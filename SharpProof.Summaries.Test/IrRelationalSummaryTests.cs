@@ -731,6 +731,124 @@ public sealed class IrRelationalSummaryTests
     }
 
     [Test]
+    public void DependencyProvenanceIdentityComponentsAreDeduplicatedStructurally()
+    {
+        var fixture = new SummaryFixture("Caller");
+        var digest = new string('f', 64);
+        var first = CreateCallee(
+            "First",
+            new IrSummaryProvenance(
+                IrSummaryOrigin.SpecificationPack,
+                digest,
+                evidenceIdentity: "C",
+                evidenceCallIdentity: "A|B"));
+        var second = CreateCallee(
+            "Second",
+            new IrSummaryProvenance(
+                IrSummaryOrigin.SpecificationPack,
+                digest,
+                evidenceIdentity: "B|C",
+                evidenceCallIdentity: "A"));
+        var callerParameter = fixture.Factory.CreateVariable(
+            "caller:parameter",
+            fixture.Factory.IntegerType);
+        var callerResult = fixture.Factory.CreateVariable(
+            "caller:result",
+            fixture.Factory.IntegerType);
+        var bodyParameter = fixture.Factory.CreateVariable(
+            "caller:body-parameter",
+            fixture.Factory.IntegerType);
+        var firstResult = fixture.Factory.CreateVariable(
+            "caller:first-result",
+            fixture.Factory.IntegerType);
+        var secondResult = fixture.Factory.CreateVariable(
+            "caller:second-result",
+            fixture.Factory.IntegerType);
+        var builder = new IrProgramBuilder(fixture.Factory);
+        var entry = builder.CreateBlock("entry");
+        var firstCall = builder.Call(
+            entry,
+            fixture.Factory.CreateOperation("first-call"),
+            firstResult,
+            first.Member,
+            receiver: null,
+            fixture.Factory.Variable(bodyParameter));
+        var secondCall = builder.Call(
+            entry,
+            fixture.Factory.CreateOperation("second-call"),
+            secondResult,
+            second.Member,
+            receiver: null,
+            fixture.Factory.Variable(firstResult));
+        builder.Return(
+            entry,
+            fixture.Factory.CreateOperation("return"),
+            fixture.Factory.Variable(secondResult));
+        var signature = new IrSummarySignature(
+            fixture.Member,
+            receiver: null,
+            [callerParameter],
+            callerResult,
+            Provenance('b'));
+
+        var built = IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            signature,
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyParameter] = fixture.Factory.Variable(callerParameter)
+            },
+            new Dictionary<IrInstructionId, IrRelationalSummary>
+            {
+                [firstCall.Id] = first.Summary,
+                [secondCall.Id] = second.Summary
+            });
+
+        Assert.That(built.IsSuccess, Is.True, built.Reason.ToString());
+        Assert.That(
+            built.Summary!.DependencyProvenance.Count(static provenance =>
+                provenance.Origin == IrSummaryOrigin.SpecificationPack),
+            Is.EqualTo(2));
+
+        (IrMemberId Member, IrRelationalSummary Summary) CreateCallee(
+            string name,
+            IrSummaryProvenance provenance)
+        {
+            var member = fixture.CreateMember(name);
+            var parameter = fixture.Factory.CreateVariable(
+                name + ":parameter",
+                fixture.Factory.IntegerType);
+            var result = fixture.Factory.CreateVariable(
+                name + ":result",
+                fixture.Factory.IntegerType);
+            var calleeBodyParameter = fixture.Factory.CreateVariable(
+                name + ":body-parameter",
+                fixture.Factory.IntegerType);
+            var calleeBuilder = new IrProgramBuilder(fixture.Factory);
+            var calleeEntry = calleeBuilder.CreateBlock(name + ":entry");
+            calleeBuilder.Return(
+                calleeEntry,
+                fixture.Factory.CreateOperation(name + ":return"),
+                fixture.Factory.Variable(calleeBodyParameter));
+            var calleeSignature = new IrSummarySignature(
+                member,
+                receiver: null,
+                [parameter],
+                result,
+                provenance);
+            var summary = IrRelationalSummaryBuilder.Build(
+                calleeBuilder.Build(),
+                calleeSignature,
+                new Dictionary<IrVarId, IrTerm>
+                {
+                    [calleeBodyParameter] = fixture.Factory.Variable(parameter)
+                });
+            Assert.That(summary.IsSuccess, Is.True, summary.Reason.ToString());
+            return (member, summary.Summary!);
+        }
+    }
+
+    [Test]
     public void CyclicControlFlowAbstainsWithTypedReason()
     {
         var fixture = new SummaryFixture("Loop");

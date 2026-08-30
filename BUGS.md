@@ -22,15 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.11. MEDIUM - Dependency provenance deduplication key is delimiter-ambiguous
-
-- File: `SharpProof.Summaries/IrRelationalSummaryBuilder.cs`
-- Member: `IrRelationalSummaryBuilder.Run.AddDependencyProvenance`
-- Current lines: 480-487, especially 482-487
-- Mechanism: The key concatenates origin, call identity, `|`, evidence identity, `|`, and digest without escaping or length-prefixing. Valid arbitrary identities can collide, and dictionary assignment overwrites the first entry.
-- Impact: A composed summary silently omits genuine specification-pack dependency evidence.
-- Safe reproduction/evidence: With the same origin and digest, use pairs `("A|B","C")` and `("A","B|C")` in two called summaries. The caller's `DependencyProvenance` contains one instead of two.
-
 ## Wave 2.12. MEDIUM - Enhanced `#line` character offsets make authenticated source locations unreconstructable
 
 - Primary file: `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs`

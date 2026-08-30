@@ -187,8 +187,11 @@ public static class IrRelationalSummaryBuilder
         private readonly List<IrTerm> _relations = [];
         private readonly List<IrVarId> _existentials = [];
         private readonly HashSet<IrMemberId> _dependencies = [];
-        private readonly Dictionary<string, IrSummaryProvenance>
-            _dependencyProvenance = new(StringComparer.Ordinal);
+        private readonly Dictionary<(
+            IrSummaryOrigin Origin,
+            string EvidenceCallIdentity,
+            string EvidenceIdentity,
+            string EvidenceSha256), IrSummaryProvenance> _dependencyProvenance = [];
         private readonly HashSet<IrId> _visitedTerms = [];
         private int _remainingOperations;
         private bool _mayThrow;
@@ -281,7 +284,13 @@ public static class IrRelationalSummaryBuilder
                 [.. _dependencies.OrderBy(
                     static member => member.Value)],
                 [.. _dependencyProvenance
-                    .OrderBy(static item => item.Key, StringComparer.Ordinal)
+                    .OrderBy(static item => item.Key.Origin)
+                    .ThenBy(static item => item.Key.EvidenceCallIdentity,
+                        StringComparer.Ordinal)
+                    .ThenBy(static item => item.Key.EvidenceIdentity,
+                        StringComparer.Ordinal)
+                    .ThenBy(static item => item.Key.EvidenceSha256,
+                        StringComparer.Ordinal)
                     .Select(static item => item.Value)],
                 _mayThrow ? IrSummaryEffect.MayThrow : IrSummaryEffect.None,
                 IrSummaryTermination.TerminatesOrThrows);
@@ -479,11 +488,11 @@ public static class IrRelationalSummaryBuilder
 
         private void AddDependencyProvenance(IrSummaryProvenance provenance)
         {
-            var key = ((int)provenance.Origin).ToString(
-                    System.Globalization.CultureInfo.InvariantCulture) +
-                provenance.EvidenceCallIdentity + "|" +
-                provenance.EvidenceIdentity + "|" +
-                provenance.EvidenceSha256;
+            var key = (
+                provenance.Origin,
+                provenance.EvidenceCallIdentity,
+                provenance.EvidenceIdentity,
+                provenance.EvidenceSha256);
             _dependencyProvenance[key] = provenance;
         }
 
