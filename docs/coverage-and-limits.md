@@ -191,7 +191,7 @@ ghost specification evidence.
   state is a fatal `CounterexampleReplayFailed`; one on an unselected path
   does not block the refutation. Result models expose only canonical user
   variables.
-  For an effect candidate, compiler artifact schema 17 admits unconditional
+  For an effect candidate, compiler artifact schema 18 admits unconditional
   definite managed object/array allocation, exact framework explicit-throw,
   empty-`lock`, and exact-`Monitor` events. The worker recomputes each event's
   constraint and operation identities, checks its source-tree identity/span
@@ -244,7 +244,7 @@ ghost specification evidence.
 ## Closed compiler artifact and remaining limits
 
 During container verification, the production analyzer captures compiler
-artifact schema version 17 from the post-generator compilation. The artifact
+artifact schema version 18 from the post-generator compilation. The artifact
 contains:
 
 - the feature-selected, sealed claim manifest;
@@ -270,8 +270,8 @@ contains:
   aliases. A module is capped at 256 MiB, the complete closure at 1 GiB, and
   the closure at 4,096 modules.
 
-The bounded compilation-option record covers output kind, optimization,
-platform, nullable context, metadata import, checked overflow, unsafe mode,
+The bounded compilation-option record covers output kind, explicit main-type
+selection, optimization, platform, nullable context, metadata import, checked overflow, unsafe mode,
 determinism, global usings, warning level, general and per-diagnostic reporting
 options, reference-supersession state, the supported Default/Desktop
 assembly-identity comparer profile, and the fixed evidence-only resolver

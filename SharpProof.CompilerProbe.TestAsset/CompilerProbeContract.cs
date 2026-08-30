@@ -9,7 +9,7 @@ public static class CompilerProbeContract
     public const string SchemaName = "SharpProof.CompilerProbe";
 
     /// <summary>The probe JSON schema version.</summary>
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     /// <summary>The MSBuild property carrying the analyzer output path.</summary>
     public const string OutputPathPropertyName = "SharpProofProbeOutputPath";

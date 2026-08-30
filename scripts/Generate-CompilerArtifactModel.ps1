@@ -563,8 +563,8 @@ foreach ($declaration in $declarations) {
 $envelope = Get-RequiredMember $schema 'artifactEnvelope' 'schema'
 if ([string](Get-RequiredMember $envelope 'schema' 'artifact envelope') -ne
         'SharpProof.CompilerManifest' -or
-    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 17) {
-    throw 'The compiler-artifact envelope must remain schema version 17.'
+    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 18) {
+    throw 'The compiler-artifact envelope must remain schema version 18.'
 }
 
 $catalogs = @(Get-RequiredMember $schema 'wireEnumCatalogs' 'schema')

@@ -48,6 +48,7 @@ internal enum CompilerReportDiagnostic
 internal sealed class CompilerCompilationOptionsSnapshot
 {
     public CompilerOutputKind OutputKind { get; set; }
+    public string MainTypeName { get; set; } = string.Empty;
     public CompilerOptimizationLevel OptimizationLevel { get; set; }
     public CompilerPlatform Platform { get; set; }
     public CompilerNullableContext NullableContext { get; set; }

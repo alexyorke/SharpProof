@@ -60,7 +60,7 @@ manifest claims while sharing the effective combined constraint and evidence.
 Each effect claim is `Proven` only when a complete compiler-produced effect
 summary establishes its contract. The compiler can record a structured
 `DefiniteViolation` candidate for a simple unconditional direct operation.
-Compiler artifact schema 17 carries independently replayable events for a
+Compiler artifact schema 18 carries independently replayable events for a
 definite managed object or array allocation, an exact framework explicit throw,
 an empty `lock`, or an exact `Monitor` call. Event operands must already be
 known to complete; object allocation cannot depend on unmodeled static
@@ -213,7 +213,7 @@ identity-mismatched pack never contributes a fact.
 
 Every summary call seals its origin, SHA-256 evidence, pack identity when
 applicable, and the canonical transitive provenance of every composed
-dependency. Compiler artifact schema 17, relational-summary schema version 2,
+dependency. Compiler artifact schema 18, relational-summary schema version 2,
 and specification-pack schema version 1 validate that closure before backend
 creation.
 Unsupported or incomplete calls remain `Unknown`; neither a convenient method
@@ -382,7 +382,7 @@ its outcome is not combined with the containing callable. Unavailable captured
 facts remain unknown. An expression-tree lambda is quoted code and is not
 treated as an executing call site.
 
-The packaged verifier consumes compiler artifact schema version 17 produced
+The packaged verifier consumes compiler artifact schema version 18 produced
 from the final post-generator compilation. The artifact contains the sealed
 feature-selected manifest and, for every selected callable, either a typed
 lowering failure or portable whole-body CFG/IR with bound clauses, canonical

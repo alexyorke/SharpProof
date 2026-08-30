@@ -117,7 +117,7 @@ replace the current coverage inventory or normative semantics.
 ## Known production gaps
 
 During container verification, the production analyzer emits a deterministic
-schema-17 compiler artifact from the final post-generator Roslyn
+schema-18 compiler artifact from the final post-generator Roslyn
 `Compilation`. It contains the selected-claim manifest and portable lowered
 whole-body CFG/IR for supported selected callables, plus bounded relational
 source/implementation-IL/audited-pack calls, bound contract/spec
@@ -134,7 +134,7 @@ production-plan Step 4 is complete for the bounded verifier subset.
 Independent whole-body postcondition-counterexample replay is implemented for
 the admitted scalar program subset. The proof kernel checks exact model closure
 and the lowered assumptions/goal before the worker independently executes the
-compiler-produced whole-body CFG. Schema 17 carries independently replayable
+compiler-produced whole-body CFG. Schema 18 carries independently replayable
 events for unconditional definite managed object/array allocation, exact
 framework explicit throw, empty `lock`, and exact `Monitor` calls. The worker
 authenticates the selected effect, capability, and exception constraints,
