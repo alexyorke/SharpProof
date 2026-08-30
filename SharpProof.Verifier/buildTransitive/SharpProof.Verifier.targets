@@ -26,8 +26,8 @@
     <SharpProofVerifyPolicy Condition="'$(SharpProofVerifyPolicy)' == ''">advisory</SharpProofVerifyPolicy>
     <SharpProofAssumptionPolicy Condition="'$(SharpProofAssumptionPolicy)' == '' AND '$(_SharpProofProfileNormalized)' == 'strict'">error</SharpProofAssumptionPolicy>
     <SharpProofAssumptionPolicy Condition="'$(SharpProofAssumptionPolicy)' == ''">allow</SharpProofAssumptionPolicy>
-    <_SharpProofVerifyPolicyNormalized>$([System.String]::Copy('$(SharpProofVerifyPolicy)').ToLowerInvariant())</_SharpProofVerifyPolicyNormalized>
-    <_SharpProofAssumptionPolicyNormalized>$([System.String]::Copy('$(SharpProofAssumptionPolicy)').ToLowerInvariant())</_SharpProofAssumptionPolicyNormalized>
+    <_SharpProofVerifyPolicyNormalized>$([System.String]::Copy('$(SharpProofVerifyPolicy)').Trim().ToLowerInvariant())</_SharpProofVerifyPolicyNormalized>
+    <_SharpProofAssumptionPolicyNormalized>$([System.String]::Copy('$(SharpProofAssumptionPolicy)').Trim().ToLowerInvariant())</_SharpProofAssumptionPolicyNormalized>
   </PropertyGroup>
 
   <Target Name="_SharpProofValidateRuntimeClosure"

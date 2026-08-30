@@ -1369,6 +1369,31 @@ public sealed class WorkerMsBuildIntegrationTests
     }
 
     [Test]
+    public async Task VerificationPoliciesIgnoreSurroundingWhitespace()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(IdentitySource);
+
+        var build = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyPolicy", " Advisory "),
+            ("SharpProofAssumptionPolicy", " Allow "));
+
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        var request = WorkerProtocolJson.DeserializeRequest(
+            await File.ReadAllTextAsync(project.RequestPath))!;
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                request.VerifyPolicy,
+                Is.EqualTo(WorkerVerifyPolicy.Advisory));
+            Assert.That(
+                request.AssumptionPolicy,
+                Is.EqualTo(WorkerAssumptionPolicy.Allow));
+        }
+    }
+
+    [Test]
     public async Task ConcurrentInvocationsUseIsolatedWorkerFiles()
     {
         RequireContainerWorker();

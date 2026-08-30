@@ -22,14 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.23. LOW - Verification policy normalization lowercases but does not trim
-
-- File: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`
-- Location: Property group at current lines 25-30; checks at 142-145
-- Mechanism: The policy is normalized with `ToLowerInvariant` only, unlike adjacent configuration that trims.
-- Impact: Leading or trailing whitespace in an otherwise valid CI or command-line value causes validation failure.
-- Safe reproduction/evidence: Configure the verification or assumption policy with surrounding whitespace.
-
 ## Wave 2.24. MEDIUM - Failed fuzz campaigns withhold the campaign evidence named in the error
 
 - Files and members: `scripts/Invoke-SharpProofFuzzCampaign.ps1`, `Invoke-FuzzRun` and campaign finalization, current lines 193-220, especially 212-220; `scripts/SharpProof.FuzzEvidenceLifecycle.ps1`, `Initialize-SharpProofFuzzEvidence`, lines 141-170.
