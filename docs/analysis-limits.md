@@ -70,6 +70,12 @@ Relative paths are resolved from the project directory before this projection;
 absolute paths retain their configured directory. Single-target behavior is
 unchanged.
 
+Configured request, result, and compiler-manifest paths follow the same
+multitarget projection as SARIF:
+`<directory>/<target-framework>/<filename>`. This keeps each inner build's
+published evidence triple isolated. Their default paths are already scoped by
+the target framework beneath the intermediate output directory.
+
 Container verification also initializes an internal, compiler-visible
 `_SharpProofCompilerManifestPath` beneath the isolated invocation directory.
 The final analyzer compilation atomically writes the manifest there. The

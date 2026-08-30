@@ -22,15 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.21. HIGH - User-configured publication triple is not target-framework scoped
-
-- File: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`
-- Target: `_SharpProofInitializeVerify`
-- Current lines: 46-51, especially 46-48
-- Mechanism: Configured request, result, and compiler-manifest paths are used verbatim for each inner target framework. Only SARIF adds a `TargetFramework` subdirectory.
-- Impact: Parallel target frameworks race invalidation and publication and may validate another framework's result; a serial build overwrites earlier evidence.
-- Safe reproduction/evidence: Use a multitarget `net8.0`/`net9.0` fixture with verification and common configured publication paths; compare SARIF scoping at lines 50-51.
-
 ## Wave 2.22. MEDIUM - Publication tasks resolve relative paths against the ambient process directory
 
 - Files and members: `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`, `SharpProofResetPublishedVerification`, lines 239-253; `SharpProof.BuildTasks/ResetPublishedVerification.cs`, `Execute`, lines 19-25; `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs`, properties and `Execute`, lines 10-28 and 51-65.

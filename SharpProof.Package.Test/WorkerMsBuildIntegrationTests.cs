@@ -616,9 +616,17 @@ public sealed class WorkerMsBuildIntegrationTests
             segment + "4",
             segment + "5");
         Directory.CreateDirectory(publicationDirectory);
-        var requestPath = Path.Combine(publicationDirectory, "request.json");
-        var resultPath = Path.Combine(publicationDirectory, "result.json");
-        var manifestPath = Path.Combine(publicationDirectory, "manifest.json");
+        var configuredRequestPath = Path.Combine(
+            publicationDirectory, "request.json");
+        var configuredResultPath = Path.Combine(
+            publicationDirectory, "result.json");
+        var configuredManifestPath = Path.Combine(
+            publicationDirectory, "manifest.json");
+        var effectiveDirectory = Path.Combine(
+            publicationDirectory, "netstandard2.0");
+        var requestPath = Path.Combine(effectiveDirectory, "request.json");
+        var resultPath = Path.Combine(effectiveDirectory, "result.json");
+        var manifestPath = Path.Combine(effectiveDirectory, "manifest.json");
         var sarifPath = Path.Combine(publicationDirectory, "result.sarif");
         var effectiveSarifPath = Path.Combine(
             publicationDirectory,
@@ -629,9 +637,9 @@ public sealed class WorkerMsBuildIntegrationTests
 
         var dotnet = await project.BuildAsync(
             verify: true,
-            ("SharpProofVerifyRequestFile", requestPath),
-            ("SharpProofVerifyResultFile", resultPath),
-            ("SharpProofCompilerManifestFile", manifestPath),
+            ("SharpProofVerifyRequestFile", configuredRequestPath),
+            ("SharpProofVerifyResultFile", configuredResultPath),
+            ("SharpProofCompilerManifestFile", configuredManifestPath),
             ("SharpProofVerifyCacheDirectory", cachePath),
             ("SharpProofVerifySarifFile", sarifPath));
         using (Assert.EnterMultipleScope())
@@ -676,12 +684,18 @@ public sealed class WorkerMsBuildIntegrationTests
             ("TargetFrameworks", "netstandard2.0"));
         var publicationDirectory = Directory.CreateDirectory(
             Path.Combine(project.Root, "long-basename-publication"));
-        var requestPath = Path.Combine(
+        var configuredRequestPath = Path.Combine(
             publicationDirectory.FullName, "request.json");
-        var resultPath = Path.Combine(
+        var configuredResultPath = Path.Combine(
             publicationDirectory.FullName, "result.json");
-        var manifestPath = Path.Combine(
+        var configuredManifestPath = Path.Combine(
             publicationDirectory.FullName, "compiler-manifest.json");
+        var effectiveDirectory = Path.Combine(
+            publicationDirectory.FullName, "netstandard2.0");
+        var requestPath = Path.Combine(effectiveDirectory, "request.json");
+        var resultPath = Path.Combine(effectiveDirectory, "result.json");
+        var manifestPath = Path.Combine(
+            effectiveDirectory, "compiler-manifest.json");
         var sarifPath = Path.Combine(
             publicationDirectory.FullName,
             new string('s', 220) + ".sarif");
@@ -693,15 +707,15 @@ public sealed class WorkerMsBuildIntegrationTests
 
         var first = await project.BuildAsync(
             verify: true,
-            ("SharpProofVerifyRequestFile", requestPath),
-            ("SharpProofVerifyResultFile", resultPath),
-            ("SharpProofCompilerManifestFile", manifestPath),
+            ("SharpProofVerifyRequestFile", configuredRequestPath),
+            ("SharpProofVerifyResultFile", configuredResultPath),
+            ("SharpProofCompilerManifestFile", configuredManifestPath),
             ("SharpProofVerifySarifFile", sarifPath));
         var second = await project.BuildAsync(
             verify: true,
-            ("SharpProofVerifyRequestFile", requestPath),
-            ("SharpProofVerifyResultFile", resultPath),
-            ("SharpProofCompilerManifestFile", manifestPath),
+            ("SharpProofVerifyRequestFile", configuredRequestPath),
+            ("SharpProofVerifyResultFile", configuredResultPath),
+            ("SharpProofCompilerManifestFile", configuredManifestPath),
             ("SharpProofVerifySarifFile", sarifPath));
 
         using (Assert.EnterMultipleScope())
@@ -908,6 +922,42 @@ public sealed class WorkerMsBuildIntegrationTests
                     Is.EqualTo(Path.GetFullPath(
                         project.VerifyOutputPath(
                             framework, "compiler-manifest.json"))));
+            }
+        }
+    }
+
+    [Test]
+    public async Task MultiTargetConfiguredPublicationTripleIsFrameworkScoped()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateConfigured(
+            IdentitySource,
+            ("TargetFrameworks", "net8.0;net9.0"),
+            ("BuildInParallel", "false"),
+            ("SharpProofVerifyRequestFile", "evidence/request.json"),
+            ("SharpProofVerifyResultFile", "evidence/result.json"),
+            ("SharpProofCompilerManifestFile", "evidence/compiler-manifest.json"));
+
+        var build = await project.BuildAsync(verify: true);
+
+        Assert.That(build.ExitCode, Is.Zero, build.Output);
+        foreach (var framework in new[] { "net8.0", "net9.0" })
+        {
+            var directory = Path.Combine(project.Root, "evidence", framework);
+            var requestPath = Path.Combine(directory, "request.json");
+            var resultPath = Path.Combine(directory, "result.json");
+            var manifestPath = Path.Combine(directory, "compiler-manifest.json");
+            var request = WorkerProtocolJson.DeserializeRequest(
+                await File.ReadAllTextAsync(requestPath))!;
+            var response = WorkerProtocolJson.DeserializeResponse(
+                await File.ReadAllTextAsync(resultPath))!;
+            var artifact = await AssertPublicationBindingAsync(request, response);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(artifact.TargetFramework, Is.EqualTo(framework));
+                Assert.That(request.CompilerManifest.Path,
+                    Is.EqualTo(Path.GetFullPath(manifestPath)));
+                Assert.That(File.Exists(manifestPath), Is.True, build.Output);
             }
         }
     }
@@ -3424,7 +3474,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     Is.EqualTo("SharpProof.CompilerManifest"));
                 Assert.That(
                     root.GetProperty("schemaVersion").GetInt32(),
-                    Is.EqualTo(15));
+                    Is.EqualTo(16));
                 Assert.That(
                     root.GetProperty("protocolVersion").GetString(),
                     Is.EqualTo(WorkerProtocolVersions.Current));
