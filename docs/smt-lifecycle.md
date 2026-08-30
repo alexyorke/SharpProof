@@ -52,7 +52,7 @@ Project timeout and caller cancellation use the separate `TimedOut` and
 `Canceled` run statuses.
 
 Effect refutation replay is independent of this SMT lifecycle. Compiler
-artifact schema 17 admits unconditional definite managed object/array
+artifact schema 18 admits unconditional definite managed object/array
 allocation, exact framework explicit-throw, empty-`lock`, and exact-`Monitor`
 events. A worker-owned interpreter validates event identity, source-tree span,
 the authenticated selected constraint, and the sealed witness, then derives

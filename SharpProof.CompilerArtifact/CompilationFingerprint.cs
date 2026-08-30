@@ -239,6 +239,7 @@ internal static class CompilationFingerprint
     {
         return value != null &&
         Enum.IsDefined(typeof(CompilerOutputKind), value.OutputKind) &&
+        value.MainTypeName != null &&
         Enum.IsDefined(typeof(CompilerOptimizationLevel), value.OptimizationLevel) &&
         Enum.IsDefined(typeof(CompilerPlatform), value.Platform) &&
         Enum.IsDefined(typeof(CompilerNullableContext), value.NullableContext) &&

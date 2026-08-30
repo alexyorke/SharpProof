@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 17
+    "version": 18
   },
   "declarations": [
     {
@@ -21,7 +21,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 17
+          "value": 18
         }
       ]
     },
@@ -3073,6 +3073,16 @@
           "set": "set",
           "default": {
             "kind": "implicit"
+          }
+        },
+        {
+          "name": "MainTypeName",
+          "jsonName": "mainTypeName",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
           }
         },
         {

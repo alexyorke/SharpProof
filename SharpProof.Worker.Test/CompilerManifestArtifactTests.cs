@@ -213,7 +213,8 @@ public sealed class CompilerManifestArtifactTests
             snapshot => snapshot.AssemblyIdentity = "not-an-assembly-identity",
             snapshot => snapshot.References[0].Identity =
                 "not-an-assembly-identity",
-            snapshot => snapshot.AssemblyName = "DifferentAssembly"
+            snapshot => snapshot.AssemblyName = "DifferentAssembly",
+            snapshot => snapshot.Options.MainTypeName = null!
         ];
 
         foreach (var corrupt in corruptions)

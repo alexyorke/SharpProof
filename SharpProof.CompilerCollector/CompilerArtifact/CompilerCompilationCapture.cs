@@ -91,6 +91,7 @@ internal static class CompilerCompilationCapture
             Options = new CompilerCompilationOptionsSnapshot
             {
                 OutputKind = CompilerOptionWireMappings.Map(options.OutputKind),
+                MainTypeName = options.MainTypeName ?? string.Empty,
                 OptimizationLevel = CompilerOptionWireMappings.Map(options.OptimizationLevel),
                 Platform = CompilerOptionWireMappings.Map(options.Platform),
                 NullableContext = CompilerOptionWireMappings.Map(options.NullableContextOptions),

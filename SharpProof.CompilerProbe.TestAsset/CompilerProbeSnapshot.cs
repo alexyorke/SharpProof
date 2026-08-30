@@ -107,6 +107,11 @@ internal static class CompilerProbeSnapshot
         ProbeJson.StringProperty(
             builder,
             ref first,
+            "mainTypeName",
+            options.MainTypeName ?? string.Empty);
+        ProbeJson.StringProperty(
+            builder,
+            ref first,
             "nullableContextOptions",
             options.NullableContextOptions.ToString());
         ProbeJson.StringProperty(
