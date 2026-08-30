@@ -7,6 +7,41 @@ namespace SharpProof.Ir.Test;
 public sealed class IrFactoryInvariantRegressionTests
 {
     [Test]
+    public void CastAllowsReferenceToScalarUnboxingTerms()
+    {
+        var factory = new IrFactory();
+        var customReferenceType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(),
+            "Box");
+        var objectValue = factory.CreateVariable(
+            "objectValue",
+            factory.ObjectType);
+        var customValue = factory.CreateVariable(
+            "customValue",
+            customReferenceType);
+
+        var integer = factory.Cast(
+            factory.IntegerType,
+            factory.Variable(objectValue));
+        var boolean = factory.Cast(
+            factory.BooleanType,
+            factory.Variable(customValue));
+        var nullInteger = factory.Cast(
+            factory.IntegerType,
+            factory.Null(factory.ObjectType));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(integer, Is.TypeOf<IrCastTerm>());
+            Assert.That(integer.Type, Is.EqualTo(factory.IntegerType));
+            Assert.That(boolean, Is.TypeOf<IrCastTerm>());
+            Assert.That(boolean.Type, Is.EqualTo(factory.BooleanType));
+            Assert.That(nullInteger, Is.TypeOf<IrCastTerm>());
+            Assert.That(nullInteger.Type, Is.EqualTo(factory.IntegerType));
+        }
+    }
+
+    [Test]
     public void CastRejectsInvalidNonIdentitySourceAndTargetTypes()
     {
         var factory = new IrFactory();

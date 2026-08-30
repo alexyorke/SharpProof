@@ -415,15 +415,6 @@ This section records 30 unique findings from exactly 30 fresh read-only auditors
 - Impact: SMT-totalized evaluation treats throwing executions as normal, causing spurious obligations or counterexamples and failure to prove contracts valid for all normally returning executions.
 - Safe evidence: For `divisor == 0`, totalized division chooses a branch and enters the normal return-path disjunction; a contract such as `ensures divisor != 0` can fail despite the execution throwing.
 
-## Wave 6.18. MEDIUM - Null unboxing casts are classified InvalidCast rather than NullReference
-
-- File: `SharpProof.Ir/IrInterpreter.cs`
-- Member: `EvaluateCast`
-- Current lines: 391-425, especially null-target logic at 404-413
-- Mechanism: When an `ObjectType` value of kind Null is cast to Integer or Boolean, the nonnullable-target branch unconditionally returns `Fault(InvalidCast)`. Valid C# unboxing such as `(long)(object)null!` or `(bool)(object)null!` throws `NullReferenceException`; `InvalidCastException` applies to nonnull boxed values of the wrong type.
-- Impact: Interpreter semantics diverge from C#; `IrCSharpDifferentialOracle` reports `Mismatch`, and exception-sensitive consumers receive false evidence.
-- Safe evidence: Bind an `ObjectType` variable to `CreateNullValue(ObjectType)`, cast to `IntegerType`, and evaluate. Current result is Exception/InvalidCast while compiled C# throws `NullReferenceException`.
-
 ## Wave 6.21. HIGH - Calls fail to havoc locals captured and mutated by local functions or closures
 
 - File: `SharpProof.Frontend/RoslynProgramLowerer.cs`

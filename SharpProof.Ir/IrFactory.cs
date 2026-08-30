@@ -530,6 +530,9 @@ public sealed class IrFactory
             }
 
             var source = GetTypeInfoCore(operand.Type, nameof(operand));
+            var isUnboxing =
+                source.Kind == IrTypeKind.Reference &&
+                target.Kind is IrTypeKind.Boolean or IrTypeKind.Integer;
             if (!IrTermServices.IsNullable(source.Kind))
             {
                 throw new ArgumentException(
@@ -537,14 +540,15 @@ public sealed class IrFactory
                     nameof(operand));
             }
 
-            if (!IrTermServices.IsNullable(target.Kind))
+            if (!IrTermServices.IsNullable(target.Kind) && !isUnboxing)
             {
                 throw new ArgumentException(
-                    "Non-identity casts require a string, reference, or sequence target.",
+                    "Non-identity casts require a reference-like target or " +
+                    "a boolean or integer unboxing target.",
                     nameof(targetType));
             }
 
-            if (operand is IrNullTerm)
+            if (operand is IrNullTerm && IrTermServices.IsNullable(target.Kind))
             {
                 return Null(targetType);
             }
