@@ -27,15 +27,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: Solver replacement or upgrade leaves cache/input identity unchanged. Cache results can cross solver versions, and the staged runtime does not pin the actual solver.
 - Safe reproduction/evidence: Compute identity for two isolated fixture closures differing only in `libz3.so`; the identities remain equal. The package ships `tools/native/linux-x64/libz3.so`.
 
-## 26. MEDIUM - ContractFor generator host omits generated-compilation errors and filters analyzer crashes
-
-- File: `SharpProof.ContractForGenerator.Test/GeneratorTestHost.cs`
-- Members: `Run`, `AnalyzeFinalCompilation`
-- Lines: 61-94, 97-119
-- Mechanism: After `RunGeneratorsAndUpdateCompilation`, the host never checks `outputCompilation` diagnostics. It combines driver diagnostics only with analyzer IDs starting with SPCF, dropping CSxxxx and AD0001.
-- Impact: Tests expecting no diagnostics can pass on invalid generated code or an analyzer crash.
-- Safe reproduction/evidence: Have a test generator fixture emit invalid source, or a test analyzer fixture produce AD0001; result collection remains empty. Input is validated only at lines 57 and 168-179.
-
 ## 27. MEDIUM - Differential C# oracle permanently loads one assembly per comparison
 
 - File: `SharpProof.Testing/IrCSharpDifferentialOracle.cs`
