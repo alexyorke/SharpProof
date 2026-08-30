@@ -1889,6 +1889,43 @@ public sealed class BuildTaskTests
 
     [Test]
     [Platform("Linux")]
+    public void PublicationResetRecoversInterruptedMarkerCleanupWhenMembersAreAbsent()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-publication-reset-recovery-");
+        try
+        {
+            var set = new[]
+            {
+                Path.Combine(directory.FullName, "request.json"),
+                Path.Combine(directory.FullName, "result.json"),
+                Path.Combine(directory.FullName, "manifest.json")
+            };
+            using (LinuxPathIdentity.AcquirePublicationSet(
+                       set,
+                       TimeSpan.FromSeconds(5)))
+            {
+            }
+            File.Delete(LinuxPathIdentity.PublicationMarkerPath(set[1]));
+
+            Assert.That(
+                (Action)(() => LinuxPathIdentity.ResetPublicationSet(
+                    set,
+                    TimeSpan.FromSeconds(5))),
+                Throws.Nothing);
+            Assert.That(
+                set.Any(path => File.Exists(
+                    LinuxPathIdentity.PublicationMarkerPath(path))),
+                Is.False);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
     public async System.Threading.Tasks.Task InvalidationCancellationInterruptsPublicationLockWait()
     {
         var directory = Directory.CreateTempSubdirectory(

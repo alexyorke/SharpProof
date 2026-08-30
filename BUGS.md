@@ -9,15 +9,6 @@ This section records the coordinator's unverified compilation of findings from e
 - Impact: Deployment/update races or mutation in a writable native root can load bytes different from those hashed, defeating native-payload integrity.
 - Safe reproduction/evidence: The code has a TOCTOU gap. A controlled unit or integration harness can pause between validation and load and replace the test fixture with a different same-length fixture.
 
-## 16. MEDIUM - Interrupted marker deletion permanently wedges publication reset
-
-- File: `SharpProof.Host/LinuxPathIdentity.cs`
-- Member: `ResetPublicationSet`
-- Lines: 174-225, especially 189-200 and 211-225
-- Mechanism: Markers are deleted sequentially with cancellation checks. Cancellation or I/O failure after some deletions leaves a subset, and the next reset rejects the marker-count mismatch before cleanup.
-- Impact: The output set cannot recover through the public reset API; acquire and publish remain unusable until manual metadata cleanup.
-- Safe reproduction/evidence: Use a fixture with at least two markers, inject cancellation or a filesystem failure after the first marker deletion, then retry with `CancellationToken.None`.
-
 ## 18. HIGH - Worker and cache identity exclude the native Z3 solver
 
 - File: `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs`
