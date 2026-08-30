@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using NUnit.Framework;
 using SharpProof.Gates.Corpus;
 
@@ -7,6 +8,125 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusGateTests
 {
+    [Test]
+    public async Task CorpusBatchRollsBackACommitFailure()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var first = Path.Combine(root, "first.txt");
+        var second = Path.Combine(root, "second.txt");
+        await File.WriteAllTextAsync(first, "old-first\n");
+        await File.WriteAllTextAsync(second, "old-second\n");
+        try
+        {
+            Func<Task> write = () => CorpusFileTransaction.WriteAllAsync(
+                root,
+                [
+                    new CorpusFileUpdate(first, "new-first\n"),
+                    new CorpusFileUpdate(second, "new-second\n")
+                ],
+                CancellationToken.None,
+                index =>
+                {
+                    if (index == 1)
+                    {
+                        throw new IOException("injected failure");
+                    }
+                });
+            Assert.ThrowsAsync<IOException>(write);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    await File.ReadAllTextAsync(first),
+                    Is.EqualTo("old-first\n"));
+                Assert.That(
+                    await File.ReadAllTextAsync(second),
+                    Is.EqualTo("old-second\n"));
+                Assert.That(
+                    File.Exists(Path.Combine(
+                        root,
+                        ".sharpproof-corpus-transaction.json")),
+                    Is.False);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CorpusCatalogRecoveryRollsBackAnInterruptedBatch()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var first = Path.Combine(root, "first.txt");
+        var second = Path.Combine(root, "second.txt");
+        var firstStage = Path.Combine(root, "first.new");
+        var secondStage = Path.Combine(root, "second.new");
+        var firstBackup = Path.Combine(root, "first.old");
+        var secondBackup = Path.Combine(root, "second.old");
+        var marker = Path.Combine(
+            root,
+            ".sharpproof-corpus-transaction.json");
+        await File.WriteAllTextAsync(first, "new-first\n");
+        await File.WriteAllTextAsync(second, "old-second\n");
+        await File.WriteAllTextAsync(secondStage, "new-second\n");
+        await File.WriteAllTextAsync(firstBackup, "old-first\n");
+        await File.WriteAllTextAsync(secondBackup, "old-second\n");
+        await File.WriteAllTextAsync(
+            marker,
+            JsonSerializer.Serialize(new
+            {
+                SchemaVersion = 1,
+                Entries = new[]
+                {
+                    new
+                    {
+                        DestinationPath = first,
+                        StagedPath = firstStage,
+                        BackupPath = firstBackup,
+                        DestinationExisted = true
+                    },
+                    new
+                    {
+                        DestinationPath = second,
+                        StagedPath = secondStage,
+                        BackupPath = secondBackup,
+                        DestinationExisted = true
+                    }
+                }
+            }));
+        try
+        {
+            CorpusFileTransaction.Recover(root);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    await File.ReadAllTextAsync(first),
+                    Is.EqualTo("old-first\n"));
+                Assert.That(
+                    await File.ReadAllTextAsync(second),
+                    Is.EqualTo("old-second\n"));
+                Assert.That(File.Exists(marker), Is.False);
+                Assert.That(File.Exists(secondStage), Is.False);
+                Assert.That(File.Exists(firstBackup), Is.False);
+                Assert.That(File.Exists(secondBackup), Is.False);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Test]
     [Platform("Linux")]
     [System.Runtime.Versioning.SupportedOSPlatform("linux")]

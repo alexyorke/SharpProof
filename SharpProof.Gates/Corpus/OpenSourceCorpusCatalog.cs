@@ -25,6 +25,7 @@ internal static class OpenSourceCorpusCatalog
     internal static OpenSourceCorpusDocument Load(string repositoryRoot)
     {
         var corpusDirectory = GetCorpusDirectory(repositoryRoot);
+        CorpusFileTransaction.Recover(corpusDirectory);
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         if (!File.Exists(manifestPath))
         {

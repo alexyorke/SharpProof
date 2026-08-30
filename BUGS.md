@@ -22,13 +22,6 @@ This section records the coordinator's unverified compilation of findings from e
 
 This section records the coordinator's unverified compilation of 26 new findings from exactly 10 fresh read-only auditors, after title/mechanism deduplication against the prior audit and within this wave. The central writer did not inspect or reverify the code. Auditor coverage: Dataflow (1), SMT core (8), Verify core (1), Summaries (1), CompilerCollector (2), ContractForGenerator and Attributes (0), Worker/Launcher/Protocol (2), Gates (5), Package and BuildTasks (3), and release scripts (3).
 
-## Wave 2.19. MEDIUM - Corpus update writes tracked artifacts non-atomically and independently
-
-- Files and members: `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs`, `ImportAsync`, lines 132-137 and 187-195; `SharpProof.Gates/Corpus/CorpusGate.cs`, `WriteActualSnapshotAsync`, lines 319-328.
-- Mechanism: Direct `WriteAllTextAsync` truncates the final path; license, manifest, and snapshot are committed in separate steps.
-- Impact: Cancellation, disk-full, or termination can destroy a previous valid file or leave a cross-file mismatch.
-- Safe reproduction/evidence: Use an isolated temporary fixture that injects cancellation or a fault after destination creation or between license and manifest writes.
-
 ## Wave 2.20. MEDIUM - OSS corpus aggregation drops diagnostics outside selected method spans
 
 - File: `SharpProof.Gates/Corpus/OpenSourceCorpusRunner.cs`

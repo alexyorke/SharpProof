@@ -283,11 +283,18 @@ internal static class CorpusGate
     {
         repositoryRoot ??= RepositoryLayout.FindRoot();
         var openSourceDocument = OpenSourceCorpusCatalog.Load(repositoryRoot);
+        return await RenderActualSnapshotAsync(
+                openSourceDocument,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task<string> RenderActualSnapshotAsync(
+        OpenSourceCorpusDocument openSourceDocument,
+        CancellationToken cancellationToken)
+    {
         var lines = new List<string>();
-        foreach (var item in CorpusCatalog.CreateCases(repositoryRoot)
-                     .Where(static item =>
-                         item.Origin ==
-                         CorpusOrigin.SyntheticMetamorphic))
+        foreach (var item in CorpusCatalog.CreateSyntheticCases())
         {
             cancellationToken.ThrowIfCancellationRequested();
             lines.Add(
@@ -307,23 +314,26 @@ internal static class CorpusGate
         string repositoryRoot,
         CancellationToken cancellationToken = default)
     {
-        await OpenSourceCorpusImporter.ImportIfRequestedAsync(
+        var import = await OpenSourceCorpusImporter.PrepareIfRequestedAsync(
                 repositoryRoot,
                 cancellationToken)
             .ConfigureAwait(false);
+        var document = import?.Document ??
+            OpenSourceCorpusCatalog.Load(repositoryRoot);
         var snapshotPath = Path.Combine(
             repositoryRoot,
             "SharpProof.Gates",
             "Corpus",
             "expected.canonical.snapshot");
         var snapshot = await RenderActualSnapshotAsync(
-                repositoryRoot,
+                document,
                 cancellationToken)
             .ConfigureAwait(false);
-        await File.WriteAllTextAsync(
-                snapshotPath,
-                snapshot,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+        var updates = import?.Updates.ToList() ?? [];
+        updates.Add(new CorpusFileUpdate(snapshotPath, snapshot));
+        await CorpusFileTransaction.WriteAllAsync(
+                OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot),
+                updates,
                 cancellationToken)
             .ConfigureAwait(false);
     }

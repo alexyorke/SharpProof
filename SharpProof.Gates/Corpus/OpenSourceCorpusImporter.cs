@@ -10,6 +10,10 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Gates.Corpus;
 
+internal sealed record OpenSourceCorpusImportPlan(
+    OpenSourceCorpusDocument Document,
+    CorpusFileUpdate[] Updates);
+
 internal static class OpenSourceCorpusImporter
 {
     internal const string SourceEnvironmentVariable =
@@ -29,7 +33,8 @@ internal static class OpenSourceCorpusImporter
         Converters = { new JsonStringEnumConverter() }
     };
 
-    internal static async Task ImportIfRequestedAsync(
+    internal static async Task<OpenSourceCorpusImportPlan?>
+        PrepareIfRequestedAsync(
         string repositoryRoot,
         CancellationToken cancellationToken)
     {
@@ -37,10 +42,10 @@ internal static class OpenSourceCorpusImporter
             SourceEnvironmentVariable);
         if (string.IsNullOrWhiteSpace(upstreamRoot))
         {
-            return;
+            return null;
         }
 
-        await ImportAsync(
+        return await PrepareAsync(
                 repositoryRoot,
                 upstreamRoot,
                 cancellationToken)
@@ -51,7 +56,7 @@ internal static class OpenSourceCorpusImporter
         "Globalization",
         "CA1308:Normalize strings to uppercase",
         Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
-    internal static async Task ImportAsync(
+    internal static async Task<OpenSourceCorpusImportPlan> PrepareAsync(
         string repositoryRoot,
         string upstreamRoot,
         CancellationToken cancellationToken)
@@ -125,22 +130,12 @@ internal static class OpenSourceCorpusImporter
         var licenseTargetPath = Path.GetFullPath(
             Path.Combine(corpusDirectory, LicenseRelativePath));
         EnsureContained(corpusDirectory, licenseTargetPath);
-        Directory.CreateDirectory(
-            Path.GetDirectoryName(licenseTargetPath) ??
-            throw new InvalidDataException(
-                "Could not resolve the imported license directory."));
-        await File.WriteAllTextAsync(
-                licenseTargetPath,
-                licenseText.EndsWith('\n') ? licenseText : licenseText + "\n",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-                cancellationToken)
-            .ConfigureAwait(false);
+        var licenseContent = licenseText.EndsWith('\n')
+            ? licenseText
+            : licenseText + "\n";
         var licenseHash = Convert.ToHexString(
                 System.Security.Cryptography.SHA256.HashData(
-                    await File.ReadAllBytesAsync(
-                            licenseTargetPath,
-                            cancellationToken)
-                        .ConfigureAwait(false)))
+                    Encoding.UTF8.GetBytes(licenseContent)))
             .ToLowerInvariant();
         var source = new OpenSourceCorpusSource(
             SourceId,
@@ -187,12 +182,6 @@ internal static class OpenSourceCorpusImporter
         var manifest = JsonSerializer.Serialize(document, JsonOptions)
             .Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
-        await File.WriteAllTextAsync(
-                manifestPath,
-                manifest,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-                cancellationToken)
-            .ConfigureAwait(false);
         var unreviewedMethods = methods
             .Where(static method =>
                 method.Support == CorpusSupport.Unspecified)
@@ -205,7 +194,12 @@ internal static class OpenSourceCorpusImporter
                 "support classification. Set each generated support field " +
                 $"before updating the snapshot: {string.Join(", ", unreviewedMethods)}");
         }
-        _ = OpenSourceCorpusCatalog.Load(repositoryRoot);
+        return new OpenSourceCorpusImportPlan(
+            document,
+            [
+                new CorpusFileUpdate(licenseTargetPath, licenseContent),
+                new CorpusFileUpdate(manifestPath, manifest)
+            ]);
     }
 
     private static ImmutableDictionary<string, CorpusSupport>

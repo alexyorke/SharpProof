@@ -20,9 +20,14 @@ internal static class CorpusCatalog
         string repositoryRoot)
     {
         return [
-            .. Seeds.SelectMany(CreateCases),
+            .. CreateSyntheticCases(),
             .. OpenSourceCorpusCatalog.CreateCases(repositoryRoot)
         ];
+    }
+
+    internal static ImmutableArray<CorpusCase> CreateSyntheticCases()
+    {
+        return [.. Seeds.SelectMany(CreateCases)];
     }
 
     internal static ImmutableArray<CorpusSeed> Seeds
