@@ -635,6 +635,52 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void InterpolationUsesTheIFormattableFormattingMethod()
+    {
+        var result = Analyze(
+            """
+            using System;
+
+            public sealed class FormattedValue : IFormattable {
+                private static volatile int s_state;
+
+                public override string ToString() => "";
+
+                string IFormattable.ToString(
+                    string? format,
+                    IFormatProvider? provider) {
+                    s_state = 1;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                public static string Format(FormattedValue value) =>
+                    $"{value}";
+            }
+            """,
+            "Sample",
+            "Format");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                result.Summary.Capabilities.Contains(
+                    EffectCapabilityKind.Synchronization),
+                Is.True);
+            AssertContainsThrows(
+                result.Summary,
+                "System.InvalidOperationException");
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void StringConcatenationIncludesExactSourceToStringEffects()
     {
         var result = Analyze(
