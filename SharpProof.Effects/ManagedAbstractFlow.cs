@@ -2511,11 +2511,14 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         {
             IWhileLoopOperation
             {
-                ConditionIsTop: true,
                 ConditionIsUntil: false,
                 Condition.ConstantValue: { HasValue: true, Value: true }
             } => true,
             IForLoopOperation { Condition: null } => true,
+            IForLoopOperation
+            {
+                Condition.ConstantValue: { HasValue: true, Value: true }
+            } => true,
             _ => false
         };
     }
