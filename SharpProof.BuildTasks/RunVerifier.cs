@@ -838,11 +838,62 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private bool HasWorkerLauncherBudgetArguments()
     {
-        return Arguments.Any(static argument =>
-            string.Equals(
-                argument.ItemSpec,
-                "--project-wall-ms",
-                StringComparison.Ordinal));
+        if (Arguments.Length < 4 ||
+            !IsWorkerLauncherPath(Arguments[0].ItemSpec) ||
+            !string.Equals(
+                Arguments[1].ItemSpec,
+                "verify",
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        for (var index = 2; index + 1 < Arguments.Length; index += 2)
+        {
+            if (string.Equals(
+                    Arguments[index].ItemSpec,
+                    "--project-wall-ms",
+                    StringComparison.Ordinal) &&
+                int.TryParse(
+                    Arguments[index + 1].ItemSpec,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var projectWallTimeMilliseconds) &&
+                projectWallTimeMilliseconds == ProjectWallTimeMilliseconds)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsWorkerLauncherPath(string path)
+    {
+        try
+        {
+            var assemblyDirectory = Path.GetDirectoryName(
+                typeof(RunVerifier).Assembly.Location);
+            return assemblyDirectory != null &&
+                string.Equals(
+                    Path.GetFullPath(path),
+                    Path.Combine(
+                        assemblyDirectory,
+                        "SharpProof.Worker.Launcher.dll"),
+                    StringComparison.Ordinal);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+        catch (PathTooLongException)
+        {
+            return false;
+        }
     }
 
     private static string ResolveSupervisorAssemblyRequired()
