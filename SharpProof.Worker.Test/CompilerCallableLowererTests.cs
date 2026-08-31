@@ -124,19 +124,19 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
-    public void ResolvedSpecCallIsBoundToExactLoweredInstruction()
+    public void ResolvedNonThrowingSpecCallIsBoundToExactLoweredInstruction()
     {
         var preparation = Prepare(
             """
             using SharpProof.Attributes;
             internal static class Subject {
-                internal static int Absolute(int value) {
-                    Contract.Ensures(Contract.Result<int>() >= 0);
-                    return System.Math.Abs(value);
+                internal static string Concat(string left, string right) {
+                    Contract.Ensures(Contract.Result<string>() != null);
+                    return string.Concat(left, right);
                 }
             }
             """,
-            "Absolute");
+            "Concat");
 
         Assert.That(
             preparation.IsSuccess,
@@ -152,10 +152,36 @@ public sealed class CompilerCallableLowererTests
         {
             Assert.That(
                 descriptor.WitnessIdentifier,
-                Is.EqualTo("bcl.math.abs.int32"));
-            Assert.That(descriptor.CallIdentity, Is.EqualTo("M:System.Math.Abs(System.Int32)"));
+                Is.EqualTo("bcl.string.concat.string-string"));
+            Assert.That(
+                descriptor.CallIdentity,
+                Is.EqualTo("M:System.String.Concat(System.String,System.String)"));
             Assert.That(descriptor.ConsumesMemoryHavoc, Is.False);
             Assert.That(call.Id, Is.EqualTo(descriptor.Instruction));
+        }
+    }
+
+    [Test]
+    public void MayThrowSpecCallWithoutCompletionConditionIsRejected()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Absolute(int value) {
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    return System.Math.Abs(value);
+                }
+            }
+            """,
+            "Absolute");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.False);
+            Assert.That(
+                preparation.FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
         }
     }
 

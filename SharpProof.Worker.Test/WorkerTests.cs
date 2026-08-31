@@ -2202,7 +2202,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task DirectMathAbsReturnIsProvenFromItsApiSpec()
+    public async Task MayThrowApiSpecWithoutCompletionConditionIsUnsupported()
     {
         using var project = TestProject.Create(
             """
@@ -2227,13 +2227,11 @@ public sealed class WorkerTests
         {
             Assert.That(
                 record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 record.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(
-                record.ProofCore,
-                Is.EqualTo(["spec:bcl.math.abs.int32"]));
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+            Assert.That(record.ProofCore, Is.Empty);
             Assert.That(record.Model, Is.Empty);
         }
     }
@@ -2246,9 +2244,11 @@ public sealed class WorkerTests
             using System;
             using SharpProof.Attributes;
             public static class Subject {
-                public static int AbsoluteBranch(long divisor) {
+                public static string ConcatBranch(long divisor) {
                     Contract.Ensures(divisor != 0);
-                    return Math.Abs(1L / divisor == 0 ? 1 : -1);
+                    return string.Concat(
+                        1L / divisor == 0 ? "" : "value",
+                        "");
                 }
             }
             """);
@@ -3646,48 +3646,6 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task SpecModeledCallProducesTypedNonfatalUnreplayableCounterexample()
-    {
-        using var project = TestProject.Create(
-            """
-            using System;
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static int Absolute(int value) {
-                    Contract.Ensures(
-                        Contract.Result<int>() >= value);
-                    return Math.Abs(value);
-                }
-            }
-            """);
-        var request = project.CreateRequest(cacheEnabled: false);
-        using var worker = SharpProofWorker.Create(request.Budgets);
-
-        var response = await worker.VerifyAsync(request);
-
-        Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                response.RunStatus,
-                Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(
-                response.FailureReason,
-                Is.EqualTo(WorkerRunFailureReason.None));
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.CounterexampleNotReplayable));
-            Assert.That(record.ProofCore, Is.Empty);
-            Assert.That(record.Model, Is.Empty);
-        }
-    }
-
-    [Test]
     public async Task RelationalSummaryCallProducesTypedNonfatalUnreplayableCounterexample()
     {
         using var project = TestProject.Create(
@@ -3761,7 +3719,7 @@ public sealed class WorkerTests
                     if (value == 0) {
                         return 0;
                     }
-                    var ignored = Math.Abs(value);
+                    var ignored = string.Concat("", "");
                     return 1;
                 }
             }
@@ -3823,17 +3781,17 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task WorkerProductPathInstantiatesApiSpecPostconditions()
+    public async Task WorkerProductPathInstantiatesApiSpecResultEvidence()
     {
         using var project = TestProject.Create(
             """
             using System;
             using SharpProof.Attributes;
             public static class Subject {
-                public static int Absolute(int value) {
+                public static string Concat(string left, string right) {
                     Contract.Ensures(
-                        Contract.Result<int>() >= 0);
-                    return Math.Abs(value);
+                        Contract.Result<string>() != null);
+                    return string.Concat(left, right);
                 }
             }
             """);
@@ -3847,22 +3805,15 @@ public sealed class WorkerTests
         var query = backend.Query;
         var specAssumption = query.Assumptions.Single(assumption =>
             assumption.Justification is SpecJustification);
-        var predicate = specAssumption.Predicate as IrBinaryTerm;
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.Errors, Is.Empty);
             Assert.That(
                 response.ClaimResults.Single().ProofCore,
-                Is.EqualTo(["spec:bcl.math.abs.int32"]));
-            Assert.That(predicate, Is.Not.Null);
+                Is.EqualTo(["spec:bcl.string.concat.string-string"]));
             Assert.That(
-                predicate!.Operator,
-                Is.EqualTo(IrBinaryOperator.GreaterThanOrEqual));
-            Assert.That(predicate.Left, Is.TypeOf<IrVariableTerm>());
-            Assert.That(
-                predicate.Right,
-                Is.TypeOf<IrIntegerTerm>()
-                    .And.Property(nameof(IrIntegerTerm.Value)).EqualTo(0));
+                specAssumption.Predicate,
+                Is.TypeOf<IrVariableTerm>());
         }
     }
 
