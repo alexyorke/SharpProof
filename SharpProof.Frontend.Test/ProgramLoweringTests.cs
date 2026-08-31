@@ -243,6 +243,44 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void RefConditionalAssignmentCannotUpdateOnlyTheSyntheticCapture()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(bool choose, long left, long right) {
+                (choose ? ref left : ref right) = 42L;
+                return choose ? left : right;
+            }
+            """);
+        var parameters = lowered.Result.Variables
+            .Where(static binding =>
+                binding.Symbol is IParameterSymbol
+                {
+                    Name: "left" or "right"
+                })
+            .Select(static binding => binding.Variable)
+            .OrderBy(static variable => variable.Value)
+            .ToArray();
+        var havoced = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .OfType<IrHavocInstruction>()
+            .SelectMany(static havoc => havoc.Variables)
+            .Distinct()
+            .OrderBy(static variable => variable.Value)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedMutation));
+            Assert.That(havoced, Does.Contain(parameters[0]));
+            Assert.That(havoced, Does.Contain(parameters[1]));
+        }
+    }
+
+    [Test]
     public void UnsupportedMutationAbstainsAndHavocsWithoutThrowing()
     {
         FrontendProgramLoweringResult? result = null;
