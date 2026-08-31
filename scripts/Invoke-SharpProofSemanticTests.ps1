@@ -185,6 +185,7 @@ $architectureFixtures = @(
     'DevCheckCommandPlanTests',
     'DocumentationSupportContractTests',
     'FuzzRunnerEvidenceTests',
+    'FuzzRunnerEvidenceProcessSafetyTests',
     'GeneratedFileHelperTests',
     'NativeTestBootstrapTests',
     'OpenCodePluginDependencyTests',

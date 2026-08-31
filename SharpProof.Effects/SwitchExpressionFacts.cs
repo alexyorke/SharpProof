@@ -63,11 +63,11 @@ internal static class SwitchExpressionFacts
         IMethodSymbol method)
     {
         return method.DeclaringSyntaxReferences.Length == 0 &&
-            (IsRuntimeSpanMember(compilation, method, "System.Span`1") ||
+            (IsRuntimeSpanMember(compilation, method, FrameworkTypeMetadataNames.Span) ||
              IsRuntimeSpanMember(
                  compilation,
                  method,
-                 "System.ReadOnlySpan`1"));
+                 FrameworkTypeMetadataNames.ReadOnlySpan));
     }
 
     private static bool IsRuntimeSpanMember(

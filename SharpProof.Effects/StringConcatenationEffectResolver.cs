@@ -7,9 +7,6 @@ namespace SharpProof.Effects;
 /// </summary>
 internal static class StringConcatenationEffectResolver
 {
-    private const string FormattableStringMetadataName =
-        "System.FormattableString";
-    private const string IFormattableMetadataName = "System.IFormattable";
 
     internal static bool DefersInterpolationFormatting(
         IInterpolatedStringOperation interpolation,
@@ -268,9 +265,9 @@ internal static class StringConcatenationEffectResolver
         }
 
         var formattableString = compilation.GetTypeByMetadataName(
-            FormattableStringMetadataName);
+            FrameworkTypeMetadataNames.FormattableString);
         var formattable = compilation.GetTypeByMetadataName(
-            IFormattableMetadataName);
+            FrameworkTypeMetadataNames.IFormattable);
         return formattableString != null &&
                 SymbolEqualityComparer.Default.Equals(
                     type,
