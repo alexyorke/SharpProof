@@ -229,6 +229,11 @@ internal sealed class ManagedAbstractFlow
             case IAnonymousFunctionOperation or ILocalFunctionOperation:
                 break;
             case IVariableDeclaratorOperation declarator:
+                if (IsUntrackedManagedReference(declarator.Symbol.RefKind))
+                {
+                    state = state.WithUntrackedAlias();
+                }
+
                 if (declarator.Initializer == null)
                 {
                     state = state.Set(declarator.Symbol, ManagedAbstractValue.TopForType(declarator.Symbol.Type));
@@ -257,26 +262,23 @@ internal sealed class ManagedAbstractFlow
                         : EvaluateCore(capture.Value, state));
                 break;
             case ISimpleAssignmentOperation assignment:
+                var aliasesUntrackedStorage = IsUntrackedRefLocal(assignment.Target);
+                if (aliasesUntrackedStorage)
+                {
+                    // Roslyn lowers ref-local declarations and writes through
+                    // ref locals to assignments. The target aliases storage
+                    // that this domain cannot identify, so facts must remain
+                    // forgotten after the alias enters the flow.
+                    state = state.WithUntrackedAlias();
+                }
+
                 var valueHasMutation = ManagedMutationFacts.HasMutation(
                     assignment.Value);
                 state = TransferMany(state, assignment.ChildOperations, result, cancellationToken);
                 var assignedValue = valueHasMutation
                     ? TopForType(assignment.Type)
                     : EvaluateCore(assignment.Value, state);
-                if (DefiniteOperationFacts.UnwrapHarmlessValue(assignment.Target)
-                    is ILocalReferenceOperation
-                    {
-                        IsDeclaration: true,
-                        Local.RefKind: RefKind.Ref
-                    })
-                {
-                    // Roslyn lowers a ref-local declaration to an assignment.
-                    // Its target aliases storage that this domain does not
-                    // model, so subsequent writes through it can invalidate
-                    // any currently known local fact.
-                    state = state.Forget();
-                }
-                else
+                if (!aliasesUntrackedStorage)
                 {
                     state = SetStorage(
                         state,
@@ -289,12 +291,30 @@ internal sealed class ManagedAbstractFlow
                 }
                 break;
             case ICompoundAssignmentOperation compound:
+                var compoundAliasesUntrackedStorage = IsUntrackedRefLocal(compound.Target);
+                if (compoundAliasesUntrackedStorage)
+                {
+                    state = state.WithUntrackedAlias();
+                }
+
                 state = TransferMany(state, compound.ChildOperations, result, cancellationToken);
-                state = SetStorage(state, compound.Target, TopForType(compound.Type));
+                if (!compoundAliasesUntrackedStorage)
+                {
+                    state = SetStorage(state, compound.Target, TopForType(compound.Type));
+                }
                 break;
             case IIncrementOrDecrementOperation increment:
+                var incrementAliasesUntrackedStorage = IsUntrackedRefLocal(increment.Target);
+                if (incrementAliasesUntrackedStorage)
+                {
+                    state = state.WithUntrackedAlias();
+                }
+
                 state = Transfer(state, increment.Target, result, cancellationToken);
-                state = SetStorage(state, increment.Target, Increment(increment, state));
+                if (!incrementAliasesUntrackedStorage)
+                {
+                    state = SetStorage(state, increment.Target, Increment(increment, state));
+                }
                 break;
             case IInvocationOperation invocation:
                 state = TransferMany(state, invocation.ChildOperations, result, cancellationToken);
@@ -921,6 +941,17 @@ internal sealed class ManagedAbstractFlow
         return TryStorage(operation, out var storage) ? state.Set(storage, value) : state;
     }
 
+    private static bool IsUntrackedRefLocal(IOperation operation)
+    {
+        return DefiniteOperationFacts.UnwrapHarmlessValue(operation) is ILocalReferenceOperation local &&
+            IsUntrackedManagedReference(local.Local.RefKind);
+    }
+
+    private static bool IsUntrackedManagedReference(RefKind refKind)
+    {
+        return refKind is RefKind.Ref or RefKind.RefReadOnly or RefKind.RefReadOnlyParameter;
+    }
+
     private static bool TryStorage(IOperation operation, out object storage)
     {
         operation = Unwrap(operation);
@@ -1134,7 +1165,7 @@ internal sealed class ManagedAbstractFlow
     {
         internal static FlowDomain Instance { get; } = new();
         public override ManagedFlowState Bottom => ManagedFlowState.Bottom;
-        public override ManagedFlowState Top => ManagedFlowState.Empty;
+        public override ManagedFlowState Top => ManagedFlowState.Top;
         public override ManagedFlowState Join(ManagedFlowState left, ManagedFlowState right)
         {
             return ManagedFlowState.Join(left, right);
@@ -1438,14 +1469,19 @@ internal sealed class ManagedFlowState
     private static readonly ImmutableDictionary<object, ManagedAbstractValue> NoValues =
         ImmutableDictionary.Create<object, ManagedAbstractValue>(Comparer);
     private readonly ImmutableDictionary<object, ManagedAbstractValue>? _values;
+    private readonly bool _hasUntrackedAlias;
 
-    private ManagedFlowState(ImmutableDictionary<object, ManagedAbstractValue>? values)
+    private ManagedFlowState(
+        ImmutableDictionary<object, ManagedAbstractValue>? values,
+        bool hasUntrackedAlias = false)
     {
         _values = values;
+        _hasUntrackedAlias = hasUntrackedAlias;
     }
 
     internal static ManagedFlowState Bottom { get; } = new(null);
     internal static ManagedFlowState Empty { get; } = new(NoValues);
+    internal static ManagedFlowState Top { get; } = new(NoValues, hasUntrackedAlias: true);
     internal bool IsBottom => _values == null;
     internal ManagedAbstractValue Get(object storage)
     {
@@ -1467,12 +1503,22 @@ internal sealed class ManagedFlowState
 
     internal ManagedFlowState Set(object storage, ManagedAbstractValue value)
     {
-        return _values == null || value.IsBottom ? Bottom : new(_values.SetItem(storage, value));
+        if (_values == null || value.IsBottom)
+        {
+            return Bottom;
+        }
+
+        return _hasUntrackedAlias ? this : new(_values.SetItem(storage, value));
+    }
+
+    internal ManagedFlowState WithUntrackedAlias()
+    {
+        return IsBottom ? this : Top;
     }
 
     internal ManagedFlowState Forget()
     {
-        return IsBottom ? this : Empty;
+        return IsBottom || _hasUntrackedAlias ? this : Empty;
     }
 
     internal static ManagedFlowState Join(ManagedFlowState left, ManagedFlowState right)
@@ -1485,6 +1531,11 @@ internal sealed class ManagedFlowState
         if (right._values == null)
         {
             return left;
+        }
+
+        if (left._hasUntrackedAlias || right._hasUntrackedAlias)
+        {
+            return Top;
         }
 
         var result = NoValues.ToBuilder();
@@ -1504,6 +1555,16 @@ internal sealed class ManagedFlowState
         }
 
         if (right._values == null)
+        {
+            return false;
+        }
+
+        if (right._hasUntrackedAlias)
+        {
+            return true;
+        }
+
+        if (left._hasUntrackedAlias)
         {
             return false;
         }
