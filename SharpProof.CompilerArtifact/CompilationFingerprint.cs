@@ -152,6 +152,21 @@ internal static class CompilationFingerprint
         CompilerSummaryEvidenceSnapshot row,
         CompilerCompilationSnapshot snapshot)
     {
+        // JSON deserialization can populate non-nullable string properties with
+        // null. Validate the complete shape before the branch-specific checks
+        // below, so malformed evidence is rejected rather than throwing while
+        // reading Length or comparing a field.
+        if (row.CallIdentity is null ||
+            row.EvidenceIdentity is null ||
+            row.EvidenceSha256 is null ||
+            row.SourcePath is null && row.SourceTreeSha256 is null ||
+            row.OwningModuleName is null ||
+            row.OwningModuleMvid is null ||
+            row.OwningModuleSha256 is null)
+        {
+            return false;
+        }
+
         switch (row.Origin)
         {
             case CompilerSummaryOrigin.Source:
