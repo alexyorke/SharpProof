@@ -54,6 +54,67 @@ public sealed class ProtocolJsonTests
 
     [Test]
     [Platform("Linux")]
+    public void BoundedUtf8FileReaderRejectsGrowthAfterOpen()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "protocol-json-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllBytes(
+                path,
+                new byte[WorkerProtocolJson.MaximumJsonBytes]);
+
+            using (var reader = OpenReader())
+            {
+                AppendByte();
+                Assert.Throws<InvalidDataException>(
+                    (Action)(() => reader.ReadToEnd()));
+            }
+
+            File.WriteAllBytes(
+                path,
+                new byte[WorkerProtocolJson.MaximumJsonBytes]);
+            using (var reader = OpenReader())
+            {
+                AppendByte();
+                Func<Task> readAsync = async () =>
+                    await reader.ReadToEndAsync();
+                Assert.ThrowsAsync<InvalidDataException>(
+                    readAsync);
+            }
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+
+        StreamReader OpenReader()
+        {
+            var method = typeof(WorkerProtocolJson).GetMethod(
+                "OpenJsonReader",
+                System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Static)!;
+            return (StreamReader)method.Invoke(null, [path])!;
+        }
+
+        void AppendByte()
+        {
+            using var writer = new FileStream(
+                path,
+                FileMode.Append,
+                FileAccess.Write,
+                FileShare.ReadWrite);
+            writer.WriteByte((byte)' ');
+            writer.Flush(flushToDisk: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
     public void BoundedUtf8FileReaderRejectsFifoBeforeBlockingOpen()
     {
         var path = Path.Combine(
