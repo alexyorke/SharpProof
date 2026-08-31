@@ -17,6 +17,15 @@ internal static class CacheSoundnessRules
     internal static void AnalyzeWrite(OperationAnalysisContext context, IInvocationOperation invocation)
     {
         var root = Root(invocation);
+        if (ForwardsNonCacheableSemanticAnswer(
+                invocation,
+                root,
+                context.CancellationToken))
+        {
+            Report(context, invocation.Syntax.GetLocation());
+            return;
+        }
+
         if (!WriteMethods.Contains(invocation.TargetMethod.Name) ||
             !IsCacheReceiver(
                 invocation.Instance,
@@ -39,6 +48,171 @@ internal static class CacheSoundnessRules
         }
 
         Report(context, invocation.Syntax.GetLocation());
+    }
+
+    private static bool ForwardsNonCacheableSemanticAnswer(
+        IInvocationOperation invocation,
+        IOperation root,
+        CancellationToken cancellationToken)
+    {
+        var method = invocation.TargetMethod.OriginalDefinition;
+        if (method.DeclaringSyntaxReferences.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var argument in invocation.Arguments)
+        {
+            var ordinal = argument.Parameter?.Ordinal ?? -1;
+            if (ordinal < 0 ||
+                ordinal >= method.Parameters.Length ||
+                method.Parameters[ordinal].Type is not ITypeParameterSymbol ||
+                !IsNonCacheableSemanticAnswer(
+                    argument.Value,
+                    root,
+                    new HashSet<ILocalSymbol>(
+                        SymbolEqualityComparer.Default)))
+            {
+                continue;
+            }
+
+            if (IsForwardedToCacheWrite(
+                    method,
+                    method.Parameters[ordinal],
+                    cancellationToken))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsForwardedToCacheWrite(
+        IMethodSymbol method,
+        IParameterSymbol parameter,
+        CancellationToken cancellationToken)
+    {
+        foreach (var reference in method.DeclaringSyntaxReferences)
+        {
+            var declaration = reference.GetSyntax(cancellationToken);
+            foreach (var invocation in declaration.DescendantNodesAndSelf()
+                         .OfType<InvocationExpressionSyntax>()
+                         .Where(candidate =>
+                             !IsInsideNestedCallable(candidate, declaration)))
+            {
+                if (!WriteMethods.Contains(
+                        GetInvokedName(invocation.Expression) ?? string.Empty) ||
+                    !IsSyntacticCacheReceiver(invocation.Expression, method) ||
+                    !invocation.ArgumentList.Arguments.Any(argument =>
+                        IsForwardedParameter(
+                            argument.Expression,
+                            parameter.Name)))
+                {
+                    continue;
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSyntacticCacheReceiver(
+        ExpressionSyntax expression,
+        IMethodSymbol method)
+    {
+        if (expression is SimpleNameSyntax)
+        {
+            return IsCacheType(method.ContainingType);
+        }
+
+        if (expression is not MemberAccessExpressionSyntax member)
+        {
+            return false;
+        }
+
+        var receiver = UnwrapSyntax(member.Expression);
+        if (receiver is IdentifierNameSyntax identifier)
+        {
+            var receiverName = identifier.Identifier.ValueText;
+            var parameter = method.Parameters.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.Name,
+                    receiverName,
+                    StringComparison.Ordinal));
+            if (parameter != null)
+            {
+                return IsCacheType(parameter.Type);
+            }
+
+            return IsCacheMember(method.ContainingType, receiverName);
+        }
+
+        return receiver is MemberAccessExpressionSyntax
+        {
+            Expression: ThisExpressionSyntax,
+            Name: { } memberName
+        } && IsCacheMember(
+            method.ContainingType,
+            memberName.Identifier.ValueText);
+    }
+
+    private static bool IsCacheMember(
+        INamedTypeSymbol? containingType,
+        string name)
+    {
+        return containingType?.GetMembers(name).Any(member =>
+            member switch
+            {
+                IFieldSymbol field => IsCacheType(field.Type),
+                IPropertySymbol property => IsCacheType(property.Type),
+                _ => false
+            }) == true;
+    }
+
+    private static bool IsForwardedParameter(
+        ExpressionSyntax expression,
+        string parameterName)
+    {
+        expression = UnwrapSyntax(expression);
+        return expression switch
+        {
+            IdentifierNameSyntax identifier => string.Equals(
+                identifier.Identifier.ValueText,
+                parameterName,
+                StringComparison.Ordinal),
+            ConditionalExpressionSyntax conditional =>
+                IsForwardedParameter(conditional.WhenTrue, parameterName) ||
+                IsForwardedParameter(conditional.WhenFalse, parameterName),
+            BinaryExpressionSyntax binary
+                when binary.IsKind(SyntaxKind.CoalesceExpression) =>
+                IsForwardedParameter(binary.Left, parameterName) ||
+                IsForwardedParameter(binary.Right, parameterName),
+            _ => false
+        };
+    }
+
+    private static ExpressionSyntax UnwrapSyntax(ExpressionSyntax expression)
+    {
+        while (true)
+        {
+            switch (expression)
+            {
+                case ParenthesizedExpressionSyntax parenthesized:
+                    expression = parenthesized.Expression;
+                    continue;
+                case CastExpressionSyntax cast:
+                    expression = cast.Expression;
+                    continue;
+                case CheckedExpressionSyntax checkedExpression:
+                    expression = checkedExpression.Expression;
+                    continue;
+                default:
+                    return expression;
+            }
+        }
     }
 
     private static bool IsNonCacheableGetOrAddFactory(
