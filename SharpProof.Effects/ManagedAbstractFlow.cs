@@ -1037,6 +1037,27 @@ internal sealed class ManagedAbstractFlow
         Compilation compilation,
         IOperation operation)
     {
+        var statement = operation.Syntax.AncestorsAndSelf()
+            .OfType<StatementSyntax>()
+            .FirstOrDefault();
+        if (statement != null)
+        {
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, statement.SyntaxTree);
+            try
+            {
+                if (model.AnalyzeControlFlow(statement) is
+                    { Succeeded: true, StartPointIsReachable: false })
+                {
+                    return true;
+                }
+            }
+            catch (ArgumentException)
+            {
+                // Unsupported statement shapes retain the permissive fallback.
+            }
+        }
+
         foreach (var syntax in operation.Syntax.Ancestors())
         {
             SyntaxNode? condition = syntax switch
@@ -2510,6 +2531,13 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     {
         foreach (var operation in operations)
         {
+            if (ManagedAbstractFlow.IsCompileTimeUnreachable(
+                    compilation,
+                    operation))
+            {
+                continue;
+            }
+
             if (!MayCompleteNormally(operation))
             {
                 return false;
