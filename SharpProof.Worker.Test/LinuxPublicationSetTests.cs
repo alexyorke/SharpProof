@@ -167,7 +167,10 @@ public sealed class LinuxPublicationSetTests
     {
         using var directory = TemporaryDirectory.Create();
         var paths = CreatePaths(directory.Path, "reset-sync");
-        using (LinuxPathIdentity.AcquirePublicationSet(paths, TimeSpan.FromSeconds(1))) { }
+        using (LinuxPathIdentity.AcquirePublicationSet(
+                   paths, TimeSpan.FromSeconds(1)))
+        {
+        }
         LinuxPathIdentity.ResetPublicationSet(paths, TimeSpan.FromSeconds(1));
         Assert.That(paths, Has.All.Matches<string>(path => !File.Exists(path)));
         Assert.That(
