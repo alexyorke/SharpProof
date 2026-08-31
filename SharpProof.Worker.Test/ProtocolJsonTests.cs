@@ -918,6 +918,29 @@ public sealed class ProtocolJsonTests
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void OversizedNumericEnumStringsAreRejectedAsMalformedJson(
+        bool request)
+    {
+        const string oversized = "9999999999999999999999999999999999999999";
+        var json = request
+            ? WorkerProtocolJson.SerializeRequest(CreateRequest()).Replace(
+                "\"verifyPolicy\":\"Advisory\"",
+                $"\"verifyPolicy\":\"{oversized}\"",
+                StringComparison.Ordinal)
+            : WorkerProtocolJson.SerializeResponse(
+                    CreateResponse(CreateManifest()))
+                .Replace(
+                    "\"outcome\":\"Proven\"",
+                    $"\"outcome\":\"{oversized}\"",
+                    StringComparison.Ordinal);
+
+        Assert.That(
+            (Action)(() => DeserializeByRoot(json)),
+            Throws.TypeOf<JsonException>());
+    }
+
     [Test]
     public void OmittedNestedManifestSchemaVersionIsRejectedDuringDeserialization()
     {
