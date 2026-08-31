@@ -12,6 +12,7 @@ internal sealed class ExceptionHandlerReachability(
     Func<ICompoundAssignmentOperation, bool> canCompoundValueComplete,
     Func<IIncrementOrDecrementOperation, bool> canIncrementValueComplete,
     Func<IWithOperation, bool> canWithCloneComplete,
+    ConversionEffectClassifier conversionEffects,
     Func<IListPatternOperation, IReadOnlyList<IMethodSymbol>>
         getReachableListPatternMembers,
     ResolvedApiSpecTable apiSpecs,
@@ -774,6 +775,31 @@ internal sealed class ExceptionHandlerReachability(
                     Add(UnknownPotential, conversion);
                 }
                 PushChildren(conversion);
+                continue;
+            }
+            if (operation is IConversionOperation builtInConversion)
+            {
+                if (canCompleteNormally(builtInConversion.Operand))
+                {
+                    var conversionKind = Microsoft.CodeAnalysis.CSharp
+                        .CSharpExtensions.GetConversion(builtInConversion);
+                    if (conversionKind.IsUnboxing ||
+                        conversionKind is { IsReference: true, IsExplicit: true } &&
+                        !builtInConversion.IsTryCast)
+                    {
+                        Add(
+                            FromThrowSet(
+                                conversionEffects.Classify(
+                                    builtInConversion,
+                                    conversionKind).Throws),
+                            builtInConversion);
+                    }
+                }
+                if (CanThrowUnknownAfterPrerequisites(builtInConversion))
+                {
+                    Add(UnknownPotential, builtInConversion);
+                }
+                PushChildren(builtInConversion);
                 continue;
             }
             if (operation is IUsingOperation or IUsingDeclarationOperation)

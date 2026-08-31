@@ -87,6 +87,7 @@ internal sealed partial class OperationEffectScanner
             _completionEvaluator.CanCompleteCompoundValue,
             _completionEvaluator.CanCompleteIncrementValue,
             _completionEvaluator.CanCompleteWithClone,
+            _conversionEffects,
             _completionEvaluator.GetReachableImplicitListPatternMembers,
             session.ApiSpecs,
             session.KnownSymbols,

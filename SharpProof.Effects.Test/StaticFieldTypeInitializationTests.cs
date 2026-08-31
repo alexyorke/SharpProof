@@ -222,6 +222,9 @@ public sealed class StaticFieldTypeInitializationTests
             canCompoundValueComplete: static _ => true,
             canIncrementValueComplete: static _ => true,
             canWithCloneComplete: static _ => true,
+            conversionEffects: new ConversionEffectClassifier(
+                session,
+                abstractFlow: null),
             getReachableListPatternMembers: static _ => [],
             apiSpecs: session.ApiSpecs,
             knownSymbols: session.KnownSymbols,
