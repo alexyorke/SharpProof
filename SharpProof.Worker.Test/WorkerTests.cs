@@ -150,6 +150,22 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task BuiltInWorkerRejectsRequestWithDifferentQueryRlimit()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        using var worker = SharpProofWorker.Create(request.Budgets);
+        request.Budgets.QueryRlimit++;
+
+        var response = await worker.VerifyAsync(request);
+
+        Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+        Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.InvalidRequest));
+        Assert.That(response.Errors.Select(static error => error.Code),
+            Does.Contain("budgets.query_rlimit_mismatch"));
+    }
+
+    [Test]
     public async Task ClosedCompilerManifestDoesNotRereadChangedSourceFiles()
     {
         using var project = TestProject.Create(TautologySource);
