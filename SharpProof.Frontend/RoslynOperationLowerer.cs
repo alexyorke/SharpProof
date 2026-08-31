@@ -764,9 +764,17 @@ public sealed class RoslynOperationLowerer
             }
             var leftOperand = operation.LeftOperand;
             var rightOperand = operation.RightOperand;
+            ITypeSymbol? referenceComparisonType = null;
             if (operation.OperatorKind is
                 BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals)
             {
+                if (leftOperand.Type?.IsReferenceType == true &&
+                    SymbolEqualityComparer.Default.Equals(
+                        leftOperand.Type,
+                        rightOperand.Type))
+                {
+                    referenceComparisonType = leftOperand.Type;
+                }
                 leftOperand = UnwrapImplicitReferenceConversions(leftOperand);
                 rightOperand = UnwrapImplicitReferenceConversions(rightOperand);
                 if (ChangesReferenceEqualityToString(leftOperand) ||
@@ -834,8 +842,21 @@ public sealed class RoslynOperationLowerer
 
             try
             {
+                var leftTerm = left.Term;
+                var rightTerm = right.Term;
+                if (referenceComparisonType != null)
+                {
+                    var comparisonType =
+                        _owner.GetTypeId(referenceComparisonType);
+                    leftTerm = _owner._factory.Cast(
+                        comparisonType,
+                        leftTerm);
+                    rightTerm = _owner._factory.Cast(
+                        comparisonType,
+                        rightTerm);
+                }
                 return LoweredExpression.Exact(_owner._factory.Binary(
-                    mapped.Value, left.Term, right.Term));
+                    mapped.Value, leftTerm, rightTerm));
             }
             catch (ArgumentException)
             {
