@@ -1035,13 +1035,7 @@ internal sealed class ManagedAbstractFlow
             marks[block.Ordinal] = 1;
             foreach (var (branch, _) in Successors(block))
             {
-                if (included != null &&
-                    (branch.Destination == null ||
-                     !included.Contains(branch.Destination.Ordinal)))
-                {
-                    continue;
-                }
-                if (!Visit(branch.Destination!))
+                if (branch.Destination != null && !Visit(branch.Destination))
                 {
                     return false;
                 }
