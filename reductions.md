@@ -1033,3 +1033,37 @@ those tests exercise no remaining behavior.
 >
 > **⚠ Adjacent correctness observation (not a reduction, not counted):** `pilot-review` is the only branch that writes the `pilots` qualification receipt (`Invoke-SharpProofContainer.ps1:617-627`), yet **no workflow, doc, or script invokes `tooling pilot-review`** — `release.yml` runs `pilots` then `release-qualification`. That looks like a gap in release orchestration rather than dead code.
 
+---
+
+## CI workflows, Dockerfile, and compose (round 3)
+
+**Estimated savings: ~64 LOC** of *new* findings (excluding the four earlier `.github/` findings), of which ~41 are self-contained and need no test or `contract.json` change.
+
+### 1. Delete the never-built `build` / `test` / `package` Dockerfile stages
+- **Files:** `eng/container/Dockerfile:84-106`
+- **Est. LOC saved:** ~23 (Dockerfile only; ~45 more in the contract script if the cross-area change is taken)
+- **Why it's safe:** Every image build in the repo targets `dev` and nothing else — `.github/actions/build-tooling/action.yml:22` (`--target dev`) and `compose.yaml:6` (`target: dev`) are the only builders, and a repo-wide grep for `--target`/`target:` returns only those two plus assertions pinning `target: dev` (`scripts/Test-SharpProofContainerContract.ps1:315`, `SharpProof.ArchitectureTest/ContainerAuthorityScriptTests.cs:84`). `portable-tests`/`pack` run through the `dev` entrypoint, never these stages. Within the dead block, `test` (`:95-98`) and `package` (`:102-105`) also re-declare `ENV SHARPPROOF_REPO_ROOT=/src`, `WORKDIR /src`, `USER sharpproof`, `ENTRYPOINT` — all inherited from `build`, so 8 of those lines are no-ops even if the stages stay.
+- **⚠ Blocking dependency (outside this area):** `scripts/Test-SharpProofContainerContract.ps1:159-245` pins the exact nine-stage `$expectedStages` list and a `$stageContracts` table for `build`/`test`/`package`; those must be trimmed in the same commit. `eng/acceptance/contract.json:665` lists only the Dockerfile path, so no contract edit is needed. Note the minimum-risk subset (deleting just the 8 inherited-and-restated lines) *also* needs the script change, because `Assert-SingleMatchingLine` requires those exact lines per stage.
+- **Proposed change:** Drop `FROM toolchain AS build` / `AS test` / `AS package`, trimming the contract script in the same commit.
+
+### 2. Extend the `build-tooling` prelude to a `checkout + build-tooling` composite across 4 more workflows
+- **Files:** `.github/workflows/ci.yml:25-30`, `coverage.yml:30-32` and `:57-58`, `nightly.yml:19-24`, `weekly.yml:19-24`, `security-reusable.yml:37-42` and `:60-65`
+- **Est. LOC saved:** ~24 (6 job sites × ~4 lines; the composite action file itself is already accounted for by the earlier `package-consumers` prelude finding)
+- **Why it's safe:** All six sites are byte-identical — `actions/checkout@3d3c42e5…` with `fetch-depth: 0`, then `uses: ./.github/actions/build-tooling`. The only variation is the step `name`, which is cosmetic. A local composite action can itself call `actions/checkout`, so the pinned SHA stays pinned in one place.
+- **⚠ Two caveats:** (a) `SharpProof.ArchitectureTest/ArchitectureTests.cs:1044` asserts `package-consumers.yml` literally contains `fetch-depth: 0` — leave those sites inline or update the assertion; (b) new files under `.github/actions/` will likely need adding to `eng/acceptance/contract.json:93-97` (`releaseAuthorityClosure`) and `:686` (`releaseAuthorityDerivedLeaves`), which currently list `build-tooling/action.yml`.
+- **Proposed change:** Add `.github/actions/checkout-and-build-tooling/action.yml` running the pinned checkout then the existing `build-tooling` action; replace the six inline pairs with one `uses:`.
+
+### 3. Hoist the five per-job `COMPOSE_PROJECT_NAME` env blocks to workflow level
+- **Files:** `.github/workflows/package-consumers.yml:36-37, 105-106, 176-177, 293-294, 339-340` (workflow `env:` already at `:19-20`)
+- **Est. LOC saved:** ~9
+- **Why it's safe:** All five follow the identical shape `sharpproof-<label>-${{ github.run_id }}-${{ github.run_attempt }}`; the label is per-job only to keep compose project namespaces distinct, and `${{ github.job }}` reproduces that uniqueness exactly. Nothing outside the workflow reads these values — grep for `COMPOSE_PROJECT_NAME` outside `artifacts/` hits only docs (`AGENTS.md:6`, `docs/container-development.md`) and the `compose.yaml:2` image-name assertions (`Test-SharpProofContainerContract.ps1:290`, `ContainerAuthorityScriptTests.cs:36`), none of which pin a specific project name. `DockerWorkflowsCapCpuUseToHostedRunnerCapacity` (`ArchitectureTests.cs:1557-1580`) only requires the literal `SHARPPROOF_CONTAINER_CPU_LIMIT: 4`, already at workflow level.
+- **Proposed change:** Add `COMPOSE_PROJECT_NAME: sharpproof-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}` to the workflow-level `env:`; delete the five job-level blocks. The `release-qualification` job keeps its step-level `env:` at `:218`.
+
+### 4. Drop the four job-level `permissions: contents: read` blocks that restate the workflow default
+- **Files:** `.github/workflows/package-consumers.yml:34-35, 174-175, 291-292`; `security-reusable.yml:22-23`
+- **Est. LOC saved:** ~8
+- **Why it's safe:** Both files already declare workflow-level `permissions: contents: read` (`package-consumers.yml:12-13`, `security-reusable.yml:12-13`), and a job with no `permissions:` key inherits the workflow block verbatim. These four list *exactly* `contents: read` and nothing else, so the effective token scope is unchanged.
+- **Proposed change:** Delete the four redundant two-line blocks. **Deliberately not touched:** `package-consumers.yml:27-29` (`packages: read`), `:73-77` (`id-token`/`attestations`/`artifact-metadata: write`), `:336-338` (`id-token: write`), and `security.yml:24-26` — job `permissions` *replaces* rather than merges, so those must stay complete.
+
+> **Checked, NOT a reduction:** `security.yml` and the `package-consumers` `security` job are **not** redundant. `security.yml:3-10` triggers on `push: branches: [master]`, PRs, and a weekly cron — GitHub does not fire `branches:`-filtered push triggers for tag pushes, so the `if: startsWith(github.ref, 'refs/tags/v')` job at `package-consumers.yml:23-29` is the **only** tag-time security run, and `release-qualification` genuinely `needs: security` (`:170`). Likewise, `weekly.yml` is deletable but `nightly.yml` is not — it is pinned by path in `eng/acceptance/contract.json:96` and `:687`, and `ArchitectureTests.cs:2360-2371` requires `tooling fuzz-nightly` to appear in `nightly.yml` and in no other workflow.
+
