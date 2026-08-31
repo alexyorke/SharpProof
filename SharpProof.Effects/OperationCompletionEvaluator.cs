@@ -107,6 +107,8 @@ internal sealed class OperationCompletionEvaluator
             ICompoundAssignmentOperation assignment =>
                 CanCompleteCompoundValue(assignment) &&
                 CanCompleteWriteTarget(assignment.Target),
+            IEventAssignmentOperation eventAssignment =>
+                CanCompleteEventAssignment(eventAssignment),
             IParenthesizedOperation parenthesized =>
                 CanCompleteNormally(parenthesized.Operand),
             IConversionOperation conversion =>
@@ -793,7 +795,22 @@ internal sealed class OperationCompletionEvaluator
         return CanCompleteNormally(element.ArrayReference) &&
             !_isProvenNull(element.ArrayReference, element) &&
             element.Indices.All(CanCompleteNormally) &&
-            ArrayAccessMayComplete(element);
+            ArrayAccessMayComplete(element) &&
+            ArrayStoreMayComplete(element);
+    }
+
+    private bool ArrayStoreMayComplete(IArrayElementReferenceOperation element)
+    {
+        if (element.Parent is not IAssignmentOperation { Target: IArrayElementReferenceOperation target, Value: { } value } ||
+            !ReferenceEquals(target, element) ||
+            element.ArrayReference.Type is not IArrayTypeSymbol array ||
+            array.ElementType.IsValueType || value.Type == null ||
+            value.ConstantValue is { HasValue: true, Value: null })
+        {
+            return true;
+        }
+
+        return _compilation.ClassifyCommonConversion(value.Type, array.ElementType).IsImplicit;
     }
 
     private bool ArrayAccessMayComplete(
@@ -1103,6 +1120,22 @@ internal sealed class OperationCompletionEvaluator
 
         return array.Initializer == null ||
             CanCompleteNormally(array.Initializer);
+    }
+
+    private bool CanCompleteEventAssignment(
+        IEventAssignmentOperation assignment)
+    {
+        if (assignment.EventReference is not IEventReferenceOperation reference ||
+            !CanCompleteNormally(assignment.HandlerValue))
+        {
+            return false;
+        }
+
+        var accessor = assignment.Adds
+            ? reference.Event.AddMethod
+            : reference.Event.RemoveMethod;
+        return accessor != null &&
+            CanCompleteInvocation(accessor, reference.Instance, assignment);
     }
 
     private bool CanCompleteInterpolatedString(
