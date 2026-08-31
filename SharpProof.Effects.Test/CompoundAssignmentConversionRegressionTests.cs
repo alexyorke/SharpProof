@@ -22,23 +22,18 @@ public sealed class CompoundAssignmentConversionRegressionTests
             }
 
             public readonly struct OperatorResult {
-                public OperatorResult(OutConversionFailure? failure) {
-                    Failure = failure;
-                }
-
-                public OutConversionFailure? Failure { get; }
             }
 
             public readonly struct EffectfulTarget {
                 private static int s_inConversionState;
+                private static OutConversionFailure? s_outFailure;
                 private readonly InConversionFailure? _inFailure;
-                private readonly OutConversionFailure? _outFailure;
 
                 public EffectfulTarget(
                     InConversionFailure? inFailure,
                     OutConversionFailure? outFailure) {
                     _inFailure = inFailure;
-                    _outFailure = outFailure;
+                    s_outFailure = outFailure;
                 }
 
                 public static implicit operator InputOperand(
@@ -53,16 +48,15 @@ public sealed class CompoundAssignmentConversionRegressionTests
                 public static implicit operator EffectfulTarget(
                     OperatorResult value) {
                     _ = new object();
-                    if (value.Failure != null) {
-                        throw value.Failure;
+                    if (s_outFailure != null) {
+                        throw s_outFailure;
                     }
                     return default;
                 }
 
                 public static OperatorResult operator +(
                     InputOperand left,
-                    EffectfulTarget right) =>
-                    new(right._outFailure);
+                    EffectfulTarget right) => default;
             }
 
             public readonly struct DivergingInOperand {
