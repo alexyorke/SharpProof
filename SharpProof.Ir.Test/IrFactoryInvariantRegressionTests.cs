@@ -141,6 +141,95 @@ public sealed class IrFactoryInvariantRegressionTests
     }
 
     [Test]
+    public void OpaqueArgumentsCannotChangeAfterValidation()
+    {
+        const int argumentCount = 4096;
+        const int maximumAttempts = 256;
+        var factory = new IrFactory();
+        var parameterTypes = Enumerable.Repeat(
+                factory.IntegerType,
+                argumentCount)
+            .ToArray();
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "M",
+            factory.IntegerType,
+            isStatic: true,
+            parameterTypes);
+        var valid = factory.Integer(1);
+        var invalid = factory.Boolean(true);
+        var arguments = Enumerable.Repeat<IrTerm>(
+                valid,
+                argumentCount)
+            .ToArray();
+        using var stop = new CancellationTokenSource();
+        using var started = new ManualResetEventSlim();
+        var mutator = new Thread(() =>
+        {
+            started.Set();
+            while (!stop.IsCancellationRequested)
+            {
+                Volatile.Write(ref arguments[0], invalid);
+                Thread.SpinWait(64);
+                Volatile.Write(ref arguments[0], valid);
+                Thread.SpinWait(64);
+            }
+        })
+        {
+            IsBackground = true
+        };
+
+        IrOpaqueTerm? poisoned = null;
+        var successfulConstructions = 0;
+        var joined = false;
+        try
+        {
+            mutator.Start();
+            started.Wait();
+            for (var attempt = 0;
+                 attempt < maximumAttempts && poisoned == null;
+                 attempt++)
+            {
+                try
+                {
+                    var opaque = factory.PureOpaque(
+                        member,
+                        receiver: null,
+                        arguments);
+                    successfulConstructions++;
+                    if (opaque.Arguments[0].Type != factory.IntegerType)
+                    {
+                        poisoned = opaque;
+                    }
+                }
+                catch (ArgumentException)
+                {
+                    Thread.Yield();
+                }
+            }
+        }
+        finally
+        {
+            stop.Cancel();
+            joined = mutator.Join(TimeSpan.FromSeconds(5));
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(joined, Is.True, "The argument mutator did not stop.");
+            Assert.That(
+                successfulConstructions,
+                Is.GreaterThan(0),
+                "The constructor never observed a valid argument snapshot.");
+            Assert.That(
+                poisoned,
+                Is.Null,
+                "A signature-mismatched argument escaped validation.");
+        }
+    }
+
+    [Test]
     public void ExternalIdentityHashingRunsOutsideFactoryLock()
     {
         var factory = new IrFactory();
