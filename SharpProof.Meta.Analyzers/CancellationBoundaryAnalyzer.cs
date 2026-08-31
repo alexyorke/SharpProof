@@ -108,64 +108,13 @@ internal static class CancellationBoundaryAnalyzer
         {
             return false;
         }
-        var operation = Unwrap(context.SemanticModel.GetOperation(
-            filter, context.CancellationToken));
-        if (operation is IIsTypeOperation typeTest &&
-            Unwrap(typeTest.ValueOperand) is ILocalReferenceOperation typeTested)
-        {
-            if (!SymbolEqualityComparer.Default.Equals(
-                    typeTested.Local, caughtLocal))
-            {
-                return false;
-            }
-            return IsOrDerivesFrom(cancellationType, typeTest.TypeOperand);
-        }
-        if (operation is not IIsPatternOperation patternTest ||
-            Unwrap(patternTest.Value) is not ILocalReferenceOperation tested ||
-            !SymbolEqualityComparer.Default.Equals(tested.Local, caughtLocal))
-        {
-            return false;
-        }
-        return PatternIncludesAllCancellation(
-            patternTest.Pattern, caughtType, cancellationType);
-    }
 
-    private static bool PatternIncludesAllCancellation(
-        IPatternOperation pattern,
-        ITypeSymbol? caughtType,
-        INamedTypeSymbol cancellationType)
-    {
-        return pattern switch
-        {
-            ITypePatternOperation typePattern =>
-                IsOrDerivesFrom(cancellationType, typePattern.MatchedType),
-            IBinaryPatternOperation binary
-                when binary.OperatorKind == BinaryOperatorKind.Or =>
-                PatternIncludesAllCancellation(
-                    binary.LeftPattern, caughtType, cancellationType) ||
-                PatternCannotThrow(binary.LeftPattern) &&
-                PatternIncludesAllCancellation(
-                    binary.RightPattern, caughtType, cancellationType),
-            IBinaryPatternOperation binary
-                when binary.OperatorKind == BinaryOperatorKind.And =>
-                PatternIncludesAllCancellation(
-                    binary.LeftPattern, caughtType, cancellationType) &&
-                PatternIncludesAllCancellation(
-                    binary.RightPattern, caughtType, cancellationType),
-            _ => false
-        };
-    }
-
-    private static bool PatternCannotThrow(IPatternOperation pattern)
-    {
-        return pattern switch
-        {
-            ITypePatternOperation => true,
-            IBinaryPatternOperation binary =>
-                PatternCannotThrow(binary.LeftPattern) &&
-                PatternCannotThrow(binary.RightPattern),
-            _ => false
-        };
+        return EvaluateCancellationFilter(
+                GetFilterOperation(filter, context),
+                caughtLocal,
+                caughtType,
+                cancellationType) ==
+            CancellationFilterOutcome.ReturnsTrue;
     }
 
     private static bool CatchesCancellation(
@@ -189,36 +138,219 @@ internal static class CancellationBoundaryAnalyzer
         {
             return false;
         }
-
-        var constant = context.SemanticModel.GetConstantValue(
-            filter, context.CancellationToken);
-        if (constant is { HasValue: true, Value: false })
+        if (context.SemanticModel.GetConstantValue(
+                filter, context.CancellationToken) is
+            { HasValue: true, Value: false })
         {
             return true;
         }
-
-        ExpressionSyntax patternExpression = filter;
-        while (patternExpression is ParenthesizedExpressionSyntax parenthesized)
-        {
-            patternExpression = parenthesized.Expression;
-        }
         if (clause.Declaration == null ||
-            patternExpression is not IsPatternExpressionSyntax ||
             context.SemanticModel.GetDeclaredSymbol(
                 clause.Declaration,
-                context.CancellationToken) is not ILocalSymbol caughtLocal ||
-            Unwrap(context.SemanticModel.GetOperation(
-                patternExpression, context.CancellationToken)) is not
-                IIsPatternOperation patternTest ||
-            Unwrap(patternTest.Value) is not ILocalReferenceOperation tested ||
-            !SymbolEqualityComparer.Default.Equals(
-                tested.Local, caughtLocal))
+                context.CancellationToken) is not ILocalSymbol caughtLocal)
         {
             return false;
         }
 
-        return PatternExcludesCancellation(
-            patternTest.Pattern, caughtType, cancellationType);
+        return (EvaluateCancellationFilter(
+                    GetFilterOperation(filter, context),
+                    caughtLocal,
+                    caughtType,
+                    cancellationType) &
+                CancellationFilterOutcome.ReturnsTrue) == 0;
+    }
+
+    private static IOperation? GetFilterOperation(
+        ExpressionSyntax expression,
+        SyntaxNodeAnalysisContext context)
+    {
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            expression = parenthesized.Expression;
+        }
+
+        return context.SemanticModel.GetOperation(
+            expression, context.CancellationToken);
+    }
+
+    private static CancellationFilterOutcome EvaluateCancellationFilter(
+        IOperation? operation,
+        ILocalSymbol caughtLocal,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType)
+    {
+        operation = Unwrap(operation);
+        if (operation?.ConstantValue is
+            { HasValue: true, Value: bool constant })
+        {
+            return constant
+                ? CancellationFilterOutcome.ReturnsTrue
+                : CancellationFilterOutcome.ReturnsFalse;
+        }
+
+        return operation switch
+        {
+            IIsTypeOperation typeTest
+                when ReferencesLocal(typeTest.ValueOperand, caughtLocal) =>
+                EvaluateTypeTest(
+                    typeTest.TypeOperand, caughtType, cancellationType),
+            IIsPatternOperation patternTest
+                when ReferencesLocal(patternTest.Value, caughtLocal) =>
+                EvaluatePattern(
+                    patternTest.Pattern, caughtType, cancellationType),
+            IUnaryOperation
+            {
+                OperatorMethod: null,
+                OperatorKind: UnaryOperatorKind.Not
+            } unary =>
+                Negate(EvaluateCancellationFilter(
+                    unary.Operand,
+                    caughtLocal,
+                    caughtType,
+                    cancellationType)),
+            IBinaryOperation
+            {
+                OperatorMethod: null,
+                OperatorKind: BinaryOperatorKind.ConditionalOr
+            } binary =>
+                ConditionalOr(
+                    EvaluateCancellationFilter(
+                        binary.LeftOperand,
+                        caughtLocal,
+                        caughtType,
+                        cancellationType),
+                    EvaluateCancellationFilter(
+                        binary.RightOperand,
+                        caughtLocal,
+                        caughtType,
+                        cancellationType)),
+            IBinaryOperation
+            {
+                OperatorMethod: null,
+                OperatorKind: BinaryOperatorKind.ConditionalAnd
+            } binary =>
+                ConditionalAnd(
+                    EvaluateCancellationFilter(
+                        binary.LeftOperand,
+                        caughtLocal,
+                        caughtType,
+                        cancellationType),
+                    EvaluateCancellationFilter(
+                        binary.RightOperand,
+                        caughtLocal,
+                        caughtType,
+                        cancellationType)),
+            _ => CancellationFilterOutcome.Unknown
+        };
+    }
+
+    private static CancellationFilterOutcome EvaluatePattern(
+        IPatternOperation pattern,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType)
+    {
+        return pattern switch
+        {
+            ITypePatternOperation typePattern =>
+                EvaluateTypeTest(
+                    typePattern.MatchedType, caughtType, cancellationType),
+            IConstantPatternOperation constantPattern
+                when IsNullConstant(constantPattern.Value) =>
+                CancellationFilterOutcome.ReturnsFalse,
+            IConstantPatternOperation =>
+                CancellationFilterOutcome.ReturnsFalse |
+                CancellationFilterOutcome.ReturnsTrue,
+            IDiscardPatternOperation => CancellationFilterOutcome.ReturnsTrue,
+            INegatedPatternOperation negated =>
+                Negate(EvaluatePattern(
+                    negated.Pattern, caughtType, cancellationType)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.Or =>
+                ConditionalOr(
+                    EvaluatePattern(
+                        binary.LeftPattern, caughtType, cancellationType),
+                    EvaluatePattern(
+                        binary.RightPattern, caughtType, cancellationType)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.And =>
+                ConditionalAnd(
+                    EvaluatePattern(
+                        binary.LeftPattern, caughtType, cancellationType),
+                    EvaluatePattern(
+                        binary.RightPattern, caughtType, cancellationType)),
+            _ => CancellationFilterOutcome.Unknown
+        };
+    }
+
+    private static CancellationFilterOutcome EvaluateTypeTest(
+        ITypeSymbol matchedType,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType)
+    {
+        if (IsAssignableTo(cancellationType, matchedType) ||
+            IsAssignableTo(caughtType, matchedType))
+        {
+            return CancellationFilterOutcome.ReturnsTrue;
+        }
+        return TypePatternExcludesCancellation(matchedType, cancellationType)
+            ? CancellationFilterOutcome.ReturnsFalse
+            : CancellationFilterOutcome.ReturnsFalse |
+              CancellationFilterOutcome.ReturnsTrue;
+    }
+
+    private static CancellationFilterOutcome Negate(
+        CancellationFilterOutcome outcome)
+    {
+        var result = outcome & CancellationFilterOutcome.Throws;
+        if ((outcome & CancellationFilterOutcome.ReturnsFalse) != 0)
+        {
+            result |= CancellationFilterOutcome.ReturnsTrue;
+        }
+        if ((outcome & CancellationFilterOutcome.ReturnsTrue) != 0)
+        {
+            result |= CancellationFilterOutcome.ReturnsFalse;
+        }
+        return result;
+    }
+
+    private static CancellationFilterOutcome ConditionalAnd(
+        CancellationFilterOutcome left,
+        CancellationFilterOutcome right)
+    {
+        var result = left & CancellationFilterOutcome.Throws;
+        if ((left & CancellationFilterOutcome.ReturnsFalse) != 0)
+        {
+            result |= CancellationFilterOutcome.ReturnsFalse;
+        }
+        if ((left & CancellationFilterOutcome.ReturnsTrue) != 0)
+        {
+            result |= right;
+        }
+        return result;
+    }
+
+    private static CancellationFilterOutcome ConditionalOr(
+        CancellationFilterOutcome left,
+        CancellationFilterOutcome right)
+    {
+        var result = left & CancellationFilterOutcome.Throws;
+        if ((left & CancellationFilterOutcome.ReturnsTrue) != 0)
+        {
+            result |= CancellationFilterOutcome.ReturnsTrue;
+        }
+        if ((left & CancellationFilterOutcome.ReturnsFalse) != 0)
+        {
+            result |= right;
+        }
+        return result;
+    }
+
+    private static bool ReferencesLocal(
+        IOperation? operation,
+        ILocalSymbol local)
+    {
+        return Unwrap(operation) is ILocalReferenceOperation reference &&
+            SymbolEqualityComparer.Default.Equals(reference.Local, local);
     }
 
     private static IOperation? Unwrap(IOperation? operation)
@@ -239,42 +371,28 @@ internal static class CancellationBoundaryAnalyzer
         }
     }
 
-    private static bool PatternExcludesCancellation(
-        IPatternOperation pattern,
-        ITypeSymbol? caughtType,
+    private static bool TypePatternExcludesCancellation(
+        ITypeSymbol matchedType,
         INamedTypeSymbol? cancellationType)
     {
-        switch (pattern)
-        {
-            case ITypePatternOperation typePattern:
-                return typePattern.MatchedType.TypeKind == TypeKind.Class &&
-                       !IsOrDerivesFrom(
-                           cancellationType, typePattern.MatchedType) &&
-                       !IsOrDerivesFrom(
-                           typePattern.MatchedType, cancellationType);
-            case INegatedPatternOperation
-            {
-                Pattern: ITypePatternOperation excludedPattern
-            }:
-                return IsOrDerivesFrom(
-                           cancellationType, excludedPattern.MatchedType) ||
-                       IsAssignableTo(
-                           caughtType, excludedPattern.MatchedType);
-            case IBinaryPatternOperation binary
-                when binary.OperatorKind == BinaryOperatorKind.Or:
-                return PatternExcludesCancellation(
-                           binary.LeftPattern, caughtType, cancellationType) &&
-                       PatternExcludesCancellation(
-                           binary.RightPattern, caughtType, cancellationType);
-            case IBinaryPatternOperation binary
-                when binary.OperatorKind == BinaryOperatorKind.And:
-                return PatternExcludesCancellation(
-                           binary.LeftPattern, caughtType, cancellationType) ||
-                       PatternExcludesCancellation(
-                           binary.RightPattern, caughtType, cancellationType);
-            default:
-                return false;
-        }
+        return matchedType.TypeKind == TypeKind.Class &&
+            !IsOrDerivesFrom(cancellationType, matchedType) &&
+            !IsOrDerivesFrom(matchedType, cancellationType);
+    }
+
+    private static bool IsNullConstant(IOperation operation)
+    {
+        return Unwrap(operation)?.ConstantValue is { HasValue: true, Value: null };
+    }
+
+    [Flags]
+    private enum CancellationFilterOutcome
+    {
+        None = 0,
+        ReturnsFalse = 1,
+        ReturnsTrue = 2,
+        Throws = 4,
+        Unknown = ReturnsFalse | ReturnsTrue | Throws
     }
 
     private static bool IsOrDerivesFrom(
