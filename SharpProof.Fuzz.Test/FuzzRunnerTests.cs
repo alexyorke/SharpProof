@@ -454,6 +454,17 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public void PartialTermGeneratorUsesHigherSeedBitsForDistinctCases()
+    {
+        var factory = new IrFactory();
+        var first = PartialTermSmtCaseGenerator.Create(factory, 0);
+        var second = PartialTermSmtCaseGenerator.Create(factory, 8);
+        var printer = new IrPrinter(factory);
+
+        Assert.That(printer.Print(first.Formula), Is.Not.EqualTo(printer.Print(second.Formula)));
+    }
+
+    [Test]
     public async Task PartialTermOracleAbstainsOnGenericCounterexampleReplayFailure()
     {
         var factory = new IrFactory();
