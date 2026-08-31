@@ -167,6 +167,59 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void RequiresBindingIgnoresUnrelatedClausePlacementFailures()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void InvalidEnsures(int value) {
+                    Contract.Requires(value > 0);
+                    if (value > 0) Contract.Ensures(true);
+                }
+
+                public static void InvalidAssume(int value) {
+                    Contract.Requires(value > 0);
+                    value++;
+                    Contract.Assume(true);
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var methodName in new[]
+                     {
+                         "InvalidEnsures",
+                         "InvalidAssume"
+                     })
+            {
+                var full = subject.Bind("Target", methodName);
+                var requires = subject.BindRequires("Target", methodName);
+
+                Assert.That(
+                    full.Failure,
+                    Is.EqualTo(
+                        ContractBindingFailure.InvalidClausePlacement),
+                    methodName);
+                Assert.That(
+                    requires.IsSuccess,
+                    Is.True,
+                    $"{methodName}: {requires.Failure}");
+                if (requires.IsSuccess)
+                {
+                    Assert.That(
+                        requires.Contracts!.Clauses.Select(
+                            static clause => clause.Kind),
+                        Is.EqualTo([BoundContractKind.Requires]),
+                        methodName);
+                }
+            }
+        }
+    }
+
+    [Test]
     public void InvalidTargetPlacementCannotBeHiddenByAValidCompanion()
     {
         const string source =
