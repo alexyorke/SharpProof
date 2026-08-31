@@ -2145,6 +2145,25 @@ public sealed class RequiresAndControlTests
             Is.EqualTo(["SP0027"]));
     }
 
+    [Test]
+    public async Task SynthesizedConstructorReplaysParameterlessBasePrecondition()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            public class Base {
+                protected Base() { Contract.Requires(false); }
+            }
+            public sealed class Derived : Base { }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
     [TestCase("int value = 0", false)]
     [TestCase("params int[] values", false)]
     [TestCase("int value = 0", true)]
@@ -2196,7 +2215,9 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
     }
 
     [Test]
