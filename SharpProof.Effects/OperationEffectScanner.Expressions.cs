@@ -411,6 +411,7 @@ internal sealed partial class OperationEffectScanner
                 _callResolver,
                 _abstractFlow,
                 _conversionOwnership.ClassifyRegion),
+            BuiltInDelegateCombinationAllocation(binary),
             IntegralDivisionExceptions(binary.OperatorKind, binary.Type,
                 binary.LeftOperand, binary.RightOperand, binary),
             _conversionEffects.CheckedOverflow(binary.IsChecked, binary),
@@ -418,6 +419,21 @@ internal sealed partial class OperationEffectScanner
                 binary.OperatorMethod,
                 [binary.LeftOperand, binary.RightOperand],
                 binary));
+    }
+
+    private static EffectSummary BuiltInDelegateCombinationAllocation(
+        IBinaryOperation binary)
+    {
+        var isCombination = binary.OperatorKind is
+            BinaryOperatorKind.Add or BinaryOperatorKind.Subtract;
+        var isBuiltIn = binary.OperatorMethod == null ||
+            binary.OperatorMethod.MethodKind == MethodKind.BuiltinOperator;
+        return binary.Type?.TypeKind == TypeKind.Delegate &&
+            isCombination &&
+            isBuiltIn
+            ? EffectSummaryOperations.Allocate(
+                EffectAllocationKind.Managed)
+            : EffectSummary.Empty;
     }
 
     private EffectSummary ScanConditional(IConditionalOperation conditional)
