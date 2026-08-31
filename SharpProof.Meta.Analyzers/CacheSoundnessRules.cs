@@ -577,7 +577,13 @@ internal static class CacheSoundnessRules
                 when field.Field.ContainingType.TypeKind == TypeKind.Enum &&
                      IsSemanticAnswerType(field.Type) => IsNonCacheableName(field.Field.Name),
             IObjectCreationOperation creation =>
-                IsSemanticAnswerType(creation.Type) && IsNonCacheableName(creation.Type?.Name),
+                (IsSemanticAnswerType(creation.Type) &&
+                 IsNonCacheableName(creation.Type?.Name)) ||
+                creation.Arguments.Any(argument =>
+                    IsNonCacheableSemanticAnswer(
+                        argument.Value,
+                        root,
+                        resolving)),
             ILocalReferenceOperation local => ResolveLocal(
                 local,
                 root,
@@ -1258,6 +1264,29 @@ internal static class CacheSoundnessRules
                 break;
             case ObjectCreationExpressionSyntax creation:
                 names.Add(creation.Type.ToString());
+                if (creation.ArgumentList != null)
+                {
+                    foreach (var argument in creation.ArgumentList.Arguments)
+                    {
+                        names.AddRange(GetExpressionValueNames(
+                            argument.Expression,
+                            owner,
+                            syntax,
+                            resolving,
+                            resolvingNames));
+                    }
+                }
+                break;
+            case ImplicitObjectCreationExpressionSyntax implicitCreation:
+                foreach (var argument in implicitCreation.ArgumentList.Arguments)
+                {
+                    names.AddRange(GetExpressionValueNames(
+                        argument.Expression,
+                        owner,
+                        syntax,
+                        resolving,
+                        resolvingNames));
+                }
                 break;
         }
         return names.ToImmutable();
