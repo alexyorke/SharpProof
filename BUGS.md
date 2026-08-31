@@ -1,6 +1,6 @@
 # Bug backlog
 
-434 open bugs, reprioritized by impact, reachability, and affected scope.
+433 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,11 +9,10 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (146)
+## P0 - Critical (145)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
-- **BUG-025 [P0] - Compound assignments omit user-defined conversions:** Effects scanning, completion, and catch reachability process compound-assignment targets and operators but never execute the Roslyn InConversion or OutConversion method symbols. Conversion writes, allocations, capabilities, throws, and divergence disappear from complete summaries.
 - **BUG-027 [P0] - Conditional operators omit op_True and op_False effects:** OperationEffectScanner models user-defined conditional binary expressions through op_BitwiseAnd or op_BitwiseOr but never scans the separate truth operator used for short-circuiting. Writes, throws, divergence, and capabilities in op_True or op_False are absent, allowing invalid effect contracts to pass.
 - **BUG-028 [P0] - Constructor effects are scanned in the wrong runtime order:** EffectMethodNodeBuilder scans derived member initializers before constructor initializer and body effects, then skips the root when an initializer cannot complete. Effects from base or delegated constructor calls can be omitted from a Complete summary.
 - **BUG-029 [P0] - Constructor-bypass allocation fabricates protected proof outcomes:** SharpProofSoundnessAnalyzer inspects object creation but not RuntimeHelpers.GetUninitializedObject invocations. Nonkernel code can manufacture uninitialized ProvenOutcome instances that downstream cache and proof paths trust by runtime type identity.

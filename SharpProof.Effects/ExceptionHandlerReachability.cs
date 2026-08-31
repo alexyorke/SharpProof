@@ -451,36 +451,41 @@ internal sealed class ExceptionHandlerReachability(
             }
             if (operation is ICompoundAssignmentOperation compound)
             {
-                var priorPhasesComplete =
-                    canCompleteNormally(compound.Target) &&
+                var targetCompletes = canCompleteNormally(compound.Target);
+                var inConversionCompletes = targetCompletes &&
+                    AddCompoundCallablePotential(
+                        compound.InConversion.MethodSymbol,
+                        compound,
+                        activeMethods,
+                        depth,
+                        Add);
+                var priorPhasesComplete = inConversionCompletes &&
                     canCompleteNormally(compound.Value);
-                var operatorInitializationCompletes = true;
-                if (priorPhasesComplete &&
-                    compound.OperatorMethod is { } compoundOperator)
-                {
-                    operatorInitializationCompletes =
-                        AddStaticInitializationPotential(
-                            compoundOperator,
-                            compound,
-                            Add);
-                    if (operatorInitializationCompletes)
-                    {
-                        Add(
-                            GetOperatorExceptions(
-                                compoundOperator,
-                                activeMethods,
-                                depth),
-                            compound);
-                    }
-                }
-                if (CanThrowUnknownAfterPrerequisites(compound))
+                var operatorCompletes = priorPhasesComplete &&
+                    AddCompoundCallablePotential(
+                        compound.OperatorMethod,
+                        compound,
+                        activeMethods,
+                        depth,
+                        Add) &&
+                    !(compound.OperatorKind is
+                            BinaryOperatorKind.Divide or
+                            BinaryOperatorKind.Remainder &&
+                        compound.Value.ConstantValue is
+                        { HasValue: true, Value: 0 });
+                if (priorPhasesComplete && CanThrowUnknown(compound))
                 {
                     Add(UnknownPotential, compound);
                 }
-                var operatorCompletes =
-                    operatorInitializationCompletes &&
-                    canCompoundValueComplete(compound);
-                if (priorPhasesComplete && operatorCompletes &&
+                var outConversionCompletes = operatorCompletes &&
+                    AddCompoundCallablePotential(
+                        compound.OutConversion.MethodSymbol,
+                        compound,
+                        activeMethods,
+                        depth,
+                        Add);
+                if (outConversionCompletes &&
+                    canCompoundValueComplete(compound) &&
                     compound.Target is IPropertyReferenceOperation property)
                 {
                     AddPropertySetterExceptions(
@@ -1186,6 +1191,16 @@ internal sealed class ExceptionHandlerReachability(
                     remaining.Push(coalesce.Value);
                 }
                 remaining.Push(coalesce.Target);
+                return;
+            case ICompoundAssignmentOperation compound:
+                if (canCompleteNormally(compound.Target) &&
+                    (compound.InConversion.MethodSymbol == null ||
+                     canMethodCompleteNormally(
+                         compound.InConversion.MethodSymbol)))
+                {
+                    remaining.Push(compound.Value);
+                }
+                remaining.Push(compound.Target);
                 return;
             case IConditionalAccessOperation access:
                 var receiverCompletes = canCompleteNormally(
@@ -2785,6 +2800,26 @@ internal sealed class ExceptionHandlerReachability(
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
             depth: 0);
         return potential.Unknown || !potential.Known.IsEmpty;
+    }
+
+    private bool AddCompoundCallablePotential(
+        IMethodSymbol? method,
+        IOperation origin,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth,
+        Action<PotentialExceptions, IOperation> add)
+    {
+        if (method == null)
+        {
+            return true;
+        }
+        if (!AddStaticInitializationPotential(method, origin, add))
+        {
+            return false;
+        }
+
+        add(GetOperatorExceptions(method, activeMethods, depth), origin);
+        return canMethodCompleteNormally(method);
     }
 
     private PotentialExceptions GetOperatorExceptions(

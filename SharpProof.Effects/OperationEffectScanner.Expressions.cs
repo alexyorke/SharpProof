@@ -583,12 +583,25 @@ internal sealed partial class OperationEffectScanner
         ImmutableArray<IOperation?> operands,
         IOperation origin)
     {
-        return _callResolver.ResolveOperator(
+        return ResolveOperatorEffects(
             method,
-            EffectRegionSet.Empty,
             [.. operands.Select(
                 operand => _conversionOwnership
                     .ClassifyCallArgumentRegion(operand))],
+            operands,
+            origin);
+    }
+
+    private EffectSummary ResolveOperatorEffects(
+        IMethodSymbol? method,
+        ImmutableArray<EffectRegionSet> operandRegions,
+        ImmutableArray<IOperation?> operands,
+        IOperation origin)
+    {
+        return _callResolver.ResolveOperator(
+            method,
+            EffectRegionSet.Empty,
+            operandRegions,
             operands,
             origin);
     }
