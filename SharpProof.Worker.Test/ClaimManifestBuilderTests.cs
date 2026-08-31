@@ -1054,6 +1054,34 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void UnrelatedEarlierNestedCallableDoesNotRenumberClaimedCallable()
+    {
+        static string Source(bool includeUnrelated) => $"""
+            using System;
+            using SharpProof.Attributes;
+            public static class Subject {{
+                public static void Outer() {{
+                    {(includeUnrelated ? "Func<long, long> unrelated = value => value;" : "")}
+                    Func<long, long> selected = value => {{
+                        Contract.Ensures(Contract.Result<long>() == value);
+                        return value;
+                    }};
+                    _ = selected(1);
+                }}
+            }}
+            """;
+
+        var without = Build(("Subject.cs", Source(false)));
+        var with = Build(("Subject.cs", Source(true)));
+        var withoutId = without.Manifest.Callables.Single(static callable =>
+            callable.CallableId != "M:Subject.Outer()").CallableId;
+        var withId = with.Manifest.Callables.Single(static callable =>
+            callable.CallableId != "M:Subject.Outer()").CallableId;
+
+        Assert.That(withId, Is.EqualTo(withoutId));
+    }
+
+    [Test]
     public void NestedCallableClaimsAppearExactlyOnceWithoutIdentityCollisions()
     {
         var result = Build((

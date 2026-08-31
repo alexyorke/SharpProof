@@ -567,6 +567,11 @@ internal sealed partial class ClaimManifestBuilder(
         foreach (var group in callables
                      .Where(static seed => seed.Method.MethodKind is
                          MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+                     // Callables without contract clauses do not participate in
+                     // the manifest identity. Excluding them keeps an unrelated
+                     // sibling from renumbering the callables that do.
+                     .Where(seed => _clauses.Create(seed.Method, null, cancellationToken)
+                         .Clauses.Length != 0)
                      .GroupBy(static seed => seed.Method.ContainingSymbol!,
                          SymbolEqualityComparer.Default))
         {
