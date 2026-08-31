@@ -1,4 +1,6 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json.Nodes;
 using NUnit.Framework;
 using SharpProof.Host;
@@ -10,6 +12,37 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class ContainerContractTests
 {
+    [Test]
+    public void OpenedContractStreamEnforcesTheActualByteLimit()
+    {
+        var parseOpenedStream = typeof(ContainerContract).GetMethod(
+            "ReadBoundedJson",
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            [typeof(Stream)],
+            modifiers: null);
+        Assert.That(
+            parseOpenedStream,
+            Is.Not.Null,
+            "The size bound must be applied to the opened file descriptor.");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(
+            new string(' ', 16 * 1024) + "{}"));
+
+        var exception = Assert.Throws<TargetInvocationException>(
+            (Action)(() =>
+                _ = parseOpenedStream!.Invoke(null, [stream])));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                exception!.InnerException,
+                Is.TypeOf<InvalidDataException>());
+            Assert.That(
+                exception.InnerException!.Message,
+                Does.Contain("invalid size"));
+        }
+    }
+
     [Test]
     public void RequiredContractNormalizesMalformedJsonAsInvalidData()
     {
