@@ -257,6 +257,37 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public async Task NestedNameOfPropertiesDoNotExecuteAccessors()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public sealed class Node {
+                public Node Child {
+                    get {
+                        Contract.Requires(false);
+                        return this;
+                    }
+                }
+                public int Value => 0;
+            }
+            public static class Subject {
+                private static readonly Node Root = new();
+                private static readonly string Name =
+                    nameof(Root.Child.Value);
+                public static string Read() => Name;
+            }
+            """,
+            ["SP0027"]);
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public void AccessorOperationShapesProduceOneReplayCandidateEach()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
