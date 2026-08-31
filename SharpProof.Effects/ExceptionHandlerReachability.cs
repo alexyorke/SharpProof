@@ -549,7 +549,9 @@ internal sealed class ExceptionHandlerReachability(
                 {
                     var initializationCompletes = true;
                     if (creation.Constructor is { } constructor &&
-                        !IsExceptionType(creation.Type))
+                        (!IsExceptionType(creation.Type) ||
+                         creation.Type is
+                         { DeclaringSyntaxReferences.Length: > 0 }))
                     {
                         initializationCompletes =
                             AddStaticInitializationPotential(
