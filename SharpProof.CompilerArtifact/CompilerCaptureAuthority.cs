@@ -17,11 +17,7 @@ internal static class CompilerCaptureAuthority
                 nameof(path));
         }
 
-        // Compiler paths can arrive from a Windows host even when capture is
-        // replayed on Linux. Treat both separator spellings identically so
-        // provenance keys cannot diverge for the same source file.
-        var portable = path.Replace('\\', Path.DirectorySeparatorChar);
-        return Path.GetFullPath(portable);
+        return Path.GetFullPath(path);
     }
 
     internal static bool IsCanonicalPath(string path)
