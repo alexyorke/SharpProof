@@ -136,7 +136,8 @@ internal sealed class ConversionOwnershipClassifier
                 EffectRegionId.Captured(parameter.Ordinal));
         }
 
-        return parameter.Type.IsRefLikeType &&
+        return (parameter.Type.IsReferenceType ||
+                parameter.Type.IsRefLikeType) &&
             _localRegions.TryGetValue(parameter, out var learnedRegions)
                 ? declaredRegion.Union(learnedRegions)
                 : declaredRegion;
