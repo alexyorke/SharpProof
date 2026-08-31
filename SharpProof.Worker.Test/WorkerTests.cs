@@ -5992,10 +5992,16 @@ public sealed class WorkerTests
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: true);
         request.Budgets.MethodWallTimeMilliseconds = 5_000;
-        using var worker = new SharpProofWorker(new DelayingBackend());
-        using var cancellation = new CancellationTokenSource(50);
+        var backendStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var worker = new SharpProofWorker(
+            new SignalingDelayingBackend(backendStarted));
+        using var cancellation = new CancellationTokenSource();
 
-        var response = await worker.VerifyAsync(request, cancellation.Token);
+        var verification = worker.VerifyAsync(request, cancellation.Token);
+        await backendStarted.Task;
+        await cancellation.CancelAsync();
+        var response = await verification;
 
         using (Assert.EnterMultipleScope())
         {
@@ -6020,10 +6026,11 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task PreCanceledRunLoadsTheAuthoritativeManifestWithoutStartingProofWork()
+    public async Task PreCanceledRunDoesNotLoadManifestOrStartProofWork()
     {
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: false);
+        File.Delete(request.CompilerManifest.Path);
         var backend = new CountingBackend(BackendCheckResult.Unsatisfiable([]));
         using var worker = new SharpProofWorker(backend);
         using var cancellation = new CancellationTokenSource();
@@ -6034,15 +6041,18 @@ public sealed class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Canceled));
-            Assert.That(response.Manifest.Claims, Has.Length.EqualTo(1));
-            Assert.That(response.ClaimResults.Single().Reason, Is.EqualTo(WorkerClaimReason.Canceled));
+            Assert.That(response.Manifest.Claims, Is.Empty);
+            Assert.That(response.ClaimResults, Is.Empty);
+            Assert.That(
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("worker.canceled"));
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
     [Test]
-    public async Task ProjectBoundaryPermitsWorkThatFinishesBeforeItsDeadline()
+    public async Task ProjectBoundaryIncludesManifestLoading()
     {
         var sources = Enumerable.Range(0, 512)
             .Select(index => ($"Padding{index}.cs", $"internal sealed class Padding{index} {{ }}"))
@@ -6057,23 +6067,16 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
 
-        Assert.That(response.Manifest.Claims, Has.Length.EqualTo(1));
-        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
-        var reason = response.ClaimResults.Single().Reason;
-        if (response.RunStatus == WorkerRunStatus.TimedOut)
+        using (Assert.EnterMultipleScope())
         {
-            Assert.That(reason, Is.EqualTo(WorkerClaimReason.ProjectTimeout));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.TimedOut));
+            Assert.That(response.Manifest.Claims, Is.Empty);
+            Assert.That(response.ClaimResults, Is.Empty);
             Assert.That(
-                backend.CallCount,
-                Is.LessThanOrEqualTo(1),
-                "The project deadline may expire immediately before or " +
-                "after the single backend call completes.");
-        }
-        else
-        {
-            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(reason, Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(backend.CallCount, Is.EqualTo(1));
+                response.Errors.Select(static error => error.Code),
+                Does.Contain("worker.timeout"));
+            Assert.That(backend.CallCount, Is.Zero);
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
@@ -6510,6 +6513,20 @@ public sealed class WorkerTests
             VerificationQuery query,
             CancellationToken cancellationToken)
         {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return BackendCheckResult.Unknown(
+                BackendFailureReason.InfrastructureFailure);
+        }
+    }
+
+    private sealed class SignalingDelayingBackend(
+        TaskCompletionSource started) : ISmtBackend
+    {
+        public async Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            started.TrySetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return BackendCheckResult.Unknown(
                 BackendFailureReason.InfrastructureFailure);
