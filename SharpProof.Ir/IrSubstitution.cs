@@ -28,7 +28,14 @@ public static class IrSubstitution
         ArgumentNullGuard.NotNull(replacements, nameof(replacements));
 
         factory.EnsureTerm(root, nameof(root));
-        foreach (var replacement in replacements)
+        // Materialize the caller-supplied view once. IReadOnlyDictionary is an
+        // interface, not an immutable snapshot; validation and rewriting must
+        // operate on the same mapping.
+        var replacementSnapshot = replacements.ToArray();
+        var replacementMap = replacementSnapshot.ToDictionary(
+            static pair => pair.Key,
+            static pair => pair.Value);
+        foreach (var replacement in replacementSnapshot)
         {
             var variable = factory.GetVariableInfo(replacement.Key);
             factory.EnsureTerm(replacement.Value, nameof(replacements));
@@ -39,13 +46,13 @@ public static class IrSubstitution
                     nameof(replacements));
             }
         }
-        if (replacements.Count == 0)
+        if (replacementSnapshot.Length == 0)
         {
             return root;
         }
 
         var memo = new Dictionary<IrId, IrTerm>();
-        return Rewrite(factory, root, replacements, memo);
+        return Rewrite(factory, root, replacementMap, memo);
     }
 
     /// <summary>
@@ -56,7 +63,7 @@ public static class IrSubstitution
     private static IrTerm Rewrite(
         IrFactory factory,
         IrTerm root,
-        IReadOnlyDictionary<IrVarId, IrTerm> replacements,
+        Dictionary<IrVarId, IrTerm> replacements,
         Dictionary<IrId, IrTerm> memo)
     {
         var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
