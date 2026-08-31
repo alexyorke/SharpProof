@@ -1,6 +1,6 @@
 # Bug backlog
 
-433 open bugs, reprioritized by impact, reachability, and affected scope.
+432 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (145)
+## P0 - Critical (144)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -18,7 +18,6 @@ Priority definitions:
 - **BUG-029 [P0] - Constructor-bypass allocation fabricates protected proof outcomes:** SharpProofSoundnessAnalyzer inspects object creation but not RuntimeHelpers.GetUninitializedObject invocations. Nonkernel code can manufacture uninitialized ProvenOutcome instances that downstream cache and proof paths trust by runtime type identity.
 - **BUG-030 [P0] - Container contract validation omits required schema fields:** ContainerContract validates only part of the generated marker and accepts missing, changed, duplicate, or unknown runtime and image identity fields. Preflight can certify a stale or conflicting environment contract that disagrees with repository pins.
 - **BUG-031 [P0] - Contract API trust is not bound to referenced metadata:** ContractApiIdentityResolver accepts symbols from PortableExecutableReference metadata but hashes mutable contents reopened through FilePath. Mismatched or stale metadata can cross the trusted contract API boundary while an unrelated file supplies the expected digest.
-- **BUG-032 [P0] - Contract.Result bypasses supported-value-domain checks:** ContractExpressionBinder creates Result variables through GetTypeId without first applying supported-domain admission. Nullable, pointer, function-pointer, or unconstrained values can enter exact reference-sort contract IR and support fabricated nullness reasoning instead of fail-closed abstention.
 - **BUG-033 [P0] - Corpus importer attributes ignored files to the pinned commit:** OpenSourceCorpusImporter trusts clean git status but enumerates all on-disk C# files, including ignored untracked files. Such files can change corpus compilation and analyzer verdicts while the manifest falsely attributes the input to the pinned upstream commit.
 - **BUG-034 [P0] - Counterexample replay accepts out-of-domain integer results:** Callable replay and response authority compare only the shared IR Integer type and never enforce the result variable's C# source interval. A canonical artifact can return an impossible value such as 256 for byte and obtain an accepted replay-backed refutation.
 - **BUG-035 [P0] - Cross-tree array identities can suppress ArrayTypeMismatchException:** OperationEffectScanner keys fresh array types only by syntax-relative SpanStart while scanning constructor bodies and member initializers across partial-declaration trees. Colliding offsets can substitute the wrong runtime array type and omit a reachable ArrayTypeMismatchException from a complete summary.
