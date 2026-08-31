@@ -377,6 +377,55 @@ public sealed class FuzzRunnerTests
         Assert.That(unsat.FiniteDomainAssumptions, Is.EqualTo(1));
     }
 
+    [Test]
+    public async Task OversizedFiniteDomainAbstainsBeforeEnumeration()
+    {
+        var factory = new IrFactory();
+        IrTerm any = factory.Boolean(false);
+        for (var index = 0; index < 32; index++)
+        {
+            var variable = factory.CreateVariable(
+                "value" + index,
+                factory.BooleanType);
+            any = factory.Binary(
+                IrBinaryOperator.OrElse,
+                any,
+                factory.Variable(variable));
+        }
+        var contradiction = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            any,
+            factory.Unary(IrUnaryOperator.Not, any));
+        using var safety = new CancellationTokenSource(
+            TimeSpan.FromSeconds(1));
+
+        var defined = FiniteDomainSmtDifferentialOracle
+            .IsDefinedForAllAssignments(
+                factory,
+                contradiction,
+                safety.Token);
+        var comparison = await new FiniteDomainSmtDifferentialOracle()
+            .CompareAsync(
+                factory,
+                contradiction,
+                safety.Token);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(defined, Is.False);
+            Assert.That(
+                comparison.Status,
+                Is.EqualTo(FuzzOracleStatus.Abstained));
+            Assert.That(
+                comparison.Detail,
+                Does.Contain("assignment limit"));
+            Assert.That(
+                safety.IsCancellationRequested,
+                Is.False,
+                "The safety timeout fired before the oracle budget.");
+        }
+    }
+
     [TestCase(0, 0, 1, 1)]
     [TestCase(7, 1, 0, 1)]
     public async Task PartialTermOracleChecksShortCircuitAndUndefinedArithmetic(
