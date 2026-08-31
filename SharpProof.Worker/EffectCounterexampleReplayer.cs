@@ -31,11 +31,14 @@ internal static class EffectCounterexampleReplayer
         }
 
         WorkerEffectViolationWitness? violation = null;
+        var treeSnapshotHashes = target.Compilation.SyntaxTrees
+            .Select(CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256)
+            .ToArray();
         for (var index = 0; index < replay.Events.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var effectEvent = replay.Events[index];
-            ValidateEvent(target, effectEvent, index);
+            ValidateEvent(target, effectEvent, index, treeSnapshotHashes);
             var observed = Interpret(effectEvent);
             if (observed == null)
             {
@@ -59,7 +62,8 @@ internal static class EffectCounterexampleReplayer
     private static void ValidateEvent(
         CompilerCallablePreparation target,
         CompilerEffectReplayEventArtifact effectEvent,
-        int ordinal)
+        int ordinal,
+        string[] treeSnapshotHashes)
     {
         if (effectEvent == null ||
             effectEvent.Ordinal != ordinal ||
@@ -82,8 +86,7 @@ internal static class EffectCounterexampleReplayer
         var tree = trees[effectEvent.SyntaxTreeOrdinal];
         if (tree == null ||
             effectEvent.SyntaxTreeSha256 != tree.Sha256 ||
-            effectEvent.SyntaxTreeSnapshotSha256 !=
-                CompilationFingerprint.ComputeSyntaxTreeSnapshotSha256(tree) ||
+            effectEvent.SyntaxTreeSnapshotSha256 != treeSnapshotHashes[effectEvent.SyntaxTreeOrdinal] ||
             effectEvent.SyntaxTreeLineMapSha256 != tree.LineMapSha256 ||
             effectEvent.SyntaxStart < 0 ||
             effectEvent.SyntaxLength <= 0 ||
