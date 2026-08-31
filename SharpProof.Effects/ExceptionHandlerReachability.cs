@@ -2620,33 +2620,49 @@ internal sealed class ExceptionHandlerReachability(
                 return result;
             }
         }
-        if (info.MoveNextMethod is not { } moveNext)
+        var moveNextExceptions = EmptyPotential;
+        var moveNextCompletes = true;
+        if (info.MoveNextMethod is { } moveNext)
+        {
+            moveNextExceptions = GetImplicitCallableExceptions(
+                moveNext,
+                forEach,
+                activeMethods,
+                depth,
+                out moveNextCompletes);
+            result = Union(result, moveNextExceptions);
+            if (moveNextCompletes &&
+                info.CurrentProperty?.GetMethod is { } getCurrent)
+            {
+                result = Union(
+                    result,
+                    GetImplicitCallableExceptions(
+                        getCurrent,
+                        forEach,
+                        activeMethods,
+                        depth,
+                        out reachesBody));
+            }
+            else
+            {
+                reachesBody = moveNextCompletes;
+            }
+        }
+        else
         {
             reachesBody = true;
-            return result;
         }
-        var moveNextExceptions = GetImplicitCallableExceptions(
-            moveNext,
-            forEach,
-            activeMethods,
-            depth,
-            out var moveNextCompletes);
-        result = Union(result, moveNextExceptions);
-        if (moveNextCompletes &&
-            info.CurrentProperty?.GetMethod is { } getCurrent)
+        if (reachesBody &&
+            info.ElementConversion.MethodSymbol is { } elementConversion)
         {
             result = Union(
                 result,
                 GetImplicitCallableExceptions(
-                    getCurrent,
+                    elementConversion,
                     forEach,
                     activeMethods,
                     depth,
                     out reachesBody));
-        }
-        else
-        {
-            reachesBody = moveNextCompletes;
         }
         if ((moveNextCompletes || moveNextExceptions.Unknown ||
              !moveNextExceptions.Known.IsEmpty) &&
