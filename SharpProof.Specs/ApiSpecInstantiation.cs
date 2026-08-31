@@ -39,6 +39,7 @@ public static partial class ApiSpecInstantiator
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         substitutions = ArgumentNullGuard.NotNull(
             substitutions, nameof(substitutions));
+        substitutions = substitutions.ToImmutableDictionary();
 
         var variables = template.Variables.ToImmutableDictionary(static item => item.Id);
         foreach (var substitution in substitutions)
