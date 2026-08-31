@@ -1660,6 +1660,122 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 diagnostic.ToString())));
     }
 
+    [TestCase("caught is ArgumentException")]
+    [TestCase("!(caught is OperationCanceledException)")]
+    [TestCase("caught is null")]
+    [TestCase("!(caught is not null)")]
+    [TestCase("caught is not (OperationCanceledException or ArgumentException)")]
+    [TestCase("caught is not OperationCanceledException && condition")]
+    [TestCase("caught is ArgumentException || caught is InvalidOperationException")]
+    public async Task AllowsComposedFiltersThatExcludeCancellation(string filter)
+    {
+        var source =
+            $$"""
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static void M(bool condition) {
+                    try { }
+                    catch (Exception caught) when ({{filter}}) { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA003"),
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic =>
+                diagnostic.ToString())));
+    }
+
+    [TestCase("caught is not OperationCanceledException || condition")]
+    [TestCase("caught is not ArgumentException && condition")]
+    [TestCase("!(caught is ArgumentException)")]
+    [TestCase("caught is not null")]
+    public async Task RejectsComposedFiltersThatMayIncludeCancellation(string filter)
+    {
+        var source =
+            $$"""
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static void M(bool condition) {
+                    try { }
+                    catch (Exception caught) when ({{filter}}) { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA003"),
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic =>
+                diagnostic.ToString())));
+    }
+
+    [TestCase("caught is not null")]
+    [TestCase("caught is not ArgumentException")]
+    [TestCase("!(caught is ArgumentException)")]
+    [TestCase("caught is OperationCanceledException || condition")]
+    [TestCase(
+        "caught is OperationCanceledException && caught is not ArgumentException")]
+    public async Task AllowsLaterCatchAfterExhaustiveCancellationFilter(
+        string filter)
+    {
+        var source =
+            $$"""
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static void M(bool condition) {
+                    try { }
+                    catch (Exception caught) when ({{filter}}) { throw; }
+                    catch (Exception) { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA003"),
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic =>
+                diagnostic.ToString())));
+    }
+
+    [TestCase("MayThrow() || caught is OperationCanceledException")]
+    [TestCase("!(MayThrow() && caught is ArgumentException)")]
+    public async Task DoesNotTreatPotentiallyThrowingFilterAsExhaustive(
+        string filter)
+    {
+        var source =
+            $$"""
+            using System;
+            namespace SharpProof.Verify;
+            static class C {
+                static bool MayThrow() => throw new InvalidOperationException();
+                static void M() {
+                    try { }
+                    catch (Exception caught) when ({{filter}}) { throw; }
+                    catch (Exception) { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1),
+            string.Join(Environment.NewLine, diagnostics.Select(static diagnostic =>
+                diagnostic.ToString())));
+    }
+
     [Test]
     public async Task UserDefinedConversionCannotExcludeCancellationFilterAnalysis()
     {
@@ -2889,7 +3005,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     catch (Exception) { }
                 }
 
-                static void UnsupportedExhaustivePattern()
+                static void ExhaustiveNonNullPattern()
                 {
                     try { }
                     catch (Exception caught)
@@ -2948,7 +3064,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             .ToArray();
         Assert.That(
             cancellationDiagnostics,
-            Has.Length.EqualTo(5),
+            Has.Length.EqualTo(4),
             string.Join(
                 ", ",
                 cancellationDiagnostics.Select(static diagnostic =>
