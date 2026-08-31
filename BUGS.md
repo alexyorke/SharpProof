@@ -1,6 +1,6 @@
 # Bug backlog
 
-391 open bugs, reprioritized by impact, reachability, and affected scope.
+390 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (103)
+## P0 - Critical (102)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -38,7 +38,6 @@ Priority definitions:
 - **BUG-088 [P0] - Mutable runtime paths invalidate containment authentication:** RunVerifier reduces the dotnet host and supervisor assembly to mutable pathnames before launch, without durable byte identity. Replacement between validation and launch can make lifecycle receipts describe code that did not enforce descendant cleanup.
 - **BUG-092 [P0] - Nested local functions can suppress list-pattern indexer calls:** Effects list-pattern completion can confuse a nested expression-bodied local function with a custom Length constant and skip the mandatory indexer call. Indexer effects and noncompletion can disappear from a Complete summary, falsely proving effect contracts.
 - **BUG-093 [P0] - Nested nameof properties are treated as executed accessors:** RequiresCallSiteDiscovery suppresses only property references directly parented by nameof, not nested receiver properties. It can replay a getter that never executes and emit a false SP0027 Refuted outcome.
-- **BUG-094 [P0] - Nested wrappers bypass semantic-cache soundness diagnostics:** CacheSoundnessRules removes only one parenthesis or ordinary conversion before classifying a cached semantic answer. Additional wrappers hide unsafe Unknown or error answers from SPMETA010, allowing prohibited semantic results into caches.
 - **BUG-095 [P0] - Non-consuming delegate uses are treated as execution or escape:** RequiresCallSiteTreeAnalyzer treats metadata reads, write-only out arguments, and unused delegate combinations as consumption of prior delegates. It analyzes dead local functions or lambdas and can emit false SP0027 diagnostics or Refuted outcomes.
 - **BUG-096 [P0] - Non-root operation subtrees are accepted as contract bodies:** ContractClauseInventoryBuilder accepts any supplied IOperation without proving it is the callable body root. A late or conditional contract invocation can be promoted to a valid prologue, suppressing placement failure and changing effective contract semantics.
 - **BUG-097 [P0] - Normal control flow bypasses mandatory finally regions:** RoslynProgramLowerer and nested-callable reachability follow only branch destinations and ignore ControlFlowBranch.FinallyRegions. Mandatory finally mutations can be erased while frontend lowering remains Exact, enabling false postcondition proofs and missed Requires diagnostics.
