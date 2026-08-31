@@ -60,18 +60,37 @@ internal static class ContractForCompanionValidator
         var candidates = GetLogicalMethods(companion.Companion);
         var intrinsics = new ContractIntrinsicValidator(compilation);
         var comparer = (IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default;
-        var byTarget = targets.ToDictionary(
-            static target => target,
-            target => candidates.Where(candidate =>
-                ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
-                .ToImmutableArray(),
-            comparer);
-        var byCandidate = candidates.ToDictionary(
-            static candidate => candidate,
-            candidate => targets.Where(target =>
-                ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
-                .ToImmutableArray(),
-            comparer);
+        var byTarget = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(comparer);
+        foreach (var target in targets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var matches = ImmutableArray.CreateBuilder<IMethodSymbol>();
+            foreach (var candidate in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
+                {
+                    matches.Add(candidate);
+                }
+            }
+            byTarget.Add(target, matches.ToImmutable());
+        }
+
+        var byCandidate = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(comparer);
+        foreach (var candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var matches = ImmutableArray.CreateBuilder<IMethodSymbol>();
+            foreach (var target in targets)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
+                {
+                    matches.Add(target);
+                }
+            }
+            byCandidate.Add(candidate, matches.ToImmutable());
+        }
         var targetSurfaceIsComplete = targets.All(target =>
             byTarget[target] is { Length: 1 } matches &&
             byCandidate[matches[0]].Length == 1);
