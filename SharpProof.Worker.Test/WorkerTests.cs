@@ -5173,6 +5173,85 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task ThrowingBackendCleanupDoesNotReplaceCompletedOutcome()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var backend = new ThrowingDisposeBackend(
+            BackendCheckResult.Unsatisfiable([]));
+        using var worker = new SharpProofWorker(() => backend);
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
+            Assert.That(
+                response.ClaimResults.Single().Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(backend.DisposeCalls, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public async Task PartialBackendSetupCleanupPreservesTypedFailureAndDisposesEveryLane()
+    {
+        using var project = TestProject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Subject {
+                public static long A(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+                public static long B(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+                public static long C(long value) {
+                    Contract.Ensures(Contract.Result<long>() == value);
+                    return value;
+                }
+            }
+            """);
+        var request = project.CreateRequest(cacheEnabled: false);
+        request.Budgets.MaxParallelism = 3;
+        var factoryCalls = 0;
+        var created = new List<ThrowingDisposeBackend>();
+        using var worker = new SharpProofWorker(() =>
+        {
+            factoryCalls++;
+            if (factoryCalls == 3)
+            {
+                throw new DllNotFoundException("third backend unavailable");
+            }
+
+            var backend = new ThrowingDisposeBackend(
+                BackendCheckResult.Unsatisfiable([]));
+            created.Add(backend);
+            return backend;
+        });
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factoryCalls, Is.EqualTo(3));
+            Assert.That(created, Has.Count.EqualTo(2));
+            Assert.That(
+                created.Select(static backend => backend.DisposeCalls),
+                Is.All.EqualTo(1));
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.BackendUnavailable));
+            Assert.That(
+                response.ClaimResults.Select(static result => result.Reason),
+                Is.All.EqualTo(WorkerClaimReason.BackendUnavailable));
+        }
+    }
+
+    [Test]
     public async Task BackendFactoryCannotReuseAnInstanceAcrossSolverLanes()
     {
         using var project = TestProject.Create(
@@ -6297,6 +6376,32 @@ public sealed class WorkerTests
         public void Dispose()
         {
             _state.DisposedBackend();
+        }
+    }
+
+    private sealed class ThrowingDisposeBackend(BackendCheckResult result) :
+        ISmtBackend,
+        IDisposable
+    {
+        private readonly BackendCheckResult _result = result;
+
+        internal int DisposeCalls
+        {
+            get; private set;
+        }
+
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(_result);
+        }
+
+        public void Dispose()
+        {
+            DisposeCalls++;
+            throw new InvalidOperationException("backend disposal failed");
         }
     }
 
