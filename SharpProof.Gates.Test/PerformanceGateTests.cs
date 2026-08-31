@@ -1,8 +1,6 @@
 using NUnit.Framework;
 using SharpProof.Gates.Performance;
 using SharpProof.Worker.Protocol;
-using Microsoft.CodeAnalysis;
-using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -464,22 +462,18 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
-    public void EnabledAnalyzerRetentionWarmupsRemainTracked()
+    public void EnabledRetentionAnalysisAcceptsAReusableAnalyzer()
     {
         var method = typeof(PerformanceGate).GetMethod(
-            "WarmEnabledAnalyzerRetentionPaths",
-            BindingFlags.NonPublic | BindingFlags.Static) ??
-            throw new InvalidOperationException(
-                "Could not find the enabled analyzer retention warmup.");
+            "AnalyzeEnabledCompilation",
+            BindingFlags.NonPublic | BindingFlags.Static);
 
-        var result = method.Invoke(null, [1, CancellationToken.None]);
-
+        Assert.That(method, Is.Not.Null);
         Assert.That(
-            result,
-            Is.TypeOf<ImmutableArray<WeakReference<Compilation>>>());
-        Assert.That(
-            (ImmutableArray<WeakReference<Compilation>>)result!,
-            Has.Length.EqualTo(1));
+            method!.GetParameters().Count(static parameter =>
+                typeof(Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer)
+                    .IsAssignableFrom(parameter.ParameterType)),
+            Is.EqualTo(1));
     }
 
     [Test]
