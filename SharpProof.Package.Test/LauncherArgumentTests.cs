@@ -458,6 +458,44 @@ public sealed class LauncherArgumentTests
 
     [Test]
     [Platform("Linux")]
+    public void RequestProjectionRejectsDirectoryResultBeforeManifestRead()
+    {
+        var root = Directory.CreateTempSubdirectory(
+            "sharpproof-directory-result-");
+        var workerDirectory = Path.Combine(root.FullName, "worker");
+        var ioDirectory = Path.Combine(root.FullName, "io");
+        var resultDirectory = Path.Combine(ioDirectory, "result.json");
+        Directory.CreateDirectory(workerDirectory);
+        Directory.CreateDirectory(resultDirectory);
+        try
+        {
+            string[] arguments = [
+                "verify",
+                "--worker", Path.Combine(workerDirectory, "worker.dll"),
+                "--request", Path.Combine(ioDirectory, "request.json"),
+                "--result", resultDirectory,
+                "--compiler-manifest", Path.Combine(
+                    ioDirectory,
+                    "missing-compiler-manifest.json"),
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ];
+            Assert.That(
+                LauncherArguments.TryParse(arguments, out var parsed),
+                Is.True);
+
+            Assert.That(
+                (Action)(() => parsed.CreateRequest(out _, out _)),
+                Throws.TypeOf<ArgumentException>());
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
     public void RequestProjectionRejectsSymbolicLinkPathBeforeManifestRead()
     {
         var root = Path.Combine(
