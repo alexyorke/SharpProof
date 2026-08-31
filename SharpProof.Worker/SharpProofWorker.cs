@@ -52,10 +52,17 @@ public sealed class SharpProofWorker : IDisposable
 
         ArgumentNullException.ThrowIfNull(request);
         var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
-        using var projectBoundary = cancellationToken.IsCancellationRequested
-            ? new CancellationTokenSource()
-            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        projectBoundary.CancelAfter(request.Budgets.ProjectWallTimeMilliseconds);
+        using var projectBoundary =
+            CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken);
+        var remainingProjectMilliseconds =
+            request.Budgets.ProjectWallTimeMilliseconds - Elapsed(started);
+        var projectDeadlineExpired = remainingProjectMilliseconds <= 0;
+        if (!projectDeadlineExpired)
+        {
+            projectBoundary.CancelAfter(
+                checked((int)remainingProjectMilliseconds));
+        }
         WorkerVerifyResponse Failed(WorkerRunFailureReason reason, string code, string message, string inputHash = "")
         {
             return Failure(inputHash, reason, request.Budgets, started, Error(code, message), requestHash);
@@ -79,16 +86,19 @@ public sealed class SharpProofWorker : IDisposable
                     : null,
                 versions: Versions(), elapsedMilliseconds: Elapsed(started));
         }
+        if (projectDeadlineExpired)
+        {
+            return Interrupted();
+        }
         WorkerInputSnapshot snapshot;
         VerificationLane[] solverLanes = [];
         var ownsInjectedBackendRunGate = false;
         try
         {
-            // A timeout or cancellation result must remain accountable to the
-            // authoritative manifest. The launcher hard limit still bounds a
-            // snapshot load that does not complete.
             snapshot = await WorkerInputSnapshot.LoadAsync(
-                request, WorkerCacheIdentity.Current, CancellationToken.None).ConfigureAwait(false);
+                request,
+                WorkerCacheIdentity.Current,
+                projectBoundary.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) { return Interrupted(); }
         catch (IOException exception) when (exception.Message == WorkerInputSnapshot.ManifestUnavailable)
@@ -137,7 +147,9 @@ public sealed class SharpProofWorker : IDisposable
             ImmutableArray<CompilerCallablePreparation> targets;
             try
             {
-                targets = CompilerManifestArtifactJson.DecodeCallables(snapshot.CompilerManifest);
+                targets = CompilerManifestArtifactJson.DecodeCallables(
+                    snapshot.CompilerManifest,
+                    projectBoundary.Token);
             }
             catch (Exception exception) when (exception is not OutOfMemoryException and
                 not StackOverflowException and not OperationCanceledException)

@@ -301,9 +301,12 @@ internal sealed class WorkerRuntimeClosureSnapshot(
 
 internal static class CompilerManifestArtifactJson
 {
-    internal static string Serialize(CompilerManifestArtifact artifact)
+    internal static string Serialize(
+        CompilerManifestArtifact artifact,
+        CancellationToken cancellationToken = default)
     {
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!HasValidDiagnosticShapes(artifact.CompilerDiagnostics))
         {
@@ -322,11 +325,14 @@ internal static class CompilerManifestArtifactJson
                 .OrderBy(static item => item?.OwnerKind)
                 .ThenBy(static item => item?.OwnerId, StringComparer.Ordinal)
         ];
-        Validate(artifact);
+        cancellationToken.ThrowIfCancellationRequested();
+        Validate(artifact, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         var json = JsonSerializer.Serialize(
                 artifact,
                 WorkerProtocolJson.Options) +
             "\n";
+        cancellationToken.ThrowIfCancellationRequested();
         if (Encoding.UTF8.GetByteCount(json) >
             CompilerManifestArtifactFile.MaximumBytes)
         {
@@ -337,26 +343,35 @@ internal static class CompilerManifestArtifactJson
         return json;
     }
 
-    internal static CompilerManifestArtifact Deserialize(string json)
+    internal static CompilerManifestArtifact Deserialize(
+        string json,
+        CancellationToken cancellationToken = default)
     {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSpecificationPackAuthorityProperties(json);
+        cancellationToken.ThrowIfCancellationRequested();
         RequireDiagnosticClassificationProperties(json);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
             json, WorkerProtocolJson.Options) ??
             throw new JsonException("A compiler manifest artifact is required.");
-        Validate(artifact);
-        if (Serialize(artifact) != json)
+        cancellationToken.ThrowIfCancellationRequested();
+        Validate(artifact, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Serialize(artifact, cancellationToken) != json)
         {
             throw new JsonException("The compiler manifest artifact is not canonical.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return artifact;
     }
 
     internal static ImmutableArray<CompilerCallablePreparation> DecodeCallables(
-        CompilerManifestArtifact artifact)
+        CompilerManifestArtifact artifact,
+        CancellationToken cancellationToken = default)
     {
         // DecodeCallables is also used by in-memory hydration probes that
         // deliberately mutate lowered evidence after the wire seal. Let the
@@ -365,56 +380,83 @@ internal static class CompilerManifestArtifactJson
         Validate(
             artifact,
             validateFeatureScope: false,
-            validateDecodability: false);
+            validateDecodability: false,
+            cancellationToken);
         return CompilerLoweredArtifact.Decode(
             artifact.Callables,
             artifact.Manifest,
-            artifact.Compilation);
+            artifact.Compilation,
+            cancellationToken);
     }
 
-    internal static void Validate(CompilerManifestArtifact value)
+    internal static void Validate(
+        CompilerManifestArtifact value,
+        CancellationToken cancellationToken = default)
     {
         Validate(
             value,
             validateFeatureScope: true,
-            validateDecodability: true);
+            validateDecodability: true,
+            cancellationToken);
     }
 
     private static void Validate(
         CompilerManifestArtifact value,
         bool validateFeatureScope,
-        bool validateDecodability)
+        bool validateDecodability,
+        CancellationToken cancellationToken)
     {
-        if (!HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation) ||
-            !HasValidEnvelope(value) ||
-            (validateFeatureScope && !HasValidFeatureScope(value)) ||
-            !HasValidLocationAuthorities(value) ||
-            !HasMatchingCallables(value.Callables, value.Manifest) ||
-            !HasValidCallableStates(
-                value.Callables,
-                value.CompilerDiagnostics.Length != 0) ||
-            !HasValidEffectReplayTrees(value.Callables, value.Compilation))
-        {
-            throw new JsonException("The compiler manifest artifact is invalid.");
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(
+            HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(HasValidEnvelope(value));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(!validateFeatureScope || HasValidFeatureScope(value));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(HasValidLocationAuthorities(value));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(HasMatchingCallables(value.Callables, value.Manifest));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(HasValidCallableStates(
+            value.Callables,
+            value.CompilerDiagnostics.Length != 0));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(HasValidEffectReplayTrees(
+            value.Callables,
+            value.Compilation));
 
+        cancellationToken.ThrowIfCancellationRequested();
         CompilationFingerprint.ValidateShape(value.Compilation);
-        if (validateDecodability && !HasDecodableCallables(value))
+        cancellationToken.ThrowIfCancellationRequested();
+        if (validateDecodability &&
+            !HasDecodableCallables(value, cancellationToken))
         {
             throw new JsonException(
                 "The compiler manifest callable payload is invalid.");
         }
+
+        static void RequireValid(bool condition)
+        {
+            if (!condition)
+            {
+                throw new JsonException(
+                    "The compiler manifest artifact is invalid.");
+            }
+        }
     }
 
     private static bool HasDecodableCallables(
-        CompilerManifestArtifact value)
+        CompilerManifestArtifact value,
+        CancellationToken cancellationToken)
     {
         try
         {
             _ = CompilerLoweredArtifact.Decode(
                 value.Callables,
                 value.Manifest,
-                value.Compilation);
+                value.Compilation,
+                cancellationToken);
             return true;
         }
         catch (InvalidDataException)
@@ -901,14 +943,21 @@ internal static class CompilerManifestArtifactFile
 
     internal static byte[] ReadAllBytes(
         string path,
-        int maximumBytes = MaximumBytes)
+        int maximumBytes = MaximumBytes,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         using var stream = Open(path, out var length, maximumBytes);
+        cancellationToken.ThrowIfCancellationRequested();
         var bytes = new byte[length];
         var offset = 0;
         while (offset < bytes.Length)
         {
-            var read = stream.Read(bytes, offset, bytes.Length - offset);
+            cancellationToken.ThrowIfCancellationRequested();
+            var read = stream.Read(
+                bytes,
+                offset,
+                Math.Min(64 * 1024, bytes.Length - offset));
             if (read == 0)
             {
                 throw new InvalidDataException(
@@ -917,7 +966,9 @@ internal static class CompilerManifestArtifactFile
 
             offset += read;
         }
+        cancellationToken.ThrowIfCancellationRequested();
         EnsureEndOfFile(stream.ReadByte());
+        cancellationToken.ThrowIfCancellationRequested();
         return bytes;
     }
 
