@@ -337,7 +337,10 @@ internal sealed partial class OperationEffectScanner
     }
 
     private EffectSummary ScanProperty(
-        IPropertyReferenceOperation property, EffectAccess access, IOperation? assignedValue = null)
+        IPropertyReferenceOperation property,
+        EffectAccess access,
+        IOperation? assignedValue = null,
+        EffectRegionSet? assignedValueRegion = null)
     {
         if (PrimaryConstructorParameterOwnership
             .IsPositionalRecordProperty(property.Property))
@@ -372,12 +375,21 @@ internal sealed partial class OperationEffectScanner
         var actualArguments = EffectCallSiteResolver.AlignActualArguments(
             property.Arguments,
             accessor.Parameters.Length);
-        if (assignedValue != null)
+        var storedValueRegion = assignedValueRegion;
+        if (storedValueRegion == null && assignedValue != null)
+        {
+            storedValueRegion =
+                _conversionOwnership.ClassifyCallArgumentRegion(
+                    assignedValue);
+        }
+        if (storedValueRegion is { } region)
         {
             arguments = arguments.SetItem(
                 accessor.Parameters.Length - 1,
-                _conversionOwnership.ClassifyCallArgumentRegion(
-                    assignedValue));
+                region);
+        }
+        if (assignedValue != null)
+        {
             actualArguments = actualArguments.SetItem(
                 accessor.Parameters.Length - 1,
                 assignedValue);
