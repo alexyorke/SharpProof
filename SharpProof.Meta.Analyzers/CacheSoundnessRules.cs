@@ -508,10 +508,10 @@ internal static class CacheSoundnessRules
         ILocalSymbol local)
     {
         if (invocation.TargetMethod.ReducedFrom is
-                { Parameters.Length: > 0 } reduced &&
+            { Parameters.Length: > 0 } reduced &&
             IsWritableReference(reduced.Parameters[0].RefKind) &&
             FindLocalReference(invocation.Instance, local) is
-                { } receiver)
+            { } receiver)
         {
             return receiver;
         }
