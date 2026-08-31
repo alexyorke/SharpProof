@@ -6,15 +6,33 @@ namespace SharpProof.Specs;
 /// </summary>
 internal static class ApiSpecTermValidator
 {
+    private const int MaximumExpressionDepth = 256;
+
     internal static TermFacts Validate(
         SpecTermDeclaration declaration,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets)
     {
+        return Validate(declaration, variables, facets, depth: 1);
+    }
+
+    private static TermFacts Validate(
+        SpecTermDeclaration declaration,
+        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+        ApiSpecFacets facets,
+        int depth)
+    {
         if (declaration == null)
         {
             throw new ArgumentException(
                 "Spec expressions cannot contain null.",
+                nameof(declaration));
+        }
+
+        if (depth > MaximumExpressionDepth)
+        {
+            throw new ArgumentException(
+                "Spec expressions exceed the expression depth limit.",
                 nameof(declaration));
         }
 
@@ -74,13 +92,21 @@ internal static class ApiSpecTermValidator
 
                 return new(nullValue.Type, true, false, null);
             case SpecUnaryDeclaration unary:
-                return ValidateUnary(unary, variables, facets);
+                return ValidateUnary(unary, variables, facets, depth);
             case SpecBinaryDeclaration binary:
-                return ValidateBinary(binary, variables, facets);
+                return ValidateBinary(binary, variables, facets, depth);
             case SpecConditionalDeclaration conditional:
-                return ValidateConditional(conditional, variables, facets);
+                return ValidateConditional(
+                    conditional,
+                    variables,
+                    facets,
+                    depth);
             case SpecLengthDeclaration length:
-                var value = Validate(length.Value, variables, facets);
+                var value = Validate(
+                    length.Value,
+                    variables,
+                    facets,
+                    depth + 1);
                 if (value.Type is not (
                     IrTypeKind.String or IrTypeKind.Sequence))
                 {
@@ -104,9 +130,14 @@ internal static class ApiSpecTermValidator
     private static TermFacts ValidateUnary(
         SpecUnaryDeclaration unary,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        int depth)
     {
-        var operand = Validate(unary.Operand, variables, facets);
+        var operand = Validate(
+            unary.Operand,
+            variables,
+            facets,
+            depth + 1);
         var expected = IrOperatorCatalog.Get(unary.Operator).Operand;
         if (operand.Type != expected || unary.Type != expected)
         {
@@ -139,10 +170,19 @@ internal static class ApiSpecTermValidator
     private static TermFacts ValidateBinary(
         SpecBinaryDeclaration binary,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        int depth)
     {
-        var left = Validate(binary.Left, variables, facets);
-        var right = Validate(binary.Right, variables, facets);
+        var left = Validate(
+            binary.Left,
+            variables,
+            facets,
+            depth + 1);
+        var right = Validate(
+            binary.Right,
+            variables,
+            facets,
+            depth + 1);
         var shape = IrOperatorCatalog.Get(binary.Operator);
         var operandTypesMatch = shape.Operand.HasValue
             ? left.Type == shape.Operand.Value &&
@@ -195,11 +235,24 @@ internal static class ApiSpecTermValidator
     private static TermFacts ValidateConditional(
         SpecConditionalDeclaration conditional,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        int depth)
     {
-        var condition = Validate(conditional.Condition, variables, facets);
-        var whenTrue = Validate(conditional.WhenTrue, variables, facets);
-        var whenFalse = Validate(conditional.WhenFalse, variables, facets);
+        var condition = Validate(
+            conditional.Condition,
+            variables,
+            facets,
+            depth + 1);
+        var whenTrue = Validate(
+            conditional.WhenTrue,
+            variables,
+            facets,
+            depth + 1);
+        var whenFalse = Validate(
+            conditional.WhenFalse,
+            variables,
+            facets,
+            depth + 1);
         if (condition.Type != IrTypeKind.Boolean ||
             whenTrue.Type != whenFalse.Type ||
             conditional.Type != whenTrue.Type)
