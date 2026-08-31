@@ -2067,15 +2067,20 @@ internal sealed class ExceptionHandlerReachability(
                 ITypeSymbol Type,
                 IOperation Resource,
                 IOperation Origin)>();
-            var acquisitionFailed = false;
+            var allInitializersComplete = true;
+            var reachableDisposalCount = 0;
             foreach (var declarator in group.Declarations
                          .SelectMany(static declaration =>
                              declaration.Declarators))
             {
                 var resource = declarator.Initializer?.Value;
+                if (resource != null && CanExitAbruptly(resource, resource))
+                {
+                    reachableDisposalCount = acquired.Count;
+                }
                 if (!canCompleteNormally(resource))
                 {
-                    acquisitionFailed = true;
+                    allInitializersComplete = false;
                     break;
                 }
                 if (resource != null)
@@ -2086,11 +2091,15 @@ internal sealed class ExceptionHandlerReachability(
                         declarator));
                 }
             }
-            if (!scopeExitReachable && !acquisitionFailed)
+            if (scopeExitReachable && allInitializersComplete)
+            {
+                reachableDisposalCount = acquired.Count;
+            }
+            if (reachableDisposalCount == 0)
             {
                 return EmptyPotential;
             }
-            foreach (var item in acquired.AsEnumerable().Reverse())
+            foreach (var item in acquired.Take(reachableDisposalCount).Reverse())
             {
                 var disposal = GetDisposalExceptions(
                     item.Type,
