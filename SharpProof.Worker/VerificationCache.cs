@@ -102,7 +102,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         }
         catch (Exception exception) when (exception is
             ArgumentException or JsonException or IOException or InvalidDataException or
-                UnauthorizedAccessException)
+                UnauthorizedAccessException or OverflowException)
         {
             return null;
         }
