@@ -715,6 +715,12 @@ public sealed class EffectAnalysisTests
                     FormattableString deferred = $"{value}";
                     s_state++;
                 }
+
+                public static void DeferredFormattingCannotReachCatch(
+                    DeferredValue value) {
+                    try { FormattableString deferred = $"{value}"; }
+                    catch (InvalidOperationException) { s_state++; }
+                }
             }
             """);
         var session = new EffectAnalysisSession(compilation);
@@ -723,6 +729,8 @@ public sealed class EffectAnalysisTests
             Method(compilation, "EvaluateLaterHole"));
         var continuation = session.Analyze(
             Method(compilation, "ContinueAfterCreation"));
+        var unreachableCatch = session.Analyze(
+            Method(compilation, "DeferredFormattingCannotReachCatch"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -763,6 +771,15 @@ public sealed class EffectAnalysisTests
                 "deferred formatter before suffix");
             AssertDoesNotThrow(
                 continuation.Summary,
+                "System.InvalidOperationException");
+
+            Assert.That(
+                unreachableCatch.Summary.Writes.Contains(
+                    EffectRegionId.Static()),
+                Is.False,
+                "deferred formatting catch");
+            AssertDoesNotThrow(
+                unreachableCatch.Summary,
                 "System.InvalidOperationException");
         }
     }
