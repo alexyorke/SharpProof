@@ -368,9 +368,8 @@ public sealed class EffectAnalysisSession
             normalizedTarget.StaticConstructors.Any(
                 static constructor => !constructor.IsImplicitlyDeclared))
         {
-            return EffectSummaryOperations.Throw(
-                ResolveExceptionSet(
-                    FrameworkTypeMetadataNames.TypeInitializationException));
+            return EffectSummaryOperations.UnknownBoundary(
+                EffectUncertainty.UnmodeledCall);
         }
         var mayInitialize = !isSourceType ||
             EffectMethodNodeBuilder.HasPotentialStaticInitialization(
