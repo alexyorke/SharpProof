@@ -106,8 +106,18 @@ internal sealed class ConversionEffectClassifier(
 
     internal bool SkipsLiftedOperator(IOperation operation)
     {
+        return SkipsLiftedOperator(operation, abstractFlow);
+    }
+
+    internal static bool SkipsLiftedOperator(
+        IOperation operation,
+        ManagedFlowResult? flow)
+    {
         var operands = operation switch
         {
+            IConversionOperation conversion when
+                IsLiftedNullableUserConversion(conversion) =>
+                [conversion.Operand],
             IBinaryOperation { IsLifted: true } binary =>
                 [binary.LeftOperand, binary.RightOperand],
             IUnaryOperation { IsLifted: true } unary =>
@@ -121,11 +131,28 @@ internal sealed class ConversionEffectClassifier(
 
         return operands.Any(operand =>
             ManagedAbstractValue.IsNullableType(operand.Type) &&
-            abstractFlow?.TryEvaluate(
-                operation,
-                operand,
-                out var value) == true &&
-            value.IsDefinitelyNull);
+            (operand.ConstantValue is { HasValue: true, Value: null } ||
+                flow?.TryEvaluate(
+                    operation,
+                    operand,
+                    out var value) == true &&
+                value.IsDefinitelyNull));
+    }
+
+    internal static bool IsLiftedNullableUserConversion(
+        IConversionOperation operation)
+    {
+        return operation.OperatorMethod is
+        {
+            Parameters.Length: 1,
+            ReturnType.IsValueType: true
+        } method &&
+            method.Parameters[0].Type.IsValueType &&
+            !ManagedAbstractValue.IsNullableType(
+                method.Parameters[0].Type) &&
+            !ManagedAbstractValue.IsNullableType(method.ReturnType) &&
+            ManagedAbstractValue.IsNullableType(operation.Operand.Type) &&
+            ManagedAbstractValue.IsNullableType(operation.Type);
     }
 
     private EffectSummary ClassifyBoxing(IConversionOperation operation)

@@ -616,9 +616,16 @@ internal sealed partial class OperationEffectScanner
         }
 
         var conversion = Microsoft.CodeAnalysis.CSharp.CSharpExtensions.GetConversion(operation);
+        var operatorEffect = _conversionEffects
+            .SkipsLiftedOperator(operation)
+                ? EffectSummary.Empty
+                : ResolveOperatorEffects(
+                    operation.OperatorMethod,
+                    [operation.Operand],
+                    operation);
         var conversionEffect = EffectSummaryOperations.Join(
             _conversionEffects.Classify(operation, conversion),
-            ResolveOperatorEffects(operation.OperatorMethod, [operation.Operand], operation));
+            operatorEffect);
         return operand.Then(new EffectStep(
             conversionEffect,
             _completionEvaluator.CanCompleteNormally(operation))).Summary;

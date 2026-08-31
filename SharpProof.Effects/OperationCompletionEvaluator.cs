@@ -1096,6 +1096,16 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
+        if (ConversionEffectClassifier
+                .IsLiftedNullableUserConversion(conversion) &&
+            (_isProvenNull(conversion.Operand, conversion) ||
+             ConversionEffectClassifier.SkipsLiftedOperator(
+                 conversion,
+                 _abstractFlow)))
+        {
+            return true;
+        }
+
         if (conversion.OperatorMethod == null &&
             conversion.Type?.IsValueType == true &&
             !ManagedAbstractValue.IsNullableType(conversion.Type) &&

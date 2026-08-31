@@ -721,7 +721,10 @@ internal sealed class ExceptionHandlerReachability(
             if (operation is IConversionOperation conversion &&
                 conversion.OperatorMethod is { } conversionOperator)
             {
-                if (canCompleteNormally(conversion.Operand))
+                if (canCompleteNormally(conversion.Operand) &&
+                    !ConversionEffectClassifier.SkipsLiftedOperator(
+                        conversion,
+                        abstractFlow))
                 {
                     if (AddStaticInitializationPotential(
                             conversionOperator,
