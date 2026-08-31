@@ -510,7 +510,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             ControlFlowGraph graph,
             IOperation value)
         {
-            if (IsDirectDelegateRemovalOperand(value.Syntax))
+            if (IsDirectDelegateRemovalOperand(value.Syntax) ||
+                IsDiscardedDelegateConversion(value.Syntax))
             {
                 return false;
             }
@@ -532,6 +533,24 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 block.Ordinal,
                 definition.Span.End,
                 GetTuplePath(value.Syntax, definition));
+        }
+
+        private bool IsDiscardedDelegateConversion(SyntaxNode value)
+        {
+            var assignment = value.Ancestors()
+                .OfType<AssignmentExpressionSyntax>()
+                .FirstOrDefault(candidate =>
+                    candidate.Right.Span.Contains(value.Span));
+            if (assignment?.Left is not IdentifierNameSyntax discard ||
+                discard.Identifier.Text != "_")
+            {
+                return false;
+            }
+
+            // A real local named "_" is a destination and remains reachable.
+            return semanticModel.GetSymbolInfo(
+                discard,
+                cancellationToken).Symbol == null;
         }
 
         private bool TryGetLocalDestination(

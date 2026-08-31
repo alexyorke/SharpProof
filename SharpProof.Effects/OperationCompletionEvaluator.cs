@@ -21,7 +21,8 @@ internal sealed class OperationCompletionEvaluator
         Func<IOperation?, IOperation, bool> isProvenNull,
         Func<IOperation?, IOperation, bool> isProvenNonNull,
         Func<IInvocationOperation, bool> isImplicitLockEnterWithNullValue,
-        ManagedFlowResult? abstractFlow = null)
+        ManagedFlowResult? abstractFlow = null,
+        CancellationToken cancellationToken = default)
     {
         _abstractFlow = abstractFlow;
         _apiSpecs = session.ApiSpecs;
@@ -29,10 +30,10 @@ internal sealed class OperationCompletionEvaluator
         _compilation = session.Compilation;
         _completionFacts = new DefiniteOperationFacts(
             session.Compilation,
-            CancellationToken.None);
+            cancellationToken);
         _staticInitializationFacts = new DefiniteOperationFacts(
             session.Compilation,
-            CancellationToken.None);
+            cancellationToken);
         _isProvenNull = isProvenNull;
         _isProvenNonNull = isProvenNonNull;
         _isImplicitLockEnterWithNullValue = isImplicitLockEnterWithNullValue;

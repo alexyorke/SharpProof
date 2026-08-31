@@ -54,7 +54,8 @@ internal sealed class EffectMethodNodeBuilder
             _session, method, calls, root, abstractAnalysis?.Result,
             allowDirectWitnesses:
                 graph != null &&
-                HasDefiniteBodyEntry(method, _session.ApiSpecs));
+                HasDefiniteBodyEntry(method, _session.ApiSpecs),
+            cancellationToken);
         var preBodyInitializers = method.MethodKind ==
             MethodKind.StaticConstructor
                 ? ScanConstructorMemberInitializers(
@@ -294,7 +295,8 @@ internal sealed class EffectMethodNodeBuilder
                 calls,
                 operation,
                 abstractFlow: null,
-                allowDirectWitnesses: false);
+                allowDirectWitnesses: false,
+                cancellationToken);
             result = result.Then(scanner.ScanSequence([operation]));
             if (!result.CompletesNormally)
             {

@@ -5,6 +5,19 @@ namespace SharpProof.CompilerArtifact;
 // assembly so the collector and worker cannot gradually diverge.
 internal static class CompilerSourceLocationAuthority
 {
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<WorkerSourceLocation, TreeBinding> TreeBindings = new();
+    private sealed class TreeBinding(int ordinal) { internal int Ordinal { get; } = ordinal; }
+
+    internal static void RememberTree(WorkerSourceLocation location, int ordinal)
+    {
+        TreeBindings.Remove(location);
+        TreeBindings.Add(location, new TreeBinding(ordinal));
+    }
+
+    private static int RememberedTree(WorkerSourceLocation location)
+    {
+        return TreeBindings.TryGetValue(location, out var binding) ? binding.Ordinal : -1;
+    }
     internal static bool IsNone(WorkerSourceLocation? value)
     {
         return value is
@@ -90,6 +103,12 @@ internal static class CompilerSourceLocationAuthority
         }
 
         var ordinal = -1;
+        var remembered = RememberedTree(location);
+        if (remembered >= 0 && remembered < compilation.SyntaxTrees.Length &&
+            HasValidLocationGeometry(location, compilation.SyntaxTrees[remembered]))
+        {
+            return remembered;
+        }
         for (var index = 0; index < compilation.SyntaxTrees.Length; index++)
         {
             var tree = compilation.SyntaxTrees[index];

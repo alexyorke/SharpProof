@@ -663,7 +663,7 @@ internal sealed partial class ClaimManifestBuilder(
         return declaration?.GetLocation() ?? method.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
     }
 
-    private static WorkerSourceLocation ToSourceLocation(Location location)
+    private WorkerSourceLocation ToSourceLocation(Location location)
     {
         if (!location.IsInSource)
         {
@@ -674,7 +674,7 @@ internal sealed partial class ClaimManifestBuilder(
         var path = string.IsNullOrEmpty(mapped.Path)
             ? location.SourceTree?.FilePath ?? string.Empty
             : mapped.Path;
-        return new WorkerSourceLocation
+        var result = new WorkerSourceLocation
         {
             Path = string.IsNullOrEmpty(path) ? "<compiler-generated>" : path,
             Start = location.SourceSpan.Start,
@@ -682,6 +682,15 @@ internal sealed partial class ClaimManifestBuilder(
             Line = mapped.StartLinePosition.Line + 1,
             Column = mapped.StartLinePosition.Character + 1
         };
+        if (location.SourceTree is { } sourceTree)
+        {
+            var ordinal = _compilation.SyntaxTrees.IndexOf(sourceTree);
+            if (ordinal >= 0)
+            {
+                CompilerSourceLocationAuthority.RememberTree(result, ordinal);
+            }
+        }
+        return result;
     }
 
 }

@@ -13,6 +13,32 @@ internal interface ICompilerAdditionalTextSnapshot
 
 internal static class CompilerCompilationCapture
 {
+    private sealed class SyntaxTreeCache
+    {
+        internal SyntaxTreeCache(
+            CSharpCompilation compilation,
+            CancellationToken cancellationToken)
+        {
+            Trees = [.. compilation.SyntaxTrees.Select(tree =>
+                CaptureTree(tree, cancellationToken))];
+        }
+
+        internal CompilerSyntaxTreeSnapshot[] Trees { get; }
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CSharpCompilation, SyntaxTreeCache>
+        SyntaxTreeCaches = new();
+
+    internal static CompilerSyntaxTreeSnapshot[] CaptureTrees(
+        CSharpCompilation compilation,
+        CancellationToken cancellationToken)
+    {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        return SyntaxTreeCaches.GetValue(
+            compilation,
+            value => new SyntaxTreeCache(value, cancellationToken)).Trees;
+    }
+
     private const string CommandLineAdditionalTextTypeName =
         "Microsoft.CodeAnalysis.AdditionalTextFile";
 
@@ -114,7 +140,7 @@ internal static class CompilerCompilationCapture
                 Usings = options.Usings.ToArray(),
                 ResolverPolicy = CompilerResolverPolicy.EvidenceOnly
             },
-            SyntaxTrees = [.. compilation.SyntaxTrees.Select(tree => CaptureTree(tree, cancellationToken))],
+            SyntaxTrees = CaptureTrees(compilation, cancellationToken),
             References = CaptureReferences(
                 compilation.References,
                 ReferenceCaptureLimits.Default,

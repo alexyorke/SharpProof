@@ -411,9 +411,9 @@ internal static class CompilerEffectReplayLowerer
             return false;
         }
 
-        var syntaxTree = CompilerCompilationCapture.CaptureTree(
-            tree,
-            cancellationToken);
+        var capturedTrees = CompilerCompilationCapture.CaptureTrees(
+            compilation, cancellationToken);
+        var syntaxTree = capturedTrees[treeOrdinal];
         treeSha256 = syntaxTree.Sha256;
         treeLineMapSha256 = syntaxTree.LineMapSha256;
         treeSnapshotSha256 = CompilationFingerprint
@@ -426,9 +426,7 @@ internal static class CompilerEffectReplayLowerer
         for (var index = 0; index < trees.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var candidate = CompilerCompilationCapture.CaptureTree(
-                trees[index],
-                cancellationToken);
+            var candidate = capturedTrees[index];
             if (!CompilerSourceLocationAuthority.HasValidLocationGeometry(
                     location,
                     candidate))

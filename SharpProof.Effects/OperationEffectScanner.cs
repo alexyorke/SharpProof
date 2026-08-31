@@ -41,7 +41,8 @@ internal sealed partial class OperationEffectScanner
 
     internal OperationEffectScanner(
         EffectAnalysisSession session, IMethodSymbol method, List<EffectCallSite> calls,
-        IOperation root, ManagedFlowResult? abstractFlow, bool allowDirectWitnesses)
+        IOperation root, ManagedFlowResult? abstractFlow, bool allowDirectWitnesses,
+        CancellationToken cancellationToken = default)
     {
         _session = session;
         _method = method;
@@ -77,7 +78,8 @@ internal sealed partial class OperationEffectScanner
             _nullnessEvaluator.IsProvenNull,
             _nullnessEvaluator.IsProvenNonNull,
             _nullnessEvaluator.IsImplicitLockEnterWithNullValue,
-            abstractFlow);
+            abstractFlow,
+            cancellationToken);
         _handlerReachability = new ExceptionHandlerReachability(
             session.Compilation,
             _method,

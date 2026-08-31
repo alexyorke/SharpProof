@@ -150,8 +150,12 @@ internal static class CompilerCaptureAuthority
                 value.Sha256,
                 EmptyTextSha256,
                 StringComparison.Ordinal) &&
+            // Roslyn preserves duplicate parse-option symbols in the raw
+            // capture, while the effective symbol set necessarily removes
+            // duplicates. Compare against the producer's effective view so
+            // an empty tree does not reject its own capture.
             value.EffectivePreprocessorSymbols.SequenceEqual(
-                value.PreprocessorSymbols,
+                value.PreprocessorSymbols.Distinct(StringComparer.Ordinal),
                 StringComparer.Ordinal);
     }
 }

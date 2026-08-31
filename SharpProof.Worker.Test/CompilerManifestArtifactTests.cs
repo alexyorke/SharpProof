@@ -434,6 +434,20 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void Sp034EmptySyntaxTreesAcceptDuplicateRawPreprocessorSymbols()
+    {
+        var artifact = CreateArtifact(
+            new CSharpParseOptions(
+                LanguageVersion.CSharp12,
+                preprocessorSymbols: ["DUPLICATE", "DUPLICATE"]),
+            source: string.Empty);
+
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact))));
+    }
+
+    [Test]
     public void CompilerCallableFailuresUseOnlyProducerReasons()
     {
         var allowed = new HashSet<WorkerClaimReason>
