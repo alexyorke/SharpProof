@@ -1002,7 +1002,10 @@ internal sealed partial class OperationEffectScanner
         memberIndex++;
 
         if (SwitchExpressionFacts
-            .IsCompilerIntrinsicListPatternMember(pattern, method))
+            .IsCompilerIntrinsicListPatternMember(
+                _session.Compilation,
+                pattern,
+                method))
         {
             return true;
         }

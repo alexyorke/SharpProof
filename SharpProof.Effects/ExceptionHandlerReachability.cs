@@ -849,6 +849,7 @@ internal sealed class ExceptionHandlerReachability(
                     Add(
                         SwitchExpressionFacts
                             .IsCompilerIntrinsicListPatternMember(
+                                compilation,
                                 listPattern,
                                 member)
                             ? EmptyPotential

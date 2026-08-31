@@ -45,13 +45,48 @@ internal static class SwitchExpressionFacts
     }
 
     internal static bool IsCompilerIntrinsicListPatternMember(
+        Compilation compilation,
         IListPatternOperation pattern,
         IMethodSymbol method)
     {
-        return method.DeclaringSyntaxReferences.Length == 0 &&
-            method.ContainingType is { } containingType &&
-            (pattern.InputType is IArrayTypeSymbol ||
-             containingType.IsRefLikeType);
+        if (method.DeclaringSyntaxReferences.Length != 0)
+        {
+            return false;
+        }
+
+        return pattern.InputType is IArrayTypeSymbol ||
+            IsRuntimeSpanMember(compilation, method, "System.Span`1") ||
+            IsRuntimeSpanMember(compilation, method, "System.ReadOnlySpan`1");
+    }
+
+    private static bool IsRuntimeSpanMember(
+        Compilation compilation,
+        IMethodSymbol method,
+        string metadataName)
+    {
+        var runtimeType = compilation
+            .GetSpecialType(SpecialType.System_Object)
+            .ContainingAssembly
+            .GetTypeByMetadataName(metadataName);
+        if (runtimeType == null ||
+            !SymbolEqualityComparer.Default.Equals(
+                method.ContainingType.OriginalDefinition,
+                runtimeType.OriginalDefinition))
+        {
+            return false;
+        }
+
+        return runtimeType.GetMembers().Any(member => member switch
+        {
+            IMethodSymbol candidate => SymbolEqualityComparer.Default.Equals(
+                method.OriginalDefinition,
+                candidate.OriginalDefinition),
+            IPropertySymbol { GetMethod: { } getter } =>
+                SymbolEqualityComparer.Default.Equals(
+                    method.OriginalDefinition,
+                    getter.OriginalDefinition),
+            _ => false
+        });
     }
 
     internal static IReadOnlyList<ISwitchExpressionArmOperation> GetReachableArms(
