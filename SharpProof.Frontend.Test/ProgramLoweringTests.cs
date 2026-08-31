@@ -307,6 +307,30 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void ReachableCatchHandlerCannotBeOmittedFromExactLowering()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long value) {
+                try {
+                    return 10L / value;
+                }
+                catch (System.DivideByZeroException) {
+                    return -1L;
+                }
+            }
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedControlFlow));
+        }
+    }
+
+    [Test]
     public void InvocationLoweringPreservesReceiverAndSourceArgumentOrder()
     {
         var lowered = Lower(
