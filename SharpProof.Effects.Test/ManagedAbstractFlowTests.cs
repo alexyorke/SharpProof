@@ -234,7 +234,7 @@ public sealed class ManagedAbstractFlowTests
         {
             Assert.That(conditionalValue.IsUnknown, Is.True);
             Assert.That(coalesceValue.IsDefinitelyNull, Is.False);
-            Assert.That(coalesceValue.IsDefinitelyNonNull, Is.False);
+            Assert.That(coalesceValue.IsDefinitelyNonNull, Is.True);
         }
     }
 
