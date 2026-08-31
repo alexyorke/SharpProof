@@ -911,7 +911,11 @@ internal static class CacheSoundnessRules
     {
         if (!resolving.Add(reference.Local))
         {
-            return true;
+            // A repeated local produced by a plain local initializer or
+            // assignment is an alias cycle; the outer frame evaluates the
+            // originating definition. Reference/out writes are different:
+            // their value is intentionally unknown and must remain flagged.
+            return IsPlainLocalAlias(reference) ? false : true;
         }
         try
         {
@@ -933,6 +937,31 @@ internal static class CacheSoundnessRules
         {
             resolving.Remove(reference.Local);
         }
+    }
+
+    private static bool IsPlainLocalAlias(ILocalReferenceOperation reference)
+    {
+        for (var parent = reference.Parent; parent != null; parent = parent.Parent)
+        {
+            if (parent is IArgumentOperation)
+            {
+                return false;
+            }
+
+            if (parent is IVariableDeclaratorOperation or
+                ISimpleAssignmentOperation or
+                IDeconstructionAssignmentOperation)
+            {
+                return true;
+            }
+
+            if (parent is IInvocationOperation)
+            {
+                return false;
+            }
+        }
+
+        return false;
     }
 
     private static IOperation[] GetReachingLocalValues(

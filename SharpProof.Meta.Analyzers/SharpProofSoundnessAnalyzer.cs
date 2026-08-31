@@ -13,6 +13,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 {
     private static readonly ImmutableArray<string> KnownTypeNames = [
         "Microsoft.CodeAnalysis.Compilation", "Microsoft.CodeAnalysis.SemanticModel",
+        "Microsoft.CodeAnalysis.ModelExtensions",
+        "Microsoft.CodeAnalysis.CSharp.CSharpCompilation",
+        "Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel",
+        "Microsoft.CodeAnalysis.CSharp.CSharpExtensions",
         "Microsoft.CodeAnalysis.CSharp.SyntaxFactory",
         "Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree",
         "Microsoft.CodeAnalysis.ISymbol",
@@ -45,7 +49,28 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "RemoveSyntaxTrees",
                 "RemoveAllSyntaxTrees",
                 "GetSymbolsWithName"),
-            [KnownType.SemanticModel] = Names("TryGetSpeculativeSemanticModel", "GetSpeculativeTypeInfo", "GetDiagnostics")
+            [KnownType.SemanticModel] = Names(
+                "TryGetSpeculativeSemanticModel",
+                "GetSpeculativeSymbolInfo",
+                "GetSpeculativeTypeInfo",
+                "GetSpeculativeAliasInfo",
+                "GetDiagnostics"),
+            [KnownType.ModelExtensions] = Names(
+                "GetSpeculativeSymbolInfo",
+                "GetSpeculativeTypeInfo",
+                "GetSpeculativeAliasInfo"),
+            [KnownType.CSharpSemanticModel] = Names(
+                "TryGetSpeculativeSemanticModel",
+                "TryGetSpeculativeSemanticModelForMethodBody",
+                "GetSpeculativeSymbolInfo",
+                "GetSpeculativeTypeInfo",
+                "GetSpeculativeAliasInfo"),
+            [KnownType.CSharpExtensions] = Names(
+                "TryGetSpeculativeSemanticModel",
+                "TryGetSpeculativeSemanticModelForMethodBody",
+                "GetSpeculativeSymbolInfo",
+                "GetSpeculativeTypeInfo",
+                "GetSpeculativeAliasInfo")
         }.ToImmutableDictionary();
 
     private static readonly ImmutableArray<string> CSharpExpressionFragments =
@@ -144,7 +169,12 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        if (method.Name == "GetSemanticModel" && IsSameType(method.ContainingType, symbols[KnownType.Compilation]))
+        if (method.Name == "GetSemanticModel" &&
+            IsAnyType(
+                method.ContainingType,
+                symbols,
+                KnownType.Compilation,
+                KnownType.CSharpCompilation))
         {
             return !IsSameType(containingSymbol.ContainingType, symbols[KnownType.CompilationModelProvider]);
         }
@@ -883,7 +913,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         return IsNamespaceOrNested(value, "SharpProof", "Analyzer") ||
         IsNamespaceOrNested(value, "SharpProof", "Frontend") ||
-        IsNamespaceOrNested(value, "SharpProof", "Verify");
+        IsNamespaceOrNested(value, "SharpProof", "Verify") ||
+        IsNamespaceOrNested(value, "SharpProof", "Meta", "Analyzers") ||
+        IsNamespaceOrNested(value, "SharpProof", "ContractForGenerator");
     }
 
     private static bool IsNamespaceOrNested(INamespaceSymbol? value, params string[] expectedPrefix)
@@ -935,7 +967,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     internal enum KnownType
     {
-        Compilation, SemanticModel, SyntaxFactory, CSharpSyntaxTree, Symbol,
+        Compilation, SemanticModel, ModelExtensions, CSharpCompilation,
+        CSharpSemanticModel, CSharpExtensions, SyntaxFactory, CSharpSyntaxTree, Symbol,
         DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, CompilationModelProvider,
         MetaDiagnosticDescriptors, AnalyzerDiagnosticDescriptors,
