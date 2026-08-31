@@ -42,7 +42,8 @@ internal static class CacheSoundnessRules
             !invocation.Arguments.Any(argument =>
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
-                return !IsGuardedCacheableResponse(
+                return IsStoredValueArgument(invocation, argument) &&
+                    !IsGuardedCacheableResponse(
                         invocation,
                         argument.Value) &&
                     (IsNonCacheableSemanticAnswer(
@@ -125,7 +126,10 @@ internal static class CacheSoundnessRules
                     !invocation.ArgumentList.Arguments.Any(argument =>
                         IsForwardedParameter(
                             argument.Expression,
-                            parameter.Name)))
+                            parameter.Name) &&
+                        IsStoredValueArgument(
+                            invocation,
+                            argument)))
                 {
                     continue;
                 }
@@ -135,6 +139,33 @@ internal static class CacheSoundnessRules
         }
 
         return false;
+    }
+
+    private static bool IsStoredValueArgument(
+        IInvocationOperation invocation,
+        IArgumentOperation argument)
+    {
+        return !string.Equals(invocation.TargetMethod.Name, "TryUpdate",
+                StringComparison.Ordinal) || argument.Parameter?.Ordinal != 2;
+    }
+
+    private static bool IsStoredValueArgument(
+        InvocationExpressionSyntax invocation,
+        ArgumentSyntax argument)
+    {
+        // TryUpdate(cache, key, newValue, comparisonValue) reads the final
+        // argument only for comparison; it is not the value persisted in the
+        // cache. Use the bound parameter ordinal when available through the
+        // syntax position as this helper is intentionally syntax-only.
+        if (!string.Equals(
+                GetInvokedName(invocation.Expression),
+                "TryUpdate",
+                StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return invocation.ArgumentList.Arguments.IndexOf(argument) != 2;
     }
 
     private static bool IsSyntacticCacheReceiver(
