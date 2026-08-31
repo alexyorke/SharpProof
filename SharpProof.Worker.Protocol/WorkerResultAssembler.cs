@@ -22,8 +22,8 @@ internal static class WorkerResultAssembler
             ClaimResults = claims,
             Summary = new WorkerVerificationSummary
             {
-                CallableCount = manifest.Callables.Length,
-                ClaimCount = manifest.Claims.Length,
+                CallableCount = callables.Length,
+                ClaimCount = claims.Length,
                 OutcomeCounts = [.. claims.GroupBy(static claim => claim.Outcome)
                     .Select(static group => new WorkerClaimOutcomeCount { Outcome = group.Key, Count = group.Count() })],
                 ReasonCounts = [.. claims.GroupBy(static claim => claim.Reason)
@@ -47,19 +47,28 @@ internal static class WorkerResultAssembler
         WorkerClaimReason claimReason, IEnumerable<WorkerProtocolError>? errors = null,
         WorkerVersionSummary? versions = null, long elapsedMilliseconds = 0)
     {
-        var assumptionsByCallable = manifest.Callables.ToLookup(
-            static callable => callable.CallableId,
-            static callable => callable.Assumptions,
-            StringComparer.Ordinal);
+        var callables = (manifest.Callables ?? [])
+            .OfType<WorkerCallableManifestEntry>()
+            .ToArray();
+        var claims = (manifest.Claims ?? [])
+            .OfType<WorkerClaimManifestEntry>()
+            .ToArray();
+        var assumptionsByCallable = callables
+            .Where(static callable =>
+                !string.IsNullOrWhiteSpace(callable.CallableId))
+            .ToLookup(
+                static callable => callable.CallableId,
+                static callable => callable.Assumptions ?? [],
+                StringComparer.Ordinal);
         return Create(inputHash, manifest, status, failureReason,
-            manifest.Callables.Select(callable => new WorkerCallableResult
+            callables.Select(callable => new WorkerCallableResult
             {
                 CallableId = callable.CallableId,
                 Coverage = WorkerCallableCoverage.Incomplete,
                 Reason = callableReason,
-                Assumptions = callable.Assumptions
+                Assumptions = callable.Assumptions ?? []
             }),
-            manifest.Claims.Select(claim => new WorkerClaimResult
+            claims.Select(claim => new WorkerClaimResult
             {
                 ClaimId = claim.ClaimId,
                 Outcome = WorkerClaimOutcome.Unknown,
@@ -70,8 +79,10 @@ internal static class WorkerResultAssembler
                 // This runs on the failure path, where the manifest may already be
                 // malformed. A claim naming an absent callable must not turn a
                 // reported failure into an unhandled exception.
-                Assumptions = assumptionsByCallable[claim.CallableId]
-                    .FirstOrDefault() ?? []
+                Assumptions = string.IsNullOrWhiteSpace(claim.CallableId)
+                    ? []
+                    : assumptionsByCallable[claim.CallableId]
+                        .FirstOrDefault() ?? []
             }),
             budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, errors, requestHash, versions);
     }
