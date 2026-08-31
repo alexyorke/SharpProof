@@ -408,13 +408,13 @@ internal static class CompilerManifestArtifactJson
     {
         cancellationToken.ThrowIfCancellationRequested();
         RequireValid(
-            HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation));
+            HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation, cancellationToken));
         cancellationToken.ThrowIfCancellationRequested();
         RequireValid(HasValidEnvelope(value));
         cancellationToken.ThrowIfCancellationRequested();
         RequireValid(!validateFeatureScope || HasValidFeatureScope(value));
         cancellationToken.ThrowIfCancellationRequested();
-        RequireValid(HasValidLocationAuthorities(value));
+        RequireValid(HasValidLocationAuthorities(value, cancellationToken));
         cancellationToken.ThrowIfCancellationRequested();
         RequireValid(HasMatchingCallables(value.Callables, value.Manifest));
         cancellationToken.ThrowIfCancellationRequested();
@@ -733,11 +733,12 @@ internal static class CompilerManifestArtifactJson
 
     private static bool HasValidDiagnostics(
         CompilerDiagnosticArtifact[]? diagnostics,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        CancellationToken cancellationToken)
     {
         return HasValidDiagnosticShapes(diagnostics) &&
             CompilerDiagnosticArtifactOrdering.IsCanonical(diagnostics!) &&
-            diagnostics!.All(item => HasValidDiagnosticBinding(item, compilation));
+            diagnostics!.All(item => HasValidDiagnosticBinding(item, compilation, cancellationToken));
     }
 
     private static bool HasValidDiagnosticShapes(
@@ -756,7 +757,8 @@ internal static class CompilerManifestArtifactJson
 
     private static bool HasValidDiagnosticBinding(
         CompilerDiagnosticArtifact value,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        CancellationToken cancellationToken)
     {
         if (value?.Location is not { } location)
         {
@@ -783,11 +785,13 @@ internal static class CompilerManifestArtifactJson
             value.SourceTreePath,
             value.SourceTreeSha256,
             value.SourceLineMapSha256,
-            compilation);
+            compilation,
+            cancellationToken: cancellationToken);
     }
 
     private static bool HasValidLocationAuthorities(
-        CompilerManifestArtifact? value)
+        CompilerManifestArtifact? value,
+        CancellationToken cancellationToken)
     {
         if (value?.LocationAuthorities is not { } authorities ||
             value.Manifest is not { } manifest ||
@@ -826,6 +830,7 @@ internal static class CompilerManifestArtifactJson
 
         for (var index = 0; index < expected.Length; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var authority = authorities[index];
             var row = expected[index];
             if (!Enum.IsDefined(
@@ -844,7 +849,8 @@ internal static class CompilerManifestArtifactJson
                     authority.SourceTreeSha256,
                     authority.SourceLineMapSha256,
                     compilation,
-                    allowNone: true))
+                    allowNone: true,
+                    cancellationToken: cancellationToken))
             {
                 return false;
             }

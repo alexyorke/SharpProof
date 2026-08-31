@@ -12,6 +12,34 @@ namespace SharpProof.Worker.Test;
 public sealed class CompilerSourceLocationAuthorityTests
 {
     [Test]
+    public void LineMapValidationHonorsCancellationBeforeScanningEveryEntry()
+    {
+        var artifact = CreateArtifact(
+            "#line 17 \"mapped.cs\"\n" +
+            "internal static class Subject { static int M() { return ; } }\n");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            CompilerSourceLocationAuthority.HasValidLineMap(
+                artifact.Compilation.SyntaxTrees.Single(),
+                cancellation.Token));
+    }
+
+    [Test]
+    public void LineMapValidationRejectsNoncanonicalSourceLength()
+    {
+        var artifact = CreateArtifact("class Subject {}\nclass Other {}\n");
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        tree.LineMap[0].SourceLength++;
+        tree.LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(tree.LineMap);
+
+        Assert.That(
+            CompilerSourceLocationAuthority.HasValidLineMap(tree),
+            Is.False);
+    }
+
+    [Test]
     public void ProducerBindsCompilerDiagnosticsToPhysicalTreeAndLineMap()
     {
         var artifact = CreateArtifact(

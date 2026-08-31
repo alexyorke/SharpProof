@@ -31,7 +31,8 @@ internal static class CompilerSourceLocationAuthority
     }
 
     internal static bool HasValidLineMap(
-        CompilerSyntaxTreeSnapshot? tree)
+        CompilerSyntaxTreeSnapshot? tree,
+        CancellationToken cancellationToken = default)
     {
         if (tree == null ||
             !WorkerProtocolJson.IsSha256(tree.LineMapSha256) ||
@@ -42,8 +43,10 @@ internal static class CompilerSourceLocationAuthority
         }
 
         var previousStart = -1;
-        foreach (var entry in entries)
+        for (var entryIndex = 0; entryIndex < entries.Length; entryIndex++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            var entry = entries[entryIndex];
             if (entry == null ||
                 entry.SourceStart < 0 ||
                 entry.SourceLength < 0 ||
@@ -59,6 +62,26 @@ internal static class CompilerSourceLocationAuthority
                 return false;
             }
 
+            // SourceLength is the physical line span, not an arbitrary bound.
+            // Without retaining source text, the only canonical relationship
+            // available is the line-start gap: a non-final line must account
+            // for exactly one LF or one CRLF terminator, while the final line
+            // must end at the captured text length.
+            var nextStart = entryIndex + 1 < entries.Length
+                ? entries[entryIndex + 1]?.SourceStart ?? -1
+                : tree.TextLength;
+            var gap = nextStart - entry.SourceStart;
+            var terminatorLength = entryIndex + 1 < entries.Length
+                ? gap - entry.SourceLength
+                : 0;
+            if (gap < 0 ||
+                (entryIndex + 1 < entries.Length
+                    ? terminatorLength is < 1 or > 2
+                    : entry.SourceLength != gap))
+            {
+                return false;
+            }
+
             previousStart = entry.SourceStart;
         }
 
@@ -67,11 +90,12 @@ internal static class CompilerSourceLocationAuthority
 
     internal static bool HasValidLocationGeometry(
         WorkerSourceLocation? location,
-        CompilerSyntaxTreeSnapshot? tree)
+        CompilerSyntaxTreeSnapshot? tree,
+        CancellationToken cancellationToken = default)
     {
         if (location == null || tree == null ||
             !WorkerProtocolJson.HasValidLocation(location) ||
-            !HasValidLineMap(tree) ||
+            !HasValidLineMap(tree, cancellationToken) ||
             location.Start < 0 ||
             location.Length < 0 ||
             location.Start > tree.TextLength ||
@@ -95,7 +119,8 @@ internal static class CompilerSourceLocationAuthority
     // example two trees using the same #line path).  Never guess in that case.
     internal static int FindUniqueTree(
         WorkerSourceLocation? location,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        CancellationToken cancellationToken = default)
     {
         if (location == null || compilation is not { SyntaxTrees: not null })
         {
@@ -105,14 +130,15 @@ internal static class CompilerSourceLocationAuthority
         var ordinal = -1;
         var remembered = RememberedTree(location);
         if (remembered >= 0 && remembered < compilation.SyntaxTrees.Length &&
-            HasValidLocationGeometry(location, compilation.SyntaxTrees[remembered]))
+            HasValidLocationGeometry(location, compilation.SyntaxTrees[remembered], cancellationToken))
         {
             return remembered;
         }
         for (var index = 0; index < compilation.SyntaxTrees.Length; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var tree = compilation.SyntaxTrees[index];
-            if (tree == null || !HasValidLocationGeometry(location, tree))
+            if (tree == null || !HasValidLocationGeometry(location, tree, cancellationToken))
             {
                 continue;
             }
@@ -135,7 +161,8 @@ internal static class CompilerSourceLocationAuthority
         string? sourceTreeSha256,
         string? sourceLineMapSha256,
         CompilerCompilationSnapshot? compilation,
-        bool allowNone = false)
+        bool allowNone = false,
+        CancellationToken cancellationToken = default)
     {
         if (location == null || compilation is not { SyntaxTrees: not null } ||
             sourceTreePath == null || sourceTreeSha256 == null ||
@@ -166,7 +193,7 @@ internal static class CompilerSourceLocationAuthority
             string.Equals(tree.Path, sourceTreePath, StringComparison.Ordinal) &&
             string.Equals(tree.Sha256, sourceTreeSha256, StringComparison.Ordinal) &&
             string.Equals(tree.LineMapSha256, sourceLineMapSha256, StringComparison.Ordinal) &&
-            HasValidLocationGeometry(location, tree);
+            HasValidLocationGeometry(location, tree, cancellationToken);
     }
 
     internal static CompilerLocationAuthorityArtifact CreateAuthority(
