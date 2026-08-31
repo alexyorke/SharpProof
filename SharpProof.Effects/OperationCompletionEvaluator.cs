@@ -799,7 +799,7 @@ internal sealed class OperationCompletionEvaluator
              minimumIndex < maximumLength);
     }
 
-    private bool CanCompleteWriteTarget(IOperation target)
+    internal bool CanCompleteWriteTarget(IOperation target)
     {
         return target switch
         {
@@ -863,17 +863,22 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        var phasesMayComplete = !TryGetDeconstructionInfo(
-            _compilation,
-            deconstruction,
-            out var info) ||
+        return CanCompleteDeconstructionPhases(deconstruction) &&
+            CanCompleteDeconstructionTarget(deconstruction.Target);
+    }
+
+    internal bool CanCompleteDeconstructionPhases(
+        IDeconstructionAssignmentOperation deconstruction)
+    {
+        return !TryGetDeconstructionInfo(
+                _compilation,
+                deconstruction,
+                out var info) ||
             DeconstructionPhasesMayComplete(
                 info,
                 deconstruction.Value,
                 isRoot: true,
                 origin: deconstruction);
-        return phasesMayComplete &&
-            CanCompleteDeconstructionTarget(deconstruction.Target);
     }
 
     private bool CanCompleteDeconstructionTarget(IOperation target)
