@@ -242,6 +242,52 @@ public sealed class ApiSpecInstantiationCoverageTests
     }
 
     [Test]
+    public void InstantiationUsesOneValidatedSubstitutionSnapshot()
+    {
+        var template = CreateTemplate(
+            isStatic: true,
+            receiverType: null,
+            parameterTypes: [IrTypeKind.Integer],
+            resultType: null,
+            [Equal(
+                Variable(
+                    SpecVariableRole.Parameter,
+                    0,
+                    IrTypeKind.Integer),
+                Integer(0))]);
+        var variable = template.Parameters.Single();
+        var factory = new IrFactory();
+        var validated = factory.Integer(0);
+        var foreignFactory = new IrFactory();
+        IrTerm?[] lookupValues = [
+            foreignFactory.Integer(0),
+            factory.Boolean(false),
+            null
+        ];
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var lookupValue in lookupValues)
+            {
+                var instantiated =
+                    ApiSpecInstantiator.InstantiatePostconditions(
+                        template,
+                        factory,
+                        new InconsistentSubstitutions(
+                            variable,
+                            validated,
+                            lookupValue));
+
+                Assert.That(
+                    instantiated.Status,
+                    Is.EqualTo(SpecInstantiationStatus.Succeeded));
+                Assert.That(instantiated.Failure, Is.Null);
+                Assert.That(instantiated.Postconditions, Has.Length.EqualTo(1));
+            }
+        }
+    }
+
+    [Test]
     public void SequenceNullProducesAnExplicitUnsupportedValueFailure()
     {
         var nullSequence =
@@ -489,6 +535,52 @@ public sealed class ApiSpecInstantiationCoverageTests
         Assert.That(result.Failure, Is.Not.Null);
         Assert.That(result.Failure!.Kind, Is.EqualTo(kind));
         Assert.That(result.Failure.Detail, Is.Not.Empty);
+    }
+
+    private sealed class InconsistentSubstitutions(
+        SpecVarId key,
+        IrTerm enumeratedValue,
+        IrTerm? lookupValue) : IReadOnlyDictionary<SpecVarId, IrTerm>
+    {
+        public IrTerm this[SpecVarId requestedKey] =>
+            requestedKey == key
+                ? lookupValue!
+                : throw new KeyNotFoundException();
+
+        public IEnumerable<SpecVarId> Keys => [key];
+
+        public IEnumerable<IrTerm> Values => [enumeratedValue];
+
+        public int Count => 1;
+
+        public bool ContainsKey(SpecVarId requestedKey)
+        {
+            return requestedKey == key;
+        }
+
+        public bool TryGetValue(
+            SpecVarId requestedKey,
+            out IrTerm value)
+        {
+            if (requestedKey == key)
+            {
+                value = lookupValue!;
+                return true;
+            }
+
+            value = null!;
+            return false;
+        }
+
+        public IEnumerator<KeyValuePair<SpecVarId, IrTerm>> GetEnumerator()
+        {
+            yield return KeyValuePair.Create(key, enumeratedValue);
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 
     private static ApiSpecTemplate CreateTemplate(
