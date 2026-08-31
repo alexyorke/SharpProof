@@ -1890,6 +1890,32 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task AllowsOnlyTheResolvedMetaDescriptorCatalog()
+    {
+        const string source =
+            """
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Meta.Analyzers {
+                static class MetaDiagnosticDescriptors {
+                    static readonly DiagnosticDescriptor Rule = new(
+                        "ID", "title", "message", "category",
+                        DiagnosticSeverity.Info, true);
+                }
+                static class HandwrittenDescriptors {
+                    static readonly DiagnosticDescriptor Rule = new(
+                        "ID", "title", "message", "category",
+                        DiagnosticSeverity.Info, true);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPMETA005"]));
+    }
+
+    [Test]
     public async Task AllowsOnlyTheNamedSemanticModelHostAdapter()
     {
         const string source =
