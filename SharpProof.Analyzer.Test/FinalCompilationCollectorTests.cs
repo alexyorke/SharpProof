@@ -577,6 +577,36 @@ public sealed class FinalCompilationCollectorTests
         }
     }
 
+    [Test]
+    public async Task SuppressedWarningAsErrorDoesNotInvalidateTheSeal()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            #pragma warning disable CS0168
+            using SharpProof.Attributes;
+            internal static class Fixture {
+                [DoesNotThrow]
+                internal static int Method() {
+                    int unused;
+                    return 1;
+                }
+            }
+            #pragma warning restore CS0168
+            """).WithOptions(
+                CreateCompilation().Options.WithGeneralDiagnosticOption(
+                    ReportDiagnostic.Error));
+
+        var artifact = await EmitArtifact(
+            compilation,
+            workspace.SealPath("suppressed-warning-as-error"));
+
+        Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+        Assert.That(
+            artifact.Callables.Single().FailureReason,
+            Is.Not.EqualTo(CompilerCallableProducerReasonCatalog.DiagnosticFailureReason));
+    }
+
     [TestCase("?", "first.cs")]
     [TestCase("class C {\n    void M() {\n        Missing();\n    }\n}", "ordinary.cs")]
     [TestCase("#line 100 \"mapped.cs\"\nclass C { void M() { Missing(); } }", "physical.cs")]
