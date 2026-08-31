@@ -84,7 +84,7 @@ public sealed class WorkerResultAssemblerTests
         var budgets = new WorkerBudgets { QueryRlimit = 123 };
         var response = WorkerResultAssembler.Create(
             WorkerProtocolVersions.EmptySha256,
-            new WorkerClaimManifest(), WorkerRunStatus.Completed,
+            new WorkerClaimManifest(), WorkerRunStatus.Complete,
             WorkerRunFailureReason.None, [], [], budgets,
             WorkerCacheStatus.Disabled, 0);
 
