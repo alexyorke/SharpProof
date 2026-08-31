@@ -2956,6 +2956,44 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ThrowingPropertyPatternDoesNotHandleCancellationExhaustively()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Verify;
+
+            sealed class CustomCancellationException :
+                OperationCanceledException
+            {
+                public bool Throws => throw new Exception();
+            }
+
+            static class C
+            {
+                static void Call()
+                {
+                    try { }
+                    catch (Exception caught)
+                        when (caught is
+                            CustomCancellationException { Throws: true }
+                            or OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception) { }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPMETA003"]));
+    }
+
+    [Test]
     public async Task AuditedWorkerReificationHandlesConversionsAndBlocksExactly()
     {
         const string source =
