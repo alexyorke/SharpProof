@@ -501,6 +501,10 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             ControlFlowGraph graph,
             IOperation value)
         {
+            if (IsInsideNameOf(value))
+            {
+                return false;
+            }
             if (IsDirectDelegateRemovalOperand(value.Syntax))
             {
                 return false;
@@ -524,6 +528,20 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 definition.Span.End,
                 new HashSet<SyntaxNode> { definition },
                 GetTuplePath(value.Syntax, definition));
+        }
+
+        private static bool IsInsideNameOf(IOperation value)
+        {
+            for (var operation = value.Parent;
+                 operation != null;
+                 operation = operation.Parent)
+            {
+                if (operation is INameOfOperation)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private bool TryGetLocalDestination(
