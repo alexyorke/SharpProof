@@ -56,6 +56,8 @@ if ($Gate -in @(
 $valid = switch -Regex ($Gate) {
     '^acceptance-(?:debug|release)$' {
         [int]$evidence.schemaVersion -eq 1 -and
+        [string]$evidence.command -ceq 'acceptance' -and
+        [string]$evidence.configuration -ceq $Gate.Substring(11) -and
         [string]$evidence.status -ceq 'passed' -and
         [string]$evidence.commit -ceq $commit
     }

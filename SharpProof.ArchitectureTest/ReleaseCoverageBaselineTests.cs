@@ -285,6 +285,8 @@ public sealed class ReleaseCoverageBaselineTests
                 (Value: JsonSerializer.Serialize(new
                 {
                     schemaVersion = 1,
+                    command = "acceptance",
+                    configuration = "release",
                     status = "passed",
                     commit = head
                 }), Valid: true)
