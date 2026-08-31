@@ -5177,9 +5177,13 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: false);
-        var backend = new ThrowingDisposeBackend(
-            BackendCheckResult.Unsatisfiable([]));
-        using var worker = new SharpProofWorker(() => backend);
+        ThrowingDisposeBackend? backend = null;
+        using var worker = new SharpProofWorker(() =>
+        {
+            backend = new ThrowingDisposeBackend(
+                BackendCheckResult.Unsatisfiable([]));
+            return backend;
+        });
 
         var response = await worker.VerifyAsync(request);
 
@@ -5189,7 +5193,7 @@ public sealed class WorkerTests
             Assert.That(
                 response.ClaimResults.Single().Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(backend.DisposeCalls, Is.EqualTo(1));
+            Assert.That(backend!.DisposeCalls, Is.EqualTo(1));
         }
     }
 
