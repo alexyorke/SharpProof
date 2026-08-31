@@ -20,28 +20,40 @@ internal sealed class ContractIntrinsicValidator
         }
 
         var violations = ImmutableArray.CreateBuilder<ContractIntrinsicViolation>();
-        foreach (var invocation in body.DescendantsAndSelf().OfType<IInvocationOperation>()
+        foreach (var operation in body.DescendantsAndSelf()
+                     .Where(static value => value is IInvocationOperation or
+                         IMethodReferenceOperation)
                      .OrderBy(static value => value.Syntax.SpanStart))
         {
-            var isResult = _api.IsResult(invocation.TargetMethod);
-            if (!isResult && !_api.IsOld(invocation.TargetMethod))
+            var target = operation switch
+            {
+                IInvocationOperation directInvocation =>
+                    directInvocation.TargetMethod,
+                IMethodReferenceOperation methodReference =>
+                    methodReference.Method,
+                _ => null
+            };
+            var isResult = target != null && _api.IsResult(target);
+            if (!isResult && (target == null || !_api.IsOld(target)))
             {
                 continue;
             }
 
-            var owner = GetOwner(invocation);
+            var owner = GetOwner(operation);
             if (owner == null || !includeNestedCallables &&
                 !SameCallable(owner, callable))
             {
                 continue;
             }
 
-            var context = GetContext(invocation, owner);
-            var violationKind = Classify(invocation, owner, context, isResult);
+            var context = GetContext(operation, owner);
+            var violationKind = operation is IInvocationOperation invocation
+                ? Classify(invocation, owner, context, isResult)
+                : ClassifyMethodReference(context, isResult);
             if (violationKind.HasValue)
             {
                 violations.Add(new(
-                    invocation,
+                    operation,
                     context.Clause,
                     violationKind.Value));
             }
@@ -84,6 +96,27 @@ internal sealed class ContractIntrinsicValidator
         return context.InsideOld
             ? ContractIntrinsicViolationKind.OldInsideOld
             : null;
+    }
+
+    private static ContractIntrinsicViolationKind ClassifyMethodReference(
+        IntrinsicContext context,
+        bool isResult)
+    {
+        if (context.Clause != BoundContractKind.Ensures)
+        {
+            return isResult
+                ? ContractIntrinsicViolationKind.ResultOutsideEnsures
+                : ContractIntrinsicViolationKind.OldOutsideEnsures;
+        }
+        if (context.InsideOld)
+        {
+            return isResult
+                ? ContractIntrinsicViolationKind.ResultInsideOld
+                : ContractIntrinsicViolationKind.OldInsideOld;
+        }
+        return isResult
+            ? ContractIntrinsicViolationKind.InvalidResultSignature
+            : ContractIntrinsicViolationKind.InvalidOldSignature;
     }
 
     private IntrinsicContext GetContext(IOperation operation, IMethodSymbol owner)
@@ -139,11 +172,11 @@ internal enum ContractIntrinsicViolationKind
 }
 
 internal readonly struct ContractIntrinsicViolation(
-    IInvocationOperation invocation,
+    IOperation operation,
     BoundContractKind? enclosingClauseKind,
     ContractIntrinsicViolationKind kind)
 {
-    internal IInvocationOperation Invocation { get; } = invocation;
+    internal IOperation Operation { get; } = operation;
     internal BoundContractKind? EnclosingClauseKind { get; } = enclosingClauseKind;
     internal ContractIntrinsicViolationKind Kind { get; } = kind;
     internal bool IsOld => Kind is

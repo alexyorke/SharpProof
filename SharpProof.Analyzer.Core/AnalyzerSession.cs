@@ -285,8 +285,8 @@ internal sealed class AnalyzerSession
         ContractIntrinsicViolation violation)
     {
         return _validatedContractIntrinsics.TryAdd(
-            (violation.Invocation.Syntax.SyntaxTree,
-             violation.Invocation.Syntax.Span),
+            (violation.Operation.Syntax.SyntaxTree,
+             violation.Operation.Syntax.Span),
             0);
     }
 

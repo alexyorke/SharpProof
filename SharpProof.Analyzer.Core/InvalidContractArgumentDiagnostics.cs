@@ -12,7 +12,7 @@ internal static class InvalidContractArgumentDiagnostics
             violation.IsOld ? "Contract.Old" : "Contract.Result",
             argument,
             reason,
-            violation.Invocation.Syntax.GetLocation());
+            violation.Operation.Syntax.GetLocation());
     }
 
     internal static Diagnostic Create(string attributeName, string argument, string reason, Location location)

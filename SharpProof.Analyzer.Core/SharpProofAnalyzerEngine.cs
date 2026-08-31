@@ -223,8 +223,8 @@ internal sealed partial class SharpProofAnalyzerEngine
                     return AdvisoryActivation.Full;
                 }
 
-                if (node is InvocationExpressionSyntax invocation &&
-                    IsContractApiCandidate(invocation.Expression))
+                if (node is ExpressionSyntax expression &&
+                    IsContractApiCandidate(expression))
                 {
                     hasContractApiCandidate = true;
                 }
