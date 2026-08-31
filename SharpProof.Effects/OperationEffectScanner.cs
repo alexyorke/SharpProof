@@ -110,6 +110,21 @@ internal sealed partial class OperationEffectScanner
         _conversionOwnership.BuildLocalRegions(root, IsReachable);
     }
 
+    internal static OperationEffectScanner CreateReachabilityProbe(
+        Compilation compilation,
+        IMethodSymbol method,
+        IOperation root,
+        ManagedFlowResult? abstractFlow)
+    {
+        return new OperationEffectScanner(
+            new EffectAnalysisSession(compilation),
+            method,
+            new List<EffectCallSite>(),
+            root,
+            abstractFlow,
+            allowDirectWitnesses: false);
+    }
+
     internal ImmutableArray<EffectDirectWitness> DirectWitnesses =>
         _directWitnesses.ToImmutable();
 

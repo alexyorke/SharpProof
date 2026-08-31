@@ -132,6 +132,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             semanticModel.Compilation,
             cancellationToken);
         var delegateTargets = GetDirectDelegateTargets(operationRoot!);
+        OperationEffectScanner? semanticReachability = null;
         foreach (var block in graph.Blocks)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -173,9 +174,17 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
                 var hasFlowState =
                     flowResult?.TryGetState(operation, out _) == true;
+                var isInsideExceptionHandler =
+                    IsInsideExceptionHandler(operation);
                 if (flowAnalysis.IsComplete &&
                     !hasFlowState &&
-                    !IsInsideExceptionHandler(operation) &&
+                    (!isInsideExceptionHandler ||
+                     !(semanticReachability ??=
+                         OperationEffectScanner.CreateReachabilityProbe(
+                             semanticModel.Compilation,
+                             caller,
+                             operationRoot!,
+                             flowResult)).IsReachable(operation)) &&
                     operation is not IListPatternOperation)
                 {
                     continue;
