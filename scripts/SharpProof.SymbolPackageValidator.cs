@@ -201,8 +201,18 @@ internal static class SharpProofSymbolPackageValidator
                 $"Assembly '{assemblyEntry.FullName}' must contain exactly " +
                 "one CodeView debug identifier.");
         }
+        if (!codeViewEntries[0].IsPortableCodeView)
+        {
+            throw new InvalidDataException(
+                $"Assembly '{assemblyEntry.FullName}' must contain a portable CodeView identifier.");
+        }
         var codeView = peReader.ReadCodeViewDebugDirectoryData(
             codeViewEntries[0]);
+        if (codeView.Age != 1)
+        {
+            throw new InvalidDataException(
+                $"Assembly '{assemblyEntry.FullName}' has an invalid portable CodeView age.");
+        }
 
         using var pdbImage = CopyToMemory(pdbEntry);
         MetadataReaderProvider provider;

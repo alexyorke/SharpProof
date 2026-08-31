@@ -1795,6 +1795,14 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ReleasePackageRolesAuthenticateNamesArchivesAndNuspecs'
     },
     [pscustomobject]@{
+        Name = 'release-portable-codeview-age'
+        File = 'scripts\SharpProof.SymbolPackageValidator.cs'
+        Original = '        if (codeView.Age != 1)'
+        Mutated = '        if (false)'
+        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
+        Filter = 'FullyQualifiedName~ReleasePackageRolesAuthenticateNamesArchivesAndNuspecs'
+    },
+    [pscustomobject]@{
         Name = 'portable-ir-exact-encoder-image'
         File = 'SharpProof.CompilerArtifact\PortableIrGraphCodec.cs'
         Original = '            actual.SequenceEqual(expected),'
