@@ -112,7 +112,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             Report(context, MetaDiagnosticDescriptors.ForbiddenRoslynApi, invocation.Syntax.GetLocation(), method.Name);
         }
 
-        AnalyzeSemanticEquals(context, invocation, symbols);
+        AnalyzeSemanticStringInvocation(context, invocation, symbols);
         if (IsStringConcat(invocation))
         {
             AnalyzeCSharpExpressionText(context, invocation);
