@@ -495,8 +495,94 @@ internal static class CacheSoundnessRules
                 when SymbolEqualityComparer.Default.Equals(
                     target.Local,
                     local) => assignment.Value,
+            IInvocationOperation invocation =>
+                GetRefOrOutWriteValue(invocation, local),
+            IDeconstructionAssignmentOperation deconstruction =>
+                GetDeconstructionWriteValue(deconstruction, local),
             _ => null
         };
+    }
+
+    private static IOperation? GetRefOrOutWriteValue(
+        IInvocationOperation invocation,
+        ILocalSymbol local)
+    {
+        if (invocation.TargetMethod.ReducedFrom is
+                { Parameters.Length: > 0 } reduced &&
+            IsWritableReference(reduced.Parameters[0].RefKind) &&
+            FindLocalReference(invocation.Instance, local) is
+                { } receiver)
+        {
+            return receiver;
+        }
+
+        foreach (var argument in invocation.Arguments)
+        {
+            if (argument.Parameter is { } parameter &&
+                IsWritableReference(parameter.RefKind) &&
+                FindLocalReference(argument.Value, local) is { } reference)
+            {
+                return reference;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsWritableReference(RefKind refKind)
+    {
+        return refKind is RefKind.Ref or RefKind.Out;
+    }
+
+    private static IOperation? GetDeconstructionWriteValue(
+        IDeconstructionAssignmentOperation assignment,
+        ILocalSymbol local)
+    {
+        return GetDeconstructionWriteValue(
+            UnwrapValue(assignment.Target),
+            UnwrapValue(assignment.Value),
+            local);
+    }
+
+    private static IOperation? GetDeconstructionWriteValue(
+        IOperation target,
+        IOperation value,
+        ILocalSymbol local)
+    {
+        if (target is ITupleOperation targetTuple &&
+            value is ITupleOperation valueTuple &&
+            targetTuple.Elements.Length == valueTuple.Elements.Length)
+        {
+            for (var index = 0; index < targetTuple.Elements.Length; index++)
+            {
+                var result = GetDeconstructionWriteValue(
+                    UnwrapValue(targetTuple.Elements[index]),
+                    UnwrapValue(valueTuple.Elements[index]),
+                    local);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            return null;
+        }
+
+        return FindLocalReference(target, local) == null
+            ? null
+            : value;
+    }
+
+    private static ILocalReferenceOperation? FindLocalReference(
+        IOperation? operation,
+        ILocalSymbol local)
+    {
+        return operation?.DescendantsAndSelf()
+            .OfType<ILocalReferenceOperation>()
+            .FirstOrDefault(reference =>
+                SymbolEqualityComparer.Default.Equals(
+                    reference.Local,
+                    local));
     }
 
     private static IOperation[] GetPriorLocalValues(
