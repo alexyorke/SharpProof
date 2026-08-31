@@ -265,13 +265,16 @@ public static class FuzzRunner
             {
                 case "frontend":
                     var frontendCase = frontendCases[index];
-                    var minimizedFrontend = CSharpStructuralShrinker.Minimize(
-                        frontendCase,
-                        candidate => frontendOracle.Compare(
-                            candidate,
-                            cancellationToken).Status !=
-                            FuzzOracleStatus.Agreement,
-                        cancellationToken);
+                    var minimizedFrontend = IsCompilationFailure(
+                            frontendResults[index])
+                        ? frontendCase
+                        : CSharpStructuralShrinker.Minimize(
+                            frontendCase,
+                            candidate => IsSemanticMismatch(
+                                frontendOracle.Compare(
+                                    candidate,
+                                    cancellationToken)),
+                            cancellationToken);
                     var minimizedFrontendResult = frontendOracle.Compare(
                         minimizedFrontend,
                         cancellationToken);
@@ -406,6 +409,20 @@ public static class FuzzRunner
             smtStatus == FuzzOracleStatus.Abstained ||
             partialStatus == FuzzOracleStatus.Abstained;
         return new FuzzCaseClassification(hasMismatch, hasAbstention);
+    }
+
+    internal static bool IsCompilationFailure(FrontendDifferentialResult result)
+    {
+        return result.Status == FuzzOracleStatus.Mismatch &&
+            result.Detail.StartsWith(
+                "Generated C# did not compile:",
+                StringComparison.Ordinal);
+    }
+
+    internal static bool IsSemanticMismatch(FrontendDifferentialResult result)
+    {
+        return result.Status == FuzzOracleStatus.Mismatch &&
+            !IsCompilationFailure(result);
     }
 
     private static FrontendFuzzCoverage CreateFrontendCoverage(

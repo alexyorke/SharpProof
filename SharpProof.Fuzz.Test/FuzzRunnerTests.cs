@@ -42,7 +42,7 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
-    public void PartialAbstentionIsNotClassifiedAsMismatchEvidence()
+    public void PartialAbstentionIsRetainedAsFailureEvidence()
     {
         var classification = FuzzRunner.ClassifyCase(
             FuzzOracleStatus.Agreement,
@@ -57,8 +57,25 @@ public sealed class FuzzRunnerTests
         {
             Assert.That(classification.HasMismatch, Is.False);
             Assert.That(classification.HasAbstention, Is.True);
-            Assert.That(keys, Is.Empty);
+            Assert.That(
+                keys,
+                Is.EqualTo(new[] { new FuzzFailureKey(0, "partial-term-smt") }));
         }
+    }
+
+    [Test]
+    public void FrontendMinimizationDoesNotTreatCompileErrorsAsSemanticMismatches()
+    {
+        var compileFailure = new FrontendDifferentialResult(
+            FuzzOracleStatus.Mismatch,
+            "Generated C# did not compile: CS1002");
+        var semanticFailure = new FrontendDifferentialResult(
+            FuzzOracleStatus.Mismatch,
+            "Compiled C# and lowered IR produced different values.");
+
+        Assert.That(FuzzRunner.IsCompilationFailure(compileFailure), Is.True);
+        Assert.That(FuzzRunner.IsSemanticMismatch(compileFailure), Is.False);
+        Assert.That(FuzzRunner.IsSemanticMismatch(semanticFailure), Is.True);
     }
 
     [Test]
