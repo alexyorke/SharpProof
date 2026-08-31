@@ -257,6 +257,10 @@ internal static class CompilerImplementationIlSummaryLowerer
         out ModuleMetadata module,
         out string modulePath)
     {
+        var found = false;
+        PortableExecutableReference foundReference = null!;
+        ModuleMetadata foundModule = null!;
+        var foundPath = string.Empty;
         foreach (var candidate in compilation.References
                      .OfType<PortableExecutableReference>())
         {
@@ -286,15 +290,32 @@ internal static class CompilerImplementationIlSummaryLowerer
                     continue;
                 }
 
-                reference = candidate;
-                module = current;
-                modulePath = index == 0
+                var candidatePath = index == 0
                     ? Path.GetFullPath(candidate.FilePath)
                     : CompilerCompilationCapture.ResolveSiblingModule(
                         candidate.FilePath,
                         name);
-                return true;
+                if (found)
+                {
+                    reference = null!;
+                    module = null!;
+                    modulePath = string.Empty;
+                    return false;
+                }
+
+                found = true;
+                foundReference = candidate;
+                foundModule = current;
+                foundPath = candidatePath;
             }
+        }
+
+        if (found)
+        {
+            reference = foundReference;
+            module = foundModule;
+            modulePath = foundPath;
+            return true;
         }
 
         reference = null!;
