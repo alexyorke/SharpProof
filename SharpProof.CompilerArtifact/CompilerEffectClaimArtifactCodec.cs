@@ -120,7 +120,7 @@ internal static class CompilerEffectClaimArtifactCodec
         WorkerEffectViolationWitness witness,
         CompilerEffectReplayArtifact replay)
     {
-        var eventValue = replay.Events is [var first, ..] ? first : null;
+        var eventValue = replay.Events.Length > 0 ? replay.Events[0] : null;
         if (eventValue == null || witness.Location.Path != eventValue.Location.Path ||
             witness.Location.Start != eventValue.Location.Start ||
             witness.Location.Length != eventValue.Location.Length ||
