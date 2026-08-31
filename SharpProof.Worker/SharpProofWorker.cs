@@ -52,6 +52,7 @@ public sealed class SharpProofWorker : IDisposable
     public async Task<WorkerVerifyResponse> VerifyAsync(
         WorkerVerifyRequest request, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
         ObjectDisposedException.ThrowIf(_disposed, this);
         var started = Stopwatch.GetTimestamp();
         var validation = WorkerProtocolJson.Validate(request);
@@ -69,7 +70,6 @@ public sealed class SharpProofWorker : IDisposable
                     "The request query rlimit must match the worker creation limit."));
         }
 
-        ArgumentNullException.ThrowIfNull(request);
         var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
         using var projectBoundary =
             CancellationTokenSource.CreateLinkedTokenSource(
