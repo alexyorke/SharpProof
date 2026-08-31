@@ -589,8 +589,7 @@ internal sealed partial class OperationEffectScanner
             return EffectSummary.Empty;
         }
 
-        if (invocation.IsImplicit &&
-            invocation.Syntax.AncestorsAndSelf().Any(static syntax => syntax is LockStatementSyntax))
+        if (IsSynthesizedLockMonitorCall(invocation))
         {
             return ScanArgumentValues(invocation.Arguments);
         }
@@ -1350,6 +1349,19 @@ internal sealed partial class OperationEffectScanner
         _monitorType != null &&
         SymbolEqualityComparer.Default.Equals(
             invocation.TargetMethod.ContainingType.OriginalDefinition, _monitorType.OriginalDefinition);
+    }
+
+    private bool IsSynthesizedLockMonitorCall(IInvocationOperation invocation)
+    {
+        return invocation.IsImplicit &&
+            invocation.Instance == null &&
+            invocation.TargetMethod.Name is "Enter" or "Exit" &&
+            _monitorType != null &&
+            SymbolEqualityComparer.Default.Equals(
+                invocation.TargetMethod.ContainingType.OriginalDefinition,
+                _monitorType.OriginalDefinition) &&
+            invocation.Syntax.AncestorsAndSelf().Any(
+                static syntax => syntax is LockStatementSyntax);
     }
 
     private bool IsFrameworkException(INamedTypeSymbol type)
