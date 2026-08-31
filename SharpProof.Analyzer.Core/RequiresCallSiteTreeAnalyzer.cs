@@ -1176,6 +1176,11 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                       conversion.Operand.Type?.IsReferenceType == true &&
                       conversion.Type?.IsValueType == true));
             }
+            if (operation is IMethodReferenceOperation methodReference)
+            {
+                return !methodReference.Method.IsStatic &&
+                    methodReference.Instance?.Type?.IsReferenceType == true;
+            }
             return operation is
                 IThrowOperation or
                 IInvocationOperation or
