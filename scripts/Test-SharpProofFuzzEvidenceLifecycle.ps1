@@ -5,6 +5,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.FuzzEvidenceLifecycle.ps1')
 
+$seedToday = Get-SharpProofRotatingSeed -UtcDate ([DateTime]::new(2026, 8, 31))
+$seedAfterStride = Get-SharpProofRotatingSeed -UtcDate ([DateTime]::new(2027, 10, 2))
+if ((($seedAfterStride - $seedToday) % 397) -eq 0) {
+    throw 'Rotating seeds repeat the FuzzRunner case stride after 397 days.'
+}
+
 $root = Join-Path ([IO.Path]::GetTempPath()) (
     'SharpProof-fuzz-evidence-' + [Guid]::NewGuid().ToString('N'))
 try {

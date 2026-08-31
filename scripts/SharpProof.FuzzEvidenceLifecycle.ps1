@@ -1,5 +1,14 @@
 Set-StrictMode -Version Latest
 
+function Get-SharpProofRotatingSeed {
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][DateTime]$UtcDate)
+
+    $utcDay = [int]$UtcDate.ToUniversalTime().Date.Subtract(
+        [DateTime]::UnixEpoch).TotalDays
+    return [int]($utcDay * 1009 + [int][Math]::Floor($utcDay / 397))
+}
+
 function Get-SharpProofCleanFuzzSourceCommit {
     [CmdletBinding()]
     param(
