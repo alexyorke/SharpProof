@@ -115,6 +115,29 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void RefLocalAliasesAbstainInsteadOfBecomingIndependentValues()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long first, long second) {
+                ref long alias = ref first;
+                alias = 10L;
+                alias = ref second;
+                alias = 20L;
+                return checked(first + second);
+            }
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedMutation));
+        }
+    }
+
+    [Test]
     public void NestedRefInvocationCarriesCallAndMutationHavoc()
     {
         var lowered = Lower(
