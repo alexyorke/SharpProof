@@ -18,6 +18,7 @@ internal sealed record CompilerSummaryEvidenceAuthority(
 
 internal sealed class CompilerRelationalSummaryProvider
 {
+    private const int MaximumDependencyDepth = 64;
     private readonly CSharpCompilation _compilation;
     private readonly IrFactory _factory;
     private readonly ResolvedApiSpecTable _apiSpecs;
@@ -30,6 +31,7 @@ internal sealed class CompilerRelationalSummaryProvider
         new(SymbolEqualityComparer.Default);
     private readonly HashSet<IMethodSymbol> _active =
         new(SymbolEqualityComparer.Default);
+    private bool _dependencyResourceLimitReached;
 
     internal CompilerImplementationIlAbstentionReason LastImplementationIlAbstention
     {
@@ -96,11 +98,28 @@ internal sealed class CompilerRelationalSummaryProvider
             return summary.Signature.Member == member;
         }
 
-        if (_failed.Contains(method) || !_active.Add(method))
+        if (_failed.Contains(method) || _active.Contains(method))
         {
             summary = null;
             return false;
         }
+
+        if (_active.Count == 0)
+        {
+            _dependencyResourceLimitReached = false;
+        }
+
+        if (_active.Count >= MaximumDependencyDepth)
+        {
+            _dependencyResourceLimitReached = true;
+            LastImplementationIlAbstention =
+                CompilerImplementationIlAbstentionReason
+                    .SummaryResourceLimit;
+            summary = null;
+            return false;
+        }
+
+        _active.Add(method);
 
         try
         {
@@ -125,7 +144,11 @@ internal sealed class CompilerRelationalSummaryProvider
                     cancellationToken,
                     out summary))
             {
-                LastImplementationIlAbstention = implementationIlAbstention;
+                LastImplementationIlAbstention =
+                    _dependencyResourceLimitReached
+                        ? CompilerImplementationIlAbstentionReason
+                            .SummaryResourceLimit
+                        : implementationIlAbstention;
                 _failed.Add(method);
                 return false;
             }
@@ -143,6 +166,7 @@ internal sealed class CompilerRelationalSummaryProvider
 
             _summaries.Add(method, summary!);
             _authorities.Add(method, authority);
+            _dependencyResourceLimitReached = false;
             return true;
         }
         finally
