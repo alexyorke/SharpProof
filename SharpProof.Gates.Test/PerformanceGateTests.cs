@@ -462,6 +462,21 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    public void EnabledRetentionAnalysisAcceptsAReusableAnalyzer()
+    {
+        var method = typeof(PerformanceGate).GetMethod(
+            "AnalyzeEnabledCompilation",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.That(method, Is.Not.Null);
+        Assert.That(
+            method!.GetParameters().Count(static parameter =>
+                typeof(Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer)
+                    .IsAssignableFrom(parameter.ParameterType)),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public void RetainedMemoryLimitsAreEnforcedIndependently()
     {
         var contract = AcceptancePerformanceContract.Load(
