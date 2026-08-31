@@ -518,16 +518,33 @@ internal static class CacheSoundnessRules
         var outputs = graph.Blocks.ToDictionary(
             static block => block.Ordinal,
             static _ => new HashSet<IOperation>());
+        var exceptionalInputs = graph.Blocks.ToDictionary(
+            static block => block.Ordinal,
+            static _ => new HashSet<IOperation>());
         bool changed;
         do
         {
             changed = false;
+            var nextExceptionalInputs = graph.Blocks.ToDictionary(
+                static block => block.Ordinal,
+                static _ => new HashSet<IOperation>());
             foreach (var block in graph.Blocks.Where(static block => block.IsReachable))
             {
-                var input = new HashSet<IOperation>();
+                var input = new HashSet<IOperation>(
+                    exceptionalInputs[block.Ordinal]);
                 foreach (var predecessor in block.Predecessors)
                 {
                     input.UnionWith(outputs[predecessor.Source.Ordinal]);
+                }
+                var exceptional = GetExceptionalLocalValues(
+                    block,
+                    reference.Local,
+                    input,
+                    root);
+                foreach (var successor in ExceptionalSuccessors(graph, block))
+                {
+                    nextExceptionalInputs[successor.Ordinal]
+                        .UnionWith(exceptional);
                 }
                 var output = TransferLocalValues(
                     block,
@@ -541,10 +558,21 @@ internal static class CacheSoundnessRules
                     changed = true;
                 }
             }
+
+            foreach (var block in graph.Blocks)
+            {
+                if (!exceptionalInputs[block.Ordinal].SetEquals(
+                        nextExceptionalInputs[block.Ordinal]))
+                {
+                    changed = true;
+                }
+            }
+            exceptionalInputs = nextExceptionalInputs;
         }
         while (changed);
 
-        var reaching = new HashSet<IOperation>();
+        var reaching = new HashSet<IOperation>(
+            exceptionalInputs[target.Ordinal]);
         foreach (var predecessor in target.Predecessors)
         {
             reaching.UnionWith(outputs[predecessor.Source.Ordinal]);
@@ -606,6 +634,107 @@ internal static class CacheSoundnessRules
             result.Add(value);
         }
         return result;
+    }
+
+    private static HashSet<IOperation> GetExceptionalLocalValues(
+        BasicBlock block,
+        ILocalSymbol local,
+        IEnumerable<IOperation> input,
+        IOperation root)
+    {
+        var state = new HashSet<IOperation>(input);
+        var exceptional = new HashSet<IOperation>();
+        foreach (var candidate in BlockOperations(block)
+                     .SelectMany(operation =>
+                         InEvaluationOrder(operation, root)))
+        {
+            if (OperationMayThrow(candidate))
+            {
+                exceptional.UnionWith(state);
+            }
+
+            var value = GetLocalWriteValue(candidate, local);
+            if (value == null)
+            {
+                continue;
+            }
+
+            state.Clear();
+            state.Add(value);
+        }
+        return exceptional;
+    }
+
+    private static bool OperationMayThrow(IOperation operation)
+    {
+        if (operation is IConversionOperation conversion)
+        {
+            return conversion.IsChecked ||
+                (!conversion.IsTryCast && !conversion.IsImplicit &&
+                 (conversion.Conversion.IsReference ||
+                  conversion.Operand.Type?.IsReferenceType == true &&
+                  conversion.Type?.IsValueType == true));
+        }
+
+        return operation is
+            IThrowOperation or
+            IInvocationOperation or
+            IDynamicInvocationOperation or
+            IDynamicObjectCreationOperation or
+            IDynamicIndexerAccessOperation or
+            IFunctionPointerInvocationOperation or
+            IObjectCreationOperation or
+            IArrayCreationOperation or
+            IArrayElementReferenceOperation or
+            IDynamicMemberReferenceOperation or
+            IFieldReferenceOperation { Instance: not null } or
+            IPropertyReferenceOperation or
+            IEventAssignmentOperation or
+            ILockOperation or
+            IAwaitOperation or
+            ICompoundAssignmentOperation { IsChecked: true } or
+            ICompoundAssignmentOperation
+            {
+                OperatorKind: BinaryOperatorKind.Divide or
+                    BinaryOperatorKind.Remainder
+            } or
+            IBinaryOperation { IsChecked: true } or
+            IBinaryOperation
+            {
+                OperatorKind: BinaryOperatorKind.Divide or
+                    BinaryOperatorKind.Remainder
+            } or
+            IUnaryOperation { IsChecked: true } or
+            IIncrementOrDecrementOperation { IsChecked: true };
+    }
+
+    private static IEnumerable<BasicBlock> ExceptionalSuccessors(
+        ControlFlowGraph graph,
+        BasicBlock block)
+    {
+        var yielded = new HashSet<int>();
+        for (var region = block.EnclosingRegion;
+             region != null;
+             region = region.EnclosingRegion)
+        {
+            if (region.Kind != ControlFlowRegionKind.Try ||
+                region.EnclosingRegion is not { } owner)
+            {
+                continue;
+            }
+
+            foreach (var handler in owner.NestedRegions.Where(candidate =>
+                         candidate.Kind is ControlFlowRegionKind.Filter or
+                             ControlFlowRegionKind.Catch or
+                             ControlFlowRegionKind.FilterAndHandler or
+                             ControlFlowRegionKind.Finally))
+            {
+                if (yielded.Add(handler.FirstBlockOrdinal))
+                {
+                    yield return graph.Blocks[handler.FirstBlockOrdinal];
+                }
+            }
+        }
     }
 
     private static IEnumerable<IOperation> InEvaluationOrder(
