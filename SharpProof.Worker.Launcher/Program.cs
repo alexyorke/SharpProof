@@ -908,6 +908,12 @@ internal sealed partial class LauncherArguments
         string? cacheDirectory = null)
     {
         var workerPath = WorkerPath;
+        if (Directory.Exists(ResultPath))
+        {
+            throw new ArgumentException(
+                "The SharpProof result path must name a file.");
+        }
+
         var runtimeRoots = new[] {
             workerPath,
             Path.ChangeExtension(workerPath, ".deps.json"),
