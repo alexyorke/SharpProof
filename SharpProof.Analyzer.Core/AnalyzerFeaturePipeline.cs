@@ -83,6 +83,16 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
+        var firstDeclaration = method.DeclaringSyntaxReferences[0]
+            .GetSyntax(context.CancellationToken);
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                method,
+                firstDeclaration.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
 
         EffectContractDiagnostics.ValidateArguments(method, session, context.ReportDiagnostic);
         ClosedContractDiagnostics.Validate(method, session, context.ReportDiagnostic);
