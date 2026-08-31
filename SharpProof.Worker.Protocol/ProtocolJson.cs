@@ -99,7 +99,13 @@ public static partial class WorkerProtocolJson
                 "The JSON file changed while it was opened.");
         }
 
-        return new StreamReader(stream, s_strictUtf8, detectEncodingFromByteOrderMarks: false);
+        return new StreamReader(
+            new BoundedReadStream(
+                stream,
+                MaximumJsonBytes,
+                $"The JSON file exceeds the {MaximumJsonBytes} byte limit."),
+            s_strictUtf8,
+            detectEncodingFromByteOrderMarks: false);
     }
 
     public static string SerializeResponse(WorkerVerifyResponse response)
