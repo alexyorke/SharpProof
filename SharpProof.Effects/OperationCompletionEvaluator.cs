@@ -532,7 +532,8 @@ internal sealed class OperationCompletionEvaluator
         {
             expression = returnBody;
         }
-        else if (declaration.DescendantNodes()
+        else if (declaration.DescendantNodes(
+                     static node => node is not LocalFunctionStatementSyntax)
                      .OfType<ArrowExpressionClauseSyntax>()
                      .FirstOrDefault() is { Expression: { } arrowBody })
         {
