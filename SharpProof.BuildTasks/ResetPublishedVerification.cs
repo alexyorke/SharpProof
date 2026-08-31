@@ -3,8 +3,11 @@ using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
-public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task
+public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task, ICancelableTask
 {
+    private readonly object _synchronization = new();
+    private Action? _cancelExecution;
+    private bool _canceled;
     [Required]
     public string RequestPath { get; set; } = string.Empty;
 
@@ -19,6 +22,34 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task
     public string? ProjectDirectory { get; set; }
 
     public override bool Execute()
+    {
+        using var cancellation = new CancellationTokenSource();
+        Action cancel = cancellation.Cancel;
+        lock (_synchronization)
+        {
+            if (_canceled)
+            {
+                return false;
+            }
+            _cancelExecution = cancel;
+        }
+        try
+        {
+            return Execute(cancellation.Token);
+        }
+        finally
+        {
+            lock (_synchronization)
+            {
+                if (ReferenceEquals(_cancelExecution, cancel))
+                {
+                    _cancelExecution = null;
+                }
+            }
+        }
+    }
+
+    private bool Execute(CancellationToken cancellationToken)
     {
         try
         {
@@ -37,14 +68,27 @@ public sealed class ResetPublishedVerification : Microsoft.Build.Utilities.Task
             LinuxPathIdentity.ResetPublicationSet(
                 Present(RequestPath, ResultPath, ManifestPath, SarifPath)
                     .Select(ResolvePath),
-                TimeSpan.FromSeconds(30));
+                TimeSpan.FromSeconds(30), cancellationToken);
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
         }
         catch (Exception exception) when (exception is
             ArgumentException or IOException or UnauthorizedAccessException)
         {
             Log.LogErrorFromException(exception, showStackTrace: false);
             return false;
+        }
+    }
+
+    public void Cancel()
+    {
+        lock (_synchronization)
+        {
+            _canceled = true;
+            _cancelExecution?.Invoke();
         }
     }
 
