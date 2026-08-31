@@ -1612,6 +1612,46 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 diagnostic.ToString())));
     }
 
+    [Test]
+    public async Task UserDefinedConversionCannotExcludeCancellationFilterAnalysis()
+    {
+        const string source =
+            """
+            using System;
+            namespace SharpProof.Verify;
+
+            sealed class FilterException : Exception { }
+
+            sealed class CustomCancellationException :
+                OperationCanceledException
+            {
+                public static explicit operator FilterException(
+                    CustomCancellationException exception) => new();
+            }
+
+            static class C
+            {
+                static void M()
+                {
+                    try { }
+                    catch (CustomCancellationException caught)
+                        when (((object)(FilterException)caught) is not
+                            OperationCanceledException)
+                    {
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPMETA003"]),
+            string.Join(Environment.NewLine, diagnostics.Select(
+                static diagnostic => diagnostic.ToString())));
+    }
+
     [TestCase(
         """
         using System;
