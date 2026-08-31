@@ -224,6 +224,14 @@ public static partial class LinuxPathIdentity
             cancellationToken.ThrowIfCancellationRequested();
             File.Delete(markerPath);
         }
+        foreach (var directory in canonicalPaths
+                     .Concat(markerPaths)
+                     .Select(static path => Path.GetDirectoryName(path)!)
+                     .Distinct(StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            SyncDirectory(directory);
+        }
     }
 
     public static IDisposable AcquirePublicationSet(

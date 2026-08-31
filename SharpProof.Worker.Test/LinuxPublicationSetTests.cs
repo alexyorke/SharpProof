@@ -163,6 +163,17 @@ public sealed class LinuxPublicationSetTests
     }
 
     [Test]
+    public void ResetPublicationSetRemovesOwnedMembersAndMarkers()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var paths = CreatePaths(directory.Path, "reset-sync");
+        using (LinuxPathIdentity.AcquirePublicationSet(paths, TimeSpan.FromSeconds(1))) { }
+        LinuxPathIdentity.ResetPublicationSet(paths, TimeSpan.FromSeconds(1));
+        Assert.That(paths, Has.All.Matches<string>(path => !File.Exists(path)));
+        Assert.That(paths.Select(LinuxPathIdentity.PublicationMarkerPath), Has.All.Matches<string>(path => !File.Exists(path)));
+    }
+
+    [Test]
     public void SameSetInDifferentOrdersSerializesWithoutDeadlock()
     {
         using var directory = TemporaryDirectory.Create();
