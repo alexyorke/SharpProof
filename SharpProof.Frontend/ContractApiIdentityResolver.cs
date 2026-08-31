@@ -9,9 +9,13 @@ namespace SharpProof.Frontend;
 internal sealed class ContractApiIdentityResolver
 {
     private const string AttributesAssemblyName = "SharpProof.Attributes";
+    private const string AttributesAssemblyMvidMetadataKey =
+        "SharpProof.Attributes.MVID";
     private static readonly ImmutableArray<byte>
         AttributesAssemblyPayloadSha256 =
             ReadExpectedPayloadSha256();
+    private static readonly Guid AttributesAssemblyModuleVersionId =
+        ReadExpectedModuleVersionId();
     private static readonly Version AttributesAssemblyVersion =
         typeof(ContractApiIdentityResolver).Assembly.GetName().Version ??
         throw new InvalidOperationException(
@@ -193,15 +197,16 @@ internal sealed class ContractApiIdentityResolver
                         reference)))
             .ToImmutableArray();
         if (matches.Length != 1 ||
-            matches[0] is not PortableExecutableReference
-            {
-                FilePath: { Length: > 0 } path
-            })
+            matches[0] is not PortableExecutableReference reference)
         {
             return false;
         }
 
-        var trusted = HasExpectedPayloadHash(path, out var unreadableReason);
+        var trusted = reference.FilePath is { Length: > 0 } path
+            ? HasExpectedPayloadHash(path, out var unreadableReason)
+            : HasExpectedModuleVersionId(
+                reference,
+                out unreadableReason);
         if (unreadableReason != null)
         {
             UnreadableContractApiReason = unreadableReason;
@@ -237,6 +242,35 @@ internal sealed class ContractApiIdentityResolver
                 UnauthorizedAccessException or
                 SecurityException or
                 CryptographicException)
+        {
+            unreadableReason = exception.Message;
+            return false;
+        }
+    }
+
+    private static bool HasExpectedModuleVersionId(
+        PortableExecutableReference reference,
+        out string? unreadableReason)
+    {
+        unreadableReason = null;
+        try
+        {
+            if (AttributesAssemblyModuleVersionId == Guid.Empty ||
+                reference.GetMetadata() is not AssemblyMetadata metadata)
+            {
+                return false;
+            }
+
+            var modules = metadata.GetModules();
+            return modules.Length == 1 &&
+                modules[0].GetModuleVersionId() ==
+                    AttributesAssemblyModuleVersionId;
+        }
+        catch (Exception exception) when (
+            exception is BadImageFormatException or
+                IOException or
+                InvalidOperationException or
+                NotSupportedException)
         {
             unreadableReason = exception.Message;
             return false;
@@ -282,6 +316,24 @@ internal sealed class ContractApiIdentityResolver
         }
 
         return result.MoveToImmutable();
+    }
+
+    private static Guid ReadExpectedModuleVersionId()
+    {
+        var values = typeof(ContractApiIdentityResolver)
+            .Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .Where(static attribute => string.Equals(
+                attribute.Key,
+                AttributesAssemblyMvidMetadataKey,
+                StringComparison.Ordinal))
+            .Select(static attribute => attribute.Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
+        return values.Length == 1 &&
+            Guid.TryParseExact(values[0], "D", out var result)
+                ? result
+                : Guid.Empty;
     }
 
     private bool IsAttribute(INamedTypeSymbol candidate)
