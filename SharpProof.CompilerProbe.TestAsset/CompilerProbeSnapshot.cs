@@ -411,7 +411,7 @@ internal static class CompilerProbeSnapshot
             builder,
             ref first,
             "fileSha256",
-            File.Exists(path) ? ProbeHash.File(path) : string.Empty);
+            GetPortableReferenceSha256(reference, path));
         ProbeJson.StringProperty(
             builder,
             ref first,
@@ -465,6 +465,33 @@ internal static class CompilerProbeSnapshot
             reference.Properties.Kind.ToString());
         builder.Append('}');
         return builder.ToString();
+    }
+
+    private static string GetPortableReferenceSha256(
+        PortableExecutableReference reference,
+        string path)
+    {
+        if (File.Exists(path))
+        {
+            return ProbeHash.File(path);
+        }
+
+        var metadata = reference.GetMetadata();
+        var method = metadata.GetType().GetMethod(
+            "GetEntireImage",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic,
+            binder: null,
+            Type.EmptyTypes,
+            modifiers: null);
+        if (method?.Invoke(metadata, null) is System.Collections.Immutable.ImmutableArray<byte> image &&
+            !image.IsDefault)
+        {
+            return ProbeHash.Bytes(image.ToArray());
+        }
+
+        return string.Empty;
     }
 
     private static CSharpCompilation GetReferencedCompilation(
