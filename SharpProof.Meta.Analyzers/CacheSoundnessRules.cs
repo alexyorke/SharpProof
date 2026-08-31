@@ -1684,9 +1684,55 @@ internal static class CacheSoundnessRules
             .Select(static arrow => arrow.Expression)
             .Concat(syntax.DescendantNodesAndSelf()
                 .OfType<ReturnStatementSyntax>()
-                .Where(static statement => statement.Expression != null)
+                .Where(static statement => statement.Expression != null &&
+                    !IsSyntacticallyUnreachableReturn(statement))
                 .Select(static statement => statement.Expression!))
             .Where(expression => !IsInsideNestedCallable(expression, syntax));
+    }
+
+    // Roslyn's operation CFG is not available at this syntax-only stage. Keep
+    // the conservative fallback for unknown conditions, but avoid treating a
+    // return in an obviously disabled constant branch as a possible result.
+    private static bool IsSyntacticallyUnreachableReturn(ReturnStatementSyntax statement)
+    {
+        for (SyntaxNode? current = statement; current?.Parent != null; current = current.Parent)
+        {
+            if (current.Parent is IfStatementSyntax @if)
+            {
+                bool? condition = GetBooleanConstant(@if.Condition);
+                if (condition.HasValue)
+                {
+                    bool inThen = @if.Statement.Span.Contains(statement.Span);
+                    bool inElse = @if.Else?.Statement.Span.Contains(statement.Span) == true;
+                    if ((inThen && !condition.Value) || (inElse && condition.Value))
+                    {
+                        return true;
+                    }
+                }
+            }
+            else if (current.Parent is WhileStatementSyntax @while &&
+                     GetBooleanConstant(@while.Condition) == false)
+            {
+                return true;
+            }
+            else if (current.Parent is ForStatementSyntax @for &&
+                     @for.Condition != null && GetBooleanConstant(@for.Condition) == false)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool? GetBooleanConstant(ExpressionSyntax expression)
+    {
+        expression = UnwrapSyntax(expression);
+        return expression switch
+        {
+            LiteralExpressionSyntax literal when literal.IsKind(SyntaxKind.TrueLiteralExpression) => true,
+            LiteralExpressionSyntax literal when literal.IsKind(SyntaxKind.FalseLiteralExpression) => false,
+            _ => null
+        };
     }
 
     private static ImmutableArray<string> GetExpressionValueNames(

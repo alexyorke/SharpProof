@@ -1010,6 +1010,28 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesIgnoreReturnsInConstantDisabledHelperBranches()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache { internal void Write(Answer answer) { } }
+            static class AnswerSource {
+                internal static Answer Create() {
+                    if (false) return Answer.Unknown;
+                    return Answer.Proven;
+                }
+            }
+            sealed class C {
+                void M(ProofCache cache) => cache.Write(AnswerSource.Create());
+            }
+            """);
+
+        Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"), Is.EqualTo(0));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesInspectVirtualAndInterfaceProducerImplementations()
     {
         var diagnostics = await Analyze(
