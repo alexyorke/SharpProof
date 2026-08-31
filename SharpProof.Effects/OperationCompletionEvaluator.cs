@@ -938,7 +938,12 @@ internal sealed class OperationCompletionEvaluator
     internal bool CanCompleteCompoundOperator(
         ICompoundAssignmentOperation assignment)
     {
-
+        if (ConversionEffectClassifier.SkipsLiftedOperator(
+                assignment,
+                _abstractFlow))
+        {
+            return true;
+        }
         if (assignment.OperatorKind is
                 BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder &&
             assignment.Value.ConstantValue is { HasValue: true, Value: 0 })
@@ -973,7 +978,10 @@ internal sealed class OperationCompletionEvaluator
         IIncrementOrDecrementOperation increment)
     {
         return CanCompleteNormally(increment.Target) &&
-            (increment.OperatorMethod == null ||
+            (ConversionEffectClassifier.SkipsLiftedOperator(
+                 increment,
+                 _abstractFlow) ||
+             increment.OperatorMethod == null ||
              CanCompleteInvocation(
                  increment.OperatorMethod,
                  instance: null,
@@ -1161,6 +1169,13 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
+        if (ConversionEffectClassifier.SkipsLiftedOperator(
+                binary,
+                _abstractFlow))
+        {
+            return true;
+        }
+
         if (binary.OperatorKind is
                 BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder &&
             binary.RightOperand.ConstantValue is { HasValue: true, Value: 0 })
@@ -1178,7 +1193,10 @@ internal sealed class OperationCompletionEvaluator
     private bool CanCompleteUnary(IUnaryOperation unary)
     {
         return CanCompleteNormally(unary.Operand) &&
-            (unary.OperatorMethod == null ||
+            (ConversionEffectClassifier.SkipsLiftedOperator(
+                 unary,
+                 _abstractFlow) ||
+             unary.OperatorMethod == null ||
              CanCompleteInvocation(
                  unary.OperatorMethod,
                  instance: null,

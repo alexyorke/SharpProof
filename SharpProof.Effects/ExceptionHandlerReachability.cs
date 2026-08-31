@@ -454,6 +454,10 @@ internal sealed class ExceptionHandlerReachability(
             if (operation is ICompoundAssignmentOperation compound)
             {
                 var targetCompletes = canCompleteNormally(compound.Target);
+                var skipsOperator =
+                    ConversionEffectClassifier.SkipsLiftedOperator(
+                        compound,
+                        abstractFlow);
                 var inConversionCompletes = targetCompletes &&
                     AddCompoundCallablePotential(
                         compound.InConversion.MethodSymbol,
@@ -464,18 +468,20 @@ internal sealed class ExceptionHandlerReachability(
                 var priorPhasesComplete = inConversionCompletes &&
                     canCompleteNormally(compound.Value);
                 var operatorCompletes = priorPhasesComplete &&
-                    AddCompoundCallablePotential(
-                        compound.OperatorMethod,
-                        compound,
-                        activeMethods,
-                        depth,
-                        Add) &&
-                    !(compound.OperatorKind is
+                    (skipsOperator || AddCompoundCallablePotential(
+                            compound.OperatorMethod,
+                            compound,
+                            activeMethods,
+                            depth,
+                            Add)) &&
+                    (skipsOperator || !(compound.OperatorKind is
                             BinaryOperatorKind.Divide or
                             BinaryOperatorKind.Remainder &&
                         compound.Value.ConstantValue is
-                        { HasValue: true, Value: 0 });
-                if (priorPhasesComplete && CanThrowUnknown(compound))
+                        { HasValue: true, Value: 0 }));
+                if (priorPhasesComplete &&
+                    !skipsOperator &&
+                    CanThrowUnknown(compound))
                 {
                     Add(UnknownPotential, compound);
                 }
@@ -506,6 +512,9 @@ internal sealed class ExceptionHandlerReachability(
                     canCompleteNormally(increment.Target);
                 var operatorInitializationCompletes = true;
                 if (priorPhasesComplete &&
+                    !ConversionEffectClassifier.SkipsLiftedOperator(
+                        increment,
+                        abstractFlow) &&
                     increment.OperatorMethod is { } incrementOperator)
                 {
                     operatorInitializationCompletes =
@@ -646,6 +655,10 @@ internal sealed class ExceptionHandlerReachability(
             if (operation is IBinaryOperation binary &&
                 binary.OperatorMethod is { } binaryOperator)
             {
+                var skipsOperator =
+                    ConversionEffectClassifier.SkipsLiftedOperator(
+                        binary,
+                        abstractFlow);
                 var priorPhasesComplete =
                     canCompleteNormally(binary.LeftOperand);
                 if (binary.OperatorKind is
@@ -681,7 +694,8 @@ internal sealed class ExceptionHandlerReachability(
                 }
 
                 if (priorPhasesComplete &&
-                    canCompleteNormally(binary.RightOperand))
+                    canCompleteNormally(binary.RightOperand) &&
+                    !skipsOperator)
                 {
                     if (AddStaticInitializationPotential(
                             binaryOperator,
@@ -706,7 +720,10 @@ internal sealed class ExceptionHandlerReachability(
             if (operation is IUnaryOperation unary &&
                 unary.OperatorMethod is { } unaryOperator)
             {
-                if (canCompleteNormally(unary.Operand))
+                if (canCompleteNormally(unary.Operand) &&
+                    !ConversionEffectClassifier.SkipsLiftedOperator(
+                        unary,
+                        abstractFlow))
                 {
                     if (AddStaticInitializationPotential(
                             unaryOperator,
@@ -3113,7 +3130,10 @@ internal sealed class ExceptionHandlerReachability(
 
     private bool CanThrowUnknownAfterPrerequisites(IOperation operation)
     {
-        if (!CanThrowUnknown(operation))
+        if (!CanThrowUnknown(operation) ||
+            ConversionEffectClassifier.SkipsLiftedOperator(
+                operation,
+                abstractFlow))
         {
             return false;
         }

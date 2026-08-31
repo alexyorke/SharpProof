@@ -336,14 +336,16 @@ internal sealed partial class OperationEffectScanner
         return ScanReadModifyWrite(
             increment.Target,
             () => EffectStep.Empty,
-            () => EffectSummaryOperations.Join(
-                _conversionEffects.CheckedOverflow(
-                    increment.IsChecked,
-                    increment),
-                ResolveOperatorEffects(
-                    increment.OperatorMethod,
-                    [increment.Target],
-                    increment)),
+            () => _conversionEffects.SkipsLiftedOperator(increment)
+                ? EffectSummary.Empty
+                : EffectSummaryOperations.Join(
+                    _conversionEffects.CheckedOverflow(
+                        increment.IsChecked,
+                        increment),
+                    ResolveOperatorEffects(
+                        increment.OperatorMethod,
+                        [increment.Target],
+                        increment)),
             () => _completionEvaluator.CanCompleteIncrementValue(increment),
             increment.Target);
     }
@@ -403,6 +405,12 @@ internal sealed partial class OperationEffectScanner
             return result;
         }
 
+        var operatorEffect = _conversionEffects.SkipsLiftedOperator(binary)
+            ? EffectSummary.Empty
+            : ResolveOperatorEffects(
+                binary.OperatorMethod,
+                [binary.LeftOperand, binary.RightOperand],
+                binary);
         return EffectSummaryOperations.Join(
             result,
             StringConcatenationEffectResolver.Resolve(
@@ -415,10 +423,7 @@ internal sealed partial class OperationEffectScanner
             IntegralDivisionExceptions(binary.OperatorKind, binary.Type,
                 binary.LeftOperand, binary.RightOperand, binary),
             _conversionEffects.CheckedOverflow(binary.IsChecked, binary),
-            ResolveOperatorEffects(
-                binary.OperatorMethod,
-                [binary.LeftOperand, binary.RightOperand],
-                binary));
+            operatorEffect);
     }
 
     private static EffectSummary BuiltInDelegateCombinationAllocation(
@@ -592,9 +597,14 @@ internal sealed partial class OperationEffectScanner
             return operand.Summary;
         }
 
-        var operation = EffectSummaryOperations.Join(
-            _conversionEffects.CheckedOverflow(unary.IsChecked, unary),
-            ResolveOperatorEffects(unary.OperatorMethod, [unary.Operand], unary));
+        var operation = _conversionEffects.SkipsLiftedOperator(unary)
+            ? EffectSummary.Empty
+            : EffectSummaryOperations.Join(
+                _conversionEffects.CheckedOverflow(unary.IsChecked, unary),
+                ResolveOperatorEffects(
+                    unary.OperatorMethod,
+                    [unary.Operand],
+                    unary));
         return operand.Then(new EffectStep(
             operation,
             _completionEvaluator.CanCompleteNormally(unary))).Summary;

@@ -107,7 +107,9 @@ internal sealed partial class OperationEffectScanner
 
         result = result.Then(new EffectStep(
             EffectSummaryOperations.Join(
-                ResolveCompoundOperatorEffects(assignment),
+                _conversionEffects.SkipsLiftedOperator(assignment)
+                    ? EffectSummary.Empty
+                    : ResolveCompoundOperatorEffects(assignment),
                 IntegralDivisionExceptions(
                     assignment.OperatorKind,
                     assignment.Type,
