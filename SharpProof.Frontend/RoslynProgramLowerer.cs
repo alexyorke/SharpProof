@@ -198,6 +198,19 @@ public sealed class RoslynProgramLowerer(
             IrBlockId block, OperationId operation, IVariableDeclaratorOperation declarator)
         {
             var target = _expressions.GetVariable(declarator.Symbol, declarator.Symbol.Type);
+            if (declarator.Symbol.RefKind != RefKind.None)
+            {
+                if (declarator.Initializer != null)
+                {
+                    _ = LowerValue(
+                        block,
+                        operation,
+                        declarator.Initializer.Value);
+                }
+                Abstain(operation, FrontendAbstention.UnsupportedMutation);
+                HavocKnownState(block, operation);
+                return;
+            }
             if (declarator.Initializer == null)
             {
                 Havoc(block, operation, IrHavocKind.Variables, target.Variable);
@@ -223,6 +236,20 @@ public sealed class RoslynProgramLowerer(
                 _ = LowerValue(block, operation, assignment.Value);
                 Abstain(operation, FrontendAbstention.UnsupportedMutation);
                 HavocKnownState(block, operation);
+                return;
+            }
+
+            if (assignment.IsRef ||
+                assignment.Target is ILocalReferenceOperation
+                {
+                    Local.RefKind: not RefKind.None
+                })
+            {
+                LowerUnsupportedMutation(
+                    block,
+                    operation,
+                    assignment.Target,
+                    assignment.Value);
                 return;
             }
 
