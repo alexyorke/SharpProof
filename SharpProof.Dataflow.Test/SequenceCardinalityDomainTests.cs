@@ -95,6 +95,20 @@ public sealed class SequenceCardinalityDomainTests
     }
 
     [Test]
+    public void UnboundedNonEmptyLengthsRetainTheirLowerBoundAfterTransforms()
+    {
+        var appended = _domain.Append(SequenceCardinalityValue.NonEmpty);
+        var concatenated = _domain.Concat(
+            SequenceCardinalityValue.NonEmpty,
+            SequenceCardinalityValue.NonEmpty);
+
+        Assert.That(appended.Kind, Is.EqualTo(SequenceCardinalityKind.NonEmpty));
+        Assert.That(appended.Length.LowerBound, Is.EqualTo(2));
+        Assert.That(concatenated.Kind, Is.EqualTo(SequenceCardinalityKind.NonEmpty));
+        Assert.That(concatenated.Length.LowerBound, Is.EqualTo(2));
+    }
+
+    [Test]
     public void WideningTerminatesForGrowingLengths()
     {
         var previous = SequenceCardinalityValue.Empty;
