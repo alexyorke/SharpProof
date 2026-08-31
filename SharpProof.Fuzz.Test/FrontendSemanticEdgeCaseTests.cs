@@ -130,6 +130,28 @@ public sealed class FrontendSemanticEdgeCaseTests
     }
 
     [Test]
+    public void SameContentSequenceIdentityMismatchIsDetected()
+    {
+        long[] first = [1, 2];
+        long[] second = [1, 2];
+        var result = new FrontendDifferentialOracle().CompareSemanticEdges(
+        [
+            new FrontendSemanticEdgeCase(
+                "long[]",
+                "long[] first, long[] second",
+                "first",
+                new SwappedSequenceArguments(first, second),
+                FrontendSubsetDecision.Exact,
+                FrontendAbstention.None)
+        ]).Single();
+
+        Assert.That(
+            result.Status,
+            Is.EqualTo(FuzzOracleStatus.Mismatch),
+            result.Detail);
+    }
+
+    [Test]
     public void CompileInvalidSemanticEdgeDoesNotPoisonValidPeer()
     {
         var results = new FrontendDifferentialOracle().CompareSemanticEdges(
@@ -255,5 +277,30 @@ public sealed class FrontendSemanticEdgeCaseTests
             arguments,
             FrontendSubsetDecision.ClosedAbstention,
             abstention);
+    }
+
+    private sealed class SwappedSequenceArguments(
+        long[] first,
+        long[] second) : IReadOnlyList<object?>
+    {
+        public int Count => 2;
+
+        public object this[int index] => index switch
+        {
+            0 => first,
+            1 => second,
+            _ => throw new ArgumentOutOfRangeException(nameof(index))
+        };
+
+        public IEnumerator<object?> GetEnumerator()
+        {
+            yield return second;
+            yield return first;
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 }
