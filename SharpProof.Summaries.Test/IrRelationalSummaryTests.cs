@@ -818,6 +818,120 @@ public sealed class IrRelationalSummaryTests
     }
 
     [Test]
+    public void InstanceCallCompositionRequiresANonNullReceiver()
+    {
+        var factory = new IrFactory();
+        var declaringType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(),
+            "InstanceReceiver");
+        var calleeMember = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            declaringType,
+            "Read",
+            factory.IntegerType,
+            isStatic: false);
+        var calleeReceiver = factory.CreateVariable(
+            "callee:receiver",
+            declaringType);
+        var calleeResult = factory.CreateVariable(
+            "callee:result",
+            factory.IntegerType);
+        var calleeBuilder = new IrProgramBuilder(factory);
+        var calleeEntry = calleeBuilder.CreateBlock("callee:entry");
+        calleeBuilder.Return(
+            calleeEntry,
+            factory.CreateOperation("callee:return"),
+            factory.Integer(1));
+        var calleeSummary = IrRelationalSummaryBuilder.Build(
+            calleeBuilder.Build(),
+            new IrSummarySignature(
+                calleeMember,
+                calleeReceiver,
+                [],
+                calleeResult,
+                Provenance('c')),
+            new Dictionary<IrVarId, IrTerm>()).Summary!;
+
+        var callerMember = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            declaringType,
+            "CallRead",
+            factory.IntegerType,
+            isStatic: true,
+            declaringType);
+        var callerReceiver = factory.CreateVariable(
+            "caller:receiver",
+            declaringType);
+        var callerResult = factory.CreateVariable(
+            "caller:result",
+            factory.IntegerType);
+        var bodyReceiver = factory.CreateVariable(
+            "caller:body-receiver",
+            declaringType);
+        var callResult = factory.CreateVariable(
+            "caller:call-result",
+            factory.IntegerType);
+        var callerBuilder = new IrProgramBuilder(factory);
+        var callerEntry = callerBuilder.CreateBlock("caller:entry");
+        var call = callerBuilder.Call(
+            callerEntry,
+            factory.CreateOperation("caller:call"),
+            callResult,
+            calleeMember,
+            factory.Variable(bodyReceiver));
+        callerBuilder.Return(
+            callerEntry,
+            factory.CreateOperation("caller:return"),
+            factory.Variable(callResult));
+        var built = IrRelationalSummaryBuilder.Build(
+            callerBuilder.Build(),
+            new IrSummarySignature(
+                callerMember,
+                receiver: null,
+                [callerReceiver],
+                callerResult,
+                Provenance('d')),
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [bodyReceiver] = factory.Variable(callerReceiver)
+            },
+            new Dictionary<IrInstructionId, IrRelationalSummary>
+            {
+                [call.Id] = calleeSummary
+            });
+
+        Assert.That(built.IsSuccess, Is.True, built.Reason.ToString());
+        var summary = built.Summary!;
+        var internalResult = summary.ExistentialVariables.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(summary.Effects, Is.EqualTo(IrSummaryEffect.MayThrow));
+            Assert.That(
+                EvaluateCompletion(factory.CreateNullValue(declaringType)),
+                Is.False);
+            Assert.That(
+                EvaluateCompletion(
+                    factory.CreateReferenceValue(declaringType, new object())),
+                Is.True);
+        }
+
+        bool EvaluateCompletion(IrValue receiver)
+        {
+            var evaluation = new IrInterpreter(factory).Evaluate(
+                summary.NormalCompletion,
+                new Dictionary<IrVarId, IrValue>
+                {
+                    [callerReceiver] = receiver,
+                    [internalResult] = factory.CreateIntegerValue(1)
+                });
+            Assert.That(
+                evaluation.Status,
+                Is.EqualTo(IrEvaluationStatus.Value));
+            return evaluation.Value!.Boolean;
+        }
+    }
+
+    [Test]
     public void DependencyProvenanceIdentityComponentsAreDeduplicatedStructurally()
     {
         var fixture = new SummaryFixture("Caller");
