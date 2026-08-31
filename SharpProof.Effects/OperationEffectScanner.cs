@@ -18,7 +18,9 @@ internal sealed partial class OperationEffectScanner
     private readonly INamedTypeSymbol? _contractType;
     private readonly INamedTypeSymbol? _exceptionType;
     private readonly ExceptionHandlerReachability _handlerReachability;
-    private readonly Dictionary<int, IArrayTypeSymbol> _freshArrayTypes = new();
+    private readonly Dictionary<
+        (SyntaxTree Tree, int SpanStart),
+        IArrayTypeSymbol> _freshArrayTypes = new();
     private readonly ConversionOwnershipClassifier _conversionOwnership;
     private readonly IMethodSymbol _method;
     private readonly INamedTypeSymbol? _monitorType;
@@ -100,7 +102,9 @@ internal sealed partial class OperationEffectScanner
         {
             if (creation.Type is IArrayTypeSymbol type)
             {
-                _freshArrayTypes[creation.Syntax.SpanStart] = type;
+                _freshArrayTypes[
+                    (creation.Syntax.SyntaxTree, creation.Syntax.SpanStart)] =
+                    type;
             }
         }
         _conversionOwnership.BuildLocalRegions(root, IsReachable);
@@ -511,7 +515,9 @@ internal sealed partial class OperationEffectScanner
         if (assignedValue == null ||
             regions.Regions.Length != 1 ||
             regions.Regions[0] is not { Kind: EffectRegionKind.Fresh } fresh ||
-            !_freshArrayTypes.TryGetValue(fresh.Ordinal, out var runtimeType) ||
+            !_freshArrayTypes.TryGetValue(
+                (element.Syntax.SyntaxTree, fresh.Ordinal),
+                out var runtimeType) ||
             assignedValue.Type == null)
         {
             return false;
