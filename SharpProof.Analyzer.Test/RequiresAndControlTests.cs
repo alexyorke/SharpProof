@@ -180,6 +180,60 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task ImpossibleCatchAccessorsAreNotReplayed()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Source {
+                public int Impossible {
+                    get { Contract.Requires(false); return 0; }
+                }
+
+                public int Reachable {
+                    get { Contract.Requires(false); return 0; }
+                }
+            }
+
+            public static class Subject {
+                public static int ImpossibleHandler(Source source) {
+                    try { return 0; }
+                    catch (InvalidOperationException) { return source.Impossible; }
+                }
+
+                public static int ImpossibleFilter(Source source) {
+                    try { return 0; }
+                    catch (InvalidOperationException)
+                        when (source.Impossible == 0) { return 1; }
+                }
+
+                public static int ReachableHandler(Source source) {
+                    try { throw new InvalidOperationException(); }
+                    catch (InvalidOperationException) { return source.Reachable; }
+                }
+
+                public static int ReachableFilter(Source source) {
+                    try { throw new InvalidOperationException(); }
+                    catch (InvalidOperationException)
+                        when (source.Reachable == 0) { return 1; }
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0027", 2)));
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.GetMessage(
+                CultureInfo.InvariantCulture)),
+            Has.All.Contains("get_Reachable"));
+    }
+
+    [Test]
     public async Task CompoundPropertyAccessChecksGetterAndFailsClosedForSetter()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
