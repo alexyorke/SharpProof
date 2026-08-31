@@ -1,6 +1,6 @@
 # Bug backlog
 
-350 open bugs, reprioritized by impact, reachability, and affected scope.
+347 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -109,16 +109,13 @@ Priority definitions:
 - **BUG-285 [P1] - Worker timeout can signal a reused process ID:** LinuxWorkerProcess checks a managed process for exit and later sends SIGTERM through its numeric PID without retaining process identity. If the PID is recycled in that window, timeout or disposal can terminate an unrelated process while reporting a normal worker timeout.
 - **BUG-286 [P1] - Z3 resolver becomes visible before the verified handle:** ContainerNativeLibrary registers the DllImport resolver before publishing the verified Z3 handle. A concurrent first P/Invoke can observe zero and fail binding or fall back to ambient library probing.
 
-## P2 - Medium (100)
+## P2 - Medium (97)
 
 - **BUG-316 [P2] - Companion surface matching is uncancellable and quadratic:** ContractForCompanionValidator materializes two full target-candidate matching matrices before its first cancellation check. Large generated surfaces continue consuming analyzer CPU and allocations after cancellation.
 - **BUG-317 [P2] - Compiler evidence validation is uncancellable and quadratic:** Compiler response evidence validation performs uncancellable repeated linear searches and replays the full body for each postcondition claim. Valid bounded responses can consume quadratic work, overrun deadlines, and delay cancellation.
 - **BUG-323 [P2] - ContractFor companion bodies skip intrinsic and API validation:** ContractForCompanionValidator checks mapping and clause placement but not rejected Contract APIs or malformed intrinsics, while normal operation analysis skips companion methods. Invalid clauses can be ignored or fail later without SP0047, SP0024, or a companion diagnostic.
-- **BUG-326 [P2] - Deep cutoff uncertainty poisons shallower effect caches:** EffectAnalysisSession leaves the method at the depth cutoff uncached but caches its caller after joining UnknownBoundary. Later shallow analysis reuses that poisoned entry, making effects and completeness request-order dependent and less precise.
 - **BUG-327 [P2] - Delegate reachability enters impossible handlers:** RequiresCallSiteTreeAnalyzer sends every possibly throwing operation to all sibling catches and filters without considering thrown type, catch order, or constant filters. Dead callbacks in impossible handlers can be analyzed and emit false SP0027 diagnostics.
 - **BUG-329 [P2] - Descendant cleanup performs unbounded quadratic process scans:** VerifierProcessSupervisor checks its cleanup deadline only outside process-table scans and rescans the full table for every descendant. Large process trees can exceed nominal cleanup budgets by a wide margin and push builds toward timeout.
-- **BUG-330 [P2] - Direct long.MinValue syntax abstains before negation admission:** RoslynOperationLowerer lowers the unsigned literal operand of -9223372036854775808L before applying its special long-minimum rule. The unsupported UInt64 operand causes an UnsupportedType abstention even though the resulting Int64 constant is exactly representable.
-- **BUG-331 [P2] - Discarded iterator calls are treated as executing their bodies:** RequiresCallSiteTreeAnalyzer marks every local-function invocation as immediate body reachability, ignoring iterator deferral and result consumption. Discarding an unenumerated iterator can therefore produce false SP0027 diagnostics from a body that never runs.
 - **BUG-333 [P2] - Duplicate line geometry prevents source-tree authority emission:** ClaimManifestBuilder discards Roslyn's source-tree identity and later reconstructs it from mapped path and geometry. Two legal source trees with identical line mappings become ambiguous, causing collector failure and loss of the manifest.
 - **BUG-334 [P2] - Duplicate preprocessor symbols make empty-tree artifacts self-reject:** Compiler capture preserves duplicate raw preprocessor symbols but derives effective symbols through a set. For an empty syntax tree, canonical validation compares those unequal sequences and rejects the producer's own legal compilation artifact.
 - **BUG-335 [P2] - Effect completion analysis drops cancellation:** OperationCompletionEvaluator constructs DefiniteOperationFacts helpers with CancellationToken.None despite receiving a live analyzer token. Canceled source-body and operation-completion walks continue consuming CPU until their scans finish.
