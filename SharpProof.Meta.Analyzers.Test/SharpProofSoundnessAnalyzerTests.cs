@@ -2952,6 +2952,33 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     "(" + name + ") is not null";
             }
             """).SetName("ConcatenatedExpressionTextRemainsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string name) {
+                    var result = "(" + name + ")";
+                    result += " is not null";
+                    return result;
+                }
+            }
+            """).SetName("CompoundAssignedExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string name) =>
+                    string.Concat("(", name, ") is not null");
+            }
+            """).SetName("StringConcatExpressionTextIsRejected");
+        yield return new TestCaseData(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static string M(string name) =>
+                    "(" + name + ") is" + " not null";
+            }
+            """).SetName("SplitExpressionTextIsRejected");
     }
 
     private static IEnumerable<TestCaseData> SemanticPatternControlFlowCases()
