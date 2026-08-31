@@ -729,6 +729,45 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task TupleItemAliasesReachNamedDelegateComponents()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    var unused = (
+                        Callback: (Func<int>)Dead,
+                        Number: 1);
+                    _ = unused.Item2;
+                    var consumed = (
+                        Number: 2,
+                        Callback: (Func<int>)Reachable);
+                    return consumed.Item2();
+
+                    int Dead() => Positive(-1);
+                    int Reachable() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-2)", StringComparison.Ordinal)));
+    }
+
+    [Test]
     public async Task NestedTupleMethodGroupsTrackTheirFullProjectionPath()
     {
         const string source =
