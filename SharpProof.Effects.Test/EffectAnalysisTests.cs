@@ -5284,6 +5284,54 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void AnalyzeAllIncludesPrimaryConstructorInitializationEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Global {
+                public static int State;
+
+                public static int Touch(int value) {
+                    State = value;
+                    return value;
+                }
+            }
+
+            public class BaseSample {
+                protected BaseSample(int value) {
+                }
+            }
+
+            public sealed class Sample(int value)
+                : BaseSample(Global.Touch(value)) {
+                private readonly int _value = Global.Touch(value);
+            }
+            """);
+        var constructor = EffectTestHost.RequireType(compilation, "Sample")
+            .InstanceConstructors
+            .Single(static method => method.Parameters.Length == 1);
+        var session = new EffectAnalysisSession(compilation);
+
+        var direct = session.Analyze(constructor);
+        var bulk = session.AnalyzeAll().Single(result =>
+            SymbolEqualityComparer.Default.Equals(
+                result.Method,
+                constructor));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                direct.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                direct.Summary.Writes.Contains(EffectRegionId.Receiver),
+                Is.True);
+            Assert.That(bulk.Summary, Is.EqualTo(direct.Summary));
+            Assert.That(bulk.DirectWitnesses, Is.EqualTo(direct.DirectWitnesses));
+        }
+    }
+
+    [Test]
     public void ColdConcurrentAnalysisPublishesOneDeterministicCache()
     {
         var compilation = EffectTestHost.CreateCompilation(
