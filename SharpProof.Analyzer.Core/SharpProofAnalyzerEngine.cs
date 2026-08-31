@@ -323,8 +323,15 @@ internal sealed partial class SharpProofAnalyzerEngine
                 continue;
             }
 
-            if (reference is CompilationReference)
+            if (reference is CompilationReference source)
             {
+                if (CompilationContainsRequiresClause(
+                        source.Compilation,
+                        cancellationToken))
+                {
+                    return true;
+                }
+
                 var symbol = compilation.GetAssemblyOrModuleSymbol(reference);
                 if (symbol == null)
                 {
@@ -355,6 +362,58 @@ internal sealed partial class SharpProofAnalyzerEngine
             }
 
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool CompilationContainsRequiresClause(
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
+        if (compilation.Language != LanguageNames.CSharp)
+        {
+            return true;
+        }
+
+        var contract = SharpProof.Frontend.ContractApiIdentityResolver
+            .ForCompilation(compilation)
+            .Contract;
+        if (contract == null)
+        {
+            return false;
+        }
+
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!MayContainAdvisoryActivationSyntax(
+                    tree.GetText(cancellationToken)))
+            {
+                continue;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, tree);
+            foreach (var invocation in tree.GetRoot(cancellationToken)
+                         .DescendantNodes()
+                         .OfType<InvocationExpressionSyntax>())
+            {
+                if (!IsContractApiCandidate(invocation.Expression) ||
+                    model.GetSymbolInfo(invocation, cancellationToken)
+                        .Symbol is not IMethodSymbol
+                        {
+                            Name: ContractApiMetadata.RequiresMethodName
+                        } method ||
+                    !SymbolEqualityComparer.Default.Equals(
+                        method.ContainingType.OriginalDefinition,
+                        contract.OriginalDefinition))
+                {
+                    continue;
+                }
+
+                return true;
+            }
         }
 
         return false;
