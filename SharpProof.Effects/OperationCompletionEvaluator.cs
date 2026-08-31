@@ -86,6 +86,8 @@ internal sealed class OperationCompletionEvaluator
             ILockOperation @lock => CanCompleteLock(@lock),
             IFlowCaptureOperation capture =>
                 CanCompleteNormally(capture.Value),
+            IAwaitOperation awaitOperation =>
+                CanCompleteNormally(awaitOperation.Operation),
             IMethodReferenceOperation methodReference =>
                 CanCompleteMethodReference(methodReference),
             IArgumentOperation argument =>
