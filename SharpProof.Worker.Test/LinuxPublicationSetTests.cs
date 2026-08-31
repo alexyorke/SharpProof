@@ -650,6 +650,19 @@ public sealed class LinuxPublicationSetTests
     }
 
     [Test]
+    public void RequireLocalPathRejectsUnsupportedVirtualFilesystem()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        Assert.That(
+            () => LinuxPathIdentity.RequireLocalPath("/proc"),
+            Throws.ArgumentException);
+    }
+
+    [Test]
     public void PublicationMetadataSupportsNameMaxBoundaryForEveryMember()
     {
         using var directory = TemporaryDirectory.Create();

@@ -41,10 +41,12 @@ public static partial class LinuxPathIdentity
         Encoding.ASCII.GetBytes("SharpProof.PublicationSetIdentity/1\0");
     private static readonly byte[] PublicationPathIdentityDomain =
         Encoding.ASCII.GetBytes("SharpProof.PublicationPathIdentity/1\0");
-    private static readonly HashSet<string> UnsupportedRemoteFileSystems =
+    // Publication requires local flock, atomic rename, and directory fsync
+    // semantics. Unknown mount types must fail closed.
+    private static readonly HashSet<string> SupportedLocalFileSystems =
         new(StringComparer.Ordinal)
         {
-            "cifs", "nfs", "nfs4", "smb3", "sshfs", "fuse.sshfs"
+            "btrfs", "ext2", "ext3", "ext4", "overlay", "tmpfs", "xfs"
         };
 
     public static string Canonicalize(string path)
@@ -112,10 +114,10 @@ public static partial class LinuxPathIdentity
     {
         var canonical = Canonicalize(path);
         var fileSystem = FindFileSystemType(canonical);
-        if (UnsupportedRemoteFileSystems.Contains(fileSystem))
+        if (!SupportedLocalFileSystems.Contains(fileSystem))
         {
             throw new ArgumentException(
-                $"SharpProof preview publication does not support the '{fileSystem}' filesystem.",
+                $"SharpProof preview publication requires a supported local filesystem; '{fileSystem}' is not supported.",
                 nameof(path));
         }
         return canonical;
