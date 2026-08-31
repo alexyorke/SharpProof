@@ -534,6 +534,7 @@ internal static class PerformanceGate
                 <LangVersion>12.0</LangVersion>
                 <Deterministic>true</Deterministic>
                 <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+                <WarningsAsErrors>$(WarningsAsErrors);AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
                 <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
                 <_SharpProofContractForGeneratorPath>{generatorPath}</_SharpProofContractForGeneratorPath>
                 <_SharpProofSharedDirectory>{sharedDirectory}</_SharpProofSharedDirectory>
