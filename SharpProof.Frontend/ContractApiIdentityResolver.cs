@@ -3,6 +3,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
 using System.Security.Cryptography;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 
 namespace SharpProof.Frontend;
 
@@ -208,7 +210,7 @@ internal sealed class ContractApiIdentityResolver
         foreach (var match in matches.Cast<PortableExecutableReference>())
         {
             var current = match.FilePath is { Length: > 0 } path
-                ? HasExpectedPayloadHash(path, out var currentReason)
+                ? HasExpectedPayloadHash(path, match, out var currentReason)
                 : HasExpectedModuleVersionId(match, out currentReason);
             trusted &= current;
             unreadableReason ??= currentReason;
@@ -228,7 +230,7 @@ internal sealed class ContractApiIdentityResolver
     /// environment fault the user can act on, and reporting it is the difference
     /// between an explained failure and the analyzer silently doing nothing.
     /// </summary>
-    private static bool HasExpectedPayloadHash(string path, out string? unreadableReason)
+    private static bool HasExpectedPayloadHash(string path, PortableExecutableReference reference, out string? unreadableReason)
     {
         unreadableReason = null;
         try
@@ -238,6 +240,18 @@ internal sealed class ContractApiIdentityResolver
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.Read);
+            using var reader = new PEReader(stream, PEStreamOptions.LeaveOpen);
+            if (!reader.HasMetadata)
+            {
+                return false;
+            }
+            var metadataReader = reader.GetMetadataReader();
+            if (metadataReader.GetGuid(metadataReader.GetModuleDefinition().Mvid) !=
+                GetBoundModuleVersionId(reference))
+            {
+                return false;
+            }
+            stream.Position = 0;
             using var algorithm = SHA256.Create();
             return algorithm.ComputeHash(stream).SequenceEqual(
                 AttributesAssemblyPayloadSha256);
@@ -253,6 +267,14 @@ internal sealed class ContractApiIdentityResolver
             unreadableReason = exception.Message;
             return false;
         }
+    }
+
+    private static Guid GetBoundModuleVersionId(PortableExecutableReference reference)
+    {
+        return reference.GetMetadata() is AssemblyMetadata metadata &&
+            metadata.GetModules() is { Length: 1 } modules
+                ? modules[0].GetModuleVersionId()
+                : Guid.Empty;
     }
 
     private static bool HasExpectedModuleVersionId(
