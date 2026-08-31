@@ -1,5 +1,6 @@
 using static SharpProof.Worker.CallableVerificationPolicy;
 using SharpProof.Host;
+using System.Threading.Channels;
 
 namespace SharpProof.Worker;
 
@@ -8,6 +9,8 @@ public sealed class SharpProofWorker : IDisposable
     private readonly ISmtBackend? _backend;
     private readonly Func<ISmtBackend>? _backendFactory;
     private readonly Func<long>? _readConsumedResourceCount;
+    private readonly Channel<byte> _injectedBackendRunGate =
+        CreateInjectedBackendRunGate();
     private bool _disposed;
     public SharpProofWorker(ISmtBackend backend) : this(
         backend, backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null)
@@ -78,6 +81,7 @@ public sealed class SharpProofWorker : IDisposable
         }
         WorkerInputSnapshot snapshot;
         VerificationLane[] solverLanes = [];
+        var ownsInjectedBackendRunGate = false;
         try
         {
             // A timeout or cancellation result must remain accountable to the
@@ -203,6 +207,13 @@ public sealed class SharpProofWorker : IDisposable
                         return cachedResponse;
                     }
                 }
+            }
+            if (_backend != null)
+            {
+                await _injectedBackendRunGate.Reader.ReadAsync(
+                        projectBoundary.Token)
+                    .ConfigureAwait(false);
+                ownsInjectedBackendRunGate = true;
             }
             if (!TryCreateLanes(request.Budgets, targets.Length, out solverLanes, out var backendError))
             {
@@ -344,11 +355,27 @@ public sealed class SharpProofWorker : IDisposable
             {
                 lane.DisposeOwnedBackend();
             }
+            if (ownsInjectedBackendRunGate)
+            {
+                _ = _injectedBackendRunGate.Writer.TryWrite(0);
+            }
         }
     }
     public void Dispose()
     {
         _disposed = true;
+    }
+
+    private static Channel<byte> CreateInjectedBackendRunGate()
+    {
+        var gate = Channel.CreateBounded<byte>(1);
+        if (!gate.Writer.TryWrite(0))
+        {
+            throw new InvalidOperationException(
+                "The injected backend run gate could not be initialized.");
+        }
+
+        return gate;
     }
 
     private static VerificationCache? CreateCacheIfEnabled(
