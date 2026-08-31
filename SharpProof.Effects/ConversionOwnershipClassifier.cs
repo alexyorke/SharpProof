@@ -629,13 +629,27 @@ internal sealed class ConversionOwnershipClassifier
             return ClassifyRegion(operation.Operand, aliasSource);
         }
 
-        // Boxing creates a new object containing a copy of the value. The box is
-        // locally owned, even when the source is a ref parameter, so mutations
-        // through an interface/object view must not be attributed to the caller.
+        // Concrete value-type boxing creates a locally owned copy. Roslyn also
+        // classifies a type-parameter-to-interface conversion as boxing when the
+        // type parameter permits both value and reference instantiations; retain
+        // the operand ownership for the reference-instantiation path.
         if (conversion.IsBoxing)
         {
-            return EffectRegionSet.Create(
+            var fresh = EffectRegionSet.Create(
                 EffectRegionId.Fresh(operation.Syntax.SpanStart));
+            if (operation.Operand.Type is ITypeParameterSymbol typeParameter)
+            {
+                var operand = ClassifyRegion(operation.Operand, aliasSource);
+                if (typeParameter.IsReferenceType)
+                {
+                    return operand;
+                }
+                if (!typeParameter.IsValueType)
+                {
+                    return fresh.Union(operand);
+                }
+            }
+            return fresh;
         }
 
         // Unboxing, nullable, numeric, enum, and identity conversions whose
