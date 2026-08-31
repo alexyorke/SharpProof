@@ -516,6 +516,66 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task OnlyExecutingOrEscapedDelegateUsesReachNestedCallables()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                private static void Replace(out Func<int> callback) =>
+                    callback = () => 0;
+
+                public static int MetadataOnly() {
+                    Func<int> callback = Dead;
+                    _ = callback.Method;
+                    _ = callback.Target;
+                    return 0;
+
+                    int Dead() => Positive(-1);
+                }
+
+                public static int WriteOnlyOut() {
+                    Func<int> callback = Dead;
+                    Replace(out callback);
+                    return callback();
+
+                    int Dead() => Positive(-2);
+                }
+
+                public static int DiscardedCombination() {
+                    Func<int> callback =
+                        () => Positive(-3);
+                    _ = callback + (Func<int>)(() => 0);
+                    return 0;
+                }
+
+                public static int ConsumedCombination() {
+                    Func<int> callback =
+                        () => Positive(-4);
+                    var combined =
+                        callback + (Func<int>)(() => 0);
+                    return combined();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-4)", StringComparison.Ordinal)));
+    }
+
+    [Test]
     public async Task CoalesceAssignmentOnlyReachesLaterConsumedMethodGroups()
     {
         const string source =
