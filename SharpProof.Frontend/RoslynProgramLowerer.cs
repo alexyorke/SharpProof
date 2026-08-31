@@ -80,6 +80,19 @@ public sealed class RoslynProgramLowerer(
         internal SelectedProgramLoweringResult Lower()
         {
             var selected = SelectBlocks();
+            var omittedHandler = _graph.Blocks.FirstOrDefault(block =>
+                block.IsReachable &&
+                !selected.Contains(block) &&
+                IsInsideCatchHandler(block));
+            if (omittedHandler != null)
+            {
+                Abstain(
+                    CreateOperation(
+                        omittedHandler,
+                        ordinal: -1,
+                        kind: OperationKind.None),
+                    FrontendAbstention.UnsupportedControlFlow);
+            }
             foreach (var block in selected)
             {
                 _blocks.Add(block, _builder.CreateBlock(
@@ -655,6 +668,23 @@ public sealed class RoslynProgramLowerer(
         private static bool HasMandatoryFinally(ControlFlowBranch? branch)
         {
             return branch != null && !branch.FinallyRegions.IsDefaultOrEmpty;
+        }
+
+        private static bool IsInsideCatchHandler(BasicBlock block)
+        {
+            for (var region = block.EnclosingRegion;
+                 region != null;
+                 region = region.EnclosingRegion)
+            {
+                if (region.Kind is
+                    ControlFlowRegionKind.Catch or
+                    ControlFlowRegionKind.Filter or
+                    ControlFlowRegionKind.FilterAndHandler)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private BasicBlock[] SelectBlocks()
