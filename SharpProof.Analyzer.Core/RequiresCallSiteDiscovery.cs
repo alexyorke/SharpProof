@@ -184,18 +184,20 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
                 var hasFlowState =
                     flowResult?.TryGetState(operation, out _) == true;
+                var hasReachableFlowState =
+                    flowResult?.IsReachable(operation) == true &&
+                    (hasFlowState || operation is IListPatternOperation);
                 var isInsideExceptionHandler =
                     IsInsideExceptionHandler(operation);
                 if (flowAnalysis.IsComplete &&
-                    !hasFlowState &&
+                    !hasReachableFlowState &&
                     (!isInsideExceptionHandler ||
                      !(semanticReachability ??=
                          OperationEffectScanner.CreateReachabilityProbe(
                              semanticModel.Compilation,
                              caller,
                              operationRoot!,
-                             flowResult)).IsReachable(operation)) &&
-                    operation is not IListPatternOperation)
+                             flowResult)).IsReachable(operation)))
                 {
                     continue;
                 }
