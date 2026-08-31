@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
@@ -9,6 +11,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Ir;
+using SharpProof.Summaries;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
@@ -2654,6 +2657,81 @@ public sealed class WorkerTests
                     "il-summary:",
                     StringComparison.Ordinal)),
                 Is.True);
+        }
+    }
+
+    [Test]
+    public void ImplementationIlRejectsStackDepthBeyondDeclaredMaximum()
+    {
+        using var project = TestProject.Create(
+            "public static class Subject { }");
+        var implementationPath = project.AddImplementationReference(
+            """
+            public static class ExternalStackDepth
+            {
+                public static int Add(int left, int right)
+                {
+                    int result = left + right;
+                    return result;
+                }
+            }
+            """,
+            OptimizationLevel.Debug);
+        SetDeclaredMaxStack(
+            implementationPath,
+            "Add",
+            declaredMaxStack: 1);
+        var compilation = project.CreateCompilation();
+        var method = compilation.GetTypeByMetadataName(
+                "ExternalStackDepth")!
+            .GetMembers("Add")
+            .OfType<IMethodSymbol>()
+            .Single();
+        var factory = new IrFactory();
+        var declaringType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(),
+            "ExternalStackDepth");
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            declaringType,
+            "Add",
+            factory.IntegerType,
+            isStatic: true,
+            factory.IntegerType,
+            factory.IntegerType);
+
+        var built = CompilerImplementationIlSummaryLowerer.TryBuild(
+            compilation,
+            factory,
+            method,
+            member,
+            static _ => false,
+            NoDependency,
+            CancellationToken.None,
+            out var summary,
+            out var reason);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(built, Is.False);
+            Assert.That(summary, Is.Null);
+            Assert.That(
+                reason,
+                Is.EqualTo(
+                    CompilerImplementationIlAbstentionReason.UnsupportedIl));
+        }
+
+        static bool NoDependency(
+            IMethodSymbol method,
+            IrMemberId member,
+            CancellationToken cancellationToken,
+            out IrRelationalSummary? summary)
+        {
+            _ = method;
+            _ = member;
+            _ = cancellationToken;
+            summary = null;
+            return false;
         }
     }
 
@@ -6549,6 +6627,50 @@ public sealed class WorkerTests
             "Repository root was not found.");
     }
 
+    private static void SetDeclaredMaxStack(
+        string path,
+        string methodName,
+        ushort declaredMaxStack)
+    {
+        var bytes = File.ReadAllBytes(path);
+        int methodBodyOffset;
+        using (var stream = new MemoryStream(bytes, writable: false))
+        using (var image = new PEReader(stream))
+        {
+            var metadata = image.GetMetadataReader();
+            var methodHandle = metadata.MethodDefinitions
+                .Where(handle => string.Equals(
+                    metadata.GetString(
+                        metadata.GetMethodDefinition(handle).Name),
+                    methodName,
+                    StringComparison.Ordinal))
+                .Single();
+            var definition = metadata.GetMethodDefinition(methodHandle);
+            var body = image.GetMethodBody(
+                definition.RelativeVirtualAddress);
+            Assert.That(
+                body.MaxStack,
+                Is.GreaterThan(declaredMaxStack));
+
+            var sectionIndex = image.PEHeaders.GetContainingSectionIndex(
+                definition.RelativeVirtualAddress);
+            Assert.That(sectionIndex, Is.GreaterThanOrEqualTo(0));
+            var section = image.PEHeaders.SectionHeaders[sectionIndex];
+            methodBodyOffset = checked(
+                definition.RelativeVirtualAddress -
+                section.VirtualAddress +
+                section.PointerToRawData);
+            Assert.That(
+                bytes[methodBodyOffset] & 0x03,
+                Is.EqualTo(0x03),
+                "The malformed-IL fixture requires a fat method header.");
+        }
+
+        bytes[methodBodyOffset + 2] = (byte)declaredMaxStack;
+        bytes[methodBodyOffset + 3] = (byte)(declaredMaxStack >> 8);
+        File.WriteAllBytes(path, bytes);
+    }
+
     private sealed class TestProject : IDisposable
     {
         private static readonly ImmutableArray<MetadataReference>
@@ -6662,7 +6784,7 @@ public sealed class WorkerTests
             };
         }
 
-        internal void AddImplementationReference(
+        internal string AddImplementationReference(
             string source,
             OptimizationLevel optimizationLevel = OptimizationLevel.Release)
         {
@@ -6694,6 +6816,7 @@ public sealed class WorkerTests
                     emit.Diagnostics.Select(static diagnostic =>
                         diagnostic.ToString())));
             _additionalReferencePaths.Add(path);
+            return path;
         }
 
         public void Dispose()
