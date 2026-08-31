@@ -169,6 +169,13 @@ internal sealed partial class SharpProofAnalyzerEngine
             }
             if (activation.RequiresFullOperationAnalysis)
             {
+                context.RegisterSyntaxNodeAction(
+                    syntaxContext =>
+                        AnalyzerFeaturePipeline.AnalyzeLambdaEffects(
+                            syntaxContext,
+                            session),
+                    SyntaxKind.SimpleLambdaExpression,
+                    SyntaxKind.ParenthesizedLambdaExpression);
                 context.RegisterOperationBlockAction(operationContext =>
                     AnalyzerFeaturePipeline.AnalyzeOperationBlock(
                         operationContext,

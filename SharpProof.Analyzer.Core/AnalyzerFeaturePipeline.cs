@@ -327,6 +327,102 @@ internal static partial class AnalyzerFeaturePipeline
         session.RecordSemanticOutcome(method, outcome);
     }
 
+    internal static void AnalyzeLambdaEffects(
+        SyntaxNodeAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.SemanticModel.GetOperation(
+                context.Node,
+                context.CancellationToken) is not
+            IAnonymousFunctionOperation anonymousFunction)
+        {
+            return;
+        }
+
+        var method = anonymousFunction.Symbol;
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                method,
+                context.Node.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
+        EffectContractDiagnostics.ValidateArguments(
+            method,
+            session,
+            context.ReportDiagnostic);
+        var rejectedContractApi =
+            session.Attributes.GetRejectedSelectionFeatures(method) !=
+            ContractSelectionFeatures.None;
+        if (rejectedContractApi &&
+            session.TryMarkRejectedContractApiReported(method))
+        {
+            ReportRejectedContractApi(
+                method,
+                context.ReportDiagnostic,
+                context.CancellationToken);
+        }
+
+        var selection = GetSelection(
+            method,
+            session,
+            context.ReportDiagnostic,
+            context.CancellationToken);
+        if (!selection.Effects ||
+            !session.TryBeginExecutableAnalysis(method))
+        {
+            return;
+        }
+        if (rejectedContractApi)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
+        if (selection.IsSuppressed)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Suppressed);
+            return;
+        }
+
+        var subset = LanguageSubsetGate.ClassifyEffects(
+            method,
+            context.Node,
+            context.SemanticModel,
+            [anonymousFunction.Body],
+            session.HasResolvedApiSpec,
+            context.CancellationToken);
+        if (!subset.IsSupported)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+                method.Name,
+                subset.OperationKind is { } operation
+                    ? subset.Reason + " (" + operation + ")"
+                    : subset.Reason.ToString()));
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
+
+        session.RecordSemanticOutcome(
+            method,
+            EffectContractDiagnostics.Analyze(
+                method,
+                context.Node,
+                session,
+                context.ReportDiagnostic,
+                context.CancellationToken));
+    }
+
     internal static void ReconcileSelectedSemicolonAccessors(
         CompilationAnalysisContext context,
         AnalyzerSession session)

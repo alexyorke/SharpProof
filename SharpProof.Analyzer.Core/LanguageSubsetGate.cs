@@ -135,6 +135,7 @@ internal static class LanguageSubsetGate
 
         return method.MethodKind is
             MethodKind.Ordinary or
+            MethodKind.AnonymousFunction or
             MethodKind.Constructor or
             MethodKind.StaticConstructor or
             MethodKind.PropertyGet or
