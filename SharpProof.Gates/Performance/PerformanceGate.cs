@@ -865,12 +865,10 @@ internal static class PerformanceGate
             compilations.Add(AnalyzeEnabledCompilation(
                 CreateEnabledSource(index),
                 $"EnabledRetentionWarmup_{index}",
-                cancellationToken));
                 analyzer,
                 cancellationToken));
         }
         ForceCollection();
-        return compilations.ToImmutable();
         GC.KeepAlive(analyzer);
         return compilations.ToImmutable();
     }
