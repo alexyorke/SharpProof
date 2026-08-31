@@ -69,6 +69,13 @@ internal static class LanguageSubsetGate
             foreach (var operation in root.DescendantsAndSelf())
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                // The outer callable's language subset must not be decided by
+                // an unused local function or lambda. Those callables are
+                // analyzed independently when selected/reachable.
+                if (operation != root && IsNestedCallableOperation(operation))
+                {
+                    continue;
+                }
                 if (!OperationKindDecisions.TryGetValue(operation.Kind, out var supported) || !supported)
                 {
                     return LanguageSubsetDecision.Abstain(
@@ -93,6 +100,19 @@ internal static class LanguageSubsetGate
         }
 
         return LanguageSubsetDecision.Supported;
+    }
+
+    private static bool IsNestedCallableOperation(IOperation operation)
+    {
+        for (var parent = operation.Parent; parent != null; parent = parent.Parent)
+        {
+            if (parent is ILocalFunctionOperation or IAnonymousFunctionOperation)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static ImmutableArray<IOperation> GetFallbackRoots(
