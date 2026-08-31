@@ -92,12 +92,16 @@ public static class ContainerContract
         foreach (var property in actual.EnumerateObject())
         {
             if (!required.Remove(property.Name))
+            {
                 throw new InvalidDataException(
                     $"The SharpProof container contract property '{property.Name}' is unknown or duplicated.");
+            }
         }
         if (required.Count != 0)
+        {
             throw new InvalidDataException(
                 $"The SharpProof container contract property '{required.First()}' is missing.");
+        }
         RequireInteger(actual, "schemaVersion", 1);
         RequireInteger(
             actual,
