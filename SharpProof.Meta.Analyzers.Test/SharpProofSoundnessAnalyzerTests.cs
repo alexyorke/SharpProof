@@ -682,6 +682,48 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheGetOrAddInspectsValueFactories()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System;
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, TimedOut, Failed, Proven }
+            sealed class ProofCache {
+                internal Answer GetOrAdd(
+                    string key,
+                    Func<string, Answer> valueFactory) =>
+                    valueFactory(key);
+            }
+            sealed class C {
+                private static Answer CreateFailure(string key) =>
+                    Answer.Failed;
+                private static Answer CreateSafe(string key) =>
+                    Answer.Proven;
+
+                void M(ProofCache cache, bool condition) {
+                    cache.GetOrAdd("unknown", _ => Answer.Unknown);
+                    cache.GetOrAdd("timeout", _ => {
+                        var answer = Answer.TimedOut;
+                        return answer;
+                    });
+                    cache.GetOrAdd("failure", CreateFailure);
+                    cache.GetOrAdd(
+                        "conditional",
+                        _ => condition ? Answer.Proven : Answer.Unknown);
+                    cache.GetOrAdd("safe", _ => Answer.Proven);
+                    cache.GetOrAdd("safe-helper", CreateSafe);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(4));
+    }
+
+    [Test]
     public async Task WorkerVerifyResponseIsAConservativeSemanticCacheValue()
     {
         var diagnostics = await Analyze(
