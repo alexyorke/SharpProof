@@ -47,18 +47,18 @@ internal sealed partial class OperationEffectScanner
             return result.Summary;
         }
 
-        var receiverCheck = new EffectStep(
-            PotentialNullReceiver(reference.Instance, eventAssignment),
-            _nullnessEvaluator.IsProvenNonNull(
-                reference.Instance,
-                eventAssignment));
-        result = result.Then(receiverCheck);
+        result = result.Then(ScanStep(eventAssignment.HandlerValue));
         if (!result.CompletesNormally)
         {
             return result.Summary;
         }
 
-        result = result.Then(ScanStep(eventAssignment.HandlerValue));
+        var receiverCheck = new EffectStep(
+            PotentialNullReceiver(reference.Instance, eventAssignment),
+            !_nullnessEvaluator.IsProvenNull(
+                reference.Instance,
+                eventAssignment));
+        result = result.Then(receiverCheck);
         if (!result.CompletesNormally)
         {
             return result.Summary;
