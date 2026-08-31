@@ -1021,6 +1021,33 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Is.EqualTo(1));
     }
 
+    [TestCase("SetAsync")]
+    [TestCase("Put")]
+    [TestCase("Store")]
+    [TestCase("Insert")]
+    [TestCase("Update")]
+    public async Task SemanticCacheWritesRecognizeCommonMutationNames(
+        string methodName)
+    {
+        var diagnostics = await Analyze(
+            $$"""
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache {
+                internal void {{methodName}}(string key, Answer answer) { }
+            }
+            sealed class C {
+                void M(ProofCache cache) =>
+                    cache.{{methodName}}("key", Answer.Unknown);
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(1));
+    }
+
     [Test]
     public async Task SemanticCacheGetOrAddInspectsValueFactories()
     {
