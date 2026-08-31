@@ -658,7 +658,7 @@ public sealed class LinuxPublicationSetTests
         }
 
         Assert.That(
-            () => LinuxPathIdentity.RequireLocalPath("/proc"),
+            (Action)(() => LinuxPathIdentity.RequireLocalPath("/proc")),
             Throws.ArgumentException);
     }
 
