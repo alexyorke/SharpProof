@@ -1047,6 +1047,117 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task ThrowingUserDefinedOperatorsKeepOldDelegateReachableInCatch()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public struct Source {
+                    public static implicit operator Func<int>(Source value) =>
+                        throw new InvalidOperationException();
+
+                    public static bool operator &(Source left, Source right) =>
+                        throw new InvalidOperationException();
+
+                    public static bool operator !(Source value) =>
+                        throw new InvalidOperationException();
+
+                    public static Source operator +(Source left, Source right) =>
+                        throw new InvalidOperationException();
+
+                    public static Source operator ++(Source value) =>
+                        throw new InvalidOperationException();
+                }
+
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Conversion(Source source) {
+                    Func<int> callback = Reachable;
+                    try { callback = source; }
+                    catch (InvalidOperationException) { return callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-1);
+                }
+
+                public static int Binary(Source source) {
+                    Func<int> callback = Reachable;
+                    Func<int> replacement = () => 0;
+                    try {
+                        callback = source & source
+                            ? replacement
+                            : replacement;
+                    }
+                    catch (InvalidOperationException) { return callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-2);
+                }
+
+                public static int Unary(Source source) {
+                    Func<int> callback = Reachable;
+                    Func<int> replacement = () => 0;
+                    try {
+                        callback = !source
+                            ? replacement
+                            : replacement;
+                    }
+                    catch (InvalidOperationException) { return callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-3);
+                }
+
+                public static int Compound(Source source) {
+                    Func<int> callback = Reachable;
+                    Func<int> replacement = () => 0;
+                    try {
+                        source += source;
+                        callback = replacement;
+                    }
+                    catch (InvalidOperationException) { return callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-4);
+                }
+
+                public static int Increment(Source source) {
+                    Func<int> callback = Reachable;
+                    Func<int> replacement = () => 0;
+                    try {
+                        source++;
+                        callback = replacement;
+                    }
+                    catch (InvalidOperationException) { return callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-5);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 5);
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EquivalentTo(new[] {
+                source.IndexOf("Positive(-1)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-3)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-4)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-5)", StringComparison.Ordinal)
+            }));
+    }
+
+    [Test]
     public async Task ExceptionHandlersCanConsumeTrackedDelegates()
     {
         const string source =
