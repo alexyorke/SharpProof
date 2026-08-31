@@ -12,7 +12,8 @@ internal static class CompilerFeatureScopeFingerprint
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
 
         using var hash = new CanonicalHashWriter();
-        hash.Add(Domain, Version, (int)artifact.Features);
+        hash.Add(Domain, Version, (int)artifact.Features,
+            "budget.expression_depth", artifact.MaximumExpressionDepth);
         AddJson(hash, artifact.Manifest);
 
         var callables = artifact.Callables;

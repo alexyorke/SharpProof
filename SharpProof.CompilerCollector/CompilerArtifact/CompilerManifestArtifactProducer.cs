@@ -78,7 +78,7 @@ internal static class CompilerManifestArtifactProducer
                 specificationPackAuthority.SpecificationPackCatalogSha256,
             Features = features,
             CompilationSha256 = CompilationFingerprint.ComputeSha256(
-                snapshot, diagnosticArtifacts),
+                snapshot, diagnosticArtifacts, maximumExpressionDepth),
             Compilation = snapshot,
             Manifest = discovery.Manifest,
             MaximumExpressionDepth = maximumExpressionDepth,

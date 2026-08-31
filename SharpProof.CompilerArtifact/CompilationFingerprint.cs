@@ -45,7 +45,8 @@ internal static class CompilationFingerprint
 
     internal static string ComputeSha256(
         CompilerCompilationSnapshot snapshot,
-        CompilerDiagnosticArtifact[] diagnostics)
+        CompilerDiagnosticArtifact[] diagnostics,
+        int maximumExpressionDepth = WorkerBudgets.DefaultMaximumExpressionDepth)
     {
         snapshot = ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
 
@@ -53,6 +54,7 @@ internal static class CompilationFingerprint
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
             10,
+            "budget.expression_depth", maximumExpressionDepth,
             JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options),
             JsonSerializer.Serialize(
                 CompilerDiagnosticArtifactOrdering.Canonicalize(

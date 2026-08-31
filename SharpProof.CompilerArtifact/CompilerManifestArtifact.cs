@@ -483,7 +483,8 @@ internal static class CompilerManifestArtifactJson
         WorkerProtocolJson.IsDefined(value.Features, WorkerFeatureSet.Unspecified) &&
         WorkerProtocolJson.IsSha256(value.CompilationSha256) &&
         value.CompilationSha256 == CompilationFingerprint.ComputeSha256(
-            value.Compilation, value.CompilerDiagnostics) &&
+            value.Compilation, value.CompilerDiagnostics,
+            value.MaximumExpressionDepth) &&
         WorkerProtocolJson.ValidateManifest(value.Manifest).IsValid;
     }
 
