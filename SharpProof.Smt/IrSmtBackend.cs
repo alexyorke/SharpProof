@@ -558,6 +558,18 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private EncodedValue EncodeBinary(IrBinaryTerm binary)
         {
             var left = Encode(binary.Left);
+            if (binary.Operator == IrBinaryOperator.AndAlso &&
+                left.Value is BoolExpr leftAnd &&
+                binary.Left is IrBooleanTerm { Value: false })
+            {
+                return new EncodedValue(leftAnd, left.Defined);
+            }
+            if (binary.Operator == IrBinaryOperator.OrElse &&
+                left.Value is BoolExpr leftOr &&
+                binary.Left is IrBooleanTerm { Value: true })
+            {
+                return new EncodedValue(leftOr, left.Defined);
+            }
             var right = Encode(binary.Right);
             if (binary.Operator == IrBinaryOperator.AndAlso &&
                 left.Value is BoolExpr leftBoolean &&
@@ -621,6 +633,12 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private EncodedValue EncodeConditional(IrConditionalTerm conditional)
         {
             var condition = EncodeBoolean(conditional.Condition);
+            if (conditional.Condition is IrBooleanTerm constant)
+            {
+                return constant.Value
+                    ? Encode(conditional.WhenTrue)
+                    : Encode(conditional.WhenFalse);
+            }
             var whenTrue = Encode(conditional.WhenTrue);
             var whenFalse = Encode(conditional.WhenFalse);
             // Expr.Sort creates a fresh managed wrapper over the native sort.
