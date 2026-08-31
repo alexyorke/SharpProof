@@ -1,4 +1,4 @@
-<Project TreatAsLocalProperty="_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained">
+<Project TreatAsLocalProperty="_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCompilerManifestStagingPath;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained;_SharpProofCleanVerifyDirectory;_SharpProofCleanCompilerManifestStagingPath">
   <PropertyGroup>
     <_SharpProofToolsDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofToolsDirectory)'))</_SharpProofToolsDirectory>
     <_SharpProofWorkerPathConfigured>$([System.String]::Copy('$(SharpProofWorkerPath)').Trim())</_SharpProofWorkerPathConfigured>
@@ -85,7 +85,8 @@
            Text="SharpProof invocation directory must resolve canonically to a direct child of the package-owned runs directory." />
     <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
       <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
-      <_SharpProofCompilerManifestPath>$([System.IO.Path]::Combine('$(_SharpProofInvocationDirectory)', 'compiler-manifest.json'))</_SharpProofCompilerManifestPath>
+      <_SharpProofCompilerManifestStagingPath>$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'compiler-manifest.staging.json'))</_SharpProofCompilerManifestStagingPath>
+      <_SharpProofCompilerManifestPath Condition="'$(_SharpProofCompilerManifestPath)' == ''">$(_SharpProofCompilerManifestStagingPath)</_SharpProofCompilerManifestPath>
       <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
     </PropertyGroup>
     <ItemGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
@@ -249,6 +250,7 @@
           Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
     <PropertyGroup>
       <_SharpProofCleanVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofCleanVerifyDirectory>
+      <_SharpProofCleanCompilerManifestStagingPath>$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'compiler-manifest.staging.json'))</_SharpProofCleanCompilerManifestStagingPath>
       <_SharpProofCleanRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'request.json'))</_SharpProofCleanRequestFile>
       <_SharpProofCleanRequestFile Condition="'$(SharpProofVerifyRequestFile)' != ''">$(SharpProofVerifyRequestFile)</_SharpProofCleanRequestFile>
       <_SharpProofCleanConfiguredRequestFullPath Condition="'$(SharpProofVerifyRequestFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::GetFullPath('$(SharpProofVerifyRequestFile)'))</_SharpProofCleanConfiguredRequestFullPath>
@@ -271,6 +273,7 @@
         ManifestPath="$(_SharpProofCleanManifestFile)"
         SarifPath="$(_SharpProofCleanSarifFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)" />
+    <Delete Files="$(_SharpProofCleanCompilerManifestStagingPath)" />
   </Target>
 
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
