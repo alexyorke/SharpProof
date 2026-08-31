@@ -7641,6 +7641,35 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ConstructionInitializationScanHonorsCancellation()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public class Base {
+                public static object Value = new object();
+            }
+
+            public sealed class Derived : Base {
+            }
+            """);
+        var apiSpecs = new ApiSpecResolver(
+            ApiSpecTable.Default).Resolve(compilation);
+        var type = compilation.GetTypeByMetadataName("Derived")!;
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Action action = () => _ = EffectMethodNodeBuilder
+            .HasPotentialConstructionInitialization(
+                type,
+                apiSpecs,
+                cancellation.Token);
+
+        Assert.That(
+            action,
+            Throws.InstanceOf<OperationCanceledException>());
+    }
+
+    [Test]
     public void ExcessiveBaseTypeDepthFailsClosedWithoutRecursion()
     {
         var declarations = Enumerable.Range(0, 260)
