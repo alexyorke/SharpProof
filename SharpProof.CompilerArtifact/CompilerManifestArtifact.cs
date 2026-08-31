@@ -362,7 +362,10 @@ internal static class CompilerManifestArtifactJson
         // deliberately mutate lowered evidence after the wire seal. Let the
         // existing lowerer report those malformed-body cases; wire reads and
         // writes still enforce the feature-scope seal below.
-        Validate(artifact, validateFeatureScope: false);
+        Validate(
+            artifact,
+            validateFeatureScope: false,
+            validateDecodability: false);
         return CompilerLoweredArtifact.Decode(
             artifact.Callables,
             artifact.Manifest,
@@ -371,12 +374,16 @@ internal static class CompilerManifestArtifactJson
 
     internal static void Validate(CompilerManifestArtifact value)
     {
-        Validate(value, validateFeatureScope: true);
+        Validate(
+            value,
+            validateFeatureScope: true,
+            validateDecodability: true);
     }
 
     private static void Validate(
         CompilerManifestArtifact value,
-        bool validateFeatureScope)
+        bool validateFeatureScope,
+        bool validateDecodability)
     {
         if (!HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation) ||
             !HasValidEnvelope(value) ||
@@ -392,6 +399,28 @@ internal static class CompilerManifestArtifactJson
         }
 
         CompilationFingerprint.ValidateShape(value.Compilation);
+        if (validateDecodability && !HasDecodableCallables(value))
+        {
+            throw new JsonException(
+                "The compiler manifest callable payload is invalid.");
+        }
+    }
+
+    private static bool HasDecodableCallables(
+        CompilerManifestArtifact value)
+    {
+        try
+        {
+            _ = CompilerLoweredArtifact.Decode(
+                value.Callables,
+                value.Manifest,
+                value.Compilation);
+            return true;
+        }
+        catch (InvalidDataException)
+        {
+            return false;
+        }
     }
 
     private static bool HasValidEnvelope(CompilerManifestArtifact? value)
