@@ -15,6 +15,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "Microsoft.CodeAnalysis.CSharp.SyntaxFactory", "Microsoft.CodeAnalysis.ISymbol",
         "Microsoft.CodeAnalysis.DiagnosticDescriptor", "System.OperationCanceledException",
         "System.Threading.CancellationToken", "SharpProof.Frontend.Host.CompilationModelProvider",
+        "SharpProof.Meta.Analyzers.MetaDiagnosticDescriptors",
         "SharpProof.Analyzer.GeneratedDiagnosticDescriptors", "SharpProof.ContractForGenerator.GeneratedDiagnosticDescriptors",
         "System.String", "SharpProof.Verify.Assumption", "SharpProof.Verify.ProofKernel",
         "SharpProof.Worker.CallableEvidenceBuilder",
@@ -138,8 +139,12 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         var creation = (IObjectCreationOperation)context.Operation;
         var containingType = context.ContainingSymbol.ContainingType;
         if (IsSameType(creation.Type, symbols[KnownType.DiagnosticDescriptor]) &&
-            !IsExactNamespace(context.ContainingSymbol.ContainingNamespace, "SharpProof", "Meta", "Analyzers") &&
-            !IsAnyType(containingType, symbols, KnownType.AnalyzerDiagnosticDescriptors, KnownType.ContractForDiagnosticDescriptors))
+            !IsAnyType(
+                containingType,
+                symbols,
+                KnownType.MetaDiagnosticDescriptors,
+                KnownType.AnalyzerDiagnosticDescriptors,
+                KnownType.ContractForDiagnosticDescriptors))
         {
             Report(context, MetaDiagnosticDescriptors.DescriptorConstruction, creation.Syntax.GetLocation());
         }
@@ -516,7 +521,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         Compilation, SemanticModel, SyntaxFactory, Symbol, DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, CompilationModelProvider,
-        AnalyzerDiagnosticDescriptors, ContractForDiagnosticDescriptors, String,
+        MetaDiagnosticDescriptors, AnalyzerDiagnosticDescriptors,
+        ContractForDiagnosticDescriptors, String,
         Assumption, ProofKernel, CallableEvidenceBuilder, CallableVerifier,
         PostconditionObligationBuilder,
         EffectSummary, EffectSummaryDomain,
