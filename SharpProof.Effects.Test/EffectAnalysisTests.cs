@@ -6105,7 +6105,7 @@ public sealed class EffectAnalysisTests
                     compilation,
                     "GenericStaticBomb`1",
                     "GenericStaticProbe"))
-                    .Summary.Writes.Regions.Contains(EffectRegionId.Static()),
+                    .Summary.Writes.Contains(EffectRegionId.Static()),
                 Is.True);
             Assert.That(HasStaticWrite("ThrowingFilter"), Is.False);
             Assert.That(HasStaticWrite("Rethrow"), Is.True);
