@@ -479,6 +479,77 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesUseNestedCallableReachingValues()
+    {
+        var unsafeDiagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache {
+                internal void Write(Answer answer) { }
+            }
+            sealed class C {
+                void Lambda(ProofCache cache) {
+                    var answer = Answer.Proven;
+                    System.Action write = () => {
+                        answer = Answer.Unknown;
+                        cache.Write(answer);
+                    };
+                    write();
+                }
+
+                void LocalFunction(ProofCache cache) {
+                    var answer = Answer.Proven;
+                    void Write() {
+                        answer = Answer.Unknown;
+                        cache.Write(answer);
+                    }
+                    Write();
+                }
+            }
+            """);
+        var safeDiagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache {
+                internal void Write(Answer answer) { }
+            }
+            sealed class C {
+                void Lambda(ProofCache cache) {
+                    var answer = Answer.Unknown;
+                    System.Action write = () => {
+                        answer = Answer.Proven;
+                        cache.Write(answer);
+                    };
+                    write();
+                }
+
+                void LocalFunction(ProofCache cache) {
+                    var answer = Answer.Unknown;
+                    void Write() {
+                        answer = Answer.Proven;
+                        cache.Write(answer);
+                    }
+                    Write();
+                }
+            }
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                unsafeDiagnostics.Count(static diagnostic =>
+                    diagnostic.Id == "SPMETA010"),
+                Is.EqualTo(2));
+            Assert.That(
+                safeDiagnostics.Count(static diagnostic =>
+                    diagnostic.Id == "SPMETA010"),
+                Is.Zero);
+        }
+    }
+
+    [Test]
     public async Task SemanticCacheWritesRetainPreAssignmentValuesOnExceptionalPaths()
     {
         var diagnostics = await Analyze(
