@@ -1,6 +1,6 @@
 # Bug backlog
 
-86 open bugs, reprioritized by impact, reachability, and affected scope.
+70 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -85,24 +85,6 @@ Priority definitions:
 - **BUG-285 [P1] - Worker timeout can signal a reused process ID:** LinuxWorkerProcess checks a managed process for exit and later sends SIGTERM through its numeric PID without retaining process identity. If the PID is recycled in that window, timeout or disposal can terminate an unrelated process while reporting a normal worker timeout.
 - **BUG-286 [P1] - Z3 resolver becomes visible before the verified handle:** ContainerNativeLibrary registers the DllImport resolver before publishing the verified Z3 handle. A concurrent first P/Invoke can observe zero and fail binding or fall back to ambient library probing.
 
-## P2 - Medium (8)
+## P2 - Medium (0)
 
-- **BUG-317 [P2] - Compiler evidence validation is uncancellable and quadratic:** Compiler response evidence validation performs uncancellable repeated linear searches and replays the full body for each postcondition claim. Valid bounded responses can consume quadratic work, overrun deadlines, and delay cancellation.
-- **BUG-347 [P2] - Final validation can read a torn publication generation:** ValidatePublishedVerificationResult reads request, result, and manifest independently after the launcher releases its publication lease. A concurrent publisher can replace files between reads, causing a valid build to fail against a mixed generation.
-- **BUG-370 [P2] - Manifest diagnostics repeatedly reauthenticate full line maps:** Each source diagnostic or location authority reserializes, hashes, and scans the same full line map without memoization or cancellation. Valid bounded manifests can trigger multiplicative CPU and allocation before verification begins.
-- **BUG-381 [P2] - One lane renewal failure retires healthy lanes:** SharpProofWorker records a lane-local renewal failure as global retirement, causing usable lanes to stop after current work. Remaining targets are synthesized as Unknown even when healthy capacity could complete them.
-- **BUG-395 [P2] - Referenced companion collisions lack duplicate diagnostics:** ContractFor validation reports duplicate companions only for current-compilation declarations, while runtime discovery also sees referenced assemblies. Two referenced companions can silently make an external contract ambiguous without SPCF0002 or an explanation identifying the collision.
-- **BUG-408 [P2] - Timed-out injected backends are reused:** SharpProofWorker reuses a caller-injected backend after a timeout or cancellation because renewal is unsupported and no poisoned state persists. Later requests can inherit stale interruption or resource state and fail unpredictably.
-- **BUG-413 [P2] - Unreachable handler loops fabricate divergence:** Effects termination analysis checks cycles across structurally reachable Roslyn blocks even when semantic scanning has excluded an impossible catch. A loop in that handler can falsely mark a terminating method MayDiverge and suppress effect witnesses.
-- **BUG-414 [P2] - Unreachable helper returns trigger SPMETA010:** CacheSoundnessRules gathers every syntactic return from a helper without reachability analysis. A constant-disabled Unknown return therefore blocks a build even when the helper can only return a cacheable answer.
-
-## P3 - Low (8)
-
-- **BUG-429 [P3] - Conditional-elision test exercises the wrong rejection:** ApiSpecTests uses a synthetic SharpProof.Attributes assembly that fails payload authentication before conditional-shape validation. The test remains green even if the conditional-elision check is removed, providing false coverage of that trust-boundary condition.
-- **BUG-438 [P3] - Final-compilation tests do not bind input provenance:** FinalCompilationProbeTests load portable references and additional files from the independent probe but never compare them with the compiler manifest. Collector regressions that omit or alter those inputs can keep package acceptance green.
-- **BUG-441 [P3] - Frontend fuzz coverage omits operator families:** FrontendFuzzCoverage has no facets for arithmetic, remainder, conditionals, short-circuit operators, equality, or comparisons. The campaign can report complete passing coverage after those supported expression families disappear from generation.
-- **BUG-443 [P3] - Generated source provenance relies on filename heuristics:** CompilerProbeSnapshot labels trees generated based on filename suffixes and auto-generated comments rather than actual pipeline origin. Handwritten and generator-emitted trees can be classified in reverse, weakening provenance checks.
-- **BUG-444 [P3] - IR printing emits unescaped type display names:** IrPrinter inserts unescaped display names into null and cast syntax and omits type identity. Legal names can inject lines or make distinct terms print identically, leaving diagnostics and fuzz evidence ambiguous.
-- **BUG-454 [P3] - SourceLength permits noncanonical authority digests:** CompilerSourceLocationAuthority validates only broad SourceLength bounds and never uses the field for mapping. Structurally impossible alternate lengths remain accepted while changing line-map and enclosing evidence hashes for identical source behavior.
-- **BUG-456 [P3] - Unknown-reason ratchet retains stale ceilings:** CorpusGate checks only currently observed Unknown categories against configured maxima and never requires ceilings to decrease after precision improves. A removed category can later regress up to its stale maximum without failing the ratchet.
-- **BUG-457 [P3] - Unrelated nested callables renumber stable claim identifiers:** ClaimManifestBuilder assigns nested callable ordinals using syntax order that includes unselected siblings. Adding an unrelated earlier lambda changes selected CallableId and ClaimId values, causing cache and baseline correlation churn.
+## P3 - Low (0)
