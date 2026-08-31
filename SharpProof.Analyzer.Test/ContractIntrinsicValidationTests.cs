@@ -56,6 +56,37 @@ public sealed class ContractIntrinsicValidationTests
     }
 
     [Test]
+    public async Task CompanionNestedCallableIntrinsicsAreValidated()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public interface Target {
+                int Read(int value);
+            }
+
+            [ContractFor(typeof(Target))]
+            public static class TargetContracts {
+                public static int Read(Target receiver, int value) {
+                    int Invalid() => Contract.Result<int>();
+                    return Invalid();
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0024"]));
+        Assert.That(
+            diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
+            Does.Contain("Contract.Result")
+                .And.Contain("expected use inside Contract.Ensures"));
+    }
+
+    [Test]
     public async Task IndirectIntrinsicCallsReportPlacementDiagnostics()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
