@@ -390,7 +390,8 @@ internal static class EffectContractDiagnostics
     private static string FormatDiagnosticTypes(
         IEnumerable<INamedTypeSymbol> types)
     {
-        return string.Join(", ", types.Select(static type => type.Name)
+        return string.Join(", ", types.Select(static type =>
+                CompilerIdentityBridge.CreateTypeDisplay(type))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal));
     }

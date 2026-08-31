@@ -3447,6 +3447,36 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task AllowedExceptionDiagnosticsRetainNamespaceIdentity()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            namespace First { public sealed class SameException : System.Exception { } }
+            namespace Second { public sealed class SameException : System.Exception { } }
+            public static class Fixture {
+                [DoesNotThrow]
+                public static void Run(bool first) {
+                    if (first) throw new First.SameException();
+                    throw new Second.SameException();
+                }
+            }
+            """,
+            mode: null,
+            ["SP0046"],
+            new SharpProofAnalyzer(new RecordingSessionFactory()),
+            features: "effects");
+
+        var message = diagnostics.Single(static diagnostic => diagnostic.Id == "SP0046")
+            .GetMessage(CultureInfo.InvariantCulture);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(message, Does.Contain("First.SameException"));
+            Assert.That(message, Does.Contain("Second.SameException"));
+        }
+    }
+
+    [Test]
     public async Task AllowedExceptionsUsesRuntimeTypeForDefinitelyNullThrows()
     {
         var factory = new RecordingSessionFactory();
