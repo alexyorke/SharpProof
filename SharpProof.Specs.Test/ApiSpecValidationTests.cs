@@ -274,6 +274,41 @@ public sealed class ApiSpecValidationTests
         });
     }
 
+    [Test]
+    public async Task SharedTermDagValidationRejectsInvalidRootWithinBound()
+    {
+        SpecTermDeclaration condition = new SpecBooleanDeclaration(true);
+        for (var depth = 0; depth < 40; depth++)
+        {
+            condition = new SpecBinaryDeclaration(
+                IrBinaryOperator.AndAlso,
+                condition,
+                condition,
+                IrTypeKind.Boolean);
+        }
+
+        var invalidRoot = new SpecBinaryDeclaration(
+            IrBinaryOperator.Equal,
+            condition,
+            new SpecIntegerDeclaration(0),
+            IrTypeKind.Boolean);
+        var declaration = Declaration(
+            "shared-dag",
+            resultType: null,
+            SpecNullness.NotApplicable,
+            SpecCardinality.NotApplicable,
+            [invalidRoot]);
+        var validation = Task.Run(() =>
+            Assert.Throws<ArgumentException>(() =>
+                ApiSpecTable.Create([declaration])));
+
+        var exception = await validation.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.That(
+            exception!.Message,
+            Does.Contain("Invalid binary spec expression types"));
+    }
+
     private static SpecBinaryDeclaration Equal(
         SpecTermDeclaration left,
         SpecTermDeclaration right)
