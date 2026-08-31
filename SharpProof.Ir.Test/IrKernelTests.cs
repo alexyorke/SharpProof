@@ -1067,6 +1067,58 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void MemoizedSubtermsCannotBypassTheEvaluationDepthLimit()
+    {
+        const int maximumDepth = 256;
+        var factory = new IrFactory();
+        var sharedVariable = factory.CreateVariable(
+            "shared",
+            factory.IntegerType);
+        var uncachedVariable = factory.CreateVariable(
+            "uncached",
+            factory.IntegerType);
+        var shared = (IrTerm)factory.Variable(sharedVariable);
+        var uncached = (IrTerm)factory.Variable(uncachedVariable);
+
+        var cachedLeafTerm = Nest(shared);
+        var uncachedLeafTerm = Nest(uncached);
+        var environment = new Dictionary<IrVarId, IrValue>
+        {
+            [sharedVariable] = factory.CreateIntegerValue(1),
+            [uncachedVariable] = factory.CreateIntegerValue(1)
+        };
+        var interpreter = new IrInterpreter(factory);
+
+        var cachedLeaf = interpreter.Evaluate(cachedLeafTerm, environment);
+        var uncachedLeaf = interpreter.Evaluate(uncachedLeafTerm, environment);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                cachedLeaf.Status,
+                Is.EqualTo(IrEvaluationStatus.Unsupported),
+                "a cached leaf cannot bypass the structural depth limit");
+            Assert.That(
+                uncachedLeaf.Status,
+                Is.EqualTo(IrEvaluationStatus.Unsupported),
+                "the equivalent uncached leaf is rejected at the same depth");
+        }
+
+        IrTerm Nest(IrTerm leaf)
+        {
+            var term = leaf;
+            for (var index = 0; index < maximumDepth; index++)
+            {
+                term = factory.Binary(
+                    IrBinaryOperator.Add,
+                    shared,
+                    term);
+            }
+            return term;
+        }
+    }
+
+    [Test]
     public void DeeplyNestedTermsAbstainInsteadOfExhaustingTheStack()
     {
         var factory = new IrFactory();
