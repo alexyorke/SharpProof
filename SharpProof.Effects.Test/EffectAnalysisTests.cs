@@ -3505,6 +3505,60 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void ClosedGenericCompanionDoesNotAffectOtherConstructions()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Target<T> {
+                public void Run(T value) { }
+            }
+
+            [ContractFor(typeof(Target<int>))]
+            public static class IntTargetContracts {
+                public static void Run(
+                    Target<int> receiver,
+                    int value) {
+                    Contract.Requires(value > 0);
+                }
+            }
+
+            public static class Sample {
+                public static void InvokeInt(
+                    Target<int> target,
+                    int value) =>
+                    target.Run(value);
+
+                public static void InvokeString(
+                    Target<string> target,
+                    string value) =>
+                    target.Run(value);
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+
+        var intCall = session.Analyze(
+            Method(compilation, "InvokeInt"));
+        var stringCall = session.Analyze(
+            Method(compilation, "InvokeString"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                intCall.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven));
+            Assert.That(intCall.Projection.IsComplete, Is.False);
+            Assert.That(
+                stringCall.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(stringCall.Projection.IsComplete, Is.True);
+        }
+    }
+
+    [Test]
     public void TrustedCompleteBodylessSourceContractIsResolved()
     {
         var compilation = EffectTestHost.CreateCompilation(
