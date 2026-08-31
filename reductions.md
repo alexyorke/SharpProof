@@ -8,44 +8,74 @@ Nothing here has been applied; each entry is a proposal with evidence.
 
 ## Summary
 
-71 findings across 10 disjoint areas. **Total estimated reduction: ~5,230 lines.**
+135 findings across two survey rounds, 20 disjoint areas. **Total estimated reduction: ~9,950 lines.**
 
-| Area | Est. LOC |
-|---|---:|
-| Test projects (Package.Test, ArchitectureTest, +14 suites) | ~1,580 |
-| Worker.Test / Analyzer.Test / Effects.Test | ~1,190 |
-| Build & repo infrastructure | ~440 |
-| CompilerArtifact / CompilerCollector / CompilerProbe | ~370 |
-| Effects / Gates | ~350 |
-| Contracts / Attributes / ContractForGenerator / Testing | ~330 |
-| Analyzer / Analyzer.Core | ~300 |
-| Frontend / Summaries / Specs / Meta.Analyzers | ~260 |
-| Ir / Dataflow / Smt / Verify / Verifier | ~230 (+~60 tests) |
-| Worker / Worker.Protocol / Worker.Launcher / Host | ~180 |
+Round one split the C# solution by project. Round two covered what that split could not see: the 36k-line PowerShell tooling layer, the code generators and their output, the four largest single files, cross-project duplication, and the docs.
+
+| Area | Est. LOC | Round |
+|---|---:|:--:|
+| `EffectAnalysisTests.cs` (single file) | ~1,977 ⚠ | 2 |
+| Test projects (Package.Test, ArchitectureTest, +14 suites) | ~1,580 | 1 |
+| Worker.Test / Analyzer.Test / Effects.Test | ~1,190 | 1 |
+| Documentation and root markdown | ~1,025 | 2 |
+| Mutation / coverage / test-orchestration scripts | ~1,010 | 2 |
+| Code generators + emitted output | ~673 | 2 |
+| Cross-project duplication sweep | ~525 | 2 |
+| `WorkerTests.cs` + 3 siblings (deep pass) | ~505 | 2 |
+| Build & repo infrastructure | ~440 | 1 |
+| Fuzz tools / BuildTasks / peripheral projects | ~375 | 2 |
+| CompilerArtifact / CompilerCollector / CompilerProbe | ~370 | 1 |
+| Effects / Gates | ~350 | 1 |
+| Contracts / Attributes / ContractForGenerator / Testing | ~330 | 1 |
+| Analyzer / Analyzer.Core | ~300 | 1 |
+| Frontend / Summaries / Specs / Meta.Analyzers | ~260 | 1 |
+| Deep pass: ExceptionHandlerReachability / ManagedAbstractFlow / CacheSoundnessRules | ~256 | 2 |
+| Ir / Dataflow / Smt / Verify / Verifier | ~230 (+~60 tests) | 1 |
+| Container / acceptance / orchestration tooling | ~245 | 2 |
+| Release / packaging / dependency scripts | ~200 | 2 |
+| Worker / Worker.Protocol / Worker.Launcher / Host | ~180 | 1 |
+
+⚠ **~1,300 of the `EffectAnalysisTests.cs` total is pure reformatting**, not simplification — see that section. Excluding it, the substantive total is **~8,650 lines**.
 
 ### What the survey did *not* find
 
-Genuinely dead code is rare in this repo. Six of the ten areas ran explicit reachability sweeps (declared-identifier frequency counts across the whole repo, excluding `artifacts/`, `bin/`, `obj/`) and found **zero** unreferenced types or methods. The two real deletions are:
+Genuinely dead code is rare here. Eight areas ran explicit reachability sweeps (declared-identifier frequency counts across the whole repo, excluding `artifacts/`, `bin/`, `obj/`) and found **zero** unreferenced types or methods. The real deletions are few:
 
 - **`SharpProof.Dataflow` abstract-domain arithmetic** (~95 LOC) — no production callers, and it carries filed soundness bug **BUG-453** (`BUGS.md:251`), which the deletion closes.
 - **17 unreferenced `compose.yaml` services** (~88 LOC) — no invocation anywhere in workflows, scripts, or docs.
+- **An unreachable dispatch arm** at `ExceptionHandlerReachability.cs:1227-1245` (~19 LOC) — see the latent-bug note below.
+- **Dead locals and an unreachable `finally`** in `Test-SharpProofPackageConsumers.ps1:256-276` (~10 LOC).
+- **Two dead parameters** on `Test-SharpProofCoverage.ps1` (~20 LOC).
+- **An unreferenced script**, `scripts/Get-SharpProofModuleVersionId.ps1` (30 LOC) — referenced by nothing outside the git index.
+- **A degenerate single-arm `case`** wrapping 55 lines of `entrypoint.sh` (~5 LOC).
+- **Three orphaned soundness notes** in `docs/` (~157 LOC), indexed by nothing.
 
 Everything else is duplication, boilerplate, and accidental complexity.
 
+### Two things that are not reductions
+
+1. **A latent bug.** `ExceptionHandlerReachability.cs:1227-1245` is unreachable because the dispatch ladder tests `IConversionOperation` three times and the second test (line 823) is unguarded with every path ending in `continue`. Deleting the block is safe — but it means a method-group-conversion null-receiver check that was evidently *intended* to run never does. That deserves its own BUGS.md entry.
+2. **A decaying document.** The 848-row ledger in `docs/code-usefulness-audit.md` already lists 7 paths that no longer exist.
+
 ### Suggested order of attack
 
-1. **Mechanical, near-zero risk, highest volume** — the 49 `RepositoryRoot()` copies (~690), the duplicated process runner (~380), the temp-directory `try/finally` boilerplate (~200), and the diagnostic-id assertion helper (~380). ~1,650 LOC of pure extraction with no semantic change.
-2. **Build infra** (~440) — self-verifying: if the hoists are wrong, the build breaks immediately.
-3. **Cross-file de-duplication in production code** — the using-disposal graph (~130), the probe JSON writer (~180), the static-initializer scan (~65), the `ExecutableUnflowedDescendantsAndSelfCore` recursion (~100).
-4. **Record/primary-constructor conversions** — safe individually, but check each type for equality semantics (dictionary keys, reference identity) before converting a class to a `record`.
+1. **Mechanical, near-zero risk, highest volume** — the 49 `RepositoryRoot()` copies (~690), the 26-site `TRUSTED_PLATFORM_ASSEMBLIES` builder (~150), the duplicated process runner (~380), the temp-directory `try/finally` boilerplate (~200), the diagnostic-id assertion helper (~380). ~1,800 LOC of pure extraction, no semantic change.
+2. **Two-line template edits with large multipliers** — the generator property/ctor emitters (~493 emitted lines from ~8 lines of PowerShell change), and moving the 2,238-line mutation catalog literal to a data file (~600).
+3. **Build infra** (~440) — self-verifying: if the hoists are wrong, the build breaks immediately.
+4. **Docs** (~1,025) — no build risk at all; the ledger collapse alone is ~800.
+5. **Cross-file de-duplication in production code** — the using-disposal graph (~130), the probe JSON writer (~180), the static-initializer scan (~65), the `ExecutableUnflowedDescendantsAndSelfCore` recursion (~100), the cross-project SHA256/CFG/model helpers (~185).
+6. **Record/primary-constructor conversions** — safe individually, but check each type for equality semantics (dictionary keys, reference identity) first, and see the rejected-idea note below.
 
 ### Cross-cutting caveats
 
-- **`IrTraversal.GetChildren` is re-implemented three times** — in `SharpProof.Smt` (`IrSmtBackend.QueryEncoder.Children`), in `SharpProof.Testing` (`IrCSharpDifferentialOracle.TryCollectTerms`), and partially in `IrSubstitution`/`IrSemanticTerms`. Worth fixing once, centrally, rather than area by area.
+- **`IrTraversal.GetChildren` is re-implemented FOUR times** — `SharpProof.Smt` (`IrSmtBackend.QueryEncoder.Children`), `SharpProof.Testing` (`IrCSharpDifferentialOracle.TryCollectTerms`), `Tools/SharpProof.Fuzz` (two copies of `CollectVariables`), and partially in `IrSubstitution`/`IrSemanticTerms`. Four independent agents found it separately. Fix once, centrally.
+- **⛔ Positional records for generated types are NOT safe** and the idea is formally rejected in the generator section: all 34 constructors in `IrModel.generated.cs` are `internal` on `public sealed` types, so conversion would promote them to public and add `Deconstruct`/`with`/value-equality — a breaking API change. The repo already emits genuine positional records where the catalog asks for them, so the current shape is deliberate.
 - **Public API.** `SharpProof.Contracts` and `SharpProof.Attributes` ship publicly. Items flagged *PUBLIC API NOTE* would change a public shape; treat those as opt-in.
 - **Generated files.** `*.generated.cs` comes from `scripts/Generate-*.ps1` and the `*.schema.json` models — change the generator template, never the output.
-- **Meta-analyzers.** The repo ships `SharpProofSoundnessAnalyzer` and `CancellationBoundaryAnalyzer`, which pin specific type and member names in the Worker/cancellation plumbing. Any rename there must be re-checked against `SharpProof.Meta.Analyzers.Test`.
-- **Estimates are estimates.** Each is a line count against the current formatting, not a measured diff.
+- **`README.md` is NOT generated.** `scripts/Generate-Readme.ps1` has zero write calls; it is a `-Verify` consistency checker. The only generated doc is `docs/api-spec-catalog.generated.md`.
+- **`eng/acceptance/contract.json`** pins script **paths only — no digests** (`grep -c sha256` → 0). Editing script contents is free; *adding* a script or `.psm1` requires an entry (path lists at `:130-147`, `:168`, `:708`).
+- **Meta-analyzers.** The repo ships `SharpProofSoundnessAnalyzer` and `CancellationBoundaryAnalyzer`, which pin specific type and member names in the Worker/cancellation plumbing. Any rename must be re-checked against `SharpProof.Meta.Analyzers.Test`.
+- **Estimates are estimates.** Each is a line count against current formatting, not a measured diff.
 
 ### Validation protocol
 
@@ -551,3 +581,455 @@ those tests exercise no remaining behavior.
 - **Est. LOC saved:** ~14
 - **Why it's safe:** The 24-name enumeration is precisely "every csproj except the test projects, `samples/`, `eng/pilots/`, and 6 named non-production projects (`SharpProof.Testing`, `SharpProof.Package`, `SharpProof.Verifier`, `SharpProof.Smoke.Net472`, `SharpProof.CompilerProbe.TestAsset`, `SharpProof.PortableAnalyzer`)" — verified against the full csproj inventory.
 - **Proposed change:** Compute as `'$(SharpProofTestProject)' != 'true'` AND not in a short exclusion list, so adding a production project no longer requires editing this file.
+---
+
+## Mutation / coverage / test-orchestration scripts (PowerShell)
+
+**Estimated savings: ~1,010 lines** (~600 of them from relocating the mutation catalog to a data file).
+
+> **Caveat for whoever applies these:** `eng/acceptance/contract.json` enumerates these script paths (lines 150-190, 414-416, 676-677) and pins `mutationEvidence.expectedCatalogCount`/`expectedCatalogSha256`. Adding a new `.psm1`, or moving the catalog to a data file, requires adding that path to the contract's file list. The catalog digest itself is unaffected as long as field values do not change.
+
+### 1. Move the 262-entry mutation catalog out of the script into a data file
+- **Files:** `scripts/Test-SharpProofTrustedMutations.ps1:69-2306` — 2,238 of the file's 2,960 lines are one `$mutations = @(...)` literal of 261 `[pscustomobject]@{ Name/File/Original/Mutated/Project/Filter }` blocks
+- **Est. LOC saved:** ~600 script lines (and 2,238 lines of PowerShell become a pure data file)
+- **Why it's safe:** The catalog's identity is already digest-pinned and consumed structurally, not lexically. `Get-SharpProofMutationCatalogSha256` (`scripts/SharpProof.MutationEvidence.psm1:4`) hashes only the six fields, and the digest/count is compared against `eng/acceptance/contract.json` `mutationEvidence.expectedCatalogCount/expectedCatalogSha256` at `Test-SharpProofTrustedMutations.ps1:2313-2320`. The same digest function is already fed plain `ConvertFrom-Json` objects in `Test-SharpProofMutationCatalog.ps1:61` and `Invoke-SharpProofTrustedMutationsParallel.ps1:458`, proving JSON-sourced catalog objects are accepted verbatim.
+- **Proposed change:** Move the catalog to `eng/mutation/catalog.json` (or a `.psd1`) and load via `Get-Content | ConvertFrom-Json`. Each entry drops the `[pscustomobject]@{`/`},` wrapper lines (261 × 2) plus the 27 `@'…'@` here-string wrapper pairs. The contract digest is unchanged because the hashed field values are unchanged.
+
+### 2. Extract the duplicated parallel test-shard scheduler
+- **Files:** `scripts/Invoke-SharpProofSemanticTests.ps1:420-575` and `scripts/Invoke-SharpProofPackageTests.ps1:565-720`
+- **Est. LOC saved:** ~120
+- **Why it's safe:** The two loops are structurally the same: identical `ProcessStartInfo` setup (`FileName='dotnet'`, `WorkingDirectory=$repositoryRoot`, both streams redirected), identical `running` record shape (`Process`/`StartedUtc`/`StandardOutput`/`StandardError` async reads), identical deadline + `Kill($true)` block, identical `$completed = @($running | Where-Object { $_.Process.HasExited })` / `Start-Sleep -Milliseconds 100` drain, identical stdout/stderr echo and elapsed/exitCode timing record. Only the banner text, the env var (`SHARPPROOF_TEST_PROJECT_PARALLELISM` vs `SHARPPROOF_PACKAGE_SOURCE`), slot accounting vs exclusive-shard gating, and the vstest/`dotnet test` argument builder differ — all expressible as parameters/scriptblocks. Both scripts already import `SharpProof.ContainerExecution.psm1` and already call its `New-SharpProofIsolatedTestOutput` and `Get-SharpProofTestAssemblyPath`.
+- **Proposed change:** Add `Invoke-SharpProofParallelTestShards` to `SharpProof.ContainerExecution.psm1` taking the shard list, parallelism, timeout, a label, an environment hashtable and an argument-builder scriptblock; both scripts keep only their argument builders.
+
+### 3. Collapse the repeated TRX-fixture construction
+- **Files:** `scripts/Test-SharpProofMutationEvidence.ps1` — 26 `Write-Fixture` call sites, 32 `New-TestParts` call sites, 28 repetitions of the `$zeroInfrastructure` counters string
+- **Est. LOC saved:** ~150
+- **Why it's safe:** Every `Write-Fixture` call passes exactly `-Definitions $x.Definition -Entries $x.Entry -Results $x.Result` from a single `New-TestParts` result (or the concatenation of two), and `-Counters` is always `'total="N" executed="N" passed="P" failed="F" ' + $zeroInfrastructure`. These are local helpers in a self-contained fixture script (`param()` at line 2, no exported surface), so the change is invisible outside the file.
+- **Proposed change:** Add `New-TrxFixture -Name -Parts -Failed:<n>` inside the script, deriving the counters string and forwarding `Definition`/`Entry`/`Result` (concatenating when several parts are given). Each ~10-line block becomes ~3 lines.
+
+### 4. Share the coverage-argument preamble and `Invoke-RequiredDotnet` between the two test drivers
+- **Files:** `scripts/Invoke-SharpProofSemanticTests.ps1:24-34,46-90,82-89` and `scripts/Invoke-SharpProofPackageTests.ps1:22-31,58-104,96-103`
+- **Est. LOC saved:** ~55
+- **Why it's safe:** Byte-identical runs confirmed by diff: the `-Fast`/`-NoBuild` guard (7 lines), the `$coverageEnabled` computation plus the "CoverageSettings and CoverageResultsDirectory must be supplied together" throw (9 lines — the only two occurrences of that message in the repo), the `$resolvedCoverageSettings`/`$resolvedCoverageResults`/`$isolatedOutputRoot` blocks (13 + 18 lines), and the `Invoke-RequiredDotnet` wrapper (8 lines, defined identically in both). Both already import `SharpProof.ContainerExecution.psm1`.
+- **Proposed change:** Add `Resolve-SharpProofCoverageOptions` (returning Enabled/Settings/Results/IsolatedOutputRoot) and `Invoke-SharpProofRequiredDotnet` to the shared module; delete both copies. The `$IsLinux`/`SHARPPROOF_CONTAINER` guard differs only in its message, so it takes a `-Purpose` string.
+
+### 5. Table-drive `New-ShardTiming` and reuse `Assert-UniqueMutationTarget`
+- **Files:** `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1:299-343`; `scripts/Test-SharpProofTrustedMutations.ps1:2322-2347` vs `:2531-2555`
+- **Est. LOC saved:** ~40
+- **Why it's safe:** `New-ShardTiming` repeats the same `$(if ($null -ne $timing) { [long]$timing.X } else { 0L })` idiom six times over five field names — a loop over a name list produces identical output. Separately, the preflight loop at `:2322-2347` reimplements exactly the find-then-uniqueness `IndexOf` check that `Assert-UniqueMutationTarget` (same file, line 2531) already performs; only the reporting style differs (accumulate vs throw).
+- **Proposed change:** Build the timing object by iterating a field-name array with a default of `0`; give `Assert-UniqueMutationTarget` an optional `-Collect [List[string]]` so the preflight calls it instead of duplicating the two `IndexOf` probes.
+
+### 6. Factor the atomic timing-evidence write
+- **Files:** `scripts/Invoke-SharpProofSemanticTests.ps1:574-587`, `Invoke-SharpProofPackageTests.ps1:740-781`, `Invoke-SharpProofTrustedMutationsParallel.ps1:493-520`, plus `Invoke-SharpProofDevCheck.ps1:112-126`
+- **Est. LOC saved:** ~25
+- **Why it's safe:** All four sites are the identical four-step sequence — `Join-Path $repositoryRoot 'artifacts/timings'`, `CreateDirectory`, `$path + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'`, `ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM`, `Move-Item -Force`. Only the payload object differs. The semantic and package tests additionally share an identical 10-line "read prior timings when `-Fast`" loop (`Invoke-SharpProofSemanticTests.ps1:141-150` = `Invoke-SharpProofPackageTests.ps1:255-264`).
+- **Proposed change:** Add `Write-SharpProofTimingEvidence -Path -Payload` and a `Get-SharpProofPriorTimingPaths -Stem -Fast` helper to the shared module.
+
+### 7. Dead parameters on the coverage validator
+- **Files:** `scripts/Test-SharpProofCoverage.ps1:10` (`-BaselinePath`), `:16` (`-ReportOnly`), and their uses at `:167-176`, `:227-229`, `:885`
+- **Est. LOC saved:** ~20
+- **Why it's safe:** The script's only caller in the repo is `scripts/Invoke-SharpProofContainer.ps1:490`, which splats a hashtable containing only `CoverageRoot`, `ComparisonRef`, `SummaryPath`, and conditionally `IncludeWorkingTree` (`Invoke-SharpProofContainer.ps1:481-489`). A repo-wide grep for `ReportOnly` and `BaselinePath` outside `Test-SharpProofCoverage.ps1` returns no other hits (the only `BaselinePath` matches are an unrelated local `$caseBaselinePath` in `Test-SharpProofMutationEvidence.ps1`). Nothing in `.github/`, `eng/`, `docs/`, or `compose.yaml` passes them.
+- **Proposed change:** Remove both parameters and inline the default baseline path; the `-ReportOnly` removal also simplifies the `ComparisonRef`-required guard at line 227 and the final failure throw at 885.
+
+---
+
+## Deep pass: ExceptionHandlerReachability / ManagedAbstractFlow / CacheSoundnessRules
+
+**Estimated savings: ~256 LOC** (~121 in `ExceptionHandlerReachability.cs`, ~22 in `ManagedAbstractFlow.cs`, ~107 in `CacheSoundnessRules.cs`).
+
+> **Deliberate non-finding:** the immutable carriers `PotentialExceptions` (`:3430`), `CatchReachability` (`:3426`), `InternalGotoTargets` (`:3434`), `SwitchCaseReachability` (`:3453`), `ManagedAbstractValue` (`:1618`) and `ManagedFlowState` are *already* records/record structs — nothing to convert. `ManagedAbstractValue`'s record-struct value equality is load-bearing for the dataflow fixpoint (`LessThanOrEqual`/`Join` convergence) and must **not** become a class.
+
+### 1. Thread recursion context via local functions in `GetExpressionValueNames` / `GetIdentifierValueNames`
+- **Files:** `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1738-1901`
+- **Est. LOC saved:** ~58
+- **Why it's safe:** `GetExpressionValueNames(expression, owner, syntax, resolving, resolvingNames)` is a 5-parameter recursion where 4 of the 5 arguments are passed through *verbatim, unmodified* at every one of the 10 recursive call sites (1749, 1757, 1765, 1771, 1781, 1791, 1797, 1833, 1845, 1888). Each call occupies 6-7 physical lines to convey one varying argument. A local function is a pure syntactic rewrite — same method, same arguments, same order, same mutable `resolvingNames` set identity, so the re-entrancy guard at 1865 behaves identically.
+- **Proposed change:** Add `void AddNames(ExpressionSyntax e) => names.AddRange(GetExpressionValueNames(e, owner, syntax, resolving, resolvingNames));` and reduce each 6-line recursive call to one line; `GetIdentifierValueNames` (`:1888-1893`) gets the same treatment.
+
+### 2. Same context-threading collapse in the two `IsNonCacheable*` recursive switches
+- **Files:** `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:666-716` and `:772-811`
+- **Est. LOC saved:** ~40
+- **Why it's safe:** `IsNonCacheableSemanticAnswer(x, root, resolving)` recurses 6 times (675, 684, 689, 695, 700, 704) always forwarding `root` and `resolving` unchanged; `IsNonCacheableNumericEnumValue(x, enumType, root, resolving)` recurses 5 times (781, 787, 794, 800, 805) always forwarding `enumType, root, resolving` unchanged. Both are `switch` *expressions*, so ordering and short-circuit semantics of `||` / `.Any(...)` are preserved exactly by a local function closing over the same variables. `resolving` is a mutable `LocalResolution` — capturing it preserves the add/remove cycle identity used by `ResolveLocal`/`ResolveNumericEnumLocal`.
+- **Proposed change:** In each method add `bool Recurse(IOperation value) => …;` and collapse each 4-5 line recursive arm to one line.
+
+### 3. Extract the repeated "virtual/abstract ⇒ Unknown, else recurse" dispatch ternary
+- **Files:** `SharpProof.Effects/ExceptionHandlerReachability.cs:326-331, 373-381, 934-945, 966-971, 995-1000, 1126-1131, 1166-1172, 1183-1190, 1197-1203`
+- **Est. LOC saved:** ~38
+- **Why it's safe:** All nine sites compute the same expression modulo the method symbol: `m == null || m.IsVirtual || m.IsAbstract ? UnknownPotential : GetCallableExceptions(m, activeMethods, depth + 1)`. Sites 934-945 and 995-1000 add one extra `EmptyPotential` branch for compiler-intrinsic members, so those two keep their intrinsic check in front and delegate only the tail. `GetImplicitCallableExceptions:2875` already encodes a superset of this predicate (it additionally treats `TypeKind.Interface` as unknown), confirming the shape is the intended idiom — **the new helper must not include the interface clause**, or the nine sites would become more conservative.
+- **Proposed change:** Add `private PotentialExceptions ResolveDispatch(IMethodSymbol? target, HashSet<IMethodSymbol> activeMethods, int depth)` returning that exact ternary; replace the nine call sites with a one-line call.
+
+### 4. `IConversionOperation` method-group arm at 1227-1245 is UNREACHABLE
+- **Files:** `SharpProof.Effects/ExceptionHandlerReachability.cs:1227-1245`
+- **Est. LOC saved:** ~19
+- **Why it's safe:** The dispatch ladder in `GetPotentialExceptions` tests `operation is IConversionOperation` three times (795, 823, 1227). The arm at **823 is unguarded** — `if (operation is IConversionOperation builtInConversion) { … }` — and every path inside it ends at the `continue;` on line 846. No `IOperation` can reach line 1227. Deleting the block cannot change any result. The immediately preceding `IDelegateCreationOperation` arm (1210-1226) *is* reachable and does the same work via `MethodGroupConversionFacts.GetDelegateConstructorCheckedTarget`.
+- **Proposed change:** Delete lines 1227-1245. **⚠ Separately flag to the owners:** the method-group-conversion null-receiver check was evidently intended to run and currently never does. That is a latent semantics bug, not a reduction — worth its own BUGS.md entry.
+
+### 5. Pack `activeMethods` + `depth` into a traversal context
+- **Files:** `SharpProof.Effects/ExceptionHandlerReachability.cs` — 14 signatures declare `HashSet<IMethodSymbol> activeMethods, int depth`; ~30 call sites pass them on separate lines (70 mentions of `activeMethods`, 65 of them a standalone `activeMethods,` argument line)
+- **Est. LOC saved:** ~40
+- **Why it's safe:** Purely mechanical parameter packing. `activeMethods` is a mutable `HashSet` shared by reference across the traversal (seeded at 87), so a `readonly record struct ExceptionScanContext(HashSet<IMethodSymbol> ActiveMethods, int Depth)` preserves the reference identity the recursion-cycle guard depends on. `depth` is only ever passed as `depth` or `depth + 1`, so a `Deeper()` member reproduces both forms. Neither value is ever used as a dictionary key anywhere in the file, so record-struct value equality introduces no new semantics.
+- **Proposed change:** Replace the two parameters with one `ExceptionScanContext context` across 14 signatures and all call sites; `depth + 1` becomes `context.Deeper()`.
+
+### 6. Merge the near-identical unary / conversion operator arms
+- **Files:** `SharpProof.Effects/ExceptionHandlerReachability.cs:767-794` vs `:795-822`
+- **Est. LOC saved:** ~24
+- **Why it's safe:** Line-for-line identical after renaming (`unary`→`conversion`): same `canCompleteNormally(operand)` guard, same `ConversionEffectClassifier.SkipsLiftedOperator(op, abstractFlow)` guard, same `AddStaticInitializationPotential` → `GetOperatorExceptions` body, same `CanThrowUnknownAfterPrerequisites` tail, same `PushChildren` + `continue`. They are adjacent and mutually exclusive (an operation cannot be both), so collapsing preserves dispatch order exactly. Both helpers take `IOperation`, so no overload resolution changes.
+- **Proposed change:** Precede the arm with a pattern extracting `(operatorMethod, operand)` from `IUnaryOperation { OperatorMethod: not null }` or `IConversionOperation { OperatorMethod: not null }`, then run one shared body.
+
+### 7. Collapse the triple untracked-ref-alias guard in `TransferCore`
+- **Files:** `SharpProof.Effects/ManagedAbstractFlow.cs:264-292, 293-305, 306-318`
+- **Est. LOC saved:** ~12
+- **Why it's safe:** All three arms open with the identical five-line `var xAliasesUntrackedStorage = IsUntrackedRefLocal(<target>); if (xAliasesUntrackedStorage) { state = state.WithUntrackedAlias(); }` and close with the matching `if (!xAliases…) { state = SetStorage(…); }`. `WithUntrackedAlias()` is a state transformation on an immutable `ManagedFlowState` called at the same point in each arm with the same argument, so the state sequence is unchanged.
+- **Proposed change:** Add `private static ManagedFlowState MarkUntrackedAlias(ManagedFlowState state, IOperation target, out bool aliased)`; use at the head of all three arms.
+
+### 8. `TopForType` / `DefaultForType` are the same three-way type dispatch
+- **Files:** `SharpProof.Effects/ManagedAbstractFlow.cs:1656-1671` vs `:1673-1688`
+- **Est. LOC saved:** ~10
+- **Why it's safe:** Structurally identical: same `SpecialType.System_Boolean` test, same `IntegerType(type, out …)` test, same `type?.IsReferenceType is true || IsNullableType(type)` tail, same `Unknown` fallback. Only the three produced values differ, and `DefaultForType` discards the integer semantics (`out _`). Factoring the branch selection leaves both results bit-identical.
+- **Proposed change:** Add `private static TypeDomain Classify(ITypeSymbol? type, out CSharpIntegerSemantics integer)`; both methods become a single `switch` expression.
+
+### 9. Inline a single-caller pass-through overload
+- **Files:** `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1393-1401` (caller at `:1357`)
+- **Est. LOC saved:** ~15
+- **Why it's safe:** Repo-wide grep shows the name occurring exactly twice — declaration plus one call site. The two-argument `GetDeconstructionWriteValue` is a pure forwarder to the three-argument overload with `UnwrapValue` applied; folding it in removes 9 lines with no branch change.
+- **Proposed change:** Delete the two-argument overload; inline its body at line 1357. **Explicitly skipped:** the four larger `ExceptionHandlerReachability` single-caller helpers (`ApplySwitchGuard` `:1839-1854`, `GetImplicitConstructorExceptions` `:3118-3137`, `CanDisposalUnwind` `:2603-2624`, `CanCaseClauseReachBody` `:1790-1815`) — inlining saves only ~5 signature lines each and hurts readability of soundness-critical code.
+
+---
+
+## Deep pass: WorkerTests.cs + CompilerManifestArtifactTests + ClaimManifestBuilderTests + WorkerTcbEdgeCaseTests
+
+**Estimated savings: ~505 LOC** (of 14,554 across the four files).
+
+> **Negative results (checked, nothing to report):** no dead private helpers, unused fields, or unreachable setup in any of the four files — every `private static`/`private sealed` member and every static readonly array (`InvalidBudgetErrorCodes`, `RequiredReferenceFileNames`, `ReplayedAllocationWitnessKinds` at `WorkerTests.cs:23-42`; `DenseOrdinals`, `CompanionEvidence`, `UserAndTrusted` at `ClaimManifestBuilderTests.cs:18-26`) has a live reference. No strictly-subsumed tests. `TestProject` (`WorkerTests.cs:7117-7368`, ~250 lines) is **not** duplicated — it is private to that file and the other three build `CSharpCompilation` directly via the already-shared `WorkerTestMetadataReferences`.
+
+### 1. `AssertClaimVerdict` helper for the single-claim outcome/reason assertion cluster
+- **Files:** `SharpProof.Worker.Test/WorkerTests.cs:2214, 2376, 2412, 2525, 2561, 2598, 2677, 3903, 3938, 4108, 4243, 4276, 4316, 4424` (plus 16 more using `response.ClaimResults.Single()`; 30 total)
+- **Est. LOC saved:** ~150
+- **Why it's safe:** Every site is the identical shape `Assert.That(response.Errors, Is.Empty); var record = response.ClaimResults.Single(); using (Assert.EnterMultipleScope()) { Assert.That(record.Outcome, …); Assert.That(record.Reason, …); … }`. A helper with optional named parameters preserves each distinct assertion — sites asserting extra facets (`:4224` asserts `Vacuity`, `ProofCore`, `Model`; `:4257` asserts `RunStatus`/`FailureReason`) pass those explicitly rather than dropping them. Sites asserting something not expressible as a facet (e.g. `:4089`, a specific `Model.Single(...).Value`) keep their own line.
+- **Proposed change:** Add `AssertClaimVerdict(response, outcome, reason = None, vacuity = null, proofCoreEntry = null, runStatus = null)` next to the existing `GetClaim`/`AssertSemanticallyEquivalent` helpers (`:6211-6300`); collapse the 30 clusters to one call each.
+
+### 2. Authority validate/forge helpers in the `ArtifactAuthority*` block
+- **Files:** `SharpProof.Worker.Test/WorkerTests.cs:6839-7032`
+- **Est. LOC saved:** ~70
+- **Why it's safe:** All four tests repeat two exact blocks: a 6-line baseline `Assert.That(WorkerProtocolJson.Validate(response, response.InputHash, response.Manifest, authority).IsValid, Is.True, FormatValidationErrors(response, authority));` (4 occurrences: 6868, 6915, 6962, 7010) and a 5-line forgery check asserting a specific error code (8 occurrences: `proof_core_authority` ×2, `assumption_usage_authority`, `model_authority`, `effect_witness_authority`, `vacuity_authority`, …). Each distinct expected error code stays an explicit argument.
+- **Proposed change:** Add `AssertAuthorityAccepts(response, authority)` and `AssertAuthorityRejects(response, authority, string errorCode)` beside `CreateResponseAuthority` (`:7033`) and `FormatValidationErrors` (`:7042`); the 12 sites become one line each.
+
+### 3. Merge the three `RehashedCache*` tests into one `[TestCase]`-driven test
+- **Files:** `SharpProof.Worker.Test/WorkerTests.cs:5256-5344`
+- **Est. LOC saved:** ~60
+- **Why it's safe:** `RehashedCacheCannotUpgradeARefutationToProven`, `…SealedForDifferentManifestMissesAndRecomputes` and `…WithInvalidScalarModelMissesAndRecomputes` are byte-identical apart from one mutation lambda. All three assert the *same four* facts: `first.Summary.CacheStatus == Written`, `backend.CallCount == 2`, `second.Summary.CacheStatus == Written`, `second.ClaimResults.Single().Outcome == Refuted`. The only variation is which JSON node is rewritten.
+- **Proposed change:** One test taking a mutation-kind string (`"outcome"`, `"manifestHash"`, `"model"`) that switches to the right `RewriteCachedClaimAsync`/`RewriteCachedPayloadAsync`; the shared 20-line body runs once.
+
+### 4. Route hand-rolled corruption blocks through the existing `AssertMalformedCapture`, and add its positive twin
+- **Files:** `SharpProof.Worker.Test/CompilerManifestArtifactTests.cs:203-434`, helper at `:2819`
+- **Est. LOC saved:** ~60
+- **Why it's safe:** `AssertMalformedCapture(Action<CompilerCompilationSnapshot>)` already exists and does exactly `CreateArtifact` → corrupt → recompute `CompilationSha256` → `Assert.Throws<JsonException>`. Four tests re-implement it inline: `Sp034MalformedCaptureEvidenceIsRejected` (`:203`, 7 corruption lambdas + a 12-line loop), `Sp034ReferenceRolesRejectModuleOnlyProperties` (`:375`), `Sp034SyntaxTreePathsMustBeCaptureCanonical` (`:407`), `Sp034EmptySyntaxTreesRetainDerivedCaptureValues` (`:420`). Separately the 8-line "recompute hash then `Assert.DoesNotThrow(Deserialize(Serialize(artifact)))`" round-trip appears at `:240-249, :264-278, :313-320, :331-334, :355-363, :442-446` with no helper. Both assert the same throw/no-throw outcome.
+- **Proposed change:** Rewrite the four inline blocks as `AssertMalformedCapture(...)` calls; add `AssertWellFormedCapture(Action<CompilerCompilationSnapshot>)` for the six positive round-trips.
+
+### 5. `AssertUnsupportedTargets` helper + de-duplicate two source literals across files
+- **Files:** `SharpProof.Worker.Test/ClaimManifestBuilderTests.cs:778-836` and `:882-934`; source strings duplicated verbatim at `ClaimManifestBuilderTests.cs:781-803` vs `WorkerTests.cs:1103-1125`, and `ClaimManifestBuilderTests.cs:842-858` vs `WorkerTests.cs:1177-1195`
+- **Est. LOC saved:** ~55
+- **Why it's safe:** `UnsupportedEffectCallablesCannotCarryConcreteEvidence` (`:778`) and `UnsupportedEffectCallableShapesCannotCarryReplayEvidence` (`:882`) have *identical* 28-line assertion bodies (count, `Does.ContainKey` per name, all `!IsVerifierSupported`, all effect-claim `Outcome == Unknown`, all `Reason == UnsupportedContract`, all `Witness == null && Replay == null`) — only the expected names differ (`Generic/Async/DelegateCall` vs `.cctor/get_Value`). A `params string[] expectedNames` helper preserves all six assertions. The two `Subject` source literals are character-for-character identical across the two files.
+- **Proposed change:** Add `AssertUnsupportedEffectTargets(ClaimManifestBuildResult, params string[] names)`; move the two shared `Subject` sources into a `WorkerTestSources` constants class (no existing home — `SharpProof.Testing/` holds only `IrCSharpDifferentialOracle` and `WellSortedIrGenerator`; `WorkerTestMetadataReferences.cs` is the natural neighbour).
+
+### 6. Parameterize the precondition / normal-completion vacuity test groups
+- **Files:** `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:380-411 + 414-446`, `:519-543 + 545-569`, `:610-625 + 627-640 + 667-683`
+- **Est. LOC saved:** ~55
+- **Why it's safe:** Three groups, 7 tests.
+  - `SemanticPreconditionContradictionIsExplicitVacuityEvidence` / `…ShortCircuitsUnsupportedBody`: identical 18-line arrange, differing only `body: CompilerPreparedBody.Trivial()` vs `body: null`. **The second asserts a superset** (`Reason`, `ProofCore`), so merging must apply the superset to both — that *increases* coverage. Verify the trivial-body case also yields `Reason == None` first; if not, keep the extra asserts conditional.
+  - `SatisfiablePreconditionProducesOrdinaryProof` / `…DoesNotHideFalsePostcondition`: identical arrange except `Ensures(true)`/`Ensures(false)` and expected `Proven`/`Refuted`.
+  - `NonliteralUnreachableNormalCompletionIsExplicitVacuityEvidence` / `NonliteralReachableNormalCompletionIsNotVacuous` / `UserAssumeCannotSupplyNormalCompletionEvidence`: each is three lines of `CreateDivisionTarget(op, postcondition, assumeCompletion?)` plus the same `Outcome == Proven` + `Vacuity == X` pair.
+- **Proposed change:** Convert each group to `[TestCase]` on the varying operand plus the expected outcome/vacuity.
+
+### 7. Merge the two reparse-point cache tests
+- **Files:** `SharpProof.Worker.Test/WorkerTests.cs:5072-5103` and `:5104-5134`
+- **Est. LOC saved:** ~30
+- **Why it's safe:** `ReparsePointCacheEntryFailsClosedWithoutTouchingTarget` and `ReparsePointCacheLockFailsClosedWithoutTouchingTarget` are line-for-line identical except which path is replaced by the symlink (the `*.sharp-proof-cache.json` entry vs the `.lock`) and the external filename/content string. Both assert exactly `backend.CallCount == 2`, `CacheStatus == Unavailable`, and that the external target's bytes are untouched, and both share the same `Assert.Ignore` guard.
+- **Proposed change:** One `[TestCase("entry")] [TestCase("lock")]` test resolving the path to symlink from the case name.
+
+### 8. Adopt the existing `CacheFiles(project)` helper at the remaining inline sites
+- **Files:** `SharpProof.Worker.Test/WorkerTests.cs` — helper at `:6229`; inline `Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")` at `:4814, 4830, 4867, 4885, 4915, 4922, 4950, 4998, 5028, 5081, 5162, 5215` (24 literal occurrences of the glob vs 12 uses of the helper)
+- **Est. LOC saved:** ~25
+- **Why it's safe:** Pure textual substitution of an existing helper with identical semantics; no assertion changes. Each inline form spans 3 lines because of wrapping.
+- **Proposed change:** Replace the inline `Directory.GetFiles(...)` calls with `CacheFiles(project)`.
+
+---
+
+## Deep pass: EffectAnalysisTests.cs (9,004 lines — largest file in the solution)
+
+**Estimated savings: ~1,977 LOC** (9,004 → ~7,030), no assertion dropped.
+
+> ⚠ **Read this before acting.** ~1,300 of that total (findings 1, 3, 4) is **pure reformatting** — rewrapping to the repo's own 140-column limit and de-padding fixture strings. It reduces the line count without improving the code, produces an enormous diff across 580+ sites, and would conflict with any in-flight work on this file. It is a different *kind* of change from every other finding in this document, which remove real duplication or complexity. Treat findings 2 and 5 as the substantive wins (~570 LOC) and the reflow as an optional, separately-committed formatting pass — ideally enforced by a formatter rather than done by hand.
+
+### 1. Reflow multi-line `Assert.That(...)` calls to the repo's own 140-column limit *(formatting)*
+- **Files:** `SharpProof.Effects.Test/EffectAnalysisTests.cs` — 382 call sites (e.g. `:111-113, :167-169, :5183-5185, :6202-6511`)
+- **Est. LOC saved:** ~932
+- **Why it's safe:** Pure whitespace. Every argument, message string and constraint is byte-identical; no assertion is added, removed, or merged.
+- **Proposed change:** `.editorconfig:13` sets `max_line_length = 140`, and 131 non-fixture lines in this file already exceed 80 columns — so the ~80-col hand-wrapping is inconsistent, not a rule. Measured breakdown of `Assert.That(` statements that fit on one line at ≤140 once joined: 2 spans of 2 lines, 235 of 3, 125 of 4, 15 of 5, 5 of 6. This subsumes the 48 wrapped `Assert.That(HasStaticWrite("X"), …)` entries at `:6202-6511` — converting that table to two `string[]` name lists on top of the reflow saves nothing further, so skip it.
+
+### 2. Parameterize the three test families with byte-identical assertion bodies *(substantive)*
+- **Files:** `:3167-3269` (`FreshArrayContents…` / `FreshObjectContents…` / `NestedFreshContainerContents…`), `:4517-4562` (`ReducedSourceExtensionRemapsItsReceiverArgument` / `RefParameterWritesRemapToTheCaller`), `:5188-5235` (`SealedReferenceArrayStore…` / `DefinitelyNullReferenceArrayStore…`)
+- **Est. LOC saved:** ~60 (~36 + ~13 + ~11)
+- **Why it's safe:** Every test body was diffed with fixture text stripped; within each family the code is character-for-character identical — same `Analyze(...)` call shape, same `Assert.EnterMultipleScope()`, same constraints. Only the fixture string differs. Raw string literals are compile-time constants, so `[TestCase("""…""")]` is legal in NUnit and each case keeps its own failure identity.
+- **Proposed change:** Merge each family into one `[TestCase]`-driven method taking the fixture source as the parameter. **These are the only three such families in the file** — all 144 `[Test]` methods were checked, so parameterization potential beyond this is nil.
+
+### 3. Reflow multi-line non-assertion call statements *(formatting)*
+- **Files:** same file — 198 statements (e.g. `:5100-5108, :6199-6201, :8190-8191`)
+- **Est. LOC saved:** ~363
+- **Why it's safe:** Whitespace only; disjoint from finding 1 (that count excludes `Assert.That(` heads).
+- **Proposed change:** Same 140-col reflow applied to `EffectTestHost.CreateCompilation(...)`, `session.Analyze(...)`, and `Analyze(source, "Sample", "X")` invocation tails.
+
+### 4. Blank lines and 3-line bodies inside embedded C# fixture raw strings *(formatting)*
+- **Files:** same file — 153 raw-string fixtures totalling 3,927 lines, of which 508 are blank; plus 36 three-line fixture method bodies (`:84, :97, :132, :145, :149, :185, :198, :202, :206, :315, :950, :1956, :2357, :2460, :2468`, …) and the 14 four-line `lock` methods at `:8117-8185`
+- **Est. LOC saved:** ~508 blank (recommend the ~400 that only pad between type declarations) + ~114 body collapse
+- **Why it's safe:** These lines are *inside* `"""…"""` literals fed to `EffectTestHost.CreateCompilation`. They are whitespace in a C# source string; no symbol, span, or diagnostic position that any assertion checks depends on them, and no assertion in the file inspects fixture line numbers. The `lock` fixture's assertions (`AssertKinds` at `:8229`) key off method *names*, not layout.
+- **Proposed change:** Strip blank padding inside fixtures and write short bodies as one-liners, matching the already-dominant dense style — 49 fixtures open directly with `public static class Sample {` and carry zero blanks (e.g. `:6030-6145` packs ~115 declarations one per line).
+
+> **Negative findings:** **Duplicate fixture strings: zero.** All 153 fixture literals are textually distinct, so no test is strictly subsumed by another (subsumption requires an identical fixture). The largest shared preamble is a 3-line `public sealed class Box { public int Value; }` in 7 fixtures — a shared constant saves ~14 lines at the cost of string concatenation at every call site; not worth it. **No dead helpers or fields:** all seven private helpers are live (`Analyze` 333 refs, `Method` 268, `AssertThrows` 70, `AssertContainsThrows` 16, `AssertDoesNotThrow` 14, `ResultKey` 13, `RequireGetter` 4, `AssertNoEffectsAndTerminates` 4).
+
+---
+
+## Cross-project duplication sweep (whole solution)
+
+**Estimated savings: ~525 LOC** across 7 findings. This is the view no per-project agent had.
+
+### 1. `TRUSTED_PLATFORM_ASSEMBLIES` → `MetadataReference` list builder — 26 sites, 12 projects
+- **Files:** `SharpProof.Contracts.Test/ContractTestMetadataReferences.cs:18`, `SharpProof.Worker.Test/WorkerTestMetadataReferences.cs:21`, `SharpProof.Contracts.Test/ContractApiIdentityTests.cs:158`, `SharpProof.Frontend.Test/ContractApiIdentityResolverTests.cs:323`, `ProgramLoweringTests.cs:914`, `OpaqueSemanticIdentityTests.cs:204`, `FrontendLoweringTests.cs:1473`, `UnaryAndDefaultLoweringCoverageTests.cs:372`, `SharpProof.Analyzer.Test/AnalyzerTestHost.cs:254`, `ContractApiIdentityAnalyzerTests.cs:385,451,623`, `SharpProof.ContractForGenerator.Test/GeneratorTestHost.cs:198`, `SharpProof.Effects.Test/EffectTestHost.cs:222`, `SharpProof.Meta.Analyzers.Test/SharpProofSoundnessAnalyzerTests.cs:3472`, `SharpProof.Package.Test/BuildTaskTests.cs:1793`, `CompilerProbeInputConsistencyTests.cs:74`, `SharpProof.Worker.Test/ExceptionIdentityReplayTests.cs:459`, `ProtocolJsonTests.cs:2056`, `ScalarDifferentialMatrixTests.cs:1018`, `WorkerTests.cs:7289`, `SharpProof.Specs.Test/ApiSpecTests.cs:1201`; non-test: `SharpProof.Gates/AnalyzerGateHost.cs:189`, `Gates/Performance/WorkerPerformanceProbe.cs:736,851`, `SharpProof.Testing/IrCSharpDifferentialOracle.cs:610`, `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1817`
+- **Est. LOC saved:** ~150
+- **Why it's safe:** ~10 bodies were read side by side. Every one is the same three-step recipe: `AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")` → throw `InvalidOperationException("Trusted platform assemblies are unavailable.")` if null → `.Split(Path.PathSeparator).Select(MetadataReference.CreateFromFile)`. Per-site variation is only optional modifiers — `Distinct(OrdinalIgnoreCase)`, `OrderBy`, `Where(exclude "SharpProof.Attributes")`, `Append(<extra location>)` — all expressible as parameters. A shared home exists and is already wired: `eng/testing/DiagnosticDescriptorCatalogAssertions.cs` is linked via `<Compile Include="..\eng\testing\…">` into Analyzer.Test, ContractForGenerator.Test and Meta.Analyzers.Test.
+- **Proposed change:** Add `eng/testing/TrustedPlatformReferences.cs` exposing `Create(distinct, ordered, extraLocations, filter)`, link it into the test projects, and mirror it as a public helper in `SharpProof.Testing` for the 5 Gates/Testing/Fuzz callers.
+
+### 2. `OperationMayThrow` + `ExceptionalSuccessors` CFG helpers
+- **Files:** `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1207` and `:1260`; `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1215` and `:1258`
+- **Est. LOC saved:** ~75
+- **Why it's safe:** Both pairs read in full. `ExceptionalSuccessors` is line-for-line identical (same `yielded` HashSet, same enclosing-region walk, same `Filter/Catch/FilterAndHandler/Finally` filter, same `graph.Blocks[handler.FirstBlockOrdinal]` yield); Meta's version only adds `cancellationToken.ThrowIfCancellationRequested()` and takes a `CancellationToken` — a strict superset signature. `OperationMayThrow` is the same ~50-case operation-kind pattern list in the same order; Analyzer.Core's copy is a strict superset (it additionally admits `IMethodReferenceOperation` and the `OperatorMethod: not null` variants).
+- **⚠ Caveat:** unifying on the superset only widens "may throw" — the conservative direction for both callers — but that **is** a semantic change for Meta.Analyzers and must be confirmed against its tests. Also note Analyzer.Core references Meta.Analyzers with `OutputItemType="Analyzer" ReferenceOutputAssembly="false"` (`SharpProof.Analyzer.Core.csproj:32`), so there is **no** compile-time dependency between them. The repo already solves exactly this with linked source (`SharpProof.Dataflow.csproj:12` and `SharpProof.Smt.csproj:13` both link `..\SharpProof.Ir\ArgumentNullGuard.cs`).
+- **Proposed change:** Extract both into `RoslynCfgThrowFacts.cs` and link it into both projects, keeping the Analyzer.Core operation list and the cancellation-aware `ExceptionalSuccessors`.
+
+### 3. Lowercase-hex SHA256 formatting — 18 sites, 12 projects
+- **Files:** canonical-ish home `SharpProof.Ir/CanonicalHashWriter.cs:147`; `SharpProof.Worker.Protocol/ProtocolJson.cs:1062`, `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:519,532`, `CompilerRelationalSummaryProvider.cs:351`, `CompilerSpecificationPackProvider.cs:331`, `SharpProof.Effects/ApiSpecResolution.cs:227`, `SharpProof.Gates/Program.cs:170`, `Gates/Performance/WorkerPerformanceProbe.cs:681`, `Gates/Corpus/OpenSourceCorpusCatalog.cs:66,368`, `OpenSourceCorpusImporter.cs:136`, `SharpProof.CompilerProbe.TestAsset/ProbeHash.cs:23`, `SharpProof.ArchitectureTest/ArchitectureTests.cs:752`, `SharpProof.Analyzer.Test/FinalCompilationCollectorTests.cs:1300`, `SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs:509,3497`, `SharpProof.Specs.Test/ApiSpecTests.cs:1183`, `SharpProof.Worker.Test/WorkerTests.cs:7214`
+- **Est. LOC saved:** ~55
+- **Why it's safe:** Every distinct spelling was read. They are three interchangeable encodings of one function: `string.Concat(bytes.Select(v => v.ToString("x2", InvariantCulture)))`, a `StringBuilder` loop appending `"x2"` (ProbeHash), and `Convert.ToHexString(...).ToLowerInvariant()` (Gates/Corpus). All produce identical lowercase hex, and the hashes are compared `Ordinal`/`OrdinalIgnoreCase` against each other across the collector/worker boundary, so they must already agree. `SharpProof.Ir` is referenced by Summaries, Smt, Dataflow, CompilerArtifact, Worker, Analyzer.Core and Effects.
+- **Proposed change:** Add `ToLowerHex(ReadOnlySpan<byte>)` and `ComputeSha256Hex(...)` next to `CanonicalHashWriter` in `SharpProof.Ir`; leave the Gates/test-only sites that cannot reference Ir on `Convert.ToHexString(...).ToLowerInvariant()`.
+
+### 4. Counterexample-model materialization: `TryCreateValue` + `EntryAssumptionsHold`
+- **Files:** `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:909` and `:831`; `SharpProof.Worker/VerificationCache.cs:583` and `:617`
+- **Est. LOC saved:** ~55
+- **Why it's safe:** Both pairs read end to end. `TryCreateValue` is character-identical apart from line wrapping of the `interval.Minimum`/`Maximum` conjunct — same `factory.GetVariableInfo(...).Type` lookup, same `nameof(IrValueKind.Boolean)`/`Integer` kind strings, same `NumberStyles.AllowLeadingSign` round-trip, same `SourceIntegerInterval` range guard. `EntryAssumptionsHold` differs only in taking `IReadOnlyDictionary` vs `ImmutableDictionary`; unifying on `IReadOnlyDictionary` is source-compatible for both. The neighbouring `TryCreateModel` was **deliberately excluded** — the two copies genuinely differ (the Worker one tolerates absent non-scalar inputs by design, per its inline comment). Shared home already exists: `SharpProof.Worker.csproj:20` references CompilerArtifact, which already grants `InternalsVisibleTo("SharpProof.Worker")` (`:31`).
+- **Proposed change:** Move both into `internal static class CompilerModelValues` in `SharpProof.CompilerArtifact`; call from `VerificationCache`. No project-file change needed.
+
+### 5. Acyclic block-ordering walker `CreateOrder`
+- **Files:** `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:731`, `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:531`
+- **Est. LOC saved:** ~50
+- **Why it's safe:** Both bodies read fully. Same explicit-stack DFS with an `active`/`complete` HashSet pair and a `Stack<(IrBlockId, bool Exit)>`, same `Spend()` budget check, same terminator switch (`IrBranchInstruction` pushing `WhenFalse` then `WhenTrue`, `IrGotoInstruction`, `IrReturnInstruction`, default → bail), same trailing `result.Reverse(); return [.. result];`. The only difference is failure reporting: Summaries records `IrSummaryAbstentionReason.CyclicControlFlow`/`UnsupportedInstruction` before returning `default`; Worker just returns `default`. Both projects reference `SharpProof.Ir`, where `IrBlockId`/`IrBranchInstruction` live.
+- **Proposed change:** Add `IrBlockOrder.TryCreateAcyclicOrder(program, spend, out IrAcyclicOrderFailure)` to `SharpProof.Ir` returning the reverse-postorder array plus a small failure enum; each caller maps the enum to its own reason type.
+
+### 6. Test-side Roslyn fixture boilerplate
+- **Files:** `AssertNoErrors`/`RequireNoErrors` (5 copies): `SharpProof.Contracts.Test/ContractApiIdentityTests.cs:174`, `ContractForMetadataSignatureTests.cs:206`, `SharpProof.Frontend.Test/ContractApiIdentityResolverTests.cs:339`, `SharpProof.Effects.Test/EffectTestHost.cs:231`, `SharpProof.ContractForGenerator.Test/GeneratorTestHost.cs:214`. Surrogate attributes source (3 copies): `EffectTestHost.cs:101-165`, `ContractApiIdentityResolverTests.cs:196-300`, `ContractApiIdentityTests.cs:100-155`
+- **Est. LOC saved:** ~100
+- **Why it's safe:** The five `*NoErrors` bodies were diffed: all are `GetDiagnostics().Where(d => d.Severity == Error).ToImmutableArray()` plus a `string.Join(Environment.NewLine, …)` message; three use `Assert.That(errors, Is.Empty, msg)` and two throw `InvalidOperationException(msg)` — trivially unified. For the surrogate source, an 8-line-window match found 21-line and 12-line verbatim runs between `EffectTestHost.cs` and `ContractApiIdentityResolverTests.cs`, confirmed by reading: the same raw string declaring `SharpProof.Attributes.Contract` with `ConditionalSymbol`, the `{{conditional}}` hole, `Requires`/`Ensures`/`Assume`/`Result<T>`/`Old<T>`, `SharpProofEffect`, `NotNullAttribute`, `EffectContractAttribute`, `SharpProofTrustedAttribute`.
+- **⚠ Lower confidence than 1-5:** the three copies are **not** identical (Frontend's adds `PositiveAttribute`/`InRangeAttribute`; Contracts' stops after `Contract`), so this is a superset-plus-flags consolidation, and the emitted assembly's contents must be verified against each test's expectations.
+- **Proposed change:** Put `AssertNoErrors` and a `SurrogateAttributesAssembly.Emit(validContractShape, includeRangeAttributes)` builder in `eng/testing/`; link into the four test projects.
+
+### 7. `*TestMetadataReferences` — a duplicated whole file
+- **Files:** `SharpProof.Contracts.Test/ContractTestMetadataReferences.cs:1-40`, `SharpProof.Worker.Test/WorkerTestMetadataReferences.cs:1-43`
+- **Est. LOC saved:** ~38
+- **Why it's safe:** `diff` of the two whole files reports exactly three hunks: the `namespace` line, the class name, and three extra lines in the Worker copy adding a `CoreLibraryOnly` property. `CreatePlatformReferences`, `AddSharpProofReference` and the `WithSharpProof` property are byte-identical. Both projects already link shared sources from `eng/testing/`.
+- **Proposed change:** Move to `eng/testing/TestMetadataReferences.cs` under a shared namespace (folding in `CoreLibraryOnly`), link into both, delete the copies. This also subsumes two sites from finding 1.
+
+---
+
+## Code generators and their emitted output
+
+**Estimated savings: ~673 LOC** (~493 emitted C#, ~180 PowerShell), from three localized template/helper edits.
+
+> **Correction to an earlier caveat:** `eng/acceptance/contract.json` pins script **paths only — it contains no sha256/digest fields** (`grep -c sha256` → 0). Editing existing script *contents* does not require touching it; only *adding a new script file* does (path lists at `:130-147`).
+
+### 1. Collapse emitted 4-line `get;`-only property blocks to one line
+- **Files:** `scripts/Generate-IrModel.ps1:586-592`, `scripts/Generate-DeclarativeModels.ps1:174-179`
+- **Est. LOC saved:** ~423 emitted lines
+- **Why it's safe:** Both sites emit exactly 5 lines per property (blank, signature, `{`, `get;`, `}`); the one-line `public T P { get; }` is semantically identical and **already the house style elsewhere in the generated tree** (`Generate-ApiSpecCatalog.ps1:903-910`, `Generate-ContractApiCatalog.ps1:320-334`, `Generate-ProtocolModel.ps1:647`). Exact 3-line `{ / get; / }` runs counted per file: IrModel 94, Verify/DeclarativeModels 12, Contracts/DeclarativeModels 12, Frontend/DeclarativeModels 8, Contracts/EffectiveContractModels 5, Effects/EffectResultModels 4, Specs/DeclarativeModels 3, Effects/ApiSpecResolutionModels 3 = **141 properties × 3 lines = 423**. `.editorconfig` allows 140 chars; the longest resulting line is well under. `Format-SharpProofGeneratedCSharp` only re-indents open braces, so it will not re-expand them.
+- **Proposed change:** Replace the 5-`Add` block in each generator with a single `$lines.Add("$indent    $access $type $name { get; }")`. Two ~4-line edits. (Dropping the preceding blank line too would save a further ~141.)
+
+### 2. Deduplicate copy-pasted schema/emit helpers into the existing shared file
+- **Files:** `Assert-Identifier`/`Identifier` in 11 scripts (`Generate-AnalyzerDiagnosticCatalog.ps1:26`, `Generate-BoundContractModel.ps1:31`, `Generate-CompilerArtifactModel.ps1:94`, `Generate-ContractApiCatalog.ps1:97`, `Generate-DiagnosticDescriptors.ps1:47`, `Generate-EffectContractMappings.ps1:23`, `Generate-IrModel.ps1:94`, `Generate-OperationSupportCatalog.ps1:26`, `Generate-ProtocolModel.ps1:52`, `Generate-DeclarativeModels.ps1:26`, `Generate-ProjectionCatalog.ps1:27`); `Assert-TypeName`/`TypeName` in 6; `ConvertTo-CSharpString`/`ConvertTo-CSharpStringLiteral`/`Quote-CSharpString` in 8; `Get-RequiredMember`/`Get-RequiredProperty`/`Required` in 8; `Assert-Properties` in 4; `NamespaceName` in 2
+- **Est. LOC saved:** ~180 net (~265 deleted, ~85 for the shared file)
+- **Why it's safe:** Bodies are character-identical apart from parameter-declaration style and `$Value`/`$value` casing — e.g. `Generate-EffectContractMappings.ps1:23-37` and `Generate-CompilerArtifactModel.ps1:94-113` have byte-identical regexes, throw strings and logic. The infrastructure already exists: every generator dot-sources `scripts/GeneratedFileHelpers.ps1` for `Update-SharpProofGeneratedFile`, so extending that file needs no new wiring.
+- **Proposed change:** Move one canonical copy of each helper into `scripts/GeneratedFileHelpers.ps1`; delete the 30+ duplicates. **Two regexes are not identical and must be parameterized or kept local:** `TypeName` in `Generate-ProjectionCatalog.ps1:41` permits `(` `)` (tuple types) where `Generate-DeclarativeModels.ps1:33` does not.
+
+### 3. Emit single-line constructor signatures when they fit
+- **Files:** `scripts/Generate-IrModel.ps1` (ctor param emission), `scripts/Generate-DeclarativeModels.ps1:151-157`
+- **Est. LOC saved:** ~70 emitted lines
+- **Why it's safe:** Both wrap every constructor parameter onto its own line unconditionally, regardless of length. Measured against a 120-char budget: IrModel 9 ctors / 47 lines, Verify/DeclarativeModels 6 / 16, Effects/ApiSpecResolutionModels 1 / 4, Contracts/DeclarativeModels 1 / 3 = **70 lines**. Example: `internal IrExceptionInfo(IrExceptionKind kind, string detail)` is 62 chars but occupies 4 lines (`IrModel.generated.cs:152-156`).
+- **Proposed change:** Join parameters onto the signature line when the result is ≤120 chars; fall back to the existing wrap otherwise.
+
+### 4. ⛔ REJECTED: positional records for generated types
+- **Files:** `SharpProof.Ir/IrModel.generated.cs:150,169,201`, `SharpProof.Effects/ApiSpecResolutionModels.generated.cs:11`
+- **Why it is NOT safe:** All 34 constructors in `IrModel.generated.cs` are declared `internal` on types declared `public sealed [partial] class` (0 public ctors, verified by grep). A primary constructor or positional record takes the *type's* accessibility, so converting would promote 34 internal constructors to public and add public `Deconstruct`/`with`/value-equality members — **a breaking API change**. `Generate-DeclarativeModels.ps1` already emits genuine positional records where the catalog asks for them (`ApiSpecResolutionModels.generated.cs:37,44,49`), so the class-with-internal-ctor shape is a deliberate distinction, not an oversight.
+- **Note:** this independently confirms the *PUBLIC API NOTE* raised against the same idea in the Contracts area. Findings 1 and 3 above capture the line savings without touching the API surface.
+
+> **Negative results:** all 15 `scripts/Generate-*.ps1` are wired into `eng/acceptance/contract.json`/CI — no orphaned generators. No dead generator functions — every `function` in the 15 generators plus `GeneratedFileHelpers.ps1` has a call site. Write-if-changed is already shared (`Update-SharpProofGeneratedFile`). Generated output is **not** broadly verbose — `ProtocolModel.generated.cs` (1,001 lines), `CompilerArtifactModel.generated.cs`, `IrOperatorCatalog.generated.cs` already emit one-line auto-properties; the verbosity is confined to the two emitters above. No unconsumed `*.generated.cs` (the one flag, `CompilerEffectConstraintRule`, is consumed via `CompilerEffectEvidenceCatalog.ConstraintRules` at `CompilerEffectClaimArtifactCodec.cs:130`).
+
+---
+
+## Release / packaging / dependency scripts (PowerShell)
+
+**Estimated savings: ~200 LOC.** No dead functions found — every declared function in the ten files has at least one caller in `scripts/`, `eng/`, `.github/`, or `docs/`.
+
+### 1. `Get-PackageIdentity` copy-pasted three times (nuspec reader)
+- **Files:** `scripts/Publish-SharpProofRelease.ps1:149-212`, `scripts/New-SharpProofReleaseEvidence.ps1:26-91`, `scripts/Test-SharpProofPackageConsumers.ps1:29-79`
+- **Est. LOC saved:** ~115
+- **Why it's safe:** The three bodies are byte-identical from `[IO.Compression.ZipFile]::OpenRead` through the nuspec/namespace/metadata extraction. They diverge only in (a) two error-message wordings, (b) whether repository metadata is required, and (c) the returned property set (`id/version/repositoryCommit` lowercased vs `Id/Version/RepositoryUrl/RepositoryCommit` vs `Id/Version/Path`). `Publish-SharpProofRelease.ps1:40-48` already dot-sources five sibling files, so a shared module is trivially reachable. Two more near-copies of the same "open archive, find exactly one .nuspec" prologue exist at `Test-SharpProofPackageDependencies.ps1:181-190` and `SharpProof.PublicationDestination.ps1:79-90`, which the same helper can serve.
+- **Proposed change:** Add `Get-SharpProofNuspecMetadata` (returning the parsed `metadata` XML node) plus `Get-SharpProofPackageIdentity -RequireRepository` to a shared `scripts/SharpProof.PackageIdentity.psm1`; each caller projects the property names it needs. **Note:** `eng/acceptance/contract.json` lists `.psm1` paths (lines 168, 708), so a *new* module needs an entry there.
+
+### 2. Git-subprocess byte-capture boilerplate duplicated inside one file
+- **Files:** `scripts/Get-SharpProofReleaseDigests.ps1:64-110` and `:193-250`
+- **Est. LOC saved:** ~35
+- **Why it's safe:** `Get-GitTreeEntries` and `Get-GitBlobBytes` both build a `ProcessStartInfo` with the same five property assignments, push `-C $resolvedRepository` plus args, start the process, `ReadToEndAsync` stderr, `CopyToAsync` stdout to a stream, `WaitForExit`, check `ExitCode`, and throw with the same message shape. Only the arg list, the destination stream (MemoryStream vs temp file), and the operation noun differ. Both are file-local — no external callers, verified by grep across `scripts/`, `eng/`, `.github/`.
+- **Proposed change:** Extract one private `Invoke-GitBinary -Arguments -Operation` returning `byte[]`; drop the temp-file path in `Get-GitBlobBytes` since the MemoryStream form already works.
+
+### 3. Hardcoded first-party package-ID triple repeated in five places
+- **Files:** `scripts/Publish-SharpProofRelease.ps1:50-54`, `scripts/New-SharpProofReleaseEvidence.ps1:588-592`, `scripts/Test-SharpProofPackageConsumers.ps1:111-115`, `scripts/SharpProof.PublicationPlanIdentity.psm1:264`, `scripts/Test-SharpProofSamples.ps1:184-188`
+- **Est. LOC saved:** ~20
+- **Why it's safe:** All five are the same set — `SharpProof`, `SharpProof.Attributes`, `SharpProof.Verifier` — varying only in ordering (`Publish` keeps a deliberate `$packageOrder` for push sequencing; the others `| Sort-Object` immediately).
+- **Proposed change:** Expose `$SharpProofPackageIds` (sorted) and `$SharpProofPackagePushOrder` from the shared module; replace the five literals. **Do not** try to derive the IDs from `scripts/package-projects.json` — `SharpProof.Package/SharpProof.Package.csproj` produces package id `SharpProof`, so the mapping is not path-derivable; hardcoding the IDs once is the honest fix.
+
+### 4. Dead locals and an unreachable `finally` in `Invoke-ConsumerDotNet`
+- **Files:** `scripts/Test-SharpProofPackageConsumers.ps1:256-276`
+- **Est. LOC saved:** ~10
+- **Why it's safe:** `$captureOutput` is assigned at line 258 and never read anywhere in the file. `$capturePath` is set to `$null` at line 256 and never reassigned, so the `finally` guard `if ($null -ne $capturePath …) { Remove-Item … }` at 273-275 **can never fire**. Verified: those two names appear only at 256, 258, 273, 274.
+- **Proposed change:** Delete the `$captureOutput` assignment, the `$capturePath` initialization, and the dead cleanup branch, leaving `Push-Location`/`Pop-Location` in the `finally`.
+
+### 5. "Compare shapes then compare canonical JSON, else throw" idiom repeated
+- **Files:** `scripts/SharpProof.PublicationDestination.ps1:239-245` and `:329-335`; `scripts/Test-SharpProofPackageDependencies.ps1:555-558, :681-685, :743-746`
+- **Est. LOC saved:** ~20
+- **Why it's safe:** Every site is the same three-part predicate — property-name sequence equality via a `-join`, then `(… | ConvertTo-Json -Compress [-Depth n]) -cne (… | ConvertTo-Json -Compress [-Depth n])`, then `throw '<message>'`. Only the depth argument and the message string vary. `scripts/SharpProof.ReleaseJson.ps1:21` already hosts a partial version of this shape.
+- **Proposed change:** Add `Assert-SharpProofCanonicalMatch -Actual -Expected -Depth -Message` to `SharpProof.ReleaseJson.ps1`; collapse the five sites to one line each.
+
+> **Reinforcing evidence (not double-counted).** The atomic-write idiom flagged in the mutation-scripts area recurs here: `New-SharpProofReleaseEvidence.ps1:93-119` (`Write-AtomicText`), an inline copy at `Test-SharpProofDependencyAudit.ps1:572-588`, and `Write-SharpProofPublicationPlanAtomic` in `SharpProof.PublicationPlanTopology.ps1:130` (called from `Publish-SharpProofRelease.ps1:808`). Two further sites write JSON non-atomically with the same "resolve path, create parent dir, WriteAllText UTF8-no-BOM + `\n`" tail (`Get-SharpProofReleaseDigests.ps1:436-457`, `Get-SharpProofProductionInventory.ps1:459-465`). Folding all five into the shared atomic writer adds roughly **35 more lines** on top of that area's count.
+>
+> **Noted, not filed:** `.sln` project-list parsing is hand-rolled twice with different regexes (`Test-SharpProofDependencyAudit.ps1:159-190`, `Get-SharpProofProductionInventory.ps1:148-154`) — real duplication, but the two return different shapes and only ~15 lines are recoverable.
+
+---
+
+## Fuzz tools / BuildTasks / peripheral projects
+
+**Estimated savings: ~375 LOC.**
+
+> **Checked and found live — do not remove.** `SharpProof.Smoke.Net472` is in `SharpProof.sln:17` and asserted by `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:435` (only 14 source lines). `SharpProof.Verifier` is the real MSBuild-integration package (`buildTransitive/SharpProof.Verifier.targets` + `.nuspec`) with no RID-specific twin in the tree. All four BuildTasks and every `internal` test seam in `RunVerifier.cs` (`ComputeProcessTimeout`, `WaitForOutputCompletion`, `RetainedCleanupAnchorCount`, the four `*Override` hooks) have live references.
+
+### 1. Replace two verbatim copies of `CollectVariables` with the existing `IrTermAnalysis.CollectVariables`
+- **Files:** `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs:414-470`, `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs:379-435`
+- **Est. LOC saved:** ~110
+- **Why it's safe:** `diff` of the two 57-line regions is empty — identical private helpers. `SharpProof.Ir/IrSemanticTerms.cs:124` already exposes `public static ImmutableHashSet<IrVarId> IrTermAnalysis.CollectVariables(IrTerm)`, delegating to the non-recursive `IrTraversal.CollectVariables` (`IrTraversal.cs:23`), which walks the same node set via `GetChildren`. Both fuzz projects already reference `SharpProof.Ir`. The only behavioral difference is ordering: the fuzz copies return an `ImmutableArray` sorted by `IrVarId.Value`.
+- **Proposed change:** Delete both helpers; call `[.. IrTermAnalysis.CollectVariables(root).OrderBy(static v => v.Value)]` at the two sites, preserving deterministic ordering. **Bonus:** the Ir version is iterative, so this also removes the deep-term stack-overflow risk of the recursive copies. *(This is a fourth instance of the `IrTraversal` re-implementation pattern flagged elsewhere in this document.)*
+
+### 2. Collapse 8 identical leaf factories + verbose auto-property block in `GeneratedCSharpExpression`
+- **Files:** `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:78` (property block), `:127-222` (leaf factories)
+- **Est. LOC saved:** ~85
+- **Why it's safe:** `Left/Right/Condition/Text/Values/Reference/NullReference/NullString` are byte-for-byte identical bodies differing only in the `(Kind, Type)` pair — each a 10-line `return new(kind, type, 0, false, []);`. The 8 public properties are 4-line `{ get; }` blocks (28 lines for 8 get-only autoprops). No `partial`, no reflection over these members — `GeneratedCSharpExpression` is used only by `Tools/SharpProof.Fuzz` and `SharpProof.Fuzz.Test`, all by direct call.
+- **Proposed change:** Add one `private static GeneratedCSharpExpression Leaf(GeneratedExpressionKind, GeneratedExpressionType)`; make the 8 factories one-line expression bodies over it; collapse the autoprops to single-line form.
+
+### 3. Table-drive `FrontendFuzzCoverage` counting and validation
+- **Files:** `Tools/SharpProof.Fuzz/FuzzRunner.cs:23-75` (record), `:428-520` (`CreateFrontendCoverage`), `:524-528` (`HasRequiredFrontendCoverage`)
+- **Est. LOC saved:** ~70
+- **Why it's safe:** The same 13 members are enumerated three times: `HasValidCounts` (all `>= 0`), `HasExpandedCategories` (all `> 0`), and the 13-argument positional construction. `CreateFrontendCoverage` declares 13 local counters and two switch ladders mapping one enum case to one counter each. `HasRequiredFrontendCoverage` is a 5-line wrapper with one caller (`:184`) that just returns `coverage.HasExpandedCategories`. `FrontendFuzzCoverage` is constructed only here and consumed by `FuzzSummary.Passed` and `SharpProof.Fuzz.Test/FuzzRunnerTests.cs` via named properties — the record shape must stay, its bodies need not.
+- **Proposed change:** Expose a private `IEnumerable<int> Counts => [TextParameters, …]` and define the two predicates over it; tally into `Dictionary<GeneratedExpressionKind,int>` / `Dictionary<IrExceptionKind,int>` and read out at construction; inline `HasRequiredFrontendCoverage`.
+
+### 4. Extract the duplicated cancelable-MSBuild-task scaffold
+- **Files:** `SharpProof.BuildTasks/InvalidatePublishedResult.cs:10-12,48-72,247-262`, `ResetPublishedVerification.cs:7-9,24-48,82-98`, `ValidatePublishedVerificationResult.cs:29-38`
+- **Est. LOC saved:** ~65
+- **Why it's safe:** The first two contain a character-for-character identical `_synchronization`/`_cancelExecution`/`_canceled` field trio, `Execute()` override (create CTS, latch under lock, call `Execute(token)`, clear under lock in `finally`), `Cancel()` body, and `private static IEnumerable<string> Present(params string?[])`. All three repeat the same `projectDirectory = Path.GetFullPath(...)` + `string ResolvePath(string)` local function over `LinuxPathIdentity.RequireLocalPath`. All four tasks are live — `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:15-21` declares the `UsingTask`s and lines 114/216/229/272 invoke them — so this is refactor-only.
+- **Proposed change:** Add an internal `abstract class CancelableBuildTask : Task, ICancelableTask` holding the latch, `Execute()`, `Cancel()`, `Present`, and a `ResolveProjectRelativePath` helper; the three tasks implement only `ExecuteCore(CancellationToken)`.
+
+### 5. De-duplicate `ReturnType` and the Roslyn compile/emit plumbing in the frontend oracle
+- **Files:** `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:686-697` and `:1680-1690` (`ReturnType`); `:989-1010` vs `:1155-1177` (parse/compile/emit); `:676-684` vs `:1605-1624` (source emission)
+- **Est. LOC saved:** ~45
+- **Why it's safe:** `ReturnType` appears twice with identical bodies (`GeneratedCSharpCase` and `FrontendDifferentialOracle`). `CompareBatch` and `CompareSemanticEdges` each repeat the same ~22-line `CSharpSyntaxTree.ParseText(LanguageVersion.CSharp12)` + `CSharpCompilation.Create(…, OutputKind.DynamicallyLinkedLibrary, Release, checkOverflow: true, NullableContextOptions.Enable)` + `MemoryStream`/`Emit` sequence, differing only in assembly name and failure-isolation callback. `GeneratedCSharpCase.Source` re-implements the single-case form of `CreateBatchSource`; `Source` is public API used by `FuzzRunner.cs:285-286` and `FuzzRunnerTests.cs:308,316,591`, so keep the property but delegate.
+- **Proposed change:** Hoist one `internal static string ReturnType(GeneratedExpressionType)`; add a private `CompileGenerated(source, assemblyName, cancellationToken)` returning the tree/compilation/emit triple, called from both comparison paths.
+
+### 6. Two stale top-level directories containing only build output
+- **Files:** `SharpProof.PortableAnalyzer/`, `SharpProof.Verifier.Win-x64/`
+- **Est. LOC saved:** **0 repo lines** — see below
+- **Why it's safe:** Both directories contain nothing but `bin/` and `obj/` — no `.csproj`, no `.cs`. Neither name appears in `SharpProof.sln`, in any `.slnf` filter, or in any `.csproj`/`.props`/`.targets`. `docs/soundness-notes/2026-08-08-….md:11` records that the PortableAnalyzer packaging project was removed. Surviving references are deliberate: a stale-path assertion in `scripts/Test-SharpProofPackageConsumers.ps1:336` and "this property was removed" guards in `SharpProof.AnalyzerConsumer.props:116` and `SharpProof.Package/buildTransitive/SharpProof.targets:74`. `SharpProof.Verifier.Win-x64` appears only in `scripts/Generate-Readme.ps1:435` and a doc fixture named `stale-win-x64` — a name to *detect*, not a project to build.
+- **⚠ Verified correction:** `git ls-files` returns **nothing** for either directory, and `.gitignore:28` (`[Bb]in/`) already covers them. They are untracked local build residue, so deleting them **removes zero lines from the repository** — it is working-tree tidiness only, not a reduction. Leave the guard/stale-detection references intact.
+
+---
+
+## Documentation and root markdown
+
+**Estimated savings: ~1,025 lines** (~800 audit ledger, ~157 orphan notes, ~44 duplicated gaps prose, ~24 duplicated dev instructions).
+
+> **⚠ Correction to a premise in this survey's own brief:** `README.md` is **not generated**. `scripts/Generate-Readme.ps1` contains **zero** `Set-Content`, `Out-File`, or `WriteAllText` calls — it is a `-Verify` consistency checker over hand-written docs, confirmed in-repo at `docs/README.md:179-180` ("The script does not generate these files."). There is no generated region and no template to change; all `README.md` reductions are ordinary hand-edits. The only genuinely generated doc is `docs/api-spec-catalog.generated.md:2`, produced by `scripts/Generate-ApiSpecCatalog.ps1`.
+
+### 1. Collapse the 848-row per-file ledger in the code-usefulness audit
+- **Files:** `docs/code-usefulness-audit.md:187-1034` (`## Per-file baseline coverage ledger`)
+- **Est. LOC saved:** ~800
+- **Why it's safe:** 848 rows; the verdict column is `retained` on **820**, `removed` on 7, `simplified` on 4. The rationale column has only **7 distinct** boilerplate strings covering 807 rows (`Retained as required analysis, verification, protocol, validation, or fail-closed soundness logic.` ×252; `Retained as independent behavioral, packaging, or integration evidence…` ×219; `Retained after MSBuild import, workflow, package, release, or dynamic invocation review.` ×180; `Retained with its owning catalog or generator and parity checks.` ×90; plus 3 smaller). All 11 non-retained rows are already narrated in prose with commit hashes at `:91-108`, and the rejected leads at `:109-126`. The remaining per-row data (blob SHA-1, line count) is recoverable from git at the recorded baseline commit `18083cd7783146f7b5d7a4db26b31b1f41f3561b` (verified: `git cat-file -t` → `commit`). **The ledger is already decaying** — 7 listed paths no longer exist: `scripts/Get-SharpProofCoverageAuthority.ps1`, `scripts/GitHubEvidenceArtifact.ps1`, `scripts/Invoke-SharpProofDogfood.ps1`, `SharpProof.Testing/AnalyzerTestHost.cs`, `SharpProof.Testing/ReadmeExampleAttribute.cs`, `SharpProof.Analyzer/GlobalUsings.cs`, `SharpProof.Analyzer/Resources/.gitkeep`.
+- **Proposed change:** Replace the row-per-file table with a per-category count table (retained-by-rationale × 7) plus the ~28 non-plain-`retained` rows, stating that the full manifest is reproducible from the pinned baseline commit. Keep `## Scope and stop condition` through `## Validation evidence` untouched.
+
+### 2. Delete or index the three orphaned soundness notes
+- **Files:** `docs/soundness-notes/2026-07-29-production-hardening-refactor.md` (56), `2026-07-29-readable-format-coverage-baseline.md` (50), `2026-08-08-coverage-authority-and-tcb-ownership.md` (51)
+- **Est. LOC saved:** ~157
+- **Why it's safe:** `docs/README.md:97-110` is the index for dated evidence and lists only 6 of the 10 files in `docs/soundness-notes/`. `scripts/Generate-Readme.ps1:56-63` (`$datedEvidenceDocuments`) lists 7 — and these three are in **neither**. A repo-wide grep for each filename returns exactly one hit each: `docs/code-usefulness-audit.md`, i.e. the historical ledger proposed for collapse above. No `.ps1`, `.yml`, or maintained `.md` references them. (`2026-07-29-semantic-precondition-vacuity.md` is *not* orphaned — it is in `Generate-Readme.ps1:61`.)
+- **Proposed change:** Either add all three to the `docs/README.md` dated-evidence table and `$datedEvidenceDocuments` so they become link-checked, or delete them as superseded. Deleting is the LOC win; keeping costs nothing but requires indexing.
+
+### 3. Remove "Known production gaps" from the documentation map
+- **Files:** `docs/README.md:117-162`
+- **Est. LOC saved:** ~44
+- **Why it's safe:** This 46-line prose blob restates `docs/coverage-and-limits.md:244-330` and **ends by naming that section as the authority** (`docs/README.md:162` links to `coverage-and-limits.md#closed-compiler-artifact-and-remaining-limits`). Overlapping facts appear in both: schema-18 artifact (`README.md:120` / `coverage-and-limits.md:246-247`), protocol 11 / cache schema 13 / relational-summary schema 2 / pack schema 1 (`:143-144` / `:256-258`, `smt-lifecycle.md:63`), SPDX 2.3 SBOM (`:146` / `:307`), "duplicate skipping is never used" (`:154` / `:319` / `native-smt-packaging.md:66` / root `README.md:235`). `docs/README.md` self-describes as a "documentation map" (`:1`) whose documents "are not interchangeable sources of truth" (`:3-4`) — status prose is off-role for it.
+- **Proposed change:** Replace with a two-line pointer to the authoritative section. The anchor is checked by `scripts/Generate-Readme.ps1 -Verify`, so the link stays validated.
+
+### 4. Fold `docs/getting-started.md` "Develop the repository" into the container guide
+- **Files:** `docs/getting-started.md:136-159`
+- **Est. LOC saved:** ~24
+- **Why it's safe:** A third copy of the same commands. `:141-143` (`docker compose up -d dev` / `exec dev sharpproof-dev-init` / `exec dev bash`) is identical to `README.md:185-187` and `docs/container-development.md:204-206`. `:151-153` (`tooling build` / `test` / `acceptance -Configuration Release`) overlaps `README.md:170-172` and `CONTRIBUTING.md:26-27`. The section already ends (`:156-159`) by deferring to `container-development.md`, which owns workspace isolation, test targets, and resource overrides. `getting-started.md` is otherwise the *package consumer* on-ramp.
+- **Proposed change:** Replace the body with one sentence linking to `container-development.md`; keep the consumer-facing sections intact.
+
+> **Checked, no finding:** **No stale compose-service references in docs** — every `docker compose` invocation across `docs/` and root markdown names only `dev`, `loop`, or `tooling` (`docs/getting-started.md:126,127,141-143,151-153`, `docs/container-development.md:88,97-99,204-206`, `README.md:170-172,179,185-187,198`, `AGENTS.md:4`, `CONTRIBUTING.md:26-27`, `docs/code-usefulness-audit.md:56-58,180-181`). The 17 unreferenced compose services are a `compose.yaml` problem, not a docs problem. **No stale `sp <cmd>` references** — all 13 distinct `sp` commands in docs are present in the `[ValidateSet(...)]` at `scripts/Invoke-SharpProofContainer.ps1:4`, which `eng/container/dev-command.sh:11-13` dispatches to. **No orphaned top-level `docs/*.md`** — every file is referenced from at least 3 places.
+
+---
+
+## Container / acceptance / orchestration tooling
+
+**Estimated savings: ~245 LOC.**
+
+### 1. Table-drive the acceptance contract assertion ladder in `Verify.ps1`
+- **Files:** `eng/acceptance/Verify.ps1:449-605` (also `:309-324` `Assert-Equal`, `:326-370` `Get-MsBuildProperty`/`Get-MsBuildDefault`)
+- **Est. LOC saved:** ~80
+- **Why it's safe:** A flat run of ~46 `Assert-Equal` calls with no control flow and no ordering dependency — each is `(expected literal or contract scalar)` vs `(contract field or MSBuild property)`. Three shapes only: (a) `Assert-Equal $contract.<path> <literal> '<name>'` (~26 calls, `:449-513`), (b) `Assert-Equal (Get-MsBuildProperty $doc '<prop>' '<owner>') <expected> '<prop>'` (~15 calls, `:514-605`), (c) `Get-MsBuildDefault` (4 calls, `:478-493`). Every architecture test that reads `Verify.ps1` was grepped (`ArchitectureTests.cs:1182,1345,1756,2344`, `AcceptanceScriptTests.cs`, `DocumentationSupportContractTests.cs:68`) — the only substring pins are `Test-AcceptanceTimingTimeline`, `Start-AcceptanceTimingPhase -Name 'restore'`, and the `Generate-Readme.ps1 -Verify` invocation; none touch this region. The trusted-mutation catalog's two `Verify.ps1` entries (`Test-SharpProofTrustedMutations.ps1:1971,1995`) pin those same two lines, also outside this region.
+- **Proposed change:** Replace the three assertion runs with three `foreach` loops over ordered hashtables (`@{ Name; Actual; Expected }`, and `@{ Document; Property; Owner; Expected }` for the MSBuild ones), keeping `Assert-Equal`/`Get-MsBuildProperty`/`Get-MsBuildDefault` unchanged so failure messages stay byte-identical.
+
+### 2. Collapse the four near-identical CPU-budget functions
+- **Files:** `scripts/SharpProof.ContainerExecution.psm1:22-149`
+- **Est. LOC saved:** ~70
+- **Why it's safe:** `Get-SharpProofTestProjectParallelism`, `…SemanticTestParallelism`, `…PackageTestParallelism` and `…BuildParallelism` are 128 lines differing only in (i) whether the contract knob is a divisor (`automation.testProjectCpuDivisor`), a percent (`automation.packageTestCpuPercent`, `automation.buildCpuPercent`), or nothing (semantic = all visible CPUs), and (ii) the error text. Each repeats the same `SHARPPROOF_TEST_PROJECT_PARALLELISM` override read, the same `ProcessorCount -lt 1` throw, and the same `contract.json` load. The guarding tests are behavioral, not textual: `BuildSchedulingTests.cs:377,437,502` import the module and invoke by name; the only text pins (`:124-127`) are `function Get-SharpProofBuildParallelism` and `function Invoke-SharpProofParallelDotnetBuilds`, which survive if the four public names remain.
+- **Proposed change:** Add a private `Get-SharpProofCpuBudget -RepositoryRoot -Divisor <name> | -Percent <name>` owning the override, processor-count and contract read; reduce the four exported functions to two-line wrappers. Keep all four names in `Export-ModuleMember`.
+
+### 3. Fold the repeated `Join-Path` + `$LASTEXITCODE` guard into one helper
+- **Files:** `scripts/Invoke-SharpProofContainer.ps1:75-664` — 22 `if ($LASTEXITCODE -ne 0)` blocks at `:158, 171, 197, 215, 226, 359, 370, 380, 425, 446, 479, 492, 509, 526, 538, 543, 597, 600, 608, 615, 622`, plus 20+ `& (Join-Path $repositoryRoot 'scripts/…')` invocations
+- **Est. LOC saved:** ~40
+- **Why it's safe:** Every branch is the identical shape `& (Join-Path $repositoryRoot '<script>') <args>; if ($LASTEXITCODE -ne 0) { throw '<message>' }`. The message is the only per-branch variation, so a helper taking `-Path`, `-Failure` and splatted arguments reproduces the exact throw. `DocumentationSupportContractTests.cs:69-70` reads this file but asserts only on the ordering of `Generate-Readme.ps1`/gate names, which a helper preserves as long as the script paths stay literals.
+- **Proposed change:** Add `Invoke-RequiredScript([string]$RelativePath, [string]$Failure, [hashtable]$Arguments)` next to the existing local `Invoke-DotNet` (`:60`); rewrite the 20+ sibling-script invocations. *(Reinforces the sibling proposal for `Invoke-SharpProofRequiredDotnet` — the same invoke/check/throw shape is needed for both the `dotnet` path and the sibling-script path, and both callers live in this file.)*
+
+### 4. Delete the unreferenced `Get-SharpProofModuleVersionId.ps1`
+- **Files:** `scripts/Get-SharpProofModuleVersionId.ps1:1-30`
+- **Est. LOC saved:** 30
+- **Why it's safe:** A repo-wide grep for `Get-SharpProofModuleVersionId` returns hits only inside `.git/*/index` — no `.ps1`, `.psm1`, `.cs`, `.sh`, `.yml`, `.yaml`, `.md` or `.json` reference. It is **not** listed in `eng/acceptance/contract.json` and **not** in `docs/code-usefulness-audit.md` (unlike every other retained script), so no contract update is required. The MVID-reading behavior it duplicates exists in C# at `SharpProof.Gates/Program.cs:161` and `SharpProof.CompilerArtifact/CompilerCaptureAuthority.cs:66`, which is what `StandaloneGateEvidenceTests.cs:62` actually asserts on.
+- **Proposed change:** Delete the file.
+
+### 5. Replace the hand-rolled `-NoBuild`/`-Fast` splat construction with one helper
+- **Files:** `scripts/Invoke-SharpProofContainer.ps1:273-303, :344-358` (and the mirrored `$fastBuildArguments` handling at `:53-58, :239-243, :260, :312, :332`)
+- **Est. LOC saved:** ~20
+- **Why it's safe:** The `test-changed`, `semantic-tests` and `package-tests` branches each build the same splat by hand: seed `Configuration` (plus `TestFilter`/`PackageSource` where the callee accepts them), then `if ($NoBuild) { … = $true }` and `if ($Fast) { … = $true }`. The switches are already validated once up front (`:38-52`), so the per-branch construction carries no additional logic. Splatting an absent key is identical to not passing the switch.
+- **Proposed change:** Add `New-TestInvocationArguments` returning the hashtable with `Configuration` plus any set switches; use it in the three branches.
+
+### 6. Remove the degenerate single-branch `case` in `entrypoint.sh`
+- **Files:** `eng/container/entrypoint.sh:113-169`
+- **Est. LOC saved:** ~5 (plus a 4-space de-indent of ~55 lines)
+- **Why it's safe:** The statement is `case "${command_name}" in *) … ;; esac` — one wildcard arm that always matches, wrapping the whole task-clone-and-exec body. Removing it cannot change which code runs. Genuine command discrimination already happens earlier in `requires_clean_exact_commit_source`/`requires_git_source` (`:55-83`) and the `dev` short-circuit at `:51`.
+- **⚠ Caveat that must be handled:** `scripts/Test-SharpProofTrustedMutations.ps1:2067` pins the exact string `    if [[ "${source_has_git}" = "true" ]]; then` **with its current four-space indent**, so the de-indent requires updating that catalog entry in the same change — otherwise keep the body indented and only drop the four wrapper lines.
+
+> **`entrypoint.sh` command dispatch — checked, no dead-command finding.** Unlike `compose.yaml`'s 17 unused services, `entrypoint.sh` has no per-command dispatch table to prune; it forwards every command verbatim to `Invoke-SharpProofContainer.ps1`. Its only command lists are the two guard predicates, and every name in them is reachable.
+>
+> **⚠ Adjacent correctness observation (not a reduction, not counted):** `pilot-review` is the only branch that writes the `pilots` qualification receipt (`Invoke-SharpProofContainer.ps1:617-627`), yet **no workflow, doc, or script invokes `tooling pilot-review`** — `release.yml` runs `pilots` then `release-qualification`. That looks like a gap in release orchestration rather than dead code.
+
