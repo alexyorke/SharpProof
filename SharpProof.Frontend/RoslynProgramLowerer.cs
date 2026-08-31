@@ -256,8 +256,36 @@ public sealed class RoslynProgramLowerer(
                     Abstain(operation, location.Abstention);
                     break;
                 default:
-                    LowerNestedInvocations(block, operation, value);
-                    break;
+                    var nestedValues = new Dictionary<IOperation, IrTerm>();
+                    LowerNestedOperations(
+                        block,
+                        operation,
+                        value,
+                        nestedValues);
+                    if (nestedValues.Count == 0)
+                    {
+                        break;
+                    }
+
+                    var priorCustomLowering =
+                        _expressions.CustomLowering;
+                    _expressions.CustomLowering = candidate =>
+                        nestedValues.TryGetValue(
+                            candidate,
+                            out var replacement)
+                            ? (true, replacement)
+                            : priorCustomLowering(candidate);
+                    try
+                    {
+                        var nestedLowered = _expressions.Lower(value);
+                        Observe(operation, nestedLowered.Classification);
+                        return nestedLowered.Term;
+                    }
+                    finally
+                    {
+                        _expressions.CustomLowering =
+                            priorCustomLowering;
+                    }
             }
 
             var lowered = _expressions.Lower(value);
@@ -265,13 +293,21 @@ public sealed class RoslynProgramLowerer(
             return lowered.Term;
         }
 
-        private void LowerNestedInvocations(
-            IrBlockId block, OperationId operation, IOperation value)
+        private void LowerNestedOperations(
+            IrBlockId block,
+            OperationId operation,
+            IOperation value,
+            Dictionary<IOperation, IrTerm> nestedValues)
         {
             switch (value)
             {
                 case IInvocationOperation invocation:
                     LowerInvocation(block, operation, invocation, wantsResult: false);
+                    return;
+                case IArrayElementReferenceOperation:
+                    nestedValues.Add(
+                        value,
+                        LowerValue(block, operation, value));
                     return;
                 case IAnonymousFunctionOperation:
                 case ILocalFunctionOperation:
@@ -281,7 +317,11 @@ public sealed class RoslynProgramLowerer(
 
             foreach (var child in value.ChildOperations)
             {
-                LowerNestedInvocations(block, operation, child);
+                LowerNestedOperations(
+                    block,
+                    operation,
+                    child,
+                    nestedValues);
             }
         }
 
