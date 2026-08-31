@@ -429,7 +429,8 @@ public sealed class RoslynOperationLowerer
 
         var sourceType = operation.Type ??
             operation.SemanticModel?.GetTypeInfo(operation.Syntax).ConvertedType;
-        if (!IsSupportedValueDomain(sourceType))
+        if (sourceType?.TypeKind == TypeKind.Error ||
+            !IsSupportedValueDomain(sourceType))
         {
             return Opaque(operation, FrontendAbstention.UnsupportedType);
         }
