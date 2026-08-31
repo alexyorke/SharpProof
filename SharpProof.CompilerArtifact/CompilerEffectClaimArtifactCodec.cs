@@ -307,7 +307,10 @@ internal static class CompilerEffectClaimArtifactCodec
             hash.Add(value.OperationIdentitySha256);
         }
 
-        hash.Add(value.MemberIdentity, value.MemberDocumentationId,
+        // Array-allocation events canonically have no member identity. Treat
+        // the wire-level null and empty representations as the same value so
+        // replay semantics and operation hashes cannot diverge.
+        hash.Add(value.MemberIdentity ?? string.Empty, value.MemberDocumentationId,
             value.TypeIdentity, value.TypeDocumentationId,
             value.SpecWitnessIdentifier);
         hash.Add(value.SourceTreeOrdinal, value.SourceTreePath,

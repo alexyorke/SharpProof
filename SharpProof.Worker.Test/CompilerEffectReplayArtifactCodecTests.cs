@@ -85,6 +85,24 @@ public sealed class CompilerEffectReplayArtifactCodecTests
     }
 
     [Test]
+    public void ArrayReplayNullAndEmptyMemberIdentityHaveOneCanonicalHash()
+    {
+        var nullIdentity = ReplayEvent();
+        nullIdentity.Kind = CompilerEffectReplayEventKind.ManagedArrayAllocation;
+        nullIdentity.MemberIdentity = null!;
+        var emptyIdentity = ReplayEvent();
+        emptyIdentity.Kind = CompilerEffectReplayEventKind.ManagedArrayAllocation;
+        emptyIdentity.MemberIdentity = string.Empty;
+
+        Assert.That(
+            CompilerEffectClaimArtifactCodec.ComputeReplayOperationSha256(
+                nullIdentity),
+            Is.EqualTo(
+                CompilerEffectClaimArtifactCodec.ComputeReplayOperationSha256(
+                    emptyIdentity)));
+    }
+
+    [Test]
     public void CodecRequiresSealedUnconditionalAllocationReplayForRefutation()
     {
         var evidence = RefutedEvidence();
