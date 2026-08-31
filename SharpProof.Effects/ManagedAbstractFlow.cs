@@ -840,9 +840,22 @@ internal sealed class ManagedAbstractFlow
     private static ManagedFlowState HavocCall(
         ManagedFlowState state, IMethodSymbol method, ImmutableArray<IArgumentOperation> arguments)
     {
-        return method.MethodKind == MethodKind.LocalFunction || method.ContainingType.TypeKind == TypeKind.Delegate
+        return method.MethodKind == MethodKind.LocalFunction ||
+            method.ContainingType.TypeKind == TypeKind.Delegate ||
+            arguments.Any(static argument =>
+                CanCarryDelegate(argument.Value))
             ? state.Forget()
             : HavocArguments(state, arguments);
+    }
+
+    private static bool CanCarryDelegate(IOperation value)
+    {
+        value = Unwrap(value);
+        return value is IDelegateCreationOperation ||
+            value.Type is { } type &&
+            (type.TypeKind == TypeKind.Delegate ||
+             type.SpecialType is SpecialType.System_Delegate or
+                 SpecialType.System_MulticastDelegate);
     }
 
     private static ManagedFlowState HavocArguments(
