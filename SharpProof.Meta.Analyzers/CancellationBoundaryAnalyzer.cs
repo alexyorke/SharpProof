@@ -532,6 +532,10 @@ internal static class CancellationBoundaryAnalyzer
             !ReferencesParameter(
                 cancellationRequested.Instance,
                 method.Parameters[1]) ||
+            !PreservesIncomingParameterValue(
+                context,
+                method,
+                method.Parameters[1]) ||
             Unwrap(context.SemanticModel.GetOperation(
                 resultExpression,
                 context.CancellationToken)) is not
@@ -633,6 +637,10 @@ internal static class CancellationBoundaryAnalyzer
             !ReferencesParameter(
                 cancellationRequested.Instance,
                 method.Parameters[6]) ||
+            !PreservesIncomingParameterValue(
+                context,
+                method,
+                method.Parameters[6]) ||
             SoleReturn(cancellationIf.Statement)?.Expression is not
                 ExpressionSyntax returnExpression ||
             context.SemanticModel.GetOperation(
@@ -705,15 +713,78 @@ internal static class CancellationBoundaryAnalyzer
         IOperation? receiver,
         IParameterSymbol parameter)
     {
-        while (receiver is IConversionOperation conversion)
-        {
-            receiver = conversion.Operand;
-        }
+        receiver = Unwrap(receiver);
 
         return receiver is IParameterReferenceOperation reference &&
                SymbolEqualityComparer.Default.Equals(
                    reference.Parameter,
                    parameter);
+    }
+
+    private static bool PreservesIncomingParameterValue(
+        SyntaxNodeAnalysisContext context,
+        IMethodSymbol method,
+        IParameterSymbol parameter)
+    {
+        var declaration = method.DeclaringSyntaxReferences.SingleOrDefault();
+        if (declaration == null ||
+            declaration.SyntaxTree != context.Node.SyntaxTree ||
+            context.SemanticModel.GetOperation(
+                declaration.GetSyntax(context.CancellationToken),
+                context.CancellationToken) is not { } root)
+        {
+            return false;
+        }
+
+        return !root.DescendantsAndSelf().Any(operation =>
+            WritesParameter(operation, parameter));
+    }
+
+    private static bool WritesParameter(
+        IOperation operation,
+        IParameterSymbol parameter)
+    {
+        return operation switch
+        {
+            IAssignmentOperation assignment =>
+                TargetsParameter(assignment.Target, parameter),
+            IIncrementOrDecrementOperation increment =>
+                ReferencesParameter(increment.Target, parameter),
+            IArgumentOperation argument
+                when argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out =>
+                ReferencesParameter(argument.Value, parameter),
+            IInvocationOperation invocation
+                when HasWritableReducedReceiver(invocation) =>
+                ReferencesParameter(invocation.Instance, parameter),
+            IVariableDeclaratorOperation declarator
+                when declarator.Symbol.RefKind != RefKind.None =>
+                ReferencesParameter(declarator.Initializer?.Value, parameter),
+            _ => false
+        };
+    }
+
+    private static bool HasWritableReducedReceiver(
+        IInvocationOperation invocation)
+    {
+        var reduced = invocation.TargetMethod.ReducedFrom;
+        return reduced != null &&
+               reduced.Parameters.Length > 0 &&
+               reduced.Parameters[0].RefKind is RefKind.Ref or RefKind.Out;
+    }
+
+    private static bool TargetsParameter(
+        IOperation operation,
+        IParameterSymbol parameter)
+    {
+        operation = Unwrap(operation) ?? operation;
+        if (ReferencesParameter(operation, parameter))
+        {
+            return true;
+        }
+
+        return operation is ITupleOperation tuple &&
+               tuple.Elements.Any(element =>
+                   TargetsParameter(element, parameter));
     }
 
     private static bool IsAuditedWorkerMain(
