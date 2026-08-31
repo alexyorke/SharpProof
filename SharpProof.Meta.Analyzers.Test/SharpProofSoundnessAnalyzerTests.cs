@@ -2409,13 +2409,21 @@ public sealed class SharpProofSoundnessAnalyzerTests
     {
         const string source =
             """
+            #pragma warning disable RSEXPERIMENTAL001
             using Microsoft.CodeAnalysis;
+            using Microsoft.CodeAnalysis.CSharp;
             namespace SharpProof.Frontend.Host;
             static class CompilationModelProvider {
                 internal static SemanticModel Get(
                     Compilation compilation,
                     SyntaxTree tree) =>
                     compilation.GetSemanticModel(tree);
+
+                internal static SemanticModel GetCSharp(
+                    CSharpCompilation compilation,
+                    SyntaxTree tree) =>
+                    compilation.GetSemanticModel(
+                        tree, default(SemanticModelOptions));
             }
             """;
 
@@ -2445,6 +2453,146 @@ public sealed class SharpProofSoundnessAnalyzerTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Does.Contain("SPMETA001"));
+    }
+
+    [TestCase(
+        """
+        using Microsoft.CodeAnalysis;
+        namespace SharpProof.Frontend;
+        static class C {
+            static SymbolInfo M(SemanticModel model, SyntaxNode node) =>
+                model.GetSpeculativeSymbolInfo(
+                    0, node, SpeculativeBindingOption.BindAsExpression);
+        }
+        """,
+        "GetSpeculativeSymbolInfo")]
+    [TestCase(
+        """
+        using Microsoft.CodeAnalysis;
+        namespace SharpProof.Frontend;
+        static class C {
+            static TypeInfo M(SemanticModel model, SyntaxNode node) =>
+                model.GetSpeculativeTypeInfo(
+                    0, node, SpeculativeBindingOption.BindAsExpression);
+        }
+        """,
+        "GetSpeculativeTypeInfo")]
+    [TestCase(
+        """
+        using Microsoft.CodeAnalysis;
+        namespace SharpProof.Frontend;
+        static class C {
+            static IAliasSymbol? M(SemanticModel model, SyntaxNode node) =>
+                model.GetSpeculativeAliasInfo(
+                    0, node, SpeculativeBindingOption.BindAsTypeOrNamespace);
+        }
+        """,
+        "GetSpeculativeAliasInfo")]
+    [TestCase(
+        """
+        #pragma warning disable RSEXPERIMENTAL001
+        using Microsoft.CodeAnalysis;
+        using Microsoft.CodeAnalysis.CSharp;
+        namespace SharpProof.Frontend;
+        static class C {
+            static SemanticModel M(
+                CSharpCompilation compilation,
+                SyntaxTree tree) =>
+                compilation.GetSemanticModel(
+                    tree, default(SemanticModelOptions));
+        }
+        """,
+        "GetSemanticModel")]
+    [TestCase(
+        """
+        using Microsoft.CodeAnalysis;
+        using Microsoft.CodeAnalysis.CSharp;
+        using Microsoft.CodeAnalysis.CSharp.Syntax;
+        namespace SharpProof.Frontend;
+        static class C {
+            static bool M(
+                SemanticModel model,
+                StatementSyntax statement,
+                out SemanticModel speculative) =>
+                Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+                    .TryGetSpeculativeSemanticModel(
+                    model, 0, statement, out speculative);
+        }
+        """,
+        "TryGetSpeculativeSemanticModel")]
+    [TestCase(
+        """
+        using Microsoft.CodeAnalysis;
+        using Microsoft.CodeAnalysis.CSharp;
+        using Microsoft.CodeAnalysis.CSharp.Syntax;
+        namespace SharpProof.Frontend;
+        static class C {
+            static bool M(
+                SemanticModel model,
+                BaseMethodDeclarationSyntax declaration,
+                out SemanticModel speculative) =>
+                Microsoft.CodeAnalysis.CSharp.CSharpExtensions
+                    .TryGetSpeculativeSemanticModelForMethodBody(
+                    model, 0, declaration, out speculative);
+        }
+        """,
+        "TryGetSpeculativeSemanticModelForMethodBody")]
+    public async Task RejectsEverySpeculativeSemanticApiVariant(
+        string source,
+        string methodName)
+    {
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics
+                .Where(static diagnostic => diagnostic.Id == "SPMETA001")
+                .Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Is.EqualTo([
+                $"API '{methodName}' is forbidden in " +
+                "soundness-critical SharpProof layers"
+            ]));
+    }
+
+    [Test]
+    public void ForbiddenCatalogIncludesInternalCSharpSpeculativeVariants()
+    {
+        var analyzer = typeof(SharpProofSoundnessAnalyzer);
+        var knownTypeNames = (ImmutableArray<string>)analyzer.GetField(
+                "KnownTypeNames",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Static)!
+            .GetValue(null)!;
+        var forbidden = (System.Collections.IEnumerable)analyzer.GetField(
+                "ForbiddenMethods",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Static)!
+            .GetValue(null)!;
+        var entry = forbidden.Cast<object>().SingleOrDefault(item =>
+            string.Equals(
+                item.GetType().GetProperty("Key")!.GetValue(item)!.ToString(),
+                "CSharpSemanticModel",
+                StringComparison.Ordinal));
+        IEnumerable<string> methods = entry == null
+            ? []
+            : (IEnumerable<string>)entry.GetType()
+                .GetProperty("Value")!
+                .GetValue(entry)!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(entry, Is.Not.Null);
+            Assert.That(
+                knownTypeNames,
+                Does.Contain(
+                    "Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel"));
+            Assert.That(
+                methods,
+                Is.SupersetOf([
+                    "TryGetSpeculativeSemanticModel",
+                    "TryGetSpeculativeSemanticModelForMethodBody"
+                ]));
+        }
     }
 
     [Test]
