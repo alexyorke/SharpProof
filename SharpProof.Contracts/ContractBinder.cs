@@ -189,7 +189,10 @@ public sealed class ContractBinder
                 return ContractBindingResult.Fail(directFailure);
             }
         }
-        if (resolution.Failure != ContractBindingFailure.None)
+        if (resolution.Failure != ContractBindingFailure.None &&
+            (!requiresOnly ||
+             resolution.Failure != ContractBindingFailure.InvalidClausePlacement ||
+             HasRequiresPlacementErrors(resolution.Inventory)))
         {
             return ContractBindingResult.Fail(resolution.Failure);
         }
@@ -247,6 +250,15 @@ public sealed class ContractBinder
 
         return ContractBindingResult.Success(new BoundMethodContracts(
             target, source, clauses.ToImmutable(), canonical.ToBoundVariables(), usesCompanion));
+    }
+
+    private static bool HasRequiresPlacementErrors(
+        ContractClauseInventory inventory)
+    {
+        return inventory.Clauses.Any(static clause =>
+            clause.Kind == BoundContractKind.Requires &&
+            !clause.IsValid &&
+            clause.Placement != ContractClausePlacement.NestedCallable);
     }
 
     private ClauseBindingResult BindInvocations(
