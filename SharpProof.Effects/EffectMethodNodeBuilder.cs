@@ -513,7 +513,7 @@ internal sealed class EffectMethodNodeBuilder
         var type = method.ContainingType;
         return method.MethodKind == MethodKind.Constructor &&
         method.IsImplicitlyDeclared &&
-        method.Parameters.IsDefaultOrEmpty &&
+        CanBeImplicitlyInvoked(method.Parameters) &&
         type.DeclaringSyntaxReferences.Length != 0 &&
         !HasPotentialStaticInitialization(type, apiSpecs) &&
         !HasInstanceMemberInitializer(type);
@@ -537,9 +537,19 @@ internal sealed class EffectMethodNodeBuilder
     {
         var candidates = constructor.ContainingType.BaseType?
             .InstanceConstructors
-            .Where(static candidate => candidate.Parameters.IsDefaultOrEmpty)
+            .Where(static candidate =>
+                CanBeImplicitlyInvoked(candidate.Parameters))
             .ToImmutableArray() ?? [];
         return candidates.Length == 1 ? candidates[0] : null;
+    }
+
+    private static bool CanBeImplicitlyInvoked(
+        ImmutableArray<IParameterSymbol> parameters)
+    {
+        // The compiler may omit the argument list for an implicit base call
+        // when every parameter has a default, including a params parameter.
+        return parameters.All(static parameter =>
+            parameter.IsOptional || parameter.IsParams);
     }
 
     private static bool HasInstanceMemberInitializer(INamedTypeSymbol type)
