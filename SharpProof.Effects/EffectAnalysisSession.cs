@@ -657,6 +657,14 @@ public sealed class EffectAnalysisSession
                     case IMethodSymbol method when IsSourceMethod(method):
                         methods.Add(NormalizeMethod(method));
                         break;
+                    case INamedTypeSymbol type
+                        when syntax is TypeDeclarationSyntax declaration:
+                        AddPrimaryConstructor(
+                            methods,
+                            type,
+                            declaration,
+                            cancellationToken);
+                        break;
                     case IPropertySymbol property:
                         if (property.GetMethod is { } getter && IsSourceMethod(getter))
                         {
@@ -674,6 +682,33 @@ public sealed class EffectAnalysisSession
         }
         return [.. methods.OrderBy(
             static method => method, EffectSymbolComparer<IMethodSymbol>.Instance)];
+    }
+
+    private void AddPrimaryConstructor(
+        HashSet<IMethodSymbol> methods,
+        INamedTypeSymbol type,
+        TypeDeclarationSyntax declaration,
+        CancellationToken cancellationToken)
+    {
+        if (declaration.ParameterList == null)
+        {
+            return;
+        }
+
+        foreach (var constructor in type.InstanceConstructors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (constructor.MethodKind == MethodKind.Constructor &&
+                IsSourceMethod(constructor) &&
+                constructor.DeclaringSyntaxReferences.Any(reference =>
+                    reference.SyntaxTree == declaration.SyntaxTree &&
+                    reference.GetSyntax(cancellationToken) is
+                        TypeDeclarationSyntax owner &&
+                    owner.Span == declaration.Span))
+            {
+                methods.Add(NormalizeMethod(constructor));
+            }
+        }
     }
 
     private ImmutableArray<EffectModuleInitializer> GetModuleInitializers(
