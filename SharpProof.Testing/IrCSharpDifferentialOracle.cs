@@ -459,6 +459,16 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
 
     private static bool ValuesAgree(IrValue interpreted, object? actual)
     {
+        var comparedSequences = new Dictionary<IrValue, HashSet<Array>>(
+            ReferenceEqualityComparer.Instance);
+        return ValuesAgreeCore(interpreted, actual, comparedSequences);
+    }
+
+    private static bool ValuesAgreeCore(
+        IrValue interpreted,
+        object? actual,
+        IDictionary<IrValue, HashSet<Array>> comparedSequences)
+    {
         return interpreted.Kind switch
         {
             IrValueKind.Boolean =>
@@ -473,12 +483,16 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
             IrValueKind.Null => actual == null,
             IrValueKind.Reference =>
                 ReferenceEquals(actual, interpreted.Reference),
-            IrValueKind.Sequence => SequenceAgrees(interpreted, actual),
+            IrValueKind.Sequence =>
+                SequenceAgrees(interpreted, actual, comparedSequences),
             _ => false
         };
     }
 
-    private static bool SequenceAgrees(IrValue interpreted, object? actual)
+    private static bool SequenceAgrees(
+        IrValue interpreted,
+        object? actual,
+        IDictionary<IrValue, HashSet<Array>> comparedSequences)
     {
         if (actual is not Array array ||
             array.Rank != 1 ||
@@ -486,9 +500,21 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         {
             return false;
         }
+        if (!comparedSequences.TryGetValue(interpreted, out var comparedArrays))
+        {
+            comparedArrays = new HashSet<Array>(ReferenceEqualityComparer.Instance);
+            comparedSequences.Add(interpreted, comparedArrays);
+        }
+        if (!comparedArrays.Add(array))
+        {
+            return true;
+        }
         for (var index = 0; index < array.Length; index++)
         {
-            if (!ValuesAgree(interpreted.Elements[index], array.GetValue(index)))
+            if (!ValuesAgreeCore(
+                    interpreted.Elements[index],
+                    array.GetValue(index),
+                    comparedSequences))
             {
                 return false;
             }
