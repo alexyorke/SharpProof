@@ -109,7 +109,7 @@ public sealed class RoslynOperationLowerer
                 CompilerIdentityBridge.CreateTypeDisplay(type));
     }
 
-    private bool IsSupportedValueDomain(ITypeSymbol? type)
+    internal bool IsSupportedValueDomain(ITypeSymbol? type)
     {
         return CompilerIdentityBridge.IsSupportedValueDomain(
             TypeSpecializer(type));

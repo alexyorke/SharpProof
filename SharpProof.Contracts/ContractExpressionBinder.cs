@@ -53,6 +53,11 @@ internal sealed class ContractExpressionBinder
 
         if (_api.IsResult(invocation.TargetMethod))
         {
+            if (!_lowerer.IsSupportedValueDomain(_source.ReturnType))
+            {
+                return (true, null);
+            }
+
             _result ??= _factory.CreateVariable(
                 "source-result",
                 _lowerer.GetTypeId(_source.ReturnType));
