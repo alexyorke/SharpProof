@@ -114,6 +114,36 @@ public sealed class PostconditionObligationBuilderTests
     }
 
     [Test]
+    public void SourceDomainPredicateIsRetainedAlongsideIdenticalUserAssumption()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var predicate = factory.Binary(
+            IrBinaryOperator.GreaterThanOrEqual, factory.Variable(value),
+            factory.Integer(0));
+        var assumptions = ImmutableArray.CreateBuilder<Assumption>();
+        assumptions.Add((Assumption)typeof(Assumption)
+            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Single()
+            .Invoke([factory, predicate,
+                new UserAssumedJustification(new SourceLocationId(1))]));
+        var labels = new Dictionary<ProofJustification, string>();
+        var entry = ImmutableArray.CreateBuilder<Assumption>();
+
+        Assert.That(PostconditionObligationBuilder.TryAddSourceDomainAssumptions(
+            factory,
+            [new CompilerCanonicalVariable(
+                CompilerVariableRole.Parameter, 0, value, null,
+                new CompilerIntegerInterval(1, int.MaxValue), "parameter:0")],
+            [], ImmutableDictionary<IrVarId, SpecResultProjection>.Empty,
+            assumptions, entry, labels), Is.True);
+        Assert.That(assumptions, Has.Count.EqualTo(2));
+        Assert.That(assumptions.Any(static item =>
+            item.Justification is UserAssumedJustification), Is.True);
+        Assert.That(labels.Values, Is.EqualTo(["domain:parameter:0"]));
+    }
+
+    [Test]
     public void NormalCompletionAuthorityReplacesAliasedResultDomain()
     {
         var factory = new IrFactory();

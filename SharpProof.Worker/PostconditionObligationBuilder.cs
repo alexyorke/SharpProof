@@ -11,7 +11,14 @@ internal static class PostconditionObligationBuilder
         ImmutableArray<Assumption>.Builder entryDomainAssumptions,
         Dictionary<ProofJustification, string> assumptionLabels)
     {
-        var seenPredicates = assumptions.Select(static assumption => assumption.Predicate.Id).ToHashSet();
+        // User assumptions and compiler-domain assumptions may intentionally
+        // share a predicate. Keep both: deduplicating by predicate alone can
+        // erase the trusted domain row and its provenance.
+        var seenPredicates = assumptions
+            .Where(static assumption =>
+                assumption.Justification is not UserAssumedJustification)
+            .Select(static assumption => assumption.Predicate.Id)
+            .ToHashSet();
         foreach (var variable in variables
                      .Where(static variable => variable.Role is CompilerVariableRole.Receiver
                          or CompilerVariableRole.Parameter or CompilerVariableRole.Result)
