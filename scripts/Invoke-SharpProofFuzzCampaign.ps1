@@ -25,6 +25,9 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $resolvedOutput = Resolve-SharpProofContainedPath `
     -Root $repositoryRoot -Path $OutputDirectory `
     -ParameterName 'OutputDirectory'
+$logicalOutput = [IO.Path]::GetRelativePath(
+    $repositoryRoot,
+    [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDirectory))).Replace('\', '/')
 Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput
 $sourceCommit = Get-SharpProofCleanFuzzSourceCommit `
     -RepositoryRoot $repositoryRoot
@@ -218,12 +221,8 @@ function Invoke-FuzzRun {
         validationPassed = $null -eq $validationError
         validationError = $validationError
         resultSha256 = $resultSha256
-        standardOutput = [IO.Path]::GetRelativePath(
-            $repositoryRoot,
-            $standardOutput).Replace('\', '/')
-        standardError = [IO.Path]::GetRelativePath(
-            $repositoryRoot,
-            $standardError).Replace('\', '/')
+        standardOutput = "$logicalOutput/$Name.stdout.json"
+        standardError = "$logicalOutput/$Name.stderr.txt"
     }
 }
 
