@@ -1091,7 +1091,7 @@ public sealed class FrontendDifferentialOracle
                     generated);
                 var interpreted = new IrInterpreter(factory).Evaluate(
                     lowering.Term,
-                    environment,
+                    environment.Variables,
                     cancellationToken);
                 var runtimeMethod = runtimeType.GetMethod(
                     MethodName(index),
@@ -1100,7 +1100,10 @@ public sealed class FrontendDifferentialOracle
                     runtimeMethod,
                     generated,
                     cancellationToken);
-                results.Add(CompareOutcomes(interpreted, actual));
+                results.Add(CompareOutcomes(
+                    interpreted,
+                    actual,
+                    environment.SequenceOrigins));
             }
             return results.ToImmutable();
         }
@@ -1281,13 +1284,17 @@ public sealed class FrontendDifferentialOracle
         return [.. left, .. right];
     }
 
-    private static Dictionary<IrVarId, IrValue> CreateEnvironment(
+    private static (
+        Dictionary<IrVarId, IrValue> Variables,
+        Dictionary<IrValue, Array> SequenceOrigins) CreateEnvironment(
         IrFactory factory,
         IMethodSymbol method,
         FrontendLoweringResult lowering,
         GeneratedCSharpCase generated)
     {
         var environment = new Dictionary<IrVarId, IrValue>();
+        var sequenceOrigins = new Dictionary<IrValue, Array>(
+            ReferenceEqualityComparer.Instance);
         foreach (var binding in lowering.Variables)
         {
             if (binding.Symbol is not IParameterSymbol parameter ||
@@ -1309,9 +1316,9 @@ public sealed class FrontendDifferentialOracle
                 4 => generated.Values == null
                     ? factory.CreateNullValue(
                         factory.GetVariableInfo(binding.Variable).Type)
-                    : factory.CreateSequenceValue(
+                    : CreateSequenceValue(
                         factory.GetVariableInfo(binding.Variable).Type,
-                        generated.Values.Select(factory.CreateIntegerValue)),
+                        generated.Values),
                 5 => generated.Reference == null
                     ? factory.CreateNullValue(factory.ObjectType)
                     : factory.CreateReferenceValue(
@@ -1322,7 +1329,16 @@ public sealed class FrontendDifferentialOracle
             };
             environment.Add(binding.Variable, value);
         }
-        return environment;
+        return (environment, sequenceOrigins);
+
+        IrValue CreateSequenceValue(IrTypeId type, long[] values)
+        {
+            var value = factory.CreateSequenceValue(
+                type,
+                values.Select(factory.CreateIntegerValue));
+            sequenceOrigins.Add(value, values);
+            return value;
+        }
     }
 
     private static FrontendSemanticEdgeResult CompareSemanticEdge(
@@ -1396,7 +1412,7 @@ public sealed class FrontendDifferentialOracle
             generated.Arguments);
         var interpreted = new IrInterpreter(factory).Evaluate(
             lowering.Term,
-            environment,
+            environment.Variables,
             cancellationToken);
         var runtimeMethod = runtimeType.GetMethod(
             SemanticEdgeMethodName(index),
@@ -1406,7 +1422,8 @@ public sealed class FrontendDifferentialOracle
             InvokeMethod(
                 runtimeMethod,
                 generated.Arguments,
-                cancellationToken));
+                cancellationToken),
+            environment.SequenceOrigins);
         return new FrontendSemanticEdgeResult(
             comparison.Status,
             actual.Decision,
@@ -1415,7 +1432,9 @@ public sealed class FrontendDifferentialOracle
             comparison.ExceptionKind);
     }
 
-    private static Dictionary<IrVarId, IrValue>
+    private static (
+        Dictionary<IrVarId, IrValue> Variables,
+        Dictionary<IrValue, Array> SequenceOrigins)
         CreateSemanticEdgeEnvironment(
             IrFactory factory,
             IMethodSymbol method,
@@ -1424,6 +1443,8 @@ public sealed class FrontendDifferentialOracle
     {
         var environment = new Dictionary<IrVarId, IrValue>();
         var sequenceValues = new Dictionary<object, Dictionary<IrTypeId, IrValue>>(
+            ReferenceEqualityComparer.Instance);
+        var sequenceOrigins = new Dictionary<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
         foreach (var binding in lowering.Variables)
         {
@@ -1442,16 +1463,18 @@ public sealed class FrontendDifferentialOracle
                     factory,
                     type,
                     arguments[parameter.Ordinal],
-                    sequenceValues));
+                    sequenceValues,
+                    sequenceOrigins));
         }
-        return environment;
+        return (environment, sequenceOrigins);
     }
 
     private static IrValue CreateSemanticEdgeValue(
         IrFactory factory,
         IrTypeId type,
         object? value,
-        Dictionary<object, Dictionary<IrTypeId, IrValue>> sequenceValues)
+        Dictionary<object, Dictionary<IrTypeId, IrValue>> sequenceValues,
+        Dictionary<IrValue, Array> sequenceOrigins)
     {
         var kind = factory.GetTypeInfo(type).Kind;
         if (value == null)
@@ -1503,13 +1526,15 @@ public sealed class FrontendDifferentialOracle
                         factory,
                         elementType,
                         element,
-                        sequenceValues)));
+                        sequenceValues,
+                        sequenceOrigins)));
             if (!sequenceValues.TryGetValue(array, out typedValues))
             {
                 typedValues = [];
                 sequenceValues.Add(array, typedValues);
             }
             typedValues.Add(type, created);
+            sequenceOrigins.Add(created, array);
             return created;
         }
     }
@@ -1665,7 +1690,8 @@ public sealed class FrontendDifferentialOracle
 
     private static FrontendDifferentialResult CompareOutcomes(
         IrEvaluationResult interpreted,
-        RuntimeOutcome actual)
+        RuntimeOutcome actual,
+        IReadOnlyDictionary<IrValue, Array> sequenceOrigins)
     {
         if (actual.Exception != null)
         {
@@ -1701,14 +1727,20 @@ public sealed class FrontendDifferentialOracle
                 ".");
         }
 
-        var agrees = SemanticValueEquals(actual.Value, interpreted.Value!);
+        var agrees = SemanticValueEquals(
+            actual.Value,
+            interpreted.Value!,
+            sequenceOrigins);
         return agrees
             ? Agreement()
             : Mismatch(
                 "Compiled C# and the lowered IR produced different values.");
     }
 
-    private static bool SemanticValueEquals(object? actual, IrValue interpreted)
+    private static bool SemanticValueEquals(
+        object? actual,
+        IrValue interpreted,
+        IReadOnlyDictionary<IrValue, Array> sequenceOrigins)
     {
         return interpreted.Kind switch
         {
@@ -1729,10 +1761,8 @@ public sealed class FrontendDifferentialOracle
                 ReferenceEquals(actual, interpreted.Reference),
             IrValueKind.Sequence =>
                 actual is Array array &&
-                array.Length == interpreted.Elements.Length &&
-                array.Cast<object?>().Zip(
-                    interpreted.Elements,
-                    SemanticValueEquals).All(static equal => equal),
+                sequenceOrigins.TryGetValue(interpreted, out var origin) &&
+                ReferenceEquals(array, origin),
             IrValueKind.Null => actual == null,
             _ => false
         };
