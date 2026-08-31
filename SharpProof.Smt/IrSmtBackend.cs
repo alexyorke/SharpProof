@@ -623,7 +623,12 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             var condition = EncodeBoolean(conditional.Condition);
             var whenTrue = Encode(conditional.WhenTrue);
             var whenFalse = Encode(conditional.WhenFalse);
-            if (!whenTrue.Value.Sort.Equals(whenFalse.Value.Sort))
+            // Expr.Sort creates a fresh managed wrapper over the native sort.
+            // Keep these temporary wrappers bounded by this comparison; unlike
+            // expressions, they are not part of the query expression owner.
+            using var whenTrueSort = whenTrue.Value.Sort;
+            using var whenFalseSort = whenFalse.Value.Sort;
+            if (!whenTrueSort.Equals(whenFalseSort))
             {
                 throw new UnsupportedIrEncodingException();
             }
