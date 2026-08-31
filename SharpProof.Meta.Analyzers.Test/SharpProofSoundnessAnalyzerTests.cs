@@ -402,6 +402,41 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesClassifyNumericEnumConversions()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer {
+                Unknown = 0,
+                Proven = 1,
+                Abstained = 2
+            }
+            sealed class ProofCache {
+                internal void Write(Answer answer) { }
+            }
+            sealed class C {
+                void M(ProofCache cache, int runtimeValue) {
+                    var unknown = 0;
+                    var proven = 1;
+                    var abstained = 2;
+                    var undefined = 42;
+                    cache.Write((Answer)unknown);
+                    cache.Write((Answer)proven);
+                    cache.Write((Answer)abstained);
+                    cache.Write((Answer)undefined);
+                    cache.Write((Answer)runtimeValue);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(4));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesTrackRefOutAndDeconstructionDefinitions()
     {
         var diagnostics = await Analyze(
