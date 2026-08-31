@@ -751,7 +751,11 @@ internal sealed partial class OperationEffectScanner
     private EffectSummary ScanArgumentValues(
         IEnumerable<IArgumentOperation> arguments)
     {
-        return ScanSequence(arguments.Select(static argument => argument.Value))
+        // An out argument is a destination, not an input value.  Reading its
+        // operation invents a state read before the callee initializes it.
+        return ScanSequence(arguments
+                .Where(static argument => argument.Parameter?.RefKind != RefKind.Out)
+                .Select(static argument => argument.Value))
             .Summary;
     }
 

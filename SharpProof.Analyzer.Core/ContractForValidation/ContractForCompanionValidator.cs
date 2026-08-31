@@ -203,7 +203,7 @@ internal static class ContractForCompanionValidator
             cancellationToken: cancellationToken);
         if (inventory.HasRejectedContractApiUsage)
         {
-            SharpProofControlAttributePolicy.ReportRejectedContractApi(
+            SharpProof.Analyzer.SharpProofControlAttributePolicy.ReportRejectedContractApi(
                 method.Name,
                 GetSourceLocation(method, compilation, fallback),
                 diagnostics.Add);
