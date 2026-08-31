@@ -121,7 +121,10 @@ internal static class OpenSourceCorpusImporter
                 "The upstream license no longer has the reviewed MIT form.");
         }
 
-        var (files, candidates) = DiscoverSources(resolvedUpstreamRoot);
+        var (files, candidates) = await DiscoverSourcesAsync(
+                resolvedUpstreamRoot,
+                cancellationToken)
+            .ConfigureAwait(false);
         var selected = SelectDiverseCandidates(candidates, TargetMethodCount);
 
         var corpusDirectory =
@@ -221,10 +224,11 @@ internal static class OpenSourceCorpusImporter
             StringComparer.Ordinal);
     }
 
-    private static (
+    private static async Task<(
         ImmutableArray<OpenSourceCorpusFile> Files,
-        ImmutableArray<ImportCandidate> Candidates)
-        DiscoverSources(string upstreamRoot)
+        ImmutableArray<ImportCandidate> Candidates)> DiscoverSourcesAsync(
+        string upstreamRoot,
+        CancellationToken cancellationToken)
     {
         var sourceRoots = new[] {
             Path.Combine(upstreamRoot, "Algorithms"),
@@ -242,27 +246,26 @@ internal static class OpenSourceCorpusImporter
         var files = ImmutableArray.CreateBuilder<OpenSourceCorpusFile>();
         var candidates = ImmutableArray.CreateBuilder<ImportCandidate>();
         var declarationHashes = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var path in sourceRoots
-                     .SelectMany(static root =>
-                         Directory.EnumerateFiles(
-                             root,
-                             "*.cs",
-                             SearchOption.AllDirectories))
-                     .Where(static path =>
-                         !path.Contains(
-                             $"{Path.DirectorySeparatorChar}bin" +
-                             Path.DirectorySeparatorChar,
-                             StringComparison.OrdinalIgnoreCase) &&
-                         !path.Contains(
-                             $"{Path.DirectorySeparatorChar}obj" +
-                             Path.DirectorySeparatorChar,
-                             StringComparison.OrdinalIgnoreCase))
+        var trackedPaths = await ReadGitAsync(
+                upstreamRoot,
+                ["ls-files", "--cached", "--", "Algorithms", "DataStructures"],
+                cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var relativePath in trackedPaths
+                     .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                     .Where(static path => path.EndsWith(".cs", StringComparison.Ordinal))
                      .OrderBy(static path => path, StringComparer.Ordinal))
         {
+            var path = Path.Combine(
+                upstreamRoot,
+                relativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(path))
+            {
+                throw new InvalidDataException(
+                    $"Tracked upstream source file is missing: {relativePath}");
+            }
             var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
                 File.ReadAllText(path));
-            var relativePath = Path.GetRelativePath(upstreamRoot, path)
-                .Replace('\\', '/');
             files.Add(
                 new OpenSourceCorpusFile(
                     SourceId,
