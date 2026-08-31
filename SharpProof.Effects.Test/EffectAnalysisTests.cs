@@ -681,6 +681,92 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void FormattableStringDefersHoleFormattingEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class DeferredValue {
+                private int _formatCount;
+
+                public override string ToString() {
+                    _formatCount++;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                private static int s_state;
+
+                private static DeferredValue Evaluate(DeferredValue value) {
+                    s_state++;
+                    return value;
+                }
+
+                public static FormattableString Create(DeferredValue value) =>
+                    $"{value}";
+
+                public static FormattableString EvaluateHole(
+                    DeferredValue value) => $"{Evaluate(value)}";
+
+                public static void ContinueAfterCreation(
+                    DeferredValue value) {
+                    FormattableString deferred = $"{value}";
+                    s_state++;
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var create = session.Analyze(Method(compilation, "Create"));
+        var evaluate = session.Analyze(Method(compilation, "EvaluateHole"));
+        var continuation = session.Analyze(
+            Method(compilation, "ContinueAfterCreation"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                create.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.False,
+                "deferred formatter write");
+            AssertDoesNotThrow(
+                create.Summary,
+                "System.InvalidOperationException");
+            Assert.That(
+                create.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                create.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+
+            Assert.That(
+                evaluate.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                "hole evaluation");
+            Assert.That(
+                evaluate.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.False,
+                "deferred formatter after hole evaluation");
+            AssertDoesNotThrow(
+                evaluate.Summary,
+                "System.InvalidOperationException");
+
+            Assert.That(
+                continuation.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                "suffix after deferred construction");
+            Assert.That(
+                continuation.Summary.Writes.Contains(
+                    EffectRegionId.Parameter(0)),
+                Is.False,
+                "deferred formatter before suffix");
+            AssertDoesNotThrow(
+                continuation.Summary,
+                "System.InvalidOperationException");
+        }
+    }
+
+    [Test]
     public void StringConcatenationIncludesExactSourceToStringEffects()
     {
         var result = Analyze(
