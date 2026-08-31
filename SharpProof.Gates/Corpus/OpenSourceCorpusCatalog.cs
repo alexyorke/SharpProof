@@ -373,7 +373,10 @@ internal static class OpenSourceCorpusCatalog
     {
         if (string.IsNullOrWhiteSpace(path) ||
             Path.IsPathRooted(path) ||
-            path.Split('/', '\\').Any(static part => part == ".."))
+            path.Split('/', '\\').Any(static part => part == "..") ||
+            path.Contains("|", StringComparison.Ordinal) ||
+            path.Any(static character => character is '\r' or '\n' ||
+                char.IsControl(character)))
         {
             throw new InvalidDataException(
                 $"OSS corpus {description} path must be relative and contained.");
