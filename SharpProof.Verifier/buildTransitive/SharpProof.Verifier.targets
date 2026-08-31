@@ -230,6 +230,7 @@
         RequestPath="$(_SharpProofEffectiveRequestFile)"
         ResultPath="$(_SharpProofEffectiveResultFile)"
         ManifestPath="$(_SharpProofEffectiveCompilerManifestFile)"
+        SarifPath="$(_SharpProofEffectiveSarifFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)" />
     <Message Importance="High"
              Text="SharpProof verifier result: $(_SharpProofEffectiveResultFile)" />

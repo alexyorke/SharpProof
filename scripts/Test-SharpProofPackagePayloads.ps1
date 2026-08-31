@@ -86,6 +86,11 @@ function Get-SharpProofPayloadSpecifications {
     return @(
         $nuspec.SelectNodes('/n:package/n:files/n:file', $namespace) |
             Where-Object {
+                # Every nuspec-declared file is part of the authenticated
+                # payload, including executable MSBuild props/targets and
+                # catalogs.  Restricting this to binaries leaves behavioral
+                # package inputs mutable without changing the evidence.
+                $_.src -notmatch '\$nativeroot\$' -or
                 $_.src -match '\.(?:dll|so)$'
             } |
             ForEach-Object {
@@ -95,8 +100,13 @@ function Get-SharpProofPayloadSpecifications {
                 $target = ([string]$_.target).
                     Replace('\', '/')
                 [pscustomobject][ordered]@{
-                    Entry = $target.TrimEnd('/') + '/' +
+                    Entry = if ([string]::IsNullOrEmpty($target)) {
                         [IO.Path]::GetFileName($source)
+                    }
+                    else {
+                        $target.TrimEnd('/') + '/' +
+                            [IO.Path]::GetFileName($source)
+                    }
                     Source = if ($source.Contains('$nativeroot$')) {
                         $null
                     }
@@ -163,8 +173,7 @@ function Test-SharpProofPackagePayload {
         $payloadEntries = @(
             $archive.Entries |
                 Where-Object {
-                    $_.FullName.EndsWith('.dll', [StringComparison]::OrdinalIgnoreCase) -or
-                    $_.FullName.EndsWith('.so', [StringComparison]::OrdinalIgnoreCase)
+                    $_.FullName -ne ($PackageId.ToLowerInvariant() + '.nuspec')
                 }
         )
         $duplicate = @(
