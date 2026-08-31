@@ -378,7 +378,12 @@ internal sealed class CompilerCallableLowerer
     {
         var symbol = ResolvedApiSpecTable.NormalizeSymbol(method);
         identity = symbol?.GetDocumentationCommentId() ?? string.Empty;
-        return identity.Length != 0;
+        // Compiler artifacts bound identity fields to 512 characters. Reject
+        // an otherwise legal Roslyn documentation ID here so a long symbol
+        // becomes a scoped unsupported call instead of failing artifact
+        // construction after partially lowering the body.
+        return identity is { Length: > 0 and <= 512 } &&
+            identity.All(static character => !char.IsControl(character));
     }
 
     private static bool TryAdmitSpecCallEffects(IInvocationOperation invocation, IrCallInstruction call,

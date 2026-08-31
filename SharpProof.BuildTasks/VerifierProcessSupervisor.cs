@@ -213,7 +213,8 @@ internal static partial class VerifierProcessSupervisor
         var deadline = Stopwatch.StartNew();
         while (deadline.ElapsedMilliseconds < maximumMilliseconds)
         {
-            var discovered = DescendantProcessIds(supervisorId);
+            var parents = ReadProcessParents();
+            var discovered = DescendantProcessIds(supervisorId, parents);
             if (discovered.Count == 0)
             {
                 return new DescendantStopResult(
@@ -221,8 +222,15 @@ internal static partial class VerifierProcessSupervisor
                     Complete: true);
             }
             foundAny = true;
+            // The process-parent table is a snapshot for this pass. Reusing it
+            // avoids rescanning /proc once per descendant (which made large
+            // trees quadratic) while preserving the existing pidfd checks.
             foreach (var processId in discovered)
             {
+                if (deadline.ElapsedMilliseconds >= maximumMilliseconds)
+                {
+                    break;
+                }
                 var descriptor = openPidFd?.Invoke(processId) ??
                     OpenPidFd(processId);
                 if (descriptor < 0)
@@ -238,7 +246,7 @@ internal static partial class VerifierProcessSupervisor
                     if (!IsDescendant(
                             processId,
                             supervisorId,
-                            ReadProcessParents()))
+                            parents))
                     {
                         continue;
                     }
@@ -307,7 +315,13 @@ internal static partial class VerifierProcessSupervisor
 
     private static HashSet<int> DescendantProcessIds(int supervisorId)
     {
-        var parents = ReadProcessParents();
+        return DescendantProcessIds(supervisorId, ReadProcessParents());
+    }
+
+    private static HashSet<int> DescendantProcessIds(
+        int supervisorId,
+        Dictionary<int, int> parents)
+    {
         return parents.Keys
             .Where(processId =>
                 IsDescendant(processId, supervisorId, parents))
