@@ -1,6 +1,6 @@
 # Bug backlog
 
-399 open bugs, reprioritized by impact, reachability, and affected scope.
+398 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (111)
+## P0 - Critical (110)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -34,7 +34,6 @@ Priority definitions:
 - **BUG-078 [P0] - Malformed UTF-16 makes IR fingerprints non-injective:** IR metadata constructors accept lone UTF-16 surrogates that JSON encoding replaces with the same replacement character. Distinct accepted graphs can therefore serialize and fingerprint identically, breaking faithful round-trip and authenticated graph identity.
 - **BUG-079 [P0] - Manual support review survives semantic context changes:** OpenSourceCorpusImporter reuses support decisions by a method-declaration hash that excludes containing type, namespace, imports, path, and source commit. Identical text moved into a different semantic context can inherit an obsolete review status and silently invalidate coverage claims.
 - **BUG-080 [P0] - MaximumExpressionDepth is excluded from compiler evidence seals:** CompilerManifestArtifactProducer assigns MaximumExpressionDepth outside both compilation and feature-scope fingerprints, while worker validation checks only range and request parity. A modified artifact and request can change verifier cutoffs without invalidating authenticated compiler evidence.
-- **BUG-081 [P0] - May-throw API specifications are modeled as normally total:** CompilerCallableLowerer admits side-effect-free API specifications without checking their Throws facet, and the lowered call carries no completion condition. Exceptional inputs are fabricated as normal executions, allowing valid normal-return contracts to be falsely refuted.
 - **BUG-082 [P0] - Metadata exception construction hides reachable handlers:** ExceptionHandlerReachability treats every metadata constructor for an Exception-derived type as unable to throw. Matching catch handlers and their writes or allocations can be omitted while the effect summary remains complete, enabling false no-write or no-allocation certification.
 - **BUG-084 [P0] - Mixed-failure using initializers omit earlier disposal:** UsingDisposalEffectResolver unwinds earlier resources only when a later initializer cannot complete normally, not when it can both return and throw. On the exceptional path, Dispose writes and throws can be omitted from the method summary and catch reachability.
 - **BUG-085 [P0] - Mixed-ownership captures resolve as always fresh:** CreationFlowCaptures records creation definitions but ignores caller-owned definitions merged into the same control-flow capture. Writes through a receiver selected between a fresh object and a parameter can therefore omit caller-state mutation and make an impure method appear pure.
