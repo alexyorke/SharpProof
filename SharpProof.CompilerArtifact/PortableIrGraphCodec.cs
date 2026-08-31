@@ -603,8 +603,8 @@ internal static partial class PortableIrGraphCodec
                 // do not allow a documentation id for another member to be
                 // carried through canonical re-encoding.
                 Require(
-                    documentationId.Contains("." + row.Name + "(", StringComparison.Ordinal) ||
-                    documentationId.Contains("." + row.Name + "~", StringComparison.Ordinal),
+                    documentationId.IndexOf("." + row.Name + "(", StringComparison.Ordinal) >= 0 ||
+                    documentationId.IndexOf("." + row.Name + "~", StringComparison.Ordinal) >= 0,
                     "Portable IR member semantic identity is not bound to its name.");
             }
             var member = _factory.GetOrCreateMember(
