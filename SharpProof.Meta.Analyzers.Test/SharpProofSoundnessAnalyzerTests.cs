@@ -332,6 +332,54 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesTrackRefOutAndDeconstructionDefinitions()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache {
+                internal void Write(Answer answer) { }
+            }
+            sealed class C {
+                private static void SetRef(ref Answer answer) =>
+                    answer = Answer.Unknown;
+                private static void SetOut(out Answer answer) =>
+                    answer = Answer.Unknown;
+
+                void RefWrite(ProofCache cache) {
+                    var answer = Answer.Proven;
+                    SetRef(ref answer);
+                    cache.Write(answer);
+                }
+
+                void OutWrite(ProofCache cache) {
+                    var answer = Answer.Proven;
+                    SetOut(out answer);
+                    cache.Write(answer);
+                }
+
+                void DeconstructionWrite(ProofCache cache) {
+                    var answer = Answer.Proven;
+                    (answer, _) = (Answer.Unknown, 0);
+                    cache.Write(answer);
+                }
+
+                void SafeDeconstructionOverwrite(ProofCache cache) {
+                    var answer = Answer.Unknown;
+                    (answer, _) = (Answer.Proven, 0);
+                    cache.Write(answer);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(3));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesUnwrapNestedOrdinaryConversions()
     {
         var diagnostics = await Analyze(
