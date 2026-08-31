@@ -1,6 +1,6 @@
 # Bug backlog
 
-95 open bugs, reprioritized by impact, reachability, and affected scope.
+93 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -92,7 +92,7 @@ Priority definitions:
 - **BUG-285 [P1] - Worker timeout can signal a reused process ID:** LinuxWorkerProcess checks a managed process for exit and later sends SIGTERM through its numeric PID without retaining process identity. If the PID is recycled in that window, timeout or disposal can terminate an unrelated process while reporting a normal worker timeout.
 - **BUG-286 [P1] - Z3 resolver becomes visible before the verified handle:** ContainerNativeLibrary registers the DllImport resolver before publishing the verified Z3 handle. A concurrent first P/Invoke can observe zero and fail binding or fall back to ambient library probing.
 
-## P2 - Medium (10)
+## P2 - Medium (8)
 
 - **BUG-317 [P2] - Compiler evidence validation is uncancellable and quadratic:** Compiler response evidence validation performs uncancellable repeated linear searches and replays the full body for each postcondition claim. Valid bounded responses can consume quadratic work, overrun deadlines, and delay cancellation.
 - **BUG-347 [P2] - Final validation can read a torn publication generation:** ValidatePublishedVerificationResult reads request, result, and manifest independently after the launcher releases its publication lease. A concurrent publisher can replace files between reads, causing a valid build to fail against a mixed generation.
@@ -100,8 +100,6 @@ Priority definitions:
 - **BUG-381 [P2] - One lane renewal failure retires healthy lanes:** SharpProofWorker records a lane-local renewal failure as global retirement, causing usable lanes to stop after current work. Remaining targets are synthesized as Unknown even when healthy capacity could complete them.
 - **BUG-395 [P2] - Referenced companion collisions lack duplicate diagnostics:** ContractFor validation reports duplicate companions only for current-compilation declarations, while runtime discovery also sees referenced assemblies. Two referenced companions can silently make an external contract ambiguous without SPCF0002 or an explanation identifying the collision.
 - **BUG-408 [P2] - Timed-out injected backends are reused:** SharpProofWorker reuses a caller-injected backend after a timeout or cancellation because renewal is unsupported and no poisoned state persists. Later requests can inherit stale interruption or resource state and fail unpredictably.
-- **BUG-409 [P2] - Undefined obligations are mislabeled as replay corruption:** ProofKernel maps undefined Precondition and EffectContract goals to CounterexampleReplayFailed while equivalent Postcondition and internal goals receive semantic undefined reasons. Valid partial obligations therefore become fatal worker failures instead of typed Unknown outcomes.
-- **BUG-410 [P2] - Unknown entry feasibility erases authoritative claim results:** CallableVerifier replaces all postcondition and effect results with Unknown whenever its preliminary entry-feasibility query is inconclusive. Independently replayable refutations and sealed compiler-proven effect claims are discarded without running or preserving their stronger evidence.
 - **BUG-413 [P2] - Unreachable handler loops fabricate divergence:** Effects termination analysis checks cycles across structurally reachable Roslyn blocks even when semantic scanning has excluded an impossible catch. A loop in that handler can falsely mark a terminating method MayDiverge and suppress effect witnesses.
 - **BUG-414 [P2] - Unreachable helper returns trigger SPMETA010:** CacheSoundnessRules gathers every syntactic return from a helper without reachability analysis. A constant-disabled Unknown return therefore blocks a build even when the helper can only return a cacheable answer.
 
