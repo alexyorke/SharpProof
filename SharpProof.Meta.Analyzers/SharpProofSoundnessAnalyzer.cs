@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -12,10 +13,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 {
     private static readonly ImmutableArray<string> KnownTypeNames = [
         "Microsoft.CodeAnalysis.Compilation", "Microsoft.CodeAnalysis.SemanticModel",
-        "Microsoft.CodeAnalysis.ModelExtensions",
-        "Microsoft.CodeAnalysis.CSharp.CSharpCompilation",
-        "Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel",
-        "Microsoft.CodeAnalysis.CSharp.CSharpExtensions",
         "Microsoft.CodeAnalysis.CSharp.SyntaxFactory",
         "Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree",
         "Microsoft.CodeAnalysis.ISymbol",
@@ -48,38 +45,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "RemoveSyntaxTrees",
                 "RemoveAllSyntaxTrees",
                 "GetSymbolsWithName"),
-            [KnownType.SemanticModel] = Names(
-                "TryGetSpeculativeSemanticModel",
-                "GetSpeculativeSymbolInfo",
-                "GetSpeculativeTypeInfo",
-                "GetSpeculativeAliasInfo",
-                "GetDiagnostics"),
-            [KnownType.ModelExtensions] = Names(
-                "GetSpeculativeSymbolInfo",
-                "GetSpeculativeTypeInfo",
-                "GetSpeculativeAliasInfo"),
-            [KnownType.CSharpSemanticModel] = Names(
-                "TryGetSpeculativeSemanticModel",
-                "TryGetSpeculativeSemanticModelForMethodBody",
-                "GetSpeculativeSymbolInfo",
-                "GetSpeculativeTypeInfo",
-                "GetSpeculativeAliasInfo"),
-            [KnownType.CSharpExtensions] = Names(
-                "TryGetSpeculativeSemanticModel",
-                "TryGetSpeculativeSemanticModelForMethodBody",
-                "GetSpeculativeSymbolInfo",
-                "GetSpeculativeTypeInfo",
-                "GetSpeculativeAliasInfo")
+            [KnownType.SemanticModel] = Names("TryGetSpeculativeSemanticModel", "GetSpeculativeTypeInfo", "GetDiagnostics")
         }.ToImmutableDictionary();
 
     private static readonly ImmutableArray<string> CSharpExpressionFragments =
         [" is null", " is not null", " == ", " != ", " && ", " || ", "=>", "?."];
-    private static readonly ImmutableHashSet<string>
-        SemanticStringPredicateNames = Names(
-            "Contains",
-            "EndsWith",
-            "Equals",
-            "StartsWith");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => MetaDiagnosticDescriptors.All;
 
@@ -103,6 +73,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 OperationKind.CompoundAssignment);
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
+            startContext.RegisterOperationAction(
+                AnalyzeCSharpCompoundAssignment,
+                OperationKind.CompoundAssignment);
             startContext.RegisterOperationAction(
                 AnalyzeInterpolatedString,
                 OperationKind.InterpolatedString);
@@ -133,7 +106,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             Report(context, MetaDiagnosticDescriptors.ForbiddenRoslynApi, invocation.Syntax.GetLocation(), method.Name);
         }
 
-        AnalyzeSemanticStringInvocation(context, invocation, symbols);
+        AnalyzeSemanticEquals(context, invocation, symbols);
+        if (IsStringConcat(invocation))
+        {
+            AnalyzeCSharpExpressionText(context, invocation);
+        }
         CacheSoundnessRules.AnalyzeWrite(context, invocation);
     }
 
@@ -161,12 +138,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        if (method.Name == "GetSemanticModel" &&
-            IsAnyType(
-                method.ContainingType,
-                symbols,
-                KnownType.Compilation,
-                KnownType.CSharpCompilation))
+        if (method.Name == "GetSemanticModel" && IsSameType(method.ContainingType, symbols[KnownType.Compilation]))
         {
             return !IsSameType(containingSymbol.ContainingType, symbols[KnownType.CompilationModelProvider]);
         }
@@ -239,7 +211,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeBinaryOperation(OperationAnalysisContext context)
     {
         AnalyzeSemanticString(context);
-        AnalyzeCSharpExpressionText(context);
+        if (IsStringAddition(context.Operation))
+        {
+            AnalyzeCSharpExpressionText(context, context.Operation);
+        }
     }
 
     private static void AnalyzeSemanticString(OperationAnalysisContext context)
@@ -247,51 +222,33 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         if (context.Operation is not IBinaryOperation
             {
                 OperatorKind: BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals
-            } binary)
+            } binary ||
+            !IsInsideCondition(binary.Syntax))
         {
             return;
         }
 
-        var literal = GetSemanticLiteral(
-                binary.LeftOperand,
-                context.CancellationToken) ??
-            GetSemanticLiteral(
-                binary.RightOperand,
-                context.CancellationToken);
+        var literal = GetSemanticLiteral(binary.LeftOperand) ?? GetSemanticLiteral(binary.RightOperand);
         if (literal != null)
         {
             Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, binary.Syntax.GetLocation(), literal);
         }
     }
 
-    private static void AnalyzeSemanticStringInvocation(
+    private static void AnalyzeSemanticEquals(
         OperationAnalysisContext context,
         IInvocationOperation invocation,
         KnownSymbols symbols)
     {
-        var method = invocation.TargetMethod;
-        var isStringPredicate =
-            IsSameType(method.ContainingType, symbols[KnownType.String]) &&
-            SemanticStringPredicateNames.Contains(method.Name);
-        var isObjectEquals =
-            method.ContainingType.SpecialType == SpecialType.System_Object &&
-            method.Name == "Equals";
-        if (method.ReturnType.SpecialType != SpecialType.System_Boolean ||
-            !isStringPredicate && !isObjectEquals)
+        if (!IsSameType(invocation.TargetMethod.ContainingType, symbols[KnownType.String]) ||
+            invocation.TargetMethod.Name != "Equals" ||
+            !IsInsideCondition(invocation.Syntax))
         {
             return;
         }
 
-        var literal = invocation.Instance == null
-            ? null
-            : GetSemanticLiteral(
-                invocation.Instance,
-                context.CancellationToken);
-        literal ??= invocation.Arguments
-            .Select(argument => GetSemanticLiteral(
-                argument.Value,
-                context.CancellationToken))
-            .FirstOrDefault(static value => value != null);
+        var literal = invocation.Instance == null ? null : GetSemanticLiteral(invocation.Instance);
+        literal ??= invocation.Arguments.Select(static a => GetSemanticLiteral(a.Value)).FirstOrDefault(value => value != null);
         if (literal != null)
         {
             Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, invocation.Syntax.GetLocation(), literal);
@@ -327,18 +284,34 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static void AnalyzeCSharpExpressionText(OperationAnalysisContext context)
+    private static void AnalyzeCSharpCompoundAssignment(
+        OperationAnalysisContext context)
     {
-        if (context.Operation is not IBinaryOperation { OperatorKind: BinaryOperatorKind.Add } binary ||
-            binary.Type?.SpecialType != SpecialType.System_String)
+        if (IsStringAddition(context.Operation))
+        {
+            AnalyzeCSharpExpressionText(context, context.Operation);
+        }
+    }
+
+    private static void AnalyzeCSharpExpressionText(
+        OperationAnalysisContext context,
+        IOperation operation)
+    {
+        if (IsNestedCSharpExpressionConstruction(operation))
         {
             return;
         }
 
-        var fragment = GetCSharpExpressionFragment(binary.LeftOperand) ?? GetCSharpExpressionFragment(binary.RightOperand);
+        var fragment = GetCSharpExpressionFragment(
+            operation,
+            context.CancellationToken);
         if (fragment != null)
         {
-            Report(context, MetaDiagnosticDescriptors.CSharpExpressionText, binary.Syntax.GetLocation(), fragment);
+            Report(
+                context,
+                MetaDiagnosticDescriptors.CSharpExpressionText,
+                operation.Syntax.GetLocation(),
+                fragment);
         }
     }
 
@@ -359,7 +332,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            var fragment = GetCSharpExpressionFragment(text.Text);
+            var fragment = GetCSharpExpressionFragment(
+                text.Text,
+                context.CancellationToken);
             if (fragment != null)
             {
                 Report(
@@ -372,110 +347,123 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static string? GetCSharpExpressionFragment(IOperation operation)
+    private static string? GetCSharpExpressionFragment(
+        IOperation operation,
+        CancellationToken cancellationToken)
     {
-        if (!operation.ConstantValue.HasValue || operation.ConstantValue.Value is not string value)
-        {
-            return null;
-        }
-
+        var shape = new StringBuilder();
+        AppendCSharpExpressionShape(
+            operation,
+            shape,
+            cancellationToken);
+        var value = shape.ToString();
         return CSharpExpressionFragments.FirstOrDefault(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
     }
 
-    private static string? GetSemanticLiteral(
+    private static void AppendCSharpExpressionShape(
         IOperation operation,
+        StringBuilder shape,
         CancellationToken cancellationToken)
     {
-        var root = operation;
-        while (root.Parent != null)
+        var pending = new Stack<IOperation>();
+        pending.Push(operation);
+        while (pending.Count != 0)
         {
-            root = root.Parent;
-        }
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = pending.Pop();
+            if (current.ConstantValue is
+                { HasValue: true, Value: string text })
+            {
+                shape.Append(text);
+                continue;
+            }
 
-        return GetSemanticLiteral(
-            operation,
-            root,
-            new HashSet<ILocalSymbol>(
-                SymbolEqualityComparer.Default),
-            cancellationToken);
+            switch (current)
+            {
+                case IBinaryOperation binary when
+                    IsStringAddition(binary):
+                    pending.Push(binary.RightOperand);
+                    pending.Push(binary.LeftOperand);
+                    break;
+                case ICompoundAssignmentOperation assignment when
+                    IsStringAddition(assignment):
+                    shape.Append('\0');
+                    pending.Push(assignment.Value);
+                    break;
+                case IInvocationOperation invocation when
+                    IsStringConcat(invocation):
+                    var arguments = invocation.Arguments.OrderBy(
+                            static argument =>
+                                argument.Parameter?.Ordinal ?? int.MaxValue)
+                        .ToArray();
+                    for (var index = arguments.Length - 1;
+                         index >= 0;
+                         index--)
+                    {
+                        pending.Push(arguments[index].Value);
+                    }
+                    break;
+                case IParenthesizedOperation parenthesized:
+                    pending.Push(parenthesized.Operand);
+                    break;
+                case IConversionOperation { OperatorMethod: null } conversion:
+                    pending.Push(conversion.Operand);
+                    break;
+                default:
+                    shape.Append('\0');
+                    break;
+            }
+        }
     }
 
-    private static string? GetSemanticLiteral(
-        IOperation operation,
-        IOperation root,
-        HashSet<ILocalSymbol> visitedLocals,
-        CancellationToken cancellationToken)
+    private static bool IsNestedCSharpExpressionConstruction(
+        IOperation operation)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (operation.ConstantValue.HasValue)
+        var parent = operation.Parent;
+        while (parent is IParenthesizedOperation or
+               IArgumentOperation or
+               IConversionOperation { OperatorMethod: null })
         {
-            return GetSemanticLiteral(operation.ConstantValue.Value);
+            parent = parent.Parent;
         }
 
-        switch (operation)
+        return IsStringAddition(parent) ||
+            parent is IInvocationOperation invocation &&
+            IsStringConcat(invocation);
+    }
+
+    private static bool IsStringAddition(IOperation? operation)
+    {
+        return operation is
+            IBinaryOperation
+            {
+                OperatorKind: BinaryOperatorKind.Add,
+                Type.SpecialType: SpecialType.System_String
+            } or
+            ICompoundAssignmentOperation
+            {
+                OperatorKind: BinaryOperatorKind.Add,
+                Type.SpecialType: SpecialType.System_String
+            };
+    }
+
+    private static bool IsStringConcat(IInvocationOperation invocation)
+    {
+        return invocation.TargetMethod is
         {
-            case IArgumentOperation argument:
-                return GetSemanticLiteral(
-                    argument.Value,
-                    root,
-                    visitedLocals,
-                    cancellationToken);
-            case IConversionOperation conversion:
-                return GetSemanticLiteral(
-                    conversion.Operand,
-                    root,
-                    visitedLocals,
-                    cancellationToken);
-            case IParenthesizedOperation parenthesized:
-                return GetSemanticLiteral(
-                    parenthesized.Operand,
-                    root,
-                    visitedLocals,
-                    cancellationToken);
-        }
-        if (operation is not ILocalReferenceOperation localReference ||
-            !visitedLocals.Add(localReference.Local))
+            Name: nameof(string.Concat),
+            ContainingType.SpecialType: SpecialType.System_String
+        };
+    }
+
+    private static string? GetSemanticLiteral(IOperation operation)
+    {
+        if (!operation.ConstantValue.HasValue)
         {
             return null;
         }
 
-        foreach (var candidate in root.DescendantsAndSelf())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            IOperation? value = candidate switch
-            {
-                IVariableDeclaratorOperation declaration
-                    when SymbolEqualityComparer.Default.Equals(
-                        declaration.Symbol,
-                        localReference.Local) =>
-                    declaration.Initializer?.Value,
-                ISimpleAssignmentOperation
-                {
-                    Target: ILocalReferenceOperation target
-                } assignment
-                    when SymbolEqualityComparer.Default.Equals(
-                        target.Local,
-                        localReference.Local) =>
-                    assignment.Value,
-                _ => null
-            };
-            if (value == null)
-            {
-                continue;
-            }
-
-            var literal = GetSemanticLiteral(
-                value,
-                root,
-                visitedLocals,
-                cancellationToken);
-            if (literal != null)
-            {
-                return literal;
-            }
-        }
-
-        return null;
+        return GetSemanticLiteral(operation.ConstantValue.Value);
     }
 
     private static string? GetSemanticLiteral(object? value)
@@ -485,6 +473,21 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
              text.StartsWith("ir_", StringComparison.Ordinal))
                 ? text
                 : null;
+    }
+
+    private static bool IsInsideCondition(SyntaxNode syntax)
+    {
+        return syntax.AncestorsAndSelf().Any(node => node switch
+        {
+            IfStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
+            WhileStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
+            DoStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
+            ForStatementSyntax { Condition: not null } statement => statement.Condition.Span.Contains(syntax.Span),
+            ConditionalExpressionSyntax conditional => conditional.Condition.Span.Contains(syntax.Span),
+            CatchFilterClauseSyntax filter => filter.FilterExpression.Span.Contains(syntax.Span),
+            WhenClauseSyntax whenClause => whenClause.Condition.Span.Contains(syntax.Span),
+            _ => false
+        });
     }
 
     private static void AnalyzeField(SymbolAnalysisContext context)
@@ -602,9 +605,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static bool IsCriticalStateNamespace(INamespaceSymbol? value)
     {
         return IsNamespaceOrNested(value, "SharpProof", "Analyzer") ||
-        IsNamespaceOrNested(value, "SharpProof", "ContractForGenerator") ||
         IsNamespaceOrNested(value, "SharpProof", "Frontend") ||
-        IsNamespaceOrNested(value, "SharpProof", "Meta", "Analyzers") ||
         IsNamespaceOrNested(value, "SharpProof", "Verify");
     }
 
@@ -657,9 +658,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     internal enum KnownType
     {
-        Compilation, SemanticModel, ModelExtensions, CSharpCompilation,
-        CSharpSemanticModel, CSharpExtensions, SyntaxFactory,
-        CSharpSyntaxTree, Symbol,
+        Compilation, SemanticModel, SyntaxFactory, CSharpSyntaxTree, Symbol,
         DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, CompilationModelProvider,
         MetaDiagnosticDescriptors, AnalyzerDiagnosticDescriptors,
