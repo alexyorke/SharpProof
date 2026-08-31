@@ -1,3 +1,5 @@
+using SharpProof.Dataflow;
+
 namespace SharpProof.Analyzer;
 
 internal static partial class RequiresCallSiteAnalyzer
@@ -98,6 +100,7 @@ internal static partial class RequiresCallSiteAnalyzer
             Instance: null,
             arguments.OfType<IArgumentOperation>().ToImmutableArray(),
             ImmutableDictionary<int, IOperation>.Empty,
+            ImmutableDictionary<int, long>.Empty,
             CanReplay: true,
             Flow: null,
             ManagedFlowStatus.BudgetExceeded);
@@ -359,6 +362,17 @@ internal static partial class RequiresCallSiteAnalyzer
                          requires))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (TryGetImplicitIntegerArgument(
+                        candidate,
+                        variable,
+                        out var implicitValue))
+                {
+                    variables.Add(
+                        variable.Variable,
+                        ManagedAbstractValue.Integer(
+                            IntervalValue.Constant(implicitValue)));
+                    continue;
+                }
                 var actual = GetActual(candidate, variable);
                 if (actual == null)
                 {
@@ -448,6 +462,21 @@ internal static partial class RequiresCallSiteAnalyzer
                          requires))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (TryGetImplicitIntegerArgument(
+                        callSite,
+                        variable,
+                        out var implicitValue))
+                {
+                    if (_factory.GetVariableInfo(variable.Variable).Type !=
+                        _factory.IntegerType)
+                    {
+                        return null;
+                    }
+                    substitutions.Add(
+                        variable.Variable,
+                        _factory.Integer(implicitValue));
+                    continue;
+                }
                 var actual = GetActual(callSite, variable);
                 if (actual == null)
                 {
@@ -569,6 +598,18 @@ internal static partial class RequiresCallSiteAnalyzer
                 GetArgument(callSite, variable)?.Value,
             _ => null
         };
+    }
+
+    private static bool TryGetImplicitIntegerArgument(
+        RequiresCallSiteCandidate callSite,
+        BoundContractVariable variable,
+        out long value)
+    {
+        value = 0;
+        return variable.Role == BoundContractVariableRole.Parameter &&
+            callSite.ImplicitIntegerArguments.TryGetValue(
+                variable.Ordinal,
+                out value);
     }
 
     private static CallArgumentEvaluation GetAliasEvaluation(
