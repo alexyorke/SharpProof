@@ -1036,7 +1036,19 @@ internal sealed class OperationCompletionEvaluator
     {
         if (creation.Arguments.Any(argument =>
                 !CanCompleteNormally(argument.Value)) ||
-            creation.Constructor is not { } constructor ||
+            !CanCompleteConstructorCall(creation))
+        {
+            return false;
+        }
+
+        return creation.Initializer == null ||
+            CanCompleteNormally(creation.Initializer);
+    }
+
+    internal bool CanCompleteConstructorCall(
+        IObjectCreationOperation creation)
+    {
+        if (creation.Constructor is not { } constructor ||
             !StaticInitializationMayComplete(constructor) ||
             DefiniteOperationFacts.HasSourceCompletionFlow(constructor) &&
             !_completionFacts.MethodCanCompleteNormally(constructor))
@@ -1044,8 +1056,7 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        return creation.Initializer == null ||
-            CanCompleteNormally(creation.Initializer);
+        return true;
     }
 
     private bool CanCompleteArrayCreation(IArrayCreationOperation array)

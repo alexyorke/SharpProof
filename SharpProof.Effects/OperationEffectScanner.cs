@@ -776,7 +776,7 @@ internal sealed partial class OperationEffectScanner
                     creation.Constructor?.Parameters.Length ?? 0));
         var constructor = new EffectStep(
             EffectSummaryDomain.Instance.Join(allocation, construction),
-            _completionEvaluator.CanCompleteConstruction(creation));
+            _completionEvaluator.CanCompleteConstructorCall(creation));
         var result = arguments.Then(constructor);
         if (creation.Initializer != null && result.CompletesNormally)
         {
@@ -852,9 +852,18 @@ internal sealed partial class OperationEffectScanner
                 ClassifyArguments(
                     creation.Arguments,
                     creation.Constructor?.Parameters.Length ?? 0));
-            return EffectSummaryOperations.ExceptionConstructionThrow(
+            var result = arguments.Then(new EffectStep(
                 construction,
-                ResolveThrownException(thrown));
+                _completionEvaluator.CanCompleteConstructorCall(creation)));
+            if (creation.Initializer != null && result.CompletesNormally)
+            {
+                result = result.Then(ScanStep(creation.Initializer));
+            }
+            return EffectSummaryOperations.ExceptionConstructionThrow(
+                result.Summary,
+                result.CompletesNormally
+                    ? ResolveThrownException(thrown)
+                    : EffectThrowSet.Empty);
         }
         var expression = thrown.Exception == null
             ? EffectStep.Empty
