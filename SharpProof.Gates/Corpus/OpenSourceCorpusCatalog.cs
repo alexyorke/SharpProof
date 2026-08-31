@@ -83,6 +83,15 @@ internal static class OpenSourceCorpusCatalog
             "Corpus");
     }
 
+    internal static int CountSourceFiles(
+        IEnumerable<OpenSourceCorpusMethod> methods)
+    {
+        return methods
+            .Select(static method => method.SourceId + "|" + method.Path)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+    }
+
     internal static string GetDeclaration(MethodDeclarationSyntax method)
     {
         return NormalizeLineEndings(
@@ -374,7 +383,7 @@ internal static class OpenSourceCorpusCatalog
         if (string.IsNullOrWhiteSpace(path) ||
             Path.IsPathRooted(path) ||
             path.Split('/', '\\').Any(static part => part == "..") ||
-            path.Contains("|", StringComparison.Ordinal) ||
+            path.Contains('|', StringComparison.Ordinal) ||
             path.Any(static character => character is '\r' or '\n' ||
                 char.IsControl(character)))
         {

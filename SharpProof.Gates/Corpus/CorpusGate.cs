@@ -228,10 +228,7 @@ internal static class CorpusGate
             CorpusCatalog.Seeds.Length + openSourceCases.Length,
             openSourceCases.Length,
             supportedOpenSourceMethodCount,
-            openSourceDocument.Methods
-                .Select(static method => method.Path)
-                .Distinct(StringComparer.Ordinal)
-                .Count(),
+            OpenSourceCorpusCatalog.CountSourceFiles(openSourceDocument.Methods),
             CorpusCatalog.Seeds.Length,
             CorpusCatalog.Variants.Length,
             observations.Sum(static observation =>

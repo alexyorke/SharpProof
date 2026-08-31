@@ -10,6 +10,20 @@ namespace SharpProof.Gates.Test;
 public sealed class CorpusGateTests
 {
     [Test]
+    public void CorpusFileCountIncludesSourceIdentity()
+    {
+        var methods = new[]
+        {
+            new OpenSourceCorpusMethod("OSS0001", "one", "shared.cs", 1, 1,
+                "hash-one", "A", "effects", CorpusVerdict.Proven, CorpusSupport.Supported),
+            new OpenSourceCorpusMethod("OSS0002", "two", "shared.cs", 1, 1,
+                "hash-two", "B", "effects", CorpusVerdict.Proven, CorpusSupport.Supported)
+        };
+
+        Assert.That(OpenSourceCorpusCatalog.CountSourceFiles(methods), Is.EqualTo(2));
+    }
+
+    [Test]
     public void CorpusSourceIdsRejectDuplicatesDeterministically()
     {
         var source = new OpenSourceCorpusSource(
