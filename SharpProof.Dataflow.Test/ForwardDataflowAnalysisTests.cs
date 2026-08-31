@@ -149,6 +149,44 @@ public sealed class ForwardDataflowAnalysisTests
     }
 
     [Test]
+    public void NonmonotoneTransferIsRejectedBeforeStaleOutputPropagates()
+    {
+        var domain = NullnessDomain.Instance;
+        var graph = new DataflowGraph<NullnessValue>(
+            [
+                new(0, value => value),
+                new(1, value => value == NullnessValue.Bottom
+                    ? NullnessValue.Bottom
+                    : NullnessValue.NonNull),
+                new(2, value => value),
+                new(3, value => value switch
+                {
+                    NullnessValue.Bottom => NullnessValue.Bottom,
+                    NullnessValue.Null => NullnessValue.NonNull,
+                    _ => NullnessValue.Null
+                }),
+                new(4, value => value)
+            ],
+            [
+                new(0, 1),
+                new(0, 3),
+                new(1, 2),
+                new(2, 3),
+                new(3, 4)
+            ]);
+
+        var failure = Assert.Throws<InvalidOperationException>((Action)(() =>
+            ForwardDataflowAnalysis.Analyze(
+                graph,
+                domain,
+                NullnessValue.Null)));
+
+        Assert.That(
+            failure!.Message,
+            Does.Contain("Block 3").And.Contain("monotone"));
+    }
+
+    [Test]
     public void GraphCanonicalizesEdgesAndRejectsNonContiguousBlocks()
     {
         var graph = new DataflowGraph<NullnessValue>(
