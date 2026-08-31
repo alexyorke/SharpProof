@@ -209,8 +209,7 @@ internal sealed class AnalyzerConfiguration
         };
         foreach (var key in keys)
         {
-            if (options.TryGetValue(key, out var found) &&
-                !string.IsNullOrWhiteSpace(found))
+            if (options.TryGetValue(key, out var found))
             {
                 value = found;
                 return true;
