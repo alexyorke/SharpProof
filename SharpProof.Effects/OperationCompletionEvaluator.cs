@@ -216,9 +216,9 @@ internal sealed class OperationCompletionEvaluator
         if (pattern is not IRecursivePatternOperation recursive ||
             pattern.InputType?.IsValueType != true &&
                 !inputDefinitelyNonNull ||
-            !SymbolEqualityComparer.Default.Equals(
-                recursive.MatchedType,
-                pattern.InputType))
+            !IsGuaranteedRecursivePatternTypeMatch(
+                pattern.InputType,
+                recursive.MatchedType))
         {
             return true;
         }
@@ -264,6 +264,26 @@ internal sealed class OperationCompletionEvaluator
             }
         }
         return true;
+    }
+
+    private bool IsGuaranteedRecursivePatternTypeMatch(
+        ITypeSymbol? inputType,
+        ITypeSymbol? matchedType)
+    {
+        if (inputType == null || matchedType == null ||
+            inputType.TypeKind == TypeKind.Dynamic)
+        {
+            return false;
+        }
+        if (SymbolEqualityComparer.Default.Equals(inputType, matchedType))
+        {
+            return true;
+        }
+
+        var conversion = _compilation.ClassifyCommonConversion(
+            inputType,
+            matchedType);
+        return conversion.IsImplicit && conversion.IsReference;
     }
 
     private bool CanCompleteListPattern(
