@@ -1246,6 +1246,28 @@ public sealed class SharpProofSoundnessAnalyzerTests
         }
     }
 
+    [TestCase("SharpProof.Meta.Analyzers")]
+    [TestCase("SharpProof.Meta.Analyzers.Rules")]
+    [TestCase("SharpProof.ContractForGenerator")]
+    [TestCase("SharpProof.ContractForGenerator.Generation")]
+    public async Task RejectsMutableStaticStateInEveryRoslynProductionNamespace(
+        string namespaceName)
+    {
+        var source =
+            $$"""
+            namespace {{namespaceName}};
+            static class C {
+                internal static int State;
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPMETA002"]));
+    }
+
     [Test]
     public async Task RejectsReadonlyReferencesToMutableStaticStorage()
     {
