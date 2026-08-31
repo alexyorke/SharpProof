@@ -64,7 +64,8 @@ public static partial class WorkerProtocolJson
 
     public static string SerializeRequest(WorkerVerifyRequest request)
     {
-        return JsonSerializer.Serialize(request ?? throw new ArgumentNullException(nameof(request)), s_options);
+        return SerializeBounded(
+            request ?? throw new ArgumentNullException(nameof(request)));
     }
 
     public static string ComputeRequestHash(WorkerVerifyRequest request)
@@ -175,7 +176,19 @@ public static partial class WorkerProtocolJson
     public static string SerializeResponse(WorkerVerifyResponse response)
     {
         Canonicalize(response ?? throw new ArgumentNullException(nameof(response)));
-        return JsonSerializer.Serialize(response, s_options);
+        return SerializeBounded(response);
+    }
+
+    private static string SerializeBounded<T>(T value)
+    {
+        var json = JsonSerializer.Serialize(value, s_options);
+        if (Encoding.UTF8.GetByteCount(json) > MaximumJsonBytes)
+        {
+            throw new InvalidDataException(
+                $"The JSON document exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
+        return json;
     }
 
     public static WorkerProtocolValidationResult Validate(WorkerVerifyRequest? request)
