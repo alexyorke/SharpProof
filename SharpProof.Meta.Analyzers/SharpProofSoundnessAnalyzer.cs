@@ -477,7 +477,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static bool IsCriticalStateNamespace(INamespaceSymbol? value)
     {
         return IsNamespaceOrNested(value, "SharpProof", "Analyzer") ||
+        IsNamespaceOrNested(value, "SharpProof", "ContractForGenerator") ||
         IsNamespaceOrNested(value, "SharpProof", "Frontend") ||
+        IsNamespaceOrNested(value, "SharpProof", "Meta", "Analyzers") ||
         IsNamespaceOrNested(value, "SharpProof", "Verify");
     }
 
