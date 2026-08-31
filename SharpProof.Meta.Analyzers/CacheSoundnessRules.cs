@@ -546,7 +546,9 @@ internal static class CacheSoundnessRules
 
     private static IOperation Root(IOperation operation)
     {
-        while (operation.Parent != null)
+        while (operation.Parent != null &&
+               operation.Parent is not
+                   (IAnonymousFunctionOperation or ILocalFunctionOperation))
         {
             operation = operation.Parent;
         }
