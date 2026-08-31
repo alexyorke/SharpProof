@@ -485,10 +485,21 @@ internal static class CompilerProbeSnapshot
             binder: null,
             Type.EmptyTypes,
             modifiers: null);
-        if (method?.Invoke(metadata, null) is System.Collections.Immutable.ImmutableArray<byte> image &&
-            !image.IsDefault)
+        var image = method?.Invoke(metadata, null);
+        if (image is null)
         {
-            return ProbeHash.Bytes(image.ToArray());
+            var reader = metadata.GetType().GetFields(
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic)
+                .Select(field => field.GetValue(metadata))
+                .OfType<System.Reflection.PortableExecutable.PEReader>()
+                .SingleOrDefault();
+            image = reader?.GetEntireImage();
+        }
+        if (image is System.Collections.Immutable.ImmutableArray<byte> bytes &&
+            !bytes.IsDefault)
+        {
+            return ProbeHash.Bytes(bytes.ToArray());
         }
 
         return string.Empty;
