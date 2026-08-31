@@ -395,6 +395,47 @@ public sealed class AnalyzerModeAndEffectTests
     }
 
     [Test]
+    public async Task LambdaOwnedEffectAttributesAreAnalyzed()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int state;
+
+                public static void Configure() {
+                    Action pure = [EnforcePure] () => state++;
+                    Func<object> allocate = [ZeroAllocations] () => new object();
+                    Func<int> divide = [DoesNotThrow] () => 1 / state;
+                    Action declared =
+                        [EffectContract(SharpProofEffect.None, Complete = true)]
+                        () => state++;
+                    _ = pure;
+                    _ = allocate;
+                    _ = divide;
+                    _ = declared;
+                }
+            }
+            """,
+            "effects",
+            ["SP0002", "SP0045", "SP0046", "SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EquivalentTo(["SP0002", "SP0045", "SP0046", "SP0047"]));
+            Assert.That(
+                factory.Outcomes.Values,
+                Has.Some.EqualTo(AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
     public async Task UnknownEffectFacetsNeverCountAsSuccess()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
