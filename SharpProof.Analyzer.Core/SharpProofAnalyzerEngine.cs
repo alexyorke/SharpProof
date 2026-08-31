@@ -204,6 +204,7 @@ internal sealed partial class SharpProofAnalyzerEngine
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        var hasContractApiCandidate = false;
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -225,12 +226,17 @@ internal sealed partial class SharpProofAnalyzerEngine
                 if (node is InvocationExpressionSyntax invocation &&
                     IsContractApiCandidate(invocation.Expression))
                 {
-                    return new(
-                        RequiresSymbolAnalysis: false,
-                        RequiresOperationAnalysis: true,
-                        RequiresFullOperationAnalysis: true);
+                    hasContractApiCandidate = true;
                 }
             }
+        }
+
+        if (hasContractApiCandidate)
+        {
+            return new(
+                RequiresSymbolAnalysis: false,
+                RequiresOperationAnalysis: true,
+                RequiresFullOperationAnalysis: true);
         }
 
         var hasSharpProofAssemblyAttribute =
