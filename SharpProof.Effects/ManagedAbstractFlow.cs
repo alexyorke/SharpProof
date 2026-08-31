@@ -2514,7 +2514,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         var target = invocation.TargetMethod.OriginalDefinition;
-        return !HasSourceCompletionFlow(target) ||
+        return invocation.IsVirtual &&
+            target.ContainingType?.IsSealed != true &&
+            !target.IsSealed ||
+            !HasSourceCompletionFlow(target) ||
             MethodCanCompleteNormally(target);
     }
 

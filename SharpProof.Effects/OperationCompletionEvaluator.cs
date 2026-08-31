@@ -611,8 +611,16 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
+        var hasUncertainVirtualDispatch =
+            origin is IInvocationOperation { IsVirtual: true } invocation &&
+            method.ContainingType?.IsSealed != true &&
+            !method.IsSealed &&
+            SymbolEqualityComparer.Default.Equals(
+                invocation.TargetMethod.OriginalDefinition,
+                method.OriginalDefinition);
         return StaticInitializationMayComplete(method) &&
-            (!DefiniteOperationFacts.HasSourceCompletionFlow(method) ||
+            (hasUncertainVirtualDispatch ||
+             !DefiniteOperationFacts.HasSourceCompletionFlow(method) ||
              _completionFacts.MethodCanCompleteNormally(method));
     }
 
