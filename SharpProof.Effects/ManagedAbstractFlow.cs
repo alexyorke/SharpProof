@@ -774,7 +774,14 @@ internal sealed class ManagedAbstractFlow
             return EvaluateCore(operation.WhenNull, state);
         }
 
-        return Join(value, EvaluateCore(operation.WhenNull, state));
+        var whenNull = EvaluateCore(operation.WhenNull, state);
+        var joined = Join(value, whenNull);
+
+        // A coalesce cannot produce null when its fallback is definitely non-null.
+        // Keep the joined reference cardinality while refining its nullness.
+        return whenNull.IsDefinitelyNonNull && !joined.IsUnknown && !joined.IsBottom
+            ? Reference(NullnessValue.NonNull, joined.Cardinality)
+            : joined;
     }
 
     internal bool ProvesNoOverflow(IOperation operation, ManagedFlowState state)
