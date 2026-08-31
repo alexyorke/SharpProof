@@ -219,6 +219,10 @@ public sealed class SharpProofWorker : IDisposable
                         return cachedResponse;
                     }
                 }
+                if (cache.LastReadUnavailable)
+                {
+                    cacheStatus = WorkerCacheStatus.Unavailable;
+                }
             }
             if (_backend != null)
             {

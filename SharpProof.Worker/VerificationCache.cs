@@ -20,6 +20,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             });
     internal static Action<string, string>? PathValidationOverride;
     internal static Action? TransactionRollbackOverride;
+    // Set for the most recent read so the worker can distinguish an
+    // operational cache failure from an ordinary miss. Each cache instance
+    // is scoped to one worker request.
+    internal bool LastReadUnavailable { get; private set; }
 
     internal async Task<WorkerVerifyResponse?> TryReadAsync(
         string inputHash,
@@ -28,6 +32,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         WorkerBudgets budgets,
         CancellationToken cancellationToken)
     {
+        LastReadUnavailable = false;
         var path = GetPath(inputHash);
         var staged = new List<StagedEntry>();
         var committed = false;
@@ -104,6 +109,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             ArgumentException or JsonException or IOException or InvalidDataException or
                 UnauthorizedAccessException or OverflowException)
         {
+            LastReadUnavailable = true;
             return null;
         }
         finally
@@ -537,9 +543,17 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                          CompilerVariableRole.Parameter))
         {
             var type = target.Factory.GetVariableInfo(variable.Variable).Type;
-            if ((type != target.Factory.BooleanType &&
-                 type != target.Factory.IntegerType) ||
-                !result.ContainsKey(variable.Variable))
+            // Replay models intentionally contain only values needed by the
+            // counterexample. Non-scalar inputs cannot be materialized by the
+            // scalar model codec, but that is harmless when the replay does
+            // not reference them. Scalar inputs remain mandatory so missing
+            // values cannot be mistaken for a concrete execution.
+            if (type != target.Factory.BooleanType &&
+                type != target.Factory.IntegerType)
+            {
+                continue;
+            }
+            if (!result.ContainsKey(variable.Variable))
             {
                 return false;
             }
