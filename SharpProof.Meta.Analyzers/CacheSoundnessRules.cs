@@ -565,6 +565,23 @@ internal static class CacheSoundnessRules
             return nonCacheable;
         }
 
+        if (operation is IConversionOperation
+            {
+                OperatorMethod: null,
+                Type: INamedTypeSymbol
+                {
+                    TypeKind: TypeKind.Enum
+                } enumType
+            } conversion &&
+            IsSemanticAnswerType(enumType))
+        {
+            return IsNonCacheableNumericEnumValue(
+                conversion.Operand,
+                enumType,
+                root,
+                resolving);
+        }
+
         operation = UnwrapValue(operation);
         if (TryClassifySemanticEnumConstant(operation, out nonCacheable))
         {
@@ -639,15 +656,169 @@ internal static class CacheSoundnessRules
             return false;
         }
 
+        nonCacheable = IsNonCacheableEnumConstant(
+            enumType,
+            constantValue);
+        return true;
+    }
+
+    private static bool IsNonCacheableNumericEnumValue(
+        IOperation operation,
+        INamedTypeSymbol enumType,
+        IOperation root,
+        HashSet<ILocalSymbol> resolving)
+    {
+        if (operation.ConstantValue is
+            {
+                HasValue: true,
+                Value: { } constantValue
+            })
+        {
+            return IsNonCacheableEnumConstant(enumType, constantValue);
+        }
+
+        operation = UnwrapValue(operation);
+        if (operation.ConstantValue is
+            {
+                HasValue: true,
+                Value: { } unwrappedConstant
+            })
+        {
+            return IsNonCacheableEnumConstant(
+                enumType,
+                unwrappedConstant);
+        }
+
+        return operation switch
+        {
+            ILocalReferenceOperation local =>
+                ResolveNumericEnumLocal(
+                    local,
+                    enumType,
+                    root,
+                    resolving),
+            IConditionalOperation conditional =>
+                IsNonCacheableNumericEnumValue(
+                    conditional.WhenTrue,
+                    enumType,
+                    root,
+                    resolving) ||
+                conditional.WhenFalse != null &&
+                IsNonCacheableNumericEnumValue(
+                    conditional.WhenFalse,
+                    enumType,
+                    root,
+                    resolving),
+            ISwitchExpressionOperation switchExpression =>
+                switchExpression.Arms.Any(arm =>
+                    IsNonCacheableNumericEnumValue(
+                        arm.Value,
+                        enumType,
+                        root,
+                        resolving)),
+            ICoalesceOperation coalesce =>
+                IsNonCacheableNumericEnumValue(
+                    coalesce.Value,
+                    enumType,
+                    root,
+                    resolving) ||
+                IsNonCacheableNumericEnumValue(
+                    coalesce.WhenNull,
+                    enumType,
+                    root,
+                    resolving),
+            _ => true
+        };
+    }
+
+    private static bool ResolveNumericEnumLocal(
+        ILocalReferenceOperation reference,
+        INamedTypeSymbol enumType,
+        IOperation root,
+        HashSet<ILocalSymbol> resolving)
+    {
+        if (!resolving.Add(reference.Local))
+        {
+            return true;
+        }
+
+        try
+        {
+            var writes = GetReachingLocalValues(reference, root);
+            return writes.Length == 0 || writes.Any(value =>
+                IsNonCacheableNumericEnumValue(
+                    value,
+                    enumType,
+                    root,
+                    resolving));
+        }
+        finally
+        {
+            resolving.Remove(reference.Local);
+        }
+    }
+
+    private static bool IsNonCacheableEnumConstant(
+        INamedTypeSymbol enumType,
+        object constantValue)
+    {
         var matchingMembers = enumType.GetMembers()
             .OfType<IFieldSymbol>()
             .Where(field =>
                 field.HasConstantValue &&
-                Equals(field.ConstantValue, constantValue))
+                field.ConstantValue is { } memberValue &&
+                AreEqualIntegralConstants(memberValue, constantValue))
             .ToArray();
-        nonCacheable = matchingMembers.Length == 0 ||
+        return matchingMembers.Length == 0 ||
             matchingMembers.Any(field => IsNonCacheableName(field.Name));
-        return true;
+    }
+
+    private static bool AreEqualIntegralConstants(
+        object left,
+        object right)
+    {
+        return TryGetIntegralConstant(left, out var leftValue) &&
+            TryGetIntegralConstant(right, out var rightValue) &&
+            leftValue == rightValue;
+    }
+
+    private static bool TryGetIntegralConstant(
+        object value,
+        out decimal result)
+    {
+        switch (value)
+        {
+            case sbyte signedByte:
+                result = signedByte;
+                return true;
+            case byte unsignedByte:
+                result = unsignedByte;
+                return true;
+            case short signedShort:
+                result = signedShort;
+                return true;
+            case ushort unsignedShort:
+                result = unsignedShort;
+                return true;
+            case int signedInteger:
+                result = signedInteger;
+                return true;
+            case uint unsignedInteger:
+                result = unsignedInteger;
+                return true;
+            case long signedLong:
+                result = signedLong;
+                return true;
+            case ulong unsignedLong:
+                result = unsignedLong;
+                return true;
+            case char character:
+                result = character;
+                return true;
+            default:
+                result = 0;
+                return false;
+        }
     }
 
     private static bool ResolveLocal(
