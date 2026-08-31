@@ -1334,6 +1334,48 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ReportsSemanticStringControlFlowThroughCommonComparisonShapes()
+    {
+        const string source =
+            """
+            using System;
+            using System.Linq;
+            namespace SharpProof.Frontend;
+            static class C {
+                internal static bool ObjectEquality(string reason) =>
+                    object.Equals(reason, "ir_object");
+
+                internal static bool StringPredicate(string provenance) =>
+                    provenance.StartsWith(
+                        "ir_prefix",
+                        StringComparison.Ordinal);
+
+                internal static bool BooleanTemporary(string reason) {
+                    var selected = reason == "ir_temporary";
+                    if (selected) return true;
+                    return false;
+                }
+
+                internal static bool LocalAlias(string reason) {
+                    var expected = "ir_alias";
+                    if (reason == expected) return true;
+                    return false;
+                }
+
+                internal static string[] QueryFilter(string[] reasons) =>
+                    reasons.Where(reason => reason == "ir_query").ToArray();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA004"),
+            Is.EqualTo(5));
+    }
+
+    [Test]
     public async Task AllowsStaticImmutableAndNonStorageMemberForms()
     {
         const string source =
