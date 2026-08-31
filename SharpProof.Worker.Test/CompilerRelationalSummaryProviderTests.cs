@@ -14,6 +14,55 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerRelationalSummaryProviderTests
 {
+    [Test]
+    public void LongSourceDependencyChainAbstainsAtResourceLimit()
+    {
+        const int dependencyCount = 65;
+        var methods = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(0, dependencyCount).Select(index =>
+                index == dependencyCount - 1
+                    ? $"internal static int Dependency{index}(int value) " +
+                      "=> value;"
+                    : $"internal static int Dependency{index}(int value) " +
+                      $"=> Dependency{index + 1}(value);"));
+        var compilation = CreateCompilation(
+            $$"""
+            internal static class Subject
+            {
+                {{methods}}
+                internal static int Verify(int value) => Dependency0(value);
+            }
+            """);
+        var factory = new IrFactory();
+        var provider = new CompilerRelationalSummaryProvider(
+            compilation,
+            factory,
+            new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation));
+        var call = GetCall(
+            compilation,
+            factory,
+            "Verify",
+            "Dependency0");
+
+        var prepared = provider.TryGet(
+            call.Method,
+            call.Member,
+            CancellationToken.None,
+            out var summary);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(prepared, Is.False);
+            Assert.That(summary, Is.Null);
+            Assert.That(
+                provider.LastImplementationIlAbstention,
+                Is.EqualTo(
+                    CompilerImplementationIlAbstentionReason
+                        .SummaryResourceLimit));
+        }
+    }
+
     [TestCase("VerifyInt", "VerifyLong")]
     [TestCase("VerifyLong", "VerifyInt")]
     public void ClosedFormsNestedInsideGenericOuterHaveIndependentCacheEntries(
@@ -113,7 +162,8 @@ public sealed class CompilerRelationalSummaryProviderTests
     private static (IMethodSymbol Method, IrMemberId Member) GetCall(
         CSharpCompilation compilation,
         IrFactory factory,
-        string callerName)
+        string callerName,
+        string calledMethodName = "F")
     {
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes()
@@ -122,7 +172,7 @@ public sealed class CompilerRelationalSummaryProviderTests
         var syntax = declaration.DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
             .Single(invocation => invocation.Expression.ToString()
-                .EndsWith(".F", StringComparison.Ordinal));
+                .EndsWith(calledMethodName, StringComparison.Ordinal));
         var model = SharpProof.Frontend.Host.CompilationModelProvider
             .GetSemanticModel(compilation, tree);
         var invocation = (IInvocationOperation)model.GetOperation(syntax)!;
