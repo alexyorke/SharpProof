@@ -407,6 +407,27 @@ public sealed class ContractBinderTests
     }
 
     [Test]
+    public void ResultWithUnsupportedNullableValueDomainFailsClosed()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static int? Read() {
+                    Contract.Ensures(
+                        Contract.Result<int?>() == null);
+                    return null;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
+    }
+
+    [Test]
     public void ArrayLengthOverResultBindsToSequenceLength()
     {
         const string source =
