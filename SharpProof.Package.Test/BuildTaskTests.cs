@@ -948,6 +948,67 @@ public sealed class BuildTaskTests
         }));
     }
 
+    [TestCase(6, true)]
+    [TestCase(42, false)]
+    [TestCase(124, false)]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void StructuredErrorsSuppressOnlySemanticVerifierExitDiagnostics(
+        int exitCode,
+        bool suppressExitDiagnostic)
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-structured-exit-");
+        try
+        {
+            var diagnostic = VerifierDiagnosticTransport.Serialize(
+                new VerifierDiagnostic(
+                    "error",
+                    "SP0047",
+                    "source.cs",
+                    1,
+                    1,
+                    "strict incomplete"));
+            var helper = CreateTimedProcessAssembly(
+                directory.FullName,
+                "System.Console.Error.WriteLine(" +
+                JsonSerializer.Serialize(diagnostic) +
+                "); return " +
+                exitCode.ToString(CultureInfo.InvariantCulture) +
+                ";");
+            var engine = new RecordingBuildEngine();
+            using var task = new RunVerifier
+            {
+                BuildEngine = engine,
+                Executable = Environment.GetEnvironmentVariable(
+                    "DOTNET_HOST_PATH") ?? "dotnet",
+                WorkingDirectory = directory.FullName,
+                Arguments = [new TaskItem(helper)],
+                ProjectWallTimeMilliseconds = 2000,
+                TerminationGraceMilliseconds = 1000
+            };
+
+            Assert.That(task.Execute(), Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(task.ExitCode, Is.EqualTo(exitCode));
+                Assert.That(
+                    engine.Errors.Select(static error => error.Code),
+                    Does.Contain("SP0047"));
+                Assert.That(
+                    task.HasStructuredError,
+                    Is.EqualTo(suppressExitDiagnostic),
+                    "A partial semantic diagnostic must not suppress an " +
+                    "infrastructure exit diagnostic.");
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
