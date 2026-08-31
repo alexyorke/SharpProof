@@ -201,6 +201,15 @@ internal static class ContractForCompanionValidator
             method,
             implementationBody: null,
             cancellationToken: cancellationToken);
+        if (inventory.HasRejectedContractApiUsage)
+        {
+            SharpProofControlAttributePolicy.ReportRejectedContractApi(
+                method.Name,
+                GetSourceLocation(method, compilation, fallback),
+                diagnostics.Add);
+            return;
+        }
+
         if (inventory.ImplementationBody == null)
         {
             diagnostics.Add(At(
