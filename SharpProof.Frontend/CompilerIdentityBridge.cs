@@ -139,7 +139,23 @@ public static class CompilerIdentityBridge
             (operation as IInstanceReferenceOperation)?.ReferenceKind,
             CompilerIdentityProjections.IsChecked(operation),
             CompilerIdentityProjections.IsLifted(operation),
-            CompilerIdentityProjections.IsTryCast(operation));
+            CompilerIdentityProjections.IsTryCast(operation),
+            UnsupportedConstantIdentity(operation));
+    }
+
+    private static string? UnsupportedConstantIdentity(IOperation operation)
+    {
+        // Unsupported constants still participate in pure opaque-term
+        // interning. Preserve their payload so distinct values cannot become
+        // the same semantic term merely because their CLR types match.
+        if (!operation.ConstantValue.HasValue)
+            return null;
+        return operation.ConstantValue.Value switch
+        {
+            null => "<null>",
+            IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+            object value => value.ToString()
+        };
     }
 
     public static string CreateSymbolDisplay(ISymbol? symbol)
@@ -214,15 +230,15 @@ public static class CompilerIdentityBridge
         BinaryOperatorKind? binaryOperator,
         UnaryOperatorKind? unaryOperator,
         InstanceReferenceKind? instanceReference,
-        bool isChecked, bool isLifted, bool isTryCast)
+        bool isChecked, bool isLifted, bool isTryCast, string? constantIdentity)
         : IEquatable<OperationSemanticIdentity>
     {
         private readonly (
             OperationKind, IrIdentityId, IrIdentityId,
             BinaryOperatorKind?, UnaryOperatorKind?,
-            InstanceReferenceKind?, bool, bool, bool) _value =
+            InstanceReferenceKind?, bool, bool, bool, string?) _value =
             (kind, type, typeOperand, binaryOperator, unaryOperator,
-             instanceReference, isChecked, isLifted, isTryCast);
+             instanceReference, isChecked, isLifted, isTryCast, constantIdentity);
 
         public bool Equals(OperationSemanticIdentity other)
         {
