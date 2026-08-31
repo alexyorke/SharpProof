@@ -1,6 +1,6 @@
 # Bug backlog
 
-383 open bugs, reprioritized by impact, reachability, and affected scope.
+382 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (95)
+## P0 - Critical (94)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -37,7 +37,6 @@ Priority definitions:
 - **BUG-087 [P0] - MSBuild omits exact-invocation result validation:** The shipped verifier target never supplies InvocationResultPath to ValidatePublishedVerificationResult, so private per-invocation binding checks are skipped. Concurrent builds sharing publication paths can accept and advertise another invocation's internally valid verification evidence.
 - **BUG-088 [P0] - Mutable runtime paths invalidate containment authentication:** RunVerifier reduces the dotnet host and supervisor assembly to mutable pathnames before launch, without durable byte identity. Replacement between validation and launch can make lifecycle receipts describe code that did not enforce descendant cleanup.
 - **BUG-099 [P0] - Null method-group conversion uses the wrong exception model:** Effects models every null instance method-group receiver as throwing NullReferenceException, but a closed delegate to a nonvirtual instance method throws ArgumentException. Throws coverage and catch reachability can therefore omit the real exception and suppress effects in the matching catch.
-- **BUG-100 [P0] - Null reduced-extension receivers are classified noncompleting:** Effects completion treats a reduced extension call on a definitely null receiver as an instance dereference. Because extension dispatch is static and accepts null, returning calls can be marked terminal and callers' reachable suffix effects omitted.
 - **BUG-102 [P0] - Nullable pattern mismatch paths are discarded:** Effects completion loses the null-mismatch path for nullable recursive and list patterns when an accessor is noncompleting. A helper that returns for null can be marked terminal, causing callers' reachable suffix effects to disappear from Complete summaries.
 - **BUG-103 [P0] - Nullable value types are classified as definitely nonnull:** OperationNullnessEvaluator treats every value type as nonnull, including Nullable<T> with HasValue=false. Effects and throws in reachable null arms or conditional-access paths can be omitted, allowing unsound effect conclusions.
 - **BUG-104 [P0] - Opaque identities alias distinct operandless operations:** CompilerIdentityBridge interns pure operandless operations using only operation kind, result type, and flags, omitting TypeOperand. Distinct typeof or sizeof expressions can receive the same opaque term and transfer facts across semantically different values.
