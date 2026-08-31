@@ -370,6 +370,38 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesInspectNeutralWrapperConstructorArguments()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, TimedOut, Proven }
+            sealed class Envelope {
+                internal Envelope(Answer answer) => Answer = answer;
+                internal Answer Answer { get; }
+            }
+            sealed class ProofCache {
+                internal void Write(Envelope envelope) { }
+            }
+            sealed class C {
+                private static Envelope CreateTimeout() =>
+                    new Envelope(Answer.TimedOut);
+
+                void M(ProofCache cache) {
+                    cache.Write(new Envelope(Answer.Unknown));
+                    cache.Write(CreateTimeout());
+                    cache.Write(new Envelope(Answer.Proven));
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(2));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesTrackRefOutAndDeconstructionDefinitions()
     {
         var diagnostics = await Analyze(
