@@ -100,6 +100,7 @@ public sealed class ContainerContractTests
                     contract["z3LibraryBytes"]!.GetValue<long>() + 1,
                 contract => contract["platform"] = " ",
                 contract => contract["platform"] = "linux/arm64"
+                ,contract => contract.Remove("dotnetTestRuntimeVersion")
             };
             foreach (var mutate in mutations)
             {
@@ -109,6 +110,13 @@ public sealed class ContainerContractTests
                 Assert.Throws<InvalidDataException>(
                     (Action)(() => ContainerContract.ValidateRequired()));
             }
+
+            File.WriteAllText(
+                candidate,
+                canonicalJson.TrimEnd('}', '\n', '\r') +
+                ",\"unexpected\":true}");
+            Assert.Throws<InvalidDataException>(
+                (Action)(() => ContainerContract.ValidateRequired()));
 
             Environment.SetEnvironmentVariable(
                 "SHARPPROOF_CONTAINER_CONTRACT",
