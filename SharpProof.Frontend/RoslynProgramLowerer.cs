@@ -530,6 +530,14 @@ public sealed class RoslynProgramLowerer(
             }
             if (IsExceptional(fallThrough?.Semantics) || IsExceptional(conditional?.Semantics))
             {
+                // The branch value is the throw operand for exceptional
+                // terminators. Lower it before abandoning control-flow
+                // modeling so calls, reads, and other observable evaluation
+                // effects are not silently omitted from the trace.
+                if (source.BranchValue != null)
+                {
+                    _ = LowerValue(block, operation, source.BranchValue);
+                }
                 Abstain(operation, FrontendAbstention.UnsupportedControlFlow);
                 Havoc(block, operation, IrHavocKind.Memory);
                 _builder.Return(block, operation);
