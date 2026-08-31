@@ -78,7 +78,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             }
         }
 
-        if (TryGetImplicitParameterlessBaseConstructor(out var baseConstructor) &&
+        if (TryGetImplicitBaseConstructor(out var baseConstructor) &&
             hasPotentialPreconditions(baseConstructor))
         {
             owners.Add(
@@ -111,7 +111,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var reachableOperationSites = new HashSet<(
             SyntaxTree Tree, int Start, int Length)>();
         var initializer = (operationRoot as IConstructorBodyOperation)?.Initializer;
-        if (TryGetImplicitParameterlessBaseConstructor(out var baseConstructor))
+        if (TryGetImplicitBaseConstructor(out var baseConstructor))
         {
             var constructorBody = operationRoot as IConstructorBodyOperation;
             var origin = (IOperation?)constructorBody?.BlockBody ??
@@ -451,7 +451,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         }
     }
 
-    private bool TryGetImplicitParameterlessBaseConstructor(
+    private bool TryGetImplicitBaseConstructor(
         out IMethodSymbol baseConstructor)
     {
         baseConstructor = null!;
@@ -470,17 +470,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
             return false;
         }
 
-        var candidates = caller.ContainingType.BaseType?
-            .InstanceConstructors
-            .Where(static constructor =>
-                constructor.Parameters.IsEmpty)
-            .ToImmutableArray() ?? [];
-        if (candidates.Length != 1)
+        var candidate = RequiresCallSiteAnalyzer.TryGetImplicitBaseConstructor(caller);
+        if (candidate == null)
         {
             return false;
         }
 
-        baseConstructor = candidates[0];
+        baseConstructor = candidate;
         return true;
     }
 

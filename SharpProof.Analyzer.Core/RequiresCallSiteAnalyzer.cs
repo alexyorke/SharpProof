@@ -59,7 +59,7 @@ internal static partial class RequiresCallSiteAnalyzer
         SyntaxNode callSiteSyntax;
         if (initializer == null)
         {
-            target = TryGetImplicitParameterlessBaseConstructor(constructor);
+            target = TryGetImplicitBaseConstructor(constructor);
             arguments = [];
             origin = null;
             callSiteSyntax = declaration;
@@ -165,7 +165,7 @@ internal static partial class RequiresCallSiteAnalyzer
             : outcome;
     }
 
-    private static IMethodSymbol? TryGetImplicitParameterlessBaseConstructor(
+    internal static IMethodSymbol? TryGetImplicitBaseConstructor(
         IMethodSymbol constructor)
     {
         if (constructor is not
@@ -180,7 +180,8 @@ internal static partial class RequiresCallSiteAnalyzer
 
         var candidates = constructor.ContainingType.BaseType?
             .InstanceConstructors
-            .Where(static candidate => candidate.Parameters.IsEmpty)
+            .Where(static candidate => candidate.Parameters.All(
+                static parameter => parameter.IsOptional || parameter.IsParams))
             .ToImmutableArray() ?? [];
         return candidates.Length == 1 ? candidates[0] : null;
     }
