@@ -476,6 +476,35 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheFieldWritesAreRejected()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Proven, Unknown }
+            sealed class ProofCache {
+                internal Answer Latest;
+                internal Answer? Optional;
+                internal Answer Combined;
+                internal Answer Safe;
+            }
+            sealed class C {
+                void M(ProofCache cache) {
+                    cache.Latest = Answer.Unknown;
+                    cache.Optional ??= Answer.Unknown;
+                    cache.Combined |= Answer.Unknown;
+                    cache.Safe = Answer.Proven;
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(3));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesRetainAllConditionalDefinitions()
     {
         var diagnostics = await Analyze(
