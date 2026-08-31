@@ -974,7 +974,7 @@ public sealed class WorkerTests
             Assert.That(response.CallableResults.Single().Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(response.CallableResults.Single().Reason,
-                Is.EqualTo(WorkerCallableCoverageReason.SemanticUnknown));
+                Is.EqualTo(WorkerCallableCoverageReason.UnsupportedContract));
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }

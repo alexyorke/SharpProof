@@ -1313,12 +1313,43 @@ public sealed class ProtocolJsonTests
         WorkerProtocolJson.SealManifest(emptyManifest);
         response = CreateResponse(emptyManifest);
         Assert.That(ValidateForRequest(response).IsValid, Is.True);
+    }
+
+    [Test]
+    public void SchemaValidIncompleteUnsupportedContractProjectionIsAccepted()
+    {
+        var response = CreateResponse(CreateManifest());
+        SetUnknown(response, WorkerClaimReason.UnsupportedContract);
         response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
         response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        Assert.That(
-            ValidateForRequest(response).Errors.Select(static error => error.Code),
-            Does.Contain("response.callable_projection"));
+            WorkerCallableCoverageReason.UnsupportedContract;
+        response.Summary = CreateSummary(response);
+
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
+    }
+
+    [TestCase(WorkerCallableCoverageReason.UnsupportedCallable)]
+    [TestCase(WorkerCallableCoverageReason.UnsupportedContract)]
+    [TestCase(WorkerCallableCoverageReason.SemanticUnknown)]
+    [TestCase(WorkerCallableCoverageReason.InfrastructureFailure)]
+    public void SchemaValidIncompleteClaimlessProjectionIsAccepted(
+        WorkerCallableCoverageReason reason)
+    {
+        var manifest = CreateManifest();
+        manifest.Callables[0].ClaimIds = [];
+        manifest.Claims = [];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        response.CallableResults[0].Reason = reason;
+        if (reason == WorkerCallableCoverageReason.InfrastructureFailure)
+        {
+            response.RunStatus = WorkerRunStatus.Failed;
+            response.FailureReason =
+                WorkerRunFailureReason.InfrastructureFailure;
+        }
+
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
     }
 
     [Test]
