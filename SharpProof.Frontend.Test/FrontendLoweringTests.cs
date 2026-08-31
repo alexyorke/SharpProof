@@ -1081,7 +1081,7 @@ public sealed class FrontendLoweringTests
                 Is.EqualTo(FrontendSubsetDecision.ClosedAbstention));
             Assert.That(
                 result.Classification.Abstention,
-                Is.Not.EqualTo(FrontendAbstention.None));
+                Is.EqualTo(FrontendAbstention.ExpressionDepthLimit));
             Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
         }
     }

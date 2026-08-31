@@ -31,6 +31,7 @@ verification returns an explicit typed record.
 | `UnsupportedStatement` | A statement has no exact program lowering |
 | `UnsupportedMutation` | A mutation has no exact state model |
 | `UnknownOperationKind` | A future numeric Roslyn operation kind is not in the closed table |
+| `ExpressionDepthLimit` | Expression lowering reached its bounded recursion ceiling |
 
 An exact expression result carries `None`. A closed abstention must carry one
 of the other values. Program lowering also records the exact `OperationId` that

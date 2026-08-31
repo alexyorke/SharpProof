@@ -2,6 +2,7 @@ namespace SharpProof.Frontend;
 
 public sealed class RoslynOperationLowerer
 {
+    private const int MaximumLoweringDepth = 256;
     private readonly IrFactory _factory;
     private readonly Func<IMethodSymbol, bool> _isKnownPure;
     private readonly bool _allowCompilerConstants;
@@ -287,21 +288,26 @@ public sealed class RoslynOperationLowerer
         ISymbol? symbol = null, IOperation? receiver = null,
         IEnumerable<IOperation>? arguments = null)
     {
-        var loweredReceiver = receiver == null ? null : LowerCore(receiver);
-        var loweredArguments = (arguments ?? operation.ChildOperations)
-            .Where(child => !ReferenceEquals(child, receiver))
-            .Select((child, index) =>
-            {
-                var argument = child as IArgumentOperation;
-                return (
-                    Ordinal: argument?.Parameter?.Ordinal ?? int.MaxValue,
-                    Index: index,
-                    Term: LowerCore(argument?.Value ?? child).Term);
-            })
-            .OrderBy(static value => value.Ordinal)
-            .ThenBy(static value => value.Index)
-            .Select(static value => value.Term)
-            .ToArray();
+        var depthLimited = abstention == FrontendAbstention.ExpressionDepthLimit;
+        var loweredReceiver = depthLimited || receiver == null
+            ? null
+            : LowerCore(receiver);
+        IrTerm[] loweredArguments = depthLimited
+            ? []
+            : (arguments ?? operation.ChildOperations)
+                .Where(child => !ReferenceEquals(child, receiver))
+                .Select((child, index) =>
+                {
+                    var argument = child as IArgumentOperation;
+                    return (
+                        Ordinal: argument?.Parameter?.Ordinal ?? int.MaxValue,
+                        Index: index,
+                        Term: LowerCore(argument?.Value ?? child).Term);
+                })
+                .OrderBy(static value => value.Ordinal)
+                .ThenBy(static value => value.Index)
+                .Select(static value => value.Term)
+                .ToArray();
         var receiverTerm = loweredReceiver?.Term;
         var argumentTerms = loweredArguments;
         var resultType = GetTypeId(operation.Type);
@@ -309,7 +315,7 @@ public sealed class RoslynOperationLowerer
             (symbol?.ContainingType == null
                 ? _factory.ObjectType
                 : GetTypeId(symbol.ContainingType));
-        var isPure = IsDemonstrablyPure(operation);
+        var isPure = !depthLimited && IsDemonstrablyPure(operation);
         var identity = CompilerIdentityBridge.InternOperation(
             _factory, operation, symbol, isPure);
         var displayName =
@@ -334,6 +340,17 @@ public sealed class RoslynOperationLowerer
 
     private bool IsDemonstrablyPure(IOperation operation)
     {
+        return IsDemonstrablyPure(operation, 0);
+    }
+
+    private bool IsDemonstrablyPure(IOperation operation, int depth)
+    {
+        if (depth >= MaximumLoweringDepth)
+        {
+            return false;
+        }
+
+        var childDepth = depth + 1;
         if (operation.ConstantValue.HasValue)
         {
             return true;
@@ -350,26 +367,27 @@ public sealed class RoslynOperationLowerer
                 ISizeOfOperation => true,
             IConversionOperation conversion =>
                 conversion.OperatorMethod == null &&
-                IsDemonstrablyPure(conversion.Operand),
+                IsDemonstrablyPure(conversion.Operand, childDepth),
             IUnaryOperation unary =>
                 unary.OperatorMethod == null &&
-                IsDemonstrablyPure(unary.Operand),
+                IsDemonstrablyPure(unary.Operand, childDepth),
             IBinaryOperation binary =>
                 binary.OperatorMethod == null &&
-                IsDemonstrablyPure(binary.LeftOperand) &&
-                IsDemonstrablyPure(binary.RightOperand),
+                IsDemonstrablyPure(binary.LeftOperand, childDepth) &&
+                IsDemonstrablyPure(binary.RightOperand, childDepth),
             IConditionalOperation conditional =>
-                IsDemonstrablyPure(conditional.Condition) &&
-                IsDemonstrablyPure(conditional.WhenTrue) &&
+                IsDemonstrablyPure(conditional.Condition, childDepth) &&
+                IsDemonstrablyPure(conditional.WhenTrue, childDepth) &&
                 conditional.WhenFalse != null &&
-                IsDemonstrablyPure(conditional.WhenFalse),
-            IIsNullOperation isNull => IsDemonstrablyPure(isNull.Operand),
+                IsDemonstrablyPure(conditional.WhenFalse, childDepth),
+            IIsNullOperation isNull =>
+                IsDemonstrablyPure(isNull.Operand, childDepth),
             IInvocationOperation invocation =>
                 _isKnownPure(invocation.TargetMethod) &&
                 (invocation.Instance == null ||
-                 IsDemonstrablyPure(invocation.Instance)) &&
+                 IsDemonstrablyPure(invocation.Instance, childDepth)) &&
                 invocation.Arguments.All(argument =>
-                    IsDemonstrablyPure(argument.Value)),
+                    IsDemonstrablyPure(argument.Value, childDepth)),
             _ => false
         };
     }
@@ -425,6 +443,7 @@ public sealed class RoslynOperationLowerer
         : OperationVisitor<LoweringContext, LoweredExpression>
     {
         private readonly RoslynOperationLowerer _owner = owner;
+        private int _depth;
 
         public override LoweredExpression Visit(
             IOperation? operation, LoweringContext argument)
@@ -434,23 +453,39 @@ public sealed class RoslynOperationLowerer
                 return _owner.CreateMissingOperation();
             }
 
-            var custom = _owner.CustomLowering(operation);
-            if (custom.Handled)
+            if (_depth >= MaximumLoweringDepth)
             {
-                return custom.Term == null
-                    ? _owner.Opaque(
-                        operation,
-                        FrontendAbstention.UnsupportedOperationKind)
-                    : LoweredExpression.Exact(custom.Term);
+                return _owner.Opaque(
+                    operation,
+                    FrontendAbstention.ExpressionDepthLimit,
+                    arguments: []);
             }
 
-            if (_owner._allowCompilerConstants &&
-                operation.ConstantValue.HasValue)
+            _depth++;
+            try
             {
-                return _owner.LowerConstant(operation);
-            }
+                var custom = _owner.CustomLowering(operation);
+                if (custom.Handled)
+                {
+                    return custom.Term == null
+                        ? _owner.Opaque(
+                            operation,
+                            FrontendAbstention.UnsupportedOperationKind)
+                        : LoweredExpression.Exact(custom.Term);
+                }
 
-            return base.Visit(operation, argument)!;
+                if (_owner._allowCompilerConstants &&
+                    operation.ConstantValue.HasValue)
+                {
+                    return _owner.LowerConstant(operation);
+                }
+
+                return base.Visit(operation, argument)!;
+            }
+            finally
+            {
+                _depth--;
+            }
         }
 
         public override LoweredExpression DefaultVisit(

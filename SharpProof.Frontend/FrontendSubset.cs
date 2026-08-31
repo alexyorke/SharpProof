@@ -23,7 +23,8 @@ public enum FrontendAbstention
     UnsupportedControlFlow,
     UnsupportedStatement,
     UnsupportedMutation,
-    UnknownOperationKind
+    UnknownOperationKind,
+    ExpressionDepthLimit
 }
 
 public readonly struct FrontendSubsetClassification
