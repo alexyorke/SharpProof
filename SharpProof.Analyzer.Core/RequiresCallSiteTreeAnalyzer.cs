@@ -799,7 +799,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     }
                     continue;
                 }
-                foreach (var successor in RegularSuccessors(block))
+                foreach (var successor in RegularSuccessors(graph, block))
                 {
                     pending.Enqueue((successor.Ordinal, -1));
                 }
@@ -1040,27 +1040,38 @@ internal static partial class RequiresCallSiteTreeAnalyzer
         }
 
         private static IEnumerable<BasicBlock> RegularSuccessors(
+            ControlFlowGraph graph,
             BasicBlock block)
         {
-            if (block.FallThroughSuccessor is
-                {
-                    Semantics: ControlFlowBranchSemantics.Regular or
-                    ControlFlowBranchSemantics.StructuredExceptionHandling,
-                    Destination: not null
-                } fallThrough)
+            var seen = new HashSet<int>();
+            foreach (var branch in new[]
+                     {
+                         block.FallThroughSuccessor,
+                         block.ConditionalSuccessor
+                     })
             {
-                yield return fallThrough.Destination!;
-            }
-            if (block.ConditionalSuccessor is
+                if (branch == null)
                 {
-                    Semantics: ControlFlowBranchSemantics.Regular or
-                    ControlFlowBranchSemantics.StructuredExceptionHandling,
-                    Destination: not null
-                } conditional &&
-                conditional.Destination.Ordinal !=
-                    block.FallThroughSuccessor?.Destination?.Ordinal)
-            {
-                yield return conditional.Destination!;
+                    continue;
+                }
+                if (!branch.FinallyRegions.IsDefaultOrEmpty)
+                {
+                    foreach (var region in branch.FinallyRegions)
+                    {
+                        if (seen.Add(region.FirstBlockOrdinal))
+                        {
+                            yield return graph.Blocks[region.FirstBlockOrdinal];
+                        }
+                    }
+                }
+                if (branch.Semantics is (
+                        ControlFlowBranchSemantics.Regular or
+                        ControlFlowBranchSemantics.StructuredExceptionHandling) &&
+                    branch.Destination is { } destination &&
+                    seen.Add(destination.Ordinal))
+                {
+                    yield return destination;
+                }
             }
         }
 

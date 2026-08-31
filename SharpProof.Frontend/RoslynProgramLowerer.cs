@@ -467,6 +467,14 @@ public sealed class RoslynProgramLowerer(
 
             var fallThrough = source.FallThroughSuccessor;
             var conditional = source.ConditionalSuccessor;
+            if (HasMandatoryFinally(fallThrough) ||
+                HasMandatoryFinally(conditional))
+            {
+                Abstain(operation, FrontendAbstention.UnsupportedControlFlow);
+                HavocKnownState(block, operation);
+                _builder.Return(block, operation);
+                return;
+            }
             if (fallThrough?.Semantics == ControlFlowBranchSemantics.Return)
             {
                 LowerReturn(block, operation, source.BranchValue);
@@ -642,6 +650,11 @@ public sealed class RoslynProgramLowerer(
                 ControlFlowBranchSemantics.ProgramTermination or
                 ControlFlowBranchSemantics.StructuredExceptionHandling or
                 ControlFlowBranchSemantics.Error;
+        }
+
+        private static bool HasMandatoryFinally(ControlFlowBranch? branch)
+        {
+            return branch != null && !branch.FinallyRegions.IsDefaultOrEmpty;
         }
 
         private BasicBlock[] SelectBlocks()
