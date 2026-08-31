@@ -25,15 +25,132 @@ internal static class CacheSoundnessRules
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)) ||
             !invocation.Arguments.Any(argument =>
                 !IsGuardedCacheableResponse(invocation, argument.Value) &&
-                IsNonCacheableSemanticAnswer(
-                    argument.Value,
-                    root,
-                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default))))
+                (IsNonCacheableSemanticAnswer(
+                     argument.Value,
+                     root,
+                     new HashSet<ILocalSymbol>(
+                         SymbolEqualityComparer.Default)) ||
+                 IsNonCacheableGetOrAddFactory(
+                     invocation,
+                     argument,
+                     root))))
         {
             return;
         }
 
         Report(context, invocation.Syntax.GetLocation());
+    }
+
+    private static bool IsNonCacheableGetOrAddFactory(
+        IInvocationOperation invocation,
+        IArgumentOperation argument,
+        IOperation root)
+    {
+        var factoryType = argument.Parameter?.Type ?? argument.Value.Type;
+        if (!string.Equals(
+                invocation.TargetMethod.Name,
+                "GetOrAdd",
+                StringComparison.Ordinal) ||
+            factoryType is not INamedTypeSymbol
+            {
+                TypeKind: TypeKind.Delegate,
+                DelegateInvokeMethod: { } invoke
+            } ||
+            !IsSemanticAnswerType(invoke.ReturnType))
+        {
+            return false;
+        }
+
+        return IsNonCacheableValueFactory(
+            argument.Value,
+            root,
+            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+    }
+
+    private static bool IsNonCacheableValueFactory(
+        IOperation operation,
+        IOperation root,
+        HashSet<ILocalSymbol> resolving)
+    {
+        operation = UnwrapValue(operation);
+        return operation switch
+        {
+            IDelegateCreationOperation creation =>
+                IsNonCacheableValueFactory(
+                    creation.Target,
+                    root,
+                    resolving),
+            IAnonymousFunctionOperation anonymous =>
+                IsNonCacheableAnonymousFactory(anonymous),
+            IMethodReferenceOperation method =>
+                IsNonCacheableReturnedValue(
+                    method.Method,
+                    method.Method.ReturnType,
+                    method.Method.Name),
+            ILocalReferenceOperation local =>
+                ResolveValueFactoryLocal(local, root, resolving),
+            IConditionalOperation conditional =>
+                IsNonCacheableValueFactory(
+                    conditional.WhenTrue,
+                    root,
+                    resolving) ||
+                conditional.WhenFalse != null &&
+                IsNonCacheableValueFactory(
+                    conditional.WhenFalse,
+                    root,
+                    resolving),
+            ICoalesceOperation coalesce =>
+                IsNonCacheableValueFactory(
+                    coalesce.Value,
+                    root,
+                    resolving) ||
+                IsNonCacheableValueFactory(
+                    coalesce.WhenNull,
+                    root,
+                    resolving),
+            _ => true
+        };
+    }
+
+    private static bool IsNonCacheableAnonymousFactory(
+        IAnonymousFunctionOperation factory)
+    {
+        var returns = factory.Body.DescendantsAndSelf()
+            .OfType<IReturnOperation>()
+            .Where(operation =>
+                !IsInsideNestedCallable(operation, factory.Body))
+            .Select(static operation => operation.ReturnedValue)
+            .Where(static value => value != null)
+            .Cast<IOperation>()
+            .ToArray();
+        return returns.Length == 0 || returns.Any(value =>
+            IsNonCacheableSemanticAnswer(
+                value,
+                factory.Body,
+                new HashSet<ILocalSymbol>(
+                    SymbolEqualityComparer.Default)));
+    }
+
+    private static bool ResolveValueFactoryLocal(
+        ILocalReferenceOperation reference,
+        IOperation root,
+        HashSet<ILocalSymbol> resolving)
+    {
+        if (!resolving.Add(reference.Local))
+        {
+            return true;
+        }
+
+        try
+        {
+            var writes = GetReachingLocalValues(reference, root);
+            return writes.Length == 0 || writes.Any(value =>
+                IsNonCacheableValueFactory(value, root, resolving));
+        }
+        finally
+        {
+            resolving.Remove(reference.Local);
+        }
     }
 
     internal static void AnalyzeAssignment(OperationAnalysisContext context)
