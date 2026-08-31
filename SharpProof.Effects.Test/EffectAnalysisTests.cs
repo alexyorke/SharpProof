@@ -884,6 +884,76 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void StringCompoundAssignmentIncludesConcatenationEffects()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class FormattedValue {
+                private static volatile int s_state;
+
+                public override string ToString() {
+                    s_state = 1;
+                    throw new InvalidOperationException();
+                }
+            }
+
+            public static class Sample {
+                public static void Allocate(string text) {
+                    text += "suffix";
+                }
+
+                public static void Direct(
+                    string text,
+                    ref int after) {
+                    text += new FormattedValue();
+                    after++;
+                }
+
+                public static void Caught(
+                    string text,
+                    ref int caught) {
+                    try { text += new FormattedValue(); }
+                    catch (InvalidOperationException) { caught++; }
+                }
+            }
+            """);
+        var session = new EffectAnalysisSession(compilation);
+        var allocation = session.Analyze(Method(compilation, "Allocate"));
+        var direct = session.Analyze(Method(compilation, "Direct"));
+        var caught = session.Analyze(Method(compilation, "Caught"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                direct.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True);
+            Assert.That(
+                direct.Summary.Capabilities.Contains(
+                    EffectCapabilityKind.Synchronization),
+                Is.True);
+            AssertContainsThrows(
+                direct.Summary,
+                "System.InvalidOperationException");
+            Assert.That(
+                allocation.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Managed));
+            Assert.That(
+                direct.Summary.Writes.Contains(EffectRegionId.Parameter(1)),
+                Is.False,
+                "a definitely throwing formatter blocks the suffix");
+            Assert.That(
+                direct.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(
+                caught.Summary.Writes.Contains(EffectRegionId.Parameter(1)),
+                Is.True,
+                "the formatting exception must reach its catch");
+        }
+    }
+
+    [Test]
     public void ImplicitFormattingExceptionsKeepHandlersReachable()
     {
         var compilation = EffectTestHost.CreateCompilation(
