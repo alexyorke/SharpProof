@@ -86,6 +86,33 @@ internal static class ContractForValidationEngine
             diagnostics.Add(At(ContractForDiagnosticDescriptors.DuplicateCompanion,
                 companion.AttributeLocation, companion.Target.Name));
         }
+
+        // Referenced companions participate in runtime resolution too, but are
+        // not returned by FindCandidates because they have no source tree in
+        // the current compilation. Report each referenced participant in an
+        // ambiguous target group so the diagnostic view matches resolution.
+        var sourceCompanions = companions
+            .Select(static companion => companion.Companion)
+            .ToHashSet((IEqualityComparer<INamedTypeSymbol>)
+                SymbolEqualityComparer.Default);
+        foreach (var companion in relationships.Accepted)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (sourceCompanions.Contains(companion.Type) ||
+                !relationships.Accepted.Any(candidate =>
+                    !SymbolEqualityComparer.Default.Equals(
+                        candidate.Type, companion.Type) &&
+                    ContractForSymbolMatcher.TargetsOverlap(
+                        candidate.ContractTarget, companion.ContractTarget)))
+            {
+                continue;
+            }
+
+            diagnostics.Add(At(
+                ContractForDiagnosticDescriptors.DuplicateCompanion,
+                companion.Type.Locations.FirstOrDefault() ?? Location.None,
+                companion.Target.Name));
+        }
         return Order(diagnostics);
     }
 
