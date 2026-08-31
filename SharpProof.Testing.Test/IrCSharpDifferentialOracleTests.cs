@@ -1,3 +1,4 @@
+using System.Reflection;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -53,6 +54,47 @@ public sealed class IrCSharpDifferentialOracleTests
         }
 
         Assert.That(CountGeneratedOracleAssemblies(), Is.EqualTo(before));
+    }
+
+    [Test]
+    public void SharedDagProgramSizeScalesWithUniqueTerms()
+    {
+        const int sharedLayers = 16;
+        var factory = new IrFactory();
+        var input = factory.CreateVariable("input", factory.IntegerType);
+        IrTerm term = factory.Variable(input);
+        for (var index = 0; index < sharedLayers; index++)
+        {
+            term = factory.Binary(IrBinaryOperator.Add, term, term);
+        }
+
+        var oracle = new IrCSharpDifferentialOracle(factory);
+        var createProgram = typeof(IrCSharpDifferentialOracle).GetMethod(
+            "TryCreateProgram",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        object?[] arguments =
+        [
+            term,
+            new Dictionary<IrVarId, IrValue>
+            {
+                [input] = factory.CreateIntegerValue(0)
+            },
+            null,
+            null,
+            null
+        ];
+
+        var created = (bool)createProgram.Invoke(oracle, arguments)!;
+        var program = (string)arguments[2]!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(created, Is.True, arguments[4] as string);
+            Assert.That(
+                program.Length,
+                Is.LessThan((sharedLayers + 1) * 512),
+                "A compact shared DAG must not be expanded into a tree.");
+        }
     }
 
     [Test]
