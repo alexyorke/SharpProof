@@ -65,6 +65,32 @@ public sealed class ContractForValidatorGeneratorTests
             Is.EqualTo(["SPCF0005"]));
     }
 
+    [TestCase("1.0m", "1.00m")]
+    [TestCase("1.00m", "1.0m")]
+    public void DecimalDefaultRepresentationMustMatchExactly(
+        string targetDefault,
+        string companionDefault)
+    {
+        var run = Run(
+            $$"""
+            using SharpProof.Attributes;
+            public interface ITarget {
+                void Read(decimal value = {{targetDefault}});
+            }
+            [ContractFor(typeof(ITarget))]
+            public static class TargetContracts {
+                public static void Read(
+                    ITarget receiver,
+                    decimal value = {{companionDefault}}) {
+                }
+            }
+            """);
+
+        Assert.That(
+            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SPCF0005"]));
+    }
+
     [TestCase("double", "0.0")]
     [TestCase("double", "-0.0")]
     [TestCase("float", "0.0f")]
