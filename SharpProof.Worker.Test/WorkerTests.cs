@@ -1380,6 +1380,64 @@ public sealed class WorkerTests
         }
     }
 
+    [TestCase(nameof(CompilerDiagnosticArtifact.SourceTreePath))]
+    [TestCase(nameof(CompilerDiagnosticArtifact.SourceTreeSha256))]
+    [TestCase(nameof(CompilerDiagnosticArtifact.SourceLineMapSha256))]
+    public async Task NullNonsourceDiagnosticBindingsAreTypedAsManifestInvalid(
+        string binding)
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var diagnostic = new CompilerDiagnosticArtifact
+        {
+            Code = "compiler.CS0001",
+            Message = "malformed non-source diagnostic",
+            Location = new WorkerSourceLocation()
+        };
+        switch (binding)
+        {
+            case nameof(CompilerDiagnosticArtifact.SourceTreePath):
+                diagnostic.SourceTreePath = null!;
+                break;
+            case nameof(CompilerDiagnosticArtifact.SourceTreeSha256):
+                diagnostic.SourceTreeSha256 = null!;
+                break;
+            case nameof(CompilerDiagnosticArtifact.SourceLineMapSha256):
+                diagnostic.SourceLineMapSha256 = null!;
+                break;
+            default:
+                throw new AssertionException(
+                    "Unknown diagnostic binding field: " + binding);
+        }
+
+        var json = await File.ReadAllTextAsync(request.CompilerManifest.Path);
+        json = json.Replace(
+            "\"compilerDiagnostics\":[]",
+            "\"compilerDiagnostics\":" + JsonSerializer.Serialize(
+                new[] { diagnostic },
+                WorkerProtocolJson.Options),
+            StringComparison.Ordinal);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        await File.WriteAllBytesAsync(request.CompilerManifest.Path, bytes);
+        request.CompilerManifest.Sha256 =
+            WorkerProtocolJson.ComputeSha256(bytes);
+        using var worker = new SharpProofWorker(
+            () => throw new AssertionException(
+                "An invalid manifest must fail before backend creation."));
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.CompilerManifestMismatch));
+            Assert.That(
+                response.Errors.Single().Code,
+                Is.EqualTo("compiler_manifest.invalid"));
+        }
+    }
+
     [Test]
     public async Task OversizedCompilerManifestIsTypedAndStopsBeforeWork()
     {
