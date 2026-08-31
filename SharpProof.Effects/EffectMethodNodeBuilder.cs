@@ -462,6 +462,19 @@ internal sealed class EffectMethodNodeBuilder
         !HasInstanceMemberInitializer(type);
     }
 
+    internal static bool IsSourceImplicitParameterlessConstructor(
+        IMethodSymbol method)
+    {
+        method = method.OriginalDefinition;
+        return method is
+        {
+            MethodKind: MethodKind.Constructor,
+            IsImplicitlyDeclared: true,
+            Parameters.IsDefaultOrEmpty: true
+        } && method.ContainingType.OriginalDefinition
+            .DeclaringSyntaxReferences.Length != 0;
+    }
+
     internal static IMethodSymbol? GetUniqueParameterlessBaseConstructor(
         IMethodSymbol constructor)
     {

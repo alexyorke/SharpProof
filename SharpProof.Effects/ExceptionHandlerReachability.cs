@@ -2856,17 +2856,11 @@ internal sealed class ExceptionHandlerReachability(
         int depth)
     {
         method = method.OriginalDefinition;
-        if (isKnownNonThrowing(method) ||
-            method is
-            {
-                MethodKind: MethodKind.Constructor,
-                IsImplicitlyDeclared: true
-            })
+        if (isKnownNonThrowing(method))
         {
             return EmptyPotential;
         }
-        if (depth > 32 ||
-            method.DeclaringSyntaxReferences.Length != 1)
+        if (depth > 32)
         {
             return UnknownPotential;
         }
@@ -2877,6 +2871,25 @@ internal sealed class ExceptionHandlerReachability(
 
         try
         {
+            if (method is
+                {
+                    MethodKind: MethodKind.Constructor,
+                    IsImplicitlyDeclared: true
+                })
+            {
+                return EffectMethodNodeBuilder
+                    .IsSourceImplicitParameterlessConstructor(method)
+                    ? GetImplicitConstructorExceptions(
+                        method,
+                        activeMethods,
+                        depth)
+                    : EmptyPotential;
+            }
+            if (method.DeclaringSyntaxReferences.Length != 1)
+            {
+                return UnknownPotential;
+            }
+
             var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
             var model = SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(compilation, declaration.SyntaxTree);
@@ -2898,6 +2911,26 @@ internal sealed class ExceptionHandlerReachability(
         {
             activeMethods.Remove(method);
         }
+    }
+
+    private PotentialExceptions GetImplicitConstructorExceptions(
+        IMethodSymbol constructor,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth)
+    {
+        if (constructor.ContainingType.IsValueType)
+        {
+            return EmptyPotential;
+        }
+
+        var baseConstructor = EffectMethodNodeBuilder
+            .GetUniqueParameterlessBaseConstructor(constructor);
+        return baseConstructor == null
+            ? UnknownPotential
+            : GetCallableExceptions(
+                baseConstructor,
+                activeMethods,
+                depth + 1);
     }
 
     internal bool CanMethodThrow(IMethodSymbol method)

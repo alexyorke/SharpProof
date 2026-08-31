@@ -610,14 +610,14 @@ internal sealed class OperationCompletionEvaluator
         }
 
         return StaticInitializationMayComplete(method) &&
-            (method.DeclaringSyntaxReferences.Length == 0 ||
+            (!DefiniteOperationFacts.HasSourceCompletionFlow(method) ||
              _completionFacts.MethodCanCompleteNormally(method));
     }
 
     internal bool CanMethodCompleteNormally(IMethodSymbol method)
     {
         return StaticInitializationMayComplete(method) &&
-            (method.DeclaringSyntaxReferences.Length == 0 ||
+            (!DefiniteOperationFacts.HasSourceCompletionFlow(method) ||
              _completionFacts.MethodCanCompleteNormally(method));
     }
 
@@ -985,7 +985,7 @@ internal sealed class OperationCompletionEvaluator
                 !CanCompleteNormally(argument.Value)) ||
             creation.Constructor is not { } constructor ||
             !StaticInitializationMayComplete(constructor) ||
-            constructor.DeclaringSyntaxReferences.Length != 0 &&
+            DefiniteOperationFacts.HasSourceCompletionFlow(constructor) &&
             !_completionFacts.MethodCanCompleteNormally(constructor))
         {
             return false;

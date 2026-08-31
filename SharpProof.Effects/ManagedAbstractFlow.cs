@@ -1953,7 +1953,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
         var normalized = method.OriginalDefinition;
-        if (normalized.DeclaringSyntaxReferences.Length != 1)
+        var isImplicitConstructor = EffectMethodNodeBuilder
+            .IsSourceImplicitParameterlessConstructor(normalized);
+        if (!isImplicitConstructor &&
+            normalized.DeclaringSyntaxReferences.Length != 1)
         {
             return true;
         }
@@ -1964,6 +1967,11 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
         try
         {
+            if (isImplicitConstructor)
+            {
+                return ImplicitConstructorMayCompleteNormally(normalized);
+            }
+
             var declaration = normalized.DeclaringSyntaxReferences[0]
                 .GetSyntax(cancellationToken);
             if (DefersBodyCompletion(normalized, declaration))
@@ -1995,6 +2003,20 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         {
             _activeMethods.Remove(normalized);
         }
+    }
+
+    private bool ImplicitConstructorMayCompleteNormally(
+        IMethodSymbol constructor)
+    {
+        if (constructor.ContainingType.IsValueType)
+        {
+            return true;
+        }
+
+        var baseConstructor = EffectMethodNodeBuilder
+            .GetUniqueParameterlessBaseConstructor(constructor);
+        return baseConstructor != null &&
+            MethodCanCompleteNormally(baseConstructor);
     }
 
     private bool ConstructorMayCompleteNormally(
@@ -2391,7 +2413,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         var target = invocation.TargetMethod.OriginalDefinition;
-        return target.DeclaringSyntaxReferences.Length == 0 ||
+        return !HasSourceCompletionFlow(target) ||
             MethodCanCompleteNormally(target);
     }
 
@@ -2404,7 +2426,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         if (creation.Constructor is { } constructor &&
-            constructor.DeclaringSyntaxReferences.Length != 0 &&
+            HasSourceCompletionFlow(constructor) &&
             !MethodCanCompleteNormally(constructor))
         {
             return false;
@@ -2412,6 +2434,14 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
         return creation.Initializer == null ||
             MayCompleteNormally(creation.Initializer);
+    }
+
+    internal static bool HasSourceCompletionFlow(IMethodSymbol method)
+    {
+        method = method.OriginalDefinition;
+        return method.DeclaringSyntaxReferences.Length != 0 ||
+            EffectMethodNodeBuilder
+                .IsSourceImplicitParameterlessConstructor(method);
     }
 
     private bool SequenceMayCompleteNormally(IEnumerable<IOperation> operations)
