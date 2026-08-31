@@ -628,19 +628,22 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                         {
                             continue;
                         }
-                        if (AssignmentKillsTrackedValue(
-                                tuplePath,
-                                accessedTuplePath))
+                        if (IsAssignedStorage(reference))
                         {
-                            exceptionalStateSurvivesKill =
-                                BlockMayThrowBeforeAssignmentCommit(
-                                    graph,
-                                    after,
-                                    reference);
-                            killed = true;
-                            break;
+                            if (AssignmentKillsTrackedValue(
+                                    tuplePath,
+                                    accessedTuplePath))
+                            {
+                                exceptionalStateSurvivesKill =
+                                    BlockMayThrowBeforeAssignmentCommit(
+                                        graph,
+                                        after,
+                                        reference);
+                                killed = true;
+                                break;
+                            }
+                            continue;
                         }
-                        continue;
                     }
                     if (TryGetWriteOnlyOutCommit(
                             reference,
@@ -1097,6 +1100,39 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 }
             }
             return false;
+        }
+
+        private static bool IsAssignedStorage(
+            ILocalReferenceOperation reference)
+        {
+            IOperation storage = reference;
+            while (true)
+            {
+                switch (storage.Parent)
+                {
+                    case IParenthesizedOperation parenthesized:
+                        storage = parenthesized;
+                        continue;
+                    case IConversionOperation
+                    {
+                        IsImplicit: true,
+                        OperatorMethod: null
+                    } conversion:
+                        storage = conversion;
+                        continue;
+                    case IFieldReferenceOperation
+                    {
+                        Field.ContainingType.IsTupleType: true,
+                        Instance: { } instance
+                    } field when ReferenceEquals(instance, storage):
+                        storage = field;
+                        continue;
+                    case ISimpleAssignmentOperation assignment:
+                        return ReferenceEquals(assignment.Target, storage);
+                    default:
+                        return false;
+                }
+            }
         }
 
         private static bool BlockMayThrowBeforeAssignmentCommit(
