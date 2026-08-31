@@ -766,6 +766,39 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesFollowGenericForwardedArguments()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache<T> {
+                internal void Write(T answer) { }
+            }
+            static class CacheForwarder {
+                internal static void Forward<T>(
+                    ProofCache<T> cache,
+                    T answer) =>
+                    cache.Write(answer);
+            }
+            sealed class C {
+                void M(
+                    ProofCache<Answer> answers,
+                    ProofCache<string> strings) {
+                    CacheForwarder.Forward(answers, Answer.Unknown);
+                    CacheForwarder.Forward(answers, Answer.Proven);
+                    CacheForwarder.Forward(strings, "Unknown");
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task SemanticCacheGetOrAddInspectsValueFactories()
     {
         var diagnostics = await Analyze(
