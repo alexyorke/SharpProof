@@ -10,6 +10,34 @@ namespace SharpProof.Gates.Test;
 public sealed class CorpusGateTests
 {
     [Test]
+    public void CorpusSourceIdsRejectDuplicatesDeterministically()
+    {
+        var source = new OpenSourceCorpusSource(
+            "shared", "https://example.invalid", new string('a', 40),
+            "MIT", "LICENSE", new string('b', 64));
+
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+            OpenSourceCorpusCatalog.ValidateSourceIds([source, source])));
+
+        Assert.That(exception!.Message, Is.EqualTo(
+            "Duplicate OSS corpus source ID: shared."));
+    }
+
+    [Test]
+    public void CorpusSourceIdsRejectEmptyValuesDeterministically()
+    {
+        var source = new OpenSourceCorpusSource(
+            " ", "https://example.invalid", new string('a', 40),
+            "MIT", "LICENSE", new string('b', 64));
+
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+            OpenSourceCorpusCatalog.ValidateSourceIds([source])));
+
+        Assert.That(exception!.Message, Is.EqualTo(
+            "OSS corpus source IDs must not be empty."));
+    }
+
+    [Test]
     public void UnassignedCorpusDiagnosticFailsTheGate()
     {
         var descriptor = new DiagnosticDescriptor(

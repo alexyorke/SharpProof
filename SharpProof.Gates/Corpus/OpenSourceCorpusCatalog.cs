@@ -114,21 +114,7 @@ internal static class OpenSourceCorpusCatalog
                 "The OSS corpus must contain its pinned upstream source files.");
         }
 
-        var sourceIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var source in document.Sources)
-        {
-            if (string.IsNullOrWhiteSpace(source.Id))
-            {
-                throw new InvalidDataException(
-                    "OSS corpus source IDs must not be empty.");
-            }
-
-            if (!sourceIds.Add(source.Id))
-            {
-                throw new InvalidDataException(
-                    $"Duplicate OSS corpus source ID: {source.Id}.");
-            }
-        }
+        ValidateSourceIds(document.Sources);
 
         if (document.Methods.Length is < MinimumMethodCount or > MaximumMethodCount)
         {
@@ -277,6 +263,26 @@ internal static class OpenSourceCorpusCatalog
             throw new InvalidDataException(
                 $"The OSS corpus spans only {sourceFileCount} source files; " +
                 $"{MinimumSourceFileCount} are required to prevent one-file padding.");
+        }
+    }
+
+    internal static void ValidateSourceIds(
+        IEnumerable<OpenSourceCorpusSource> sources)
+    {
+        var sourceIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var source in sources)
+        {
+            if (string.IsNullOrWhiteSpace(source.Id))
+            {
+                throw new InvalidDataException(
+                    "OSS corpus source IDs must not be empty.");
+            }
+
+            if (!sourceIds.Add(source.Id))
+            {
+                throw new InvalidDataException(
+                    $"Duplicate OSS corpus source ID: {source.Id}.");
+            }
         }
     }
 
