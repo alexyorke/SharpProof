@@ -352,12 +352,7 @@ internal static class CacheSoundnessRules
         var target = graph.Blocks.FirstOrDefault(block =>
             BlockOperations(block).Any(operation =>
                 operation.DescendantsAndSelf().Any(candidate =>
-                    candidate is ILocalReferenceOperation local &&
-                    SymbolEqualityComparer.Default.Equals(
-                        local.Local,
-                        reference.Local) &&
-                    candidate.Syntax.SyntaxTree == reference.Syntax.SyntaxTree &&
-                    candidate.Syntax.Span == reference.Syntax.Span)));
+                    IsSameLocalReference(candidate, reference))));
         if (target == null)
         {
             return GetPriorLocalValues(reference, root);
@@ -381,7 +376,7 @@ internal static class CacheSoundnessRules
                     block,
                     reference.Local,
                     input,
-                    int.MaxValue,
+                    null,
                     root);
                 if (!outputs[block.Ordinal].SetEquals(output))
                 {
@@ -401,7 +396,7 @@ internal static class CacheSoundnessRules
                 target,
                 reference.Local,
                 reaching,
-                reference.Syntax.SpanStart,
+                reference,
                 root)
             .ToArray();
     }
@@ -430,25 +425,70 @@ internal static class CacheSoundnessRules
         BasicBlock block,
         ILocalSymbol local,
         IEnumerable<IOperation> input,
-        int before,
+        ILocalReferenceOperation? before,
         IOperation root)
     {
         var result = new HashSet<IOperation>(input);
-        foreach (var value in BlockOperations(block)
-                     .SelectMany(static operation =>
-                         operation.DescendantsAndSelf())
-                     .Where(candidate =>
-                         candidate.Syntax.SpanStart < before &&
-                         !IsInsideNestedCallable(candidate, root))
-                     .Select(candidate => GetLocalWriteValue(candidate, local))
-                     .Where(static value => value != null)
-                     .Cast<IOperation>()
-                     .OrderBy(static value => value.Syntax.SpanStart))
+        foreach (var candidate in BlockOperations(block)
+                     .SelectMany(operation =>
+                         InEvaluationOrder(operation, root)))
         {
+            if (before != null &&
+                IsSameLocalReference(candidate, before))
+            {
+                break;
+            }
+
+            var value = GetLocalWriteValue(candidate, local);
+            if (value == null)
+            {
+                continue;
+            }
+
             result.Clear();
             result.Add(value);
         }
         return result;
+    }
+
+    private static IEnumerable<IOperation> InEvaluationOrder(
+        IOperation operation,
+        IOperation root)
+    {
+        var pending = new Stack<(IOperation Operation, bool ChildrenVisited)>();
+        pending.Push((operation, false));
+        while (pending.Count != 0)
+        {
+            var (current, childrenVisited) = pending.Pop();
+            if (IsInsideNestedCallable(current, root))
+            {
+                continue;
+            }
+
+            if (childrenVisited)
+            {
+                yield return current;
+                continue;
+            }
+
+            pending.Push((current, true));
+            foreach (var child in current.ChildOperations.Reverse())
+            {
+                pending.Push((child, false));
+            }
+        }
+    }
+
+    private static bool IsSameLocalReference(
+        IOperation candidate,
+        ILocalReferenceOperation reference)
+    {
+        return candidate is ILocalReferenceOperation local &&
+            SymbolEqualityComparer.Default.Equals(
+                local.Local,
+                reference.Local) &&
+            candidate.Syntax.SyntaxTree == reference.Syntax.SyntaxTree &&
+            candidate.Syntax.Span == reference.Syntax.Span;
     }
 
     private static IEnumerable<IOperation> BlockOperations(BasicBlock block)
