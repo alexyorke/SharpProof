@@ -13,14 +13,21 @@ internal static class ApiSpecTermValidator
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets)
     {
-        return Validate(declaration, variables, facets, depth: 1);
+        return Validate(
+            declaration,
+            variables,
+            facets,
+            depth: 1,
+            new Dictionary<SpecTermDeclaration, TermFacts>(
+                DeclarationReferenceComparer.Instance));
     }
 
     private static TermFacts Validate(
         SpecTermDeclaration declaration,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets,
-        int depth)
+        int depth,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
         if (declaration == null)
         {
@@ -36,6 +43,23 @@ internal static class ApiSpecTermValidator
                 nameof(declaration));
         }
 
+        if (validated.TryGetValue(declaration, out var facts))
+        {
+            return facts;
+        }
+
+        facts = ValidateCore(declaration, variables, facets, depth, validated);
+        validated.Add(declaration, facts);
+        return facts;
+    }
+
+    private static TermFacts ValidateCore(
+        SpecTermDeclaration declaration,
+        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+        ApiSpecFacets facets,
+        int depth,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
+    {
         switch (declaration)
         {
             case SpecVariableDeclaration variable:
@@ -92,21 +116,13 @@ internal static class ApiSpecTermValidator
 
                 return new(nullValue.Type, true, false, null);
             case SpecUnaryDeclaration unary:
-                return ValidateUnary(unary, variables, facets, depth);
+                return ValidateUnary(unary, variables, facets, depth, validated);
             case SpecBinaryDeclaration binary:
-                return ValidateBinary(binary, variables, facets, depth);
+                return ValidateBinary(binary, variables, facets, depth, validated);
             case SpecConditionalDeclaration conditional:
-                return ValidateConditional(
-                    conditional,
-                    variables,
-                    facets,
-                    depth);
+                return ValidateConditional(conditional, variables, facets, depth, validated);
             case SpecLengthDeclaration length:
-                var value = Validate(
-                    length.Value,
-                    variables,
-                    facets,
-                    depth + 1);
+                var value = Validate(length.Value, variables, facets, depth + 1, validated);
                 if (value.Type is not (
                     IrTypeKind.String or IrTypeKind.Sequence))
                 {
@@ -131,13 +147,15 @@ internal static class ApiSpecTermValidator
         SpecUnaryDeclaration unary,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets,
-        int depth)
+        int depth,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
         var operand = Validate(
             unary.Operand,
             variables,
             facets,
-            depth + 1);
+            depth + 1,
+            validated);
         var expected = IrOperatorCatalog.Get(unary.Operator).Operand;
         if (operand.Type != expected || unary.Type != expected)
         {
@@ -171,18 +189,21 @@ internal static class ApiSpecTermValidator
         SpecBinaryDeclaration binary,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets,
-        int depth)
+        int depth,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
         var left = Validate(
             binary.Left,
             variables,
             facets,
-            depth + 1);
+            depth + 1,
+            validated);
         var right = Validate(
             binary.Right,
             variables,
             facets,
-            depth + 1);
+            depth + 1,
+            validated);
         var shape = IrOperatorCatalog.Get(binary.Operator);
         var operandTypesMatch = shape.Operand.HasValue
             ? left.Type == shape.Operand.Value &&
@@ -236,23 +257,27 @@ internal static class ApiSpecTermValidator
         SpecConditionalDeclaration conditional,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets,
-        int depth)
+        int depth,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
         var condition = Validate(
             conditional.Condition,
             variables,
             facets,
-            depth + 1);
+            depth + 1,
+            validated);
         var whenTrue = Validate(
             conditional.WhenTrue,
             variables,
             facets,
-            depth + 1);
+            depth + 1,
+            validated);
         var whenFalse = Validate(
             conditional.WhenFalse,
             variables,
             facets,
-            depth + 1);
+            depth + 1,
+            validated);
         if (condition.Type != IrTypeKind.Boolean ||
             whenTrue.Type != whenFalse.Type ||
             conditional.Type != whenTrue.Type)
@@ -330,4 +355,24 @@ internal static class ApiSpecTermValidator
         bool IsNonNull,
         long? Integer,
         bool? Boolean = null);
+
+    private sealed class DeclarationReferenceComparer :
+        IEqualityComparer<SpecTermDeclaration>
+    {
+        internal static DeclarationReferenceComparer Instance { get; } =
+            new();
+
+        public bool Equals(
+            SpecTermDeclaration? left,
+            SpecTermDeclaration? right)
+        {
+            return ReferenceEquals(left, right);
+        }
+
+        public int GetHashCode(SpecTermDeclaration declaration)
+        {
+            return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(
+                declaration);
+        }
+    }
 }
