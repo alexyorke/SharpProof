@@ -51,6 +51,8 @@
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer.Core\bin\$(Configuration)\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer.Core\bin\$(Configuration)\netstandard2.0\System.Text.Encoding.CodePages.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.Analyzer.Core\bin\$(Configuration)\netstandard2.0\System.Threading.Tasks.Extensions.dll" />
+    <Analyzer Update="$(MSBuildThisFileDirectory)SharpProof.Analyzer.Core\bin\$(Configuration)\netstandard2.0\*"
+              SharpProofSourceTreeDependencyGroup="Portable" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(DesignTimeBuild)' != 'true'">
@@ -64,7 +66,46 @@
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.IO.Pipelines.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.Text.Encodings.Web.dll" />
     <Analyzer Include="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\System.Text.Json.dll" />
+    <Analyzer Update="$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(Configuration)\netstandard2.0\*"
+              SharpProofSourceTreeDependencyGroup="Collector" />
   </ItemGroup>
+
+  <Target Name="_SharpProofApplyMappedAnalyzerConfigurations"
+          AfterTargets="AssignProjectConfiguration"
+          Condition="'$(_SharpProofProfileNormalized)' != 'off'">
+    <ItemGroup>
+      <_SharpProofMappedAnalyzerProjectReference
+          Include="@(ProjectReferenceWithConfiguration)"
+          Condition="'%(ProjectReferenceWithConfiguration.Filename)' == 'SharpProof.Analyzer'" />
+      <_SharpProofMappedCollectorProjectReference
+          Include="@(ProjectReferenceWithConfiguration)"
+          Condition="'%(ProjectReferenceWithConfiguration.Filename)' == 'SharpProof.CompilerCollector'" />
+      <_SharpProofDefaultAnalyzerDependency
+          Include="@(Analyzer)"
+          Condition="'%(Analyzer.SharpProofSourceTreeDependencyGroup)' == 'Portable'" />
+      <_SharpProofDefaultCollectorDependency
+          Include="@(Analyzer)"
+          Condition="'%(Analyzer.SharpProofSourceTreeDependencyGroup)' == 'Collector'" />
+    </ItemGroup>
+    <PropertyGroup Condition="'@(_SharpProofMappedAnalyzerProjectReference)' != ''">
+      <_SharpProofMappedAnalyzerConfiguration>@(_SharpProofMappedAnalyzerProjectReference->'%(Configuration)')</_SharpProofMappedAnalyzerConfiguration>
+      <_SharpProofMappedAnalyzerConfiguration Condition="'$(_SharpProofMappedAnalyzerConfiguration)' == ''">$(Configuration)</_SharpProofMappedAnalyzerConfiguration>
+      <_SharpProofMappedAnalyzerDependencyDirectory>$(MSBuildThisFileDirectory)SharpProof.Analyzer.Core\bin\$(_SharpProofMappedAnalyzerConfiguration)\netstandard2.0</_SharpProofMappedAnalyzerDependencyDirectory>
+    </PropertyGroup>
+    <PropertyGroup Condition="'@(_SharpProofMappedCollectorProjectReference)' != ''">
+      <_SharpProofMappedCollectorConfiguration>@(_SharpProofMappedCollectorProjectReference->'%(Configuration)')</_SharpProofMappedCollectorConfiguration>
+      <_SharpProofMappedCollectorConfiguration Condition="'$(_SharpProofMappedCollectorConfiguration)' == ''">$(Configuration)</_SharpProofMappedCollectorConfiguration>
+      <_SharpProofMappedCollectorDependencyDirectory>$(MSBuildThisFileDirectory)SharpProof.CompilerCollector\bin\$(_SharpProofMappedCollectorConfiguration)\netstandard2.0</_SharpProofMappedCollectorDependencyDirectory>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(_SharpProofMappedAnalyzerDependencyDirectory)' != ''">
+      <Analyzer Remove="@(_SharpProofDefaultAnalyzerDependency)" />
+      <Analyzer Include="@(_SharpProofDefaultAnalyzerDependency->'$(_SharpProofMappedAnalyzerDependencyDirectory)\%(Filename)%(Extension)')" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(_SharpProofMappedCollectorDependencyDirectory)' != ''">
+      <Analyzer Remove="@(_SharpProofDefaultCollectorDependency)" />
+      <Analyzer Include="@(_SharpProofDefaultCollectorDependency->'$(_SharpProofMappedCollectorDependencyDirectory)\%(Filename)%(Extension)')" />
+    </ItemGroup>
+  </Target>
 
   <Target Name="_SharpProofValidateSourceTreeConfiguration"
           BeforeTargets="CoreCompile"
