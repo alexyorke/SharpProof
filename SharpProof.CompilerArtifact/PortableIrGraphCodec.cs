@@ -563,8 +563,12 @@ internal static partial class PortableIrGraphCodec
             {
                 IrTypeKind.Reference when row.Element == -1 =>
                     _factory.GetOrCreateReferenceType(_factory.CreateIdentity(), row.Name),
+                // Sequence types are structural in IR. Recreating an
+                // identity-bearing sequence here makes a decoded graph
+                // incompatible with newly lowered terms using the same
+                // element type.
                 IrTypeKind.Sequence => _factory.GetOrCreateSequenceType(
-                    _factory.CreateIdentity(), DecodeType(row.Element, depth + 1), row.Name),
+                    DecodeType(row.Element, depth + 1)),
                 _ => throw Bad("Portable IR contains a non-canonical scalar type.")
             };
             var info = _factory.GetTypeInfo(_types[index]);
