@@ -503,6 +503,13 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitLocalReference(
             ILocalReferenceOperation operation, LoweringContext argument)
         {
+            if (operation.Local.RefKind != RefKind.None)
+            {
+                return _owner.Opaque(
+                    operation,
+                    FrontendAbstention.UnsupportedMutation);
+            }
+
             return _owner.IsSupportedValueDomain(operation.Type)
                 ? LoweredExpression.Exact(
                     _owner.GetVariable(operation.Local, operation.Type))
