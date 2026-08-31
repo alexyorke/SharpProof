@@ -223,6 +223,9 @@ function ConvertTo-ValidationConditionSource {
         'nonBlank' {
             return "!string.IsNullOrWhiteSpace($($property.Source))"
         }
+        'singleLine' {
+            return "WorkerProtocolJson.IsSingleLineText($($property.Source))"
+        }
         'sha256' {
             return "WorkerProtocolJson.IsSha256($($property.Source))"
         }

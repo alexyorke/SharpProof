@@ -456,7 +456,9 @@
       "rules": [
         {"code":"valid","condition":{"op":"all","conditions":[
           {"op":"nonBlank","property":"Code"},
-          {"op":"nonBlank","property":"Message"}
+          {"op":"singleLine","property":"Code"},
+          {"op":"nonBlank","property":"Message"},
+          {"op":"singleLine","property":"Message"}
         ]}}
       ]
     }

@@ -905,7 +905,9 @@ internal static class WorkerProtocolMetadata
     ];
     internal static bool IsProtocolErrorValid(WorkerProtocolError value) =>
         (!string.IsNullOrWhiteSpace(value.Code)
-        && !string.IsNullOrWhiteSpace(value.Message));
+        && WorkerProtocolJson.IsSingleLineText(value.Code)
+        && !string.IsNullOrWhiteSpace(value.Message)
+        && WorkerProtocolJson.IsSingleLineText(value.Message));
 }
 
 internal enum WorkerManifestIdentityFieldKind

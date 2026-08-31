@@ -767,6 +767,13 @@ public static partial class WorkerProtocolJson
         return CompleteUnique(values, static value => !string.IsNullOrWhiteSpace(value), static value => value);
     }
 
+    internal static bool IsSingleLineText(string? value)
+    {
+        return value != null && value.All(static character =>
+            !char.IsControl(character) &&
+            character is not '\u2028' and not '\u2029');
+    }
+
     internal static bool AreDefinedUnique<T>(T[]? values, T unspecified, bool nonEmpty)
             where T : struct, Enum
     {

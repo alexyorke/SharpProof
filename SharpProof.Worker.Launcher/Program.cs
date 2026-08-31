@@ -401,7 +401,6 @@ internal static class Program
         if (!validation.IsValid)
         {
             WriteErrors(validation.Errors, "SharpProof ");
-            WriteErrors(response?.Errors ?? [], "SharpProof worker ");
             return 3;
         }
         if (workerExitCode is not (null or 0) &&
