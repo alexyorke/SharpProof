@@ -16,6 +16,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     ICancelableTask, IDisposable
 {
     internal const int LauncherProcessReserveMilliseconds = 1000;
+    private const int StructuredSemanticFailureExitCode = 6;
     // The worker launcher can legitimately spend the full publication lease
     // timeout after its worker budget expires. Keep that wait outside the
     // worker budget, followed by the existing bounded room for finalization
@@ -378,6 +379,11 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             }
             process?.Dispose();
         }
+        // The launcher reserves exit 6 for a completed semantic policy
+        // failure. A diagnostic observed before any other nonzero exit is
+        // partial and must not suppress the target's infrastructure error.
+        HasStructuredError &=
+            ExitCode == StructuredSemanticFailureExitCode;
         return true;
     }
 
