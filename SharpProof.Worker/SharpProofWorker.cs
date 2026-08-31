@@ -215,11 +215,30 @@ public sealed class SharpProofWorker : IDisposable
                     .ConfigureAwait(false);
                 ownsInjectedBackendRunGate = true;
             }
-            if (!TryCreateLanes(request.Budgets, targets.Length, out solverLanes, out var backendError))
+            var laneCreation = TryCreateLanes(
+                request.Budgets,
+                targets.Length,
+                out solverLanes,
+                out var laneError);
+            if (laneCreation != LaneCreationResult.Success)
             {
-                return FailedAfterManifest(WorkerRunFailureReason.BackendUnavailable,
-                    Error("backend.unavailable", "The native SMT backend is unavailable: " + backendError),
-                    WorkerClaimReason.BackendUnavailable);
+                var backendUnavailable =
+                    laneCreation == LaneCreationResult.BackendUnavailable;
+                return FailedAfterManifest(
+                    backendUnavailable
+                        ? WorkerRunFailureReason.BackendUnavailable
+                        : WorkerRunFailureReason.InfrastructureFailure,
+                    Error(
+                        backendUnavailable
+                            ? "backend.unavailable"
+                            : "worker.infrastructure",
+                        (backendUnavailable
+                            ? "The native SMT backend is unavailable: "
+                            : "The worker could not initialize verification lanes: ") +
+                        laneError),
+                    backendUnavailable
+                        ? WorkerClaimReason.BackendUnavailable
+                        : WorkerClaimReason.InfrastructureFailure);
             }
             var orderedTargets = targets.OrderBy(
                 static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
@@ -445,21 +464,23 @@ public sealed class SharpProofWorker : IDisposable
         return (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
     }
 
-    private bool TryCreateLanes(WorkerBudgets budgets, int targetCount,
+    private LaneCreationResult TryCreateLanes(
+        WorkerBudgets budgets,
+        int targetCount,
         out VerificationLane[] lanes, out string? error)
     {
         lanes = [];
         error = null;
         if (targetCount == 0)
         {
-            return true;
+            return LaneCreationResult.Success;
         }
 
         if (_backend != null)
         {
             lanes = [CreateLane(_backend, budgets.MaximumExpressionDepth, null, null,
                 _readConsumedResourceCount)];
-            return true;
+            return LaneCreationResult.Success;
         }
         var created = new List<VerificationLane>();
         try
@@ -477,7 +498,7 @@ public sealed class SharpProofWorker : IDisposable
                     backend as IDisposable, _backendFactory));
             }
             lanes = [.. created];
-            return true;
+            return LaneCreationResult.Success;
         }
         catch (Exception exception) when (exception is not OutOfMemoryException and
             not StackOverflowException and not OperationCanceledException)
@@ -488,7 +509,9 @@ public sealed class SharpProofWorker : IDisposable
             }
 
             error = exception.GetBaseException().Message;
-            return false;
+            return Program.IsBackendUnavailable(exception)
+                ? LaneCreationResult.BackendUnavailable
+                : LaneCreationResult.InfrastructureFailure;
         }
     }
 
@@ -585,6 +608,13 @@ public sealed class SharpProofWorker : IDisposable
     {
         Success,
         Unsupported,
+        BackendUnavailable,
+        InfrastructureFailure
+    }
+
+    private enum LaneCreationResult
+    {
+        Success,
         BackendUnavailable,
         InfrastructureFailure
     }
