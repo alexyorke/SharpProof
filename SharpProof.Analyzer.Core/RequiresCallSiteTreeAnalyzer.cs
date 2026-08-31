@@ -547,10 +547,9 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 return false;
             }
 
-            // A real local named "_" is a destination and remains reachable.
-            return semanticModel.GetSymbolInfo(
+            return semanticModel.GetOperation(
                 discard,
-                cancellationToken).Symbol == null;
+                cancellationToken) is IDiscardOperation;
         }
 
         private bool TryGetLocalDestination(
