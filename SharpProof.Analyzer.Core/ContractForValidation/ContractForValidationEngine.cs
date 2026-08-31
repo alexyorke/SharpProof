@@ -5,7 +5,8 @@ internal static class ContractForValidationEngine
     internal static ImmutableArray<Diagnostic> Validate(
         Compilation compilation,
         ImmutableArray<INamedTypeSymbol> candidates,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<SyntaxTree, bool>? includeTree = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (candidates.IsDefaultOrEmpty)
@@ -42,6 +43,7 @@ internal static class ContractForValidationEngine
             compilation,
             candidates,
             diagnostics,
+            includeTree,
             cancellationToken);
         var relationships = ContractForSymbolMatcher
             .ClassifyCompanionRelationships(
@@ -169,6 +171,7 @@ internal static class ContractForValidationEngine
         Compilation compilation,
         ImmutableArray<INamedTypeSymbol> candidates,
         List<Diagnostic> diagnostics,
+        Func<SyntaxTree, bool>? includeTree,
         CancellationToken cancellationToken)
     {
         var result = ImmutableArray.CreateBuilder<ResolvedCompanion>();
@@ -176,7 +179,8 @@ internal static class ContractForValidationEngine
                      (IEqualityComparer<INamedTypeSymbol>)SymbolEqualityComparer.Default))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var attributes = ContractForSymbolMatcher.GetAttributes(companion, contractFor);
+            var attributes = ContractForSymbolMatcher.GetAttributes(
+                companion, contractFor, includeTree);
             var fallback = ContractForCompanionValidator.GetSourceLocation(
                 companion, compilation, Location.None);
             if (attributes.Length != 1)

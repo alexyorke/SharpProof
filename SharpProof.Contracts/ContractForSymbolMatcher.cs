@@ -63,9 +63,13 @@ internal static class ContractForSymbolMatcher
 
     internal static ImmutableArray<AttributeData> GetAttributes(
         INamedTypeSymbol companion,
-        INamedTypeSymbol contractFor)
+        INamedTypeSymbol contractFor,
+        Func<SyntaxTree, bool>? includeTree = null)
     {
         return [.. companion.GetAttributes().Where(attribute =>
+            (attribute.ApplicationSyntaxReference == null ||
+             includeTree == null ||
+             includeTree(attribute.ApplicationSyntaxReference.SyntaxTree)) &&
             SymbolEqualityComparer.Default.Equals(
                 attribute.AttributeClass?.OriginalDefinition, contractFor.OriginalDefinition))];
     }
