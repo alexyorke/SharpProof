@@ -1515,6 +1515,49 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task NonCompletingPrefixSuppressesAccessorAndListPatternRefutations()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Subject {
+                public int Value {
+                    get { Contract.Requires(false); return 0; }
+                }
+            }
+
+            public sealed class ListLike {
+                public int Length {
+                    get { Contract.Requires(false); return 1; }
+                }
+
+                public int this[int index] => 0;
+            }
+
+            public static class Fixture {
+                private static void Stop() =>
+                    throw new System.Exception();
+
+                public static int UnreachableAccessor() {
+                    Stop();
+                    var subject = new Subject();
+                    return subject.Value;
+                }
+
+                public static bool UnreachableList(ListLike value) {
+                    Stop();
+                    return value is [0];
+                }
+            }
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task AllNormallyEvaluatedArgumentsCanProduceARefutation()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
