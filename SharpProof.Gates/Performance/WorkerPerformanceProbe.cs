@@ -242,6 +242,12 @@ internal static class WorkerPerformanceProbe
             var stopwatch = Stopwatch.StartNew();
             var waitLimit = checked(
                 (int)contract.ForcedTerminationMilliseconds + 10_000);
+            // Begin observing the worker before waiting for the launcher. If
+            // the worker exits first, reopening only after launcher exit can
+            // accidentally inspect a process that reused its numeric PID.
+            var workerExit = Task.Run(
+                () => WaitForProcessExit(workerProcessId, waitLimit),
+                boundary.Token);
 #pragma warning disable CA1849 // The deadline probe intentionally uses kernel waits.
             if (!process.WaitForExit(waitLimit))
             {
@@ -249,9 +255,7 @@ internal static class WorkerPerformanceProbe
                     "The launcher did not reach its hard deadline.");
             }
 
-            WaitForProcessExit(
-                workerProcessId,
-                Math.Max(0, waitLimit - (int)stopwatch.ElapsedMilliseconds));
+            await workerExit.WaitAsync(boundary.Token).ConfigureAwait(false);
 #pragma warning restore CA1849
             stopwatch.Stop();
             var output = await standardOutput.ConfigureAwait(false);
