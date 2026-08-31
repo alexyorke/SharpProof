@@ -15,6 +15,10 @@ internal sealed class CreationFlowCaptures
 
         if (value is not (IObjectCreationOperation or IArrayCreationOperation))
         {
+            // A later definition can reuse this capture ID at a control-flow
+            // merge. Remember non-creation provenance even when no fresh
+            // definition has been seen yet.
+            _ambiguous.Add(capture.Id);
             return;
         }
 
