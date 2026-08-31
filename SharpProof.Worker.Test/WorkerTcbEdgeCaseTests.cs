@@ -699,6 +699,43 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public void ClaimAssumptionsDoNotAliasManifestOrSiblingEvidence()
+    {
+        var target = CreateTrivialTarget();
+        target.Entry.Assumptions =
+        [
+            new WorkerAssumptionEvidence
+            {
+                Id = "assumption",
+                Kind = WorkerAssumptionKind.UserAssume
+            }
+        ];
+        var first = CallableClaimResultAssembler.Unknown(
+            target,
+            0,
+            WorkerClaimReason.UnsupportedExpression);
+        var sibling = CallableClaimResultAssembler.Unknown(
+            target,
+            0,
+            WorkerClaimReason.UnsupportedExpression);
+
+        first.Assumptions[0].Id = "mutated";
+        first.Assumptions[0].Used = true;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                first.Assumptions[0],
+                Is.Not.SameAs(target.Entry.Assumptions[0]));
+            Assert.That(first.Assumptions[0], Is.Not.SameAs(sibling.Assumptions[0]));
+            Assert.That(target.Entry.Assumptions[0].Id, Is.EqualTo("assumption"));
+            Assert.That(target.Entry.Assumptions[0].Used, Is.False);
+            Assert.That(sibling.Assumptions[0].Id, Is.EqualTo("assumption"));
+            Assert.That(sibling.Assumptions[0].Used, Is.False);
+        }
+    }
+
+    [Test]
     public void ProvenOutcomeWithUnmappedEvidenceFailsClosed()
     {
         var factory = new IrFactory();
