@@ -79,6 +79,10 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteConstruction(creation),
             IArrayCreationOperation array =>
                 CanCompleteArrayCreation(array),
+            IArrayInitializerOperation initializer =>
+                ChildrenCanComplete(initializer),
+            IInterpolatedStringOperation interpolation =>
+                CanCompleteInterpolatedString(interpolation),
             IConditionalAccessOperation conditional =>
                 CanCompleteConditionalAccess(conditional),
             IWithOperation withOperation =>
@@ -1098,6 +1102,48 @@ internal sealed class OperationCompletionEvaluator
 
         return array.Initializer == null ||
             CanCompleteNormally(array.Initializer);
+    }
+
+    private bool CanCompleteInterpolatedString(
+        IInterpolatedStringOperation interpolation)
+    {
+        if (interpolation.ConstantValue.HasValue)
+        {
+            return true;
+        }
+
+        var defersFormatting = StringConcatenationEffectResolver
+            .DefersInterpolationFormatting(
+                interpolation,
+                _compilation);
+        foreach (var part in interpolation.Parts)
+        {
+            if (part is not IInterpolationOperation value)
+            {
+                continue;
+            }
+
+            if (!CanCompleteNormally(value.Expression) ||
+                !CanCompleteNormally(value.Alignment) ||
+                !CanCompleteNormally(value.FormatString))
+            {
+                return false;
+            }
+            if (!defersFormatting &&
+                value.Alignment == null &&
+                value.FormatString == null &&
+                !StringConcatenationEffectResolver
+                    .CanFormattedValueCompleteNormally(
+                        value.Expression,
+                        value,
+                        _compilation,
+                        _abstractFlow,
+                        this))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private bool StaticInitializationMayComplete(ISymbol member)
