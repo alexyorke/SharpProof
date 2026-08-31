@@ -549,7 +549,7 @@ internal static partial class AnalyzerFeaturePipeline
             }
             var model = initializer.SyntaxTree == semanticModel.SyntaxTree
                 ? semanticModel
-                : CompilationModelProvider.GetSemanticModel(
+                : SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
                     semanticModel.Compilation,
                     initializer.SyntaxTree);
             var operation = model.GetOperation(
