@@ -551,6 +551,9 @@ internal static partial class AnalyzerFeaturePipeline
                     candidate.DeclaringSyntaxReferences.FirstOrDefault()?.SyntaxTree ??
                         initializer.SyntaxTree,
                     context.Compilation,
+                    context.CancellationToken) &&
+                !IsThisDelegatingConstructor(
+                    candidate,
                     context.CancellationToken))
             .ToArray();
         var root = context.SemanticModel.GetOperation(
@@ -627,6 +630,18 @@ internal static partial class AnalyzerFeaturePipeline
         SyntaxTree? Tree,
         TextSpan Span,
         string Message);
+
+    private static bool IsThisDelegatingConstructor(
+        IMethodSymbol constructor,
+        CancellationToken cancellationToken)
+    {
+        return constructor.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<ConstructorDeclarationSyntax>()
+            .Any(static declaration =>
+                declaration.Initializer?.ThisOrBaseKeyword.IsKind(
+                    SyntaxKind.ThisKeyword) == true);
+    }
 
     private static bool CanReachMemberInitializer(
         EqualsValueClauseSyntax target,
