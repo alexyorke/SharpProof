@@ -52,6 +52,53 @@ public sealed class DeferredCallCompletionTests
             """);
     }
 
+    [Test]
+    public void NonreturningAwaitOperandSuppressesAsyncSuffix()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System.Threading.Tasks;
+
+            public static class Sample {
+                private static int state;
+
+                private static Task NeverReturns() {
+                    while (true) { }
+                }
+
+                public static async Task Run() {
+                    await NeverReturns();
+                    state++;
+                }
+            }
+            """);
+        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var syntax = run.DeclaringSyntaxReferences.Single().GetSyntax();
+        var root = compilation.GetSemanticModel(syntax.SyntaxTree)
+            .GetOperation(syntax) ??
+            throw new InvalidOperationException("Run operation was not found.");
+        var awaitOperation = root.DescendantsAndSelf()
+            .OfType<IAwaitOperation>()
+            .Single();
+        var completion = new OperationCompletionEvaluator(
+            new EffectAnalysisSession(compilation),
+            run,
+            static (_, _) => false,
+            static (_, _) => false,
+            static _ => false);
+        var result = new EffectAnalysisSession(compilation).Analyze(run);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                completion.CanCompleteNormally(awaitOperation),
+                Is.False);
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+        }
+    }
+
     private static void AssertCallReturnsBeforeSuffix(string source)
     {
         var compilation = EffectTestHost.CreateCompilation(source);
