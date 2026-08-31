@@ -81,6 +81,23 @@ public static class ContainerContract
             throw new InvalidDataException(
                 "The SharpProof container contract root is not a JSON object.");
         }
+        var required = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "schemaVersion", "contractVersion", "platform", "dotnetSdkVersion",
+            "dotnetMinimumSdkVersion", "dotnetMinimumSdkFrameworkVersion",
+            "dotnetTestRuntimeVersion", "dotnetBaseImage", "dotnetBaseImageDigest",
+            "powershellVersionLine", "powershellImageDigest", "z3Version",
+            "z3LibraryBytes", "z3LibrarySha256", "verifierPackageId"
+        };
+        foreach (var property in actual.EnumerateObject())
+        {
+            if (!required.Remove(property.Name))
+                throw new InvalidDataException(
+                    $"The SharpProof container contract property '{property.Name}' is unknown or duplicated.");
+        }
+        if (required.Count != 0)
+            throw new InvalidDataException(
+                $"The SharpProof container contract property '{required.First()}' is missing.");
         RequireInteger(actual, "schemaVersion", 1);
         RequireInteger(
             actual,
@@ -94,6 +111,13 @@ public static class ContainerContract
             actual,
             "dotnetSdkVersion",
             RequireString(expected.GetProperty("dotnet"), "sdkVersion"));
+        RequireString(actual, "dotnetMinimumSdkVersion", RequireString(expected.GetProperty("dotnet"), "minimumSdkVersion"));
+        RequireString(actual, "dotnetMinimumSdkFrameworkVersion", RequireString(expected.GetProperty("dotnet"), "minimumSdkFrameworkVersion"));
+        RequireString(actual, "dotnetTestRuntimeVersion", RequireString(expected.GetProperty("dotnet"), "testRuntimeVersion"));
+        RequireString(actual, "dotnetBaseImage", RequireString(expected.GetProperty("dotnet"), "baseImage"));
+        RequireString(actual, "dotnetBaseImageDigest", RequireString(expected.GetProperty("dotnet"), "baseImageDigest"));
+        RequireString(actual, "powershellVersionLine", RequireString(expected.GetProperty("powershell"), "versionLine"));
+        RequireString(actual, "powershellImageDigest", RequireString(expected.GetProperty("powershell"), "imageDigest"));
         RequireString(
             actual,
             "z3Version",
