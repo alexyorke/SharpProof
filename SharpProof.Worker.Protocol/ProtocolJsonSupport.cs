@@ -167,7 +167,8 @@ public static partial class WorkerProtocolJson
         {
             parsed = Enum.Parse(enumType, text, ignoreCase: false);
         }
-        catch (ArgumentException exception)
+        catch (Exception exception) when (
+            exception is ArgumentException or OverflowException)
         {
             throw new JsonException("The JSON enum value is invalid.", exception);
         }
