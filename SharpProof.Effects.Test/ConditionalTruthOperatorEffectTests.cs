@@ -3,6 +3,98 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class ConditionalTruthOperatorEffectTests
 {
+    [TestCase("AndRightNeverCompletes", false)]
+    [TestCase("OrRightNeverCompletes", false)]
+    [TestCase("AndOperatorNeverCompletes", false)]
+    [TestCase("OrOperatorNeverCompletes", false)]
+    public void FixedTruthResultControlsConditionalCompletion(
+        string methodName,
+        bool suffixIsReachable)
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public sealed class Cell {
+                public int Value;
+            }
+
+            public readonly struct RequiredGate {
+                public static bool operator false(RequiredGate value) {
+                    _ = value;
+                    return false;
+                }
+                public static bool operator true(RequiredGate value) {
+                    _ = value;
+                    return false;
+                }
+                public static RequiredGate operator &(
+                    RequiredGate left,
+                    RequiredGate right) => left;
+                public static RequiredGate operator |(
+                    RequiredGate left,
+                    RequiredGate right) => left;
+            }
+
+            public readonly struct NonReturningGate {
+                public static bool operator false(NonReturningGate value) =>
+                    false;
+                public static bool operator true(NonReturningGate value) =>
+                    false;
+                public static NonReturningGate operator &(
+                    NonReturningGate left,
+                    NonReturningGate right) {
+                    while (true) { }
+                }
+                public static NonReturningGate operator |(
+                    NonReturningGate left,
+                    NonReturningGate right) {
+                    while (true) { }
+                }
+            }
+
+            public static class Sample {
+                public static void AndRightNeverCompletes(
+                    RequiredGate left,
+                    Cell suffix) {
+                    _ = left && Spin(left);
+                    suffix.Value++;
+                }
+                public static void OrRightNeverCompletes(
+                    RequiredGate left,
+                    Cell suffix) {
+                    _ = left || Spin(left);
+                    suffix.Value++;
+                }
+                public static void AndOperatorNeverCompletes(
+                    NonReturningGate left,
+                    Cell suffix) {
+                    _ = left && Identity(left);
+                    suffix.Value++;
+                }
+                public static void OrOperatorNeverCompletes(
+                    NonReturningGate left,
+                    Cell suffix) {
+                    _ = left || Identity(left);
+                    suffix.Value++;
+                }
+                private static RequiredGate Spin(RequiredGate value) {
+                    while (true) { }
+                }
+                private static NonReturningGate Identity(
+                    NonReturningGate value) => value;
+            }
+            """);
+        var method = EffectTestHost.RequireMethod(
+            compilation,
+            "Sample",
+            methodName);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(method);
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Parameter(1)),
+            Is.EqualTo(suffixIsReachable));
+    }
+
     [TestCase("And")]
     [TestCase("Or")]
     public void TruthOperatorEffectsPrecedeTheRightOperandAndReachCatches(
