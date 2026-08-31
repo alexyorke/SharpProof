@@ -93,6 +93,25 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void ApprovedAssemblyTokensAreUniqueIgnoringHexCase()
+    {
+        var declaration = Declaration("duplicate-token", "M:Missing.Row.Run", "Missing.Row");
+        var identity = RuntimeAssemblyIdentity();
+        declaration = declaration with
+        {
+            Target = declaration.Target with
+            {
+                ApprovedAssemblies = [
+                    identity,
+                    identity with { PublicKeyToken = identity.PublicKeyToken.ToUpperInvariant() }
+                ]
+            }
+        };
+
+        Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([declaration]));
+    }
+
+    [Test]
     public void SpecTypesAndOperatorsFailClosedOnUndefinedIrVocabulary()
     {
         var invalidType = Declaration(

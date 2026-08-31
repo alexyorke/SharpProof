@@ -226,7 +226,13 @@ public sealed partial class ApiSpecTable
                 throw new ArgumentException("Approved assembly identities are invalid.", nameof(declaration));
             }
         }
-        if (target.ApprovedAssemblies.Distinct().Count() != target.ApprovedAssemblies.Length)
+        if (target.ApprovedAssemblies
+                .Select(static assembly =>
+                    assembly.Name + "\u001f" +
+                    assembly.PublicKeyToken.ToUpperInvariant() + "\u001f" +
+                    (int)assembly.ReferenceFamily)
+                .Distinct(StringComparer.Ordinal)
+                .Count() != target.ApprovedAssemblies.Length)
         {
             throw new ArgumentException("Approved assembly identities must be unique.", nameof(declaration));
         }
