@@ -1170,6 +1170,50 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void CheckedUserConversionDoesNotInventIntrinsicOverflow()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public readonly struct Source {
+                public static explicit operator Target(Source value) =>
+                    default;
+                public static explicit operator checked Target(Source value) =>
+                    default;
+            }
+
+            public readonly struct Target {
+            }
+
+            public static class Sample {
+                public static Target Convert(Source value) =>
+                    checked((Target)value);
+            }
+            """);
+        var method = Method(compilation, "Convert");
+        var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
+        var operation = compilation.GetSemanticModel(syntax.SyntaxTree)
+            .GetOperation(syntax)!;
+        var conversion = operation.DescendantsAndSelf()
+            .OfType<IConversionOperation>()
+            .Single(static value => value.OperatorMethod != null);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(method);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(conversion.IsChecked, Is.True);
+            Assert.That(
+                conversion.OperatorMethod?.MetadataName,
+                Is.EqualTo("op_CheckedExplicit"));
+            Assert.That(result.Summary.Throws.IsEmpty, Is.True);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+            Assert.That(result.Projection.IsComplete, Is.True);
+        }
+    }
+
+    [Test]
     public void ConversionEffectsUseProvenNullnessAndNullablePresence()
     {
         var compilation = EffectTestHost.CreateCompilation(
