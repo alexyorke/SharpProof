@@ -278,6 +278,7 @@ internal sealed class CompilerCallableLowerer
             !RoslynProgramLowerer.IsDirectInvocation(invocation) ||
             invocation.TargetMethod.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
             !_apiSpecs.TryGet(invocation.TargetMethod, out var resolved) ||
+            resolved.Template.Facets.Throws.Behavior != SpecThrowBehavior.DoesNotThrow ||
             !TryAdmitSpecCallEffects(invocation, call, resolved.Template, out var consumesMemoryHavoc) ||
             !resolved.Template.Result.HasValue ||
             !TryGetSpecResultType(invocation.Type, resolved.Template.Target.ResultType,
