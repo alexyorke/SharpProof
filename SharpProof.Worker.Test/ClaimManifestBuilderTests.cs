@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using System.Reflection;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -2408,6 +2410,132 @@ public sealed class ClaimManifestBuilderTests
             claim.Kind == WorkerClaimKind.Postcondition).ToArray();
         Assert.That(claims, Has.Length.EqualTo(1));
         Assert.That(claims[0].ClaimId, Is.Not.Empty);
+    }
+
+    [Test]
+    public async Task DeeplyNestedUnselectedCallablesDoNotOverflowManifestDiscovery()
+    {
+        const string childVariable =
+            "SHARPPROOF_NESTED_CALLABLE_STACK_CHILD";
+        const string markerVariable =
+            "SHARPPROOF_NESTED_CALLABLE_STACK_MARKER";
+        if (!string.Equals(
+                Environment.GetEnvironmentVariable(childVariable),
+                "1",
+                StringComparison.Ordinal))
+        {
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "dotnet",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add("vstest");
+            startInfo.ArgumentList.Add(
+                typeof(ClaimManifestBuilderTests).Assembly.Location);
+            startInfo.ArgumentList.Add(
+                "/TestCaseFilter:FullyQualifiedName=" +
+                typeof(ClaimManifestBuilderTests).FullName + "." +
+                nameof(
+                    DeeplyNestedUnselectedCallablesDoNotOverflowManifestDiscovery));
+            startInfo.Environment[childVariable] = "1";
+            var marker = Path.Combine(
+                Path.GetTempPath(),
+                "nested-callable-stack-" + Guid.NewGuid().ToString("N"));
+            startInfo.Environment[markerVariable] = marker;
+            try
+            {
+                using var process = System.Diagnostics.Process.Start(startInfo)!;
+                var standardOutput = process.StandardOutput.ReadToEndAsync();
+                var standardError = process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+                var output = (await standardOutput) + Environment.NewLine +
+                    (await standardError);
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(process.ExitCode, Is.Zero, output);
+                    Assert.That(File.Exists(marker), Is.True, output);
+                }
+            }
+            finally
+            {
+                if (File.Exists(marker))
+                {
+                    File.Delete(marker);
+                }
+            }
+            return;
+        }
+
+        const int depth = 2048;
+        var source = new System.Text.StringBuilder(
+            "public static class Subject { public static void Outer() {");
+        for (var index = 0; index < depth; index++)
+        {
+            source.Append("void Local").Append(index).Append("() {");
+        }
+        source.Append("_ = 0;");
+        for (var index = 0; index < depth; index++)
+        {
+            source.Append('}');
+        }
+        source.Append("} }");
+
+        var compilation = GetCompilation(("Subject.cs", source.ToString()));
+        var builder = new ClaimManifestBuilder(compilation);
+        const BindingFlags privateInstance =
+            BindingFlags.Instance | BindingFlags.NonPublic;
+        var builderType = typeof(ClaimManifestBuilder);
+        var discover = builderType.GetMethod(
+            "DiscoverMethods",
+            privateInstance)!;
+        var createSeed = builderType.GetMethod(
+            "CreateSeed",
+            privateInstance)!;
+        var createIds = builderType.GetMethod(
+            "CreateCallableIds",
+            privateInstance)!;
+        var methods = (ImmutableArray<IMethodSymbol>)discover.Invoke(
+            builder,
+            null)!;
+        var seedType = createSeed.ReturnType;
+        var seedArray = Array.CreateInstance(seedType, methods.Length);
+        for (var index = 0; index < methods.Length; index++)
+        {
+            seedArray.SetValue(
+                createSeed.Invoke(builder, [methods[index]]),
+                index);
+        }
+        var createRange = typeof(ImmutableArray)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Single(static method =>
+                method.Name == nameof(ImmutableArray.CreateRange) &&
+                method.IsGenericMethodDefinition &&
+                method.GetParameters() is [{ ParameterType: { } parameter }] &&
+                parameter.IsGenericType &&
+                parameter.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            .MakeGenericMethod(seedType);
+        var seeds = createRange.Invoke(null, [seedArray])!;
+        ImmutableDictionary<IMethodSymbol, string>? ids = null;
+        var thread = new Thread(
+            () => ids =
+                (ImmutableDictionary<IMethodSymbol, string>)createIds.Invoke(
+                    builder,
+                    [seeds])!,
+            128 * 1024);
+        thread.Start();
+        thread.Join();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ids, Is.Not.Null);
+            Assert.That(ids, Has.Count.EqualTo(depth + 1));
+        }
+        await File.WriteAllTextAsync(
+            Environment.GetEnvironmentVariable(markerVariable)!,
+            "complete");
     }
 
     private static ClaimManifestBuildResult Build(
