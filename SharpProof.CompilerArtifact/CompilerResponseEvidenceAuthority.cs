@@ -595,11 +595,20 @@ internal sealed class CompilerResponseEvidenceAuthority :
         var unexpectedEffects = witness.Effects & ~evidence.Constraint.AllowedEffects;
         var unexpectedCapabilities =
             witness.Capabilities & ~evidence.Constraint.AllowedCapabilities;
+        const WorkerEffectSet impureState =
+            WorkerEffectSet.ReadsCapturedState |
+            WorkerEffectSet.ReadsStaticState |
+            WorkerEffectSet.ReadsAmbientState |
+            WorkerEffectSet.WritesReceiverState |
+            WorkerEffectSet.WritesArgumentState |
+            WorkerEffectSet.WritesCapturedState |
+            WorkerEffectSet.WritesStaticState |
+            WorkerEffectSet.WritesAmbientState;
         return evidence.ContractKind switch
         {
             WorkerEffectContractKind.EnforcePure =>
-                witness.Effects != WorkerEffectSet.None ||
-                witness.Capabilities != WorkerEffectCapabilitySet.None,
+                witness.Capabilities != WorkerEffectCapabilitySet.None ||
+                (witness.Effects & impureState) != WorkerEffectSet.None,
             WorkerEffectContractKind.ZeroAllocations =>
                 (witness.Effects & WorkerEffectSet.Allocates) != 0,
             WorkerEffectContractKind.AllowedCapabilities =>
