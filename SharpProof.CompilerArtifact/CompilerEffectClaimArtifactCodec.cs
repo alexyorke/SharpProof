@@ -105,14 +105,41 @@ internal static class CompilerEffectClaimArtifactCodec
         {
             (WorkerClaimOutcome.Proven, WorkerClaimReason.None, _, null, null) => true,
             (WorkerClaimOutcome.Refuted, WorkerClaimReason.None,
-                _, { } witness, { }) => WorkerProtocolJson.HasValidEffectWitness(witness) &&
+                _, { } witness, { } replay) => WorkerProtocolJson.HasValidEffectWitness(witness) &&
                     HasCanonicalStrings(witness.ExactExceptionTypeHierarchy) &&
-                    WorkerProtocolJson.HasValidLocation(witness.Location),
+                    WorkerProtocolJson.HasValidLocation(witness.Location) &&
+                    WitnessMatchesReplay(witness, replay),
             (WorkerClaimOutcome.Unknown,
                 var reason, _, null, null) when
                 CompilerEffectEvidenceCatalog.UnknownReasons.Contains(reason) => true,
             _ => false
         };
+    }
+
+    private static bool WitnessMatchesReplay(
+        WorkerEffectViolationWitness witness,
+        CompilerEffectReplayArtifact replay)
+    {
+        var eventValue = replay.Events is [var first, ..] ? first : null;
+        if (eventValue == null || witness.Location.Path != eventValue.Location.Path ||
+            witness.Location.Start != eventValue.Location.Start ||
+            witness.Location.Length != eventValue.Location.Length ||
+            witness.Location.Line != eventValue.Location.Line ||
+            witness.Location.Column != eventValue.Location.Column)
+        {
+            return false;
+        }
+
+        var required = eventValue.Kind switch
+        {
+            CompilerEffectReplayEventKind.ManagedObjectAllocation or
+            CompilerEffectReplayEventKind.ManagedArrayAllocation => WorkerEffectSet.Allocates,
+            CompilerEffectReplayEventKind.ExplicitThrow => WorkerEffectSet.Throws,
+            CompilerEffectReplayEventKind.MonitorCall or
+            CompilerEffectReplayEventKind.EmptyLock => WorkerEffectSet.Synchronizes,
+            _ => WorkerEffectSet.None
+        };
+        return required != WorkerEffectSet.None && (witness.Effects & required) != 0;
     }
 
     private static bool HasValidConstraint(
@@ -164,6 +191,7 @@ internal static class CompilerEffectClaimArtifactCodec
             !WorkerProtocolJson.IsSha256(value.SyntaxTreeSnapshotSha256) ||
             !WorkerProtocolJson.IsSha256(value.SyntaxTreeLineMapSha256) ||
             value.SourceTreeOrdinal < 0 ||
+            value.SourceTreeOrdinal != value.SyntaxTreeOrdinal ||
             string.IsNullOrWhiteSpace(value.SourceTreePath) ||
             !WorkerProtocolJson.IsSha256(value.SourceTreeSha256) ||
             !WorkerProtocolJson.IsSha256(value.SourceLineMapSha256) ||
