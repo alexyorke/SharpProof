@@ -4,6 +4,61 @@ namespace SharpProof.Effects.Test;
 public sealed class ConstructorRuntimeOrderRegressionTests
 {
     [Test]
+    public void ImplicitConstructorFollowsNonCompletingBaseConstructor()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+
+            public sealed class Box {
+                public int Value;
+            }
+
+            public class ThrowingBase {
+                protected ThrowingBase() =>
+                    throw new InvalidOperationException();
+            }
+
+            public sealed class ImplicitDerived : ThrowingBase { }
+
+            public static class Subject {
+                public static void Exercise(Box caught, Box after) {
+                    try {
+                        _ = new ImplicitDerived();
+                        after.Value++;
+                    }
+                    catch (InvalidOperationException) {
+                        caught.Value++;
+                    }
+                }
+            }
+            """);
+        var method = EffectTestHost.RequireType(compilation, "Subject")
+            .GetMembers("Exercise")
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        var summary = new EffectAnalysisSession(compilation)
+            .Analyze(method)
+            .Summary;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True,
+                "the base-constructor exception reaches its matching catch");
+            Assert.That(
+                summary.Writes.Contains(EffectRegionId.Parameter(1)),
+                Is.False,
+                "the definitely throwing base constructor blocks the suffix");
+            Assert.That(
+                summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void DelegatedBaseEffectsPrecedeFailingMemberInitializer()
     {
         var compilation = EffectTestHost.CreateCompilation(
