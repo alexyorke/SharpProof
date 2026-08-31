@@ -436,7 +436,9 @@ internal sealed partial class OperationEffectScanner
             : ScanStep(methodReference.Instance);
         if (!instance.CompletesNormally ||
             methodReference.Method.IsStatic ||
-            methodReference.Instance == null)
+            methodReference.Instance == null ||
+            MethodGroupConversionFacts
+                .UsesDelegateConstructorNullCheck(methodReference))
         {
             return instance.Summary;
         }
@@ -780,6 +782,38 @@ internal sealed partial class OperationEffectScanner
                     EffectAllocationKind.Managed),
                 true)).Summary
             : children.Summary;
+    }
+
+    private EffectSummary ScanDelegateCreation(
+        IDelegateCreationOperation delegateCreation)
+    {
+        var children = ScanSequence(delegateCreation.ChildOperations);
+        if (!children.CompletesNormally)
+        {
+            return children.Summary;
+        }
+
+        var allocation = EffectSummaryOperations.Allocate(
+            EffectAllocationKind.Managed);
+        var methodReference = MethodGroupConversionFacts
+            .GetDelegateConstructorCheckedTarget(delegateCreation);
+        if (methodReference?.Instance is not { } instance ||
+            _nullnessEvaluator.IsProvenNonNull(
+                instance,
+                methodReference))
+        {
+            return EffectSummaryOperations.Join(
+                children.Summary,
+                allocation);
+        }
+
+        return children.Then(new EffectStep(
+            EffectSummaryOperations.Join(
+                allocation,
+                Throw(FrameworkTypeMetadataNames.ArgumentException)),
+            !_nullnessEvaluator.IsProvenNull(
+                instance,
+                methodReference))).Summary;
     }
 
     private EffectSummary ScanThrow(IThrowOperation thrown)

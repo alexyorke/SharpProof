@@ -71,9 +71,10 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteField(field),
             IArrayElementReferenceOperation element =>
                 CanCompleteArrayElement(element),
-            IAnonymousObjectCreationOperation or
-                IDelegateCreationOperation =>
+            IAnonymousObjectCreationOperation =>
                 ChildrenCanComplete(operation),
+            IDelegateCreationOperation delegateCreation =>
+                CanCompleteDelegateCreation(delegateCreation),
             IObjectCreationOperation creation =>
                 CanCompleteConstruction(creation),
             IArrayCreationOperation array =>
@@ -725,7 +726,23 @@ internal sealed class OperationCompletionEvaluator
         return ChildrenCanComplete(methodReference) &&
             (methodReference.Method.IsStatic ||
              methodReference.Instance == null ||
+             MethodGroupConversionFacts
+                 .UsesDelegateConstructorNullCheck(methodReference) ||
              !_isProvenNull(methodReference.Instance, methodReference));
+    }
+
+    private bool CanCompleteDelegateCreation(
+        IDelegateCreationOperation delegateCreation)
+    {
+        if (!ChildrenCanComplete(delegateCreation))
+        {
+            return false;
+        }
+
+        var methodReference = MethodGroupConversionFacts
+            .GetDelegateConstructorCheckedTarget(delegateCreation);
+        return methodReference?.Instance is not { } instance ||
+            !_isProvenNull(instance, methodReference);
     }
 
     private bool CanCompleteField(IFieldReferenceOperation field)
@@ -1101,6 +1118,14 @@ internal sealed class OperationCompletionEvaluator
     private bool CanCompleteConversion(IConversionOperation conversion)
     {
         if (!CanCompleteNormally(conversion.Operand))
+        {
+            return false;
+        }
+
+        var methodReference = MethodGroupConversionFacts
+            .GetDelegateConstructorCheckedTarget(conversion);
+        if (methodReference?.Instance is { } methodInstance &&
+            _isProvenNull(methodInstance, methodReference))
         {
             return false;
         }

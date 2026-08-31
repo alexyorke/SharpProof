@@ -6,6 +6,7 @@ namespace SharpProof.Specs;
 /// </summary>
 public static class FrameworkTypeMetadataNames
 {
+    public const string ArgumentException = "System.ArgumentException";
     public const string ArgumentNullException = "System.ArgumentNullException";
     public const string ArrayTypeMismatchException =
         "System.ArrayTypeMismatchException";

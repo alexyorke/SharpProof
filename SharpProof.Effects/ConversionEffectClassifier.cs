@@ -71,7 +71,19 @@ internal sealed class ConversionEffectClassifier(
         { IsAnonymousFunction: true } or
         { IsMethodGroup: true })
         {
-            return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
+            var allocation = EffectSummaryOperations.Allocate(
+                EffectAllocationKind.Managed);
+            var methodReference = conversion.IsMethodGroup
+                ? MethodGroupConversionFacts
+                    .GetDelegateConstructorCheckedTarget(operation)
+                : null;
+            return methodReference?.Instance is { } instance &&
+                !IsDefinitelyNonNull(operation, instance) &&
+                !DefiniteOperationFacts.IsDefinitelyNonNull(instance)
+                    ? EffectSummaryOperations.Join(
+                        allocation,
+                        Throw(FrameworkTypeMetadataNames.ArgumentException))
+                    : allocation;
         }
 
         if (conversion is

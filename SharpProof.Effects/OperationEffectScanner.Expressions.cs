@@ -708,7 +708,7 @@ internal sealed partial class OperationEffectScanner
         return operation switch
         {
             IDelegateCreationOperation allocation =>
-                ScanManagedAllocation(allocation),
+                ScanDelegateCreation(allocation),
             IAnonymousObjectCreationOperation allocation =>
                 ScanManagedAllocation(allocation),
             IThrowOperation thrown when IsSourceThrow(thrown) =>

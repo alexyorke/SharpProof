@@ -24,6 +24,9 @@ internal sealed class ExceptionHandlerReachability(
     private readonly INamedTypeSymbol? _nullReferenceExceptionType =
         compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.NullReferenceException);
+    private readonly INamedTypeSymbol? _argumentExceptionType =
+        compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.ArgumentException);
     private readonly INamedTypeSymbol? _argumentNullExceptionType =
         compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.ArgumentNullException);
@@ -1135,17 +1138,55 @@ internal sealed class ExceptionHandlerReachability(
                 PushChildren(awaitOperation);
                 continue;
             }
-            if (operation is IMethodReferenceOperation methodReference &&
-                methodReference.Instance is { } methodInstance &&
-                !methodReference.Method.IsStatic)
+            if (operation is IDelegateCreationOperation delegateCreation)
+            {
+                var delegateMethodReference = MethodGroupConversionFacts
+                    .GetDelegateConstructorCheckedTarget(delegateCreation);
+                if (delegateMethodReference?.Instance is { } delegateInstance)
+                {
+                    Add(
+                        GetPotentialNullReceiver(
+                            delegateMethodReference,
+                            delegateInstance,
+                            _argumentExceptionType,
+                            out _),
+                        delegateCreation);
+                    PushChildren(delegateCreation);
+                    continue;
+                }
+            }
+            if (operation is IConversionOperation methodGroupConversion)
+            {
+                var conversionMethodReference = MethodGroupConversionFacts
+                    .GetDelegateConstructorCheckedTarget(
+                        methodGroupConversion);
+                if (conversionMethodReference?.Instance is
+                    { } conversionInstance)
+                {
+                    Add(
+                        GetPotentialNullReceiver(
+                            conversionMethodReference,
+                            conversionInstance,
+                            _argumentExceptionType,
+                            out _),
+                        methodGroupConversion);
+                    PushChildren(methodGroupConversion);
+                    continue;
+                }
+            }
+            if (operation is IMethodReferenceOperation referencedMethod &&
+                referencedMethod.Instance is { } methodInstance &&
+                !referencedMethod.Method.IsStatic &&
+                !MethodGroupConversionFacts
+                    .UsesDelegateConstructorNullCheck(referencedMethod))
             {
                 Add(
                     GetPotentialNullReceiver(
-                        methodReference,
+                        referencedMethod,
                         methodInstance,
                         out _),
-                    methodReference);
-                PushChildren(methodReference);
+                    referencedMethod);
+                PushChildren(referencedMethod);
                 continue;
             }
             if (CanThrowUnknownAfterPrerequisites(operation))
@@ -1866,6 +1907,19 @@ internal sealed class ExceptionHandlerReachability(
         IOperation instance,
         out bool dereferenceCompletes)
     {
+        return GetPotentialNullReceiver(
+            origin,
+            instance,
+            _nullReferenceExceptionType,
+            out dereferenceCompletes);
+    }
+
+    private PotentialExceptions GetPotentialNullReceiver(
+        IOperation origin,
+        IOperation instance,
+        INamedTypeSymbol? exceptionType,
+        out bool dereferenceCompletes)
+    {
         if (!canCompleteNormally(instance))
         {
             dereferenceCompletes = false;
@@ -1887,14 +1941,14 @@ internal sealed class ExceptionHandlerReachability(
         {
             return EmptyPotential;
         }
-        if (_nullReferenceExceptionType is not { } nullReferenceException)
+        if (exceptionType == null)
         {
             return UnknownPotential;
         }
         return new PotentialExceptions(
             ImmutableHashSet.Create<INamedTypeSymbol>(
                 SymbolEqualityComparer.Default,
-                nullReferenceException),
+                exceptionType),
             Unknown: false);
     }
 
