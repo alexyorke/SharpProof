@@ -45,6 +45,25 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void ProtocolCanonicalizationDoesNotRescanManifestRows()
+    {
+        const int smallSize = 512;
+        const int largeSize = 4096;
+        _ = MeasureCanonicalization(CreateValidationScalingResponse(4));
+        var small = MeasureCanonicalization(
+            CreateValidationScalingResponse(smallSize));
+        var large = MeasureCanonicalization(
+            CreateValidationScalingResponse(largeSize));
+        var maximumLarge = small * 16 + TimeSpan.FromMilliseconds(250);
+
+        Assert.That(
+            large,
+            Is.LessThanOrEqualTo(maximumLarge),
+            $"small={small.TotalMilliseconds:F0} ms, " +
+            $"large={large.TotalMilliseconds:F0} ms");
+    }
+
+    [Test]
     public void ProtocolSerializersRejectDocumentsBeyondReaderLimit()
     {
         var oversizedValue = new string(
@@ -2139,6 +2158,18 @@ public sealed class ProtocolJsonTests
             string.Join(
                 ", ",
                 validation.Errors.Select(static error => error.Code)));
+        return stopwatch.Elapsed;
+    }
+
+    private static TimeSpan MeasureCanonicalization(
+        WorkerVerifyResponse response)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        WorkerProtocolJson.Canonicalize(response);
+        stopwatch.Stop();
+
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(
+            response.Manifest.Claims.Length));
         return stopwatch.Elapsed;
     }
 
