@@ -275,9 +275,10 @@ public static partial class WorkerProtocolJson
             result.Assumptions = CanonicalizeAssumptions(result.Assumptions);
         }
 
+        var claimsById = CreateClaimIndex(response.Manifest);
         response.ClaimResults = [.. (response.ClaimResults ?? [])
-            .OrderBy(value => FindClaimCallableId(response.Manifest, value?.ClaimId), s_ordinal)
-            .ThenBy(value => FindClaimOrdinal(response.Manifest, value?.ClaimId))
+            .OrderBy(value => FindClaimCallableId(claimsById, value?.ClaimId), s_ordinal)
+            .ThenBy(value => FindClaimOrdinal(claimsById, value?.ClaimId))
             .ThenBy(static value => value?.ClaimId, s_ordinal)];
         foreach (var result in response.ClaimResults.OfType<WorkerClaimResult>())
         {
@@ -1026,16 +1027,26 @@ public static partial class WorkerProtocolJson
         EnsureJsonShape(json, typeof(T).Name);
         return JsonSerializer.Deserialize<T>(json, s_options);
     }
-    private static int FindClaimOrdinal(WorkerClaimManifest? manifest, string? id)
+    private static OrdinalIdentityIndex<WorkerClaimManifestEntry>
+        CreateClaimIndex(WorkerClaimManifest? manifest)
     {
-        return manifest?.Claims?.FirstOrDefault(value => value != null && value.ClaimId == id)?.Ordinal ??
-        int.MaxValue;
+        return new(
+            (manifest?.Claims ?? []).OfType<WorkerClaimManifestEntry>(),
+            static value => value.ClaimId);
     }
 
-    private static string FindClaimCallableId(WorkerClaimManifest? manifest, string? id)
+    private static int FindClaimOrdinal(
+        OrdinalIdentityIndex<WorkerClaimManifestEntry> claimsById,
+        string? id)
     {
-        return manifest?.Claims?.FirstOrDefault(value => value != null && value.ClaimId == id)?.CallableId ??
-            string.Empty;
+        return claimsById.Find(id)?.Ordinal ?? int.MaxValue;
+    }
+
+    private static string FindClaimCallableId(
+        OrdinalIdentityIndex<WorkerClaimManifestEntry> claimsById,
+        string? id)
+    {
+        return claimsById.Find(id)?.CallableId ?? string.Empty;
     }
 
     internal static bool IsSha256(string? value)

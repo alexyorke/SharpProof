@@ -18,6 +18,7 @@ public static partial class WorkerProtocolJson
                     static value => value?.ClaimId,
                     StringComparer.Ordinal)
         ];
+        var claimsById = CreateClaimIndex(manifest);
         manifest.Callables = SortOrdinal(
             manifest.Callables,
             static value => value?.CallableId);
@@ -31,7 +32,7 @@ public static partial class WorkerProtocolJson
             callable.ClaimIds = [
                 .. (callable.ClaimIds ?? [])
                     .OrderBy(id =>
-                        FindClaimOrdinal(manifest, id))
+                        FindClaimOrdinal(claimsById, id))
                     .ThenBy(
                         static id => id,
                         StringComparer.Ordinal)
