@@ -505,7 +505,7 @@ internal sealed class EffectMethodNodeBuilder
              apiSpecs));
     }
 
-    private static bool CanTriggerOwnTypeInitialization(IMethodSymbol method)
+    internal static bool CanTriggerOwnTypeInitialization(IMethodSymbol method)
     {
         return method.MethodKind == MethodKind.Constructor ||
         method.MethodKind != MethodKind.StaticConstructor &&

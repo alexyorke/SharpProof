@@ -26,6 +26,7 @@ public sealed class EffectAnalysisSession
     private readonly InvocationEmissionPolicy _invocationEmission;
     private readonly ExternalEffectResolver _external;
     private readonly EffectKnownSymbols _knownSymbols;
+    private readonly CSharpCompilation? _metadataImportCompilation;
     private readonly IEffectCallPreconditionPolicy
         _callPreconditions;
     private readonly EffectModuleInitialization _moduleInitialization;
@@ -54,6 +55,11 @@ public sealed class EffectAnalysisSession
         IEffectCallPreconditionPolicy? callPreconditions = null)
     {
         _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        _metadataImportCompilation = compilation is CSharpCompilation csharp
+            ? csharp.WithOptions(
+                csharp.Options.WithMetadataImportOptions(
+                    MetadataImportOptions.All))
+            : null;
         _invocationEmission = new InvocationEmissionPolicy(compilation);
         _external = new ExternalEffectResolver(compilation,
             ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs)));
@@ -211,11 +217,77 @@ public sealed class EffectAnalysisSession
         return EffectSummaryOperations.Join(
             preconditionEvidence,
             EffectSummaryOperations.DirectCall(),
+            ResolveExactMetadataTypeInitialization(normalized),
             EffectSummaryOperations.Remap(
                 _external.Resolve(normalized),
                 receiver,
                 writeReceiver,
                 arguments));
+    }
+
+    private EffectSummary ResolveExactMetadataTypeInitialization(
+        IMethodSymbol target)
+    {
+        if (!ApiSpecs.TryGet(target, out var spec) ||
+            !EffectMethodNodeBuilder.CanTriggerOwnTypeInitialization(
+                target))
+        {
+            return EffectSummary.Empty;
+        }
+
+        var importedType = ResolveImportedMetadataType(
+            target,
+            spec.Template.Target.ContainingTypeMetadataName);
+        if (importedType == null)
+        {
+            return EffectSummaryOperations.UnknownBoundary(
+                EffectUncertainty.UnmodeledCall);
+        }
+
+        var initializers = importedType.StaticConstructors;
+        if (initializers.IsDefaultOrEmpty)
+        {
+            return EffectSummary.Empty;
+        }
+
+        if (initializers.Length != 1)
+        {
+            return EffectSummaryOperations.UnknownBoundary(
+                EffectUncertainty.UnmodeledCall);
+        }
+
+        return WrapTypeInitializationFailures(
+            new ExternalEffectResolver(
+                _metadataImportCompilation!,
+                ApiSpecs).Resolve(initializers[0]));
+    }
+
+    private INamedTypeSymbol? ResolveImportedMetadataType(
+        IMethodSymbol target,
+        string metadataName)
+    {
+        if (_metadataImportCompilation == null)
+        {
+            return null;
+        }
+
+        foreach (var reference in _compilation.References)
+        {
+            if (_compilation.GetAssemblyOrModuleSymbol(reference)
+                    is not IAssemblySymbol assembly ||
+                !SymbolEqualityComparer.Default.Equals(
+                    assembly,
+                    target.ContainingAssembly) ||
+                _metadataImportCompilation.GetAssemblyOrModuleSymbol(
+                    reference) is not IAssemblySymbol importedAssembly)
+            {
+                continue;
+            }
+
+            return importedAssembly.GetTypeByMetadataName(metadataName);
+        }
+
+        return null;
     }
 
     internal EffectSummary ResolveEntryPreconditions(
