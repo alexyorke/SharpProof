@@ -132,7 +132,7 @@ internal sealed class OperationNullnessEvaluator
         return value == null ||
             value is IInstanceReferenceOperation ||
             (value.Type is { IsValueType: true } type &&
-             !ManagedAbstractFlow.IsNullableType(type)) ||
+             !ManagedAbstractValue.IsNullableType(type)) ||
             DefiniteOperationFacts.IsDefinitelyNonNull(value) ||
             _abstractFlow?.ProvesNonNull(access, value) == true;
     }
