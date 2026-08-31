@@ -1,5 +1,7 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
+using SharpProof.ContractForValidation;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -8,6 +10,41 @@ public sealed class ContractForCycleAnalyzerTests
 {
     private static readonly string[] DiagnosticIds =
         ["SP0047", "SPCF0009", "SPCF0010"];
+
+    [Test]
+    public void ContractForAttributesFromExcludedPartialTreesAreIgnored()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation("""
+            using SharpProof.Attributes;
+            public interface ITarget { int Map(int value); }
+            public static partial class Contracts
+            {
+                [ContractFor(typeof(ITarget))]
+                public static int Map(ITarget receiver, int value) => value;
+            }
+            """, []);
+        var excluded = CSharpSyntaxTree.ParseText("""
+            using SharpProof.Attributes;
+            public static partial class Contracts
+            {
+                [ContractFor(typeof(ITarget), "malformed")] 
+                public static int Extra(ITarget receiver, int value) => value;
+            }
+            """, (CSharpParseOptions)compilation.SyntaxTrees[0].Options, path: "excluded.cs");
+        compilation = compilation.AddSyntaxTrees(excluded);
+        var candidates = ContractForValidationEngine.FindCandidates(
+            compilation,
+            tree => tree.FilePath != "excluded.cs",
+            CancellationToken.None);
+
+        var diagnostics = ContractForValidationEngine.Validate(
+            compilation,
+            candidates,
+            CancellationToken.None,
+            tree => tree.FilePath != "excluded.cs");
+
+        Assert.That(diagnostics, Is.Empty);
+    }
 
     [Test]
     public async Task SelfTargetIsRejectedAndItsBodyIsAnalyzedAsImplementation()
