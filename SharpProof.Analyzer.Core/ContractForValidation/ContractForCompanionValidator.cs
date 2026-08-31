@@ -212,7 +212,8 @@ internal static class ContractForCompanionValidator
 
         foreach (var violation in intrinsics.Validate(
                      method,
-                     inventory.ImplementationBody))
+                     inventory.ImplementationBody,
+                     includeNestedCallables: true))
         {
             cancellationToken.ThrowIfCancellationRequested();
             diagnostics.Add(
