@@ -612,7 +612,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         var property = (IPropertySymbol)context.Symbol;
         if (property.Type.SpecialType == SpecialType.System_String &&
-            IsNamespaceOrNested(property.ContainingNamespace, "SharpProof", "Ir"))
+            IsNamespaceOrNested(property.ContainingNamespace, "SharpProof", "Ir") &&
+            IsAutoProperty(property, context.CancellationToken))
         {
             Report(context, MetaDiagnosticDescriptors.StringFieldInIr, property.Locations.FirstOrDefault(), property.Name);
         }
