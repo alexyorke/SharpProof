@@ -546,6 +546,26 @@ public sealed class ClaimManifestBuilderTests
     }
 
     [Test]
+    public void ExplicitInterfaceImplementationCanBeVerifierSupported()
+    {
+        var result = Build((
+            "Subject.cs",
+            """
+            using SharpProof.Attributes;
+            public interface ISubject { int Read(int value); }
+            public sealed class Subject : ISubject {
+                [EnforcePure]
+                int ISubject.Read(int value) => value;
+            }
+            """));
+
+        var target = result.Targets.Values.Single();
+        Assert.That(target.Method.MethodKind,
+            Is.EqualTo(MethodKind.ExplicitInterfaceImplementation));
+        Assert.That(target.IsVerifierSupported, Is.True);
+    }
+
+    [Test]
     public void DirectClausesOwnTheEntireContractSource()
     {
         var result = Build((

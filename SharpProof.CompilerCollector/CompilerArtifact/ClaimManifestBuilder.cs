@@ -97,7 +97,8 @@ internal sealed partial class ClaimManifestBuilder(
                 ConstructorDeclarationSyntax &&
             target.MethodKind is
                 MethodKind.Ordinary or
-                MethodKind.Constructor &&
+                MethodKind.Constructor or
+                MethodKind.ExplicitInterfaceImplementation &&
             selectedSubset.IsSupported;
         var location = CallableLocation(target, seed.Declaration);
         var effects = EffectsEnabled
