@@ -41,6 +41,9 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
             var requestPath = ResolvePath(RequestPath);
             var resultPath = ResolvePath(ResultPath);
             var manifestPath = ResolvePath(ManifestPath);
+            var sarifPath = string.IsNullOrWhiteSpace(SarifPath)
+                ? null
+                : ResolvePath(SarifPath!);
             // The launcher publishes these files as one owned set. Hold the
             // same lease while reading them so a concurrent publisher cannot
             // interleave generations between the independent reads below.
@@ -123,6 +126,22 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
                 {
                     throw new InvalidDataException(
                         "the published result does not belong to this invocation");
+                }
+            }
+            if (sarifPath != null)
+            {
+                using var sarif = JsonDocument.Parse(
+                    WorkerProtocolJson.ReadUtf8File(sarifPath));
+                var root = sarif.RootElement;
+                if (root.ValueKind != JsonValueKind.Object ||
+                    !root.TryGetProperty("version", out var version) ||
+                    version.ValueKind != JsonValueKind.String ||
+                    version.GetString() != "2.1.0" ||
+                    !root.TryGetProperty("runs", out var runs) ||
+                    runs.ValueKind != JsonValueKind.Array || runs.GetArrayLength() == 0)
+                {
+                    throw new InvalidDataException(
+                        "the published SARIF does not satisfy SARIF 2.1.0");
                 }
             }
         }
