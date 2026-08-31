@@ -155,6 +155,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 : processTimeout - LauncherProcessReserveMilliseconds;
             PreLaunchSetupOverride?.Invoke();
             var resolvedExecutable = ResolveDotNetHost(Executable);
+            var executableIdentity = GetFileIdentity(resolvedExecutable);
+            var supervisorAssembly = ResolveSupervisorAssemblyRequired();
+            var supervisorIdentity = GetFileIdentity(supervisorAssembly);
+            if (GetFileIdentity(resolvedExecutable) != executableIdentity ||
+                GetFileIdentity(supervisorAssembly) != supervisorIdentity)
+            {
+                throw new InvalidOperationException(
+                    "SharpProof verifier runtime changed after validation.");
+            }
             supervisorNonce = CreateSupervisorNonce();
             process = new Process
             {
@@ -171,7 +180,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             };
             process.StartInfo.ArgumentList.Add(resolvedExecutable);
             process.StartInfo.ArgumentList.Add(
-                ResolveSupervisorAssemblyRequired());
+                supervisorAssembly);
             process.StartInfo.ArgumentList.Add("--supervise-verifier");
             process.StartInfo.ArgumentList.Add(resolvedExecutable);
             foreach (var argument in Arguments)
@@ -1316,6 +1325,12 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         LinuxPathIdentity.Canonicalize(
             Path.Combine(directoryPath, "host", "fxr"));
         return resolved;
+    }
+
+    private static string GetFileIdentity(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream));
     }
 
     private static partial class NativeMethods

@@ -56,6 +56,7 @@ internal sealed class CompilerCompilationOptionsSnapshot
     public int WarningLevel { get; set; }
     public CompilerReportDiagnostic GeneralDiagnosticOption { get; set; }
     public CompilerDiagnosticOptionSnapshot[] SpecificDiagnosticOptions { get; set; } = [];
+    public bool ReportSuppressedDiagnostics { get; set; }
     public bool CheckOverflow { get; set; }
     public bool AllowUnsafe { get; set; }
     public bool Deterministic { get; set; }

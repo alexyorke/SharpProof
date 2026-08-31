@@ -3156,6 +3156,16 @@
           }
         },
         {
+          "name": "ReportSuppressedDiagnostics",
+          "jsonName": "reportSuppressedDiagnostics",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
+        },
+        {
           "name": "CheckOverflow",
           "jsonName": "checkOverflow",
           "type": "bool",

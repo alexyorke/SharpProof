@@ -148,6 +148,7 @@ internal static class CompilerCompilationCapture
                         Id = option.Key,
                         ReportDiagnostic = CompilerOptionWireMappings.Map(option.Value)
                     })],
+                ReportSuppressedDiagnostics = options.ReportSuppressedDiagnostics,
                 CheckOverflow = options.CheckOverflow,
                 AllowUnsafe = options.AllowUnsafe,
                 Deterministic = options.Deterministic,
