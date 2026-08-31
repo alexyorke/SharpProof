@@ -763,7 +763,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                             continue;
                         }
                         var patternDestinations = GetPatternDestinations(
-                            reference.Syntax);
+                            reference,
+                            propagatedTuplePath);
                         if (patternDestinations.Count != 0)
                         {
                             foreach (var patternAlias in patternDestinations)
@@ -772,7 +773,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                                     patternAlias.Local,
                                     ordinal,
                                     patternAlias.Definition.Span.End,
-                                    propagatedTuplePath));
+                                    patternAlias.TuplePath));
                             }
                             continue;
                         }
@@ -1349,71 +1350,170 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             return false;
         }
 
-        private List<(ILocalSymbol Local, SyntaxNode Definition)>
-            GetPatternDestinations(SyntaxNode reference)
+        private List<(
+            ILocalSymbol Local,
+            SyntaxNode Definition,
+            string[]? TuplePath)> GetPatternDestinations(
+                ILocalReferenceOperation reference,
+                string[]? tuplePath)
         {
-            var pattern = reference.Ancestors()
-                .OfType<IsPatternExpressionSyntax>()
-                .FirstOrDefault();
-            if (pattern == null)
+            IIsPatternOperation? match = null;
+            for (var current = reference.Parent;
+                 current != null;
+                 current = current.Parent)
+            {
+                if (current is IIsPatternOperation isPattern)
+                {
+                    match = isPattern;
+                    break;
+                }
+            }
+            if (match == null)
             {
                 return [];
             }
+
             var result = new List<(
                 ILocalSymbol Local,
-                SyntaxNode Definition)>();
-            foreach (var designation in WholeInputDesignations(
-                         pattern.Pattern))
+                SyntaxNode Definition,
+                string[]? TuplePath)>();
+            var pending = new Stack<(IPatternOperation Pattern, string[]? Path)>();
+            pending.Push((match.Pattern, tuplePath));
+            while (pending.Count != 0)
             {
-                if (designation is SingleVariableDesignationSyntax single &&
-                    semanticModel.GetDeclaredSymbol(
-                        single,
-                        cancellationToken) is ILocalSymbol declared &&
+                cancellationToken.ThrowIfCancellationRequested();
+                var (pattern, path) = pending.Pop();
+                var declared = pattern switch
+                {
+                    IDeclarationPatternOperation declaration =>
+                        declaration.DeclaredSymbol,
+                    IRecursivePatternOperation recursive =>
+                        recursive.DeclaredSymbol,
+                    IListPatternOperation list => list.DeclaredSymbol,
+                    _ => null
+                };
+                if (declared is ILocalSymbol local &&
                     !result.Any(candidate =>
                         SymbolEqualityComparer.Default.Equals(
                             candidate.Local,
-                            declared)))
+                            local)))
                 {
-                    result.Add((declared, pattern));
+                    result.Add((local, match.Syntax, path));
+                }
+
+                switch (pattern)
+                {
+                    case IBinaryPatternOperation binary:
+                        pending.Push((binary.RightPattern, path));
+                        pending.Push((binary.LeftPattern, path));
+                        break;
+                    case INegatedPatternOperation negated:
+                        pending.Push((negated.Pattern, path));
+                        break;
+                    case ISlicePatternOperation { Pattern: { } slice }:
+                        pending.Push((slice, path));
+                        break;
+                    case IListPatternOperation list:
+                        for (var index = list.Patterns.Length - 1;
+                             index >= 0;
+                             index--)
+                        {
+                            pending.Push((list.Patterns[index], path));
+                        }
+                        break;
+                    case IRecursivePatternOperation recursive
+                        when path is { Length: > 0 }:
+                        {
+                            var remainingPath = path.Length == 1
+                                ? null
+                                : path.Skip(1).ToArray();
+                            foreach (var subpattern in TupleComponentPatterns(
+                                         recursive,
+                                         path[0]))
+                            {
+                                pending.Push((subpattern, remainingPath));
+                            }
+                            break;
+                        }
+                    case IRecursivePatternOperation recursive:
+                        for (var index =
+                                 recursive.PropertySubpatterns.Length - 1;
+                             index >= 0;
+                             index--)
+                        {
+                            pending.Push((
+                                recursive.PropertySubpatterns[index].Pattern,
+                                path));
+                        }
+                        for (var index =
+                                 recursive.DeconstructionSubpatterns.Length - 1;
+                             index >= 0;
+                             index--)
+                        {
+                            pending.Push((
+                                recursive.DeconstructionSubpatterns[index],
+                                path));
+                        }
+                        break;
                 }
             }
             return result;
-        }
 
-        private static IEnumerable<VariableDesignationSyntax>
-            WholeInputDesignations(PatternSyntax pattern)
-        {
-            switch (pattern)
+            static IEnumerable<IPatternOperation> TupleComponentPatterns(
+                IRecursivePatternOperation recursive,
+                string component)
             {
-                case DeclarationPatternSyntax declaration:
-                    yield return declaration.Designation;
-                    yield break;
-                case VarPatternSyntax varPattern:
-                    yield return varPattern.Designation;
-                    yield break;
-                case RecursivePatternSyntax
-                { Designation: { } designation }:
-                    yield return designation;
-                    yield break;
-                case ParenthesizedPatternSyntax parenthesized:
-                    foreach (var nested in WholeInputDesignations(
-                                 parenthesized.Pattern))
+                if (recursive.InputType is not INamedTypeSymbol
                     {
-                        yield return nested;
-                    }
+                        IsTupleType: true
+                    } tuple)
+                {
                     yield break;
-                case BinaryPatternSyntax binary:
-                    foreach (var nested in WholeInputDesignations(
-                                 binary.Left))
+                }
+
+                var componentIndex = -1;
+                for (var index = 0;
+                     index < tuple.TupleElements.Length;
+                     index++)
+                {
+                    var element = tuple.TupleElements[index];
+                    if (string.Equals(
+                            element.Name,
+                            component,
+                            StringComparison.Ordinal) ||
+                        string.Equals(
+                            element.CorrespondingTupleField?.Name,
+                            component,
+                            StringComparison.Ordinal))
                     {
-                        yield return nested;
+                        componentIndex = index;
+                        break;
                     }
-                    foreach (var nested in WholeInputDesignations(
-                                 binary.Right))
+                }
+                if (componentIndex >= 0 &&
+                    componentIndex <
+                        recursive.DeconstructionSubpatterns.Length)
+                {
+                    yield return recursive.DeconstructionSubpatterns[
+                        componentIndex];
+                }
+
+                foreach (var property in recursive.PropertySubpatterns)
+                {
+                    if (property.Member is IMemberReferenceOperation member &&
+                        (string.Equals(
+                             member.Member.Name,
+                             component,
+                             StringComparison.Ordinal) ||
+                         member.Member is IFieldSymbol field &&
+                         string.Equals(
+                             field.CorrespondingTupleField?.Name,
+                             component,
+                             StringComparison.Ordinal)))
                     {
-                        yield return nested;
+                        yield return property.Pattern;
                     }
-                    yield break;
+                }
             }
         }
 
