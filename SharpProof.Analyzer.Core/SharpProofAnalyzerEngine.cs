@@ -51,6 +51,12 @@ internal sealed partial class SharpProofAnalyzerEngine
             return;
         }
 
+        // Reconcile companions even when another configuration diagnostic
+        // causes ordinary analysis to stop.  Configuration errors must not
+        // hide independent malformed companion declarations.
+        context.RegisterCompilationEndAction(
+            ValidateContractForCompanions);
+
         // A contract API that is referenced but unreadable disables every
         // contract silently, which is indistinguishable from "nothing to
         // report". Surface it instead.
@@ -85,15 +91,6 @@ internal sealed partial class SharpProofAnalyzerEngine
                     configurationDiagnostics));
             return;
         }
-
-        // ContractFor validation is a final-compilation reconciliation. The
-        // analyzer is the sole owner so every source tree, including output
-        // added by peer generators, is observed exactly once. This is
-        // intentionally independent of feature selection and advisory
-        // activation: every non-off profile must reject malformed companions
-        // rather than silently treating them as absent.
-        context.RegisterCompilationEndAction(
-            ValidateContractForCompanions);
 
         var activation = configuration.Profile == SharpProofProfile.Advisory
             ? GetAdvisoryActivation(

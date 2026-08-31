@@ -61,13 +61,17 @@ internal static class StringConcatenationEffectResolver
             return EffectSummary.Empty;
         }
 
-        var allocation = EffectSummaryOperations.Allocate(
-            EffectAllocationKind.Managed);
+        // A user-defined string-returning operator is an ordinary invocation;
+        // its allocation behavior belongs to the resolved method summary. The
+        // built-in concatenation path is the only one that can assume a new
+        // managed string is allocated here.
         if (binary.OperatorMethod != null)
         {
-            return allocation;
+            return EffectSummary.Empty;
         }
 
+        var allocation = EffectSummaryOperations.Allocate(
+            EffectAllocationKind.Managed);
         return EffectSummaryOperations.Join(
             allocation,
             ResolveFormattedValue(
