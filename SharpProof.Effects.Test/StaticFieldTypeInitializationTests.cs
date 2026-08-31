@@ -4,6 +4,56 @@ namespace SharpProof.Effects.Test;
 public sealed class StaticFieldTypeInitializationTests
 {
     [Test]
+    public void GenericStaticConstructorEffectsFailClosedAtFirstAccess()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class GenericInitialization<T> {
+                public static readonly int Value;
+
+                static GenericInitialization() {
+                    Probe.Writes++;
+                    _ = new object();
+                    lock (typeof(GenericInitialization<T>)) { }
+                    Value = 1;
+                }
+            }
+
+            public static class Probe {
+                public static int Writes;
+            }
+
+            public static class Sample {
+                public static int Read() =>
+                    GenericInitialization<int>.Value;
+            }
+            """);
+        var method = EffectTestHost.RequireMethod(
+            compilation,
+            "Sample",
+            "Read");
+
+        var result = new EffectAnalysisSession(compilation).Analyze(method);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsUnknown, Is.True);
+            Assert.That(
+                result.Summary.Allocation,
+                Is.EqualTo(EffectAllocationKind.Unknown));
+            Assert.That(result.Summary.Capabilities.IsUnknown, Is.True);
+            Assert.That(result.Summary.Throws.IncludesUnknown, Is.True);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(
+                result.Summary.Uncertainty &
+                    EffectUncertainty.UnmodeledCall,
+                Is.EqualTo(EffectUncertainty.UnmodeledCall));
+        }
+    }
+
+    [Test]
     public void DivergingStaticConstructorPreventsMethodEntryAndBodyEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(
