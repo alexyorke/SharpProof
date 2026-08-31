@@ -879,14 +879,40 @@ internal sealed class ManagedAbstractFlow
     {
         foreach (var argument in arguments)
         {
-            if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
-                TryStorage(argument.Value, out var storage))
+            if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out)
             {
-                state = state.Set(storage, TopForType(argument.Value.Type));
+                state = HavocArgumentStorage(state, argument.Value);
             }
         }
 
         return state;
+    }
+
+    private static ManagedFlowState HavocArgumentStorage(
+        ManagedFlowState state,
+        IOperation value)
+    {
+        value = Unwrap(value);
+        if (value is IConditionalOperation conditional)
+        {
+            state = HavocArgumentStorage(state, conditional.WhenTrue);
+            return conditional.WhenFalse == null
+                ? state.Forget()
+                : HavocArgumentStorage(state, conditional.WhenFalse);
+        }
+
+        if (value is IFlowCaptureReferenceOperation)
+        {
+            // A ref conditional is represented in the CFG by one capture that
+            // can alias either source storage. This value domain does not
+            // retain capture-to-storage aliases, so all scalar facts must be
+            // forgotten rather than updating only the synthetic capture.
+            return state.Forget();
+        }
+
+        return TryStorage(value, out var storage)
+            ? state.Set(storage, TopForType(value.Type))
+            : state;
     }
 
     private static ManagedFlowState SetStorage(
