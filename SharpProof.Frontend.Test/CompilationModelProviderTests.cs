@@ -58,6 +58,26 @@ public sealed class CompilationModelProviderTests
         Assert.That(exception!.ParamName, Is.EqualTo("tree"));
     }
 
+    [Test]
+    public void RejectsTreeOwnedByMultipleSourceCompilations()
+    {
+        var sharedTree = CSharpSyntaxTree.ParseText(
+            "internal static class Shared { }");
+        var firstOwner = CreateCompilation("FirstOwner", sharedTree);
+        var secondOwner = CreateCompilation("SecondOwner", sharedTree);
+        var root = CreateCompilation(
+            "Root",
+            CSharpSyntaxTree.ParseText("internal static class Root { }"),
+            firstOwner.ToMetadataReference(),
+            secondOwner.ToMetadataReference());
+
+        var exception = Assert.Throws<ArgumentException>(
+            (Action)(() =>
+                CompilationModelProvider.GetSemanticModel(root, sharedTree)));
+
+        Assert.That(exception!.ParamName, Is.EqualTo("tree"));
+    }
+
     private static CSharpCompilation CreateCompilation(
         string name,
         SyntaxTree tree,
