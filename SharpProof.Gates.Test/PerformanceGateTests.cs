@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Gates.Performance;
 using SharpProof.Worker.Protocol;
+using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Xml.Linq;
@@ -631,9 +632,9 @@ public sealed class PerformanceGateTests
             }
             document.Save(path);
 
-            Assert.Throws<InvalidDataException>(() =>
+            Assert.Throws<InvalidDataException>((Action)(() =>
                 PerformanceGate.ValidateAdvisoryPackagePolicy(
-                    temporary.FullName));
+                temporary.FullName)));
         }
         finally
         {
@@ -669,11 +670,12 @@ public sealed class PerformanceGateTests
             if (writeInvalidAnalyzer)
             {
                 Directory.CreateDirectory(analyzerDirectory);
-                File.WriteAllText(
-                    Path.Combine(
-                        analyzerDirectory,
-                        "SharpProof.Analyzer.dll"),
-                    "not an analyzer assembly");
+                await File.WriteAllTextAsync(
+                        Path.Combine(
+                            analyzerDirectory,
+                            "SharpProof.Analyzer.dll"),
+                        "not an analyzer assembly")
+                    .ConfigureAwait(false);
             }
 
             _ = await RunPerformanceProbeDotnetAsync(
@@ -681,11 +683,56 @@ public sealed class PerformanceGateTests
                 restore: true,
                 symbol: null);
 
-            Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () =>
                 _ = await RunPerformanceProbeDotnetAsync(
                     project,
                     restore: false,
-                    symbol: "SHARPPROOF_MISSING_ANALYZER"));
+                    symbol: "SHARPPROOF_MISSING_ANALYZER")));
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    [Test]
+    public void PackagePerformanceProbeHasAnInternalWallTimeLimit()
+    {
+        var temporaryRoot = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            var project = Path.Combine(temporaryRoot, "Hang.csproj");
+            File.WriteAllText(
+                project,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <Target Name="Hang" BeforeTargets="Restore">
+                    <Exec Command="sleep 30" />
+                  </Target>
+                </Project>
+                """);
+
+            var stopwatch = Stopwatch.StartNew();
+            var exception = Assert.ThrowsAsync<TimeoutException>((Func<Task>)(async () =>
+                _ = await RunPerformanceProbeDotnetAsync(
+                    project,
+                    restore: true,
+                    symbol: null,
+                    timeout: TimeSpan.FromMilliseconds(250))));
+            stopwatch.Stop();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exception!.Message, Does.Contain("restore"));
+                Assert.That(exception.Message, Does.Contain("exceeded"));
+                Assert.That(
+                    stopwatch.Elapsed,
+                    Is.LessThan(TimeSpan.FromSeconds(5)));
+            }
         }
         finally
         {
@@ -975,11 +1022,45 @@ public sealed class PerformanceGateTests
     {
         var method = typeof(PerformanceGate).GetMethod(
             "RunDotnetAsync",
-            BindingFlags.NonPublic | BindingFlags.Static) ??
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            [
+                typeof(string),
+                typeof(bool),
+                typeof(string),
+                typeof(CancellationToken)
+            ],
+            modifiers: null) ??
             throw new InvalidOperationException(
                 "Could not find the package performance process runner.");
         return (Task<double>)method.Invoke(
             null,
             [project, restore, symbol, CancellationToken.None])!;
+    }
+
+    private static Task<double> RunPerformanceProbeDotnetAsync(
+        string project,
+        bool restore,
+        string? symbol,
+        TimeSpan timeout)
+    {
+        var method = typeof(PerformanceGate).GetMethod(
+            "RunDotnetAsync",
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            [
+                typeof(string),
+                typeof(bool),
+                typeof(string),
+                typeof(TimeSpan),
+                typeof(CancellationToken)
+            ],
+            modifiers: null) ??
+            throw new InvalidOperationException(
+                "Could not find the timeout-aware package performance " +
+                "process runner.");
+        return (Task<double>)method.Invoke(
+            null,
+            [project, restore, symbol, timeout, CancellationToken.None])!;
     }
 }
