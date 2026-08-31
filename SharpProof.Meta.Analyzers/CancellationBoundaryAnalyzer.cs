@@ -424,6 +424,11 @@ internal static class CancellationBoundaryAnalyzer
                 respondMethod.Parameters[0].Type,
                 symbols[
                     SharpProofSoundnessAnalyzer.KnownType.WorkerVerifyResponse]) ||
+            !PublishesWorkerResponse(
+                respondMethod,
+                context,
+                method,
+                symbols) ||
             respond.Arguments.SingleOrDefault(candidate =>
                 candidate.Parameter?.Ordinal == 0) is not { Value: { } response } ||
             Unwrap(response) is not IInvocationOperation create)
@@ -467,6 +472,88 @@ internal static class CancellationBoundaryAnalyzer
                    runStatusArgument?.Value,
                    symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerRunStatus],
                    "Canceled");
+    }
+
+    private static bool PublishesWorkerResponse(
+        IMethodSymbol respondMethod,
+        SyntaxNodeAnalysisContext context,
+        IMethodSymbol mainMethod,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
+    {
+        var localSyntax = respondMethod.DeclaringSyntaxReferences
+            .SingleOrDefault()?
+            .GetSyntax(context.CancellationToken) as
+            LocalFunctionStatementSyntax;
+        if (localSyntax?.Body is not { Statements.Count: 2 } body ||
+            body.Statements[0] is not
+                ExpressionStatementSyntax { Expression: { } publishExpression } ||
+            body.Statements[1] is not
+                ReturnStatementSyntax { Expression: { } resultExpression } ||
+            context.SemanticModel.GetConstantValue(
+                resultExpression,
+                context.CancellationToken) is not
+                { HasValue: true, Value: 0 })
+        {
+            return false;
+        }
+
+        if (Unwrap(context.SemanticModel.GetOperation(
+                publishExpression,
+                context.CancellationToken)) is not IAwaitOperation awaited)
+        {
+            return false;
+        }
+
+        var publication = Unwrap(awaited.Operation);
+        if (publication is IInvocationOperation configureAwait &&
+            configureAwait.TargetMethod is
+            {
+                Name: "ConfigureAwait",
+                IsStatic: false,
+                Parameters.Length: 1
+            } &&
+            configureAwait.TargetMethod.Parameters[0].Type.SpecialType ==
+                SpecialType.System_Boolean)
+        {
+            publication = Unwrap(configureAwait.Instance);
+        }
+
+        if (publication is not IInvocationOperation write ||
+            write.TargetMethod is not
+            {
+                Name: "WriteResponseAtomicAsync",
+                MethodKind: MethodKind.Ordinary,
+                IsStatic: true,
+                Arity: 0,
+                Parameters.Length: 2
+            } writeMethod ||
+            !IsSameType(
+                writeMethod.ContainingType,
+                symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerProgram]) ||
+            writeMethod.Parameters[0].Type.SpecialType !=
+                SpecialType.System_String ||
+            !IsSameType(
+                writeMethod.Parameters[1].Type,
+                symbols[
+                    SharpProofSoundnessAnalyzer.KnownType.WorkerVerifyResponse]))
+        {
+            return false;
+        }
+
+        var path = write.Arguments.SingleOrDefault(candidate =>
+            candidate.Parameter?.Ordinal == 0);
+        var response = write.Arguments.SingleOrDefault(candidate =>
+            candidate.Parameter?.Ordinal == 1);
+        return Unwrap(path?.Value) is ILocalReferenceOperation
+        {
+            Local.Name: "resultPath"
+        } resultPath &&
+            SymbolEqualityComparer.Default.Equals(
+                resultPath.Local.ContainingSymbol,
+                mainMethod) &&
+            ReferencesParameter(
+                response?.Value,
+                respondMethod.Parameters[0]);
     }
 
     private static bool ReifiesWorkerVerificationCancellation(
