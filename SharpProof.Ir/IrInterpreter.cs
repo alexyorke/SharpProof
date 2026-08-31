@@ -117,11 +117,6 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateCore(IrTerm term, EvaluationState state)
     {
-        if (state.Results.TryGetValue(term.Id, out var cached))
-        {
-            return cached;
-        }
-
         state.CancellationToken.ThrowIfCancellationRequested();
 
         // Evaluation is deliberately lazy — conditionals and AndAlso/OrElse
@@ -135,6 +130,11 @@ public sealed class IrInterpreter(IrFactory factory)
                 "The term nests deeper than " +
                 MaximumEvaluationDepth.ToString(CultureInfo.InvariantCulture) +
                 " levels.");
+        }
+
+        if (state.Results.TryGetValue(term.Id, out var cached))
+        {
+            return cached;
         }
 
         state.Depth++;
