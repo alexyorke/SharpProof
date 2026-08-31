@@ -1424,6 +1424,24 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsStringAutoPropertyInIr()
+    {
+        const string source =
+            """
+            namespace SharpProof.Ir;
+            static class C {
+                internal static string Unknown { get; set; } = "ir_unknown";
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA006"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task ReportsSemanticStringControlFlowInCatchFiltersAndSwitchGuards()
     {
         const string source =
