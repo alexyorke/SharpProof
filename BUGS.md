@@ -1,6 +1,6 @@
 # Bug backlog
 
-417 open bugs, reprioritized by impact, reachability, and affected scope.
+416 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (129)
+## P0 - Critical (128)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -28,7 +28,6 @@ Priority definitions:
 - **BUG-055 [P0] - Foreach protocol calls are omitted from complete effect summaries:** OperationEffectScanner does not scan foreach GetEnumerator, MoveNext, Current, Dispose, or element conversion as executed protocol calls. Their effects and exceptions can be omitted while the method remains Complete and passes effect contracts.
 - **BUG-056 [P0] - FormattableString construction eagerly applies deferred formatting effects:** Interpolation scanning attributes formatting calls and effects when constructing a FormattableString, although formatting is deferred. This can create false effect diagnostics and, when the formatter is modeled nonreturning, suppress real suffix effects from complete analysis.
 - **BUG-057 [P0] - Fuzz decoder integration check passes without decoder use:** FuzzRunnerEvidenceTests searches the campaign script for a decoder name that is already present in a dot-sourced filename. Removing or bypassing the actual strict decoder call leaves the gate green and can admit malformed runner JSON into campaign evidence.
-- **BUG-058 [P0] - Generic exception identity omits type-argument assemblies:** CompilerExceptionTypeIdentity includes the outer generic type's assembly but not assembly identities for generic arguments. Distinct constructed exceptions can collide in manifest identity and hashes, leaving evidence unable to establish which allowed-exception constraint was analyzed.
 - **BUG-059 [P0] - Generic interface conversions erase caller ownership:** ConversionOwnershipClassifier marks every type-parameter-to-interface boxing conversion Fresh, even when a legal reference-type instantiation preserves the caller object's identity. Mutations through the converted interface can disappear from the caller-visible effect summary.
 - **BUG-060 [P0] - Generic static-constructor effects are replaced by an exception only:** EffectAnalysisSession replaces a source generic type initializer with only TypeInitializationException instead of summarizing its reads, writes, allocations, and capabilities or marking an unknown boundary. First static-field access can therefore be falsely certified nonallocating, capability-free, or nonwriting.
 - **BUG-061 [P0] - IL summaries can bind to the wrong aliased assembly:** CompilerImplementationIlSummaryLowerer selects the first reference matching assembly identity and module name without verifying aliases or bound symbol identity. Calls through a later extern alias can receive an exact summary from a different assembly body with the same identity.
