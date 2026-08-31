@@ -644,6 +644,17 @@ public static partial class LinuxPathIdentity
             throw new IOException(
                 $"SharpProof could not inspect a {description} (errno {error}).");
         }
+        // The pathname may have been replaced between open(2) and fstat(2).
+        // Never claim the lock protects the current pathname unless its inode
+        // still matches the descriptor we actually locked.
+        if (NativeMethods.LStat(path, out var pathnameInformation) != 0 ||
+            (pathnameInformation.Mode & FileTypeMask) == FileTypeSymbolicLink ||
+            !SameFile(information, pathnameInformation))
+        {
+            handle.Dispose();
+            throw new IOException(
+                $"SharpProof {description} pathname changed during open.");
+        }
         if ((information.Mode & FileTypeMask) != FileTypeRegular)
         {
             handle.Dispose();
