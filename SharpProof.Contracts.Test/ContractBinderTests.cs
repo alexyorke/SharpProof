@@ -415,7 +415,7 @@ public sealed class ContractBinderTests
             public static class Target {
                 public static int? Read() {
                     Contract.Ensures(
-                        Contract.Result<int?>() is null);
+                        Contract.Result<int?>() == null);
                     return null;
                 }
             }
