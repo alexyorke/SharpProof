@@ -207,7 +207,8 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             return status switch
             {
-                Status.UNSATISFIABLE => CreateUnsatisfiable(solver, tracked),
+                Status.UNSATISFIABLE => CreateUnsatisfiable(
+                    solver, tracked, meter, cancellationToken),
                 Status.SATISFIABLE => CreateSatisfiable(
                     query, encoder, solver, meter),
                 _ => BackendCheckResult.Unknown(
@@ -279,19 +280,27 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
     private static BackendCheckResult CreateUnsatisfiable(
         Solver solver,
-        Dictionary<string, int> tracked)
+        Dictionary<string, int> tracked,
+        QueryResourceMeter meter,
+        CancellationToken cancellationToken)
     {
         var expressions = solver.UnsatCore;
         return CreateUnsatisfiable(
             expressions,
             tracked,
-            static expression => expression.ToString());
+            static expression => expression.ToString(),
+            () =>
+            {
+                meter.Consume();
+                cancellationToken.ThrowIfCancellationRequested();
+            });
     }
 
     internal static BackendCheckResult CreateUnsatisfiable<T>(
         IReadOnlyList<T> expressions,
         IReadOnlyDictionary<string, int> tracked,
-        Func<T, string> format)
+        Func<T, string> format,
+        Action? check = null)
         where T : IDisposable
     {
         var core = ImmutableArray.CreateBuilder<int>();
@@ -299,6 +308,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         {
             foreach (var expression in expressions)
             {
+                check?.Invoke();
                 if (!tracked.TryGetValue(format(expression), out var index))
                 {
                     return BackendCheckResult.Unknown(
