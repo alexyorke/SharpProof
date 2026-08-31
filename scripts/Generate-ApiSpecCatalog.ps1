@@ -145,6 +145,29 @@ function Get-OptionalProperty {
     return $property.Value
 }
 
+function Get-RequiredArrayProperty {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Object,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        throw "$Context is missing required property '$Name'."
+    }
+    $value = $property.Value
+    if ($value -isnot [Array]) {
+        throw "$Context.$Name must be a JSON array."
+    }
+    return $value
+}
+
 function Assert-Text {
     param(
         [AllowNull()]
@@ -1035,7 +1058,10 @@ foreach ($declaration in $declarations) {
         "$cardinality, $exactCount, $cardinalityEvidence),")
     $source.Add("                    $termination),")
 
-    $postconditions = @($declaration.postconditions)
+    $postconditions = @(Get-RequiredArrayProperty `
+        -Object $declaration `
+        -Name 'postconditions' `
+        -Context $context)
     if ($postconditions.Count -eq 0) {
         $source.Add('                []),')
     }
@@ -1170,7 +1196,10 @@ foreach ($declaration in $declarations) {
         "]; cardinality=$($facets.cardinality.result)($exact) [" +
         (Format-EvidenceDocumentation $facets.cardinality.evidence) +
         ']' + $terminationText)
-    $postconditions = @($declaration.postconditions)
+    $postconditions = @(Get-RequiredArrayProperty `
+        -Object $declaration `
+        -Name 'postconditions' `
+        -Context "declarations[$($target.witnessIdentifier)]")
     $postconditionText = if ($postconditions.Count -eq 0) {
         '-'
     }
