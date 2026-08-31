@@ -195,21 +195,15 @@ internal sealed class ExceptionHandlerReachability(
                         keepEscaping),
                     exception);
                 var operandCompletes = canCompleteNormally(exception);
-                if (operandCompletes &&
-                    (abstractFlow?.ProvesNull(thrown, exception) == true ||
-                     exception.ConstantValue is
-                     { HasValue: true, Value: null }) &&
-                    _nullReferenceExceptionType is { } nullReferenceException)
+                if (!operandCompletes)
                 {
-                    Add(
-                        new PotentialExceptions(
-                            ImmutableHashSet.Create<INamedTypeSymbol>(
-                                SymbolEqualityComparer.Default,
-                                nullReferenceException),
-                            Unknown: false),
-                        thrown);
+                    continue;
                 }
-                else if (operandCompletes &&
+
+                var definitelyNull =
+                    abstractFlow?.ProvesNull(thrown, exception) == true ||
+                    DefiniteOperationFacts.IsDefinitelyNull(exception);
+                if (!definitelyNull &&
                     DefiniteOperationFacts.UnwrapHarmlessValue(exception).Type
                     is INamedTypeSymbol type)
                 {
@@ -219,6 +213,26 @@ internal sealed class ExceptionHandlerReachability(
                                 SymbolEqualityComparer.Default,
                                 type),
                             Unknown: false),
+                        thrown);
+                }
+                else if (!definitelyNull)
+                {
+                    Add(UnknownPotential, thrown);
+                }
+
+                var definitelyNonNull =
+                    abstractFlow?.ProvesNonNull(thrown, exception) == true ||
+                    DefiniteOperationFacts.IsDefinitelyNonNull(exception);
+                if (!definitelyNonNull)
+                {
+                    Add(
+                        _nullReferenceExceptionType is { } nullReferenceException
+                            ? new PotentialExceptions(
+                                ImmutableHashSet.Create<INamedTypeSymbol>(
+                                    SymbolEqualityComparer.Default,
+                                    nullReferenceException),
+                                Unknown: false)
+                            : UnknownPotential,
                         thrown);
                 }
                 continue;
@@ -3165,7 +3179,11 @@ internal sealed class ExceptionHandlerReachability(
     {
         foreach (var @catch in @try.Catches)
         {
-            if (!CatchesKnownType(@catch, thrown, model))
+            var typeSelection = GetKnownTypeSelection(
+                @catch,
+                thrown,
+                model);
+            if (typeSelection == CatchSelection.Never)
             {
                 continue;
             }
@@ -3173,7 +3191,8 @@ internal sealed class ExceptionHandlerReachability(
             {
                 return true;
             }
-            if (GetFilterSelection(@catch, model) == CatchSelection.Always)
+            if (typeSelection == CatchSelection.Always &&
+                GetFilterSelection(@catch, model) == CatchSelection.Always)
             {
                 return false;
             }
@@ -3201,18 +3220,27 @@ internal sealed class ExceptionHandlerReachability(
         return false;
     }
 
-    private static bool CatchesKnownType(
+    private static CatchSelection GetKnownTypeSelection(
         CatchClauseSyntax @catch,
         INamedTypeSymbol thrown,
         SemanticModel model)
     {
         if (@catch.Declaration == null)
         {
-            return true;
+            return CatchSelection.Always;
         }
-        return model.GetTypeInfo(@catch.Declaration.Type).Type is
-            INamedTypeSymbol caught &&
-            EffectTypeFacts.IsDerivedFrom(thrown, caught);
+        if (model.GetTypeInfo(@catch.Declaration.Type).Type is not
+            INamedTypeSymbol caught)
+        {
+            return CatchSelection.Maybe;
+        }
+        if (EffectTypeFacts.IsDerivedFrom(thrown, caught))
+        {
+            return CatchSelection.Always;
+        }
+        return EffectTypeFacts.IsDerivedFrom(caught, thrown)
+            ? CatchSelection.Maybe
+            : CatchSelection.Never;
     }
 
     private bool CatchesAllExceptions(
