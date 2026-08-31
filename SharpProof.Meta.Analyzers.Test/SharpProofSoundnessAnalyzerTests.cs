@@ -1442,11 +1442,14 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Does.Not.Contain("AD0001"));
     }
 
-    [Test]
-    public async Task AllowsExactWorkerCancellationReificationShapes()
+    [TestCase("", 0)]
+    [TestCase("cancellationToken = default;", 1)]
+    public async Task WorkerCancellationReificationRequiresIncomingToken(
+        string tokenSetup,
+        int expectedDiagnostics)
     {
-        const string source =
-            """
+        var source =
+            $$"""
             using System;
             using System.Threading;
             using System.Threading.Tasks;
@@ -1490,6 +1493,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     internal async Task<WorkerVerifyResponse> VerifyAsync(
                         WorkerVerifyRequest request,
                         CancellationToken cancellationToken) {
+                        {{tokenSetup}}
                         WorkerVerifyResponse Interrupted(object input = null) {
                             var canceled =
                                 cancellationToken.IsCancellationRequested;
@@ -1515,7 +1519,10 @@ public sealed class SharpProofSoundnessAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(expectedDiagnostics));
     }
 
     [TestCase(
@@ -1637,11 +1644,14 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Is.EqualTo(1));
     }
 
-    [Test]
-    public async Task AllowsAuditedWorkerTypedCancellationReification()
+    [TestCase("", 0)]
+    [TestCase("callerCancellation = default;", 1)]
+    public async Task TypedCancellationReificationRequiresIncomingToken(
+        string tokenSetup,
+        int expectedDiagnostics)
     {
-        const string source =
-            """
+        var source =
+            $$"""
             using System;
             using System.Threading;
             using System.Threading.Tasks;
@@ -1667,6 +1677,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                             object resourceGate,
                             object projectBoundary,
                             CancellationToken callerCancellation) {
+                        {{tokenSetup}}
                         await Task.Yield();
                         try { throw new OperationCanceledException(); }
                         catch (OperationCanceledException) {
@@ -1686,7 +1697,10 @@ public sealed class SharpProofSoundnessAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.That(diagnostics, Is.Empty);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(expectedDiagnostics));
     }
 
     [TestCase(
