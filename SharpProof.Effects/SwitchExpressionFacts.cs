@@ -55,8 +55,19 @@ internal static class SwitchExpressionFacts
         }
 
         return pattern.InputType is IArrayTypeSymbol ||
-            IsRuntimeSpanMember(compilation, method, "System.Span`1") ||
-            IsRuntimeSpanMember(compilation, method, "System.ReadOnlySpan`1");
+            IsCompilerIntrinsicRefLikeMember(compilation, method);
+    }
+
+    internal static bool IsCompilerIntrinsicRefLikeMember(
+        Compilation compilation,
+        IMethodSymbol method)
+    {
+        return method.DeclaringSyntaxReferences.Length == 0 &&
+            (IsRuntimeSpanMember(compilation, method, "System.Span`1") ||
+             IsRuntimeSpanMember(
+                 compilation,
+                 method,
+                 "System.ReadOnlySpan`1"));
     }
 
     private static bool IsRuntimeSpanMember(

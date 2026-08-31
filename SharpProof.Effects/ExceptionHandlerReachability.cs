@@ -835,9 +835,10 @@ internal sealed class ExceptionHandlerReachability(
                                 accessor == null || accessor.IsVirtual ||
                                 accessor.IsAbstract
                                     ? UnknownPotential
-                                    : accessor.DeclaringSyntaxReferences.Length == 0 &&
-                                        propertyReference.Property.ContainingType
-                                            ?.IsRefLikeType == true
+                                    : SwitchExpressionFacts
+                                        .IsCompilerIntrinsicRefLikeMember(
+                                            compilation,
+                                            accessor)
                                     ? EmptyPotential
                                     : GetCallableExceptions(
                                         accessor,
