@@ -16,12 +16,11 @@ internal sealed class EffectModuleInitialization
             nameof(compilation));
         var attribute = compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.ModuleInitializerAttribute);
-        _attribute = attribute != null &&
-            !SymbolEqualityComparer.Default.Equals(
-                attribute.ContainingAssembly,
-                compilation.Assembly)
-                ? attribute.OriginalDefinition
-                : null;
+        // A framework-compatible ModuleInitializerAttribute is commonly
+        // source-defined as a polyfill when targeting older frameworks.
+        // The compiler-bound attribute is still the authority; its assembly
+        // must not be restricted to a referenced framework assembly.
+        _attribute = attribute?.OriginalDefinition;
     }
 
     internal ImmutableArray<EffectModuleInitializer> Discover(
