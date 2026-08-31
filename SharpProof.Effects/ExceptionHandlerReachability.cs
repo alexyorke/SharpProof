@@ -225,6 +225,16 @@ internal sealed class ExceptionHandlerReachability(
                             Unknown: false),
                         thrown);
                 }
+                else if (operandCompletes &&
+                    DefiniteOperationFacts.UnwrapHarmlessValue(exception).Type
+                    is ITypeParameterSymbol typeParameter &&
+                    _exceptionType is { } exceptionType &&
+                    compilation.ClassifyCommonConversion(
+                        typeParameter,
+                        exceptionType).IsImplicit)
+                {
+                    Add(UnknownPotential, thrown);
+                }
                 continue;
             }
             if (operation is IInvocationOperation invocation)
