@@ -1,6 +1,6 @@
 # Bug backlog
 
-346 open bugs, reprioritized by impact, reachability, and affected scope.
+345 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -165,7 +165,7 @@ Priority definitions:
 - **BUG-421 [P2] - Verification cache capacity is not reconciled on ordinary misses:** VerificationCache enforces MaximumBytes only after replayable hits or cacheable writes, returning early for missing, stale, malformed, or nonreplayable entries. An existing cache can remain above a reduced byte cap indefinitely when subsequent results are not cacheable.
 - **BUG-422 [P2] - Wide SMT encoding ignores cancellation and query budgets:** IrSmtBackend checks cancellation only around whole assumptions and goals, while recursive AST encoding receives no token and runs before the solver rlimit begins. A large shallow formula can continue consuming CPU and memory after cancellation or timeout.
 
-## P3 - Low (34)
+## P3 - Low (33)
 
 - **BUG-425 [P3] - Assembly uniqueness disagrees with token canonicalization:** ApiSpecTable checks approved assembly records case-sensitively while digest and resolution logic canonicalize public-key tokens case-insensitively. Equivalent authorization sets can have multiple accepted representations and different digests, causing identity and cache churn.
 - **BUG-428 [P3] - Concurrent corpus replay covers only the first seed:** CorpusGate selects the first synthetic case for each variant from seed-major catalog order, so all concurrent replays use seed E01. Concurrency-sensitive behavior present only in the other 27 seeds is never exercised despite a passing gate.
@@ -181,8 +181,6 @@ Priority definitions:
 - **BUG-443 [P3] - Generated source provenance relies on filename heuristics:** CompilerProbeSnapshot labels trees generated based on filename suffixes and auto-generated comments rather than actual pipeline origin. Handwritten and generator-emitted trees can be classified in reverse, weakening provenance checks.
 - **BUG-444 [P3] - IR printing emits unescaped type display names:** IrPrinter inserts unescaped display names into null and cast syntax and omits type identity. Legal names can inject lines or make distinct terms print identically, leaving diagnostics and fuzz evidence ambiguous.
 - **BUG-446 [P3] - Mixed ContractFor surface errors hide extra-member diagnostics:** ContractForCompanionValidator reports extra companion members only when every target has a unique match. A surface containing both a missing target member and an extra companion member therefore requires multiple diagnostic runs to reveal all errors.
-- **BUG-449 [P3] - Portable IR changes structural sequence type identity:** Portable IR decoding recreates structural sequence types as identity-bearing types. Extending a decoded graph can then produce a second unequal sequence type and unexpected type mismatches, although production lowering normally uses identity-bearing arrays.
-- **BUG-451 [P3] - Property control attributes are diagnosed once per accessor:** AnalyzerFeaturePipeline surfaces one rejected property-level control attribute through each accessor and deduplicates by method rather than attribute syntax. A get/set property therefore emits duplicate SP0047 diagnostics whose count depends on accessor count.
 - **BUG-452 [P3] - Same-seed fuzz fallback double-counts repeated cases:** Invoke-SharpProofFuzzCampaign reruns a retained seed from index zero when the rotating run uses the same seed but fewer cases. The repeated prefix is counted as new coverage, overstating distinct campaign exploration and wasting runtime.
 - **BUG-454 [P3] - SourceLength permits noncanonical authority digests:** CompilerSourceLocationAuthority validates only broad SourceLength bounds and never uses the field for mapping. Structurally impossible alternate lengths remain accepted while changing line-map and enclosing evidence hashes for identical source behavior.
 - **BUG-456 [P3] - Unknown-reason ratchet retains stale ceilings:** CorpusGate checks only currently observed Unknown categories against configured maxima and never requires ceilings to decrease after precision improves. A removed category can later regress up to its stale maximum without failing the ratchet.

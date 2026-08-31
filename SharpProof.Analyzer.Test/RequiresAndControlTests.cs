@@ -2956,6 +2956,26 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task MalformedPropertyControlAttributeReportsOnce()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+
+            public sealed class Fixture {
+                [SharpProofSuppress("")]
+                public int Value { get; set; }
+            }
+            """,
+            "all-experimental",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SP0024"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task EmptyControlReasonsReportUsageAndDoNotSuppress()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
