@@ -1,6 +1,6 @@
 # Bug backlog
 
-415 open bugs, reprioritized by impact, reachability, and affected scope.
+414 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (127)
+## P0 - Critical (126)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -30,7 +30,6 @@ Priority definitions:
 - **BUG-059 [P0] - Generic interface conversions erase caller ownership:** ConversionOwnershipClassifier marks every type-parameter-to-interface boxing conversion Fresh, even when a legal reference-type instantiation preserves the caller object's identity. Mutations through the converted interface can disappear from the caller-visible effect summary.
 - **BUG-060 [P0] - Generic static-constructor effects are replaced by an exception only:** EffectAnalysisSession replaces a source generic type initializer with only TypeInitializationException instead of summarizing its reads, writes, allocations, and capabilities or marking an unknown boundary. First static-field access can therefore be falsely certified nonallocating, capability-free, or nonwriting.
 - **BUG-061 [P0] - IL summaries can bind to the wrong aliased assembly:** CompilerImplementationIlSummaryLowerer selects the first reference matching assembly identity and module name without verifying aliases or bound symbol identity. Calls through a later extern alias can receive an exact summary from a different assembly body with the same identity.
-- **BUG-062 [P0] - IL translation does not enforce actual evaluation-stack depth:** CompilerImplementationIlSummaryLowerer checks only the declared MaxStack header while its translation stack is unbounded and never compared with that limit. Malformed IL can cross the intended validity and resource boundary and still be summarized.
 - **BUG-063 [P0] - Implicit constructors erase base-constructor completion:** Effects completion and exception reachability treat an implicit constructor as completing normally without following its mandatory base-constructor call. A definite base throw can be ignored, making an unreachable continuation appear reachable and omitting reachable catch-handler effects.
 - **BUG-064 [P0] - Impossible catch accessors can produce false precondition refutations:** Requires accessor discovery admits structurally reachable catch blocks without semantic flow state. An accessor in an impossible catch can be concretely replayed and produce a false SP0027 Refuted outcome.
 - **BUG-065 [P0] - Incompatible API effect facets collapse to complete no-effect summaries:** ApiSpecTable accepts argument or receiver effect bits without checking the target's parameter and receiver shape. ExternalEffectResolver can expand those incompatible bits to no regions while retaining Complete status, erasing trusted declared effects.
