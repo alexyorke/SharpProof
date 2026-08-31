@@ -111,7 +111,6 @@ Priority definitions:
 
 ## P2 - Medium (97)
 
-- **BUG-316 [P2] - Companion surface matching is uncancellable and quadratic:** ContractForCompanionValidator materializes two full target-candidate matching matrices before its first cancellation check. Large generated surfaces continue consuming analyzer CPU and allocations after cancellation.
 - **BUG-317 [P2] - Compiler evidence validation is uncancellable and quadratic:** Compiler response evidence validation performs uncancellable repeated linear searches and replays the full body for each postcondition claim. Valid bounded responses can consume quadratic work, overrun deadlines, and delay cancellation.
 - **BUG-323 [P2] - ContractFor companion bodies skip intrinsic and API validation:** ContractForCompanionValidator checks mapping and clause placement but not rejected Contract APIs or malformed intrinsics, while normal operation analysis skips companion methods. Invalid clauses can be ignored or fail later without SP0047, SP0024, or a companion diagnostic.
 - **BUG-327 [P2] - Delegate reachability enters impossible handlers:** RequiresCallSiteTreeAnalyzer sends every possibly throwing operation to all sibling catches and filters without considering thrown type, catch order, or constant filters. Dead callbacks in impossible handlers can be analyzed and emit false SP0027 diagnostics.
