@@ -1269,6 +1269,78 @@ public sealed class ClaimManifestBuilderTests
         Assert.That(result.Manifest.Callables, Is.Empty);
     }
 
+    [TestCase("method")]
+    [TestCase("type")]
+    [TestCase("assembly")]
+    public void SuppressionScopesRemoveSelectedClaimsFromTheManifest(
+        string scope)
+    {
+        const string template =
+            """
+            using SharpProof.Attributes;
+            ASSEMBLY_SUPPRESSION
+            TYPE_SUPPRESSION
+            public static class Subject {
+                METHOD_SUPPRESSION
+                [ZeroAllocations]
+                public static object Allocate() => new object();
+
+                METHOD_SUPPRESSION
+                public static long Identity(long value) {
+                    Contract.Ensures(
+                        Contract.Result<long>() > value);
+                    return value;
+                }
+            }
+            """;
+        var controlSource = template
+            .Replace("ASSEMBLY_SUPPRESSION", string.Empty, StringComparison.Ordinal)
+            .Replace("TYPE_SUPPRESSION", string.Empty, StringComparison.Ordinal)
+            .Replace("METHOD_SUPPRESSION", string.Empty, StringComparison.Ordinal);
+        var suppression = scope switch
+        {
+            "method" => "[SharpProofSuppress(\"reviewed method\")]",
+            "type" => "[SharpProofSuppress(\"reviewed type\")]",
+            "assembly" => "[assembly: SharpProofSuppress(\"reviewed assembly\")]",
+            _ => throw new InvalidOperationException(
+                $"Unknown suppression scope '{scope}'.")
+        };
+        var suppressedSource = template
+            .Replace(
+                "ASSEMBLY_SUPPRESSION",
+                scope == "assembly" ? suppression : string.Empty,
+                StringComparison.Ordinal)
+            .Replace(
+                "TYPE_SUPPRESSION",
+                scope == "type" ? suppression : string.Empty,
+                StringComparison.Ordinal)
+            .Replace(
+                "METHOD_SUPPRESSION",
+                scope == "method" ? suppression : string.Empty,
+                StringComparison.Ordinal);
+
+        var control = Build(("Control.cs", controlSource));
+        var suppressed = Build(("Suppressed.cs", suppressedSource));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                control.Manifest.Claims.Select(static claim => claim.Kind),
+                Is.EquivalentTo([
+                    WorkerClaimKind.Postcondition,
+                    WorkerClaimKind.Effect
+                ]));
+            Assert.That(
+                control.Targets.Values
+                    .SelectMany(static target => target.EffectClaims)
+                    .Single().Evidence.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
+            Assert.That(suppressed.Manifest.Callables, Is.Empty);
+            Assert.That(suppressed.Manifest.Claims, Is.Empty);
+            Assert.That(suppressed.Targets, Is.Empty);
+        }
+    }
+
     [Test]
     public void FeatureSelectionFiltersTheManifest()
     {
