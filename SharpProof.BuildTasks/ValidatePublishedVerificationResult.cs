@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Microsoft.Build.Framework;
 using SharpProof.Host;
@@ -48,7 +46,7 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
             {
                 var invocationPath = ResolvePath(InvocationResultPath!);
                 invocationResponse = WorkerProtocolJson.DeserializeResponse(
-                    DecodeUtf8(File.ReadAllBytes(invocationPath)));
+                    WorkerProtocolJson.ReadUtf8File(invocationPath));
                 if (invocationResponse == null ||
                     !WorkerProtocolJson.Validate(invocationResponse).IsValid ||
                     invocationResponse.RunStatus != WorkerRunStatus.Complete)
@@ -57,16 +55,15 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
                         "the private invocation result does not satisfy the worker protocol");
                 }
             }
-            var requestBytes = File.ReadAllBytes(requestPath);
             var request = WorkerProtocolJson.DeserializeRequest(
-                DecodeUtf8(requestBytes));
+                WorkerProtocolJson.ReadUtf8File(requestPath));
             if (request == null || !WorkerProtocolJson.Validate(request).IsValid)
             {
                 throw new InvalidDataException(
                     "the published request does not satisfy the worker protocol");
             }
             var response = WorkerProtocolJson.DeserializeResponse(
-                DecodeUtf8(File.ReadAllBytes(resultPath)));
+                WorkerProtocolJson.ReadUtf8File(resultPath));
             var expectedInputHash = invocationResponse?.InputHash;
             var expectedManifest = invocationResponse?.Manifest;
             if (response == null ||
@@ -82,9 +79,8 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
                     "the published result does not satisfy the worker protocol");
             }
 
-            var manifestBytes = File.ReadAllBytes(manifestPath);
-            var manifestHash = Convert.ToHexString(
-                SHA256.HashData(manifestBytes));
+            var manifestHash = WorkerProtocolJson.ComputeFileSha256(
+                manifestPath);
             if (!string.Equals(
                     ResolvePath(request.CompilerManifest.Path),
                     manifestPath,
@@ -129,19 +125,4 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
 
         return !Log.HasLoggedErrors;
     }
-
-    private static string DecodeUtf8(byte[] bytes)
-    {
-        var offset = bytes.Length >= 3 &&
-            bytes[0] == 0xEF &&
-            bytes[1] == 0xBB &&
-            bytes[2] == 0xBF
-            ? 3
-            : 0;
-        return new UTF8Encoding(false, true).GetString(
-            bytes,
-            offset,
-            bytes.Length - offset);
-    }
-
 }

@@ -34,18 +34,22 @@ public static partial class WorkerProtocolJson
 
     internal static string ReadUtf8File(string path)
     {
-        using var reader = OpenJsonReader(path);
-        return reader.ReadToEnd().TrimStart('\uFEFF');
+        return DecodeUtf8(ReadJsonBytes(path));
     }
 
     internal static async Task<string> ReadUtf8FileAsync(
         string path, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var reader = OpenJsonReader(path);
-        var text = await reader.ReadToEndAsync().ConfigureAwait(false);
+        var bytes = await ReadJsonBytesAsync(path, cancellationToken)
+            .ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        return text.TrimStart('\uFEFF');
+        return DecodeUtf8(bytes);
+    }
+
+    internal static string ComputeFileSha256(string path)
+    {
+        return ComputeSha256(ReadJsonBytes(path));
     }
 
     public static WorkerVerifyRequest? DeserializeRequest(string json)
@@ -68,7 +72,53 @@ public static partial class WorkerProtocolJson
         return ComputeSha256(Encoding.UTF8.GetBytes(SerializeRequest(request)));
     }
 
-    private static StreamReader OpenJsonReader(string path)
+    private static byte[] ReadJsonBytes(string path)
+    {
+        using var stream = OpenJsonStream(path, out var length);
+        var bytes = new byte[length];
+        var offset = 0;
+        while (offset < bytes.Length)
+        {
+            var read = stream.Read(bytes, offset, bytes.Length - offset);
+            if (read == 0)
+            {
+                throw ChangedWhileRead();
+            }
+            offset += read;
+        }
+        EnsureEndOfFile(stream.ReadByte());
+        return bytes;
+    }
+
+    private static async Task<byte[]> ReadJsonBytesAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        using var stream = OpenJsonStream(path, out var length);
+        var bytes = new byte[length];
+        var offset = 0;
+        while (offset < bytes.Length)
+        {
+            var read = await stream.ReadAsync(
+                    bytes,
+                    offset,
+                    bytes.Length - offset,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (read == 0)
+            {
+                throw ChangedWhileRead();
+            }
+            offset += read;
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureEndOfFile(stream.ReadByte());
+        return bytes;
+    }
+
+    private static FileStream OpenJsonStream(
+        string path,
+        out int length)
     {
         // Inspect the directory entry before FileStream opens it. On Unix,
         // opening a FIFO for reading waits for a writer, so a zero-length
@@ -99,7 +149,27 @@ public static partial class WorkerProtocolJson
                 "The JSON file changed while it was opened.");
         }
 
-        return new StreamReader(stream, s_strictUtf8, detectEncodingFromByteOrderMarks: false);
+        length = checked((int)fileLength);
+        return stream;
+    }
+
+    private static string DecodeUtf8(byte[] bytes)
+    {
+        return s_strictUtf8.GetString(bytes).TrimStart('\uFEFF');
+    }
+
+    private static void EnsureEndOfFile(int extraByte)
+    {
+        if (extraByte != -1)
+        {
+            throw ChangedWhileRead();
+        }
+    }
+
+    private static InvalidDataException ChangedWhileRead()
+    {
+        return new InvalidDataException(
+            "The JSON file changed while it was read.");
     }
 
     public static string SerializeResponse(WorkerVerifyResponse response)
