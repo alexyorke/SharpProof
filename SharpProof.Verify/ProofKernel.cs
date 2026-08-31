@@ -36,14 +36,17 @@ public sealed class ProofKernel(ISmtBackend backend)
 
         return result.Status switch
         {
-            BackendCheckStatus.Unsatisfiable => CreateProven(query, result),
+            BackendCheckStatus.Unsatisfiable => CreateProven(query, result, cancellationToken),
             BackendCheckStatus.Satisfiable => ReplayCounterexample(query, result, cancellationToken),
             BackendCheckStatus.Unknown => Unknown(
                 VerificationProjections.MapFailure(result.FailureReason)),
             _ => Unknown(AbstentionReason.MalformedBackendResult)
         };
     }
-    private static ProofOutcome CreateProven(VerificationQuery query, BackendCheckResult result)
+    private static ProofOutcome CreateProven(
+        VerificationQuery query,
+        BackendCheckResult result,
+        CancellationToken cancellationToken)
     {
         if (result.Model != null ||
             result.FailureReason != BackendFailureReason.None ||
@@ -57,8 +60,13 @@ public sealed class ProofKernel(ISmtBackend backend)
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        return new ProvenOutcome([.. result.UnsatCore.Distinct()
-            .Select(index => query.Assumptions[index].Justification)]);
+        var justifications = ImmutableArray.CreateBuilder<ProofJustification>();
+        foreach (var index in result.UnsatCore.Distinct())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            justifications.Add(query.Assumptions[index].Justification);
+        }
+        return new ProvenOutcome(justifications.ToImmutable());
     }
     private static ProofOutcome ReplayCounterexample(
         VerificationQuery query,
@@ -72,7 +80,7 @@ public sealed class ProofKernel(ISmtBackend backend)
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        if (!ValidateAssignments(query, result.Model.Assignments))
+        if (!ValidateAssignments(query, result.Model.Assignments, cancellationToken))
         {
             return Unknown(AbstentionReason.CounterexampleReplayFailed);
         }
@@ -107,7 +115,8 @@ public sealed class ProofKernel(ISmtBackend backend)
             : Unknown(AbstentionReason.CounterexampleReplayFailed);
     }
     private static bool ValidateAssignments(VerificationQuery query,
-        ImmutableDictionary<IrVarId, IrValue> assignments)
+        ImmutableDictionary<IrVarId, IrValue> assignments,
+        CancellationToken cancellationToken)
     {
         if (assignments.Count != query.ModelVariables.Length ||
             query.ModelVariables.Any(variable => !assignments.ContainsKey(variable)))
@@ -115,7 +124,15 @@ public sealed class ProofKernel(ISmtBackend backend)
             return false;
         }
 
-        return assignments.All(IsValid);
+        foreach (var assignment in assignments)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsValid(assignment))
+            {
+                return false;
+            }
+        }
+        return true;
 
         bool IsValid(KeyValuePair<IrVarId, IrValue> assignment)
         {
