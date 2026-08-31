@@ -2520,7 +2520,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         };
     }
 
-    private static bool LoopHasReachableExit(ILoopOperation loop)
+    private bool LoopHasReachableExit(ILoopOperation loop)
     {
         return HasReachableExit(loop.Body);
 
@@ -2534,7 +2534,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
             if (operation is IReturnOperation)
             {
-                return true;
+                return MandatoryFinallysMayComplete(operation);
             }
 
             if (operation is IBranchOperation branch &&
@@ -2543,7 +2543,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                      loop.ExitLabel) ||
                  IsOutwardGoto(branch)))
             {
-                return true;
+                return MandatoryFinallysMayComplete(branch);
             }
 
             return operation.ChildOperations.Any(HasReachableExit);
@@ -2555,6 +2555,21 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 branch.Target.DeclaringSyntaxReferences.Any(reference =>
                     reference.SyntaxTree == loop.Syntax.SyntaxTree &&
                     !loop.Syntax.Span.Contains(reference.Span));
+        }
+
+        bool MandatoryFinallysMayComplete(IOperation exit)
+        {
+            for (var parent = exit.Parent;
+                 parent != null && !ReferenceEquals(parent, loop);
+                 parent = parent.Parent)
+            {
+                if (parent is ITryOperation { Finally: { } @finally } &&
+                    !MayCompleteNormally(@finally))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 
