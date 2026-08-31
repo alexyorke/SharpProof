@@ -6,6 +6,18 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ArgumentNullGuard.NotNull(directory, nameof(directory)));
     private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
         maximumBytes, nameof(maximumBytes));
+    private static readonly Comparer<(
+        DateTime LastWriteTimeUtc,
+        string Name)> CapacityPriorityComparer = Comparer<(
+            DateTime LastWriteTimeUtc,
+            string Name)>.Create(static (left, right) =>
+            {
+                var timeComparison = left.LastWriteTimeUtc.CompareTo(
+                    right.LastWriteTimeUtc);
+                return timeComparison != 0
+                    ? timeComparison
+                    : StringComparer.Ordinal.Compare(left.Name, right.Name);
+            });
     internal static Action<string, string>? PathValidationOverride;
     internal static Action? TransactionRollbackOverride;
 
@@ -242,46 +254,56 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var files = new DirectoryInfo(_directory)
-            .EnumerateFiles("*.sharp-proof-cache.json", SearchOption.TopDirectoryOnly)
-            .Where(static file => IsOwnedCacheEntry(file.Name))
-            .OrderBy(static file => file.LastWriteTimeUtc)
-            .ThenBy(static file => file.Name, StringComparer.Ordinal)
-            .ToArray();
+        var files = new PriorityQueue<
+            (FileInfo File, long Length),
+            (DateTime LastWriteTimeUtc, string Name)>(
+                CapacityPriorityComparer);
         long total = 0;
-        foreach (var file in files)
-        {
-            ValidatePath(file.FullName);
-            checked
-            {
-                total += file.Length;
-            }
-        }
-        foreach (var file in files)
+        foreach (var file in new DirectoryInfo(_directory).EnumerateFiles(
+                     "*.sharp-proof-cache.json",
+                     SearchOption.TopDirectoryOnly))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (total <= _maximumBytes)
+            if (!IsOwnedCacheEntry(file.Name))
             {
-                break;
+                continue;
             }
+
+            ValidatePath(file.FullName);
+            cancellationToken.ThrowIfCancellationRequested();
+            var priority = (file.LastWriteTimeUtc, file.Name);
+            var length = file.Length;
+            checked
+            {
+                total += length;
+            }
+            files.Enqueue((file, length), priority);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        while (total > _maximumBytes &&
+               files.TryDequeue(out var entry, out _))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.Equals(
-                    file.FullName,
+                    entry.File.FullName,
                     protectedPath,
                     StringComparison.Ordinal))
             {
                 continue;
             }
 
-            ValidatePath(file.FullName);
-            var length = file.Length;
-            var stagedPath = file.FullName + "." +
+            ValidatePath(entry.File.FullName);
+            cancellationToken.ThrowIfCancellationRequested();
+            var stagedPath = entry.File.FullName + "." +
                 Guid.NewGuid().ToString("N") + ".eviction";
             ValidatePath(stagedPath);
-            File.Move(file.FullName, stagedPath);
-            staged.Add(new StagedEntry(file.FullName, stagedPath));
-            total -= length;
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(entry.File.FullName, stagedPath);
+            staged.Add(new StagedEntry(entry.File.FullName, stagedPath));
+            total -= entry.Length;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return total <= _maximumBytes;
     }
 
