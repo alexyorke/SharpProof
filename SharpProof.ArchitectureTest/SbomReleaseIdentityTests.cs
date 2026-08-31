@@ -6,6 +6,37 @@ namespace SharpProof.ArchitectureTest;
 [TestFixture]
 public sealed class SbomReleaseIdentityTests
 {
+    [Test]
+    public void SbomFixtureProcessHasAnInternalWallTimeLimit()
+    {
+        var info = new ProcessStartInfo
+        {
+            FileName = "pwsh",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        info.ArgumentList.Add("-NoLogo");
+        info.ArgumentList.Add("-NoProfile");
+        info.ArgumentList.Add("-Command");
+        info.ArgumentList.Add("Start-Sleep -Seconds 30");
+
+        var stopwatch = Stopwatch.StartNew();
+        var exception = Assert.ThrowsAsync<TimeoutException>((Func<Task>)(
+            async () => _ = await InvokeProcessRunnerAsync(
+                info,
+                TimeSpan.FromMilliseconds(250))));
+        stopwatch.Stop();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.Message, Does.Contain("pwsh"));
+            Assert.That(
+                stopwatch.Elapsed,
+                Is.LessThan(TimeSpan.FromSeconds(5)));
+        }
+    }
+
     [TestCase("canonical", true)]
     [TestCase("stale-commit", false)]
     [TestCase("stale-timestamp", false)]
@@ -104,6 +135,24 @@ public sealed class SbomReleaseIdentityTests
         var error = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
         return (process.ExitCode, await output + Environment.NewLine + await error);
+    }
+
+    private static Task<(int ExitCode, string Output)> InvokeProcessRunnerAsync(
+        ProcessStartInfo info,
+        TimeSpan timeout)
+    {
+        var method = typeof(SbomReleaseIdentityTests).GetMethod(
+            "RunProcessAsync",
+            System.Reflection.BindingFlags.NonPublic |
+            System.Reflection.BindingFlags.Static,
+            binder: null,
+            [typeof(ProcessStartInfo), typeof(TimeSpan)],
+            modifiers: null) ??
+            throw new InvalidOperationException(
+                "Could not find the timeout-aware SBOM fixture runner.");
+        return (Task<(int ExitCode, string Output)>)method.Invoke(
+            null,
+            [info, timeout])!;
     }
 
     private static string FindRepositoryRoot()
