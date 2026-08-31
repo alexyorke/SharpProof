@@ -264,6 +264,38 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ReportsEveryRoslynTextParserEntryPoint()
+    {
+        var diagnostics = await Analyze(
+            """
+            using Microsoft.CodeAnalysis.CSharp;
+            namespace SharpProof.Frontend;
+            static class C {
+                static void M() {
+                    _ = SyntaxFactory.ParseCompilationUnit("class D { }");
+                    _ = SyntaxFactory.ParseMemberDeclaration("class D { }");
+                    _ = CSharpSyntaxTree.ParseText("class D { }");
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics
+                .Where(static diagnostic => diagnostic.Id == "SPMETA001")
+                .Select(static diagnostic =>
+                    diagnostic.GetMessage(CultureInfo.InvariantCulture)),
+            Is.EquivalentTo((string[])
+            [
+                "API 'ParseCompilationUnit' is forbidden in " +
+                    "soundness-critical SharpProof layers",
+                "API 'ParseMemberDeclaration' is forbidden in " +
+                    "soundness-critical SharpProof layers",
+                "API 'ParseText' is forbidden in soundness-critical " +
+                    "SharpProof layers"
+            ]));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesTrackAliasesAndAssignments()
     {
         var diagnostics = await Analyze(
