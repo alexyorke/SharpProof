@@ -55,6 +55,28 @@ public sealed class ContractIntrinsicValidationTests
             Is.EqualTo(ContractBindingFailure.NestedOld));
     }
 
+    [Test]
+    public void IndirectIntrinsicCallsFailClosed()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Target {
+                public static int Read(int value) {
+                    Func<int> result = Contract.Result<int>;
+                    Func<int, int> old = Contract.Old<int>;
+                    return result() + old(value);
+                }
+            }
+            """;
+
+        Assert.That(
+            Bind(source, "Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.ResultOutsideEnsures));
+    }
+
     private static ContractBindingResult Bind(
         string source,
         string typeName,

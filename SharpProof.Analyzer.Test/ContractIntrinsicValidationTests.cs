@@ -55,6 +55,42 @@ public sealed class ContractIntrinsicValidationTests
         AssertNestingDiagnostic(diagnostics);
     }
 
+    [Test]
+    public async Task IndirectIntrinsicCallsReportPlacementDiagnostics()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Target {
+                public static int Read(int value) {
+                    Func<int> result = Contract.Result<int>;
+                    Func<int, int> old = Contract.Old<int>;
+                    return result() + old(value);
+                }
+            }
+            """,
+            "contracts",
+            ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0024", 2)));
+        var messages = diagnostics.Select(diagnostic =>
+                diagnostic.GetMessage(CultureInfo.InvariantCulture))
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                messages[0],
+                Does.Contain("Contract.Result").And.Contain("<placement>"));
+            Assert.That(
+                messages[1],
+                Does.Contain("Contract.Old").And.Contain("<placement>"));
+        }
+    }
+
     private static void AssertNestingDiagnostic(
         IReadOnlyCollection<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
     {
