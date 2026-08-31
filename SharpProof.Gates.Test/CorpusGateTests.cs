@@ -551,6 +551,20 @@ public sealed class CorpusGateTests
     }
 
     [Test]
+    public void AlphaRenameDoesNotEmitDuplicateEffectSources()
+    {
+        var cases = CorpusCatalog.CreateSyntheticCases();
+        Assert.That(
+            cases.Any(item => item.SeedId.StartsWith('E') &&
+                item.Variant == CorpusVariant.AlphaRenameContractFormals),
+            Is.False);
+        Assert.That(
+            cases.Any(item => item.SeedId == "C07" &&
+                item.Variant == CorpusVariant.AlphaRenameContractFormals),
+            Is.True);
+    }
+
+    [Test]
     public async Task MetamorphicVariantsMustRetainSeedOutcomeAndDiagnosticClasses()
     {
         var catalog = CorpusCatalog.CreateSyntheticCases();
