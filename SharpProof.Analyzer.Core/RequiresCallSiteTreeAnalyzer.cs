@@ -522,7 +522,6 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 initialLocal,
                 block.Ordinal,
                 definition.Span.End,
-                new HashSet<SyntaxNode> { definition },
                 GetTuplePath(value.Syntax, definition));
         }
 
@@ -573,225 +572,230 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             ILocalSymbol local,
             int definitionBlock,
             int definitionEnd,
-            HashSet<SyntaxNode> activeDefinitions,
-            IReadOnlyList<string>? tuplePath = null)
+            string[]? tuplePath = null)
         {
-            var pending = new Queue<(int Ordinal, int After)>();
-            var visited = new HashSet<(int Ordinal, bool FromStart)>();
-            pending.Enqueue((definitionBlock, definitionEnd));
-            while (pending.Count != 0)
+            var searches = new Queue<(
+                ILocalSymbol Local,
+                int DefinitionBlock,
+                int DefinitionEnd,
+                string[]? TuplePath)>();
+            var searched = new Dictionary<
+                ILocalSymbol,
+                HashSet<(
+                    int DefinitionBlock,
+                    int DefinitionEnd,
+                    string TuplePath)>>(SymbolEqualityComparer.Default);
+            searches.Enqueue((
+                local,
+                definitionBlock,
+                definitionEnd,
+                tuplePath));
+            while (searches.Count != 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var (ordinal, after) = pending.Dequeue();
-                if (!visited.Add((ordinal, after < 0)))
+                (local, definitionBlock, definitionEnd, tuplePath) =
+                    searches.Dequeue();
+                if (!searched.TryGetValue(local, out var localSearches))
+                {
+                    localSearches = [];
+                    searched.Add(local, localSearches);
+                }
+                var tuplePathKey = tuplePath == null
+                    ? "\u0000"
+                    : "\u0001" + string.Join("\u0000", tuplePath);
+                if (!localSearches.Add((
+                        definitionBlock,
+                        definitionEnd,
+                        tuplePathKey)))
                 {
                     continue;
                 }
-                var block = graph.Blocks[ordinal];
-                var killed = false;
-                var exceptionalStateSurvivesKill = false;
-                var pendingWriteOnlyOutCommit = -1;
-                foreach (var reference in BlockOperations(block)
-                             .SelectMany(static operation =>
-                                 operation.DescendantsAndSelf())
-                             .OfType<ILocalReferenceOperation>()
-                             .Where(reference =>
-                                 SymbolEqualityComparer.Default.Equals(
-                                     reference.Local,
-                                     local))
-                             .OrderBy(GetReferenceOrder))
+
+                var pending = new Queue<(int Ordinal, int After)>();
+                var visited = new HashSet<(int Ordinal, bool FromStart)>();
+                pending.Enqueue((definitionBlock, definitionEnd));
+                while (pending.Count != 0)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var order = GetReferenceOrder(reference);
-                    if (order <= after || reference.IsDeclaration)
+                    var (ordinal, after) = pending.Dequeue();
+                    if (!visited.Add((ordinal, after < 0)))
                     {
                         continue;
                     }
-                    if (pendingWriteOnlyOutCommit >= 0 &&
-                        order >= pendingWriteOnlyOutCommit)
+                    var block = graph.Blocks[ordinal];
+                    var killed = false;
+                    var exceptionalStateSurvivesKill = false;
+                    var pendingWriteOnlyOutCommit = -1;
+                    foreach (var reference in BlockOperations(block)
+                                 .SelectMany(static operation =>
+                                     operation.DescendantsAndSelf())
+                                 .OfType<ILocalReferenceOperation>()
+                                 .Where(reference =>
+                                     SymbolEqualityComparer.Default.Equals(
+                                         reference.Local,
+                                         local))
+                                 .OrderBy(GetReferenceOrder))
                     {
-                        exceptionalStateSurvivesKill = true;
-                        killed = true;
-                        break;
-                    }
-                    var accessedTuplePath = GetAccessedTuplePath(reference);
-                    if (IsAssignmentTarget(reference.Syntax))
-                    {
-                        // A target-shaped reference that has no enclosing
-                        // ISimpleAssignmentOperation isn't the real commit:
-                        // a multi-block RHS (e.g. a ternary) can lower into
-                        // a flow-capture that happens to share the target's
-                        // syntax span in an earlier block. Only the
-                        // reference embedded in the actual assignment
-                        // operation represents the commit.
-                        if (!HasEnclosingSimpleAssignment(reference))
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var order = GetReferenceOrder(reference);
+                        if (order <= after || reference.IsDeclaration)
                         {
                             continue;
                         }
-                        if (IsAssignedStorage(reference))
+                        if (pendingWriteOnlyOutCommit >= 0 &&
+                            order >= pendingWriteOnlyOutCommit)
+                        {
+                            exceptionalStateSurvivesKill = true;
+                            killed = true;
+                            break;
+                        }
+                        var accessedTuplePath = GetAccessedTuplePath(reference);
+                        if (IsAssignmentTarget(reference.Syntax))
+                        {
+                            // A target-shaped reference that has no enclosing
+                            // ISimpleAssignmentOperation isn't the real commit:
+                            // a multi-block RHS (e.g. a ternary) can lower into
+                            // a flow-capture that happens to share the target's
+                            // syntax span in an earlier block. Only the
+                            // reference embedded in the actual assignment
+                            // operation represents the commit.
+                            if (!HasEnclosingSimpleAssignment(reference))
+                            {
+                                continue;
+                            }
+                            if (IsAssignedStorage(reference))
+                            {
+                                if (AssignmentKillsTrackedValue(
+                                        tuplePath,
+                                        accessedTuplePath))
+                                {
+                                    exceptionalStateSurvivesKill =
+                                        BlockMayThrowBeforeAssignmentCommit(
+                                            graph,
+                                            after,
+                                            reference);
+                                    killed = true;
+                                    break;
+                                }
+                                continue;
+                            }
+                        }
+                        if (TryGetWriteOnlyOutCommit(
+                                reference,
+                                out var writeOnlyOutCommit))
                         {
                             if (AssignmentKillsTrackedValue(
                                     tuplePath,
                                     accessedTuplePath))
                             {
-                                exceptionalStateSurvivesKill =
-                                    BlockMayThrowBeforeAssignmentCommit(
-                                        graph,
-                                        after,
-                                        reference);
-                                killed = true;
-                                break;
+                                pendingWriteOnlyOutCommit =
+                                    pendingWriteOnlyOutCommit < 0
+                                        ? writeOnlyOutCommit
+                                        : Math.Min(
+                                            pendingWriteOnlyOutCommit,
+                                            writeOnlyOutCommit);
                             }
                             continue;
                         }
-                    }
-                    if (TryGetWriteOnlyOutCommit(
-                            reference,
-                            out var writeOnlyOutCommit))
-                    {
-                        if (AssignmentKillsTrackedValue(
-                                tuplePath,
-                                accessedTuplePath))
+                        string[]? propagatedTuplePath = tuplePath;
+                        if (tuplePath != null &&
+                            accessedTuplePath.Count != 0)
                         {
-                            pendingWriteOnlyOutCommit =
-                                pendingWriteOnlyOutCommit < 0
-                                    ? writeOnlyOutCommit
-                                    : Math.Min(
-                                        pendingWriteOnlyOutCommit,
-                                        writeOnlyOutCommit);
-                        }
-                        continue;
-                    }
-                    IReadOnlyList<string>? propagatedTuplePath = tuplePath;
-                    if (tuplePath != null && accessedTuplePath.Count != 0)
-                    {
-                        var shared = 0;
-                        while (shared < tuplePath.Count &&
-                               shared < accessedTuplePath.Count &&
-                               string.Equals(
-                                   tuplePath[shared],
-                                   accessedTuplePath[shared],
-                                   StringComparison.Ordinal))
-                        {
-                            shared++;
-                        }
-                        if (shared < accessedTuplePath.Count &&
-                            shared < tuplePath.Count)
-                        {
-                            continue;
-                        }
-                        propagatedTuplePath = shared < tuplePath.Count
-                            ? tuplePath.Skip(shared).ToArray()
-                            : null;
-                    }
-                    if (TryGetLocalDestination(
-                            reference.Syntax,
-                            out var alias,
-                            out var aliasDefinition) &&
-                        (accessedTuplePath.Count != 0 ||
-                         IsDirectDelegatePropagation(
-                             reference.Syntax,
-                             aliasDefinition)))
-                    {
-                        if (activeDefinitions.Add(aliasDefinition))
-                        {
-                            try
+                            var shared = 0;
+                            while (shared < tuplePath.Length &&
+                                   shared < accessedTuplePath.Count &&
+                                   string.Equals(
+                                       tuplePath[shared],
+                                       accessedTuplePath[shared],
+                                       StringComparison.Ordinal))
                             {
-                                if (CanReachConsumption(
-                                        graph,
-                                        alias,
-                                        ordinal,
-                                        aliasDefinition.Span.End,
-                                        activeDefinitions,
-                                        propagatedTuplePath))
-                                {
-                                    return true;
-                                }
+                                shared++;
                             }
-                            finally
-                            {
-                                activeDefinitions.Remove(aliasDefinition);
-                            }
-                        }
-                        continue;
-                    }
-                    if (TryGetDeconstructionDestination(
-                            reference.Syntax,
-                            propagatedTuplePath,
-                            out var deconstructionAlias,
-                            out var deconstructionDefinition,
-                            out var remainingTuplePath))
-                    {
-                        if (deconstructionAlias != null &&
-                            activeDefinitions.Add(deconstructionDefinition))
-                        {
-                            try
-                            {
-                                if (CanReachConsumption(
-                                        graph,
-                                        deconstructionAlias,
-                                        ordinal,
-                                        deconstructionDefinition.Span.End,
-                                        activeDefinitions,
-                                        remainingTuplePath))
-                                {
-                                    return true;
-                                }
-                            }
-                            finally
-                            {
-                                activeDefinitions.Remove(
-                                    deconstructionDefinition);
-                            }
-                        }
-                        continue;
-                    }
-                    var patternDestinations = GetPatternDestinations(
-                        reference.Syntax);
-                    if (patternDestinations.Count != 0)
-                    {
-                        foreach (var patternAlias in patternDestinations)
-                        {
-                            if (!activeDefinitions.Add(
-                                    patternAlias.Definition))
+                            if (shared < accessedTuplePath.Count &&
+                                shared < tuplePath.Length)
                             {
                                 continue;
                             }
-                            try
+                            propagatedTuplePath = shared < tuplePath.Length
+                                ? tuplePath.Skip(shared).ToArray()
+                                : null;
+                        }
+                        if (TryGetLocalDestination(
+                                reference.Syntax,
+                                out var alias,
+                                out var aliasDefinition) &&
+                            (accessedTuplePath.Count != 0 ||
+                             IsDirectDelegatePropagation(
+                                 reference.Syntax,
+                                 aliasDefinition)))
+                        {
+                            searches.Enqueue((
+                                alias,
+                                ordinal,
+                                aliasDefinition.Span.End,
+                                propagatedTuplePath));
+                            continue;
+                        }
+                        if (TryGetDeconstructionDestination(
+                                reference.Syntax,
+                                propagatedTuplePath,
+                                out var deconstructionAlias,
+                                out var deconstructionDefinition,
+                                out var remainingTuplePath))
+                        {
+                            if (deconstructionAlias != null)
                             {
-                                if (CanReachConsumption(
-                                        graph,
-                                        patternAlias.Local,
-                                        ordinal,
-                                        patternAlias.Definition.Span.End,
-                                        activeDefinitions,
-                                        propagatedTuplePath))
-                                {
-                                    return true;
-                                }
+                                searches.Enqueue((
+                                    deconstructionAlias,
+                                    ordinal,
+                                    deconstructionDefinition.Span.End,
+                                    remainingTuplePath));
                             }
-                            finally
+                            continue;
+                        }
+                        var patternDestinations = GetPatternDestinations(
+                            reference.Syntax);
+                        if (patternDestinations.Count != 0)
+                        {
+                            foreach (var patternAlias in patternDestinations)
                             {
-                                activeDefinitions.Remove(
-                                    patternAlias.Definition);
+                                searches.Enqueue((
+                                    patternAlias.Local,
+                                    ordinal,
+                                    patternAlias.Definition.Span.End,
+                                    propagatedTuplePath));
+                            }
+                            continue;
+                        }
+                        if (IsNonExecutingObservation(reference))
+                        {
+                            continue;
+                        }
+                        return true;
+                    }
+                    if (!killed && pendingWriteOnlyOutCommit >= 0)
+                    {
+                        exceptionalStateSurvivesKill = true;
+                        killed = true;
+                    }
+                    if (killed)
+                    {
+                        if (exceptionalStateSurvivesKill)
+                        {
+                            foreach (var successor in ExceptionalSuccessors(
+                                         graph,
+                                         block))
+                            {
+                                pending.Enqueue((successor.Ordinal, -1));
                             }
                         }
                         continue;
                     }
-                    if (IsNonExecutingObservation(reference))
+                    foreach (var successor in RegularSuccessors(graph, block))
                     {
-                        continue;
+                        pending.Enqueue((successor.Ordinal, -1));
                     }
-                    return true;
-                }
-                if (!killed && pendingWriteOnlyOutCommit >= 0)
-                {
-                    exceptionalStateSurvivesKill = true;
-                    killed = true;
-                }
-                if (killed)
-                {
-                    if (exceptionalStateSurvivesKill)
+                    if (BlockMayThrow(block, after))
                     {
                         foreach (var successor in ExceptionalSuccessors(
                                      graph,
@@ -799,20 +803,6 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                         {
                             pending.Enqueue((successor.Ordinal, -1));
                         }
-                    }
-                    continue;
-                }
-                foreach (var successor in RegularSuccessors(graph, block))
-                {
-                    pending.Enqueue((successor.Ordinal, -1));
-                }
-                if (BlockMayThrow(block, after))
-                {
-                    foreach (var successor in ExceptionalSuccessors(
-                                 graph,
-                                 block))
-                    {
-                        pending.Enqueue((successor.Ordinal, -1));
                     }
                 }
             }
@@ -904,15 +894,15 @@ internal static partial class RequiresCallSiteTreeAnalyzer
 
         private bool TryGetDeconstructionDestination(
             SyntaxNode reference,
-            IReadOnlyList<string>? tuplePath,
+            string[]? tuplePath,
             out ILocalSymbol? local,
             out SyntaxNode definition,
-            out IReadOnlyList<string>? remainingTuplePath)
+            out string[]? remainingTuplePath)
         {
             local = null;
             definition = null!;
             remainingTuplePath = null;
-            if (tuplePath == null || tuplePath.Count == 0)
+            if (tuplePath == null || tuplePath.Length == 0)
             {
                 return false;
             }
@@ -933,7 +923,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 cancellationToken).Type as INamedTypeSymbol;
             var consumed = 0;
             while (sourceType?.IsTupleType == true &&
-                   consumed < tuplePath.Count)
+                   consumed < tuplePath.Length)
             {
                 var component = tuplePath[consumed];
                 var index = -1;
@@ -964,7 +954,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 sourceType = sourceType.TupleElements[index].Type as
                     INamedTypeSymbol;
                 consumed++;
-                if (consumed < tuplePath.Count &&
+                if (consumed < tuplePath.Length &&
                     GetDeconstructionElements(target).Length == 0)
                 {
                     break;
@@ -976,7 +966,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 return false;
             }
             definition = assignment;
-            remainingTuplePath = consumed < tuplePath.Count
+            remainingTuplePath = consumed < tuplePath.Length
                 ? tuplePath.Skip(consumed).ToArray()
                 : null;
             local = target switch
@@ -1425,14 +1415,14 @@ internal static partial class RequiresCallSiteTreeAnalyzer
         }
 
         private static bool AssignmentKillsTrackedValue(
-            IReadOnlyList<string>? trackedPath,
+            string[]? trackedPath,
             List<string> assignedPath)
         {
             if (trackedPath == null || assignedPath.Count == 0)
             {
                 return true;
             }
-            if (assignedPath.Count > trackedPath.Count)
+            if (assignedPath.Count > trackedPath.Length)
             {
                 return false;
             }
