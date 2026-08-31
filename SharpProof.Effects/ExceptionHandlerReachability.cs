@@ -843,6 +843,36 @@ internal sealed class ExceptionHandlerReachability(
                 PushChildren(propertyReference);
                 continue;
             }
+            if (operation is IRecursivePatternOperation recursivePattern)
+            {
+                var instance = SwitchExpressionFacts.GetGoverningValue(
+                    recursivePattern);
+                if (instance != null &&
+                    IsDefinitelyNull(recursivePattern, instance))
+                {
+                    continue;
+                }
+                if (recursivePattern.DeconstructSymbol is
+                    IMethodSymbol deconstruct)
+                {
+                    Add(
+                        deconstruct.IsVirtual || deconstruct.IsAbstract
+                            ? UnknownPotential
+                            : GetCallableExceptions(
+                                deconstruct,
+                                activeMethods,
+                                depth + 1),
+                        recursivePattern);
+                    if (!deconstruct.IsVirtual &&
+                        !deconstruct.IsAbstract &&
+                        !canMethodCompleteNormally(deconstruct))
+                    {
+                        continue;
+                    }
+                }
+                PushSequential(recursivePattern.ChildOperations);
+                continue;
+            }
             if (operation is IListPatternOperation listPattern)
             {
                 var members = getReachableListPatternMembers(listPattern);
@@ -1323,15 +1353,24 @@ internal sealed class ExceptionHandlerReachability(
             case ISwitchExpressionOperation @switch:
                 if (canCompleteNormally(@switch.Value))
                 {
+                    var inputDefinitelyNonNull =
+                        DefiniteOperationFacts.IsDefinitelyNonNull(
+                            @switch.Value) ||
+                        abstractFlow?.ProvesNonNull(
+                            @switch,
+                            @switch.Value) == true;
+                    PushAllCore(
+                        SwitchExpressionFacts.GetEvaluatedPatternOnlyArms(
+                                @switch,
+                                canCompleteNormally,
+                                inputDefinitelyNonNull)
+                            .Select(static arm => arm.Pattern),
+                        remaining);
                     PushAllCore(
                         SwitchExpressionFacts.GetReachableArms(
                             @switch,
                             canCompleteNormally,
-                            DefiniteOperationFacts.IsDefinitelyNonNull(
-                                @switch.Value) ||
-                            abstractFlow?.ProvesNonNull(
-                                @switch,
-                                @switch.Value) == true),
+                            inputDefinitelyNonNull),
                         remaining);
                 }
                 remaining.Push(@switch.Value);

@@ -890,12 +890,22 @@ internal sealed partial class OperationEffectScanner
         }
 
         var arms = EffectSummary.Empty;
+        var inputDefinitelyNonNull = _nullnessEvaluator.IsProvenNonNull(
+            switchExpression.Value,
+            switchExpression);
+        foreach (var arm in SwitchExpressionFacts.GetEvaluatedPatternOnlyArms(
+                     switchExpression,
+                     _completionEvaluator.CanCompleteNormally,
+                     inputDefinitelyNonNull))
+        {
+            arms = EffectSummaryDomain.Instance.Join(
+                arms,
+                Scan(arm.Pattern));
+        }
         foreach (var arm in SwitchExpressionFacts.GetReachableArms(
                      switchExpression,
                      _completionEvaluator.CanCompleteNormally,
-                     _nullnessEvaluator.IsProvenNonNull(
-                         switchExpression.Value,
-                         switchExpression)))
+                     inputDefinitelyNonNull))
         {
             arms = EffectSummaryDomain.Instance.Join(arms, Scan(arm));
         }
@@ -903,9 +913,7 @@ internal sealed partial class OperationEffectScanner
         var unmatched = SwitchExpressionFacts.HasReachableUnmatchedPath(
             switchExpression,
             _completionEvaluator.CanCompleteNormally,
-            _nullnessEvaluator.IsProvenNonNull(
-                switchExpression.Value,
-                switchExpression))
+            inputDefinitelyNonNull)
                 ? Throw(FrameworkTypeMetadataNames.SwitchExpressionException)
                 : EffectSummary.Empty;
         return EffectSummaryOperations.Join(value.Summary, arms, unmatched);
@@ -1045,7 +1053,48 @@ internal sealed partial class OperationEffectScanner
             return EffectSummary.Empty;
         }
 
-        return ScanChildren(pattern);
+        return pattern is IRecursivePatternOperation recursivePattern
+            ? ScanRecursivePattern(recursivePattern)
+            : ScanChildren(pattern);
+    }
+
+    private EffectSummary ScanRecursivePattern(
+        IRecursivePatternOperation pattern)
+    {
+        if (pattern.DeconstructSymbol is not IMethodSymbol deconstruct)
+        {
+            return ScanChildren(pattern);
+        }
+
+        var instance = SwitchExpressionFacts.GetGoverningValue(pattern);
+        var receiver = _conversionOwnership.ClassifyRegion(
+            instance,
+            aliasSource: true);
+        var argumentRegions = Enumerable.Repeat(
+                EffectRegionSet.Empty,
+                deconstruct.Parameters.Length)
+            .ToImmutableArray();
+        var actualArguments = Enumerable.Repeat<IOperation?>(
+                null,
+                deconstruct.Parameters.Length)
+            .ToImmutableArray();
+        var call = _callResolver.Resolve(
+            deconstruct,
+            receiver,
+            receiver,
+            argumentRegions,
+            actualArguments,
+            deconstruct.IsVirtual || deconstruct.IsAbstract,
+            pattern,
+            instance,
+            ImmutableArray<IArgumentOperation>.Empty);
+        var completesNormally = deconstruct.IsAbstract ||
+            deconstruct.IsVirtual && !deconstruct.IsSealed ||
+            _completionEvaluator.CanMethodCompleteNormally(deconstruct);
+        var result = new EffectStep(call, completesNormally);
+        return result.CompletesNormally
+            ? result.Then(ScanSequence(pattern.ChildOperations)).Summary
+            : result.Summary;
     }
 
     private EffectSummary ScanChildren(IOperation operation)
