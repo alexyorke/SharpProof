@@ -534,8 +534,23 @@ public sealed class SharpProofWorker : IDisposable
         }
         internal void DisposeOwnedBackend()
         {
-            _ownedBackend?.Dispose();
+            var ownedBackend = _ownedBackend;
             _ownedBackend = null;
+            if (ownedBackend == null)
+            {
+                return;
+            }
+
+            try
+            {
+                ownedBackend.Dispose();
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException and
+                not StackOverflowException and not OperationCanceledException)
+            {
+                // Backend cleanup is best-effort and cannot replace a
+                // completed response or interrupt cleanup of later lanes.
+            }
         }
     }
 
