@@ -2309,7 +2309,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
             }
             return calls.ToImmutable();
         }
-        if (property.Parent is INameOfOperation || getter == null)
+        if (getter == null ||
+            Ancestors(property).Any(static ancestor =>
+                ancestor is INameOfOperation))
         {
             return [];
         }
