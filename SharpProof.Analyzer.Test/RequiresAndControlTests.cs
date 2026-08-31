@@ -421,6 +421,44 @@ public sealed class RequiresAndControlTests
     }
 
     [Test]
+    public async Task PartialMemberInitializersStopAfterEarlierPartDoesNotComplete()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Fail() =>
+                    throw new InvalidOperationException();
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public sealed partial class Subject {
+                private int first = Guard.Fail();
+            }
+            """,
+            ["SP0027"],
+            filePath: "Subject.First.cs");
+        compilation = compilation.AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(
+                """
+                public sealed partial class Subject {
+                    private int second = Guard.Positive(-1);
+                }
+                """,
+                (CSharpParseOptions)compilation.SyntaxTrees.Single().Options,
+                path: "Subject.Second.cs"));
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            "contracts");
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task MemberInitializersRunBeforeNonCompletingBaseConstructor()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
