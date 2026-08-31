@@ -1963,7 +1963,16 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 (GetBody(declaration) is { } methodBody
                     ? model.GetOperation(methodBody, cancellationToken)
                     : null);
-            return operation == null || MayCompleteNormally(operation);
+            if (operation == null)
+            {
+                return true;
+            }
+            return normalized.MethodKind == MethodKind.Constructor &&
+                operation is IConstructorBodyOperation constructorBody
+                ? ConstructorMayCompleteNormally(
+                    normalized,
+                    constructorBody)
+                : MayCompleteNormally(operation);
         }
         catch (ArgumentException)
         {
@@ -1973,6 +1982,55 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         {
             _activeMethods.Remove(normalized);
         }
+    }
+
+    private bool ConstructorMayCompleteNormally(
+        IMethodSymbol constructor,
+        IConstructorBodyOperation body)
+    {
+        if (!MayCompleteNormally(body.Initializer))
+        {
+            return false;
+        }
+
+        var initializer = EffectMethodNodeBuilder
+            .GetConstructorInitializerInvocation(body);
+        var delegatesToThis = initializer != null &&
+            SymbolEqualityComparer.Default.Equals(
+                initializer.TargetMethod.ContainingType.OriginalDefinition,
+                constructor.ContainingType.OriginalDefinition);
+        if (!delegatesToThis)
+        {
+            foreach (var reference in EffectMethodNodeBuilder
+                         .GetMemberInitializerReferences(
+                             compilation,
+                             constructor.ContainingType,
+                             staticInitializers: false))
+            {
+                var declaration = reference.GetSyntax(cancellationToken);
+                var expression = EffectProjections.GetInitializerExpression(
+                    declaration);
+                if (expression == null)
+                {
+                    continue;
+                }
+
+                var model = SharpProof.Frontend.Host
+                    .CompilationModelProvider.GetSemanticModel(
+                        compilation,
+                        expression.SyntaxTree);
+                var operation = model.GetOperation(
+                    expression,
+                    cancellationToken);
+                if (operation != null && !MayCompleteNormally(operation))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return MayCompleteNormally(body.BlockBody) &&
+            MayCompleteNormally(body.ExpressionBody);
     }
 
     private static bool DefersBodyCompletion(
