@@ -26,6 +26,16 @@ public sealed class SharpProofSoundnessAnalyzerTests
         "SPMETA001")]
     [TestCase(
         """
+        using System.Runtime.CompilerServices;
+        namespace SharpProof.Verify;
+        static class C {
+            static object M() =>
+                RuntimeHelpers.GetUninitializedObject(typeof(object));
+        }
+        """,
+        "SPMETA001")]
+    [TestCase(
+        """
         using Microsoft.CodeAnalysis;
         namespace SharpProof.CompilerArtifact;
         sealed class C {

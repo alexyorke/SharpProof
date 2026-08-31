@@ -37,7 +37,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         "SharpProof.Worker.Protocol.WorkerCallableCoverageReason", "SharpProof.Worker.Protocol.WorkerVerifyRequest",
         "SharpProof.Worker.Protocol.WorkerVerifyResponse",
         "SharpProof.Worker.Protocol.WorkerResultAssembler",
-        "SharpProof.Worker.Protocol.WorkerRunStatus"
+        "SharpProof.Worker.Protocol.WorkerRunStatus",
+        "System.Runtime.CompilerServices.RuntimeHelpers"
     ];
 
     private static readonly ImmutableDictionary<KnownType, ImmutableHashSet<string>> ForbiddenMethods =
@@ -70,7 +71,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "TryGetSpeculativeSemanticModelForMethodBody",
                 "GetSpeculativeSymbolInfo",
                 "GetSpeculativeTypeInfo",
-                "GetSpeculativeAliasInfo")
+                "GetSpeculativeAliasInfo"),
+            [KnownType.RuntimeHelpers] = Names("GetUninitializedObject")
         }.ToImmutableDictionary();
 
     private static readonly ImmutableArray<string> CSharpExpressionFragments =
@@ -980,7 +982,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         ValidatedModel, WorkerProgram, WorkerLauncherProgram, SharpProofWorker,
         CallableVerificationPolicy, CallableVerificationResult,
         WorkerClaimReason, WorkerCallableCoverageReason, WorkerVerifyRequest,
-        WorkerVerifyResponse, WorkerResultAssembler, WorkerRunStatus
+        WorkerVerifyResponse, WorkerResultAssembler, WorkerRunStatus,
+        RuntimeHelpers
     }
 
     internal sealed class KnownSymbols
