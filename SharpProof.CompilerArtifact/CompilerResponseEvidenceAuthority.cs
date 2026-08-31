@@ -722,6 +722,21 @@ internal sealed class CompilerResponseEvidenceAuthority :
                 final[variable.Variable] = value;
             }
 
+            foreach (var variable in target.Variables)
+            {
+                if (!final.TryGetValue(variable.Variable, out var value))
+                {
+                    continue;
+                }
+
+                if (!CompilerSourceIntegerDomain.Contains(
+                        variable.SourceIntegerInterval,
+                        value))
+                {
+                    return false;
+                }
+            }
+
             var ensures = target.Clauses.Where(static clause =>
                 clause.Kind == CompilerContractKind.Ensures).ToArray();
             var ordinal = Array.FindIndex(
