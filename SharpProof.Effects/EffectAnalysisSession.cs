@@ -90,14 +90,15 @@ public sealed class EffectAnalysisSession
         method = ArgumentNullGuard.NotNull(method, nameof(method));
 
         cancellationToken.ThrowIfCancellationRequested();
-        var normalized = NormalizeMethod(method);
+        var preconditionTarget = NormalizeMethodConstruction(method);
+        var normalized = preconditionTarget.OriginalDefinition;
         if (!IsSourceMethod(normalized))
         {
             return new EffectMethodResult(
                 normalized,
                 EffectSummaryOperations.Join(
                     _external.Resolve(normalized),
-                    ResolveEntryPreconditions(normalized)));
+                    ResolveEntryPreconditions(preconditionTarget)));
         }
 
         var moduleInitializers = GetModuleInitializers(cancellationToken);
@@ -177,11 +178,12 @@ public sealed class EffectAnalysisSession
             receiver = EffectRegionSet.Empty;
             writeReceiver = EffectRegionSet.Empty;
         }
-        var normalized = NormalizeMethod(target);
+        var preconditionTarget = NormalizeMethodConstruction(target);
+        var normalized = preconditionTarget.OriginalDefinition;
         var preconditions = _callPreconditions.Assess(
             new EffectCallPreconditionContext(
                 caller,
-                normalized,
+                preconditionTarget,
                 instance,
                 actualArguments,
                 flow,
@@ -294,7 +296,7 @@ public sealed class EffectAnalysisSession
         IMethodSymbol method)
     {
         return _callPreconditions.AssessEntry(
-                NormalizeMethod(method)) ==
+                NormalizeMethodConstruction(method)) ==
             EffectCallPreconditionStatus.NotProven
                 ? EffectSummaryOperations.IncompleteAnalysis(
                     EffectAnalysisIncompleteReason
@@ -736,8 +738,14 @@ public sealed class EffectAnalysisSession
 
     internal static IMethodSymbol NormalizeMethod(IMethodSymbol method)
     {
+        return NormalizeMethodConstruction(method).OriginalDefinition;
+    }
+
+    internal static IMethodSymbol NormalizeMethodConstruction(
+        IMethodSymbol method)
+    {
         var normalized = method.ReducedFrom ?? method;
         normalized = normalized.PartialImplementationPart ?? normalized;
-        return normalized.OriginalDefinition;
+        return normalized;
     }
 }

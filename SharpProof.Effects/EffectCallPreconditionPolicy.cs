@@ -89,7 +89,7 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         IMethodSymbol method)
     {
         _cancellationToken.ThrowIfCancellationRequested();
-        method = EffectAnalysisSession.NormalizeMethod(method);
+        method = EffectAnalysisSession.NormalizeMethodConstruction(method);
         return _potentialPreconditions.GetOrAdd(
             method,
             HasPotentialPreconditionsCore);
@@ -99,7 +99,7 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         IMethodSymbol method)
     {
         _cancellationToken.ThrowIfCancellationRequested();
-        method = EffectAnalysisSession.NormalizeMethod(method);
+        method = EffectAnalysisSession.NormalizeMethodConstruction(method);
         return _directOrClosedPreconditions.GetOrAdd(
             method,
             HasPotentialDirectOrClosedPreconditionsCore);
@@ -109,11 +109,21 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         IMethodSymbol method)
     {
         _cancellationToken.ThrowIfCancellationRequested();
-        return HasPotentialDirectOrClosedPreconditions(method) ||
-            (_includeSourceCompanions ||
-             method.DeclaringSyntaxReferences.IsEmpty) &&
-            _typesWithCompanions.Value.Contains(
-                method.ContainingType.OriginalDefinition);
+        if (HasPotentialDirectOrClosedPreconditions(method))
+        {
+            return true;
+        }
+        if (!_includeSourceCompanions &&
+            !method.DeclaringSyntaxReferences.IsEmpty)
+        {
+            return false;
+        }
+
+        var containingType = method.ContainingType;
+        var companionTypes = _typesWithCompanions.Value;
+        return companionTypes.Contains(containingType) ||
+            containingType.IsGenericType &&
+            companionTypes.Contains(containingType.OriginalDefinition);
     }
 
     private bool HasPotentialDirectOrClosedPreconditionsCore(
@@ -160,7 +170,7 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
                 if (enclosing is not IMethodSymbol owner ||
                     !SymbolEqualityComparer.Default.Equals(
                         EffectAnalysisSession.NormalizeMethod(owner),
-                        method))
+                        EffectAnalysisSession.NormalizeMethod(method)))
                 {
                     continue;
                 }
@@ -240,7 +250,9 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
                     continue;
                 }
 
-                result.Add(target.OriginalDefinition);
+                result.Add(target.IsUnboundGenericType
+                    ? target.OriginalDefinition
+                    : target);
             }
         }
 
