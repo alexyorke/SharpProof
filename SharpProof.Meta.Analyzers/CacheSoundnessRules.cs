@@ -5,11 +5,45 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SharpProof.Meta.Analyzers;
 
 internal static class CacheSoundnessRules
 {
+    private sealed class LocalResolutionSet
+    {
+        private readonly Dictionary<
+            ILocalSymbol,
+            HashSet<TextSpan>> _points =
+                new(SymbolEqualityComparer.Default);
+
+        internal bool Add(ILocalReferenceOperation reference)
+        {
+            if (!_points.TryGetValue(reference.Local, out var points))
+            {
+                points = [];
+                _points.Add(reference.Local, points);
+            }
+
+            return points.Add(reference.Syntax.Span);
+        }
+
+        internal void Remove(ILocalReferenceOperation reference)
+        {
+            if (!_points.TryGetValue(reference.Local, out var points))
+            {
+                return;
+            }
+
+            points.Remove(reference.Syntax.Span);
+            if (points.Count == 0)
+            {
+                _points.Remove(reference.Local);
+            }
+        }
+    }
+
     private static readonly ImmutableHashSet<string> WriteMethods =
         new[] { "Add", "AddOrUpdate", "GetOrAdd", "Set", "TryAdd", "TryUpdate", "TryWrite", "TryWriteAsync", "Write", "WriteAsync" }
             .ToImmutableHashSet(StringComparer.Ordinal);
@@ -31,14 +65,13 @@ internal static class CacheSoundnessRules
                 invocation.Instance,
                 invocation.TargetMethod.ContainingType,
                 root,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)) ||
+                new LocalResolutionSet()) ||
             !invocation.Arguments.Any(argument =>
                 !IsGuardedCacheableResponse(invocation, argument.Value) &&
                 (IsNonCacheableSemanticAnswer(
                      argument.Value,
                      root,
-                     new HashSet<ILocalSymbol>(
-                         SymbolEqualityComparer.Default)) ||
+                     new LocalResolutionSet()) ||
                  IsNonCacheableGetOrAddFactory(
                      invocation,
                      argument,
@@ -70,8 +103,7 @@ internal static class CacheSoundnessRules
                 !IsNonCacheableSemanticAnswer(
                     argument.Value,
                     root,
-                    new HashSet<ILocalSymbol>(
-                        SymbolEqualityComparer.Default)))
+                    new LocalResolutionSet()))
             {
                 continue;
             }
@@ -238,13 +270,13 @@ internal static class CacheSoundnessRules
         return IsNonCacheableValueFactory(
             argument.Value,
             root,
-            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+            new LocalResolutionSet());
     }
 
     private static bool IsNonCacheableValueFactory(
         IOperation operation,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolutionSet resolving)
     {
         operation = UnwrapValue(operation);
         return operation switch
@@ -301,16 +333,15 @@ internal static class CacheSoundnessRules
             IsNonCacheableSemanticAnswer(
                 value,
                 factory.Body,
-                new HashSet<ILocalSymbol>(
-                    SymbolEqualityComparer.Default)));
+                new LocalResolutionSet()));
     }
 
     private static bool ResolveValueFactoryLocal(
         ILocalReferenceOperation reference,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolutionSet resolving)
     {
-        if (!resolving.Add(reference.Local))
+        if (!resolving.Add(reference))
         {
             return true;
         }
@@ -319,11 +350,12 @@ internal static class CacheSoundnessRules
         {
             var writes = GetReachingLocalValues(reference, root);
             return writes.Length == 0 || writes.Any(value =>
+                IsSelfReference(value, reference.Local) ||
                 IsNonCacheableValueFactory(value, root, resolving));
         }
         finally
         {
-            resolving.Remove(reference.Local);
+            resolving.Remove(reference);
         }
     }
 
@@ -335,7 +367,7 @@ internal static class CacheSoundnessRules
             !IsNonCacheableSemanticAnswer(
                 assignment.Value,
                 root,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)))
+                new LocalResolutionSet()))
         {
             return;
         }
@@ -347,8 +379,7 @@ internal static class CacheSoundnessRules
         IOperation target,
         IOperation root)
     {
-        var resolving = new HashSet<ILocalSymbol>(
-            SymbolEqualityComparer.Default);
+        var resolving = new LocalResolutionSet();
         return target switch
         {
             IPropertyReferenceOperation property => IsCacheReceiver(
@@ -487,7 +518,7 @@ internal static class CacheSoundnessRules
         IOperation? operation,
         ITypeSymbol? fallbackType,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolutionSet resolving)
     {
         if (IsCacheType(fallbackType) || IsCacheType(operation?.Type))
         {
@@ -526,9 +557,9 @@ internal static class CacheSoundnessRules
     private static bool ResolveCacheLocal(
         ILocalReferenceOperation reference,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolutionSet resolving)
     {
-        if (!resolving.Add(reference.Local))
+        if (!resolving.Add(reference))
         {
             return false;
         }
@@ -536,11 +567,12 @@ internal static class CacheSoundnessRules
         try
         {
             return GetReachingLocalValues(reference, root).Any(value =>
+                !IsSelfReference(value, reference.Local) &&
                 IsCacheReceiver(value, null, root, resolving));
         }
         finally
         {
-            resolving.Remove(reference.Local);
+            resolving.Remove(reference);
         }
     }
 
@@ -558,7 +590,7 @@ internal static class CacheSoundnessRules
     private static bool IsNonCacheableSemanticAnswer(
         IOperation operation,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolutionSet resolving)
     {
         if (TryClassifySemanticEnumConstant(operation, out var nonCacheable))
         {
@@ -666,7 +698,7 @@ internal static class CacheSoundnessRules
         IOperation operation,
         INamedTypeSymbol enumType,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolutionSet resolving)
     {
         if (operation.ConstantValue is
             {
@@ -735,9 +767,9 @@ internal static class CacheSoundnessRules
         ILocalReferenceOperation reference,
         INamedTypeSymbol enumType,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolutionSet resolving)
     {
-        if (!resolving.Add(reference.Local))
+        if (!resolving.Add(reference))
         {
             return true;
         }
@@ -746,6 +778,7 @@ internal static class CacheSoundnessRules
         {
             var writes = GetReachingLocalValues(reference, root);
             return writes.Length == 0 || writes.Any(value =>
+                IsSelfReference(value, reference.Local) ||
                 IsNonCacheableNumericEnumValue(
                     value,
                     enumType,
@@ -754,7 +787,7 @@ internal static class CacheSoundnessRules
         }
         finally
         {
-            resolving.Remove(reference.Local);
+            resolving.Remove(reference);
         }
     }
 
@@ -824,9 +857,9 @@ internal static class CacheSoundnessRules
     private static bool ResolveLocal(
         ILocalReferenceOperation reference,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolutionSet resolving)
     {
-        if (!resolving.Add(reference.Local))
+        if (!resolving.Add(reference))
         {
             return true;
         }
@@ -838,6 +871,7 @@ internal static class CacheSoundnessRules
                 return IsSemanticAnswerType(reference.Type);
             }
             return writes.Any(value =>
+                IsSelfReference(value, reference.Local) ||
                 IsNonCacheableSemanticAnswer(
                     value,
                     root,
@@ -845,8 +879,17 @@ internal static class CacheSoundnessRules
         }
         finally
         {
-            resolving.Remove(reference.Local);
+            resolving.Remove(reference);
         }
+    }
+
+    private static bool IsSelfReference(
+        IOperation operation,
+        ILocalSymbol local)
+    {
+        operation = UnwrapValue(operation);
+        return operation is ILocalReferenceOperation reference &&
+            SymbolEqualityComparer.Default.Equals(reference.Local, local);
     }
 
     private static IOperation[] GetReachingLocalValues(
