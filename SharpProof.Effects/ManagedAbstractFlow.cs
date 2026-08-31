@@ -2252,7 +2252,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             ILoopOperation loop when
                 LoopConditionIsAlwaysTrue(loop) &&
                 loop.Body != null &&
-                !LoopHasReachableBreak(loop.Body) => false,
+                !LoopHasReachableExit(loop) => false,
             ITryOperation @try => TryMayCompleteNormally(@try),
             ILoopOperation or ISwitchOperation => true,
             _ => true
@@ -2459,24 +2459,42 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         };
     }
 
-    private static bool LoopHasReachableBreak(IOperation body)
+    private static bool LoopHasReachableExit(ILoopOperation loop)
     {
-        foreach (var child in body.ChildOperations)
+        return HasReachableExit(loop.Body);
+
+        bool HasReachableExit(IOperation operation)
         {
-            if (child is IBranchOperation { BranchKind: BranchKind.Break })
+            if (operation is IAnonymousFunctionOperation or
+                ILocalFunctionOperation)
+            {
+                return false;
+            }
+
+            if (operation is IReturnOperation)
             {
                 return true;
             }
-            if (child is ILoopOperation or ISwitchOperation)
-            {
-                continue;
-            }
-            if (LoopHasReachableBreak(child))
+
+            if (operation is IBranchOperation branch &&
+                (SymbolEqualityComparer.Default.Equals(
+                     branch.Target,
+                     loop.ExitLabel) ||
+                 IsOutwardGoto(branch)))
             {
                 return true;
             }
+
+            return operation.ChildOperations.Any(HasReachableExit);
         }
-        return false;
+
+        bool IsOutwardGoto(IBranchOperation branch)
+        {
+            return branch.BranchKind == BranchKind.GoTo &&
+                branch.Target.DeclaringSyntaxReferences.Any(reference =>
+                    reference.SyntaxTree == loop.Syntax.SyntaxTree &&
+                    !loop.Syntax.Span.Contains(reference.Span));
+        }
     }
 
     private bool InvocationMayCompleteNormally(IInvocationOperation invocation)
