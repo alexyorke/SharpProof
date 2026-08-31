@@ -432,7 +432,7 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
-    public async Task MixedEffectAndRequiresUnsupportedBodyIsTypedIncomplete()
+    public async Task MixedEffectAndRequiresUnsupportedBodyPreservesEffectEvidence()
     {
         var preparation = Prepare(
             """
@@ -459,18 +459,31 @@ public sealed class CompilerCallableLowererTests
                 Is.EqualTo(WorkerClaimReason.UnsupportedBody));
             Assert.That(preparation.Entry.ClaimIds, Has.Length.EqualTo(1));
             Assert.That(
+                preparation.EffectClaims.Single().Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
                 verification.Callable.Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+                Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(
                 verification.Callable.Reason,
-                Is.EqualTo(WorkerCallableCoverageReason.SemanticUnknown));
+                Is.EqualTo(WorkerCallableCoverageReason.None));
             Assert.That(verification.Claims, Has.Length.EqualTo(1));
             Assert.That(
                 verification.Claims[0].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 verification.Claims[0].Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                verification.Claims[0].EffectCertainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
+            Assert.That(
+                verification.Claims[0].ProofCore,
+                Is.EqualTo([
+                    "compiler-effect:" + preparation.EffectClaims.Single()
+                        .EvidenceSha256
+                ]));
         }
     }
 

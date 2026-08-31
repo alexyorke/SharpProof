@@ -459,7 +459,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task EffectOnlyClaimRemainsAccountableWhileMixedRequiresFailsClosed()
+    public async Task EffectClaimsRemainAccountableWhenRequiresBodyIsUnsupported()
     {
         using var project = TestProject.Create(
             """
@@ -527,10 +527,17 @@ public sealed class WorkerTests
                 Is.EqualTo(WorkerEffectSet.Allocates));
             Assert.That(
                 throwing.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 throwing.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                throwing.EffectCertainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
+            Assert.That(
+                throwing.ProofCore,
+                Has.One.StartsWith("compiler-effect:"));
             Assert.That(
                 response.CallableResults.Single(result =>
                     result.CallableId.Contains(
@@ -542,14 +549,14 @@ public sealed class WorkerTests
                     result.CallableId.Contains(
                         ".ThrowExisting(",
                         StringComparison.Ordinal)).Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+                Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
     }
 
     [Test]
-    public async Task AllowedExceptionsRemainVisibleWhenMixedRequiresBodyIsUnsupported()
+    public async Task AllowedExceptionsRemainVisibleWhenRequiresBodyIsUnsupported()
     {
         using var project = TestProject.Create(
             """
@@ -603,10 +610,17 @@ public sealed class WorkerTests
             Assert.That(maybeNull.EffectWitness, Is.Null);
             Assert.That(
                 requiredNonNull.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 requiredNonNull.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                requiredNonNull.EffectCertainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
+            Assert.That(
+                requiredNonNull.ProofCore,
+                Has.One.StartsWith("compiler-effect:"));
             Assert.That(
                 response.CallableResults.Single(result =>
                     result.CallableId.Contains(
@@ -618,7 +632,7 @@ public sealed class WorkerTests
                     result.CallableId.Contains(
                         ".RequiredNonNull(",
                         StringComparison.Ordinal)).Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+                Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(backend.CallCount, Is.Zero);
             Assert.That(
                 WorkerProtocolJson.Validate(response).IsValid,
