@@ -8,7 +8,8 @@ namespace SharpProof.Frontend;
 
 internal sealed class ContractApiIdentityResolver
 {
-    private const string AttributesAssemblyName = "SharpProof.Attributes";
+    private const string AttributesAssemblyName =
+        ContractApiMetadata.AttributesNamespace;
     private const string AttributesAssemblyMvidMetadataKey =
         "SharpProof.Attributes.MVID";
     private static readonly ImmutableArray<byte>
