@@ -118,6 +118,59 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void NullReferenceAwaiterThrowsBeforeProtocolMembersRun()
+    {
+        var result = Analyze(
+            """
+            using System;
+            using System.Runtime.CompilerServices;
+            using System.Threading.Tasks;
+
+            public static class Sample {
+                private static int state;
+
+                public static async Task Run() {
+                    await new Awaitable();
+                }
+
+                public sealed class Awaitable {
+                    public Awaiter GetAwaiter() => null!;
+                }
+
+                public sealed class Awaiter : INotifyCompletion {
+                    public bool IsCompleted {
+                        get { state++; return true; }
+                    }
+
+                    public void OnCompleted(Action continuation) {
+                        state++;
+                    }
+
+                    public void GetResult() {
+                        state++;
+                    }
+                }
+            }
+            """,
+            "Sample",
+            "Run");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Throws.Types.Select(static type =>
+                    type.ToDisplayString()),
+                Does.Contain("System.NullReferenceException"));
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    [Test]
     public void CriticalAwaitProtocolUsesUnsafeContinuationEffects()
     {
         var result = Analyze(
