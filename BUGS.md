@@ -1,6 +1,6 @@
 # Bug backlog
 
-430 open bugs, reprioritized by impact, reachability, and affected scope.
+428 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (142)
+## P0 - Critical (140)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -17,8 +17,6 @@ Priority definitions:
 - **BUG-030 [P0] - Container contract validation omits required schema fields:** ContainerContract validates only part of the generated marker and accepts missing, changed, duplicate, or unknown runtime and image identity fields. Preflight can certify a stale or conflicting environment contract that disagrees with repository pins.
 - **BUG-031 [P0] - Contract API trust is not bound to referenced metadata:** ContractApiIdentityResolver accepts symbols from PortableExecutableReference metadata but hashes mutable contents reopened through FilePath. Mismatched or stale metadata can cross the trusted contract API boundary while an unrelated file supplies the expected digest.
 - **BUG-033 [P0] - Corpus importer attributes ignored files to the pinned commit:** OpenSourceCorpusImporter trusts clean git status but enumerates all on-disk C# files, including ignored untracked files. Such files can change corpus compilation and analyzer verdicts while the manifest falsely attributes the input to the pinned upstream commit.
-- **BUG-034 [P0] - Counterexample replay accepts out-of-domain integer results:** Callable replay and response authority compare only the shared IR Integer type and never enforce the result variable's C# source interval. A canonical artifact can return an impossible value such as 256 for byte and obtain an accepted replay-backed refutation.
-- **BUG-035 [P0] - Cross-tree array identities can suppress ArrayTypeMismatchException:** OperationEffectScanner keys fresh array types only by syntax-relative SpanStart while scanning constructor bodies and member initializers across partial-declaration trees. Colliding offsets can substitute the wrong runtime array type and omit a reachable ArrayTypeMismatchException from a complete summary.
 - **BUG-036 [P0] - Custom ref-struct list-pattern members are suppressed as intrinsics:** SwitchExpressionFacts treats any metadata ref-struct Length and indexer with no syntax references as compiler intrinsics, without authenticating framework type or member identity. Calls, writes, capabilities, and exceptions in custom metadata members disappear from complete effect summaries.
 - **BUG-037 [P0] - Default API specifications accept unbound metadata identities:** ApiSpecResolver authenticates approved assemblies using only metadata name, public-key token, path substrings, and a name-matched reference attribute. An unrelated matching payload can receive trusted API effects, nullness, cardinality, or postconditions and drive an unsound Proven outcome.
 - **BUG-038 [P0] - Delegate arguments leave captured-local facts stale:** ManagedAbstractFlow havocs captured facts only when the call target itself is a delegate or local function, not when a delegate is passed by value to an ordinary call. Synchronous mutation through that argument can leave stale nullness and scalar facts that suppress real exceptions and effects.
