@@ -471,6 +471,11 @@ internal sealed class CompilerCallableLowerer
     {
         foreach (var block in graph.Blocks.OrderBy(static block => block.Ordinal))
         {
+            if (!block.IsReachable)
+            {
+                continue;
+            }
+
             for (var index = 0; index < block.Operations.Length; index++)
             {
                 if (block.Operations[index] is not IEmptyOperation &&
