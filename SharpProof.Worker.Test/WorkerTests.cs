@@ -1478,6 +1478,39 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task BackendFactoryProgrammingFailureIsInfrastructureFailure()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        using var worker = new SharpProofWorker(
+            () => throw new InvalidOperationException(
+                "test lane construction failure"));
+
+        var response = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
+            Assert.That(
+                response.FailureReason,
+                Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
+            Assert.That(
+                response.Errors.Single().Code,
+                Is.EqualTo("worker.infrastructure"));
+            Assert.That(response.Manifest.Claims, Has.Length.EqualTo(1));
+            Assert.That(
+                response.CallableResults.Single().Reason,
+                Is.EqualTo(
+                    WorkerCallableCoverageReason.InfrastructureFailure));
+            Assert.That(
+                response.ClaimResults.Single().Reason,
+                Is.EqualTo(WorkerClaimReason.InfrastructureFailure));
+            Assert.That(CacheFiles(project), Is.Empty);
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        }
+    }
+
+    [Test]
     public async Task UnavailableCompilerManifestIsTypedAndStopsBeforeWork()
     {
         using var project = TestProject.Create(TautologySource);
@@ -5256,7 +5289,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public async Task BackendFactoryCannotReuseAnInstanceAcrossSolverLanes()
+    public async Task BackendFactoryReuseIsInfrastructureFailure()
     {
         using var project = TestProject.Create(
             TautologySource + "\n" + TautologySource
@@ -5270,9 +5303,12 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Failed));
-        Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.BackendUnavailable));
+        Assert.That(
+            response.FailureReason,
+            Is.EqualTo(WorkerRunFailureReason.InfrastructureFailure));
         Assert.That(response.ClaimResults.Select(static result => result.Reason),
-            Is.All.EqualTo(WorkerClaimReason.BackendUnavailable));
+            Is.All.EqualTo(WorkerClaimReason.InfrastructureFailure));
+        Assert.That(response.Errors.Single().Code, Is.EqualTo("worker.infrastructure"));
         Assert.That(backend.CallCount, Is.Zero);
     }
 
