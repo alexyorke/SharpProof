@@ -1067,3 +1067,181 @@ those tests exercise no remaining behavior.
 
 > **Checked, NOT a reduction:** `security.yml` and the `package-consumers` `security` job are **not** redundant. `security.yml:3-10` triggers on `push: branches: [master]`, PRs, and a weekly cron — GitHub does not fire `branches:`-filtered push triggers for tag pushes, so the `if: startsWith(github.ref, 'refs/tags/v')` job at `package-consumers.yml:23-29` is the **only** tag-time security run, and `release-qualification` genuinely `needs: security` (`:170`). Likewise, `weekly.yml` is deletable but `nightly.yml` is not — it is pinned by path in `eng/acceptance/contract.json:96` and `:687`, and `ArchitectureTests.cs:2360-2371` requires `tooling fuzz-nightly` to appear in `nightly.yml` and in no other workflow.
 
+---
+
+## Deep pass: Gates + Gates.Test (round 3)
+
+**Estimated savings: ~245 LOC.**
+
+> **⚠ This corrects the round-one Effects/Gates entry**, which concluded "no dead public/internal types or methods surfaced" after an identifier-frequency scan. A targeted per-member grep found two `internal` members in `AnalyzerGateHost` with **zero callers anywhere**, including tests. Frequency scans miss members whose names collide with common words or with other types' members — finding 1 below is the counter-example.
+
+### 1. Dead surface in `AnalyzerGateHost` (two members, zero callers)
+- **Files:** `SharpProof.Gates/AnalyzerGateHost.cs:61-87` (`AnalyzeAsync(string, string?, CancellationToken)`), `:158-168` (`CreateOptions`)
+- **Est. LOC saved:** ~38
+- **Why it's safe:** Grepped `AnalyzerGateHost` across all `.cs` in the repo (excluding obj/bin): every `AnalyzeAsync` call site passes a `Compilation` (`PerformanceGate.cs:843,920,980,1014`, `OpenSourceCorpusRunner.cs:124`), and `CorpusGate` uses `AnalyzeWithSemanticOutcomesAsync`. `CreateOptions` has exactly one hit in the repo — its own definition. Neither is touched by `SharpProof.Gates.Test`. Both are `internal`; no reflection names them (the only reflection in the gate tests targets `CreatePerformanceProbeProject`, `RunDotnetAsync`, `AnalyzeEnabledCompilation`).
+- **Proposed change:** Delete both. The string-source overload's inline compile-error block is already implemented verbatim by the surviving `ThrowIfCompilationHasErrors` (`:170-187`), so nothing is lost.
+
+### 2. Three tests repeat the same four-document policy arrange block
+- **Files:** `SharpProof.Gates.Test/PerformanceGateTests.cs:758-798, :800-841, :843-886`
+- **Est. LOC saved:** ~45
+- **Why it's safe:** Each opens the identical four `XDocument.Load(Path.Combine(root, "SharpProof.Package"|"SharpProof.Verifier", "buildTransitive", …))` — lines 762-781, 804-823 and 847-866 are character-for-character the same 20 lines — then mutates one node and asserts `InvalidDataException`. Only the mutation differs. Test-only.
+- **Proposed change:** Add a private `LoadPolicyDocuments()` returning the four documents as a tuple; the two verifier-condition tests (`:800`, `:843`) can further collapse into one `[TestCase]` parameterized by the condition edit.
+
+### 3. Two retained-memory probes are the same loop with an optional analyzer
+- **Files:** `SharpProof.Gates/Performance/PerformanceGate.cs:776-797` and `:799-836`
+- **Est. LOC saved:** ~35
+- **Why it's safe:** `MeasureCompilerOnlyRetainedBytes` and `MeasureUnannotatedAdvisoryAnalyzerRetainedBytes` share identical structure: `ForceCollection()`, `GC.GetTotalMemory(true)`, a `RetainedCompilationCount` loop calling `AnalyzerGateHost.CreateCompilation(source, $"Retained_{kind}_{index}")` + `GetDiagnostics`, then `ForceCollection`/`GetTotalMemory`/`KeepAlive`/`Math.Max(1, after - before)`. The only differences are the extra `AnalyzeUnannotatedAdvisory` call and the post-loop assertion. Both are called once each (`:148`, `:152`) with distinct `kind` strings, so assembly names — and therefore measured allocations — are unchanged. **No gate threshold moves:** the measured bytes flow into `EvaluateRetainedMemoryLimits` exactly as before.
+- **Proposed change:** Merge into `MeasureRetainedBytes(source, kind, bool runAnalyzer, cancellationToken)`, adding the analyzer pass and the quiet-and-no-session assertion only when `runAnalyzer`.
+
+### 4. `SnapshotExpectation` duplicates `CorpusObservation` field-for-field
+- **Files:** `SharpProof.Gates/Corpus/CorpusModels.cs:62-72` vs `:83-93`; `CorpusGate.cs:446-455` vs `:457-466`; uses at `CorpusGate.cs:531-576`, `CorpusSnapshotFormat.cs:112-116`
+- **Est. LOC saved:** ~22
+- **Why it's safe:** Both are `internal sealed record (string, CorpusVerdict, AnalyzerSemanticOutcome, ImmutableArray<string>)` with a byte-identical `ToCanonicalLine()`. **Equality checked:** neither type is ever compared with `==`/`Equals` nor used as a dictionary key — `SnapshotExpectation` appears only as a dictionary *value* (`ImmutableDictionary<string, SnapshotExpectation>`), a constructor argument, and a `ToCanonicalLine()` receiver; comparison always goes through the explicit `Matches` helpers. The compiler-generated value equality (which would compare `ImmutableArray<string>` by reference anyway) is unobserved, so the merge cannot change a gate verdict.
+- **Proposed change:** Delete `SnapshotExpectation`; use `CorpusObservation` for snapshot baselines; delete the redundant second `Matches` overload.
+
+### 5. `RunBuildPairAsync` writes the same two awaits twice for ordering
+- **Files:** `SharpProof.Gates/Performance/PerformanceGate.cs:567-610`
+- **Est. LOC saved:** ~18
+- **Why it's safe:** The `if`/`else` arms are identical apart from which `RunDotnetAsync` is awaited first; both return `new PackageBuildPair(baseline, unannotatedAdvisory)` in the same argument order. Order-balancing — the whole point of `unannotatedAdvisoryFirst` — is preserved as long as sequential await order is preserved, which a local function invoked in the chosen order does exactly. No sample value or ratio computation changes.
+- **Proposed change:** One local `Task<double> Run(string p) => RunDotnetAsync(p, restore: false, symbol, cancellationToken)`, awaited in the selected order; construct the pair once.
+
+### 6. Four parallel `switch` expressions over the same variant
+- **Files:** `SharpProof.Gates/Corpus/CorpusCatalog.cs:281-304`
+- **Est. LOC saved:** ~14
+- **Why it's safe:** `className`, `methodName`, `helperName` and `inputName` each switch on the same `variant` with the same three arms (`Rename`, `EscapedIdentifiers`, default). Collapsing to one switch returning a 4-tuple produces identical strings for every variant, so the generated corpus source — and the canonical snapshot — stay byte-identical.
+- **Proposed change:** One `var (className, methodName, helperName, inputName) = variant switch { … };`.
+
+### 7. `Program.cs` repeats the same envelope-and-exit-code shape per gate
+- **Files:** `SharpProof.Gates/Program.cs:47-60, :75-88`
+- **Est. LOC saved:** ~14
+- **Why it's safe:** The `corpus` and `performance` branches are identical modulo the gate function and the `command` string already passed to `CreateStandaloneEnvelope`; both serialize with `JsonDefaults.Indented` and return `result.Passed ? 0 : 1`. A dispatch table keyed by command name preserves the JSON payload (the gate name is already a parameter) and the exit codes, including the fall-through usage/`2` path.
+- **Proposed change:** Dispatch the two envelope commands via a dictionary or a local function taking the gate delegate; leave `all`, `corpus-print`, `corpus-update`, `performance-smoke` as-is — their output shapes genuinely differ.
+
+### 8. Temp-directory arrange block repeated across both test fixtures
+- **Files:** `SharpProof.Gates.Test/CorpusGateTests.cs:114-118, :164-168, :235-239`; `PerformanceGateTests.cs:665-669, :716-720`
+- **Est. LOC saved:** ~15
+- **Why it's safe:** All five are the same `Path.Combine(Path.GetTempPath(), "SharpProof.Gates.Test", Guid.NewGuid().ToString("N"))` + `Directory.CreateDirectory`. Test-only.
+- **Proposed change:** One shared `internal static string CreateTestRoot()` in a small `GateTestPaths` class. While there, hoist the three copies of the snapshot `header` const in `CorpusGateTests.cs:310, 342, 360` to one fixture-level `const`.
+
+### 9. Corpus file paths rebuilt inline instead of via `GetCorpusDirectory`
+- **Files:** `SharpProof.Gates/Corpus/CorpusGate.cs:47-61, :384-388`; helper at `OpenSourceCorpusCatalog.cs:78-84`
+- **Est. LOC saved:** ~12
+- **Why it's safe:** All four sites build `Path.Combine(root, "SharpProof.Gates", "Corpus", <file>)`. `GetCorpusDirectory` returns the same thing modulo a `Path.GetFullPath(repositoryRoot)` normalization — and `CorpusGate.cs:396` already passes that helper's result as the transaction directory for the *same* files, so the two must already agree.
+- **Proposed change:** `var corpus = OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot);` then `Path.Combine(corpus, …)` in both `RunAsync` and `WriteActualSnapshotAsync`.
+
+### 10. Third copy of the "compilation had errors" throw
+- **Files:** `SharpProof.Gates/Corpus/OpenSourceCorpusRunner.cs:107-121`; `AnalyzerGateHost.cs:170-187`
+- **Est. LOC saved:** ~10
+- **Why it's safe:** Same shape (filter `Severity == Error`, join with `Environment.NewLine`, throw), differing only by a `.Take(25)` cap, the exception type (`InvalidDataException` vs `InvalidOperationException`) and the message prefix — all parameterizable.
+- **Proposed change:** Add `AnalyzerGateHost.FormatCompilationErrors(Compilation, int limit, CancellationToken) -> string?`; each caller throws its own typed exception with its own prefix.
+
+### 11. `SplitMsBuildList` and `SplitTargetList` are identical
+- **Files:** `SharpProof.Gates/Performance/PerformanceGate.cs:1820-1829` and `:1831-1840`
+- **Est. LOC saved:** ~10
+- **Why it's safe:** Same signature, same body, differing only in the lambda parameter name (`item` vs `target`). Both `private`; call sites are `:1700`, `:1706` (target list) and `:1806`, `:1808` (MSBuild list). Nothing reflects on either name.
+- **Proposed change:** Delete `SplitTargetList`; point its two call sites at `SplitMsBuildList`.
+
+### 12. `ValidateContract` re-checks positivity that `Load` already enforces
+- **Files:** `SharpProof.Gates/Performance/PerformanceGate.cs:1242-1255`; `AcceptancePerformanceContract.cs:38-73, 76-90`
+- **Est. LOC saved:** ~8
+- **Why it's safe:** `AcceptancePerformanceContract` is constructed in exactly one place — `Load` (grep for `new AcceptancePerformanceContract` returns only the record declaration and `:33`) — and `GetPositiveFiniteDouble` already throws `InvalidDataException` for every one of the eight `double` limits re-tested at `:1242-1255` (`AcceptancePerformanceContractTests.cs:10-19` pins this). The only `with`-expression (`:88`) rewrites only `Warmups`, `Samples`, `IdeEdits` — all `int`. So the eight `<= 0` clauses are **unreachable**.
+- **Proposed change:** Reduce the third `if` to the three integer non-negativity clauses (`MaximumRetainedMemoryIncreaseMiB`, `MaximumEnabledRetainedCompilations`, `MaximumEnabledRetainedMemoryIncreaseMiB` — loaded via plain `GetInt32()` and the only live checks there); leave the fixed-protocol and smoke-protocol checks untouched.
+
+### 13. `CountSourceFiles` reimplemented inline in its own file
+- **Files:** `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:266-269` vs `:86-93`
+- **Est. LOC saved:** ~4
+- **Why it's safe:** `document.Methods.Select(m => $"{m.SourceId}|{m.Path}").Distinct(Ordinal).Count()` is exactly what `CountSourceFiles` computes (`m.SourceId + "|" + m.Path`). Same value, so the `MinimumSourceFileCount` gate check is unchanged.
+- **Proposed change:** `var sourceFileCount = CountSourceFiles(document.Methods);`
+
+---
+
+## Deep pass: SharpProof.ArchitectureTest (round 3)
+
+**Estimated savings: ~1,170 LOC** (≈9.5% of the project's 12,251), of which roughly 180 lines are pure reflow of over-wrapped `Assert.That` calls inside finding 1.
+
+> **⚠ This overturns a round-one conclusion.** The earlier pass reported that "ArchitectureTests.cs's 43 tests each assert a genuinely different repository invariant and cannot be data-driven." That is true of the *tests*, but not of their *contents*: 197 of the assertions inside them are the degenerate form `Assert.That(<local>, Does.Contain("literal"))` with no message and no computed argument, and those are table-drivable without merging any test. See finding 1.
+
+### 1. Table-driven source-contract assertions replace 197 hand-written `Does.Contain` statements
+- **Files:** `BuildSchedulingTests.cs:12-1005` (92 sites, 223 physical lines); `ArchitectureTests.cs` (69 sites, 217 lines); `ReleaseCoverageBaselineTests.cs` (19 sites, 59 lines); `DependencyAutomationTests.cs` (10 sites, 36 lines); `BoundaryEnforcementTests.cs` (7 sites, 21 lines)
+- **Est. LOC saved:** ~330
+- **Why it's safe:** All 197 are exactly `Assert.That(<localVariable>, Does.Contain("literal"));` / `Does.Not.Contain("literal")` — no custom message, no computed argument. Measured cost: **556 physical lines for 197 logical assertions** (2.8 lines each, purely formatter wrapping). A helper keeps one assertion per needle with the needle string as the failure label — **strictly more diagnostic than today**, where the plain form supplies no message at all. Needle count is unchanged, so no invariant is dropped. Representative blocks: `BuildSchedulingTests.cs:99-141` (17 needles across 2 files), `:70-93` (8), `:148-171` (8), `ArchitectureTests.cs:1529-1554`.
+- **Proposed change:** Add `SourceContract.Assert(text, label, required: [...], forbidden: [...])`; rewrite each `Assert.EnterMultipleScope()` block whose contents are only plain `Does.Contain`/`Does.Not.Contain` as one call with two string arrays. The 40 remaining `Does.Contain` sites that carry messages or computed arguments stay untouched.
+- **Reflow vs substance:** ~55% of this saving is reflow of over-wrapped calls; ~45% is genuine removal of the repeated `Assert.That(x, Does.Contain(` scaffold. Counted together because the two are not separable in one edit.
+
+### 2. One shared pwsh fixture-script runner; ten near-pure "run script, assert exit 0" classes collapse
+- **Files:** identical `RunFixtureAsync(mutation)` + `ProcessStartInfo` blocks at `PublicationPlanIdentityTests.cs:66-100`, `PublicationPlanTopologyTests.cs:56-90`, `PublicationDestinationAuthorityTests.cs:78-112`, `ReleaseVersionAuthorityTests.cs:54-88`, `ReleaseChecksumAuthorityTests.cs:90-124`, `SbomSymbolArtifactScopeTests.cs:46-80`, `DocumentationSupportContractTests.cs:36-70`, `SbomReleaseIdentityTests.cs:17,121`. Zero-mutation variants: `PilotAuthorityTests.cs:12-29`, `ContainedPathAuthorityTests.cs:13-31`, `ReleaseTagValidationTests.cs:12-33`, `ReleaseAuthorityClosureTests.cs:15-31`, `ReleaseConfigurationScriptTests.cs:14-38`, `StandaloneGateEvidenceTests.cs:13-37`, `ReleaseJsonAuthorityTests.cs:14-27`. Redundant per-file `ProcessResult`/`RunAsync`/`DeleteDirectory` sets: `AcceptanceScriptTests.cs:252-325`, `ChangedTestSelectionTests.cs:137-177`, `ContainerAuthorityScriptTests.cs:287-326`, `ContainerSourceCleanlinessTests.cs:368-424`, `CoverageScriptTests.cs:1635-1708`, `ProductionInventoryAuthorityTests.cs:298-355`, `ReleaseCoverageBaselineTests.cs:936-1042`, `FuzzRunnerEvidenceTests.cs:103-156`
+- **Est. LOC saved:** ~400
+- **Why it's safe:** Every one builds the same `pwsh -NoLogo -NoProfile [-NonInteractive] -File <scripts/Test-*.ps1> [-Mutation <m>]` invocation with both streams redirected, `UseShellExecute=false`, async read + `WaitForExitAsync`, asserting on exit code with stdout+stderr as the message. The *invariant* lives entirely in the PowerShell fixture script and the `[TestCase]` mutation table — neither moves.
+- **⚠ Two constraints:** `FuzzRunnerEvidenceProcessSafetyTests.cs:11-30` greps `FuzzRunnerEvidenceTests.cs` for `ReadToEndAsync`/`WaitForExitAsync`/`CancelAfter`/`Kill(entireProcessTree: true)`, so the shared helper must live in that file or that test must be retargeted. **And a real hazard surfaced:** `StandaloneGateEvidenceTests.cs:31-33` uses the *blocking* `ReadToEnd()`/`WaitForExit()` that the safety test forbids elsewhere — consolidation also fixes a genuine deadlock risk.
+- **Proposed change:** Add a `PwshFixtures` helper (build args, run, return `(ExitCode, Output)`, plus `AssertSucceedsAsync`); delete the 8 per-file `ProcessResult`/`RunAsync`/`DeleteDirectory` copies and the 15 inline `ProcessStartInfo` blocks. Then merge the five no-argument fixture classes (241 lines total) into one `[TestCase("Test-SharpProofXFixtures.ps1")]`-driven fixture of ~25 lines; each script name stays an explicit test case, so every gate still runs as its own NUnit case.
+
+### 3. Twenty copies of `RepositoryRoot()` / `FindRepositoryRoot()` in this project alone
+- **Files:** 20 definitions — `ArchitectureTests.cs:2407`, `BoundaryEnforcementTests.cs:624`, `CoverageScriptTests.cs:1689`, `ReleaseCoverageBaselineTests.cs:1022`, `ProductionInventoryAuthorityTests.cs`, `PilotAuthorityTests.cs:31`, `ContainedPathAuthorityTests.cs:34`, `NativeTestBootstrapTests.cs:56`, `SbomSymbolArtifactScopeTests.cs:73`, `StandaloneGateEvidenceTests.cs:69`, `FuzzRunnerEvidenceProcessSafetyTests.cs:32`, +9 more
+- **Est. LOC saved:** ~240
+- **Why it's safe:** All 20 walk parents from a base directory looking for `SharpProof.sln`, differing only in seed (`AppContext.BaseDirectory` vs `TestContext.CurrentContext.TestDirectory` — same directory under NUnit), exception type, and message text. No test asserts on the exception type or message of a *missing* repository root; that throw is unreachable in any run inside the repo.
+- **Proposed change:** Add `internal static class RepositoryPaths { public static string Root { get; } }` (cached static) and delete the 20 copies (~13 lines each). Fold in `Relative(path)`, duplicated verbatim at `ArchitectureTests.cs:2402` and `BoundaryEnforcementTests.cs:604`. *(This is the in-project share of the ~49 repo-wide copies noted earlier.)*
+
+### 4. Duplicated project-graph helper set across two files
+- **Files:** `ArchitectureTests.cs:2233-2317` and `BoundaryEnforcementTests.cs:521-604`
+- **Est. LOC saved:** ~85
+- **Why it's safe:** Both define `TransitiveProjectClosure`, `ProjectReferences`/`GetProjectReferences`, `ProjectPackages`, `SourceFiles`/`ProductionSourceFiles`, `ReadProductionSources`, `ProjectFile`, `ProjectDirectory` with the same semantics: same `OutputItemType != "Analyzer"` filter on `ProjectReference`, same `Include`→filename projection, same `obj`/`bin` exclusion, same `SharpProof.Fuzz`→`Tools/SharpProof.Fuzz` special case, same ordinal ordering. The only real difference is the closure's return shape (`HashSet<string>` excluding the root vs lazily-yielded sequence including it) — one implementation returning the ordered set plus an explicit `includeRoot` flag covers both call sites without changing what either test observes. Additionally `BoundaryEnforcementTests.Count` (`:609`) and `NativeTestBootstrapTests.CountOrdinal` (`:47`) are the same 14-line ordinal occurrence counter.
+- **Proposed change:** Extract one `ProjectGraph` static helper alongside `RepositoryPaths`; delete both copies and the duplicate counter.
+
+### 5. Five different hand-rolled workflow-file enumerators
+- **Files:** `ArchitectureTests.cs:982-988`, `:1531-1538`, `:1559-1566`; `DependencyAutomationTests.cs:158-174`, `:200-216`
+- **Est. LOC saved:** ~45
+- **Why it's safe:** All five compute the same set — every `.yml`/`.yaml` directly under `.github/workflows`. Three use `EnumerateFiles(root,"*.yml").Concat(EnumerateFiles(root,"*.yaml"))`; two use `EnumerateFiles(dir)` plus a case-insensitive extension filter and an ordinal `OrderBy`. Unifying on the ordered, case-insensitive version is a superset (globs on Windows are already case-insensitive, and a deterministic order only stabilizes failure output). Each test keeps its own distinct downstream assertion — CodeQL absence, SHA pinning, `setup-dotnet` absence, CPU cap, MSBuild switch form.
+- **Proposed change:** Add `RepositoryPaths.WorkflowFiles()` returning ordinally sorted paths; replace the five inline enumerations.
+
+### 6. `BannedApiProjects` is an unverified third copy of the production-project catalog
+- **Files:** `BoundaryEnforcementTests.cs:12-36` vs `ArchitectureTests.cs:33-55`
+- **Est. LOC saved:** ~24
+- **Why it's safe:** `BannedApiProjects` (23 entries) is exactly `ArchitectureTests.ProductionProjects` (22) plus `SharpProof.Gates`, element for element. `ArchitectureTests.cs:1886-1894` already asserts that precise expression equals the `projects` keys of `eng/coverage/baseline.json`, confirmed to contain exactly those 23 names. So the repository's double-entry ledger is `ProductionProjects` ⟷ `baseline.json`; `BannedApiProjects` is a **third copy that nothing cross-checks and that can silently drift**. Deriving it removes a drift source rather than removing a check.
+- **Proposed change:** Move `ProductionProjects` to the shared helper and define `BannedApiProjects = [.. ProductionProjects, "SharpProof.Gates"]`. **Leave `ProductionProjects` itself hardcoded, and leave `DeclarationOnlyTcbCoverageFiles` (`ArchitectureTests.cs:28-31`) hardcoded** — both are the independent side of a deliberate ledger check (`:705-724`, `:1880-1894`) and must NOT be derived from JSON.
+
+### 7. Duplicated qualification-receipt workspace scaffolding
+- **Files:** `ReleaseCoverageBaselineTests.cs:174-252` and `:258-330`
+- **Est. LOC saved:** ~45
+- **Why it's safe:** The two tests share verbatim the temp-workspace creation under `artifacts/qualification-fixtures/<guid>`, the `git rev-parse HEAD` capture, the 14-line `Write-SharpProofQualificationReceipt.ps1` invocation with `-Gate/-EvidencePath/-ReceiptDirectory`, the `foreach (fixture)` loop asserting `ExitCode == 0 Is.EqualTo(fixture.Valid)`, and the `finally` cleanup. Only the fixture tables differ (package-identity mutations vs failed/stale/malformed-JSON mutations) — those tables, and the extra receipt-file existence assertion at `:325-330`, stay exactly as they are.
+- **Proposed change:** Extract `RunReceiptFixturesAsync(gate, evidenceFileName, (string Content, bool Valid)[] fixtures)` handling workspace lifecycle and the assert loop; both tests become their fixture table plus one call.
+
+---
+
+## JSON / data layer (round 3)
+
+**Estimated savings: ~267 lines** (~153 excluding the double-entry-guard removal in finding 2).
+
+### 1. `.gitignore` is unmodified GitHub `VisualStudio.gitignore` boilerplate for toolchains this repo does not use
+- **Files:** `.gitignore:11-14, 46-49, 58-61, 90-101, 109-112, 117-123, 131-163, 177-189, 205, 212-213, 223-234, 237-263, 265-295`
+- **Est. LOC saved:** ~150
+- **Why it's safe:**
+  - Only two things read this file, and both are *negative* assertions, so shrinking it cannot break them: `ArchitectureTests.cs:1399` reads it and its sole assertion (`:1447`) is `Does.Not.Contain("repository.bundle")`. `OpenCodePluginDependencyTests.cs:49` reads a *different* file, `.opencode/.gitignore`.
+  - `scripts/Test-SharpProofMutationEvidence.ps1:127` does not read it — it *writes* a synthetic `.gitignore` into a temp fixture repo.
+  - Nothing hashes or digests it: grep across `*.ps1`/`*.props`/`*.targets`/`*.csproj`/`*.json`/`*.yml` returns only those two hits.
+  - The retained blocks cover Mono/Xamarin, ATL, Visual C++ (`*.ncb`, `*.sdf`, `ipch/`), Visual Studio 6 (`*.plg`, `*.vbw`, `*.opt`), TFS 2012, Silverlight/RIA, LightSwitch, BizTalk (`*.btp.cs`, `*.odx.cs`), SQL Server/BI (`*.mdf`, `*.rdl.data`, `*.bim.layout`), Azure emulator, Node (`node_modules/`), Paket, FAKE, NCrunch, MightyMoose, Chutzpah, DocProject, InstallShield, sass, Telerik JustMock, Tabs Studio, GhostDoc, CodeRush, Ionide, MFractor, healthchecksdb, Orleans. The repo is C#/PowerShell only — 47 projects, no `package.json` outside `.opencode`, and no `.vcxproj`/`.fsproj`/`.sqlproj`/`.rptproj`/`.btproj` anywhere.
+  - `:291-292` is a dangling comment — `# Backup folder for Package Reference Convert tool in Visual Studio 2017` followed immediately by `# Ionide …`; the pattern it documented was already deleted.
+  - `:21` `!eng/release/third-party-components.json` is redundant with `:20` `!eng/release/`.
+- **Proposed change:** Trim to what this repo actually produces (VS user files, `bin/`, `obj/`, `artifacts/`, `.vs/`, `TestResults/`, `*.trx`, `*.binlog`, coverage outputs, `*.nupkg`/`*.snupkg`, `*.pdb`, the `eng/release/` re-includes, and the repo-specific audit-dump block at `:297-301`). Drop the dead comment and the redundant re-include.
+
+### 2. `releaseAuthorityClosure.paths` is 110 entries a script independently recomputes and asserts equal
+- **Files:** `eng/acceptance/contract.json:93-206`
+- **Est. LOC saved:** ~114
+- **Why it's safe:** `scripts/Test-SharpProofReleaseAuthorityClosure.ps1:17-25` computes `$derived = Get-SharpProofReleaseAuthorityClosure -RepositoryRoot $repositoryRoot` and throws unless the declared list has the same count and members. The declared list therefore carries **zero information the repo does not already determine**. It is also fully contained in the TCB list in the same file — measured `closure=110, tcb=346, overlap=110`, i.e. `closure - tcb == ∅` — and `:26-30` of that script separately asserts each derived path occurs exactly once in the TCB (which has no duplicates). Grep for `releaseAuthorityClosure` across `*.ps1`/`*.cs` returns exactly one consumer.
+- **⚠ Honest caveat:** this is a deliberate double-entry cross-check. Deleting it removes a redundancy guard rather than dead data. It is the single largest mechanically-redundant block in the data layer — **take it only if the team accepts derived-only authority.**
+- **Proposed change:** Delete the `releaseAuthorityClosure` object and have the script validate the derived closure against the TCB directly (the check it already performs at `:26-30`), dropping the declared-vs-derived equality step.
+
+### 3. `.editorconfig` suppression for a deleted file
+- **Files:** `.editorconfig:71-73`
+- **Est. LOC saved:** ~3
+- **Why it's safe:** The section is `[SharpProof.Specs/ApiSpecModel.cs]` with `dotnet_diagnostic.CA1720.severity = none`. That file does not exist — `SharpProof.Specs/*.cs` contains only `ApiSpecContentDigest.cs`, `ApiSpecInstantiation.cs`, `ApiSpecTable.cs`, `ApiSpecTermValidator.cs`, `DeclarativeModels.generated.cs`, `DefaultApiSpecCatalog.generated.cs`, `FrameworkTypeMetadataNames.cs`, `GlobalUsings.cs`, `SpecIdentifiers.cs`. A repo-wide grep for `ApiSpecModel` (excluding `obj/`, `artifacts/`) returns **zero** hits. Every other `.editorconfig` file section resolves to an existing file.
+- **Proposed change:** Delete the section and its blank separator.
+
+> ### Verified clean — recorded so nobody re-audits
+> - **`Directory.Packages.props`:** all 14 `PackageVersion Include` entries are referenced by at least one csproj/props (lowest: `Microsoft.NETFramework.ReferenceAssemblies.net472`, 1 consumer). `eng/pilots/Directory.Packages.props` is a 5-line central-pinning opt-out with no pins.
+> - **`contract.json` path staleness:** **every** path in `releaseAuthorityClosure`, `trustedKernel`, all 40 `trustedComputingBase` components, `productionCoordinatorComplexity.layers`, and `automation.mutationProjectWeights` was resolved against the filesystem — **zero missing**.
+> - **`.slnf` filters:** all three are consumed (`Invoke-SharpProofCoverage.ps1:112` → Dev, `Invoke-SharpProofSemanticTests.ps1:41,295` → Semantic, `Invoke-SharpProofContainer.ps1:305` → Portable) and all are distinct (Semantic = Dev minus `Worker.Test`; Portable = Semantic minus `ArchitectureTest`/`Fuzz.Test`/`Gates.Test`). Every listed csproj exists.
+> - **`eng/coverage/baseline.json`:** `SharpProof.Fuzz` *looks* stale but is not — the project lives at `Tools/SharpProof.Fuzz/` (also referenced at `Directory.Build.props:39,58`). All 23 project keys resolve.
+> - **`eng/acceptance/algorithm-size-ratchets.json`** (16 paths), **`eng/generated/approved-outputs.v1.json`** (41), **`eng/pilots/catalog.json`** (5 pilot dirs): every referenced path exists.
+> - **`eng/acceptance/preview-interface.v1.json`:** all 26 `msbuildProperties` are referenced in `SharpProof.Package`/`SharpProof.Verifier` props/targets. `retiredMsbuildProperties` is a deliberate absence guard — left alone.
+> - **`SharpProof.DeclarativeModels.catalog.json` / `SharpProof.Projection.catalog.json`:** every declared record, class, container and projection method name resolves to a use outside its own generated file. (`LauncherPresentation.EffectKind` initially flagged but is consumed by `ClaimKind` at `SharpProof.Worker.Launcher/LauncherProjections.generated.cs:43`.)
+
