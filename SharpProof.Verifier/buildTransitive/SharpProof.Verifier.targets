@@ -93,6 +93,8 @@
       <_SharpProofCompilerOwnedOutput Remove="@(_SharpProofCompilerOwnedOutput)" />
       <_SharpProofCompilerOwnedOutput Include="$(TargetPath)" Condition="'$(TargetPath)' != ''" />
       <_SharpProofCompilerOwnedOutput Include="@(IntermediateAssembly)" />
+      <_SharpProofCompilerOwnedOutput Include="$(IntermediateOutputPath)apphost$(_NativeExecutableExtension)" Condition="'$(UseAppHost)' == 'true' AND '$(_IsExecutable)' == 'true'" />
+      <_SharpProofCompilerOwnedOutput Include="$(TargetDir)$(AssemblyName)$(_NativeExecutableExtension)" Condition="'$(UseAppHost)' == 'true' AND '$(_IsExecutable)' == 'true'" />
       <_SharpProofCompilerOwnedOutput Include="$(DocumentationFile)" Condition="'$(DocumentationFile)' != ''" />
       <_SharpProofCompilerOwnedOutput Include="$(IntermediateOutputPath)$(TargetName).pdb" Condition="'$(TargetName)' != ''" />
       <_SharpProofCompilerOwnedOutput Include="$([System.IO.Path]::ChangeExtension('$(TargetPath)', '.pdb'))" Condition="'$(TargetPath)' != ''" />
