@@ -131,7 +131,8 @@ internal sealed class EffectMethodNodeBuilder
                               StaticConstructorCanAffectEntry(constructor))) &&
             HasPotentialStaticInitialization(
                 method.ContainingType,
-                _session.ApiSpecs)
+                _session.ApiSpecs,
+                cancellationToken)
                 ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
                 : EffectSummary.Empty);
         return new EffectMethodNode(localSummary, [.. calls], scanner.DirectWitnesses);
@@ -237,7 +238,8 @@ internal sealed class EffectMethodNodeBuilder
         if (!CanTriggerBeforeFieldInitInitialization(method) ||
             !HasPotentialStaticInitialization(
                 method.ContainingType,
-                _session.ApiSpecs) ||
+                _session.ApiSpecs,
+                cancellationToken) ||
             _beforeFieldInitNodes.ContainsKey(method.ContainingType))
         {
             return;
@@ -397,13 +399,28 @@ internal sealed class EffectMethodNodeBuilder
         INamedTypeSymbol type,
         ResolvedApiSpecTable apiSpecs)
     {
+        return HasPotentialStaticInitialization(
+            type,
+            apiSpecs,
+            CancellationToken.None);
+    }
+
+    private static bool HasPotentialStaticInitialization(
+        INamedTypeSymbol type,
+        ResolvedApiSpecTable apiSpecs,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (type.TypeKind == TypeKind.Error)
         {
             return true;
         }
 
         if (type.SpecialType == SpecialType.System_Object &&
-            HasApprovedSystemObjectConstructor(type, apiSpecs))
+            HasApprovedSystemObjectConstructor(
+                type,
+                apiSpecs,
+                cancellationToken))
         {
             return false;
         }
@@ -413,19 +430,54 @@ internal sealed class EffectMethodNodeBuilder
             return true;
         }
 
-        var result = type.StaticConstructors.Any(static constructor =>
-            constructor.DeclaringSyntaxReferences.Length != 0) ||
-            type.GetMembers().Any(member =>
-            !member.IsImplicitlyDeclared &&
-            IsInitializableMember(member, staticInitializers: true) &&
-            member.DeclaringSyntaxReferences.Any(reference =>
-                EffectProjections.GetInitializerExpression(reference.GetSyntax()) != null));
-        return result;
+        foreach (var constructor in type.StaticConstructors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (constructor.DeclaringSyntaxReferences.Length != 0)
+            {
+                return true;
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var member in type.GetMembers())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (member.IsImplicitlyDeclared ||
+                !IsInitializableMember(member, staticInitializers: true))
+            {
+                continue;
+            }
+
+            foreach (var reference in member.DeclaringSyntaxReferences)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (EffectProjections.GetInitializerExpression(
+                        reference.GetSyntax(cancellationToken)) != null)
+                {
+                    return true;
+                }
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return false;
     }
 
     internal static bool HasPotentialConstructionInitialization(
         INamedTypeSymbol type,
         ResolvedApiSpecTable apiSpecs)
+    {
+        return HasPotentialConstructionInitialization(
+            type,
+            apiSpecs,
+            CancellationToken.None);
+    }
+
+    internal static bool HasPotentialConstructionInitialization(
+        INamedTypeSymbol type,
+        ResolvedApiSpecTable apiSpecs,
+        CancellationToken cancellationToken)
     {
         const int maximumBaseTypeDepth = 256;
         var seen = new HashSet<INamedTypeSymbol>(
@@ -433,12 +485,14 @@ internal sealed class EffectMethodNodeBuilder
         INamedTypeSymbol? current = type;
         for (var depth = 0; current != null; depth++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (depth >= maximumBaseTypeDepth ||
                 current.TypeKind == TypeKind.Error ||
                 !seen.Add(current.OriginalDefinition) ||
                 HasPotentialStaticInitialization(
                     current,
-                    apiSpecs))
+                    apiSpecs,
+                    cancellationToken))
             {
                 return true;
             }
@@ -446,6 +500,7 @@ internal sealed class EffectMethodNodeBuilder
             current = current.BaseType;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return false;
     }
 
@@ -497,13 +552,23 @@ internal sealed class EffectMethodNodeBuilder
 
     private static bool HasApprovedSystemObjectConstructor(
         INamedTypeSymbol type,
-        ResolvedApiSpecTable apiSpecs)
+        ResolvedApiSpecTable apiSpecs,
+        CancellationToken cancellationToken)
     {
-        return type.InstanceConstructors.Any(constructor =>
-            constructor.Parameters.IsDefaultOrEmpty &&
-            apiSpecs.TryGet(constructor, out var spec) &&
-            spec.Template.Target.WitnessIdentifier ==
-            "bcl.object.ctor");
+        foreach (var constructor in type.InstanceConstructors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (constructor.Parameters.IsDefaultOrEmpty &&
+                apiSpecs.TryGet(constructor, out var spec) &&
+                spec.Template.Target.WitnessIdentifier ==
+                "bcl.object.ctor")
+            {
+                return true;
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return false;
     }
 
     private static bool HasDefiniteBodyEntry(

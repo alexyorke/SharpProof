@@ -15,6 +15,7 @@ internal static class CompilerEffectReplayLowerer
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         witness = ArgumentNullGuard.NotNull(witness, nameof(witness));
         apiSpecs = ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs));
+        cancellationToken.ThrowIfCancellationRequested();
 
         replay = null;
         witnessDetail = string.Empty;
@@ -119,7 +120,8 @@ internal static class CompilerEffectReplayLowerer
                 when witness.Kind == "managed-allocation" &&
                      IsDefiniteObjectAllocation(
                          creation,
-                         apiSpecs):
+                         apiSpecs,
+                         cancellationToken):
                 eventKind =
                     CompilerEffectReplayEventKind.ManagedObjectAllocation;
                 memberIdentity =
@@ -214,7 +216,10 @@ internal static class CompilerEffectReplayLowerer
                 EffectDirectEventKind.EmptyLock,
                 ILockOperation @lock) when
                 witness.Kind == "synchronization-lock" &&
-                IsDefiniteEmptyLock(@lock, apiSpecs) &&
+                IsDefiniteEmptyLock(
+                    @lock,
+                    apiSpecs,
+                    cancellationToken) &&
                 compilation.GetTypeByMetadataName(
                     FrameworkTypeMetadataNames.Monitor) is { } monitorType:
                 eventKind = CompilerEffectReplayEventKind.EmptyLock;
@@ -233,6 +238,7 @@ internal static class CompilerEffectReplayLowerer
                 return false;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(typeIdentity) ||
             string.IsNullOrWhiteSpace(witnessDetail))
         {
@@ -267,7 +273,8 @@ internal static class CompilerEffectReplayLowerer
 
     private static bool IsDefiniteObjectAllocation(
         IObjectCreationOperation creation,
-        ResolvedApiSpecTable apiSpecs)
+        ResolvedApiSpecTable apiSpecs,
+        CancellationToken cancellationToken)
     {
         return creation.Type is INamedTypeSymbol
         {
@@ -276,7 +283,8 @@ internal static class CompilerEffectReplayLowerer
         !EffectMethodNodeBuilder
             .HasPotentialConstructionInitialization(
                 type,
-                apiSpecs) &&
+                apiSpecs,
+                cancellationToken) &&
         creation.Initializer == null &&
         creation.Arguments.All(static argument =>
             DefiniteOperationFacts.IsHarmlessValue(argument.Value));
@@ -331,7 +339,8 @@ internal static class CompilerEffectReplayLowerer
 
     private static bool IsDefiniteEmptyLock(
         ILockOperation @lock,
-        ResolvedApiSpecTable apiSpecs)
+        ResolvedApiSpecTable apiSpecs,
+        CancellationToken cancellationToken)
     {
         if (@lock.Body is not IBlockOperation { Operations.Length: 0 })
         {
@@ -343,7 +352,10 @@ internal static class CompilerEffectReplayLowerer
         return receiver switch
         {
             IObjectCreationOperation creation =>
-                IsDefiniteObjectAllocation(creation, apiSpecs) &&
+                IsDefiniteObjectAllocation(
+                    creation,
+                    apiSpecs,
+                    cancellationToken) &&
                 HasNonThrowingConstructorSpec(creation, apiSpecs),
             IArrayCreationOperation array =>
                 DefiniteOperationFacts.IsDirectArrayCreationComplete(array),
