@@ -47,6 +47,10 @@ internal static class WorkerResultAssembler
         WorkerClaimReason claimReason, IEnumerable<WorkerProtocolError>? errors = null,
         WorkerVersionSummary? versions = null, long elapsedMilliseconds = 0)
     {
+        var assumptionsByCallable = manifest.Callables.ToLookup(
+            static callable => callable.CallableId,
+            static callable => callable.Assumptions,
+            StringComparer.Ordinal);
         return Create(inputHash, manifest, status, failureReason,
             manifest.Callables.Select(callable => new WorkerCallableResult
             {
@@ -66,8 +70,8 @@ internal static class WorkerResultAssembler
                 // This runs on the failure path, where the manifest may already be
                 // malformed. A claim naming an absent callable must not turn a
                 // reported failure into an unhandled exception.
-                Assumptions = manifest.Callables.FirstOrDefault(callable =>
-                    callable.CallableId == claim.CallableId)?.Assumptions ?? []
+                Assumptions = assumptionsByCallable[claim.CallableId]
+                    .FirstOrDefault() ?? []
             }),
             budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, errors, requestHash, versions);
     }
