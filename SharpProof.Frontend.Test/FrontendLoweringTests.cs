@@ -1061,6 +1061,31 @@ public sealed class FrontendLoweringTests
             FrontendAbstention.UncheckedOverflowSemantics);
     }
 
+    [Test]
+    public void DeepExactExpressionAbstainsBeforeRecursiveLoweringExhaustsTheStack()
+    {
+        var expression = string.Join(
+            " + ",
+            Enumerable.Repeat("1L", 300).Prepend("value"));
+        using var compiled = CompiledMethod.Create(
+            "public static long Target(long value) => checked(" +
+            expression +
+            ");");
+
+        var result = compiled.Lower();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Classification.Decision,
+                Is.EqualTo(FrontendSubsetDecision.ClosedAbstention));
+            Assert.That(
+                result.Classification.Abstention,
+                Is.Not.EqualTo(FrontendAbstention.None));
+            Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
+        }
+    }
+
     private static void AssertClassification(
         string members,
         FrontendSubsetDecision decision,
