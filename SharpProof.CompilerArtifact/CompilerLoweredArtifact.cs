@@ -179,7 +179,8 @@ internal static class CompilerLoweredArtifact
                     call,
                     item.Result,
                     item.ExistentialVariables,
-                    item.NormalRelation)
+                    item.NormalRelation,
+                    item.DependencyEvidence)
             };
         }
     }
@@ -810,12 +811,13 @@ internal static class CompilerLoweredArtifact
                     result,
                     existentials,
                     relation) ||
-                summary.InstantiationSha256 != SummaryInstantiationSha256(
+            summary.InstantiationSha256 != SummaryInstantiationSha256(
                     graph.Factory,
                     call,
                     result,
                     existentials,
-                    relation))
+                    relation,
+                    summary.DependencyEvidence))
             {
                 throw new InvalidDataException(
                     "A lowered source-call relation is invalid.");
@@ -890,7 +892,8 @@ internal static class CompilerLoweredArtifact
         IrCallInstruction call,
         IrVarId result,
         IReadOnlyList<IrVarId> existentials,
-        IrTerm relation)
+        IrTerm relation,
+        object dependencyEvidence)
     {
         var roots = new List<IrTerm>(
             (call.Receiver == null ? 0 : 1) +
@@ -915,6 +918,9 @@ internal static class CompilerLoweredArtifact
             .Add(existentials.Count)
             .Add(JsonSerializer.SerializeToUtf8Bytes(
                 graph,
+                WorkerProtocolJson.Options))
+            .Add(JsonSerializer.SerializeToUtf8Bytes(
+                dependencyEvidence,
                 WorkerProtocolJson.Options))
             .Finish();
     }
