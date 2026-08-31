@@ -35,6 +35,8 @@ internal sealed class ExceptionHandlerReachability(
             FrameworkTypeMetadataNames.SwitchExpressionException);
     private readonly DefiniteOperationFacts _staticInitializationFacts =
         new(compilation, CancellationToken.None);
+    private readonly ExternalEffectResolver _externalEffects =
+        new(compilation, apiSpecs);
 
     internal bool IsReachable(CatchClauseSyntax target, bool inFilter)
     {
@@ -547,33 +549,41 @@ internal sealed class ExceptionHandlerReachability(
                     canCompleteNormally(argument.Value));
                 if (argumentsComplete)
                 {
+                    var constructor = creation.Constructor;
+                    var isExceptionType = IsExceptionType(creation.Type);
+                    var metadataExceptionType = isExceptionType &&
+                        creation.Type is
+                        { DeclaringSyntaxReferences.Length: 0 };
+                    var unsourcedExceptionConstructor = isExceptionType &&
+                        constructor is
+                        { DeclaringSyntaxReferences.Length: 0 };
+                    var hasApiSpec = constructor != null &&
+                        apiSpecs.TryGet(constructor, out _);
                     var initializationCompletes = true;
-                    if (creation.Constructor is { } constructor &&
-                        (!IsExceptionType(creation.Type) ||
-                         creation.Type is
-                         { DeclaringSyntaxReferences.Length: > 0 }))
+                    if (constructor != null &&
+                        !metadataExceptionType)
                     {
                         initializationCompletes =
                             AddStaticInitializationPotential(
-                            constructor,
-                            creation,
-                            Add);
+                                constructor,
+                                creation,
+                                Add);
                     }
                     if (initializationCompletes)
                     {
                         var constructorExceptions =
-                            creation.Constructor == null
+                            constructor == null
                                 ? UnknownPotential
-                                : GetCallableExceptions(
-                                    creation.Constructor,
-                                    activeMethods,
-                                    depth + 1);
-                        if (IsExceptionType(creation.Type) &&
-                            creation.Constructor is
-                            { DeclaringSyntaxReferences.Length: 0 })
-                        {
-                            constructorExceptions = EmptyPotential;
-                        }
+                                : unsourcedExceptionConstructor
+                                    ? metadataExceptionType && hasApiSpec
+                                        ? FromThrowSet(
+                                            _externalEffects.Resolve(
+                                                constructor).Throws)
+                                        : EmptyPotential
+                                    : GetCallableExceptions(
+                                        constructor,
+                                        activeMethods,
+                                        depth + 1);
                         Add(
                             constructorExceptions,
                             creation);
@@ -3015,6 +3025,13 @@ internal sealed class ExceptionHandlerReachability(
             throws.IncludesUnknown);
     }
 
+    private bool IsExceptionType(ITypeSymbol? type)
+    {
+        return type is INamedTypeSymbol named &&
+            _exceptionType is { } exception &&
+            EffectTypeFacts.IsDerivedFrom(named, exception);
+    }
+
     private static PotentialExceptions Union(
         PotentialExceptions left,
         PotentialExceptions right)
@@ -3046,13 +3063,6 @@ internal sealed class ExceptionHandlerReachability(
             ImmutableHashSet.Create<INamedTypeSymbol>(
                 SymbolEqualityComparer.Default),
             Unknown: false);
-
-    private bool IsExceptionType(ITypeSymbol? type)
-    {
-        return type is INamedTypeSymbol named &&
-            _exceptionType is { } exception &&
-            EffectTypeFacts.IsDerivedFrom(named, exception);
-    }
 
     private static PotentialExceptions UnknownPotential =>
         new(
