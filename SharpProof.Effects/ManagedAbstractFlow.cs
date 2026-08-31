@@ -1767,7 +1767,15 @@ internal readonly record struct ManagedAbstractValue(
 
     internal static ManagedAbstractValue NegateBoolean(ManagedAbstractValue value)
     {
-        return value.TryGetBoolean(out var boolean) ? Boolean(!boolean) : Unknown;
+        // Negation preserves the Boolean domain even when the value is not a
+        // singleton. Keeping BooleanUnknown allows subsequent Boolean
+        // equality/refinement instead of widening the result to an untyped
+        // value.
+        return value.TryGetBoolean(out var boolean)
+            ? Boolean(!boolean)
+            : value.IsBoolean
+                ? BooleanUnknown
+                : Unknown;
     }
 
     internal static bool TryArithmetic(
