@@ -179,7 +179,36 @@ internal static class CompilerEffectClaimArtifactCodec
         }
 
         return replay.Events.Select((item, index) =>
-                HasValidReplayEvent(item, index)).All(static valid => valid);
+                HasValidReplayEvent(item, index)).All(static valid => valid) &&
+            replay.Events.All(eventValue =>
+                IsContractRelevantEvent(value.ContractKind, value.Constraint!, eventValue.Kind));
+    }
+
+    private static bool IsContractRelevantEvent(
+        WorkerEffectContractKind contractKind,
+        CompilerEffectConstraintArtifact constraint,
+        CompilerEffectReplayEventKind eventKind)
+    {
+        var effect = eventKind switch
+        {
+            CompilerEffectReplayEventKind.ManagedObjectAllocation or
+            CompilerEffectReplayEventKind.ManagedArrayAllocation => WorkerEffectSet.Allocates,
+            CompilerEffectReplayEventKind.ExplicitThrow => WorkerEffectSet.Throws,
+            CompilerEffectReplayEventKind.MonitorCall or
+            CompilerEffectReplayEventKind.EmptyLock => WorkerEffectSet.Synchronizes,
+            _ => WorkerEffectSet.None
+        };
+        return contractKind switch
+        {
+            WorkerEffectContractKind.ZeroAllocations => effect == WorkerEffectSet.Allocates,
+            WorkerEffectContractKind.DoesNotThrow or
+            WorkerEffectContractKind.AllowedExceptions => effect == WorkerEffectSet.Throws,
+            WorkerEffectContractKind.AllowedCapabilities => effect == WorkerEffectSet.Synchronizes,
+            WorkerEffectContractKind.EnforcePure => true,
+            WorkerEffectContractKind.EffectContract =>
+                (constraint.AllowedEffects & effect) != effect,
+            _ => false
+        };
     }
 
     private static bool HasValidReplayEvent(CompilerEffectReplayEventArtifact? value, int ordinal)
