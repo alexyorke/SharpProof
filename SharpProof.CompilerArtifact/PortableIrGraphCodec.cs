@@ -597,6 +597,16 @@ internal static partial class PortableIrGraphCodec
         {
             _cancellationToken.ThrowIfCancellationRequested();
             Require(row.ParameterTypes != null, "Portable IR member parameters cannot be null.");
+            if (row.DocumentationCommentId is { } documentationId)
+            {
+                // The semantic call identity is bound to the member shape;
+                // do not allow a documentation id for another member to be
+                // carried through canonical re-encoding.
+                Require(
+                    documentationId.Contains("." + row.Name + "(", StringComparison.Ordinal) ||
+                    documentationId.Contains("." + row.Name + "~", StringComparison.Ordinal),
+                    "Portable IR member semantic identity is not bound to its name.");
+            }
             var member = _factory.GetOrCreateMember(
                 Identity(row.Identity), Type(row.DeclaringType), row.Name,
                 Type(row.ReturnType), row.IsStatic, [.. row.ParameterTypes.Select(Type)]);
