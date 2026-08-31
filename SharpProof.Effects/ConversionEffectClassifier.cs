@@ -37,7 +37,12 @@ internal sealed class ConversionEffectClassifier(
 
         if (conversion.IsUserDefined)
         {
-            return ClassifyNullableAndCheckedConversion(operation);
+            // Checked user-defined conversions select a different user method;
+            // they do not add an intrinsic numeric overflow check. The
+            // scanner owns every effect of the selected operator method.
+            return ClassifyNullableConversion(
+                operation,
+                EffectSummary.Empty);
         }
 
         if (conversion.IsReference)
@@ -54,7 +59,9 @@ internal sealed class ConversionEffectClassifier(
 
         if (conversion.IsNullable)
         {
-            return ClassifyNullableAndCheckedConversion(operation);
+            return ClassifyNullableConversion(
+                operation,
+                CheckedOverflow(operation.IsChecked, operation));
         }
 
         if (conversion is { IsNumeric: true } or { IsEnumeration: true })
@@ -283,10 +290,10 @@ internal sealed class ConversionEffectClassifier(
             : type;
     }
 
-    private EffectSummary ClassifyNullableAndCheckedConversion(
-        IConversionOperation operation)
+    private EffectSummary ClassifyNullableConversion(
+        IConversionOperation operation,
+        EffectSummary result)
     {
-        var result = CheckedOverflow(operation.IsChecked, operation);
         if (ManagedAbstractValue.IsNullableType(operation.Operand.Type) &&
             !ManagedAbstractValue.IsNullableType(operation.Type) &&
             !IsDefinitelyNonNull(operation, operation.Operand))
