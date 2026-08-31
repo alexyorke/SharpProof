@@ -547,6 +547,58 @@ public sealed class PerformanceGateTests
             RepositoryLayout.FindRoot());
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task PackagePerformanceProbeRejectsUnusableAnalyzerEntryPoint(
+        bool writeInvalidAnalyzer)
+    {
+        var temporaryRoot = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            var project = CreatePerformanceProbeProject(
+                temporaryRoot,
+                "public static class Subject { }",
+                RepositoryLayout.FindRoot(),
+                importSharpProof: true);
+            var projectDocument = XDocument.Load(project);
+            var analyzerDirectory = Path.Combine(
+                temporaryRoot,
+                "unusable-analyzers");
+            projectDocument.Descendants("SharpProofAnalyzerDirectory")
+                .Single()
+                .Value = analyzerDirectory;
+            projectDocument.Save(project);
+            if (writeInvalidAnalyzer)
+            {
+                Directory.CreateDirectory(analyzerDirectory);
+                File.WriteAllText(
+                    Path.Combine(
+                        analyzerDirectory,
+                        "SharpProof.Analyzer.dll"),
+                    "not an analyzer assembly");
+            }
+
+            _ = await RunPerformanceProbeDotnetAsync(
+                project,
+                restore: true,
+                symbol: null);
+
+            Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                _ = await RunPerformanceProbeDotnetAsync(
+                    project,
+                    restore: false,
+                    symbol: "SHARPPROOF_MISSING_ANALYZER"));
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
     [Test]
     public void AdvisoryPolicyRejectsSubstitutedAnalyzerEntryPoint()
     {
@@ -804,5 +856,36 @@ public sealed class PerformanceGateTests
                 result.ForcedTerminationMilliseconds,
                 Is.GreaterThan(0));
         }
+    }
+
+    private static string CreatePerformanceProbeProject(
+        string directory,
+        string source,
+        string repositoryRoot,
+        bool importSharpProof)
+    {
+        var method = typeof(PerformanceGate).GetMethod(
+            "CreatePerformanceProbeProject",
+            BindingFlags.NonPublic | BindingFlags.Static) ??
+            throw new InvalidOperationException(
+                "Could not find the package performance probe factory.");
+        return (string)method.Invoke(
+            null,
+            [directory, source, repositoryRoot, importSharpProof])!;
+    }
+
+    private static Task<double> RunPerformanceProbeDotnetAsync(
+        string project,
+        bool restore,
+        string? symbol)
+    {
+        var method = typeof(PerformanceGate).GetMethod(
+            "RunDotnetAsync",
+            BindingFlags.NonPublic | BindingFlags.Static) ??
+            throw new InvalidOperationException(
+                "Could not find the package performance process runner.");
+        return (Task<double>)method.Invoke(
+            null,
+            [project, restore, symbol, CancellationToken.None])!;
     }
 }
