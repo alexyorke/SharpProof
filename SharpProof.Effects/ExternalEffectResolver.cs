@@ -107,10 +107,6 @@ internal sealed class ExternalEffectResolver
             return new(EffectContractResolutionKind.Untrusted, resolved!);
         }
 
-        // An external instance contract cannot certify that a companion
-        // contract is precondition-free until companion metadata is bound.
-        preconditionFree &= method.IsStatic;
-
         if (resolved!.Completeness != EffectCompleteness.Complete)
         {
             return new(EffectContractResolutionKind.Incomplete, EffectSummary.Top);

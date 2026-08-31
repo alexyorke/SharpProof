@@ -3805,7 +3805,7 @@ public sealed class EffectAnalysisTests
             """
             using SharpProof.Attributes;
 
-            public static class ExternalTrustFixture {
+            public class ExternalTrustFixture {
                 public static void Neither() {
                 }
 
@@ -3823,6 +3823,14 @@ public sealed class EffectAnalysisTests
                     Complete = true,
                     PreconditionFree = true)]
                 public static void Both() {
+                }
+
+                [SharpProofTrusted("reviewed implementation")]
+                [EffectContract(
+                    SharpProofEffect.None,
+                    Complete = true,
+                    PreconditionFree = true)]
+                public void InstanceBoth() {
                 }
 
                 [SharpProofTrusted("reviewed implementation")]
@@ -3883,6 +3891,14 @@ public sealed class EffectAnalysisTests
         Assert.That(accepted.Summary.Writes.IsEmpty, Is.True);
         Assert.That(accepted.Summary.Throws.IsEmpty, Is.True);
         Assert.That(accepted.Projection.IsComplete, Is.True);
+
+        var instance = session.Analyze(
+            EffectTestHost.RequireMethod(
+                compilation,
+                "ExternalTrustFixture",
+                "InstanceBoth"));
+        Assert.That(instance.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+        Assert.That(instance.Projection.IsComplete, Is.True);
     }
 
     [Test]
