@@ -78,6 +78,21 @@ public sealed class WorkerResultAssemblerTests
         Assert.That(response.Summary.ClaimCount, Is.EqualTo(1));
     }
 
+    [Test]
+    public void AssemblySnapshotsMutableBudgets()
+    {
+        var budgets = new WorkerBudgets { QueryRlimit = 123 };
+        var response = WorkerResultAssembler.Create(
+            WorkerProtocolVersions.EmptySha256,
+            new WorkerClaimManifest(), WorkerRunStatus.Completed,
+            WorkerRunFailureReason.None, [], [], budgets,
+            WorkerCacheStatus.Disabled, 0);
+
+        budgets.QueryRlimit = 456;
+
+        Assert.That(response.Summary.Budgets.QueryRlimit, Is.EqualTo(123));
+    }
+
     private static TimeSpan MeasureCreateIncomplete(
         WorkerClaimManifest manifest,
         int expectedSize)

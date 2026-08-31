@@ -32,13 +32,31 @@ internal static class WorkerResultAssembler
                 CacheHit = cacheStatus == WorkerCacheStatus.Hit,
                 CacheStatus = cacheStatus,
                 Versions = versions ?? new WorkerVersionSummary { WorkerVersion = "unavailable", ApiSpecVersion = "unavailable" },
-                Budgets = budgets,
+                Budgets = CloneBudgets(budgets),
                 ElapsedMilliseconds = Math.Max(0, elapsedMilliseconds)
             },
             Errors = errors?.ToArray() ?? []
         };
         WorkerProtocolJson.Canonicalize(response);
         return response;
+    }
+
+    private static WorkerBudgets CloneBudgets(WorkerBudgets value)
+    {
+        if (value is null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+
+        return new WorkerBudgets
+        {
+            QueryRlimit = value.QueryRlimit,
+            MethodRlimit = value.MethodRlimit,
+            MethodWallTimeMilliseconds = value.MethodWallTimeMilliseconds,
+            ProjectWallTimeMilliseconds = value.ProjectWallTimeMilliseconds,
+            MaxParallelism = value.MaxParallelism,
+            MaximumExpressionDepth = value.MaximumExpressionDepth
+        };
     }
 
     internal static WorkerVerifyResponse CreateIncomplete(
