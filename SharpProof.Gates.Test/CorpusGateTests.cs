@@ -310,6 +310,24 @@ public sealed class CorpusGateTests
     }
 
     [Test]
+    public void CorpusSnapshotFormatRequiresCanonicalRowOrdering()
+    {
+        const string header = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
+        const string first = "a|Proven|Proven|";
+        const string second = "b|Proven|Proven|";
+
+        Assert.That(
+            CorpusSnapshotFormat.Parse(Encoding.UTF8.GetBytes(
+                header + first + "\n" + second + "\n")),
+            Is.EqualTo(new[] { first, second }));
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CorpusSnapshotFormat.Parse(Encoding.UTF8.GetBytes(
+                header + second + "\n" + first + "\n"))));
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CorpusSnapshotFormat.Render([second, first])));
+    }
+
+    [Test]
     public void CorpusSnapshotFormatRequiresCanonicalEnumNames()
     {
         const string header = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
