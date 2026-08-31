@@ -759,6 +759,45 @@ public sealed class PackageLayoutSmokeTests
             ("_SharpProofVerifierHostSupported", "false"));
     }
 
+    [Test]
+    public async Task SourceConsumerAnalyzerDependenciesUseMappedConfiguration()
+    {
+        using var workspace = PackageWorkspace.Create();
+        var solution = workspace.WriteMappedSourceConsumerSolution();
+
+        var evaluation = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            solution,
+            "-target:Consumer:CaptureMappedAnalyzerItems",
+            "-property:Configuration=Debug",
+            "-property:Platform=Any CPU",
+            "-property:DesignTimeBuild=true",
+            "--nologo");
+
+        Assert.That(evaluation.ExitCode, Is.Zero, evaluation.Output);
+        Assert.That(
+            await File.ReadAllLinesAsync(
+                workspace.MappedProjectConfigurationsPath),
+            Does.Contain("SharpProof.Analyzer|Release")
+                .And.Contain("SharpProof.ContractForGenerator|Release"));
+
+        var dependencyPaths = (await File.ReadAllLinesAsync(
+                workspace.MappedAnalyzerItemsPath))
+            .Where(path => ExpectedAnalyzerDependencyFileNames.Contains(
+                Path.GetFileName(path),
+                StringComparer.Ordinal))
+            .ToArray();
+        Assert.That(
+            dependencyPaths.Select(Path.GetFileName),
+            Is.EquivalentTo(ExpectedAnalyzerDependencyFileNames));
+        Assert.That(
+            dependencyPaths,
+            Has.All.Matches<string>(path => path.Contains(
+                Path.Combine("bin", "Release", "netstandard2.0"),
+                StringComparison.Ordinal)));
+    }
+
     [TestCase(
         "SharpProofMode",
         "contracts",
@@ -2523,6 +2562,12 @@ public sealed class PackageLayoutSmokeTests
         {
             get;
         }
+        internal string MappedAnalyzerItemsPath => Path.Combine(
+            ConsumerDirectory,
+            "mapped-analyzers.txt");
+        internal string MappedProjectConfigurationsPath => Path.Combine(
+            ConsumerDirectory,
+            "mapped-project-configurations.txt");
 
         internal static PackageWorkspace Create()
         {
@@ -2777,6 +2822,108 @@ public sealed class PackageLayoutSmokeTests
                 </Project>
                 """,
                 new System.Text.UTF8Encoding(false));
+        }
+
+        internal string WriteMappedSourceConsumerSolution()
+        {
+            var repository = FindRepositoryRoot();
+            var consumerProps = SecurityElement.Escape(Path.Combine(
+                repository,
+                "SharpProof.AnalyzerConsumer.props"));
+            var analyzerItemsPath = SecurityElement.Escape(
+                MappedAnalyzerItemsPath);
+            var configurationsPath = SecurityElement.Escape(
+                MappedProjectConfigurationsPath);
+            File.WriteAllText(
+                ConsumerProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <Import Project="{consumerProps}" />
+                  <Target Name="CaptureMappedAnalyzerItems"
+                          DependsOnTargets="AssignProjectConfiguration">
+                    <WriteLinesToFile File="{analyzerItemsPath}"
+                                      Lines="@(Analyzer)"
+                                      Overwrite="true" />
+                    <WriteLinesToFile File="{configurationsPath}"
+                                      Lines="@(ProjectReferenceWithConfiguration->'%(Filename)|%(Configuration)')"
+                                      Overwrite="true" />
+                  </Target>
+                </Project>
+                """,
+                new System.Text.UTF8Encoding(false));
+
+            const string consumerGuid =
+                "{2D442BC0-F301-4913-B82B-178DB3AE1012}";
+            const string attributesGuid =
+                "{7B5B2351-815A-4416-A221-7D14948A120B}";
+            const string analyzerGuid =
+                "{07A87750-C6BB-401D-B53D-1D9890F6FF3C}";
+            const string generatorGuid =
+                "{7F668C71-D5B2-48B7-8C57-FE9CDBED2FE5}";
+            const string projectTypeGuid =
+                "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
+            var attributesProject = GetSolutionPath(
+                repository,
+                "SharpProof.Attributes",
+                "SharpProof.Attributes.csproj");
+            var analyzerProject = GetSolutionPath(
+                repository,
+                "SharpProof.Analyzer",
+                "SharpProof.Analyzer.csproj");
+            var generatorProject = GetSolutionPath(
+                repository,
+                "SharpProof.ContractForGenerator",
+                "SharpProof.ContractForGenerator.csproj");
+            var solution = Path.Combine(
+                ConsumerDirectory,
+                "MappedConsumer.sln");
+            File.WriteAllText(
+                solution,
+                $"""
+                Microsoft Visual Studio Solution File, Format Version 12.00
+                # Visual Studio Version 17
+                VisualStudioVersion = 17.0.31903.59
+                MinimumVisualStudioVersion = 10.0.40219.1
+                Project("{projectTypeGuid}") = "Consumer", "Consumer.csproj", "{consumerGuid}"
+                EndProject
+                Project("{projectTypeGuid}") = "SharpProof.Attributes", "{attributesProject}", "{attributesGuid}"
+                EndProject
+                Project("{projectTypeGuid}") = "SharpProof.Analyzer", "{analyzerProject}", "{analyzerGuid}"
+                EndProject
+                Project("{projectTypeGuid}") = "SharpProof.ContractForGenerator", "{generatorProject}", "{generatorGuid}"
+                EndProject
+                Global
+                    GlobalSection(SolutionConfigurationPlatforms) = preSolution
+                        Debug|Any CPU = Debug|Any CPU
+                    EndGlobalSection
+                    GlobalSection(ProjectConfigurationPlatforms) = postSolution
+                        {consumerGuid}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                        {consumerGuid}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                        {attributesGuid}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+                        {attributesGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
+                        {analyzerGuid}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+                        {analyzerGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
+                        {generatorGuid}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+                        {generatorGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
+                    EndGlobalSection
+                EndGlobal
+                """,
+                new System.Text.UTF8Encoding(false));
+            return solution;
+
+            string GetSolutionPath(
+                string root,
+                string projectDirectory,
+                string projectFile)
+            {
+                return Path.GetRelativePath(
+                        ConsumerDirectory,
+                        Path.Combine(root, projectDirectory, projectFile))
+                    .Replace('/', '\\');
+            }
         }
 
         internal void WriteLinkedMappedVerifierConsumer(string version)
