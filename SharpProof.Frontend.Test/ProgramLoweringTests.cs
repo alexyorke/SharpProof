@@ -376,6 +376,44 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void NestedArrayReadsLoadFromProgramMemoryAfterStores()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long[] values) {
+                values[0] = 41L;
+                return checked(values[0] + 1L);
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+        var store = instructions.OfType<IrStoreInstruction>().Single();
+        var load = instructions.OfType<IrLoadInstruction>().Single();
+        var returned = instructions.OfType<IrReturnInstruction>()
+            .Single(static instruction => instruction.Value != null);
+        var sum = (IrBinaryTerm)returned.Value!;
+        var loadedValue = (IrVariableTerm)sum.Left;
+        var storeLocation = (IrSequenceLocation)store.Location;
+        var loadLocation = (IrSequenceLocation)load.Location;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.True);
+            Assert.That(
+                Array.IndexOf(instructions, store),
+                Is.LessThan(Array.IndexOf(instructions, load)));
+            Assert.That(
+                loadLocation.Sequence.Id,
+                Is.EqualTo(storeLocation.Sequence.Id));
+            Assert.That(
+                loadLocation.Index.Id,
+                Is.EqualTo(storeLocation.Index.Id));
+            Assert.That(loadedValue.Variable, Is.EqualTo(load.Target));
+        }
+    }
+
+    [Test]
     public void RefReturnAssignmentTargetsAreEvaluatedBeforeValues()
     {
         var lowered = Lower(
