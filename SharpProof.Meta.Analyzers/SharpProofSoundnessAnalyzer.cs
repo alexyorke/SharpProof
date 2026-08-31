@@ -12,7 +12,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 {
     private static readonly ImmutableArray<string> KnownTypeNames = [
         "Microsoft.CodeAnalysis.Compilation", "Microsoft.CodeAnalysis.SemanticModel",
-        "Microsoft.CodeAnalysis.CSharp.SyntaxFactory", "Microsoft.CodeAnalysis.ISymbol",
+        "Microsoft.CodeAnalysis.CSharp.SyntaxFactory",
+        "Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree",
+        "Microsoft.CodeAnalysis.ISymbol",
         "Microsoft.CodeAnalysis.DiagnosticDescriptor", "System.OperationCanceledException",
         "System.Threading.CancellationToken", "SharpProof.Frontend.Host.CompilationModelProvider",
         "SharpProof.Meta.Analyzers.MetaDiagnosticDescriptors",
@@ -42,8 +44,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 "RemoveSyntaxTrees",
                 "RemoveAllSyntaxTrees",
                 "GetSymbolsWithName"),
-            [KnownType.SemanticModel] = Names("TryGetSpeculativeSemanticModel", "GetSpeculativeTypeInfo", "GetDiagnostics"),
-            [KnownType.SyntaxFactory] = Names("ParseStatement", "ParseExpression", "ParseTypeName")
+            [KnownType.SemanticModel] = Names("TryGetSpeculativeSemanticModel", "GetSpeculativeTypeInfo", "GetDiagnostics")
         }.ToImmutableDictionary();
 
     private static readonly ImmutableArray<string> CSharpExpressionFragments =
@@ -111,6 +112,16 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         ISymbol containingSymbol,
         KnownSymbols symbols)
     {
+        if (method.Name.StartsWith("Parse", StringComparison.Ordinal) &&
+            IsAnyType(
+                method.ContainingType,
+                symbols,
+                KnownType.SyntaxFactory,
+                KnownType.CSharpSyntaxTree))
+        {
+            return true;
+        }
+
         foreach (var entry in ForbiddenMethods)
         {
             if (IsSameType(method.ContainingType, symbols[entry.Key]) && entry.Value.Contains(method.Name))
@@ -519,7 +530,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     internal enum KnownType
     {
-        Compilation, SemanticModel, SyntaxFactory, Symbol, DiagnosticDescriptor,
+        Compilation, SemanticModel, SyntaxFactory, CSharpSyntaxTree, Symbol,
+        DiagnosticDescriptor,
         OperationCanceledException, CancellationToken, CompilationModelProvider,
         MetaDiagnosticDescriptors, AnalyzerDiagnosticDescriptors,
         ContractForDiagnosticDescriptors, String,
