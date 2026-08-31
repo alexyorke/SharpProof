@@ -4,6 +4,7 @@ namespace SharpProof.Analyzer;
 
 internal sealed partial class SharpProofAnalyzerEngine
 {
+    private const int ActivationCancellationCheckInterval = 256;
     private readonly IAnalyzerSessionFactory _sessionFactory;
 
     internal SharpProofAnalyzerEngine()
@@ -216,7 +217,8 @@ internal sealed partial class SharpProofAnalyzerEngine
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!MayContainAdvisoryActivationSyntax(
-                    tree.GetText(cancellationToken)))
+                    tree.GetText(cancellationToken),
+                    cancellationToken))
             {
                 continue;
             }
@@ -224,6 +226,7 @@ internal sealed partial class SharpProofAnalyzerEngine
             foreach (var node in tree.GetRoot(cancellationToken)
                          .DescendantNodes())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (node is AttributeSyntax attribute &&
                     !IsAssemblyOrModuleAttribute(attribute))
                 {
@@ -260,10 +263,18 @@ internal sealed partial class SharpProofAnalyzerEngine
                 : AdvisoryActivation.None;
     }
 
-    private static bool MayContainAdvisoryActivationSyntax(SourceText text)
+    private static bool MayContainAdvisoryActivationSyntax(
+        SourceText text,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         for (var index = 0; index < text.Length; index++)
         {
+            if (index % ActivationCancellationCheckInterval == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             if (text[index] == '[' ||
                 (text[index] == '\\' &&
                  index + 1 < text.Length &&
@@ -278,7 +289,10 @@ internal sealed partial class SharpProofAnalyzerEngine
         foreach (var candidate in
                  ContractApiMetadata.ContractMethodCandidateNames)
         {
-            if (ContainsOrdinal(text, candidate))
+            if (ContainsOrdinal(
+                    text,
+                    candidate,
+                    cancellationToken))
             {
                 return true;
             }
@@ -287,11 +301,20 @@ internal sealed partial class SharpProofAnalyzerEngine
         return false;
     }
 
-    private static bool ContainsOrdinal(SourceText text, string value)
+    private static bool ContainsOrdinal(
+        SourceText text,
+        string value,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var lastStart = text.Length - value.Length;
         for (var start = 0; start <= lastStart; start++)
         {
+            if (start % ActivationCancellationCheckInterval == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             var matches = true;
             for (var offset = 0; offset < value.Length; offset++)
             {
@@ -401,7 +424,8 @@ internal sealed partial class SharpProofAnalyzerEngine
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!MayContainAdvisoryActivationSyntax(
-                    tree.GetText(cancellationToken)))
+                    tree.GetText(cancellationToken),
+                    cancellationToken))
             {
                 continue;
             }
@@ -412,6 +436,7 @@ internal sealed partial class SharpProofAnalyzerEngine
                          .DescendantNodes()
                          .OfType<InvocationExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!IsContractApiCandidate(invocation.Expression) ||
                     model.GetSymbolInfo(invocation, cancellationToken)
                         .Symbol is not IMethodSymbol
