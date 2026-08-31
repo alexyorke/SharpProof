@@ -104,6 +104,40 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task LongDelegateAliasChainDoesNotOverflowAnalysis()
+    {
+        const int AliasCount = 8192;
+        var aliases = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(1, AliasCount).Select(index =>
+                $"                    Func<int> alias{index} = " +
+                $"alias{index - 1};"));
+        var source = $$"""
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    Func<int> alias0 = Reachable;
+            {{aliases}}
+                    return alias{{AliasCount}}();
+
+                    int Reachable() => Positive(-1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+    }
+
+    [Test]
     public async Task RootAndNestedOutcomesRemainIndependent()
     {
         var factory = new RecordingSessionFactory();
