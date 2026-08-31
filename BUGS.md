@@ -1,6 +1,6 @@
 # Bug backlog
 
-344 open bugs, reprioritized by impact, reachability, and affected scope.
+326 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -105,14 +105,13 @@ Priority definitions:
 - **BUG-413 [P2] - Unreachable handler loops fabricate divergence:** Effects termination analysis checks cycles across structurally reachable Roslyn blocks even when semantic scanning has excluded an impossible catch. A loop in that handler can falsely mark a terminating method MayDiverge and suppress effect witnesses.
 - **BUG-414 [P2] - Unreachable helper returns trigger SPMETA010:** CacheSoundnessRules gathers every syntactic return from a helper without reachability analysis. A constant-disabled Unknown return therefore blocks a build even when the helper can only return a cacheable answer.
 
-## P3 - Low (33)
+## P3 - Low (32)
 
 - **BUG-429 [P3] - Conditional-elision test exercises the wrong rejection:** ApiSpecTests uses a synthetic SharpProof.Attributes assembly that fails payload authentication before conditional-shape validation. The test remains green even if the conditional-elision check is removed, providing false coverage of that trust-boundary condition.
 - **BUG-438 [P3] - Final-compilation tests do not bind input provenance:** FinalCompilationProbeTests load portable references and additional files from the independent probe but never compare them with the compiler manifest. Collector regressions that omit or alter those inputs can keep package acceptance green.
 - **BUG-441 [P3] - Frontend fuzz coverage omits operator families:** FrontendFuzzCoverage has no facets for arithmetic, remainder, conditionals, short-circuit operators, equality, or comparisons. The campaign can report complete passing coverage after those supported expression families disappear from generation.
 - **BUG-443 [P3] - Generated source provenance relies on filename heuristics:** CompilerProbeSnapshot labels trees generated based on filename suffixes and auto-generated comments rather than actual pipeline origin. Handwritten and generator-emitted trees can be classified in reverse, weakening provenance checks.
 - **BUG-444 [P3] - IR printing emits unescaped type display names:** IrPrinter inserts unescaped display names into null and cast syntax and omits type identity. Legal names can inject lines or make distinct terms print identically, leaving diagnostics and fuzz evidence ambiguous.
-- **BUG-446 [P3] - Mixed ContractFor surface errors hide extra-member diagnostics:** ContractForCompanionValidator reports extra companion members only when every target has a unique match. A surface containing both a missing target member and an extra companion member therefore requires multiple diagnostic runs to reveal all errors.
 - **BUG-454 [P3] - SourceLength permits noncanonical authority digests:** CompilerSourceLocationAuthority validates only broad SourceLength bounds and never uses the field for mapping. Structurally impossible alternate lengths remain accepted while changing line-map and enclosing evidence hashes for identical source behavior.
 - **BUG-456 [P3] - Unknown-reason ratchet retains stale ceilings:** CorpusGate checks only currently observed Unknown categories against configured maxima and never requires ceilings to decrease after precision improves. A removed category can later regress up to its stale maximum without failing the ratchet.
 - **BUG-457 [P3] - Unrelated nested callables renumber stable claim identifiers:** ClaimManifestBuilder assigns nested callable ordinals using syntax order that includes unselected siblings. Adding an unrelated earlier lambda changes selected CallableId and ClaimId values, causing cache and baseline correlation churn.
