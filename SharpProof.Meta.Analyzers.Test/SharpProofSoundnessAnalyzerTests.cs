@@ -1916,6 +1916,50 @@ public sealed class SharpProofSoundnessAnalyzerTests
             Does.Not.Contain("AD0001"));
     }
 
+    [Test]
+    public async Task WorkerCancellationResponseHelperMustPublishResponse()
+    {
+        const string source =
+            """
+            using System;
+            using System.Threading.Tasks;
+
+            namespace SharpProof.Worker.Protocol {
+                sealed class WorkerVerifyResponse { }
+                enum WorkerRunStatus { Canceled }
+                static class WorkerResultAssembler {
+                    internal static WorkerVerifyResponse Create(
+                        WorkerRunStatus runStatus) => new();
+                }
+            }
+
+            namespace SharpProof.Worker {
+                using SharpProof.Worker.Protocol;
+
+                static class Program {
+                    internal static async Task<int> Main(string[] args) {
+                        async Task<int> Respond(
+                            WorkerVerifyResponse response) {
+                            await Task.Yield();
+                            return 0;
+                        }
+                        try { throw new OperationCanceledException(); }
+                        catch (OperationCanceledException) {
+                            return await Respond(WorkerResultAssembler.Create(
+                                WorkerRunStatus.Canceled));
+                        }
+                    }
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA003"),
+            Is.EqualTo(1));
+    }
+
     [TestCase("", 0)]
     [TestCase("cancellationToken = default;", 1)]
     public async Task WorkerCancellationReificationRequiresIncomingToken(
@@ -1925,6 +1969,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
         var source =
             $$"""
             using System;
+            using System.IO;
             using System.Threading;
             using System.Threading.Tasks;
 
@@ -1949,9 +1994,17 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 using SharpProof.Worker.Protocol;
 
                 static class Program {
+                    private static Task WriteResponseAtomicAsync(
+                        string path,
+                        WorkerVerifyResponse response) =>
+                        File.WriteAllTextAsync(path, response.ToString()!);
+
                     internal static async Task<int> Main(string[] args) {
+                        var resultPath = "result.json";
                         async Task<int> Respond(WorkerVerifyResponse response) {
-                            await Task.Yield();
+                            await WriteResponseAtomicAsync(
+                                resultPath,
+                                response).ConfigureAwait(false);
                             return 0;
                         }
                         try { throw new OperationCanceledException(); }
