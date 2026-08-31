@@ -196,6 +196,45 @@ public sealed class ContractClauseInventoryTests
     }
 
     [Test]
+    public void NonRootOperationCannotPromoteConditionalClauseToPrologue()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void Analyze(bool condition) {
+                    if (condition) {
+                        Contract.Requires(condition);
+                    }
+                }
+            }
+            """;
+        var compilation = CreateCompilation(
+            source,
+            includeSharpProofReference: true);
+        var tree = compilation.SyntaxTrees.Single();
+        var model = compilation.GetSemanticModel(tree);
+        var method = compilation.GetTypeByMetadataName("Target")!
+            .GetMembers("Analyze")
+            .OfType<IMethodSymbol>()
+            .Single();
+        var invocation = tree.GetRoot().DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Single();
+        var operation = model.GetOperation(invocation)!;
+
+        var inventory = new ContractClauseInventoryBuilder(compilation)
+            .Create(method, operation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(inventory.HasRejectedContractApiUsage, Is.True);
+            Assert.That(inventory.ImplementationBody, Is.Null);
+            Assert.That(inventory.Clauses, Is.Empty);
+        }
+    }
+
+    [Test]
     public void SourceDefinedRuntimeContractApiIsRejected()
     {
         const string source =
