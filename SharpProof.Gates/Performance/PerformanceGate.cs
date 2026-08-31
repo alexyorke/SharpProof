@@ -857,21 +857,25 @@ internal static class PerformanceGate
         int warmups,
         CancellationToken cancellationToken)
     {
+        var analyzer = new SharpProofAnalyzer();
         for (var index = 0; index < warmups; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             _ = AnalyzeEnabledCompilation(
                 CreateEnabledSource(index),
                 $"EnabledRetentionWarmup_{index}",
+                analyzer,
                 cancellationToken);
         }
         ForceCollection();
+        GC.KeepAlive(analyzer);
     }
 
     private static EnabledAnalyzerRetentionMeasurement
         MeasureEnabledAnalyzerRetention(
             CancellationToken cancellationToken)
     {
+        var analyzer = new SharpProofAnalyzer();
         ForceCollection();
         var before = GC.GetTotalMemory(forceFullCollection: true);
         var compilations =
@@ -883,6 +887,7 @@ internal static class PerformanceGate
                 AnalyzeEnabledCompilation(
                     CreateEnabledSource(index),
                     $"EnabledRetention_{index}",
+                    analyzer,
                     cancellationToken));
         }
         ForceCollection();
@@ -890,6 +895,7 @@ internal static class PerformanceGate
         var retainedCompilationCount = compilations.Count(
             static compilation => compilation.TryGetTarget(out _));
         GC.KeepAlive(compilations);
+        GC.KeepAlive(analyzer);
         return new EnabledAnalyzerRetentionMeasurement(
             retainedCompilationCount,
             Math.Max(0, after - before) / (1024d * 1024d));
@@ -899,6 +905,7 @@ internal static class PerformanceGate
     private static WeakReference<Compilation> AnalyzeEnabledCompilation(
         string source,
         string assemblyName,
+        DiagnosticAnalyzer analyzer,
         CancellationToken cancellationToken)
     {
         var compilation = AnalyzerGateHost.CreateCompilation(
@@ -906,7 +913,7 @@ internal static class PerformanceGate
             assemblyName);
         _ = AnalyzerGateHost.AnalyzeAsync(
                 compilation,
-                new SharpProofAnalyzer(),
+                analyzer,
                 "effects",
                 concurrentAnalysis: true,
                 cancellationToken)
