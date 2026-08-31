@@ -427,6 +427,14 @@ public static class IrRelationalSummaryBuilder
                 }
 
                 predicate = constrained;
+                if (ConstrainNonNullReceiver(
+                        predicate,
+                        receiver) is not { } nonNullReceiver)
+                {
+                    return null;
+                }
+
+                predicate = nonNullReceiver;
             }
 
             var arguments = new IrTerm[call.Arguments.Length];
@@ -487,6 +495,35 @@ public static class IrRelationalSummaryBuilder
             }
             _mayThrow |= dependency.Effects == IrSummaryEffect.MayThrow;
             return new CallApplication(instantiated.Result, predicate);
+        }
+
+        private IrTerm? ConstrainNonNullReceiver(
+            IrTerm predicate,
+            IrTerm receiver)
+        {
+            if (Factory.GetTypeInfo(receiver.Type).Kind is not (
+                    IrTypeKind.String or
+                    IrTypeKind.Reference or
+                    IrTypeKind.Sequence))
+            {
+                return predicate;
+            }
+
+            if (!Spend(2))
+            {
+                return null;
+            }
+
+            var nonNull = Factory.Binary(
+                IrBinaryOperator.NotEqual,
+                receiver,
+                Factory.Null(receiver.Type));
+            _mayThrow |= nonNull is not IrBooleanTerm { Value: true };
+            var result = Factory.Binary(
+                IrBinaryOperator.AndAlso,
+                predicate,
+                nonNull);
+            return Supported(result) ? result : null;
         }
 
         private void AddDependencyProvenance(IrSummaryProvenance provenance)
