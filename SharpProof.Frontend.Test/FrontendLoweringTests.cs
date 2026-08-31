@@ -883,6 +883,38 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void UnsupportedLeftAssociatedFallbackLowersEachOperationOnce()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            public static long Target(long value) =>
+                value + 1L + 2L + 3L + 4L + 5L + 6L + 7L + 8L + 9L + 10L + 11L + 12L;
+            """);
+        var operations = compiled.TargetExpression
+            .DescendantsAndSelf()
+            .ToArray();
+        var visits = 0;
+        var lowerer = new RoslynOperationLowerer(compiled.Factory)
+        {
+            CustomLowering = _ =>
+            {
+                visits++;
+                return default;
+            }
+        };
+
+        var result = lowerer.Lower(compiled.TargetExpression);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Classification.Abstention,
+                Is.EqualTo(FrontendAbstention.UncheckedOverflowSemantics));
+            Assert.That(visits, Is.LessThanOrEqualTo(operations.Length));
+        }
+    }
+
+    [Test]
     public void OperationKindClassifierSnapshotIsClosedAndExhaustive()
     {
         var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
