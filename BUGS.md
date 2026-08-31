@@ -1,6 +1,6 @@
 # Bug backlog
 
-419 open bugs, reprioritized by impact, reachability, and affected scope.
+418 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (131)
+## P0 - Critical (130)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -23,7 +23,6 @@ Priority definitions:
 - **BUG-044 [P0] - Effect replay accepts cross-tree provenance splicing:** CompilerEffectClaimArtifactCodec validates operation geometry and mapped-source geometry against separate syntax trees without requiring the tree ordinals to match. A malformed artifact can combine operation evidence from one tree with source authority from another and still pass replay validation.
 - **BUG-045 [P0] - Effect replay trusts self-asserted event semantics:** CompilerEffectClaimArtifactCodec validates replay event geometry and self-derived hashes but does not bind the asserted operation kind or identities to compiler semantics at the source span. A canonical artifact can fabricate an allocation event and obtain an accepted replay-backed effect refutation.
 - **BUG-046 [P0] - Effect witnesses are not bound to their replay:** Compiler effect artifact validation checks witness and replay independently but never proves the replay produces that witness. A resealed artifact can validate a fabricated Refuted effect result and source attribution that worker replay cannot establish.
-- **BUG-049 [P0] - Exact metadata call specifications omit type-initializer effects:** Effect call resolution applies exact metadata API specifications without joining the target type initializer boundary. Static calls and constructions can omit mandatory writes, allocations, divergence, capabilities, and TypeInitializationException while still producing Complete summaries.
 - **BUG-052 [P0] - Final compilation snapshots erase source checksum metadata:** The final-compilation snapshot hashes source characters as UTF-8 and omits original encoding, checksum algorithm, and Roslyn checksum. Compilations with different PDB or source-provenance inputs can receive identical evidence, so the artifact cannot faithfully attest emitted debugging metadata.
 - **BUG-053 [P0] - Final compilation snapshots omit diagnostic policy:** The final-compilation snapshot omits general and per-ID diagnostic policy, warning level, and suppressed-diagnostic reporting. Distinct compiler configurations can produce identical attestation artifacts, allowing the package oracle to certify the wrong build behavior.
 - **BUG-054 [P0] - Foreach element conversions are absent from exception reachability:** Effects reachability omits the implicit foreach element conversion exposed by Roslyn. A throwing or effectful conversion can be treated as absent, hiding handlers and effects while preserving a false Complete summary.
