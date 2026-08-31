@@ -109,6 +109,23 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             ArgumentException or JsonException or IOException or InvalidDataException or
                 UnauthorizedAccessException or OverflowException)
         {
+            // A miss is still a cache maintenance opportunity. In
+            // particular, a cache opened with a newly reduced limit must not
+            // retain stale entries merely because the requested key is absent
+            // or malformed.
+            try
+            {
+                if (TryStageCapacity(path, staged, cancellationToken))
+                {
+                    committed = true;
+                    DiscardStaged(staged);
+                }
+            }
+            catch (Exception maintenanceException) when (maintenanceException is
+                ArgumentException or IOException or UnauthorizedAccessException or
+                OverflowException)
+            {
+            }
             LastReadUnavailable = true;
             return null;
         }

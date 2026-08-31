@@ -19,6 +19,43 @@ namespace SharpProof.Worker.Test;
 public sealed class WorkerTcbEdgeCaseTests
 {
     [Test]
+    public async Task OrdinaryCacheMissReconcilesReducedCapacity()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-cache-miss-capacity-");
+        try
+        {
+            var oldest = Path.Combine(
+            directory.FullName,
+            new string('a', 64) + ".sharp-proof-cache.json");
+            var newest = Path.Combine(
+            directory.FullName,
+            new string('b', 64) + ".sharp-proof-cache.json");
+            await File.WriteAllTextAsync(oldest, new string('x', 100));
+            await File.WriteAllTextAsync(newest, new string('y', 100));
+            File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddMinutes(-1));
+            File.SetLastWriteTimeUtc(newest, DateTime.UtcNow);
+
+            var cache = new VerificationCache(directory.FullName, 150);
+            var result = await cache.TryReadAsync(
+            new string('c', 64),
+            new WorkerClaimManifest { Claims = [] },
+            [],
+            new WorkerBudgets(),
+            CancellationToken.None);
+
+            Assert.That(result, Is.Null);
+            Assert.That(
+                Directory.GetFiles(directory.FullName, "*.sharp-proof-cache.json"),
+                Is.EqualTo(new[] { newest }));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public void SymbolicLinkIsRejectedBeforeTraversal()
     {
         if (!OperatingSystem.IsLinux())

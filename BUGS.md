@@ -1,6 +1,6 @@
 # Bug backlog
 
-345 open bugs, reprioritized by impact, reachability, and affected scope.
+344 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -109,7 +109,7 @@ Priority definitions:
 - **BUG-285 [P1] - Worker timeout can signal a reused process ID:** LinuxWorkerProcess checks a managed process for exit and later sends SIGTERM through its numeric PID without retaining process identity. If the PID is recycled in that window, timeout or disposal can terminate an unrelated process while reporting a normal worker timeout.
 - **BUG-286 [P1] - Z3 resolver becomes visible before the verified handle:** ContainerNativeLibrary registers the DllImport resolver before publishing the verified Z3 handle. A concurrent first P/Invoke can observe zero and fail binding or fall back to ambient library probing.
 
-## P2 - Medium (96)
+## P2 - Medium (95)
 
 - **BUG-317 [P2] - Compiler evidence validation is uncancellable and quadratic:** Compiler response evidence validation performs uncancellable repeated linear searches and replays the full body for each postcondition claim. Valid bounded responses can consume quadratic work, overrun deadlines, and delay cancellation.
 - **BUG-323 [P2] - ContractFor companion bodies skip intrinsic and API validation:** ContractForCompanionValidator checks mapping and clause placement but not rejected Contract APIs or malformed intrinsics, while normal operation analysis skips companion methods. Invalid clauses can be ignored or fail later without SP0047, SP0024, or a companion diagnostic.
@@ -154,7 +154,6 @@ Priority definitions:
 - **BUG-408 [P2] - Timed-out injected backends are reused:** SharpProofWorker reuses a caller-injected backend after a timeout or cancellation because renewal is unsupported and no poisoned state persists. Later requests can inherit stale interruption or resource state and fail unpredictably.
 - **BUG-409 [P2] - Undefined obligations are mislabeled as replay corruption:** ProofKernel maps undefined Precondition and EffectContract goals to CounterexampleReplayFailed while equivalent Postcondition and internal goals receive semantic undefined reasons. Valid partial obligations therefore become fatal worker failures instead of typed Unknown outcomes.
 - **BUG-410 [P2] - Unknown entry feasibility erases authoritative claim results:** CallableVerifier replaces all postcondition and effect results with Unknown whenever its preliminary entry-feasibility query is inconclusive. Independently replayable refutations and sealed compiler-proven effect claims are discarded without running or preserving their stronger evidence.
-- **BUG-411 [P2] - Unreachable CFG blocks add frontend abstentions:** RoslynProgramLowerer follows control-flow successors without filtering unreachable basic blocks. Unsupported syntax in dead code can add a global abstention and turn a valid method into UnsupportedBody.
 - **BUG-412 [P2] - Unreachable finally throws pollute effect summaries:** The lexical effect pass treats every operation under a finally clause as reachable, even when the protected body is proven to diverge. Never-executed throws can produce false Throws effects and reject valid exception contracts.
 - **BUG-413 [P2] - Unreachable handler loops fabricate divergence:** Effects termination analysis checks cycles across structurally reachable Roslyn blocks even when semantic scanning has excluded an impossible catch. A loop in that handler can falsely mark a terminating method MayDiverge and suppress effect witnesses.
 - **BUG-414 [P2] - Unreachable helper returns trigger SPMETA010:** CacheSoundnessRules gathers every syntactic return from a helper without reachability analysis. A constant-disabled Unknown return therefore blocks a build even when the helper can only return a cacheable answer.
@@ -162,7 +161,6 @@ Priority definitions:
 - **BUG-416 [P2] - UNSAT-core decoding ignores cancellation and resource limits:** IrSmtBackend checks cancellation after solving but not while materializing, formatting, sorting, and disposing a large UNSAT core. Post-solve work can hold the backend gate and delay cancellation beyond the query budget.
 - **BUG-418 [P2] - Unsupported mutations omit the mandatory lvalue read:** Frontend unsupported compound assignments and increments lower lvalue locations without emitting the mandatory read before the right side. Abstained programs can omit null or bounds faults and include impossible right-side effects, though exact compiler admission still rejects them.
 - **BUG-420 [P2] - Value-position scalar mutations leave stale state:** Frontend value-position increments and compound assignments record an abstention but never update or havoc the mutated variable. The retained abstained program exposes stale state, although exact compiler admission rejects it.
-- **BUG-421 [P2] - Verification cache capacity is not reconciled on ordinary misses:** VerificationCache enforces MaximumBytes only after replayable hits or cacheable writes, returning early for missing, stale, malformed, or nonreplayable entries. An existing cache can remain above a reduced byte cap indefinitely when subsequent results are not cacheable.
 - **BUG-422 [P2] - Wide SMT encoding ignores cancellation and query budgets:** IrSmtBackend checks cancellation only around whole assumptions and goals, while recursive AST encoding receives no token and runs before the solver rlimit begins. A large shallow formula can continue consuming CPU and memory after cancellation or timeout.
 
 ## P3 - Low (33)
