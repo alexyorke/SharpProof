@@ -377,17 +377,21 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 guard = argumentGuard;
                 substitutions.Add(template.Parameters[index], argument);
             }
-            var result = factory.Variable(call.Target.Value);
+            var resultVariable = factory.CreateVariable(
+                "spec-call-result:" +
+                call.Id.Value.ToString(CultureInfo.InvariantCulture),
+                factory.GetVariableInfo(call.Target.Value).Type);
+            var result = factory.Variable(resultVariable);
             substitutions.Add(template.Result.Value, result);
             if (!SpecResultDomainProjection.TryCreate(
-                    factory, template, call.Target.Value, out var projection,
+                    factory, template, resultVariable, out var projection,
                     out var facetPredicates))
             {
                 return null;
             }
 
             if (projection != default &&
-                _projections.TryGetValue(call.Target.Value, out var existing) &&
+                _projections.TryGetValue(resultVariable, out var existing) &&
                 existing != projection)
             {
                 return null;
@@ -401,7 +405,9 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
             var projectionMap = projection == default
                 ? ImmutableDictionary<IrVarId, SpecResultProjection>.Empty
-                : ImmutableDictionary<IrVarId, SpecResultProjection>.Empty.Add(call.Target.Value, projection);
+                : ImmutableDictionary<IrVarId, SpecResultProjection>.Empty.Add(
+                    resultVariable,
+                    projection);
             var predicates = instantiated.Postconditions
                 .Select(predicate => SpecResultDomainProjection.Rewrite(factory, predicate, projectionMap))
                 .Concat(facetPredicates)
@@ -413,7 +419,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
             if (projection != default)
             {
-                _projections[call.Target.Value] = projection;
+                _projections[resultVariable] = projection;
             }
 
             _assumptions.AddRange(predicates.Select(predicate => new GuardedBodySpecAssumption(
