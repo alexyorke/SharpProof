@@ -16,12 +16,16 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     ICancelableTask, IDisposable
 {
     internal const int LauncherProcessReserveMilliseconds = 1000;
-    // The supervisor and worker launcher run from this instrumentable
-    // assembly. Keep additional bounded room for their final timeout
-    // publication and authenticated cleanup when coverage or a heavily loaded
-    // host slows managed startup. Direct task callers retain their original
+    // The worker launcher can legitimately spend the full publication lease
+    // timeout after its worker budget expires. Keep that wait outside the
+    // worker budget, followed by the existing bounded room for finalization
+    // and authenticated cleanup. Direct task callers retain their original
     // deadline semantics.
-    private const int WorkerLauncherProcessReserveMilliseconds = 5000;
+    private const int WorkerLauncherPublicationWaitMilliseconds = 30000;
+    private const int WorkerLauncherFinalizationReserveMilliseconds = 5000;
+    private const int WorkerLauncherProcessReserveMilliseconds =
+        WorkerLauncherPublicationWaitMilliseconds +
+        WorkerLauncherFinalizationReserveMilliseconds;
     private const int CleanupAuthenticationWaitMilliseconds = 5000;
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
     internal const int OutputDrainPollingMilliseconds = 25;
