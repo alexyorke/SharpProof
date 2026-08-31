@@ -1,6 +1,6 @@
 # Bug backlog
 
-326 open bugs, reprioritized by impact, reachability, and affected scope.
+95 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -57,7 +57,7 @@ Priority definitions:
 - **BUG-168 [P0] - Worker responses alias mutable request budgets:** SharpProofWorker stores the caller's mutable WorkerBudgets object directly in returned response summaries. Later request mutation changes already-issued authoritative budget evidence while hashes remain unchanged, making serialization and verification evidence internally inconsistent.
 - **BUG-169 [P0] - Z3 validation and native loading race on file replacement:** SharpProof.Host hashes the Z3 library by pathname, closes the stream, and later reopens that path for native loading. Replacement between those operations can load unverified bytes and defeat native-payload integrity.
 
-## P1 - High (33)
+## P1 - High (32)
 
 - **BUG-175 [P1] - Approved repository origin relies on unauthenticated local metadata:** OpenSourceCorpusImporter accepts an editable local origin URL without proving that the checked-out commit belongs to the approved remote. An arbitrary clean repository can be imported and attributed to the approved upstream.
 - **BUG-176 [P1] - Atomic replacement discards destination access metadata:** AtomicFile replaces an existing destination with a fresh staging inode without copying Unix mode, ACLs, or extended metadata. Rewriting a restricted output can change administrator-selected access policy, including widening its file mode under a permissive umask.
@@ -92,7 +92,7 @@ Priority definitions:
 - **BUG-285 [P1] - Worker timeout can signal a reused process ID:** LinuxWorkerProcess checks a managed process for exit and later sends SIGTERM through its numeric PID without retaining process identity. If the PID is recycled in that window, timeout or disposal can terminate an unrelated process while reporting a normal worker timeout.
 - **BUG-286 [P1] - Z3 resolver becomes visible before the verified handle:** ContainerNativeLibrary registers the DllImport resolver before publishing the verified Z3 handle. A concurrent first P/Invoke can observe zero and fail binding or fall back to ambient library probing.
 
-## P2 - Medium (95)
+## P2 - Medium (10)
 
 - **BUG-317 [P2] - Compiler evidence validation is uncancellable and quadratic:** Compiler response evidence validation performs uncancellable repeated linear searches and replays the full body for each postcondition claim. Valid bounded responses can consume quadratic work, overrun deadlines, and delay cancellation.
 - **BUG-347 [P2] - Final validation can read a torn publication generation:** ValidatePublishedVerificationResult reads request, result, and manifest independently after the launcher releases its publication lease. A concurrent publisher can replace files between reads, causing a valid build to fail against a mixed generation.
@@ -105,7 +105,7 @@ Priority definitions:
 - **BUG-413 [P2] - Unreachable handler loops fabricate divergence:** Effects termination analysis checks cycles across structurally reachable Roslyn blocks even when semantic scanning has excluded an impossible catch. A loop in that handler can falsely mark a terminating method MayDiverge and suppress effect witnesses.
 - **BUG-414 [P2] - Unreachable helper returns trigger SPMETA010:** CacheSoundnessRules gathers every syntactic return from a helper without reachability analysis. A constant-disabled Unknown return therefore blocks a build even when the helper can only return a cacheable answer.
 
-## P3 - Low (32)
+## P3 - Low (8)
 
 - **BUG-429 [P3] - Conditional-elision test exercises the wrong rejection:** ApiSpecTests uses a synthetic SharpProof.Attributes assembly that fails payload authentication before conditional-shape validation. The test remains green even if the conditional-elision check is removed, providing false coverage of that trust-boundary condition.
 - **BUG-438 [P3] - Final-compilation tests do not bind input provenance:** FinalCompilationProbeTests load portable references and additional files from the independent probe but never compare them with the compiler manifest. Collector regressions that omit or alter those inputs can keep package acceptance green.
