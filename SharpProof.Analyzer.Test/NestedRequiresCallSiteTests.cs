@@ -1281,6 +1281,64 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task NestedPatternAliasesReachOnlyTheirDelegateComponents()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Recursive() {
+                    var pair = (
+                        Callback: (Func<int>)Reachable,
+                        Number: 1);
+                    if (pair is (var callback, _)) return callback();
+                    return 0;
+
+                    int Reachable() => Positive(-1);
+                }
+
+                public static int List() {
+                    Func<int>[] callbacks = { Reachable };
+                    if (callbacks is [var callback]) return callback();
+                    return 0;
+
+                    int Reachable() => Positive(-2);
+                }
+
+                public static int RecursiveSibling() {
+                    var pair = (
+                        Dead: (Func<int>)Dead,
+                        Used: (Func<int>)Safe);
+                    if (pair is (var dead, var used)) return used();
+                    return 0;
+
+                    int Dead() => Positive(-3);
+                    int Safe() => 0;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 2);
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EquivalentTo(new[]
+            {
+                source.IndexOf("Positive(-1)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal)
+            }));
+    }
+
+    [Test]
     public async Task NestedCallableSuppressionsAreValidatedAndRecorded()
     {
         var factory = new RecordingSessionFactory();
