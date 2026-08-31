@@ -1307,6 +1307,51 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
+    public void NonBooleanContractClauseFailsDuringHydration()
+    {
+        const string callableId = "M:Subject.Verify";
+        const string assumptionId = "spa1:non-boolean";
+        var factory = new IrFactory();
+        var entry = new WorkerCallableManifestEntry
+        {
+            CallableId = callableId,
+            Assumptions =
+            [
+                new WorkerAssumptionEvidence
+                {
+                    Id = assumptionId,
+                    Kind = WorkerAssumptionKind.Precondition
+                }
+            ]
+        };
+        var preparation = new CompilerCallablePreparation(
+            factory,
+            entry,
+            [
+                new CompilerPreparedClause(
+                    CompilerContractKind.Requires,
+                    factory.Integer(1),
+                    CompilerContractEvidence.CompilerBoundInvocation,
+                    null,
+                    assumptionId)
+            ],
+            [],
+            WorkerClaimReason.None,
+            null);
+        var artifact = CompilerLoweredArtifact.Encode(preparation);
+        var manifest = new WorkerClaimManifest
+        {
+            Callables = [entry]
+        };
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CompilerLoweredArtifact.Decode(
+                [artifact],
+                manifest,
+                new CompilerCompilationSnapshot())));
+    }
+
+    [Test]
     public void LoweredProgramAboveTheReplayInstructionBoundFailsHydration()
     {
         var artifact = CreateContractArtifact(
