@@ -75,6 +75,28 @@ public sealed class CompilerProbeSnapshotTests
     }
 
     [Test]
+    public async Task ImageBackedPortableReferenceCarriesConsumedImageHash()
+    {
+        var image = await File.ReadAllBytesAsync(typeof(object).Assembly.Location);
+        var compilation = CSharpCompilation.Create(
+            "ProbeConsumer",
+            [CSharpSyntaxTree.ParseText("class Consumer {}")],
+            [MetadataReference.CreateFromImage(image)]);
+        var output = await CaptureSnapshotAsync(
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json"),
+            compilation);
+
+        using var document = JsonDocument.Parse(output);
+        var reference = document.RootElement.GetProperty("portableReferences")
+            .EnumerateArray()
+            .Single();
+        Assert.That(
+            reference.GetProperty("fileSha256").GetString(),
+            Does.Match("^[0-9a-f]{64}$"),
+            "image-backed references must be bound to consumed PE bytes");
+    }
+
+    [Test]
     public async Task ExecutableEntryPointSelectionChangesProbeSnapshot()
     {
         var directory = Directory.CreateTempSubdirectory(
