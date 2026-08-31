@@ -78,7 +78,8 @@ internal static class AnalyzerTestHost
         DiagnosticAnalyzer? analyzer = null,
         string? profile = null,
         string? features = null,
-        bool allowCompilationErrors = false)
+        bool allowCompilationErrors = false,
+        CancellationToken cancellationToken = default)
     {
         var values = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase);
@@ -116,7 +117,8 @@ internal static class AnalyzerTestHost
                 compilation,
                 values,
                 analyzer: analyzer,
-                allowCompilationErrors: allowCompilationErrors)
+                allowCompilationErrors: allowCompilationErrors,
+                cancellationToken: cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -125,7 +127,8 @@ internal static class AnalyzerTestHost
         IReadOnlyDictionary<string, string> values,
         ImmutableArray<AdditionalText> additionalFiles = default,
         DiagnosticAnalyzer? analyzer = null,
-        bool allowCompilationErrors = false)
+        bool allowCompilationErrors = false,
+        CancellationToken cancellationToken = default)
     {
         if (!allowCompilationErrors)
         {
@@ -142,7 +145,8 @@ internal static class AnalyzerTestHost
                 concurrentAnalysis: true,
                 logAnalyzerExecutionTime: false,
                 reportSuppressedDiagnostics: false));
-        return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync())
+        return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync(
+                cancellationToken))
             .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
             .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
     }

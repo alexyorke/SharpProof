@@ -1,6 +1,8 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.Analyzer.Configuration;
 
@@ -92,6 +94,41 @@ public sealed class AdvisoryActivationTests
 
         Assert.That(diagnostics, Is.Empty);
         Assert.That(factory.CreateCount, Is.Zero);
+    }
+
+    [Test]
+    public void AdvisoryTextScanObservesCancellationWithinBoundedReads()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var text = new CancellingSourceText(
+            SourceText.From(new string(' ', 100_000), Encoding.UTF8),
+            cancellation,
+            cancelPosition: 64);
+        var tree = CSharpSyntaxTree.ParseText(
+            text,
+            path: "large-generated.cs");
+        Assert.That(tree.GetText(), Is.SameAs(text));
+        var compilation = AnalyzerTestHost.CreateCompilation(
+                string.Empty,
+                [])
+            .RemoveAllSyntaxTrees()
+            .AddSyntaxTrees(tree);
+        text.Arm();
+
+        Func<Task> analyze = async () =>
+        {
+            _ = await AnalyzerTestHost.AnalyzeAsync(
+                compilation,
+                mode: null,
+                analyzer: new SharpProofAnalyzer(
+                    new RecordingSessionFactory()),
+                cancellationToken: cancellation.Token);
+        };
+
+        Assert.ThrowsAsync<OperationCanceledException>(analyze);
+        Assert.That(
+            text.ReadsAfterCancellation,
+            Is.LessThanOrEqualTo(512));
     }
 
     [Test]
@@ -417,6 +454,64 @@ public sealed class AdvisoryActivationTests
                 compilation,
                 configuration,
                 cancellationToken);
+        }
+    }
+
+    private sealed class CancellingSourceText(
+        SourceText inner,
+        CancellationTokenSource cancellation,
+        int cancelPosition) : SourceText
+    {
+        private readonly SourceText _inner = inner;
+        private readonly CancellationTokenSource _cancellation = cancellation;
+        private readonly int _cancelPosition = cancelPosition;
+        private int _armed;
+        private int _cancelledByText;
+        private int _readsAfterCancellation;
+
+        public override Encoding? Encoding => _inner.Encoding;
+
+        public override int Length => _inner.Length;
+
+        public override char this[int position]
+        {
+            get
+            {
+                if (Volatile.Read(ref _armed) != 0 &&
+                    position >= _cancelPosition &&
+                    Interlocked.Exchange(ref _cancelledByText, 1) == 0)
+                {
+                    _cancellation.Cancel();
+                }
+
+                if (Volatile.Read(ref _cancelledByText) != 0)
+                {
+                    Interlocked.Increment(ref _readsAfterCancellation);
+                }
+
+                return _inner[position];
+            }
+        }
+
+        internal int ReadsAfterCancellation =>
+            Volatile.Read(ref _readsAfterCancellation);
+
+        internal void Arm()
+        {
+            Volatile.Write(ref _armed, 1);
+        }
+
+        public override void CopyTo(
+            int sourceIndex,
+            char[] destination,
+            int destinationIndex,
+            int count)
+        {
+            _inner.CopyTo(
+                sourceIndex,
+                destination,
+                destinationIndex,
+                count);
         }
     }
 
