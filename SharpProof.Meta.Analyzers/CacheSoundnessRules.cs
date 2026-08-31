@@ -26,6 +26,7 @@ internal static class CacheSoundnessRules
         if (ForwardsNonCacheableSemanticAnswer(
                 invocation,
                 root,
+                context.Compilation,
                 context.CancellationToken))
         {
             Report(context, invocation.Syntax.GetLocation());
@@ -47,11 +48,14 @@ internal static class CacheSoundnessRules
                     (IsNonCacheableSemanticAnswer(
                          argument.Value,
                          root,
-                         new LocalResolution(context.CancellationToken)) ||
+                         new LocalResolution(
+                             context.CancellationToken,
+                             context.Compilation)) ||
                      IsNonCacheableGetOrAddFactory(
                          invocation,
                          argument,
                          root,
+                         context.Compilation,
                          context.CancellationToken));
             }))
         {
@@ -64,6 +68,7 @@ internal static class CacheSoundnessRules
     private static bool ForwardsNonCacheableSemanticAnswer(
         IInvocationOperation invocation,
         IOperation root,
+        Compilation compilation,
         CancellationToken cancellationToken)
     {
         var method = invocation.TargetMethod.OriginalDefinition;
@@ -82,7 +87,7 @@ internal static class CacheSoundnessRules
                 !IsNonCacheableSemanticAnswer(
                     argument.Value,
                     root,
-                    new LocalResolution(cancellationToken)))
+                    new LocalResolution(cancellationToken, compilation)))
             {
                 continue;
             }
@@ -232,6 +237,7 @@ internal static class CacheSoundnessRules
         IInvocationOperation invocation,
         IArgumentOperation argument,
         IOperation root,
+        Compilation compilation,
         CancellationToken cancellationToken)
     {
         var factoryType = argument.Parameter?.Type ?? argument.Value.Type;
@@ -252,7 +258,7 @@ internal static class CacheSoundnessRules
         return IsNonCacheableValueFactory(
             argument.Value,
             root,
-            new LocalResolution(cancellationToken));
+            new LocalResolution(cancellationToken, compilation));
     }
 
     private static bool IsNonCacheableValueFactory(
@@ -272,12 +278,15 @@ internal static class CacheSoundnessRules
             IAnonymousFunctionOperation anonymous =>
                 IsNonCacheableAnonymousFactory(
                     anonymous,
+                    resolving.Compilation,
                     resolving.CancellationToken),
             IMethodReferenceOperation method =>
                 IsNonCacheableReturnedValue(
                     method.Method,
                     method.Method.ReturnType,
-                    method.Method.Name),
+                    method.Method.Name,
+                    resolving.Compilation,
+                    resolving.CancellationToken),
             ILocalReferenceOperation local =>
                 ResolveValueFactoryLocal(local, root, resolving),
             IConditionalOperation conditional =>
@@ -305,6 +314,7 @@ internal static class CacheSoundnessRules
 
     private static bool IsNonCacheableAnonymousFactory(
         IAnonymousFunctionOperation factory,
+        Compilation? compilation,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -321,7 +331,7 @@ internal static class CacheSoundnessRules
             IsNonCacheableSemanticAnswer(
                 value,
                 factory.Body,
-                new LocalResolution(cancellationToken)));
+                new LocalResolution(cancellationToken, compilation)));
     }
 
     private static bool ResolveValueFactoryLocal(
@@ -361,7 +371,9 @@ internal static class CacheSoundnessRules
             !IsNonCacheableSemanticAnswer(
                 assignment.Value,
                 root,
-                new LocalResolution(context.CancellationToken)))
+                new LocalResolution(
+                    context.CancellationToken,
+                    context.Compilation)))
         {
             return;
         }
@@ -662,8 +674,12 @@ internal static class CacheSoundnessRules
                     coalesce.WhenNull,
                     root,
                     resolving),
-            IPropertyReferenceOperation property => ResolveProperty(property),
-            IInvocationOperation invocation => ResolveInvocation(invocation),
+            IPropertyReferenceOperation property => ResolveProperty(
+                property,
+                resolving),
+            IInvocationOperation invocation => ResolveInvocation(
+                invocation,
+                resolving),
             _ => IsSemanticAnswerType(operation.Type) &&
                 operation.ConstantValue is not { HasValue: true }
         };
@@ -1402,34 +1418,169 @@ internal static class CacheSoundnessRules
         return false;
     }
 
-    private static bool ResolveProperty(IPropertyReferenceOperation property)
+    private static bool ResolveProperty(
+        IPropertyReferenceOperation property,
+        LocalResolution resolving)
     {
         return IsNonCacheableReturnedValue(
             property.Property,
             property.Type,
-            property.Property.Name);
+            property.Property.Name,
+            resolving.Compilation,
+            resolving.CancellationToken);
     }
 
-    private static bool ResolveInvocation(IInvocationOperation invocation)
+    private static bool ResolveInvocation(
+        IInvocationOperation invocation,
+        LocalResolution resolving)
     {
         return IsNonCacheableReturnedValue(
             invocation.TargetMethod,
             invocation.Type,
-            invocation.TargetMethod.Name);
+            invocation.TargetMethod.Name,
+            resolving.Compilation,
+            resolving.CancellationToken);
     }
 
     private static bool IsNonCacheableReturnedValue(
         ISymbol symbol,
         ITypeSymbol? returnType,
-        string fallbackName)
+        string fallbackName,
+        Compilation? compilation,
+        CancellationToken cancellationToken)
     {
-        var names = GetReturnedValueNames(
-            symbol,
-            new HashSet<ISymbol>(SymbolEqualityComparer.Default));
-        return names.Length == 0
+        var names = ImmutableArray.CreateBuilder<string>();
+        var resolving = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        foreach (var target in GetPossibleDispatchTargets(
+                     symbol,
+                     compilation,
+                     cancellationToken))
+        {
+            names.AddRange(GetReturnedValueNames(target, resolving));
+        }
+        return names.Count == 0
             ? IsSemanticAnswerType(returnType) &&
               IsNonCacheableName(fallbackName)
             : names.Any(IsNonCacheableName);
+    }
+
+    private static ImmutableArray<ISymbol> GetPossibleDispatchTargets(
+        ISymbol symbol,
+        Compilation? compilation,
+        CancellationToken cancellationToken)
+    {
+        var targets = ImmutableArray.CreateBuilder<ISymbol>();
+        var seen = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        AddTarget(symbol, targets, seen);
+        if (compilation == null ||
+            symbol.ContainingType == null ||
+            (!symbol.IsVirtual &&
+             !symbol.IsAbstract &&
+             symbol.ContainingType.TypeKind != TypeKind.Interface))
+        {
+            return targets.ToImmutable();
+        }
+
+        foreach (var type in GetSourceTypes(compilation.Assembly.GlobalNamespace))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (symbol.ContainingType.TypeKind == TypeKind.Interface)
+            {
+                AddTarget(
+                    type.FindImplementationForInterfaceMember(symbol),
+                    targets,
+                    seen);
+                continue;
+            }
+
+            foreach (var member in type.GetMembers(symbol.Name))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (Overrides(member, symbol))
+                {
+                    AddTarget(member, targets, seen);
+                }
+            }
+        }
+        return targets.ToImmutable();
+    }
+
+    private static void AddTarget(
+        ISymbol? symbol,
+        ImmutableArray<ISymbol>.Builder targets,
+        HashSet<ISymbol> seen)
+    {
+        if (symbol != null && seen.Add(symbol))
+        {
+            targets.Add(symbol);
+        }
+    }
+
+    private static bool Overrides(ISymbol candidate, ISymbol target)
+    {
+        switch (candidate, target)
+        {
+            case (IMethodSymbol method, IMethodSymbol targetMethod):
+                for (var current = method.OverriddenMethod;
+                     current != null;
+                     current = current.OverriddenMethod)
+                {
+                    if (SymbolEqualityComparer.Default.Equals(
+                            current.OriginalDefinition,
+                            targetMethod.OriginalDefinition))
+                    {
+                        return true;
+                    }
+                }
+                break;
+            case (IPropertySymbol property, IPropertySymbol targetProperty):
+                for (var current = property.OverriddenProperty;
+                     current != null;
+                     current = current.OverriddenProperty)
+                {
+                    if (SymbolEqualityComparer.Default.Equals(
+                            current.OriginalDefinition,
+                            targetProperty.OriginalDefinition))
+                    {
+                        return true;
+                    }
+                }
+                break;
+        }
+        return false;
+    }
+
+    private static IEnumerable<INamedTypeSymbol> GetSourceTypes(
+        INamespaceSymbol @namespace)
+    {
+        foreach (var type in @namespace.GetTypeMembers())
+        {
+            foreach (var nested in GetTypeAndNestedTypes(type))
+            {
+                yield return nested;
+            }
+        }
+
+        foreach (var child in @namespace.GetNamespaceMembers())
+        {
+            foreach (var type in GetSourceTypes(child))
+            {
+                yield return type;
+            }
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> GetTypeAndNestedTypes(
+        INamedTypeSymbol type)
+    {
+        yield return type;
+        foreach (var nested in type.GetTypeMembers())
+        {
+            foreach (var descendant in GetTypeAndNestedTypes(nested))
+            {
+                yield return descendant;
+            }
+        }
     }
 
     private static ImmutableArray<string> GetReturnedValueNames(
@@ -1780,12 +1931,20 @@ internal static class CacheSoundnessRules
         private readonly HashSet<ILocalSymbol> _locals = new(
             SymbolEqualityComparer.Default);
 
-        internal LocalResolution(CancellationToken cancellationToken)
+        internal LocalResolution(
+            CancellationToken cancellationToken,
+            Compilation? compilation = null)
         {
             CancellationToken = cancellationToken;
+            Compilation = compilation;
         }
 
         internal CancellationToken CancellationToken
+        {
+            get;
+        }
+
+        internal Compilation? Compilation
         {
             get;
         }
