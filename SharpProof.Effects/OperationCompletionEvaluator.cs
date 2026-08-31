@@ -942,7 +942,11 @@ internal sealed class OperationCompletionEvaluator
                 BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder &&
             assignment.Value.ConstantValue is { HasValue: true, Value: 0 })
         {
-            return false;
+            return LiftedOperatorMayBeSkipped(
+                assignment.IsLifted,
+                assignment.Target,
+                assignment.Value,
+                assignment);
         }
 
         return assignment.OperatorMethod == null ||
@@ -1154,7 +1158,11 @@ internal sealed class OperationCompletionEvaluator
                 BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder &&
             binary.RightOperand.ConstantValue is { HasValue: true, Value: 0 })
         {
-            return false;
+            return LiftedOperatorMayBeSkipped(
+                binary.IsLifted,
+                binary.LeftOperand,
+                binary.RightOperand,
+                binary);
         }
 
         return binary.OperatorMethod == null ||
@@ -1172,6 +1180,26 @@ internal sealed class OperationCompletionEvaluator
                  unary.OperatorMethod,
                  instance: null,
                  unary));
+    }
+
+    private bool LiftedOperatorMayBeSkipped(
+        bool isLifted,
+        IOperation left,
+        IOperation right,
+        IOperation origin)
+    {
+        return isLifted &&
+            (NullableOperandMayBeNull(left, origin) ||
+             NullableOperandMayBeNull(right, origin));
+    }
+
+    private bool NullableOperandMayBeNull(
+        IOperation operand,
+        IOperation origin)
+    {
+        return ManagedAbstractValue.IsNullableType(operand.Type) &&
+            !DefiniteOperationFacts.IsDefinitelyNonNull(operand) &&
+            _abstractFlow?.ProvesNonNull(origin, operand) != true;
     }
 
     private bool CanCompleteConditional(IConditionalOperation conditional)
