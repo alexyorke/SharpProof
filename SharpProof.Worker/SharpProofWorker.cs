@@ -268,19 +268,30 @@ public sealed class SharpProofWorker : IDisposable
             var retirementCallableReason = WorkerCallableCoverageReason.InfrastructureFailure;
             var retirementClaimReason = WorkerClaimReason.InfrastructureFailure;
             var hasRetirementReason = false;
+            var retirementRank = -1;
             void RecordRetirement(
                 WorkerCallableCoverageReason callableReason,
                 WorkerClaimReason claimReason)
             {
                 lock (retirementSynchronization)
                 {
-                    if (hasRetirementReason)
+                    // Several lanes can renew concurrently.  Select the
+                    // strongest failure by a stable policy instead of letting
+                    // scheduler lock acquisition decide the response reason.
+                    var rank = claimReason switch
+                    {
+                        WorkerClaimReason.BackendUnavailable => 2,
+                        WorkerClaimReason.InfrastructureFailure => 1,
+                        _ => 0
+                    };
+                    if (hasRetirementReason && rank <= retirementRank)
                     {
                         return;
                     }
                     retirementCallableReason = callableReason;
                     retirementClaimReason = claimReason;
                     hasRetirementReason = true;
+                    retirementRank = rank;
                 }
             }
             async Task RunLane(VerificationLane lane)
