@@ -491,6 +491,56 @@ public sealed class CorpusGateTests
     }
 
     [Test]
+    public async Task MetamorphicVariantsMustRetainSeedOutcomeAndDiagnosticClasses()
+    {
+        var catalog = CorpusCatalog.CreateSyntheticCases();
+        var baseline = catalog.Single(static item =>
+            item.Id == "C02.baseline") with
+        {
+            Id = "seed.baseline",
+            SeedId = "seed"
+        };
+        var renamed = catalog.Single(static item =>
+            item.Id == "C02.rename") with
+        {
+            Id = "seed.rename",
+            SeedId = "seed"
+        };
+        var temporary = catalog.Single(static item =>
+            item.Id == "C01.temporary") with
+        {
+            Id = "seed.temporary",
+            SeedId = "seed"
+        };
+        var trivia = catalog.Single(static item =>
+            item.Id == "E02.trivia") with
+        {
+            Id = "seed.trivia",
+            SeedId = "seed"
+        };
+        var cases = new[] { baseline, renamed, temporary, trivia };
+        var observations = await Task.WhenAll(cases.Select(item =>
+            CorpusGate.ObserveCaseAsync(item, CancellationToken.None)));
+        var failures = CorpusGate.ValidateMetamorphicConsistency(
+            [.. cases],
+            [.. observations]);
+
+        Assert.That(
+            failures.ToArray(),
+            Is.EqualTo([
+                "Metamorphic variant seed.trivia changed semantic outcome " +
+                "from Refuted to Unknown relative to seed.baseline.",
+                "Metamorphic variant seed.trivia changed diagnostic classes " +
+                "from [SP0027@Warning] to [SP0002@Warning] relative to " +
+                "seed.baseline.",
+                "Metamorphic variant seed.temporary changed semantic outcome " +
+                "from Refuted to Proven relative to seed.baseline.",
+                "Metamorphic variant seed.temporary changed diagnostic classes " +
+                "from [SP0027@Warning] to [] relative to seed.baseline."
+            ]));
+    }
+
+    [Test]
     public void SnapshotCapturesSemanticOutcomeAndCanonicalDiagnostics()
     {
         var root = RepositoryLayout.FindRoot();
