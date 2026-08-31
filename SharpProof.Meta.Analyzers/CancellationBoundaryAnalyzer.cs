@@ -214,7 +214,7 @@ internal static class CancellationBoundaryAnalyzer
         {
             switch (operation)
             {
-                case IConversionOperation conversion:
+                case IConversionOperation { OperatorMethod: null } conversion:
                     operation = conversion.Operand;
                     continue;
                 case IParenthesizedOperation parenthesized:
