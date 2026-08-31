@@ -1197,6 +1197,30 @@ public sealed class WorkerMsBuildIntegrationTests
             Is.False);
     }
 
+    [TestCase("intermediate-apphost")]
+    [TestCase("final-apphost")]
+    public async Task PublicationRejectsAppHostOutputsBeforeMutation(
+        string outputKind)
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.CreateConfigured(
+            ExecutableIdentitySource,
+            ("OutputType", "Exe"),
+            ("UseAppHost", "true"));
+        var compilerOutput = project.CompilerOutputPath(outputKind);
+
+        var build = await project.BuildAsync(
+            verify: true,
+            ("SharpProofVerifyResultFile", compilerOutput));
+
+        Assert.That(build.ExitCode, Is.Not.Zero, build.Output);
+        Assert.That(build.Output, Does.Contain("compiler-owned outputs"));
+        Assert.That(
+            File.Exists(LinuxPathIdentity.PublicationMarkerPath(compilerOutput)),
+            Is.False);
+        Assert.That(File.Exists(compilerOutput), Is.False);
+    }
+
     [Test]
     public async Task WorkerExitWithoutResultProducesTypedFailure()
     {
@@ -3435,6 +3459,17 @@ public sealed class WorkerMsBuildIntegrationTests
         }
         """;
 
+    private const string ExecutableIdentitySource =
+        IdentitySource +
+        """
+
+        public static class Program {
+            public static void Main() {
+                _ = Subject.Identity(0);
+            }
+        }
+        """;
+
     private static string SemanticPayload(WorkerVerifyResponse response)
     {
         return System.Text.Json.JsonSerializer.Serialize(
@@ -3786,6 +3821,10 @@ public sealed class WorkerMsBuildIntegrationTests
                 "generated-editorconfig" => Path.Combine(
                     intermediate,
                     "Consumer.GeneratedMSBuildEditorConfig.editorconfig"),
+                "intermediate-apphost" => Path.Combine(
+                    intermediate, "apphost"),
+                "final-apphost" => Path.Combine(
+                    _root, "bin", "Release", "net8.0", "Consumer"),
                 _ => throw new ArgumentOutOfRangeException(nameof(kind))
             };
         }
