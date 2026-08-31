@@ -25,6 +25,30 @@ public sealed class ProtocolJsonTests
     ];
 
     [Test]
+    public void ProtocolSerializersRejectDocumentsBeyondReaderLimit()
+    {
+        var oversizedValue = new string(
+            'x',
+            WorkerProtocolJson.MaximumJsonBytes);
+        var request = CreateRequest();
+        request.CompilerManifest.Path = oversizedValue;
+        var response = CreateResponse(CreateManifest());
+        response.ClaimResults[0].ProofCore = [oversizedValue];
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(WorkerProtocolJson.Validate(request).IsValid, Is.True);
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+            Assert.That(
+                (Action)(() => WorkerProtocolJson.SerializeRequest(request)),
+                Throws.TypeOf<InvalidDataException>());
+            Assert.That(
+                (Action)(() => WorkerProtocolJson.SerializeResponse(response)),
+                Throws.TypeOf<InvalidDataException>());
+        }
+    }
+
+    [Test]
     public void BoundedUtf8FileReaderRejectsOversizedAndInvalidFiles()
     {
         var path = Path.Combine(
