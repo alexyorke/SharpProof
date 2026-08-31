@@ -139,6 +139,12 @@ public static class ForwardDataflowAnalysis
             foreach (var blockId in batch)
             {
                 var transferred = graph.GetBlock(blockId).Transfer(inputs[blockId]);
+                if (!domain.LessThanOrEqual(outputs[blockId], transferred))
+                {
+                    throw new InvalidOperationException(
+                        $"Block {blockId} transfer must be monotone as its input grows.");
+                }
+
                 var monotoneOutput = domain.Join(outputs[blockId], transferred);
                 if (!domain.AreEquivalent(outputs[blockId], monotoneOutput))
                 {
