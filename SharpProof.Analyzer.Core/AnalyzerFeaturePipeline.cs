@@ -520,79 +520,61 @@ internal static partial class AnalyzerFeaturePipeline
         CancellationToken cancellationToken)
     {
         var containingType = target.FirstAncestorOrSelf<TypeDeclarationSyntax>();
-        var targetMember = target.FirstAncestorOrSelf<MemberDeclarationSyntax>();
-        if (containingType == null || targetMember == null)
+        var type = containingType == null
+            ? null
+            : semanticModel.GetDeclaredSymbol(
+                containingType,
+                cancellationToken);
+        if (type == null)
         {
             return true;
         }
 
-        foreach (var member in containingType.Members)
+        foreach (var reference in EffectMethodNodeBuilder
+                     .GetMemberInitializerReferences(
+                         semanticModel.Compilation,
+                         type,
+                         isStatic))
         {
-            foreach (var initializer in GetMemberInitializers(member))
+            var initializer = GetMemberInitializer(
+                reference.GetSyntax(cancellationToken));
+            if (initializer == null)
             {
-                if (initializer.SyntaxTree == target.SyntaxTree &&
-                    initializer.Span == target.Span)
-                {
-                    return true;
-                }
-                if (!HasMatchingInitializationKind(
-                        initializer,
-                        isStatic,
-                        semanticModel,
-                        cancellationToken))
-                {
-                    continue;
-                }
-                var operation = semanticModel.GetOperation(
-                    initializer.Value,
-                    cancellationToken);
-                if (operation != null &&
-                    !operationFacts.MayCompleteNormally(operation))
-                {
-                    return false;
-                }
+                continue;
             }
-            if (member.SyntaxTree == targetMember.SyntaxTree &&
-                member.Span == targetMember.Span)
+            if (initializer.SyntaxTree == target.SyntaxTree &&
+                initializer.Span == target.Span)
             {
                 return true;
+            }
+            var model = initializer.SyntaxTree == semanticModel.SyntaxTree
+                ? semanticModel
+                : CompilationModelProvider.GetSemanticModel(
+                    semanticModel.Compilation,
+                    initializer.SyntaxTree);
+            var operation = model.GetOperation(
+                initializer.Value,
+                cancellationToken);
+            if (operation != null &&
+                !operationFacts.MayCompleteNormally(operation))
+            {
+                return false;
             }
         }
         return true;
     }
 
-    private static IEnumerable<EqualsValueClauseSyntax> GetMemberInitializers(
-        MemberDeclarationSyntax member)
+    private static EqualsValueClauseSyntax? GetMemberInitializer(
+        SyntaxNode member)
     {
         return member switch
         {
-            BaseFieldDeclarationSyntax field => field.Declaration.Variables
-                .Select(static variable => variable.Initializer)
-                .OfType<EqualsValueClauseSyntax>(),
+            VariableDeclaratorSyntax { Initializer: { } initializer } =>
+                initializer,
             PropertyDeclarationSyntax { Initializer: { } initializer } =>
-                [initializer],
-            _ => []
-        };
-    }
-
-    private static bool HasMatchingInitializationKind(
-        EqualsValueClauseSyntax initializer,
-        bool isStatic,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var symbol = initializer.Parent switch
-        {
-            VariableDeclaratorSyntax variable => semanticModel.GetDeclaredSymbol(
-                variable,
-                cancellationToken),
-            PropertyDeclarationSyntax property => semanticModel.GetDeclaredSymbol(
-                property,
-                cancellationToken),
+                initializer,
             _ => null
         };
-        return symbol is IFieldSymbol or IPropertySymbol or IEventSymbol &&
-            symbol.IsStatic == isStatic;
     }
 
     private static bool ValidateContractClauses(
