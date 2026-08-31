@@ -94,13 +94,7 @@ internal static class CacheSoundnessRules
         IOperation condition,
         IOperation value)
     {
-        condition = condition switch
-        {
-            IConversionOperation conversion when conversion.OperatorMethod == null =>
-                conversion.Operand,
-            IParenthesizedOperation parenthesized => parenthesized.Operand,
-            _ => condition
-        };
+        condition = UnwrapValue(condition);
 
         if (condition is IInvocationOperation
             {
@@ -192,13 +186,7 @@ internal static class CacheSoundnessRules
             return true;
         }
 
-        operation = operation switch
-        {
-            IConversionOperation conversion when conversion.OperatorMethod == null =>
-                conversion.Operand,
-            IParenthesizedOperation parenthesized => parenthesized.Operand,
-            _ => operation
-        };
+        operation = operation == null ? null : UnwrapValue(operation);
         if (IsCacheType(operation?.Type))
         {
             return true;
@@ -262,12 +250,7 @@ internal static class CacheSoundnessRules
         IOperation root,
         HashSet<ILocalSymbol> resolving)
     {
-        operation = operation switch
-        {
-            IConversionOperation conversion when conversion.OperatorMethod == null => conversion.Operand,
-            IParenthesizedOperation parenthesized => parenthesized.Operand,
-            _ => operation
-        };
+        operation = UnwrapValue(operation);
         return operation switch
         {
             IFieldReferenceOperation field
