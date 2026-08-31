@@ -21,6 +21,8 @@ public sealed record FiniteDomainDifferentialResult(
 
 public sealed class FiniteDomainSmtDifferentialOracle
 {
+    private const int MaximumAssignmentCount = 65_536;
+
     public static ImmutableArray<long> IntegerDomain
     {
         get;
@@ -50,6 +52,15 @@ public sealed class FiniteDomainSmtDifferentialOracle
         }
 
         var variables = CollectVariables(formula);
+        if (!TryGetFiniteDomainAssignmentCount(
+                factory,
+                variables,
+                out var assignmentCount) ||
+            assignmentCount > MaximumAssignmentCount)
+        {
+            return false;
+        }
+
         var interpreter = new IrInterpreter(factory);
         var environment = new Dictionary<IrVarId, IrValue>();
         return Check(0);
@@ -133,6 +144,31 @@ public sealed class FiniteDomainSmtDifferentialOracle
 
         cancellationToken.ThrowIfCancellationRequested();
         var variables = CollectVariables(formula);
+        if (!TryGetFiniteDomainAssignmentCount(
+                factory,
+                variables,
+                out var assignmentCount))
+        {
+            return new FiniteDomainDifferentialResult(
+                FuzzOracleStatus.Abstained,
+                FiniteDomainSatisfiability.Unsatisfiable,
+                null,
+                0,
+                "The generated formula contains a variable outside the " +
+                "finite Boolean/integer domain.");
+        }
+
+        if (assignmentCount > MaximumAssignmentCount)
+        {
+            return new FiniteDomainDifferentialResult(
+                FuzzOracleStatus.Abstained,
+                FiniteDomainSatisfiability.Unsatisfiable,
+                null,
+                0,
+                "The finite Boolean/integer domain exceeds the assignment " +
+                "limit of " + MaximumAssignmentCount + ".");
+        }
+
         var assumptions = ImmutableArray.CreateBuilder<Assumption>(
             variables.Length);
         foreach (var variable in variables)
@@ -279,6 +315,39 @@ public sealed class FiniteDomainSmtDifferentialOracle
             environment.Remove(variable);
             return false;
         }
+    }
+
+    private static bool TryGetFiniteDomainAssignmentCount(
+        IrFactory factory,
+        ImmutableArray<IrVarId> variables,
+        out int assignmentCount)
+    {
+        assignmentCount = 1;
+        foreach (var variable in variables)
+        {
+            var type = factory.GetTypeInfo(
+                factory.GetVariableInfo(variable).Type).Kind;
+            var domainSize = type switch
+            {
+                IrTypeKind.Boolean => 2,
+                IrTypeKind.Integer => IntegerDomain.Length,
+                _ => 0
+            };
+            if (domainSize == 0)
+            {
+                return false;
+            }
+
+            if (assignmentCount > MaximumAssignmentCount / domainSize)
+            {
+                assignmentCount = MaximumAssignmentCount + 1;
+                return true;
+            }
+
+            assignmentCount *= domainSize;
+        }
+
+        return true;
     }
 
     private static bool TryCreateDomainPredicate(
