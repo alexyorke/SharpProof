@@ -264,6 +264,50 @@ public sealed class DefaultApiSpecCatalogGenerationTests
                 .And.Contain("postconditions"));
     }
 
+    [Test]
+    public async Task GeneratorRejectsMisspelledPostconditionsSibling()
+    {
+        using var workspace = GenerationWorkspace.Create();
+        var root = JsonNode.Parse(
+                await File.ReadAllTextAsync(CatalogPath()))?.AsObject() ??
+            throw new InvalidDataException(
+                "The API-spec catalog root is not an object.");
+        var declaration = root["declarations"]?.AsArray()
+            .Select(static node => node?.AsObject())
+            .FirstOrDefault(static node =>
+                node?["postconditions"]?.AsArray().Count > 0) ??
+            throw new InvalidDataException(
+                "The API-spec catalog has no declaration with postconditions.");
+        var postconditions = declaration["postconditions"] ??
+            throw new InvalidDataException(
+                "The API-spec declaration has no postconditions.");
+        declaration["postconditions"] = new JsonArray();
+        declaration["postcondition"] = postconditions;
+        await File.WriteAllTextAsync(
+            workspace.CatalogInputPath,
+            root.ToJsonString(new JsonSerializerOptions
+            {
+                WriteIndented = true
+            }),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+        var result = await RunGeneratorAsync(
+            "-CatalogPath",
+            workspace.CatalogInputPath,
+            "-SourceOutputPath",
+            workspace.FirstSourcePath,
+            "-DocumentationOutputPath",
+            workspace.FirstDocumentationPath,
+            "-RuntimeWitnessOutputPath",
+            workspace.FirstRuntimeWitnessPath);
+
+        Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+        Assert.That(
+            result.Output,
+            Does.Contain("contains unexpected property")
+                .And.Contain("postcondition"));
+    }
+
     private static void AssertDeclaration(
         JsonElement declaration,
         ApiSpecTemplate template,
