@@ -1190,7 +1190,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
         {
             if (operation is IConversionOperation conversion)
             {
-                return conversion.IsChecked ||
+                return conversion.OperatorMethod != null ||
+                    conversion.IsChecked ||
                     (!conversion.IsTryCast && !conversion.IsImplicit &&
                      (conversion.Conversion.IsReference ||
                       conversion.Operand.Type?.IsReferenceType == true &&
@@ -1217,6 +1218,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 IEventAssignmentOperation or
                 ILockOperation or
                 IAwaitOperation or
+                ICompoundAssignmentOperation { OperatorMethod: not null } or
                 ICompoundAssignmentOperation
                 { IsChecked: true } or
                 ICompoundAssignmentOperation
@@ -1224,13 +1226,16 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     OperatorKind: BinaryOperatorKind.Divide or
                         BinaryOperatorKind.Remainder
                 } or
+                IBinaryOperation { OperatorMethod: not null } or
                 IBinaryOperation { IsChecked: true } or
                 IBinaryOperation
                 {
                     OperatorKind: BinaryOperatorKind.Divide or
                         BinaryOperatorKind.Remainder
                 } or
+                IUnaryOperation { OperatorMethod: not null } or
                 IUnaryOperation { IsChecked: true } or
+                IIncrementOrDecrementOperation { OperatorMethod: not null } or
                 IIncrementOrDecrementOperation { IsChecked: true };
         }
 
