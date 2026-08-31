@@ -44,7 +44,15 @@ public static partial class WorkerProtocolJson
         {
             throw new JsonException("The JSON root type is not declared.");
         }
-        EnsureObjectShape(document.RootElement, shape);
+        try
+        {
+            EnsureObjectShape(document.RootElement, shape);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new JsonException(
+                "The JSON contains an invalid UTF-16 string.", exception);
+        }
     }
 
     private static void EnsureObjectShape(
