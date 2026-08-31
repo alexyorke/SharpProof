@@ -2125,6 +2125,31 @@ public sealed class WorkerMsBuildIntegrationTests
 
     [Test]
     [SupportedOSPlatform("linux")]
+    public async Task CompilerFailuresDoNotAccumulateInvocationRunRoots()
+    {
+        RequireContainerWorker();
+        using var project = ConsumerProject.Create(
+            "public static class Subject { public static int Broken() { int unused; return 0; } }");
+
+        var first = await project.BuildAsync(
+            verify: true,
+            ("WarningsAsErrors", "CS0168"));
+        var second = await project.BuildAsync(
+            verify: true,
+            ("WarningsAsErrors", "CS0168"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.ExitCode, Is.Not.Zero, first.Output);
+            Assert.That(second.ExitCode, Is.Not.Zero, second.Output);
+            Assert.That(first.Output, Does.Contain("CS0168"));
+            Assert.That(second.Output, Does.Contain("CS0168"));
+            Assert.That(project.InvocationRunRoots, Is.Empty);
+        }
+    }
+
+    [Test]
+    [SupportedOSPlatform("linux")]
     public async Task PublicationFailureLeavesStableResultAbsent()
     {
         RequireContainerWorker();
