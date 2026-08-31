@@ -143,6 +143,7 @@ internal static class CancellationBoundaryAnalyzer
                 when binary.OperatorKind == BinaryOperatorKind.Or =>
                 PatternIncludesAllCancellation(
                     binary.LeftPattern, caughtType, cancellationType) ||
+                PatternCannotThrow(binary.LeftPattern) &&
                 PatternIncludesAllCancellation(
                     binary.RightPattern, caughtType, cancellationType),
             IBinaryPatternOperation binary
@@ -151,6 +152,18 @@ internal static class CancellationBoundaryAnalyzer
                     binary.LeftPattern, caughtType, cancellationType) &&
                 PatternIncludesAllCancellation(
                     binary.RightPattern, caughtType, cancellationType),
+            _ => false
+        };
+    }
+
+    private static bool PatternCannotThrow(IPatternOperation pattern)
+    {
+        return pattern switch
+        {
+            ITypePatternOperation => true,
+            IBinaryPatternOperation binary =>
+                PatternCannotThrow(binary.LeftPattern) &&
+                PatternCannotThrow(binary.RightPattern),
             _ => false
         };
     }
