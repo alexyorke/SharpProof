@@ -522,6 +522,11 @@ internal static class CompilerImplementationIlSummaryLowerer
                         return null;
                     }
 
+                    if (stack.Count > _body.MaxStack)
+                    {
+                        return null;
+                    }
+
                     if (terminated)
                     {
                         break;
