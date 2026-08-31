@@ -265,7 +265,8 @@ internal static class OpenSourceCorpusImporter
                     $"Tracked upstream source file is missing: {relativePath}");
             }
             var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
-                File.ReadAllText(path));
+                await File.ReadAllTextAsync(path, cancellationToken)
+                    .ConfigureAwait(false));
             files.Add(
                 new OpenSourceCorpusFile(
                     SourceId,
@@ -275,8 +276,9 @@ internal static class OpenSourceCorpusImporter
             var tree = CSharpSyntaxTree.ParseText(
                 content,
                 AnalyzerGateHost.ParseOptions,
-                relativePath);
-            foreach (var method in tree.GetCompilationUnitRoot()
+                relativePath,
+                cancellationToken: cancellationToken);
+            foreach (var method in tree.GetCompilationUnitRoot(cancellationToken)
                          .DescendantNodes()
                          .OfType<MethodDeclarationSyntax>()
                          .OrderBy(static method => method.SpanStart))
@@ -295,7 +297,7 @@ internal static class OpenSourceCorpusImporter
                     continue;
                 }
 
-                var lineSpan = tree.GetLineSpan(method.Span);
+                var lineSpan = tree.GetLineSpan(method.Span, cancellationToken);
                 candidates.Add(
                     new ImportCandidate(
                         relativePath,
