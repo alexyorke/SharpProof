@@ -2422,6 +2422,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         if (!invocation.TargetMethod.IsStatic &&
+            invocation.TargetMethod.ReducedFrom == null &&
             invocation.Instance != null &&
             IsDefinitelyNull(invocation.Instance))
         {
