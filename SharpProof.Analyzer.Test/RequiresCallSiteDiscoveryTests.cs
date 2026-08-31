@@ -862,6 +862,48 @@ public sealed class RequiresCallSiteDiscoveryTests
     }
 
     [Test]
+    public async Task ListPatternImplicitArgumentsHonorPreconditions()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            public sealed class IndexArgumentContractList {
+                public int Length => 3;
+                public int this[int index] {
+                    get {
+                        Contract.Requires(index != 2);
+                        return 0;
+                    }
+                }
+            }
+            public sealed class SliceArgumentContractList {
+                public int Length => 3;
+                public int this[int index] => 0;
+                public SliceArgumentContractList Slice(int start, int length) {
+                    Contract.Requires(start != 1);
+                    Contract.Requires(length != 1);
+                    return this;
+                }
+            }
+            public static class Subject {
+                public static bool Index() =>
+                    new IndexArgumentContractList() is [_, _, _];
+                public static bool Slice() =>
+                    new SliceArgumentContractList() is [_, .. var rest, _];
+            }
+            """,
+            ["SP0027"]);
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: "CONTRACTS");
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(Enumerable.Repeat("SP0027", 3)));
+    }
+
+    [Test]
     public async Task ExecutedImplicitCallShapesHonorRequiresPreconditions()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
