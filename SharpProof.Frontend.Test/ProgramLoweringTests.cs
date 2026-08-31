@@ -645,6 +645,30 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void ValuePositionMutationHavocsStateAndProducesUnknownValue()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long value) {
+                var result = (value += 1L);
+                return value;
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+
+        Assert.That(lowered.Result.IsExact, Is.False);
+        Assert.That(
+            lowered.Result.Abstentions.Select(static value => value.Reason),
+            Does.Contain(FrontendAbstention.UnsupportedMutation));
+        Assert.That(
+            instructions.OfType<IrHavocInstruction>()
+                .Select(static havoc => havoc.HavocKind),
+            Does.Contain(IrHavocKind.VariablesAndMemory));
+    }
+
+    [Test]
     public void InvocationLoweringOrdersArgumentsByRoslynParameterOrdinal()
     {
         var lowered = Lower(
