@@ -919,7 +919,14 @@ public sealed class RoslynOperationLowerer
                     FrontendAbstention.UserDefinedOperator, operation.OperatorMethod);
             }
 
-            if (!_owner.IsSupportedValueDomain(operation.Type))
+            // Classification must use the constructed type. Roslyn exposes
+            // the open type on generic operation nodes while this lowerer may
+            // already have specialized it (for example T -> string).
+            var specializedOperandType =
+                _owner.TypeSpecializer(operation.Operand.Type);
+            var specializedTargetType =
+                _owner.TypeSpecializer(operation.Type);
+            if (!_owner.IsSupportedValueDomain(specializedTargetType))
             {
                 return OpaqueOperand(
                     operation,
@@ -936,15 +943,15 @@ public sealed class RoslynOperationLowerer
 
             var target = _owner.GetTypeId(operation.Type);
             if (SymbolEqualityComparer.Default.Equals(
-                    operation.Operand.Type,
-                    operation.Type))
+                    specializedOperandType,
+                    specializedTargetType))
             {
                 return operand;
             }
 
             if (target == operand.Term.Type &&
-                CSharpScalarSemantics.IsValuePreservingIntegerConversion(operation.Operand.Type?.SpecialType ?? SpecialType.None,
-                    operation.Type?.SpecialType ?? SpecialType.None))
+                CSharpScalarSemantics.IsValuePreservingIntegerConversion(specializedOperandType?.SpecialType ?? SpecialType.None,
+                    specializedTargetType?.SpecialType ?? SpecialType.None))
             {
                 return operand;
             }
