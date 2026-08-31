@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -73,6 +74,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             startContext.RegisterOperationAction(c => AnalyzeObjectCreation(c, symbols), OperationKind.ObjectCreation);
             startContext.RegisterOperationAction(AnalyzeBinaryOperation, OperationKind.BinaryOperator);
             startContext.RegisterOperationAction(
+                AnalyzeCSharpCompoundAssignment,
+                OperationKind.CompoundAssignment);
+            startContext.RegisterOperationAction(
                 AnalyzeInterpolatedString,
                 OperationKind.InterpolatedString);
             startContext.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
@@ -103,6 +107,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         AnalyzeSemanticEquals(context, invocation, symbols);
+        if (IsStringConcat(invocation))
+        {
+            AnalyzeCSharpExpressionText(context, invocation);
+        }
         CacheSoundnessRules.AnalyzeWrite(context, invocation);
     }
 
@@ -203,7 +211,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeBinaryOperation(OperationAnalysisContext context)
     {
         AnalyzeSemanticString(context);
-        AnalyzeCSharpExpressionText(context);
+        if (IsStringAddition(context.Operation))
+        {
+            AnalyzeCSharpExpressionText(context, context.Operation);
+        }
     }
 
     private static void AnalyzeSemanticString(OperationAnalysisContext context)
@@ -273,18 +284,34 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static void AnalyzeCSharpExpressionText(OperationAnalysisContext context)
+    private static void AnalyzeCSharpCompoundAssignment(
+        OperationAnalysisContext context)
     {
-        if (context.Operation is not IBinaryOperation { OperatorKind: BinaryOperatorKind.Add } binary ||
-            binary.Type?.SpecialType != SpecialType.System_String)
+        if (IsStringAddition(context.Operation))
+        {
+            AnalyzeCSharpExpressionText(context, context.Operation);
+        }
+    }
+
+    private static void AnalyzeCSharpExpressionText(
+        OperationAnalysisContext context,
+        IOperation operation)
+    {
+        if (IsNestedCSharpExpressionConstruction(operation))
         {
             return;
         }
 
-        var fragment = GetCSharpExpressionFragment(binary.LeftOperand) ?? GetCSharpExpressionFragment(binary.RightOperand);
+        var fragment = GetCSharpExpressionFragment(
+            operation,
+            context.CancellationToken);
         if (fragment != null)
         {
-            Report(context, MetaDiagnosticDescriptors.CSharpExpressionText, binary.Syntax.GetLocation(), fragment);
+            Report(
+                context,
+                MetaDiagnosticDescriptors.CSharpExpressionText,
+                operation.Syntax.GetLocation(),
+                fragment);
         }
     }
 
@@ -305,7 +332,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            var fragment = GetCSharpExpressionFragment(text.Text);
+            var fragment = GetCSharpExpressionFragment(
+                text.Text,
+                context.CancellationToken);
             if (fragment != null)
             {
                 Report(
@@ -318,14 +347,113 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static string? GetCSharpExpressionFragment(IOperation operation)
+    private static string? GetCSharpExpressionFragment(
+        IOperation operation,
+        CancellationToken cancellationToken)
     {
-        if (!operation.ConstantValue.HasValue || operation.ConstantValue.Value is not string value)
+        var shape = new StringBuilder();
+        AppendCSharpExpressionShape(
+            operation,
+            shape,
+            cancellationToken);
+        var value = shape.ToString();
+        return CSharpExpressionFragments.FirstOrDefault(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
+    }
+
+    private static void AppendCSharpExpressionShape(
+        IOperation operation,
+        StringBuilder shape,
+        CancellationToken cancellationToken)
+    {
+        var pending = new Stack<IOperation>();
+        pending.Push(operation);
+        while (pending.Count != 0)
         {
-            return null;
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = pending.Pop();
+            if (current.ConstantValue is
+                { HasValue: true, Value: string text })
+            {
+                shape.Append(text);
+                continue;
+            }
+
+            switch (current)
+            {
+                case IBinaryOperation binary when
+                    IsStringAddition(binary):
+                    pending.Push(binary.RightOperand);
+                    pending.Push(binary.LeftOperand);
+                    break;
+                case ICompoundAssignmentOperation assignment when
+                    IsStringAddition(assignment):
+                    shape.Append('\0');
+                    pending.Push(assignment.Value);
+                    break;
+                case IInvocationOperation invocation when
+                    IsStringConcat(invocation):
+                    var arguments = invocation.Arguments.OrderBy(
+                            static argument =>
+                                argument.Parameter?.Ordinal ?? int.MaxValue)
+                        .ToArray();
+                    for (var index = arguments.Length - 1;
+                         index >= 0;
+                         index--)
+                    {
+                        pending.Push(arguments[index].Value);
+                    }
+                    break;
+                case IParenthesizedOperation parenthesized:
+                    pending.Push(parenthesized.Operand);
+                    break;
+                case IConversionOperation { OperatorMethod: null } conversion:
+                    pending.Push(conversion.Operand);
+                    break;
+                default:
+                    shape.Append('\0');
+                    break;
+            }
+        }
+    }
+
+    private static bool IsNestedCSharpExpressionConstruction(
+        IOperation operation)
+    {
+        var parent = operation.Parent;
+        while (parent is IParenthesizedOperation or
+               IArgumentOperation or
+               IConversionOperation { OperatorMethod: null })
+        {
+            parent = parent.Parent;
         }
 
-        return CSharpExpressionFragments.FirstOrDefault(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
+        return IsStringAddition(parent) ||
+            parent is IInvocationOperation invocation &&
+            IsStringConcat(invocation);
+    }
+
+    private static bool IsStringAddition(IOperation? operation)
+    {
+        return operation is
+            IBinaryOperation
+            {
+                OperatorKind: BinaryOperatorKind.Add,
+                Type.SpecialType: SpecialType.System_String
+            } or
+            ICompoundAssignmentOperation
+            {
+                OperatorKind: BinaryOperatorKind.Add,
+                Type.SpecialType: SpecialType.System_String
+            };
+    }
+
+    private static bool IsStringConcat(IInvocationOperation invocation)
+    {
+        return invocation.TargetMethod is
+        {
+            Name: nameof(string.Concat),
+            ContainingType.SpecialType: SpecialType.System_String
+        };
     }
 
     private static string? GetSemanticLiteral(IOperation operation)
