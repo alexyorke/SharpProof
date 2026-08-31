@@ -1286,7 +1286,7 @@ public sealed class CompilerManifestArtifactTests
     }
 
     [Test]
-    public void MalformedLoweredCallableFailsDuringHydration()
+    public void MalformedSuccessfulCallableFailsAtWireAndHydrationBoundaries()
     {
         var artifact = CreateContractArtifact();
         var valid =
@@ -1298,12 +1298,14 @@ public sealed class CompilerManifestArtifactTests
         artifact.CompilationSha256 =
             CompilationFingerprint.ComputeSha256(
                 artifact.Compilation, []);
-        var roundTrip = CompilerManifestArtifactJson.Deserialize(
-            CompilerManifestArtifactJson.Serialize(artifact));
 
-        Assert.Throws<InvalidDataException>(
-            (Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(roundTrip)));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.Throws<JsonException>((Action)(() =>
+                CompilerManifestArtifactJson.Serialize(artifact)));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CompilerManifestArtifactJson.DecodeCallables(artifact)));
+        }
     }
 
     [Test]
@@ -1394,10 +1396,8 @@ public sealed class CompilerManifestArtifactTests
             terminal.Operation,
             a: 0);
 
-        var resealed = CanonicalRoundTrip(artifact);
-
         Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(resealed)));
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
     }
 
     [TestCase(64, false)]
@@ -1408,17 +1408,17 @@ public sealed class CompilerManifestArtifactTests
     {
         var artifact = CreateContractArtifact();
         ReplaceWithLinearBody(artifact.Callables[0].Graph!, blockCount);
-        var resealed = CanonicalRoundTrip(artifact);
 
         if (malformed)
         {
             Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(resealed)));
+                CompilerManifestArtifactJson.DecodeCallables(artifact)));
         }
         else
         {
             Assert.DoesNotThrow((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(resealed)));
+                CompilerManifestArtifactJson.DecodeCallables(
+                    CanonicalRoundTrip(artifact))));
         }
     }
 
@@ -1454,10 +1454,8 @@ public sealed class CompilerManifestArtifactTests
         callable.Graph.Blocks = [];
         callable.Graph.Entry = -1;
 
-        var resealed = CanonicalRoundTrip(artifact);
-
         Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(resealed)));
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
     }
 
     [Test]
@@ -1510,10 +1508,10 @@ public sealed class CompilerManifestArtifactTests
         {
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(
-                    CanonicalRoundTrip(missing))));
+                    missing)));
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(
-                    CanonicalRoundTrip(wrongType))));
+                    wrongType)));
             Assert.DoesNotThrow((Action)(() =>
                 CompilerManifestArtifactJson.DecodeCallables(honest)));
         }
@@ -2330,10 +2328,9 @@ public sealed class CompilerManifestArtifactTests
                 artifact.Callables[0].Body!.SummaryCalls,
                 Has.Length.EqualTo(1));
             corrupt(artifact.Callables[0]);
-            var resealed = CanonicalRoundTrip(artifact);
 
             Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(resealed)));
+                CompilerManifestArtifactJson.DecodeCallables(artifact)));
         }
     }
 
@@ -2368,10 +2365,9 @@ public sealed class CompilerManifestArtifactTests
         {
             var artifact = CloneArtifact(valid);
             corrupt(artifact.Callables[0]);
-            var resealed = CanonicalRoundTrip(artifact);
 
             Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(resealed)));
+                CompilerManifestArtifactJson.DecodeCallables(artifact)));
         }
     }
 
@@ -2393,10 +2389,9 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateContractArtifact(source);
         var call = FindCall(artifact.Callables[0]);
         (call.Items[0], call.Items[1]) = (call.Items[1], call.Items[0]);
-        var resealed = CanonicalRoundTrip(artifact);
 
         Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(resealed)));
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
     }
 
     [Test]
@@ -2426,10 +2421,9 @@ public sealed class CompilerManifestArtifactTests
         call.C = Array.FindIndex(callable.Graph.Terms, value =>
             value.Kind == IrTermKind.Variable && value.A == boxIndex);
         Assert.That(call.C, Is.GreaterThanOrEqualTo(0));
-        var resealed = CanonicalRoundTrip(artifact);
 
         Assert.Throws<InvalidDataException>((Action)(() =>
-            CompilerManifestArtifactJson.DecodeCallables(resealed)));
+            CompilerManifestArtifactJson.DecodeCallables(artifact)));
     }
 
     [Test]
@@ -2464,10 +2458,9 @@ public sealed class CompilerManifestArtifactTests
         {
             var artifact = CloneArtifact(valid);
             corrupt(artifact.Callables.Single());
-            var resealed = CanonicalRoundTrip(artifact);
 
             Assert.Throws<InvalidDataException>((Action)(() =>
-                CompilerManifestArtifactJson.DecodeCallables(resealed)));
+                CompilerManifestArtifactJson.DecodeCallables(artifact)));
         }
     }
 
