@@ -482,6 +482,13 @@ internal static class CompilerImplementationIlSummaryLowerer
             }
 
             var leaderArray = leaders.ToArray();
+            // Instructions are already decoded in offset order.  Keep an
+            // offset-to-index map so each basic block can walk its contiguous
+            // slice once instead of filtering the complete instruction list.
+            var instructionIndexes = instructions
+                .Select((instruction, index) =>
+                    new KeyValuePair<int, int>(instruction.Offset, index))
+                .ToDictionary(static pair => pair.Key, static pair => pair.Value);
             for (var blockIndex = 0;
                  blockIndex < leaderArray.Length;
                  blockIndex++)
@@ -506,9 +513,12 @@ internal static class CompilerImplementationIlSummaryLowerer
                 }
 
                 var terminated = false;
-                foreach (var instruction in instructions.Where(item =>
-                             item.Offset >= start && item.Offset < end))
+                var instructionIndex = instructionIndexes[start];
+                for (; instructionIndex < instructions.Length &&
+                       instructions[instructionIndex].Offset < end;
+                     instructionIndex++)
                 {
+                    var instruction = instructions[instructionIndex];
                     if (!ExecuteInstruction(
                             instruction,
                             block,
