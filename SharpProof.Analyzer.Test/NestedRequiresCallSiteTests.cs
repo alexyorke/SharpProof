@@ -461,6 +461,53 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task AssignmentTargetEvaluationConsumesDelegates()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private sealed class Holder {
+                    public int Value;
+                }
+
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                private static Holder Select(int value) => new();
+
+                public static int Outer() {
+                    Func<int> index = Index;
+                    Func<int> receiver = Receiver;
+                    var values = new int[1];
+                    values[index()] = 1;
+                    Select(receiver()).Value = 2;
+                    return values[0];
+
+                    int Index() => Positive(-1);
+                    int Receiver() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 2);
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EquivalentTo(new[]
+            {
+                source.IndexOf("Positive(-1)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal)
+            }));
+    }
+
+    [Test]
     public async Task DelegateSubtractionDoesNotReachRemovedLocalFunctions()
     {
         var diagnostics = await Analyze(
