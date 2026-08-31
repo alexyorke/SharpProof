@@ -1521,6 +1521,43 @@ public sealed class ProtocolJsonTests
         Assert.That(ValidateForRequest(response).IsValid, Is.True);
     }
 
+    [Test]
+    public void ProtocolErrorsRejectControlAndLineSeparatorCharacters()
+    {
+        var manifest = CreateManifest();
+        manifest.Callables = [];
+        manifest.Claims = [];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        response.RunStatus = WorkerRunStatus.Failed;
+        response.FailureReason = WorkerRunFailureReason.InfrastructureFailure;
+        response.Errors = [new WorkerProtocolError {
+            Code = "worker.infrastructure",
+            Message = "failure"
+        }];
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+
+        foreach (var separator in new[]
+        {
+            "\n", "\r", "\t", "\u001b", "\u2028", "\u2029"
+        })
+        {
+            response.Errors[0].Code = "worker" + separator + "infrastructure";
+            Assert.That(
+                WorkerProtocolJson.Validate(response).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("response.errors"));
+
+            response.Errors[0].Code = "worker.infrastructure";
+            response.Errors[0].Message = "failure" + separator + "forged";
+            Assert.That(
+                WorkerProtocolJson.Validate(response).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("response.errors"));
+            response.Errors[0].Message = "failure";
+        }
+    }
+
     [TestCase("worker.timeout", WorkerRunStatus.TimedOut)]
     [TestCase("worker.canceled", WorkerRunStatus.Canceled)]
     public void EmptyManifestInterruptionRequiresExactEvidence(

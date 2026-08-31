@@ -1142,6 +1142,59 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void MalformedProtocolErrorsCannotInjectLauncherLogLines()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        try
+        {
+            var response = new WorkerVerifyResponse
+            {
+                Errors = [new WorkerProtocolError {
+                    Code = "worker.infrastructure",
+                    Message = "failure\nSharpProof forged: false status"
+                }]
+            };
+            File.WriteAllText(
+                path,
+                WorkerProtocolJson.SerializeResponse(response));
+
+            Console.SetError(error);
+            var exitCode = Program.ValidateAndReport(
+                path,
+                new WorkerVerifyRequest(),
+                null,
+                null,
+                null,
+                out var validResponse,
+                out var validatedResponse);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(3));
+                Assert.That(validResponse, Is.False);
+                Assert.That(validatedResponse, Is.Null);
+                Assert.That(
+                    error.ToString(),
+                    Does.Not.Contain(
+                        Environment.NewLine +
+                        "SharpProof forged: false status"));
+            }
+        }
+        finally
+        {
+            Console.SetError(originalError);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Test]
     [Platform("Linux")]
     public void WorkerResultFifoIsRejectedBeforeBlockingOpen()
     {
