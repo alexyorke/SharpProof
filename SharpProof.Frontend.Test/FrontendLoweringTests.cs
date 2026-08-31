@@ -393,6 +393,27 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void AssignableReferenceEqualityUsesTheCommonComparisonType()
+    {
+        AssertClassification(
+            """
+            public static bool Target(object left, string right) =>
+                left == right;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+        AssertClassification(
+            """
+            public class Base {}
+            public sealed class Derived : Base {}
+            public static bool Target(Base left, Derived right) =>
+                left != right;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+    }
+
+    [Test]
     public void DefaultAndUnknownSubsetDecisionsCannotBecomeExact()
     {
         var classification = default(FrontendSubsetClassification);
