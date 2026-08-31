@@ -559,7 +559,7 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        IMethodSymbol? constructor = null;
+        var eligibleConstructors = ImmutableArray.CreateBuilder<IMethodSymbol>();
         foreach (var candidate in constructors)
         {
             if (SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
@@ -573,14 +573,12 @@ internal static partial class AnalyzerFeaturePipeline
                     AnalyzerSemanticOutcome.Suppressed);
                 continue;
             }
-            constructor = candidate;
-            break;
+            eligibleConstructors.Add(candidate);
         }
-        if (constructor == null)
+        if (eligibleConstructors.Count == 0)
         {
             return;
         }
-        var outcome = AnalyzerSemanticOutcome.NotApplicable;
         var operationFacts = new DefiniteOperationFacts(
             context.Compilation,
             context.CancellationToken);
@@ -593,20 +591,37 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        foreach (var operation in RequiresCallSiteDiscovery
-                     .ExecutableUnflowedDescendantsAndSelf(
-                         root,
-                         operationFacts))
+        var reportedDiagnostics = new HashSet<MemberInitializerDiagnosticKey>();
+        foreach (var constructor in eligibleConstructors)
         {
-            outcome = AnalyzerSemanticOutcomes.Combine(
-                outcome,
-                RequiresCallSiteAnalyzer.AnalyzeInitializerCall(
-                    constructor, initializer, operation,
-                    context.SemanticModel, session,
-                    context.ReportDiagnostic, context.CancellationToken));
+            var outcome = RequiresCallSiteAnalyzer.AnalyzeInitializerCall(
+                constructor,
+                initializer,
+                root,
+                context.SemanticModel,
+                session,
+                diagnostic =>
+                {
+                    var key = new MemberInitializerDiagnosticKey(
+                        diagnostic.Id,
+                        diagnostic.Location.SourceTree,
+                        diagnostic.Location.SourceSpan,
+                        diagnostic.GetMessage(CultureInfo.InvariantCulture));
+                    if (reportedDiagnostics.Add(key))
+                    {
+                        context.ReportDiagnostic(diagnostic);
+                    }
+                },
+                context.CancellationToken);
+            session.RecordSemanticOutcome(constructor, outcome);
         }
-        session.RecordSemanticOutcome(constructor, outcome);
     }
+
+    private readonly record struct MemberInitializerDiagnosticKey(
+        string Id,
+        SyntaxTree? Tree,
+        TextSpan Span,
+        string Message);
 
     private static bool CanReachMemberInitializer(
         EqualsValueClauseSyntax target,

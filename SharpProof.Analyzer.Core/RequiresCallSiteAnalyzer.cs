@@ -198,26 +198,19 @@ internal static partial class RequiresCallSiteAnalyzer
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
-        var calls = RequiresCallSiteDiscovery
-            .CreateUnflowedCandidates(operation, semanticModel);
-        if (calls.IsDefaultOrEmpty)
+        var root = operation;
+        while (root.Parent != null)
         {
-            return AnalyzerSemanticOutcome.NotApplicable;
+            root = root.Parent;
         }
-        var analysis = new Analysis(
+
+        return new Analysis(
                 constructor, initializer, semanticModel, session,
-                reportDiagnostic, graph: null, operationRoot: operation,
-                cancellationToken);
-        var outcome = AnalyzerSemanticOutcome.NotApplicable;
-        foreach (var call in calls)
-        {
-            outcome = AnalyzerSemanticOutcomes.Combine(
-                outcome,
-                analysis.AnalyzeCallSite(
-                    call,
-                    requireCallerOwnership: false));
-        }
-        return outcome;
+                reportDiagnostic, graph: null, operationRoot: root,
+                cancellationToken)
+            .Run(
+                screenForPotentialCalls: false,
+                requireCallerOwnership: false);
     }
 
     private sealed class Analysis(
@@ -241,7 +234,8 @@ internal static partial class RequiresCallSiteAnalyzer
                 operationRoot);
 
         internal AnalyzerSemanticOutcome Run(
-            bool screenForPotentialCalls)
+            bool screenForPotentialCalls,
+            bool requireCallerOwnership = true)
         {
             if (screenForPotentialCalls &&
                 !_discovery.HasPotentialCallSite(
@@ -252,7 +246,8 @@ internal static partial class RequiresCallSiteAnalyzer
 
             var binding = session.BindRequires(caller);
             var callSites = _discovery.Get(
-                binding.IsSuccess ? binding.Contracts : null);
+                binding.IsSuccess ? binding.Contracts : null,
+                requireCallerOwnership);
             if (callSites == null)
             {
                 return AnalyzerSemanticOutcome.Unknown;
@@ -262,7 +257,9 @@ internal static partial class RequiresCallSiteAnalyzer
             foreach (var candidate in callSites)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                outcome = AnalyzerSemanticOutcomes.Combine(outcome, AnalyzeCallSite(candidate));
+                outcome = AnalyzerSemanticOutcomes.Combine(
+                    outcome,
+                    AnalyzeCallSite(candidate, requireCallerOwnership));
             }
             return outcome;
         }

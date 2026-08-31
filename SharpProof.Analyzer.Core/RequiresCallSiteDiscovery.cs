@@ -90,7 +90,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
     }
 
     internal ImmutableArray<RequiresCallSiteCandidate>? Get(
-        BoundMethodContracts? callerContracts)
+        BoundMethodContracts? callerContracts,
+        bool requireCallerOwnership = true)
     {
         if (!TryCreateGraph(out var operationRoot, out var graph))
         {
@@ -132,6 +133,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
         var operationFacts = new DefiniteOperationFacts(
             semanticModel.Compilation,
             cancellationToken);
+        var reachableInitializerSites = GetReachableInitializerSites(
+            operationFacts);
         var delegateTargets = GetDirectDelegateTargets(operationRoot!);
         OperationEffectScanner? semanticReachability = null;
         foreach (var block in graph.Blocks)
@@ -164,6 +167,12 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     flowResult,
                     cancellationToken);
                 if (calls.IsDefaultOrEmpty ||
+                    reachableInitializerSites != null &&
+                    !reachableInitializerSites.Contains((
+                        operation.Syntax.SyntaxTree,
+                        operation.Syntax.SpanStart,
+                        operation.Syntax.Span.Length)) ||
+                    requireCallerOwnership &&
                     !SymbolEqualityComparer.Default.Equals(
                         semanticModel.GetEnclosingSymbol(
                             operation.Syntax.SpanStart,
@@ -355,6 +364,30 @@ internal sealed partial class RequiresCallSiteDiscovery(
         ];
     }
 
+    private HashSet<(SyntaxTree Tree, int Start, int Length)>?
+        GetReachableInitializerSites(
+            DefiniteOperationFacts operationFacts)
+    {
+        if (declaration is not EqualsValueClauseSyntax initializer)
+        {
+            return null;
+        }
+
+        var operation = semanticModel.GetOperation(
+            initializer.Value,
+            cancellationToken);
+        return operation == null
+            ? []
+            : new HashSet<(SyntaxTree Tree, int Start, int Length)>(
+                ExecutableUnflowedDescendantsAndSelf(
+                        operation,
+                        operationFacts)
+                    .Select(static candidate => (
+                        Tree: candidate.Syntax.SyntaxTree,
+                        Start: candidate.Syntax.SpanStart,
+                        Length: candidate.Syntax.Span.Length)));
+    }
+
     private IEnumerable<IOperation> ExecutableDescendantsAndSelf(
         IOperation operation)
     {
@@ -400,6 +433,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     ControlFlowGraph.Create(method, cancellationToken),
                 IConstructorBodyOperation constructor =>
                     ControlFlowGraph.Create(constructor, cancellationToken),
+                IFieldInitializerOperation field =>
+                    ControlFlowGraph.Create(field, cancellationToken),
+                IPropertyInitializerOperation property =>
+                    ControlFlowGraph.Create(property, cancellationToken),
                 IBlockOperation block =>
                     ControlFlowGraph.Create(block, cancellationToken),
                 _ => ControlFlowGraph.Create(
@@ -500,6 +537,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
         IOperation callSite,
         DefiniteOperationFacts operationFacts)
     {
+        if (declaration is EqualsValueClauseSyntax)
+        {
+            return true;
+        }
+
         var body =
             ContractClauseInventoryBuilder.GetBody(
                 declaration);
