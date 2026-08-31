@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis.Operations;
+using SharpProof.Specs;
 
 namespace SharpProof.Effects.Test;
 
@@ -35,6 +36,52 @@ public sealed class OperationCompletionWaveFiveRegressionTests
         {
             Assert.That(facts.MethodCanCompleteNormally(choose), Is.True);
             Assert.That(HasStaticWrite(compilation, run), Is.True);
+        }
+    }
+
+    [Test]
+    public void RecursiveSourceCallWithBaseCaseRetainsSuffixEffect()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static int state;
+
+                private static int CountDown(int value) {
+                    if (value <= 0) return 0;
+                    return CountDown(value - 1);
+                }
+
+                public static void Run(int value) {
+                    _ = CountDown(value);
+                    state++;
+                }
+            }
+            """);
+        var countDown = EffectTestHost.RequireMethod(
+            compilation,
+            "Sample",
+            "CountDown");
+        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var facts = new DefiniteOperationFacts(
+            compilation,
+            System.Threading.CancellationToken.None);
+        var apiSpecs = new ApiSpecResolver(
+            ApiSpecTable.Default).Resolve(compilation);
+        var localNode = new EffectMethodNodeBuilder(
+                new EffectAnalysisSession(compilation, apiSpecs),
+                compilation,
+                ManagedAbstractFlow.Create(compilation, apiSpecs))
+            .Build(run, System.Threading.CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(facts.MethodCanCompleteNormally(countDown), Is.True);
+            Assert.That(localNode.LocalSummary.Writes.IsUnknown, Is.False);
+            Assert.That(
+                localNode.LocalSummary.Writes.Contains(
+                    EffectRegionId.Static()),
+                Is.True);
         }
     }
 
