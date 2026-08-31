@@ -922,6 +922,24 @@ internal static class CompilerImplementationIlSummaryLowerer
 
             var signature = _reader.GetStandaloneSignature(
                 _body.LocalSignature);
+            var signatureReader = _reader.GetBlobReader(
+                signature.Signature);
+            if (signatureReader.ReadSignatureHeader().Kind !=
+                SignatureKind.LocalVariables)
+            {
+                locals = [];
+                return false;
+            }
+
+            if (signatureReader.ReadCompressedInteger() >
+                IrRelationalSummaryBuildLimits.Default.MaximumInstructions)
+            {
+                FailureReason = CompilerImplementationIlAbstentionReason
+                    .SummaryResourceLimit;
+                locals = [];
+                return false;
+            }
+
             locals = signature.DecodeLocalSignature(
                 new ScalarSignatureTypeProvider(_factory),
                 genericContext: null);
