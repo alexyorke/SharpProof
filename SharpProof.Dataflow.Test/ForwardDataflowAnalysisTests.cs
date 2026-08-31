@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace SharpProof.Dataflow.Test;
 
 [TestFixture]
@@ -105,6 +107,35 @@ public sealed class ForwardDataflowAnalysisTests
 
         Assert.That(graph.IsCyclicBlock(4), Is.False);
         Assert.That(result.GetInputState(4), Is.EqualTo(IntervalValue.Range(1, 2)));
+    }
+
+    [Test]
+    public void SparseAcyclicCycleClassificationCompletesWithinLinearBudget()
+    {
+        const int blockCount = 30_000;
+        var blocks = Enumerable.Range(0, blockCount)
+            .Select(static id => new DataflowBlock<int>(id, value => value));
+        var edges = Enumerable.Range(0, blockCount - 1)
+            .Select(static id => new DataflowEdge(id, id + 1));
+
+        var stopwatch = Stopwatch.StartNew();
+        var graph = new DataflowGraph<int>(blocks, edges);
+        stopwatch.Stop();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(graph.IsCyclicBlock(0), Is.False);
+            Assert.That(
+                graph.IsCyclicBlock(blockCount / 2),
+                Is.False);
+            Assert.That(
+                graph.IsCyclicBlock(blockCount - 1),
+                Is.False);
+            Assert.That(
+                stopwatch.Elapsed,
+                Is.LessThan(TimeSpan.FromSeconds(5)),
+                $"Sparse DAG construction took {stopwatch.Elapsed}.");
+        }
     }
 
     [Test]
