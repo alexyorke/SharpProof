@@ -1725,6 +1725,8 @@ internal sealed class ExceptionHandlerReachability(
             : null;
         var labeledInvocations = target.DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
+            .Where(static syntax => !syntax.Ancestors().Any(static ancestor =>
+                ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
             .Select(syntax => model.GetOperation(syntax))
             .Where(static operation => operation != null)
             .Cast<IOperation>()
@@ -1737,6 +1739,8 @@ internal sealed class ExceptionHandlerReachability(
             labeledInvocations = methodSyntax.DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
                 .Where(invocation => invocation.SpanStart > target.Span.End)
+                .Where(static syntax => !syntax.Ancestors().Any(static ancestor =>
+                    ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
                 .Select(syntax => model.GetOperation(syntax))
                 .Where(static operation => operation != null)
                 .Cast<IOperation>()
