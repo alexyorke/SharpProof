@@ -60,6 +60,10 @@ internal sealed record PerformanceSmokeResult(
 internal static class PerformanceGate
 {
     private const int RetainedCompilationCount = 40;
+    private static readonly TimeSpan PackageBuildProcessTimeout =
+        TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan ProcessTerminationTimeout =
+        TimeSpan.FromSeconds(5);
 
     public static Task<PerformanceGateResult> RunAsync(
         string repositoryRoot,
@@ -607,12 +611,35 @@ internal static class PerformanceGate
         }
     }
 
-    private static async Task<double> RunDotnetAsync(
+    private static Task<double> RunDotnetAsync(
         string project,
         bool restore,
         string? symbol,
         CancellationToken cancellationToken)
     {
+        return RunDotnetAsync(
+            project,
+            restore,
+            symbol,
+            PackageBuildProcessTimeout,
+            cancellationToken);
+    }
+
+    private static async Task<double> RunDotnetAsync(
+        string project,
+        bool restore,
+        string? symbol,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        if (timeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(timeout),
+                timeout,
+                "The process timeout must be positive.");
+        }
+
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
@@ -639,30 +666,36 @@ internal static class PerformanceGate
             throw new InvalidOperationException(
                 "The performance probe process did not start.");
         var standardOutput = process.StandardOutput.ReadToEndAsync(
-            cancellationToken);
+            CancellationToken.None);
         var standardError = process.StandardError.ReadToEndAsync(
+            CancellationToken.None);
+        using var boundary = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
+        boundary.CancelAfter(timeout);
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            await process.WaitForExitAsync(cancellationToken)
+            await process.WaitForExitAsync(boundary.Token)
                 .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception)
+            when (!cancellationToken.IsCancellationRequested &&
+                  boundary.IsCancellationRequested)
+        {
+            await TerminateProcessAsync(process).ConfigureAwait(false);
+            throw new TimeoutException(
+                "The package performance " +
+                (restore ? "restore" : "build") +
+                " probe exceeded its " +
+                timeout.TotalSeconds.ToString(
+                    "0.###",
+                    CultureInfo.InvariantCulture) +
+                "-second wall-time limit.",
+                exception);
         }
         catch
         {
-            if (!process.HasExited)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (InvalidOperationException)
-                {
-                }
-            }
-
-            await process.WaitForExitAsync(CancellationToken.None)
-                .ConfigureAwait(false);
+            await TerminateProcessAsync(process).ConfigureAwait(false);
             throw;
         }
         stopwatch.Stop();
@@ -678,6 +711,37 @@ internal static class PerformanceGate
         }
 
         return stopwatch.Elapsed.TotalMilliseconds;
+    }
+
+    private static async Task TerminateProcessAsync(Process process)
+    {
+        if (!process.HasExited)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        if (process.HasExited)
+        {
+            return;
+        }
+
+        using var termination = new CancellationTokenSource(
+            ProcessTerminationTimeout);
+        try
+        {
+            await process.WaitForExitAsync(termination.Token)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+            when (termination.IsCancellationRequested)
+        {
+        }
     }
 
     private static void WarmRetentionPaths(
