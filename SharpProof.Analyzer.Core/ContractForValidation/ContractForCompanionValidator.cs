@@ -197,7 +197,10 @@ internal static class ContractForCompanionValidator
         Location fallback,
         CancellationToken cancellationToken)
     {
-        var inventory = clauses.Create(method);
+        var inventory = clauses.Create(
+            method,
+            implementationBody: null,
+            cancellationToken: cancellationToken);
         if (inventory.ImplementationBody == null)
         {
             diagnostics.Add(At(

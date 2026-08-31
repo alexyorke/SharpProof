@@ -28,11 +28,23 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         IOperation? implementationBody = null)
     {
+        return Create(callable, implementationBody, CancellationToken.None);
+    }
+
+    internal ContractClauseInventory Create(
+        IMethodSymbol callable,
+        IOperation? implementationBody,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         callable = ArgumentNullGuard.NotNull(callable, nameof(callable));
 
         callable = NormalizeCallable(callable);
         if (implementationBody != null &&
-            !IsCallableBodyRoot(callable, implementationBody))
+            !IsCallableBodyRoot(
+                callable,
+                implementationBody,
+                cancellationToken))
         {
             return new ContractClauseInventory(
                 callable,
@@ -42,29 +54,34 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                 clauses: []);
         }
         return implementationBody == null
-            ? _cache.GetOrAdd(callable, CreateUncached)
-            : CreateCore(callable, implementationBody);
+            ? _cache.GetOrAdd(
+                callable,
+                value => CreateUncached(value, cancellationToken))
+            : CreateCore(callable, implementationBody, cancellationToken);
     }
 
-    private ContractClauseInventory CreateUncached(IMethodSymbol callable)
+    private ContractClauseInventory CreateUncached(
+        IMethodSymbol callable,
+        CancellationToken cancellationToken)
     {
-        return CreateCore(callable, null);
+        return CreateCore(callable, null, cancellationToken);
     }
 
     private bool IsCallableBodyRoot(
         IMethodSymbol callable,
-        IOperation implementationBody)
+        IOperation implementationBody,
+        CancellationToken cancellationToken)
     {
         var candidate = GetBody(implementationBody.Syntax) ??
             implementationBody.Syntax;
-        if (GetDeclaredBodies(callable).Any(body =>
+        if (GetDeclaredBodies(callable, cancellationToken).Any(body =>
                 HasSameSite(body, candidate)))
         {
             return true;
         }
 
         return candidate is CompilationUnitSyntax &&
-            _compilation.GetEntryPoint(CancellationToken.None) is { } entryPoint &&
+            _compilation.GetEntryPoint(cancellationToken) is { } entryPoint &&
             HaveSameDefinition(callable, entryPoint) &&
             entryPoint.Locations.Any(location =>
                 location.SourceTree == candidate.SyntaxTree &&
@@ -73,7 +90,8 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private ContractClauseInventory CreateCore(
         IMethodSymbol callable,
-        IOperation? implementationBody)
+        IOperation? implementationBody,
+        CancellationToken cancellationToken)
     {
         var found = new List<(
             BoundContractKind Kind,
@@ -82,8 +100,12 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             int TreeOrdinal)>();
         IOperation? resolvedBody = null;
         var hasRejectedContractApiUsage = false;
-        foreach (var body in GetBodies(callable, implementationBody))
+        foreach (var body in GetBodies(
+                     callable,
+                     implementationBody,
+                     cancellationToken))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!TryGetSemanticModel(body.SyntaxTree, out var model))
             {
                 hasRejectedContractApiUsage = true;
@@ -91,7 +113,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             }
 
             resolvedBody ??= implementationBody;
-            var root = model.GetOperation(body);
+            var root = model.GetOperation(body, cancellationToken);
             if (root == null)
             {
                 continue;
@@ -100,19 +122,30 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             resolvedBody ??= root;
             foreach (var invocation in root.DescendantsAndSelf().OfType<IInvocationOperation>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (_api?.GetClauseKind(invocation.TargetMethod) is not { } kind)
                 {
                     hasRejectedContractApiUsage |=
-                        IsOwnedByCallable(callable, invocation, model) &&
+                        IsOwnedByCallable(
+                            callable,
+                            invocation,
+                            model,
+                            cancellationToken) &&
                         _identity.IsRejectedClauseMethod(
                             invocation.TargetMethod);
                     continue;
                 }
 
-                found.Add((kind, Classify(callable, invocation, model, body), invocation,
+                found.Add((kind, Classify(
+                    callable,
+                    invocation,
+                    model,
+                    body,
+                    cancellationToken), invocation,
                     GetTreeOrdinal(invocation.Syntax.SyntaxTree)));
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
         var requiresOrdinal = 0;
         var ensuresOrdinal = 0;
         var assumeOrdinal = 0;
@@ -173,19 +206,29 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IMethodSymbol callable,
         IInvocationOperation invocation,
         SemanticModel model,
-        SyntaxNode body)
+        SyntaxNode body,
+        CancellationToken cancellationToken)
     {
-        if (!IsOwnedByCallable(callable, invocation, model))
+        if (!IsOwnedByCallable(
+                callable,
+                invocation,
+                model,
+                cancellationToken))
         {
             return ContractClausePlacement.NestedCallable;
         }
 
-        if (!IsReachable(invocation.Syntax, model))
+        if (!IsReachable(invocation.Syntax, model, cancellationToken))
         {
             return ContractClausePlacement.Unreachable;
         }
 
-        if (TryGetDirectPlacement(invocation, model, body, out var placement))
+        if (TryGetDirectPlacement(
+                invocation,
+                model,
+                body,
+                cancellationToken,
+                out var placement))
         {
             return placement;
         }
@@ -200,9 +243,12 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     private static bool IsOwnedByCallable(
         IMethodSymbol callable,
         IInvocationOperation invocation,
-        SemanticModel model)
+        SemanticModel model,
+        CancellationToken cancellationToken)
     {
-        return model.GetEnclosingSymbol(invocation.Syntax.SpanStart) is
+        return model.GetEnclosingSymbol(
+                invocation.Syntax.SpanStart,
+                cancellationToken) is
                 IMethodSymbol method &&
             HaveSameDefinition(callable, method);
     }
@@ -211,6 +257,7 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         IInvocationOperation invocation,
         SemanticModel model,
         SyntaxNode body,
+        CancellationToken cancellationToken,
         out ContractClausePlacement placement)
     {
         if (body is not BlockSyntax and not CompilationUnitSyntax)
@@ -231,7 +278,8 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
                 break;
             }
 
-            if (!IsDirectClause(model, prior))
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsDirectClause(model, prior, cancellationToken))
             {
                 placement = ContractClausePlacement.Late;
                 return true;
@@ -265,15 +313,24 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         return false;
     }
 
-    private bool IsDirectClause(SemanticModel model, StatementSyntax statement)
+    private bool IsDirectClause(
+        SemanticModel model,
+        StatementSyntax statement,
+        CancellationToken cancellationToken)
     {
         return statement is ExpressionStatementSyntax expression &&
-        model.GetOperation(expression.Expression) is IInvocationOperation invocation &&
+        model.GetOperation(
+            expression.Expression,
+            cancellationToken) is IInvocationOperation invocation &&
         _api!.GetClauseKind(invocation.TargetMethod).HasValue;
     }
 
-    private static bool IsReachable(SyntaxNode syntax, SemanticModel model)
+    private static bool IsReachable(
+        SyntaxNode syntax,
+        SemanticModel model,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var statement = syntax.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault();
         if (statement == null)
         {
@@ -304,21 +361,22 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
 
     private static ImmutableArray<SyntaxNode> GetBodies(
         IMethodSymbol callable,
-        IOperation? implementationBody)
+        IOperation? implementationBody,
+        CancellationToken cancellationToken)
     {
         if (implementationBody != null)
         {
             return [GetBody(implementationBody.Syntax) ?? implementationBody.Syntax];
         }
 
-        var bodies = GetDeclaredBodies(callable);
+        var bodies = GetDeclaredBodies(callable, cancellationToken);
         if (!bodies.IsDefaultOrEmpty ||
             GetPartialImplementation(callable) is not { } implementation)
         {
             return bodies;
         }
 
-        return GetDeclaredBodies(implementation);
+        return GetDeclaredBodies(implementation, cancellationToken);
     }
 
     private static IMethodSymbol? GetPartialImplementation(
@@ -341,12 +399,20 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     }
 
     private static ImmutableArray<SyntaxNode> GetDeclaredBodies(
-        IMethodSymbol callable)
+        IMethodSymbol callable,
+        CancellationToken cancellationToken)
     {
-        return [.. callable.DeclaringSyntaxReferences
-            .Select(static reference => GetBody(reference.GetSyntax()))
-            .Where(static body => body != null)
-            .Select(static body => body!)];
+        var bodies = ImmutableArray.CreateBuilder<SyntaxNode>();
+        foreach (var reference in callable.DeclaringSyntaxReferences)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (GetBody(reference.GetSyntax(cancellationToken)) is { } body)
+            {
+                bodies.Add(body);
+            }
+        }
+
+        return bodies.ToImmutable();
     }
 
     internal static SyntaxNode? GetBody(SyntaxNode syntax)
