@@ -258,6 +258,16 @@ internal sealed class ConversionEffectClassifier(
 
         var source = preserved.Operand.Type;
         var target = GetUnderlyingType(operation.Type);
+        if (ManagedAbstractValue.IsNullableType(source))
+        {
+            if (!ManagedAbstractValue.IsNullableType(operation.Type))
+            {
+                return false;
+            }
+
+            source = GetUnderlyingType(source);
+        }
+
         return source != null && target != null &&
             SymbolEqualityComparer.Default.Equals(source, target);
     }
