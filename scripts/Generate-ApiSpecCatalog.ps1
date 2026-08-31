@@ -168,6 +168,40 @@ function Get-RequiredArrayProperty {
     return $value
 }
 
+function Assert-ExactProperties {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Object,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Names,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    $expected = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($name in $Names) {
+        [void]$expected.Add($name)
+    }
+    $actual = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($property in $Object.PSObject.Properties) {
+        [void]$actual.Add($property.Name)
+    }
+    foreach ($name in $Names) {
+        if (-not $actual.Contains($name)) {
+            throw "$Context is missing required property '$name'."
+        }
+    }
+    foreach ($name in $actual) {
+        if (-not $expected.Contains($name)) {
+            throw "$Context contains unexpected property '$name'."
+        }
+    }
+}
+
 function Assert-Text {
     param(
         [AllowNull()]
@@ -682,6 +716,13 @@ $witnesses = @($declarations | ForEach-Object {
 })
 if (@($witnesses | Sort-Object -Unique).Count -ne $witnesses.Count) {
     throw 'API-spec witness identifiers must be unique.'
+}
+foreach ($declaration in $declarations) {
+    $witness = [string]$declaration.target.witnessIdentifier
+    Assert-ExactProperties `
+        -Object $declaration `
+        -Names @('target', 'facets', 'postconditions') `
+        -Context "declarations[$witness]"
 }
 
 $source = [Collections.Generic.List[string]]::new()
