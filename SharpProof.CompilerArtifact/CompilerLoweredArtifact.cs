@@ -317,7 +317,19 @@ internal static class CompilerLoweredArtifact
                 throw new InvalidDataException("A lowered contract clause is invalid.");
             }
 
-            var clause = new CompilerPreparedClause(row.Kind, Root(row.Root), row.Evidence, row.ClaimId, row.AssumptionId);
+            var condition = Root(row.Root);
+            if (condition.Type != decoded.Factory.BooleanType)
+            {
+                throw new InvalidDataException(
+                    "A lowered contract predicate is not Boolean.");
+            }
+
+            var clause = new CompilerPreparedClause(
+                row.Kind,
+                condition,
+                row.Evidence,
+                row.ClaimId,
+                row.AssumptionId);
             if (row.PredicateSha256 != PredicateSha256(decoded.Factory, clause))
             {
                 throw new InvalidDataException("A lowered contract predicate does not equal its compiler inventory.");
