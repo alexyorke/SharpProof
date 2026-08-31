@@ -1,6 +1,6 @@
 # Bug backlog
 
-408 open bugs, reprioritized by impact, reachability, and affected scope.
+407 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (120)
+## P0 - Critical (119)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -25,7 +25,6 @@ Priority definitions:
 - **BUG-046 [P0] - Effect witnesses are not bound to their replay:** Compiler effect artifact validation checks witness and replay independently but never proves the replay produces that witness. A resealed artifact can validate a fabricated Refuted effect result and source attribution that worker replay cannot establish.
 - **BUG-052 [P0] - Final compilation snapshots erase source checksum metadata:** The final-compilation snapshot hashes source characters as UTF-8 and omits original encoding, checksum algorithm, and Roslyn checksum. Compilations with different PDB or source-provenance inputs can receive identical evidence, so the artifact cannot faithfully attest emitted debugging metadata.
 - **BUG-053 [P0] - Final compilation snapshots omit diagnostic policy:** The final-compilation snapshot omits general and per-ID diagnostic policy, warning level, and suppressed-diagnostic reporting. Distinct compiler configurations can produce identical attestation artifacts, allowing the package oracle to certify the wrong build behavior.
-- **BUG-056 [P0] - FormattableString construction eagerly applies deferred formatting effects:** Interpolation scanning attributes formatting calls and effects when constructing a FormattableString, although formatting is deferred. This can create false effect diagnostics and, when the formatter is modeled nonreturning, suppress real suffix effects from complete analysis.
 - **BUG-057 [P0] - Fuzz decoder integration check passes without decoder use:** FuzzRunnerEvidenceTests searches the campaign script for a decoder name that is already present in a dot-sourced filename. Removing or bypassing the actual strict decoder call leaves the gate green and can admit malformed runner JSON into campaign evidence.
 - **BUG-059 [P0] - Generic interface conversions erase caller ownership:** ConversionOwnershipClassifier marks every type-parameter-to-interface boxing conversion Fresh, even when a legal reference-type instantiation preserves the caller object's identity. Mutations through the converted interface can disappear from the caller-visible effect summary.
 - **BUG-060 [P0] - Generic static-constructor effects are replaced by an exception only:** EffectAnalysisSession replaces a source generic type initializer with only TypeInitializationException instead of summarizing its reads, writes, allocations, and capabilities or marking an unknown boundary. First static-field access can therefore be falsely certified nonallocating, capability-free, or nonwriting.
