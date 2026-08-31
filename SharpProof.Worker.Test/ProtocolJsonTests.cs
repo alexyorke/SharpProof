@@ -1959,8 +1959,8 @@ public sealed class ProtocolJsonTests
             Does.Contain("response.elapsed_unrepresentable"));
     }
 
-    [TestCase(1, 300001L)]
-    [TestCase(100, 300001L)]
+    [TestCase(101, 300001L)]
+    [TestCase(200, 300100L)]
     [TestCase(1000, 300900L)]
     public void RequestBoundElapsedTimeUsesTheActualLauncherGrace(
         int terminationGraceMilliseconds,
