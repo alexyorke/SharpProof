@@ -549,32 +549,83 @@ internal sealed class ConversionOwnershipClassifier
 
     private bool MethodMayIntroduceUnknownRefAlias(IMethodSymbol method)
     {
-        method = method.ReducedFrom ?? method;
+        return MethodMayIntroduceUnknownRefAlias(
+            method,
+            new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default));
+    }
+
+    private bool MethodMayIntroduceUnknownRefAlias(
+        IMethodSymbol method,
+        HashSet<IMethodSymbol> activeMethods)
+    {
+        method = (method.ReducedFrom ?? method).OriginalDefinition;
         if (method.DeclaringSyntaxReferences.Length != 1)
         {
             return true;
         }
+        if (activeMethods.Count >= EffectCallGraph.MaximumCallGraphDepth)
+        {
+            return true;
+        }
+        if (!activeMethods.Add(method))
+        {
+            return false;
+        }
 
-        var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
-        var model = SharpProof.Frontend.Host.CompilationModelProvider
-            .GetSemanticModel(_compilation, declaration.SyntaxTree);
-        var root = model.GetOperation(declaration);
-        if (root == null)
+        try
+        {
+            var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(_compilation, declaration.SyntaxTree);
+            var root = model.GetOperation(declaration);
+            if (root == null)
+            {
+                return true;
+            }
+
+            foreach (var assignment in root.DescendantsAndSelf()
+                         .OfType<ISimpleAssignmentOperation>()
+                         .Where(static assignment => assignment.IsRef))
+            {
+                if (!IsCallMappedRefSource(assignment.Value, method))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var invocation in root.DescendantsAndSelf()
+                         .OfType<IInvocationOperation>()
+                         .Where(CanRebindRefLikeStorage))
+            {
+                if (MethodMayIntroduceUnknownRefAlias(
+                        invocation.TargetMethod,
+                        activeMethods))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            activeMethods.Remove(method);
+        }
+    }
+
+    private static bool CanRebindRefLikeStorage(
+        IInvocationOperation invocation)
+    {
+        if (invocation.Instance?.Type?.IsRefLikeType == true ||
+            !invocation.TargetMethod.IsStatic &&
+            invocation.TargetMethod.ContainingType?.IsRefLikeType == true)
         {
             return true;
         }
 
-        foreach (var assignment in root.DescendantsAndSelf()
-                     .OfType<ISimpleAssignmentOperation>()
-                     .Where(static assignment => assignment.IsRef))
-        {
-            if (!IsCallMappedRefSource(assignment.Value, method))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return invocation.Arguments.Any(static argument =>
+            argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
+            argument.Value.Type?.IsRefLikeType == true);
     }
 
     private static bool IsCallMappedRefSource(
