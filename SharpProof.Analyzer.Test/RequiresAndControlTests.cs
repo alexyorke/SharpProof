@@ -2102,6 +2102,34 @@ public sealed class RequiresAndControlTests
             Is.EqualTo(["SP0027"]));
     }
 
+    [TestCase("int value = 0", false)]
+    [TestCase("params int[] values", false)]
+    [TestCase("int value = 0", true)]
+    [TestCase("params int[] values", true)]
+    public async Task ImplicitBaseInitializerReplaysOmittedArgumentConstructorPrecondition(
+        string baseParameters,
+        bool primaryConstructor)
+    {
+        ArgumentNullException.ThrowIfNull(baseParameters);
+        var derivedDeclaration = primaryConstructor
+            ? "public sealed class Derived() : Base { }"
+            : "public sealed class Derived : Base { public Derived() { } }";
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            $$"""
+            using SharpProof.Attributes;
+            public class Base {
+                protected Base({{baseParameters}}) { Contract.Requires(false); }
+            }
+            {{derivedDeclaration}}
+            """,
+            "contracts",
+            ["SP0027"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0027"]));
+    }
+
     [Test]
     public async Task ImplicitBaseInitializerControlsRemainExact()
     {
