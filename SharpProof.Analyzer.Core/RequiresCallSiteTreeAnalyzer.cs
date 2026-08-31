@@ -110,6 +110,12 @@ internal static partial class RequiresCallSiteTreeAnalyzer
         private readonly HashSet<IMethodSymbol>
             _visitedPotentialOwners =
                 new(SymbolEqualityComparer.Default);
+        private readonly bool _rootIsGenerated =
+            AnalyzerGeneratedCodePolicy.IsGenerated(
+                root,
+                rootDeclaration.SyntaxTree,
+                semanticModel.Compilation,
+                cancellationToken);
         private AnalyzerSemanticOutcome _rootOutcome =
             AnalyzerSemanticOutcome.NotApplicable;
 
@@ -153,7 +159,9 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             cancellationToken.ThrowIfCancellationRequested();
             caller = ContractClauseInventoryBuilder
                 .NormalizeCallable(caller);
-            if (!isRoot && IsGenerated(caller, declaration))
+            if (!isRoot &&
+                !_rootIsGenerated &&
+                IsGenerated(caller, declaration))
             {
                 RecordGeneratedSubtree(declaration);
                 return;
@@ -200,7 +208,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             {
                 cancellationToken
                     .ThrowIfCancellationRequested();
-                if (IsGenerated(nested.Method, nested.Declaration))
+                if (!_rootIsGenerated &&
+                    IsGenerated(nested.Method, nested.Declaration))
                 {
                     RecordGeneratedSubtree(nested.Declaration);
                     continue;
