@@ -218,6 +218,14 @@ public sealed class RoslynProgramLowerer(
         private void LowerAssignment(
             IrBlockId block, OperationId operation, ISimpleAssignmentOperation assignment)
         {
+            if (assignment.Target is IFlowCaptureReferenceOperation)
+            {
+                _ = LowerValue(block, operation, assignment.Value);
+                Abstain(operation, FrontendAbstention.UnsupportedMutation);
+                HavocKnownState(block, operation);
+                return;
+            }
+
             var variable = _expressions.GetReferencedVariable(assignment.Target, unwrapConversions: false);
             if (variable.HasValue)
             {
