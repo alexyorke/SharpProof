@@ -479,6 +479,52 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesRetainPreAssignmentValuesOnExceptionalPaths()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class AssignmentFailureException : System.Exception { }
+            sealed class ProofCache {
+                internal void Write(Answer answer) { }
+            }
+            sealed class C {
+                private static Answer CompleteOrThrow(bool fail) {
+                    if (fail) throw new AssignmentFailureException();
+                    return Answer.Proven;
+                }
+
+                void M(ProofCache cache, bool fail) {
+                    object answer = Answer.Unknown;
+                    try {
+                        answer = CompleteOrThrow(fail);
+                    }
+                    catch (AssignmentFailureException) {
+                        cache.Write((Answer)answer);
+                    }
+                }
+
+                void SafeOverwriteBeforeThrow(ProofCache cache) {
+                    object answer = Answer.Unknown;
+                    try {
+                        answer = Answer.Proven;
+                        throw new AssignmentFailureException();
+                    }
+                    catch (AssignmentFailureException) {
+                        cache.Write((Answer)answer);
+                    }
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesRejectCoalesceAndCompoundAssignments()
     {
         var diagnostics = await Analyze(
