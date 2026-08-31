@@ -2265,6 +2265,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     private bool MayCompleteRecursivePattern(
         IRecursivePatternOperation pattern)
     {
+        if (HasNullableNullMismatchPath(pattern))
+        {
+            return true;
+        }
         if (pattern.DeconstructSymbol is IMethodSymbol deconstruct &&
             !MethodCanCompleteNormally(deconstruct))
         {
@@ -2277,6 +2281,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     private bool MayCompleteListPattern(IListPatternOperation pattern)
     {
         var value = SwitchExpressionFacts.GetGoverningValue(pattern);
+        if (HasNullableNullMismatchPath(pattern, value))
+        {
+            return true;
+        }
         if (pattern.InputType?.IsValueType != true &&
             value?.Syntax.ToString().IndexOf(
                 "null",
@@ -2328,6 +2336,16 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             }
         }
         return true;
+    }
+
+    private static bool HasNullableNullMismatchPath(
+        IPatternOperation pattern,
+        IOperation? value = null)
+    {
+        value ??= SwitchExpressionFacts.GetGoverningValue(pattern);
+        return (ManagedAbstractValue.IsNullableType(pattern.InputType) ||
+                ManagedAbstractValue.IsNullableType(value?.Type)) &&
+            (value == null || !IsDefinitelyNonNull(value));
     }
 
     private bool TryGetListPatternLength(
