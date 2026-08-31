@@ -287,6 +287,50 @@ public sealed class IrCSharpDifferentialOracleTests
             Is.All.EqualTo(DifferentialStatus.Agreement));
     }
 
+    [Test]
+    public void SharedSequenceResultsDoNotExpandExponentially()
+    {
+        const int sharedDepth = 18;
+        var factory = new IrFactory();
+        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
+        IrValue interpreted = factory.CreateSequenceValue(
+            sequenceType,
+            [factory.CreateIntegerValue(1), factory.CreateIntegerValue(1)]);
+        object actual = new long[] { 1, 1 };
+        var runtimeType = typeof(long[]);
+
+        for (var depth = 0; depth < sharedDepth; depth++)
+        {
+            sequenceType = factory.GetOrCreateSequenceType(sequenceType);
+            interpreted = factory.CreateSequenceValue(
+                sequenceType,
+                [interpreted, interpreted]);
+            var shared = Array.CreateInstance(runtimeType, 2);
+            shared.SetValue(actual, 0);
+            shared.SetValue(actual, 1);
+            actual = shared;
+            runtimeType = runtimeType.MakeArrayType();
+        }
+
+        var valuesAgree = typeof(IrCSharpDifferentialOracle).GetMethod(
+            "ValuesAgree",
+            System.Reflection.BindingFlags.NonPublic |
+            System.Reflection.BindingFlags.Static)!;
+        _ = valuesAgree.Invoke(
+            null,
+            [factory.CreateIntegerValue(1), 1L]);
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+
+        var agrees = (bool)valuesAgree.Invoke(null, [interpreted, actual])!;
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(agrees, Is.True);
+            Assert.That(allocated, Is.LessThan(1_000_000));
+        }
+    }
+
     private static int CountGeneratedOracleAssemblies()
     {
         return AppDomain.CurrentDomain.GetAssemblies()
