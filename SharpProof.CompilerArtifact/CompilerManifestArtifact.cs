@@ -676,6 +676,9 @@ internal static class CompilerManifestArtifactJson
             item != null &&
             WorkerProtocolJson.IsCompilerDiagnosticCode(item.Code) &&
             !string.IsNullOrWhiteSpace(item.Message) &&
+            item.SourceTreePath != null &&
+            item.SourceTreeSha256 != null &&
+            item.SourceLineMapSha256 != null &&
             item.Location is { Path: not null } location &&
             WorkerProtocolJson.HasValidLocationOrNone(location)) == true;
     }
