@@ -928,6 +928,18 @@ public sealed class RoslynOperationLowerer
                 _owner.TypeSpecializer(operation.Type);
             if (!_owner.IsSupportedValueDomain(specializedTargetType))
             {
+                // Nullable targets are outside the IR value domain, but a
+                // conversion from a non-constant supported operand still has
+                // the normal value-changing conversion uncertainty. Preserve
+                // UnsupportedType for constant forms, which are handled by
+                // the closed-domain edge cases.
+                if (!operation.Operand.ConstantValue.HasValue &&
+                    specializedTargetType?.OriginalDefinition.SpecialType ==
+                    SpecialType.System_Nullable_T)
+                {
+                    return OpaqueOperand(operation, operation.Operand,
+                        FrontendAbstention.ConversionMayChangeValue);
+                }
                 return OpaqueOperand(
                     operation,
                     operation.Operand,
