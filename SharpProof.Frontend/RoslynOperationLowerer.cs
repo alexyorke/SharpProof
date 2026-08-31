@@ -13,6 +13,7 @@ public sealed class RoslynOperationLowerer
     private readonly Dictionary<CaptureId, IrVarId> _captures = [];
     private readonly List<IrVarId> _captureOrder = [];
     private readonly LoweringVisitor _visitor;
+    private Dictionary<IOperation, LoweredExpression>? _currentLoweringResults;
     private IrVarId? _missingInstance;
 
     public RoslynOperationLowerer(
@@ -54,9 +55,18 @@ public sealed class RoslynOperationLowerer
     {
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
-        var lowered = _visitor.Visit(operation, default);
-        return new FrontendLoweringResult(
-            lowered.Term, lowered.Classification, CreateVariableBindings());
+        var previousResults = _currentLoweringResults;
+        _currentLoweringResults = new(OperationReferenceComparer.Instance);
+        try
+        {
+            var lowered = LowerCore(operation);
+            return new FrontendLoweringResult(
+                lowered.Term, lowered.Classification, CreateVariableBindings());
+        }
+        finally
+        {
+            _currentLoweringResults = previousResults;
+        }
     }
 
     internal ImmutableArray<FrontendVariableBinding> CreateVariableBindings()
@@ -73,7 +83,20 @@ public sealed class RoslynOperationLowerer
 
     private LoweredExpression LowerCore(IOperation operation)
     {
-        return _visitor.Visit(operation, default);
+        var results = _currentLoweringResults;
+        if (results == null)
+        {
+            return _visitor.Visit(operation, default);
+        }
+
+        if (results.TryGetValue(operation, out var existing))
+        {
+            return existing;
+        }
+
+        var lowered = _visitor.Visit(operation, default);
+        results.Add(operation, lowered);
+        return lowered;
     }
 
     internal IrTypeId GetTypeId(ITypeSymbol? type)
@@ -1070,6 +1093,22 @@ public sealed class RoslynOperationLowerer
         internal static LoweredExpression Exact(IrTerm term)
         {
             return new(term, FrontendSubsetClassification.Exact);
+        }
+    }
+
+    private sealed class OperationReferenceComparer : IEqualityComparer<IOperation>
+    {
+        internal static OperationReferenceComparer Instance { get; } = new();
+
+        public bool Equals(IOperation? left, IOperation? right)
+        {
+            return ReferenceEquals(left, right);
+        }
+
+        public int GetHashCode(IOperation operation)
+        {
+            return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(
+                operation);
         }
     }
 }
