@@ -2004,7 +2004,9 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
         if (!_activeMethods.Add(normalized))
         {
-            return false;
+            // This is a may-complete query. Recursive re-entry is uncertainty,
+            // not evidence that every invocation is nonreturning.
+            return true;
         }
 
         try
