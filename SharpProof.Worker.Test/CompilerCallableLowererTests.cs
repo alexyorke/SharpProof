@@ -90,6 +90,40 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
+    public void LeadingGotoCannotSelectAnUnreachableReturnBeforeAReachableLoop()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int SelectReachable(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() == value);
+                    goto Loop;
+                Dead:
+                    return 0;
+
+                Loop:
+                    if (value == 0) {
+                        return value;
+                    }
+                    value = value - 1;
+                    goto Loop;
+                }
+            }
+            """,
+            "SelectReachable");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.False);
+            Assert.That(
+                preparation.FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
+    }
+
+    [Test]
     public void ResolvedSpecCallIsBoundToExactLoweredInstruction()
     {
         var preparation = Prepare(
