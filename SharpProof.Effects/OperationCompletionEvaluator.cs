@@ -861,6 +861,10 @@ internal sealed class OperationCompletionEvaluator
             ILocalReferenceOperation or
                 IParameterReferenceOperation or
                 IDiscardOperation => true,
+            // A ref-return invocation can be the target of an assignment.
+            // Its completion is still governed by invocation semantics; the
+            // fallback must not treat a nonreturning callee as completing.
+            IInvocationOperation invocation => CanCompleteNormally(invocation),
             _ => true
         };
     }
