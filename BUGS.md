@@ -1,6 +1,6 @@
 # Bug backlog
 
-394 open bugs, reprioritized by impact, reachability, and affected scope.
+393 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (106)
+## P0 - Critical (105)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -38,7 +38,6 @@ Priority definitions:
 - **BUG-087 [P0] - MSBuild omits exact-invocation result validation:** The shipped verifier target never supplies InvocationResultPath to ValidatePublishedVerificationResult, so private per-invocation binding checks are skipped. Concurrent builds sharing publication paths can accept and advertise another invocation's internally valid verification evidence.
 - **BUG-088 [P0] - Mutable runtime paths invalidate containment authentication:** RunVerifier reduces the dotnet host and supervisor assembly to mutable pathnames before launch, without durable byte identity. Replacement between validation and launch can make lifecycle receipts describe code that did not enforce descendant cleanup.
 - **BUG-089 [P0] - nameof marks dead local functions as executable:** RequiresCallSiteTreeAnalyzer treats local-function method references inside nameof as reachability or escape edges. It can analyze bodies that never execute and emit false precondition diagnostics or Refuted outcomes.
-- **BUG-090 [P0] - Nested array reads ignore preceding stores:** Frontend nested array reads lower as pure sequence terms instead of load instructions, so they ignore preceding stores while the program remains Exact. Consumers can receive a read-after-write result impossible in C#, creating an unsound exact lowering.
 - **BUG-092 [P0] - Nested local functions can suppress list-pattern indexer calls:** Effects list-pattern completion can confuse a nested expression-bodied local function with a custom Length constant and skip the mandatory indexer call. Indexer effects and noncompletion can disappear from a Complete summary, falsely proving effect contracts.
 - **BUG-093 [P0] - Nested nameof properties are treated as executed accessors:** RequiresCallSiteDiscovery suppresses only property references directly parented by nameof, not nested receiver properties. It can replay a getter that never executes and emit a false SP0027 Refuted outcome.
 - **BUG-094 [P0] - Nested wrappers bypass semantic-cache soundness diagnostics:** CacheSoundnessRules removes only one parenthesis or ordinary conversion before classifying a cached semantic answer. Additional wrappers hide unsafe Unknown or error answers from SPMETA010, allowing prohibited semantic results into caches.
