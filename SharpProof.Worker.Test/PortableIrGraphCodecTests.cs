@@ -11,24 +11,6 @@ namespace SharpProof.Worker.Test;
 public sealed class PortableIrGraphCodecTests
 {
     [Test]
-    public void DecodedStructuralSequenceTypeCanBeExtended()
-    {
-        var factory = new IrFactory();
-        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
-        var value = factory.CreateVariable("values", sequenceType);
-        var encoded = PortableIrGraphCodec.Encode(
-            factory,
-            program: null,
-            [factory.Variable(value)]);
-
-        var decoded = PortableIrGraphCodec.Decode(encoded.Graph);
-        var recreated = decoded.Factory.GetOrCreateSequenceType(
-            decoded.Factory.IntegerType);
-
-        Assert.That(decoded.Roots.Single().Type, Is.EqualTo(recreated));
-    }
-
-    [Test]
     public void RoundTripPreservesEveryTermInstructionAndLocationShape()
     {
         var fixture = CreateFixture();

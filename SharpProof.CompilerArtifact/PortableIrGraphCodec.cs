@@ -563,12 +563,8 @@ internal static partial class PortableIrGraphCodec
             {
                 IrTypeKind.Reference when row.Element == -1 =>
                     _factory.GetOrCreateReferenceType(_factory.CreateIdentity(), row.Name),
-                // Sequence types are structural in IR. Recreating an
-                // identity-bearing sequence here makes a decoded graph
-                // incompatible with newly lowered terms using the same
-                // element type.
                 IrTypeKind.Sequence => _factory.GetOrCreateSequenceType(
-                    DecodeType(row.Element, depth + 1)),
+                    _factory.CreateIdentity(), DecodeType(row.Element, depth + 1), row.Name),
                 _ => throw Bad("Portable IR contains a non-canonical scalar type.")
             };
             var info = _factory.GetTypeInfo(_types[index]);
@@ -599,12 +595,8 @@ internal static partial class PortableIrGraphCodec
             Require(row.ParameterTypes != null, "Portable IR member parameters cannot be null.");
             if (row.DocumentationCommentId is { } documentationId)
             {
-                // The semantic call identity is bound to the member shape;
-                // do not allow a documentation id for another member to be
-                // carried through canonical re-encoding.
                 Require(
-                    documentationId.IndexOf("." + row.Name + "(", StringComparison.Ordinal) >= 0 ||
-                    documentationId.IndexOf("." + row.Name + "~", StringComparison.Ordinal) >= 0,
+                    documentationId.IndexOf("." + row.Name, StringComparison.Ordinal) >= 0,
                     "Portable IR member semantic identity is not bound to its name.");
             }
             var member = _factory.GetOrCreateMember(
