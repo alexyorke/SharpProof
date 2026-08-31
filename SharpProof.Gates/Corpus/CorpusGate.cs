@@ -173,6 +173,8 @@ internal static class CorpusGate
         }
 
         var immutableObservations = observations.ToImmutable();
+        failures.AddRange(
+            ValidateMetamorphicConsistency(cases, immutableObservations));
         var cacheFailures = await VerifyCacheReplayAsync(
                 cases,
                 immutableObservations,
@@ -275,6 +277,68 @@ internal static class CorpusGate
                 "Unknown; supported cases must have an accountable Proven " +
                 "or Refuted result."
             ];
+    }
+
+    internal static ImmutableArray<string> ValidateMetamorphicConsistency(
+        ImmutableArray<CorpusCase> cases,
+        ImmutableArray<CorpusObservation> observations)
+    {
+        var failures = ImmutableArray.CreateBuilder<string>();
+        var observationsById = observations.ToImmutableDictionary(
+            static observation => observation.CaseId,
+            StringComparer.Ordinal);
+        foreach (var seed in cases
+                     .Where(static item =>
+                         item.Origin == CorpusOrigin.SyntheticMetamorphic)
+                     .GroupBy(static item => item.SeedId, StringComparer.Ordinal)
+                     .OrderBy(static group => group.Key, StringComparer.Ordinal))
+        {
+            var baselineCase = seed.Single(static item =>
+                item.Variant == CorpusVariant.Baseline);
+            var baseline = observationsById[baselineCase.Id];
+            var baselineDiagnosticClasses = GetDiagnosticClasses(baseline);
+            foreach (var item in seed
+                         .Where(static item =>
+                             item.Variant != CorpusVariant.Baseline)
+                         .OrderBy(static item => item.Variant))
+            {
+                var observation = observationsById[item.Id];
+                if (observation.SemanticOutcome != baseline.SemanticOutcome)
+                {
+                    failures.Add(
+                        $"Metamorphic variant {item.Id} changed semantic " +
+                        $"outcome from {baseline.SemanticOutcome} to " +
+                        $"{observation.SemanticOutcome} relative to " +
+                        $"{baseline.CaseId}.");
+                }
+
+                var diagnosticClasses = GetDiagnosticClasses(observation);
+                if (!baselineDiagnosticClasses.SequenceEqual(
+                        diagnosticClasses,
+                        StringComparer.Ordinal))
+                {
+                    failures.Add(
+                        $"Metamorphic variant {item.Id} changed diagnostic " +
+                        $"classes from [{string.Join(", ", baselineDiagnosticClasses)}] " +
+                        $"to [{string.Join(", ", diagnosticClasses)}] " +
+                        $"relative to {baseline.CaseId}.");
+                }
+            }
+        }
+        return failures.ToImmutable();
+    }
+
+    private static ImmutableArray<string> GetDiagnosticClasses(
+        CorpusObservation observation)
+    {
+        return [.. observation.Diagnostics.Select(static diagnostic =>
+        {
+            var diagnosticSpan = diagnostic.AsSpan();
+            var idSeparator = diagnosticSpan.IndexOf('@');
+            var locationSeparator = idSeparator + 1 +
+                diagnosticSpan[(idSeparator + 1)..].IndexOf('@');
+            return diagnostic[..locationSeparator];
+        })];
     }
 
     public static async Task<string> RenderActualSnapshotAsync(
