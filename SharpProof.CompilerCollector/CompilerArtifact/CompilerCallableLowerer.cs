@@ -571,6 +571,20 @@ internal sealed class CompilerCallableLowerer
                 continue;
             }
 
+            if (binding.Symbol is ITypeSymbol instanceType &&
+                !target.Method.IsStatic &&
+                SymbolEqualityComparer.Default.Equals(
+                    instanceType, target.Method.ContainingType))
+            {
+                var receiver = contracts.Variables.FirstOrDefault(
+                    static variable => variable.Role == BoundContractVariableRole.Receiver);
+                if (receiver != null)
+                {
+                    bindings.Add(binding.Variable, receiver.Variable);
+                    continue;
+                }
+            }
+
             if (binding.Symbol is not IParameterSymbol parameter ||
                 !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, target.Method) ||
                 !canonicalParameters.TryGetValue(parameter.Ordinal, out var canonical))

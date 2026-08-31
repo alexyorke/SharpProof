@@ -73,6 +73,8 @@ public sealed class RoslynOperationLowerer
     {
         return [.. _variables
             .Select(static pair => new FrontendVariableBinding(pair.Key, pair.Value))
+            .Concat(_instances.Select(static pair =>
+                new FrontendVariableBinding(pair.Key, pair.Value)))
             .OrderBy(static binding => binding.Variable.Value)];
     }
 
