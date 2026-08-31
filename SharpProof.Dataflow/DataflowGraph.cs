@@ -86,7 +86,9 @@ public sealed class DataflowGraph<T>
         }
         _predecessors = Freeze(predecessors);
         _successors = Freeze(successors);
-        _cyclicBlocks = FindCyclicBlocks(_successors);
+        _cyclicBlocks = FindCyclicBlocks(
+            _successors,
+            _predecessors);
     }
 
     public ImmutableArray<DataflowBlock<T>> Blocks
@@ -161,34 +163,82 @@ public sealed class DataflowGraph<T>
         return result.MoveToImmutable();
     }
 
-    private static ImmutableArray<bool> FindCyclicBlocks(ImmutableArray<ImmutableArray<int>> successors)
+    private static ImmutableArray<bool> FindCyclicBlocks(
+        ImmutableArray<ImmutableArray<int>> successors,
+        ImmutableArray<ImmutableArray<int>> predecessors)
     {
-        var result = ImmutableArray.CreateBuilder<bool>(successors.Length);
+        var visited = new bool[successors.Length];
+        var finishOrder = new List<int>(successors.Length);
+        var pending = new Stack<(int BlockId, int NextSuccessor)>();
         for (var start = 0; start < successors.Length; start++)
         {
-            var seen = new HashSet<int>();
-            var pending = new Stack<int>(successors[start].Reverse());
-            var cyclic = false;
+            if (visited[start])
+            {
+                continue;
+            }
+
+            visited[start] = true;
+            pending.Push((start, 0));
             while (pending.Count != 0)
             {
-                var current = pending.Pop();
-                if (current == start)
+                var (current, nextSuccessor) = pending.Pop();
+                if (nextSuccessor >= successors[current].Length)
                 {
-                    cyclic = true;
-                    break;
+                    finishOrder.Add(current);
+                    continue;
                 }
-                if (!seen.Add(current))
+
+                pending.Push((current, nextSuccessor + 1));
+                var next = successors[current][nextSuccessor];
+                if (visited[next])
                 {
                     continue;
                 }
 
-                for (var index = successors[current].Length - 1; index >= 0; index--)
+                visited[next] = true;
+                pending.Push((next, 0));
+            }
+        }
+
+        Array.Clear(visited, 0, visited.Length);
+        var result = new bool[successors.Length];
+        var component = new List<int>();
+        var componentPending = new Stack<int>();
+        for (var index = finishOrder.Count - 1; index >= 0; index--)
+        {
+            var start = finishOrder[index];
+            if (visited[start])
+            {
+                continue;
+            }
+
+            component.Clear();
+            visited[start] = true;
+            componentPending.Push(start);
+            while (componentPending.Count != 0)
+            {
+                var current = componentPending.Pop();
+                component.Add(current);
+                foreach (var predecessor in predecessors[current])
                 {
-                    pending.Push(successors[current][index]);
+                    if (visited[predecessor])
+                    {
+                        continue;
+                    }
+
+                    visited[predecessor] = true;
+                    componentPending.Push(predecessor);
                 }
             }
-            result.Add(cyclic);
+
+            var cyclic = component.Count > 1 ||
+                successors[component[0]].Contains(component[0]);
+            foreach (var blockId in component)
+            {
+                result[blockId] = cyclic;
+            }
         }
-        return result.MoveToImmutable();
+
+        return [.. result];
     }
 }
