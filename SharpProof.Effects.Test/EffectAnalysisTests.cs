@@ -1492,6 +1492,11 @@ public sealed class EffectAnalysisTests
                     return value;
                 }
 
+                public static int SafeCheckedIncrement(int value) {
+                    checked { value++; }
+                    return value;
+                }
+
                 public static int? UnknownDivide(int? left, int? right) =>
                     left / right;
 
@@ -1535,6 +1540,9 @@ public sealed class EffectAnalysisTests
         AssertThrows(
             session.Analyze(Method(compilation, "PresentCheckedIncrement")).Summary,
             "System.OverflowException");
+        Assert.That(
+            session.Analyze(Method(compilation, "SafeCheckedIncrement")).Summary.Throws,
+            Is.Empty);
         AssertThrows(
             session.Analyze(Method(compilation, "UnknownDivide")).Summary,
             "System.DivideByZeroException",
