@@ -588,29 +588,56 @@ internal sealed partial class ClaimManifestBuilder(
 
         return ids.ToImmutableDictionary(SymbolEqualityComparer.Default);
 
-        string Resolve(IMethodSymbol method)
+        void Resolve(IMethodSymbol method)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             method = ContractClauseInventoryBuilder.NormalizeCallable(method);
-            if (ids.TryGetValue(method, out var id))
+            if (ids.ContainsKey(method))
             {
-                return id;
+                return;
             }
 
-            if (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+            var unresolved = new Stack<IMethodSymbol>();
+            string parentId;
+            while (true)
             {
-                var parent = method.ContainingSymbol;
-                var parentId = parent is IMethodSymbol parentMethod
-                    ? Resolve(parentMethod)
-                    : SemanticClaimIdentity.CreateContainerId(parent);
-                id = SemanticClaimIdentity.CreateNestedCallableId(parentId, method, ordinals[method]);
+                cancellationToken.ThrowIfCancellationRequested();
+                method = ContractClauseInventoryBuilder.NormalizeCallable(
+                    method);
+                if (ids.TryGetValue(method, out parentId))
+                {
+                    break;
+                }
+
+                if (method.MethodKind is
+                    MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+                {
+                    unresolved.Push(method);
+                    if (method.ContainingSymbol is IMethodSymbol parentMethod)
+                    {
+                        method = parentMethod;
+                        continue;
+                    }
+
+                    parentId = SemanticClaimIdentity.CreateContainerId(
+                        method.ContainingSymbol);
+                    break;
+                }
+
+                parentId = SemanticClaimIdentity.CreateCallableId(method);
+                ids.Add(method, parentId);
+                break;
             }
-            else
+
+            while (unresolved.Count > 0)
             {
-                id = SemanticClaimIdentity.CreateCallableId(method);
+                cancellationToken.ThrowIfCancellationRequested();
+                var nested = unresolved.Pop();
+                parentId = SemanticClaimIdentity.CreateNestedCallableId(
+                    parentId,
+                    nested,
+                    ordinals[nested]);
+                ids.Add(nested, parentId);
             }
-            ids.Add(method, id);
-            return id;
         }
     }
 
