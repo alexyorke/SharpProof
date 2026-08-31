@@ -281,7 +281,8 @@ internal sealed class ExceptionHandlerReachability(
                     if (initializationCompletes)
                     {
                         Add(
-                            invocation.IsVirtual
+                            OperationEffectScanner.IsDispatchUncertain(
+                                invocation)
                                 ? UnknownPotential
                                 : GetCallableExceptions(
                                     invocation.TargetMethod,

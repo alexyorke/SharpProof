@@ -1570,7 +1570,7 @@ internal sealed partial class OperationEffectScanner
         return [.. result];
     }
 
-    private static bool IsDispatchUncertain(IInvocationOperation invocation)
+    internal static bool IsDispatchUncertain(IInvocationOperation invocation)
     {
         return invocation.IsVirtual && IsOpenDispatchTarget(invocation.TargetMethod);
     }
