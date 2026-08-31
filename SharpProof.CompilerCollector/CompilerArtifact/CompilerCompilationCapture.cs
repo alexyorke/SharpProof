@@ -19,8 +19,24 @@ internal static class CompilerCompilationCapture
             CSharpCompilation compilation,
             CancellationToken cancellationToken)
         {
-            Trees = [.. compilation.SyntaxTrees.Select(tree =>
-                CaptureTree(tree, cancellationToken))];
+            Trees = [.. compilation.SyntaxTrees.Select((tree, index) =>
+            {
+                var snapshot = CaptureTree(tree, cancellationToken);
+                // Roslyn permits generated/in-memory trees without a path and
+                // multiple trees sharing one path. Give each tree a stable
+                // compilation-local identity instead of rejecting the input.
+                if (string.IsNullOrEmpty(tree.FilePath))
+                {
+                    snapshot.Path = $"<compiler-generated:{index}>";
+                }
+                else if (compilation.SyntaxTrees.Take(index).Any(
+                             prior => string.Equals(prior.FilePath, tree.FilePath, StringComparison.Ordinal)))
+                {
+                    snapshot.Path = $"{snapshot.Path}#{index}";
+                }
+
+                return snapshot;
+            })];
         }
 
         internal CompilerSyntaxTreeSnapshot[] Trees { get; }
@@ -186,9 +202,10 @@ internal static class CompilerCompilationCapture
         })];
         return new CompilerSyntaxTreeSnapshot
         {
-            Path = CompilerCaptureAuthority.NormalizePath(tree.FilePath ??
-                throw new InvalidOperationException(
-                    "A compiler syntax tree has no path.")),
+            Path = CompilerCaptureAuthority.NormalizePath(
+                string.IsNullOrEmpty(tree.FilePath)
+                    ? "<compiler-generated>"
+                    : tree.FilePath),
             Sha256 = ComputeTextSha256(text),
             LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(lineMap),
             TextLength = text.Length,
