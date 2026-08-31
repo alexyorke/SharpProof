@@ -486,7 +486,25 @@ public static partial class WorkerProtocolJson
                 .SequenceEqual(Enumerable.Range(0, expected.Length)), prefix + ".dense_ordinals")
             .Check(callable.ClaimIds != null && callable.ClaimIds.SequenceEqual(
                 expected.Select(static value => value.ClaimId), s_ordinal),
-                prefix + ".claim_membership");
+                prefix + ".claim_membership")
+            .Check(HasVerifierCompatibleClaimOrder(expected), prefix + ".claim_order");
+    }
+    private static bool HasVerifierCompatibleClaimOrder(WorkerClaimManifestEntry[] claims)
+    {
+        var effectSeen = false;
+        foreach (var claim in claims)
+        {
+            if (claim.Kind == WorkerClaimKind.Effect)
+            {
+                effectSeen = true;
+            }
+            else if (effectSeen && claim.Kind == WorkerClaimKind.Postcondition)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
     private static WorkerCallableResult[] ValidateCallableResults(WorkerCallableResult[]? values,
         WorkerClaimManifest? manifest, Validator errors)
