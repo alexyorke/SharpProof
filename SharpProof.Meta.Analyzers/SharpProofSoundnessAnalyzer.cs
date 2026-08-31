@@ -49,6 +49,12 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
     private static readonly ImmutableArray<string> CSharpExpressionFragments =
         [" is null", " is not null", " == ", " != ", " && ", " || ", "=>", "?."];
+    private static readonly ImmutableHashSet<string>
+        SemanticStringPredicateNames = Names(
+            "Contains",
+            "EndsWith",
+            "Equals",
+            "StartsWith");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => MetaDiagnosticDescriptors.All;
 
@@ -102,7 +108,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             Report(context, MetaDiagnosticDescriptors.ForbiddenRoslynApi, invocation.Syntax.GetLocation(), method.Name);
         }
 
-        AnalyzeSemanticEquals(context, invocation, symbols);
+        AnalyzeSemanticStringInvocation(context, invocation, symbols);
         CacheSoundnessRules.AnalyzeWrite(context, invocation);
     }
 
@@ -211,33 +217,51 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         if (context.Operation is not IBinaryOperation
             {
                 OperatorKind: BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals
-            } binary ||
-            !IsInsideCondition(binary.Syntax))
+            } binary)
         {
             return;
         }
 
-        var literal = GetSemanticLiteral(binary.LeftOperand) ?? GetSemanticLiteral(binary.RightOperand);
+        var literal = GetSemanticLiteral(
+                binary.LeftOperand,
+                context.CancellationToken) ??
+            GetSemanticLiteral(
+                binary.RightOperand,
+                context.CancellationToken);
         if (literal != null)
         {
             Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, binary.Syntax.GetLocation(), literal);
         }
     }
 
-    private static void AnalyzeSemanticEquals(
+    private static void AnalyzeSemanticStringInvocation(
         OperationAnalysisContext context,
         IInvocationOperation invocation,
         KnownSymbols symbols)
     {
-        if (!IsSameType(invocation.TargetMethod.ContainingType, symbols[KnownType.String]) ||
-            invocation.TargetMethod.Name != "Equals" ||
-            !IsInsideCondition(invocation.Syntax))
+        var method = invocation.TargetMethod;
+        var isStringPredicate =
+            IsSameType(method.ContainingType, symbols[KnownType.String]) &&
+            SemanticStringPredicateNames.Contains(method.Name);
+        var isObjectEquals =
+            method.ContainingType.SpecialType == SpecialType.System_Object &&
+            method.Name == "Equals";
+        if (method.ReturnType.SpecialType != SpecialType.System_Boolean ||
+            !isStringPredicate && !isObjectEquals)
         {
             return;
         }
 
-        var literal = invocation.Instance == null ? null : GetSemanticLiteral(invocation.Instance);
-        literal ??= invocation.Arguments.Select(static a => GetSemanticLiteral(a.Value)).FirstOrDefault(value => value != null);
+        var literal = invocation.Instance == null
+            ? null
+            : GetSemanticLiteral(
+                invocation.Instance,
+                context.CancellationToken);
+        literal ??= invocation.Arguments
+            .Select(argument => GetSemanticLiteral(
+                argument.Value,
+                context.CancellationToken))
+            .FirstOrDefault(static value => value != null);
         if (literal != null)
         {
             Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, invocation.Syntax.GetLocation(), literal);
@@ -328,14 +352,100 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         return CSharpExpressionFragments.FirstOrDefault(fragment => value.IndexOf(fragment, StringComparison.Ordinal) >= 0);
     }
 
-    private static string? GetSemanticLiteral(IOperation operation)
+    private static string? GetSemanticLiteral(
+        IOperation operation,
+        CancellationToken cancellationToken)
     {
-        if (!operation.ConstantValue.HasValue)
+        var root = operation;
+        while (root.Parent != null)
+        {
+            root = root.Parent;
+        }
+
+        return GetSemanticLiteral(
+            operation,
+            root,
+            new HashSet<ILocalSymbol>(
+                SymbolEqualityComparer.Default),
+            cancellationToken);
+    }
+
+    private static string? GetSemanticLiteral(
+        IOperation operation,
+        IOperation root,
+        HashSet<ILocalSymbol> visitedLocals,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (operation.ConstantValue.HasValue)
+        {
+            return GetSemanticLiteral(operation.ConstantValue.Value);
+        }
+
+        switch (operation)
+        {
+            case IArgumentOperation argument:
+                return GetSemanticLiteral(
+                    argument.Value,
+                    root,
+                    visitedLocals,
+                    cancellationToken);
+            case IConversionOperation conversion:
+                return GetSemanticLiteral(
+                    conversion.Operand,
+                    root,
+                    visitedLocals,
+                    cancellationToken);
+            case IParenthesizedOperation parenthesized:
+                return GetSemanticLiteral(
+                    parenthesized.Operand,
+                    root,
+                    visitedLocals,
+                    cancellationToken);
+        }
+        if (operation is not ILocalReferenceOperation localReference ||
+            !visitedLocals.Add(localReference.Local))
         {
             return null;
         }
 
-        return GetSemanticLiteral(operation.ConstantValue.Value);
+        foreach (var candidate in root.DescendantsAndSelf())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            IOperation? value = candidate switch
+            {
+                IVariableDeclaratorOperation declaration
+                    when SymbolEqualityComparer.Default.Equals(
+                        declaration.Symbol,
+                        localReference.Local) =>
+                    declaration.Initializer?.Value,
+                ISimpleAssignmentOperation
+                {
+                    Target: ILocalReferenceOperation target
+                } assignment
+                    when SymbolEqualityComparer.Default.Equals(
+                        target.Local,
+                        localReference.Local) =>
+                    assignment.Value,
+                _ => null
+            };
+            if (value == null)
+            {
+                continue;
+            }
+
+            var literal = GetSemanticLiteral(
+                value,
+                root,
+                visitedLocals,
+                cancellationToken);
+            if (literal != null)
+            {
+                return literal;
+            }
+        }
+
+        return null;
     }
 
     private static string? GetSemanticLiteral(object? value)
@@ -345,21 +455,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
              text.StartsWith("ir_", StringComparison.Ordinal))
                 ? text
                 : null;
-    }
-
-    private static bool IsInsideCondition(SyntaxNode syntax)
-    {
-        return syntax.AncestorsAndSelf().Any(node => node switch
-        {
-            IfStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
-            WhileStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
-            DoStatementSyntax statement => statement.Condition.Span.Contains(syntax.Span),
-            ForStatementSyntax { Condition: not null } statement => statement.Condition.Span.Contains(syntax.Span),
-            ConditionalExpressionSyntax conditional => conditional.Condition.Span.Contains(syntax.Span),
-            CatchFilterClauseSyntax filter => filter.FilterExpression.Span.Contains(syntax.Span),
-            WhenClauseSyntax whenClause => whenClause.Condition.Span.Contains(syntax.Span),
-            _ => false
-        });
     }
 
     private static void AnalyzeField(SymbolAnalysisContext context)
