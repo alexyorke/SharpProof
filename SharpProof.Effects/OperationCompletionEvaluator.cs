@@ -919,11 +919,24 @@ internal sealed class OperationCompletionEvaluator
     internal bool CanCompleteCompoundValue(
         ICompoundAssignmentOperation assignment)
     {
-        if (!CanCompleteNormally(assignment.Target) ||
-            !CanCompleteNormally(assignment.Value))
-        {
-            return false;
-        }
+        return CanCompleteNormally(assignment.Target) &&
+            CanCompleteCompoundInConversion(assignment) &&
+            CanCompleteNormally(assignment.Value) &&
+            CanCompleteCompoundOperator(assignment) &&
+            CanCompleteCompoundOutConversion(assignment);
+    }
+
+    internal bool CanCompleteCompoundInConversion(
+        ICompoundAssignmentOperation assignment)
+    {
+        return CanCompleteCompoundConversion(
+            assignment.InConversion.MethodSymbol,
+            assignment);
+    }
+
+    internal bool CanCompleteCompoundOperator(
+        ICompoundAssignmentOperation assignment)
+    {
 
         if (assignment.OperatorKind is
                 BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder &&
@@ -937,6 +950,22 @@ internal sealed class OperationCompletionEvaluator
                 assignment.OperatorMethod,
                 instance: null,
                 assignment);
+    }
+
+    internal bool CanCompleteCompoundOutConversion(
+        ICompoundAssignmentOperation assignment)
+    {
+        return CanCompleteCompoundConversion(
+            assignment.OutConversion.MethodSymbol,
+            assignment);
+    }
+
+    private bool CanCompleteCompoundConversion(
+        IMethodSymbol? method,
+        ICompoundAssignmentOperation assignment)
+    {
+        return method == null ||
+            CanCompleteInvocation(method, instance: null, assignment);
     }
 
     internal bool CanCompleteIncrementValue(
