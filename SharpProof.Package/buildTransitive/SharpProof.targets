@@ -5,6 +5,7 @@
     <_SharpProofContractForGeneratorPath Condition="'$(_SharpProofTestContractForGeneratorPath)' == '' and ('$(_SharpProofContractForGeneratorPath)' == '' or '$(_SharpProofContractForGeneratorPathWasDefault)' == 'true')">$(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll</_SharpProofContractForGeneratorPath>
     <_SharpProofContractForGeneratorPath Condition="'$(_SharpProofTestContractForGeneratorPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestContractForGeneratorPath)'))</_SharpProofContractForGeneratorPath>
     <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
+    <_SharpProofSharedDirectory>$([System.IO.Path]::GetFullPath('$(_SharpProofSharedDirectory)'))</_SharpProofSharedDirectory>
     <_SharpProofCompilerCollectorPathConfigured>$([System.String]::Copy('$(SharpProofCompilerCollectorPath)').Trim())</_SharpProofCompilerCollectorPathConfigured>
     <SharpProofCompilerCollectorPath Condition="'$(_SharpProofCompilerCollectorPathConfigured)' == ''">$(_SharpProofCollectorDirectory)/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
     <SharpProofCompilerCollectorPath>$([System.IO.Path]::GetFullPath('$(SharpProofCompilerCollectorPath)'))</SharpProofCompilerCollectorPath>
