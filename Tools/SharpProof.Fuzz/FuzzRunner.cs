@@ -269,8 +269,8 @@ public static class FuzzRunner
                         frontendCase,
                         candidate => frontendOracle.Compare(
                             candidate,
-                            cancellationToken).Status ==
-                            FuzzOracleStatus.Mismatch,
+                            cancellationToken).Status !=
+                            FuzzOracleStatus.Agreement,
                         cancellationToken);
                     var minimizedFrontendResult = frontendOracle.Compare(
                         minimizedFrontend,
@@ -299,8 +299,8 @@ public static class FuzzRunner
                                         factory,
                                         candidate,
                                         cancellation)
-                                    .ConfigureAwait(false)).Status ==
-                                FuzzOracleStatus.Mismatch,
+                                    .ConfigureAwait(false)).Status !=
+                                FuzzOracleStatus.Agreement,
                             cancellationToken)
                         .ConfigureAwait(false);
                     var minimizedSmtResult = await smtOracle.CompareAsync(
@@ -371,12 +371,9 @@ public static class FuzzRunner
             MaximumRetainedFailures);
         for (var index = 0; index < frontend.Count; index++)
         {
-            Add(index, "finite-domain-smt",
-                smt[index] == FuzzOracleStatus.Mismatch);
-            Add(index, "frontend",
-                frontend[index] == FuzzOracleStatus.Mismatch);
-            Add(index, "partial-term-smt",
-                partial[index] == FuzzOracleStatus.Mismatch);
+            Add(index, "finite-domain-smt", smt[index] != FuzzOracleStatus.Agreement);
+            Add(index, "frontend", frontend[index] != FuzzOracleStatus.Agreement);
+            Add(index, "partial-term-smt", partial[index] != FuzzOracleStatus.Agreement);
             if (keys.Count >= MaximumRetainedFailures)
             {
                 break;
