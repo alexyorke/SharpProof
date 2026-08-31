@@ -149,7 +149,9 @@ public static class CompilerIdentityBridge
         // interning. Preserve their payload so distinct values cannot become
         // the same semantic term merely because their CLR types match.
         if (!operation.ConstantValue.HasValue)
+        {
             return null;
+        }
         return operation.ConstantValue.Value switch
         {
             null => "<null>",
