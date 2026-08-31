@@ -448,6 +448,57 @@ public sealed class EffectCounterexampleReplayTests
         }
     }
 
+    [TestCase("proven")]
+    [TestCase("unknown")]
+    [TestCase("unsupported-contract")]
+    [TestCase("entry-failure")]
+    public void CanceledNonRefutedEffectAssemblyCannotPublish(
+        string scenario)
+    {
+        var fixture = CreateFixture(
+            CompilerEffectReplayEventKind.ManagedObjectAllocation);
+        var entryFeasibility = CallableEntryFeasibility.Feasible;
+        switch (scenario)
+        {
+            case "proven":
+                fixture.Evidence.Outcome = WorkerClaimOutcome.Proven;
+                fixture.Evidence.Reason = WorkerClaimReason.None;
+                fixture.Evidence.Certainty = WorkerEffectEvidenceCertainty
+                    .CompleteMayEffectSummary;
+                break;
+            case "unknown":
+                fixture.Evidence.Outcome = WorkerClaimOutcome.Unknown;
+                fixture.Evidence.Reason =
+                    WorkerClaimReason.EffectSummaryIncomplete;
+                fixture.Evidence.Certainty = WorkerEffectEvidenceCertainty
+                    .IncompleteMayEffectSummary;
+                break;
+            case "unsupported-contract":
+                fixture.Evidence.Outcome = WorkerClaimOutcome.Unknown;
+                fixture.Evidence.Reason =
+                    WorkerClaimReason.UnsupportedContract;
+                fixture.Evidence.Certainty =
+                    WorkerEffectEvidenceCertainty.Unavailable;
+                break;
+            case "entry-failure":
+                entryFeasibility = CallableEntryFeasibility.Unknown(
+                    WorkerClaimReason.ResourceLimit);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(scenario));
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>((Action)(() =>
+            EffectClaimResultAssembler.Assemble(
+                fixture.Target,
+                fixture.Evidence,
+                entryFeasibility,
+                cancellation.Token)));
+    }
+
     [Test]
     public async Task ConcurrentObjectAndArrayReplaysRemainIndependent()
     {
