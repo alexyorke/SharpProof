@@ -15,9 +15,14 @@ internal static class CallableVerificationPolicy
         if (!target.IsSuccess)
         {
             return Unknown(target, target.FailureReason,
-                target.FailureReason == WorkerClaimReason.UnsupportedCallable
-                    ? WorkerCallableCoverageReason.UnsupportedCallable
-                    : WorkerCallableCoverageReason.SemanticUnknown);
+                target.FailureReason switch
+                {
+                    WorkerClaimReason.UnsupportedCallable =>
+                        WorkerCallableCoverageReason.UnsupportedCallable,
+                    WorkerClaimReason.UnsupportedContract =>
+                        WorkerCallableCoverageReason.UnsupportedContract,
+                    _ => WorkerCallableCoverageReason.SemanticUnknown
+                });
         }
 
         using var methodBoundary = CancellationTokenSource.CreateLinkedTokenSource(projectBoundary.Token);
@@ -40,9 +45,20 @@ internal static class CallableVerificationPolicy
                         methodBoundary.Token)))
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
-            var reason = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown)
-                ? WorkerCallableCoverageReason.SemanticUnknown
-                : WorkerCallableCoverageReason.None;
+            var unknownReasons = records
+                .Where(static record =>
+                    record.Outcome == WorkerClaimOutcome.Unknown)
+                .Select(static record => record.Reason)
+                .ToArray();
+            var reason = unknownReasons.Length == 0
+                ? WorkerCallableCoverageReason.None
+                : unknownReasons.All(static value =>
+                    value == WorkerClaimReason.UnsupportedCallable)
+                    ? WorkerCallableCoverageReason.UnsupportedCallable
+                    : unknownReasons.All(static value =>
+                        value == WorkerClaimReason.UnsupportedContract)
+                        ? WorkerCallableCoverageReason.UnsupportedContract
+                        : WorkerCallableCoverageReason.SemanticUnknown;
             return Result(target, reason, records);
         }
         catch (OperationCanceledException)

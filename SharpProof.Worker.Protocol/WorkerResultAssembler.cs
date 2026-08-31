@@ -189,6 +189,22 @@ internal static class WorkerResultAssembler
         WorkerRunFailureReason failureReason,
         bool hasErrors)
     {
+        if (owned.Length == 0 &&
+            !(runStatus == WorkerRunStatus.Failed && hasErrors))
+        {
+            return (callable.Coverage, callable.Reason) is
+                (WorkerCallableCoverage.Complete,
+                    WorkerCallableCoverageReason.None)
+                or (WorkerCallableCoverage.Incomplete,
+                    WorkerCallableCoverageReason.UnsupportedCallable)
+                or (WorkerCallableCoverage.Incomplete,
+                    WorkerCallableCoverageReason.UnsupportedContract)
+                or (WorkerCallableCoverage.Incomplete,
+                    WorkerCallableCoverageReason.SemanticUnknown)
+                or (WorkerCallableCoverage.Incomplete,
+                    WorkerCallableCoverageReason.InfrastructureFailure);
+        }
+
         WorkerCallableCoverageReason expected;
         if (runStatus == WorkerRunStatus.Failed && hasErrors)
         {
@@ -196,8 +212,8 @@ internal static class WorkerResultAssembler
                 ? WorkerCallableCoverageReason.MissingClaimResult
                 : WorkerCallableCoverageReason.InfrastructureFailure;
         }
-        else if (owned.Length == 0 ||
-            owned.All(static claim => claim.Outcome != WorkerClaimOutcome.Unknown))
+        else if (owned.All(static claim =>
+            claim.Outcome != WorkerClaimOutcome.Unknown))
         {
             expected = WorkerCallableCoverageReason.None;
         }
@@ -210,16 +226,19 @@ internal static class WorkerResultAssembler
             expected = reasons.All(static reason =>
                     reason == WorkerClaimReason.UnsupportedCallable)
                 ? WorkerCallableCoverageReason.UnsupportedCallable
-                : reasons.Any(static reason =>
-                    reason == WorkerClaimReason.MethodTimeout)
-                    ? WorkerCallableCoverageReason.MethodTimeout
+                : reasons.All(static reason =>
+                    reason == WorkerClaimReason.UnsupportedContract)
+                    ? WorkerCallableCoverageReason.UnsupportedContract
                     : reasons.Any(static reason =>
-                        reason == WorkerClaimReason.ProjectTimeout)
-                        ? WorkerCallableCoverageReason.ProjectTimeout
+                        reason == WorkerClaimReason.MethodTimeout)
+                        ? WorkerCallableCoverageReason.MethodTimeout
                         : reasons.Any(static reason =>
-                            reason == WorkerClaimReason.Canceled)
-                            ? WorkerCallableCoverageReason.Canceled
-                            : WorkerCallableCoverageReason.SemanticUnknown;
+                            reason == WorkerClaimReason.ProjectTimeout)
+                            ? WorkerCallableCoverageReason.ProjectTimeout
+                            : reasons.Any(static reason =>
+                                reason == WorkerClaimReason.Canceled)
+                                ? WorkerCallableCoverageReason.Canceled
+                                : WorkerCallableCoverageReason.SemanticUnknown;
         }
 
         var matchesExpected = callable.Coverage ==
