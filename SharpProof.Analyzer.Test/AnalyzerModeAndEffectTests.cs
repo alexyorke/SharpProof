@@ -184,6 +184,8 @@ public sealed class AnalyzerModeAndEffectTests
 
     [TestCase(null, "everything", null, "advisory, strict, off")]
     [TestCase(null, null, "everything", "effects, contracts, all")]
+    [TestCase(null, "   ", null, "advisory, strict, off")]
+    [TestCase(null, null, "\t", "effects, contracts, all")]
     [TestCase("everything", null, null, "option was removed")]
     public async Task InvalidConfigurationReportsAllowedValuesAndFailsClosed(
         string? mode,
