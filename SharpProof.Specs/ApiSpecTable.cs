@@ -121,7 +121,7 @@ public sealed partial class ApiSpecTable
             static variable => (variable.Role, variable.Ordinal));
         var facets = NormalizeFacets(
             declaration.Facets,
-            declaration.Target.ResultType);
+            declaration.Target);
         var postconditions = declaration.Postconditions.Select(postcondition =>
         {
             if (postcondition == null)
@@ -267,7 +267,7 @@ public sealed partial class ApiSpecTable
 
     private static ApiSpecFacets NormalizeFacets(
         ApiSpecFacets facets,
-        IrTypeKind? resultType)
+        ApiSpecTarget target)
     {
         ValidateEvidence(facets.Effects?.Evidence, nameof(facets));
         ValidateEvidence(facets.Allocation?.Evidence, nameof(facets));
@@ -292,6 +292,20 @@ public sealed partial class ApiSpecTable
             throw new ArgumentException("Unknown effects cannot be combined with known effects.", nameof(facets));
         }
 
+        if (((effects.Effects & (
+                 SpecEffect.ReadsReceiverState |
+                 SpecEffect.WritesReceiverState)) != 0 &&
+             target.IsStatic) ||
+            ((effects.Effects & (
+                 SpecEffect.ReadsArgumentState |
+                 SpecEffect.WritesArgumentState)) != 0 &&
+             target.ParameterTypes.IsDefaultOrEmpty))
+        {
+            throw new ArgumentException(
+                "The effect facet does not apply to the declared target.",
+                nameof(facets));
+        }
+
         ValidateDefined(allocation.Behavior, nameof(facets));
         ValidateDefined(throws.Behavior, nameof(facets));
         ValidateDefined(nullness.Result, nameof(facets));
@@ -299,8 +313,8 @@ public sealed partial class ApiSpecTable
         if (nullness.Result is not (
                 SpecNullness.Unknown or
                 SpecNullness.NotApplicable) &&
-            (!resultType.HasValue ||
-             !IrTermServices.IsNullable(resultType.Value)))
+            (!target.ResultType.HasValue ||
+             !IrTermServices.IsNullable(target.ResultType.Value)))
         {
             throw new ArgumentException(
                 "The nullness facet does not apply to the declared result type.",
@@ -310,7 +324,7 @@ public sealed partial class ApiSpecTable
         if (cardinality.Result is not (
                 SpecCardinality.Unknown or
                 SpecCardinality.NotApplicable) &&
-            resultType != IrTypeKind.Sequence)
+            target.ResultType != IrTypeKind.Sequence)
         {
             throw new ArgumentException(
                 "The cardinality facet does not apply to the declared result type.",
