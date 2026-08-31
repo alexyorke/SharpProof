@@ -590,6 +590,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 var block = graph.Blocks[ordinal];
                 var killed = false;
                 var exceptionalStateSurvivesKill = false;
+                var pendingWriteOnlyOutCommit = -1;
                 foreach (var reference in BlockOperations(block)
                              .SelectMany(static operation =>
                                  operation.DescendantsAndSelf())
@@ -605,6 +606,13 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     if (order <= after || reference.IsDeclaration)
                     {
                         continue;
+                    }
+                    if (pendingWriteOnlyOutCommit >= 0 &&
+                        order >= pendingWriteOnlyOutCommit)
+                    {
+                        exceptionalStateSurvivesKill = true;
+                        killed = true;
+                        break;
                     }
                     var accessedTuplePath = GetAccessedTuplePath(reference);
                     if (IsAssignmentTarget(reference.Syntax))
@@ -631,6 +639,23 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                                     reference);
                             killed = true;
                             break;
+                        }
+                        continue;
+                    }
+                    if (TryGetWriteOnlyOutCommit(
+                            reference,
+                            out var writeOnlyOutCommit))
+                    {
+                        if (AssignmentKillsTrackedValue(
+                                tuplePath,
+                                accessedTuplePath))
+                        {
+                            pendingWriteOnlyOutCommit =
+                                pendingWriteOnlyOutCommit < 0
+                                    ? writeOnlyOutCommit
+                                    : Math.Min(
+                                        pendingWriteOnlyOutCommit,
+                                        writeOnlyOutCommit);
                         }
                         continue;
                     }
@@ -756,6 +781,11 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     }
                     return true;
                 }
+                if (!killed && pendingWriteOnlyOutCommit >= 0)
+                {
+                    exceptionalStateSurvivesKill = true;
+                    killed = true;
+                }
                 if (killed)
                 {
                     if (exceptionalStateSurvivesKill)
@@ -784,6 +814,29 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 }
             }
             return false;
+
+            static bool TryGetWriteOnlyOutCommit(
+                ILocalReferenceOperation reference,
+                out int commitEnd)
+            {
+                for (var operation = reference.Parent;
+                     operation != null;
+                     operation = operation.Parent)
+                {
+                    if (operation is IArgumentOperation argument)
+                    {
+                        if (argument.Parameter?.RefKind == RefKind.Out)
+                        {
+                            commitEnd = argument.Parent?.Syntax.Span.End ??
+                                argument.Syntax.Span.End;
+                            return true;
+                        }
+                        break;
+                    }
+                }
+                commitEnd = -1;
+                return false;
+            }
         }
 
         private string[]? GetTuplePath(
@@ -1180,9 +1233,11 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 IsDirectDelegatePropagation(value, assignment);
         }
 
-        private static bool IsNonExecutingObservation(
+        private bool IsNonExecutingObservation(
             ILocalReferenceOperation reference)
         {
+            var delegateType = semanticModel.Compilation
+                .GetTypeByMetadataName("System.Delegate");
             if (reference.Syntax.Ancestors()
                 .OfType<AssignmentExpressionSyntax>()
                 .Any(assignment =>
@@ -1203,12 +1258,42 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 {
                     continue;
                 }
+                if (operation is IBinaryOperation
+                    {
+                        OperatorKind: BinaryOperatorKind.Add or
+                            BinaryOperatorKind.Subtract,
+                        Type.TypeKind: TypeKind.Delegate
+                    })
+                {
+                    continue;
+                }
+                if (operation is IPropertyReferenceOperation property &&
+                    delegateType != null &&
+                    SymbolEqualityComparer.Default.Equals(
+                        property.Property.OriginalDefinition.ContainingType,
+                        delegateType) &&
+                    property.Property.OriginalDefinition is
+                    {
+                        IsStatic: false,
+                        IsIndexer: false,
+                        GetMethod: not null,
+                        SetMethod: null,
+                        Parameters.IsEmpty: true,
+                        MetadataName: "Method" or "Target"
+                    })
+                {
+                    return true;
+                }
                 return operation is IBinaryOperation
                 {
                     OperatorMethod: null,
                     OperatorKind: BinaryOperatorKind.Equals or
                             BinaryOperatorKind.NotEquals
-                } or IIsPatternOperation;
+                } or IIsPatternOperation or
+                ISimpleAssignmentOperation
+                {
+                    Target: IDiscardOperation
+                };
             }
             return false;
         }
