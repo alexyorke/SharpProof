@@ -95,6 +95,56 @@ public sealed class AdvisoryActivationTests
     }
 
     [Test]
+    public async Task EarlyContractCallCannotHideLaterSymbolValidation()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            internal static class EarlyContractCall {
+                internal static void Activate() {
+                    Contract.Requires(true);
+                }
+            }
+
+            public interface IFixture {
+                [return: Positive]
+                int SelectedContract();
+            }
+
+            public abstract class Fixture {
+                [DoesNotThrow]
+                public abstract void SelectedEffect();
+            }
+
+            public static class NativeFixture {
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static extern int SelectedExtern();
+            }
+            """,
+            ["SP0047"]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factory.CreateCount, Is.EqualTo(1));
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(Enumerable.Repeat("SP0047", 3)));
+            Assert.That(
+                diagnostics.Select(static diagnostic =>
+                    diagnostic.GetMessage(
+                        System.Globalization.CultureInfo.InvariantCulture)),
+                Has.All.Contain("MissingOperationRoot"));
+        }
+    }
+
+    [Test]
     public async Task CompilationReferenceNestedParameterContractActivatesCallAnalysis()
     {
         var external = AnalyzerTestHost.CreateCompilation(
