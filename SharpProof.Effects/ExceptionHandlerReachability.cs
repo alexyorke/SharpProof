@@ -630,7 +630,41 @@ internal sealed class ExceptionHandlerReachability(
             if (operation is IBinaryOperation binary &&
                 binary.OperatorMethod is { } binaryOperator)
             {
-                if (canCompleteNormally(binary.LeftOperand) &&
+                var priorPhasesComplete =
+                    canCompleteNormally(binary.LeftOperand);
+                if (binary.OperatorKind is
+                        BinaryOperatorKind.ConditionalAnd or
+                        BinaryOperatorKind.ConditionalOr)
+                {
+                    var truthOperator =
+                        ConditionalTruthOperatorFacts.Resolve(binary);
+                    if (priorPhasesComplete && truthOperator != null)
+                    {
+                        var initializationCompletes =
+                            AddStaticInitializationPotential(
+                                truthOperator,
+                                binary,
+                                Add);
+                        if (initializationCompletes)
+                        {
+                            Add(
+                                GetOperatorExceptions(
+                                    truthOperator,
+                                    activeMethods,
+                                    depth),
+                                binary);
+                        }
+                        priorPhasesComplete = initializationCompletes &&
+                            canMethodCompleteNormally(truthOperator);
+                    }
+                    else if (priorPhasesComplete)
+                    {
+                        Add(UnknownPotential, binary);
+                        priorPhasesComplete = false;
+                    }
+                }
+
+                if (priorPhasesComplete &&
                     canCompleteNormally(binary.RightOperand))
                 {
                     if (AddStaticInitializationPotential(
@@ -1121,6 +1155,21 @@ internal sealed class ExceptionHandlerReachability(
                     remaining.Push(assignment.Value);
                 }
                 PushSequentialCore(inputs, remaining);
+                return;
+            case IBinaryOperation
+            {
+                OperatorMethod: not null,
+                OperatorKind: BinaryOperatorKind.ConditionalAnd or
+                        BinaryOperatorKind.ConditionalOr
+            } binary:
+                if (canCompleteNormally(binary.LeftOperand) &&
+                    ConditionalTruthOperatorFacts.Resolve(binary) is
+                    { } truthOperator &&
+                    canMethodCompleteNormally(truthOperator))
+                {
+                    remaining.Push(binary.RightOperand);
+                }
+                remaining.Push(binary.LeftOperand);
                 return;
             case IBinaryOperation
             {

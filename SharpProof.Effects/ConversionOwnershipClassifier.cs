@@ -3,6 +3,7 @@ namespace SharpProof.Effects;
 internal sealed class ConversionOwnershipClassifier
 {
     private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures;
+    private readonly ConditionalTruthOperatorFlowCaptures _conditionalTruthCaptures;
     private readonly Compilation _compilation;
     private readonly CreationFlowCaptures _creationCaptures;
     private readonly Dictionary<ISymbol, EffectRegionSet> _localRegions =
@@ -13,11 +14,13 @@ internal sealed class ConversionOwnershipClassifier
         IMethodSymbol method,
         Compilation compilation,
         CoalesceAssignmentFlowCaptures coalesceCaptures,
+        ConditionalTruthOperatorFlowCaptures conditionalTruthCaptures,
         CreationFlowCaptures creationCaptures)
     {
         _method = method;
         _compilation = compilation;
         _coalesceCaptures = coalesceCaptures;
+        _conditionalTruthCaptures = conditionalTruthCaptures;
         _creationCaptures = creationCaptures;
     }
 
@@ -47,6 +50,11 @@ internal sealed class ConversionOwnershipClassifier
                     capture,
                     out var captured) =>
                 ClassifyRegion(captured, aliasSource),
+            IFlowCaptureReferenceOperation capture
+                when _conditionalTruthCaptures.TryResolve(
+                    capture,
+                    out var truthOperand) =>
+                ClassifyRegion(truthOperand, aliasSource),
             IFlowCaptureReferenceOperation => EffectRegionSet.Unknown,
             IFieldReferenceOperation { Field.IsStatic: true } => EffectRegionSet.Create(EffectRegionId.Static()),
             IFieldReferenceOperation

@@ -9,6 +9,7 @@ internal sealed partial class OperationEffectScanner
     private readonly EffectCallSiteResolver _callResolver;
     private readonly ConversionEffectClassifier _conversionEffects;
     private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures = new();
+    private readonly ConditionalTruthOperatorFlowCaptures _conditionalTruthCaptures = new();
     private readonly OperationCompletionEvaluator _completionEvaluator;
     private readonly CreationFlowCaptures _creationCaptures = new();
     private readonly SyntaxNode? _directSyntax;
@@ -55,6 +56,7 @@ internal sealed partial class OperationEffectScanner
             _method,
             session.Compilation,
             _coalesceCaptures,
+            _conditionalTruthCaptures,
             _creationCaptures);
         _allowDirectWitnesses = allowDirectWitnesses;
         _directSyntax = GetDirectSyntax(root.Syntax);
@@ -484,6 +486,7 @@ internal sealed partial class OperationEffectScanner
     private EffectSummary ScanFlowCapture(IFlowCaptureOperation capture)
     {
         _coalesceCaptures.Record(capture);
+        _conditionalTruthCaptures.Record(capture);
         _creationCaptures.Record(capture);
         return Scan(capture.Value);
     }

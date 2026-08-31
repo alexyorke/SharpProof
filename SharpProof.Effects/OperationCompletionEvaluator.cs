@@ -1136,14 +1136,8 @@ internal sealed class OperationCompletionEvaluator
 
             if (binary.OperatorMethod != null)
             {
-                var truthOperatorName = binary.OperatorKind ==
-                    BinaryOperatorKind.ConditionalAnd
-                        ? "op_False"
-                        : "op_True";
-                var truthOperator = binary.OperatorMethod.ContainingType
-                    .GetMembers(truthOperatorName)
-                    .OfType<IMethodSymbol>()
-                    .FirstOrDefault(method => method.Parameters.Length == 1);
+                var truthOperator = ConditionalTruthOperatorFacts.Resolve(
+                    binary);
                 return truthOperator == null ||
                     CanMethodCompleteNormally(truthOperator);
             }

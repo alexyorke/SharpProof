@@ -359,6 +359,28 @@ internal sealed partial class OperationEffectScanner
         var isConditional = binary.OperatorKind is
             BinaryOperatorKind.ConditionalAnd or
             BinaryOperatorKind.ConditionalOr;
+        if (isConditional && binary.OperatorMethod != null)
+        {
+            var truthOperator = ConditionalTruthOperatorFacts.Resolve(binary);
+            if (truthOperator == null)
+            {
+                return EffectSummaryOperations.Join(
+                    left.Summary,
+                    EffectSummaryOperations.Unsupported());
+            }
+
+            left = left.Then(new EffectStep(
+                ResolveOperatorEffects(
+                    truthOperator,
+                    [binary.LeftOperand],
+                    binary),
+                _completionEvaluator.CanMethodCompleteNormally(
+                    truthOperator)));
+            if (!left.CompletesNormally)
+            {
+                return left.Summary;
+            }
+        }
         if (isConditional &&
             TryGetBoolean(binary, binary.LeftOperand, out var leftValue))
         {
