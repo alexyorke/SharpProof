@@ -218,7 +218,8 @@ public sealed class SharpProofWorker : IDisposable
                             cachedResponse,
                             snapshot.InputHash,
                             manifest,
-                            responseAuthority).IsValid)
+                            responseAuthority,
+                            projectBoundary.Token).IsValid)
                     {
                         return cachedResponse;
                     }
@@ -389,7 +390,8 @@ public sealed class SharpProofWorker : IDisposable
                 response,
                 snapshot.InputHash,
                 manifest,
-                responseAuthority);
+                responseAuthority,
+                projectBoundary.Token);
             if (!responseValidation.IsValid)
             {
                 var malformed = targets.Select(target => Unknown(target, WorkerClaimReason.InfrastructureFailure,
