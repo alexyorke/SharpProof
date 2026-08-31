@@ -39,7 +39,7 @@ public static class CompilerIdentityBridge
         {
             return factory.InternExternalIdentity(
                 CreateSemanticOperationIdentity(factory, operation),
-                OperationSemanticIdentityComparer);
+                EqualityComparer<OperationSemanticIdentity>.Default);
         }
 
         return factory.InternExternalIdentity(
@@ -116,10 +116,6 @@ public static class CompilerIdentityBridge
         return type.SpecialType == SpecialType.System_Boolean ||
             CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
     }
-
-    private static readonly IEqualityComparer<OperationSemanticIdentity>
-        OperationSemanticIdentityComparer =
-            EqualityComparer<OperationSemanticIdentity>.Default;
 
     private static OperationSemanticIdentity CreateSemanticOperationIdentity(
         IrFactory factory,

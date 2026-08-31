@@ -599,7 +599,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        if ((!field.IsReadOnly || IsMutableStorageType(field.Type)) &&
+        if ((!field.IsReadOnly || IsMutableStorageType(
+                field.Type,
+                context.CancellationToken)) &&
             IsForbiddenMutableStaticStorage(field))
         {
             Report(context, MetaDiagnosticDescriptors.MutableStaticState, field.Locations.FirstOrDefault(), field.Name);
@@ -609,7 +611,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeProperty(SymbolAnalysisContext context)
     {
         var property = (IPropertySymbol)context.Symbol;
-        if ((property.SetMethod != null || IsMutableStorageType(property.Type)) &&
+        if ((property.SetMethod != null || IsMutableStorageType(
+                property.Type,
+                context.CancellationToken)) &&
             IsForbiddenMutableStaticStorage(property) &&
             IsAutoProperty(property, context.CancellationToken))
         {
@@ -641,35 +645,195 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             IsCriticalStateNamespace(symbol.ContainingNamespace);
     }
 
-    private static bool IsMutableStorageType(ITypeSymbol type)
+    private static bool IsMutableStorageType(
+        ITypeSymbol type,
+        CancellationToken cancellationToken)
     {
+        return IsMutableStorageType(
+            type,
+            new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default),
+            cancellationToken);
+    }
+
+    private static bool IsMutableStorageType(
+        ITypeSymbol type,
+        HashSet<ITypeSymbol> visiting,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (type is IArrayTypeSymbol)
         {
             return true;
         }
 
+        if (type is ITypeParameterSymbol typeParameter)
+        {
+            return !typeParameter.HasValueTypeConstraint;
+        }
+
         if (type.IsValueType ||
             type.SpecialType != SpecialType.None ||
             type is not INamedTypeSymbol named ||
-            named.Name.StartsWith("Immutable", StringComparison.Ordinal) ||
-            named.Name.StartsWith("ReadOnly", StringComparison.Ordinal))
+            named.TypeKind == TypeKind.Delegate ||
+            IsKnownImmutableStorageType(named) ||
+            IsCompilationScopedWeakCache(named))
         {
             return false;
         }
 
-        if (named.AllInterfaces.Any(static candidate => candidate.Name is
-            "ICollection" or "IDictionary" or "IList" or "ISet" or
-            "IProducerConsumerCollection"))
+        var definition = named.OriginalDefinition;
+        if (!visiting.Add(definition))
+        {
+            return false;
+        }
+
+        try
+        {
+            for (var current = named;
+                 current != null &&
+                 current.SpecialType == SpecialType.None;
+                 current = current.BaseType)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (IsKnownImmutableStorageType(current) ||
+                    IsCompilationScopedWeakCache(current))
+                {
+                    continue;
+                }
+
+                // Metadata does not expose enough implementation detail to
+                // prove that an arbitrary reference type is immutable.
+                if (current.DeclaringSyntaxReferences.Length == 0)
+                {
+                    return true;
+                }
+
+                foreach (var field in current.GetMembers()
+                             .OfType<IFieldSymbol>())
+                {
+                    if (field.IsStatic || field.IsConst)
+                    {
+                        continue;
+                    }
+
+                    if (!field.IsReadOnly ||
+                        IsMutableStorageType(
+                            field.Type,
+                            visiting,
+                            cancellationToken))
+                    {
+                        return true;
+                    }
+                }
+
+                foreach (var property in current.GetMembers()
+                             .OfType<IPropertySymbol>())
+                {
+                    if (property.IsStatic)
+                    {
+                        continue;
+                    }
+
+                    if (property.SetMethod is { IsInitOnly: false } ||
+                        (IsAutoProperty(property, cancellationToken) &&
+                         IsMutableStorageType(
+                             property.Type,
+                             visiting,
+                             cancellationToken)))
+                    {
+                        return true;
+                    }
+                }
+
+                if (current.GetMembers().OfType<IEventSymbol>().Any(
+                        static @event => !@event.IsStatic))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            visiting.Remove(definition);
+        }
+    }
+
+    private static bool IsKnownImmutableStorageType(INamedTypeSymbol type)
+    {
+        if (type.OriginalDefinition.DeclaringSyntaxReferences.Length != 0)
+        {
+            return false;
+        }
+
+        if (IsExactNamespace(
+                type.ContainingNamespace,
+                "System",
+                "Collections",
+                "Immutable"))
+        {
+            return !string.Equals(
+                type.Name,
+                "Builder",
+                StringComparison.Ordinal);
+        }
+
+        if (IsExactNamespace(
+                type.ContainingNamespace,
+                "System",
+                "Collections",
+                "Frozen"))
         {
             return true;
         }
 
-        return named.GetMembers().OfType<IFieldSymbol>().Any(static field =>
-                field.DeclaringSyntaxReferences.Length != 0 &&
-                !field.IsStatic && !field.IsConst && !field.IsReadOnly) ||
-            named.GetMembers().OfType<IPropertySymbol>().Any(static property =>
-                property.DeclaringSyntaxReferences.Length != 0 &&
-                !property.IsStatic && property.SetMethod is { IsInitOnly: false });
+        return IsExactNamedType(type, "Version", "System") ||
+            IsExactNamedType(
+                type,
+                "DiagnosticDescriptor",
+                "Microsoft",
+                "CodeAnalysis");
+    }
+
+    private static bool IsCompilationScopedWeakCache(INamedTypeSymbol type)
+    {
+        if (type.OriginalDefinition.DeclaringSyntaxReferences.Length != 0 ||
+            !IsExactNamedType(
+                type.OriginalDefinition,
+                "ConditionalWeakTable",
+                "System",
+                "Runtime",
+                "CompilerServices") ||
+            type.TypeArguments.Length != 2)
+        {
+            return false;
+        }
+
+        for (var current = type.TypeArguments[0] as INamedTypeSymbol;
+             current != null;
+             current = current.BaseType)
+        {
+            if (IsExactNamedType(
+                    current.OriginalDefinition,
+                    "Compilation",
+                    "Microsoft",
+                    "CodeAnalysis"))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsExactNamedType(
+        INamedTypeSymbol type,
+        string name,
+        params string[] containingNamespace)
+    {
+        return string.Equals(type.Name, name, StringComparison.Ordinal) &&
+            IsExactNamespace(type.ContainingNamespace, containingNamespace);
     }
 
     private static bool IsAutoProperty(
