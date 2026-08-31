@@ -163,7 +163,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         try
         {
             using var owner = new Z3ExpressionOwner();
-            var encoder = new QueryEncoder(_context, query, owner, meter);
+            var encoder = new QueryEncoder(_context, query, owner, meter, cancellationToken);
             using var solver = _context.MkSolver();
 
             foreach (var variable in encoder.IntegerVariables)
@@ -386,23 +386,26 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private readonly Dictionary<IrVarId, Expr> _variables = [];
         private readonly IrFactory _factory;
         private readonly QueryResourceMeter _meter;
+        private readonly CancellationToken _cancellationToken;
 
         internal QueryEncoder(
             Context context,
             VerificationQuery query,
             Z3ExpressionOwner owner,
-            QueryResourceMeter meter)
+            QueryResourceMeter meter,
+            CancellationToken cancellationToken)
         {
             _context = context;
             _owner = owner;
             _factory = query.Factory;
             _meter = meter;
+            _cancellationToken = cancellationToken;
             var maximumDepths = new Dictionary<IrId, int>();
             foreach (var assumption in query.Assumptions)
             {
-                ValidateDepth(assumption.Predicate, maximumDepths, meter);
+                ValidateDepth(assumption.Predicate, maximumDepths, meter, cancellationToken);
             }
-            ValidateDepth(query.Goal.Predicate, maximumDepths, meter);
+            ValidateDepth(query.Goal.Predicate, maximumDepths, meter, cancellationToken);
             Variables = query.ModelVariables;
             var integerVariables = ImmutableArray.CreateBuilder<IrVarId>();
             foreach (var variable in Variables)
@@ -449,13 +452,15 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private static void ValidateDepth(
             IrTerm root,
             Dictionary<IrId, int> maximumDepths,
-            QueryResourceMeter meter)
+            QueryResourceMeter meter,
+            CancellationToken cancellationToken)
         {
             var pending = new Stack<(IrTerm Term, int Depth)>();
             pending.Push((root, 1));
             while (pending.Count != 0)
             {
                 meter.Consume();
+                cancellationToken.ThrowIfCancellationRequested();
                 var (term, depth) = pending.Pop();
                 if (depth > MaximumEncodingDepth)
                 {
@@ -528,6 +533,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
         private EncodedValue Encode(IrTerm term)
         {
+            _cancellationToken.ThrowIfCancellationRequested();
             if (_encoded.TryGetValue(term.Id, out var existing))
             {
                 return existing;
