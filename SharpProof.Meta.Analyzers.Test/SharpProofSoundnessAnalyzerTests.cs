@@ -264,6 +264,33 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public void CacheReachingDefinitionsObserveCancellationBeforeGraphConstruction()
+    {
+        var rules = typeof(SharpProofSoundnessAnalyzer).Assembly.GetType(
+            "SharpProof.Meta.Analyzers.CacheSoundnessRules")!;
+        var method = rules.GetMethods(
+                System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Static)
+            .SingleOrDefault(candidate =>
+                candidate.Name == "GetReachingLocalValues" &&
+                candidate.GetParameters() is
+                [_, _, { ParameterType: { } tokenType }] &&
+                tokenType == typeof(CancellationToken));
+        Assert.That(method, Is.Not.Null);
+
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var exception = Assert.Throws<System.Reflection.TargetInvocationException>(
+            (Action)(() => method!.Invoke(
+                null,
+                [null, null, cancellation.Token])));
+
+        Assert.That(
+            exception!.InnerException,
+            Is.TypeOf<OperationCanceledException>());
+    }
+
+    [Test]
     public async Task ReportsEveryRoslynTextParserEntryPoint()
     {
         var diagnostics = await Analyze(
