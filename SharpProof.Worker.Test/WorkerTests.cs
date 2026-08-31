@@ -5277,6 +5277,36 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public async Task InjectedBackendSerializesConcurrentWorkerRuns()
+    {
+        using var project = TestProject.Create(TautologySource);
+        var request = project.CreateRequest(cacheEnabled: false);
+        var backend = new ConcurrentRunBackend();
+        using var worker = new SharpProofWorker(backend);
+
+        var first = worker.VerifyAsync(request);
+        await backend.FirstEntered.WaitAsync(TimeSpan.FromSeconds(10));
+        var second = worker.VerifyAsync(request);
+        var secondEnteredBeforeRelease = ReferenceEquals(
+            await Task.WhenAny(
+                backend.SecondEntered,
+                Task.Delay(TimeSpan.FromSeconds(1))),
+            backend.SecondEntered);
+        backend.ReleaseFirst();
+        var responses = await Task.WhenAll(first, second);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(secondEnteredBeforeRelease, Is.False);
+            Assert.That(backend.MaximumActive, Is.EqualTo(1));
+            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(
+                responses.Select(static response => response.RunStatus),
+                Is.All.EqualTo(WorkerRunStatus.Complete));
+        }
+    }
+
+    [Test]
     public async Task MethodTimeoutRetiresAndRecreatesTheInterruptedSolverLane()
     {
         using var project = TestProject.Create(
@@ -6406,6 +6436,71 @@ public sealed class WorkerTests
         {
             DisposeCalls++;
             throw new InvalidOperationException("backend disposal failed");
+        }
+    }
+
+    private sealed class ConcurrentRunBackend : ISmtBackend
+    {
+        private readonly object _gate = new();
+        private readonly TaskCompletionSource _firstEntered =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _releaseFirst =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _secondEntered =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _active;
+
+        internal int CallCount
+        {
+            get; private set;
+        }
+
+        internal int MaximumActive
+        {
+            get; private set;
+        }
+
+        internal Task FirstEntered => _firstEntered.Task;
+        internal Task SecondEntered => _secondEntered.Task;
+
+        internal void ReleaseFirst()
+        {
+            _releaseFirst.TrySetResult();
+        }
+
+        public async Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            int call;
+            lock (_gate)
+            {
+                call = ++CallCount;
+                _active++;
+                MaximumActive = Math.Max(MaximumActive, _active);
+            }
+
+            try
+            {
+                if (call == 1)
+                {
+                    _firstEntered.TrySetResult();
+                    await _releaseFirst.Task.WaitAsync(cancellationToken);
+                }
+                else
+                {
+                    _secondEntered.TrySetResult();
+                }
+
+                return BackendCheckResult.Unsatisfiable([]);
+            }
+            finally
+            {
+                lock (_gate)
+                {
+                    _active--;
+                }
+            }
         }
     }
 
