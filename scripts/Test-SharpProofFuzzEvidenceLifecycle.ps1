@@ -11,6 +11,11 @@ if ((($seedAfterStride - $seedToday) % 397) -eq 0) {
     throw 'Rotating seeds repeat the FuzzRunner case stride after 397 days.'
 }
 
+$campaignScript = Get-Content -Raw (Join-Path $PSScriptRoot 'Invoke-SharpProofFuzzCampaign.ps1')
+if ($campaignScript -notmatch '\[int\]\$_ -ne \$RotatingSeed') {
+    throw 'Campaign must not replay a retained seed used by the rotating run.'
+}
+
 $root = Join-Path ([IO.Path]::GetTempPath()) (
     'SharpProof-fuzz-evidence-' + [Guid]::NewGuid().ToString('N'))
 try {

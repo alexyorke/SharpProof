@@ -63,8 +63,10 @@ $maximumCampaignCases = Assert-SharpProofFuzzCaseBudget `
     -Value $contract.fuzz.maximumCampaignCases `
     -Name 'contract.fuzz.maximumCampaignCases'
 $retainedRunSeeds = @($retainedSeeds | Where-Object {
-        [int]$_ -ne $RotatingSeed -or
-        $effectiveRotatingCases -lt $effectiveRetainedCases
+        # Both runners start at case zero.  Replaying a retained seed that
+        # matches the rotating seed would therefore duplicate its prefix when
+        # the rotating run is shorter than the retained run.
+        [int]$_ -ne $RotatingSeed
     })
 $requestedCampaignCases = Assert-SharpProofFuzzCampaignBudget `
     -RotatingCases $effectiveRotatingCases `
