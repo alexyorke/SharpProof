@@ -50,7 +50,8 @@ internal static class EffectClaimResultAssembler
                 evidence.Certainty);
         }
 
-        if (entryFeasibility.IsUnknown)
+        if (entryFeasibility.IsUnknown &&
+            evidence.Outcome == WorkerClaimOutcome.Unknown)
         {
             return CallableClaimResultAssembler.Create(
                 target,
