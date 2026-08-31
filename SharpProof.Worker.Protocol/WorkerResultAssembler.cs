@@ -184,16 +184,11 @@ internal static class WorkerResultAssembler
 
     internal static bool MatchesCallableProjection(
         WorkerCallableResult callable,
-        WorkerClaimManifest manifest,
-        IEnumerable<WorkerClaimResult> claims,
+        WorkerClaimResult[] owned,
         WorkerRunStatus runStatus,
         WorkerRunFailureReason failureReason,
         bool hasErrors)
     {
-        var ownedIds = manifest.Callables.FirstOrDefault(entry =>
-            entry.CallableId == callable.CallableId)?.ClaimIds ?? [];
-        var owned = claims.Where(claim =>
-            ownedIds.Contains(claim.ClaimId, StringComparer.Ordinal)).ToArray();
         WorkerCallableCoverageReason expected;
         if (runStatus == WorkerRunStatus.Failed && hasErrors)
         {

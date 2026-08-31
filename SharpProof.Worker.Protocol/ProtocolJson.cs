@@ -502,13 +502,20 @@ public static partial class WorkerProtocolJson
             callables.Where(static value => !string.IsNullOrWhiteSpace(value.CallableId))
                 .Select(static value => value.CallableId),
             s_ordinal);
+        var claimsByCallable = claims.ToLookup(
+            static value => (string?)value.CallableId,
+            s_ordinal);
         foreach (var callable in callables)
         {
             errors.Check(HasValidLocation(callable.Location), prefix + ".callable_location")
                 .Rules(callable, WorkerProtocolMetadata.ManifestCallableRules, prefix + ".")
                 .Check(HasProducerAssumptionKinds(callable.Assumptions),
                     prefix + ".assumption_kind");
-            ValidateClaimMembership(callable, claims, prefix, errors);
+            ValidateClaimMembership(
+                callable,
+                claimsByCallable[callable.CallableId],
+                prefix,
+                errors);
         }
         ValidateManifestAssumptionIdentity(callables, prefix, errors);
         foreach (var claim in claims)
@@ -523,9 +530,12 @@ public static partial class WorkerProtocolJson
         }
     }
     private static void ValidateClaimMembership(
-        WorkerCallableManifestEntry callable, WorkerClaimManifestEntry[] claims, string prefix, Validator errors)
+        WorkerCallableManifestEntry callable,
+        IEnumerable<WorkerClaimManifestEntry> claims,
+        string prefix,
+        Validator errors)
     {
-        var expected = claims.Where(value => value.CallableId == callable.CallableId)
+        var expected = claims
             .OrderBy(static value => value.Ordinal)
             .ThenBy(static value => value.ClaimId, s_ordinal).ToArray();
         errors.Check(expected.Select(static value => value.Ordinal)
@@ -560,11 +570,14 @@ public static partial class WorkerProtocolJson
                 .Select(static value => value.CallableId) ?? [],
             static value => value.CallableId, "response.callable_results",
             "response.callable_id", "response.callable_set", errors);
+        var declaredById = new OrdinalIdentityIndex<
+            WorkerCallableManifestEntry>(
+                manifest?.Callables?.OfType<WorkerCallableManifestEntry>() ?? [],
+                static item => item.CallableId);
         foreach (var value in valid)
         {
             errors.Rules(value, WorkerProtocolMetadata.CallableResultRules);
-            var declared = manifest?.Callables?.FirstOrDefault(
-                item => item != null && item.CallableId == value.CallableId);
+            var declared = declaredById.Find(value.CallableId);
             errors.Check(declared != null &&
                 SameAssumptionDeclarations(value.Assumptions, declared.Assumptions),
                 "response.callable_assumption_set");
@@ -578,18 +591,28 @@ public static partial class WorkerProtocolJson
                 .Select(static value => value.ClaimId) ?? [],
             static value => value.ClaimId, "response.claim_results",
             "response.result_claim_id", "response.claim_set", errors);
+        var claimsById = new OrdinalIdentityIndex<WorkerClaimManifestEntry>(
+            manifest?.Claims?.OfType<WorkerClaimManifestEntry>() ?? [],
+            static item => item.ClaimId);
+        var callablesById = new OrdinalIdentityIndex<
+            WorkerCallableManifestEntry>(
+                manifest?.Callables?.OfType<WorkerCallableManifestEntry>() ?? [],
+                static item => item.CallableId);
         foreach (var value in valid)
         {
-            ValidateClaimResult(value, manifest, errors);
+            ValidateClaimResult(value, claimsById, callablesById, errors);
         }
 
         return valid;
     }
-    private static void ValidateClaimResult(WorkerClaimResult value, WorkerClaimManifest? manifest, Validator errors)
+    private static void ValidateClaimResult(
+        WorkerClaimResult value,
+        OrdinalIdentityIndex<WorkerClaimManifestEntry> claimsById,
+        OrdinalIdentityIndex<WorkerCallableManifestEntry> callablesById,
+        Validator errors)
     {
         errors.Rules(value, WorkerProtocolMetadata.ClaimResultRules);
-        var claim = manifest?.Claims?.FirstOrDefault(
-            item => item != null && item.ClaimId == value.ClaimId);
+        var claim = claimsById.Find(value.ClaimId);
         var effectClaim = claim?.Kind == WorkerClaimKind.Effect;
         errors.Check(claim != null &&
                 WorkerProtocolMetadata.MatchesClaimKindOutcome(
@@ -624,8 +647,7 @@ public static partial class WorkerProtocolJson
         errors.Check(WorkerProtocolMetadata.MatchesVacuity(
             claim?.Kind ?? WorkerClaimKind.Unspecified, value.Outcome, value.Vacuity),
             "response.vacuity");
-        var owner = manifest?.Callables?.FirstOrDefault(
-            item => item != null && item.CallableId == claim?.CallableId);
+        var owner = callablesById.Find(claim?.CallableId);
         errors.Check(owner != null && SameAssumptionDeclarations(value.Assumptions, owner.Assumptions),
             "response.claim_assumption_set");
     }
@@ -684,18 +706,48 @@ public static partial class WorkerProtocolJson
             "response.run_projection");
         if (response.Manifest != null && projected)
         {
+            var callablesById = new OrdinalIdentityIndex<
+                WorkerCallableManifestEntry>(
+                    response.Manifest.Callables
+                        .OfType<WorkerCallableManifestEntry>(),
+                    static item => item.CallableId);
+            var claimsById = claims.ToLookup(
+                static claim => (string?)claim.ClaimId,
+                s_ordinal);
             foreach (var callable in callables)
             {
+                var declared = callablesById.Find(callable.CallableId);
+                var owned = GetOwnedClaimResults(declared, claimsById);
                 errors.Check(WorkerResultAssembler.MatchesCallableProjection(
                         callable,
-                        response.Manifest,
-                        claims,
+                        owned,
                         expectedStatus,
                         expectedFailure,
                         protocolErrors.Length != 0),
                     "response.callable_projection");
             }
         }
+    }
+
+    private static WorkerClaimResult[] GetOwnedClaimResults(
+        WorkerCallableManifestEntry? callable,
+        ILookup<string?, WorkerClaimResult> claimsById)
+    {
+        if (callable?.ClaimIds == null)
+        {
+            return [];
+        }
+
+        var ownedIds = new HashSet<string?>(s_ordinal);
+        var owned = new List<WorkerClaimResult>();
+        foreach (var claimId in callable.ClaimIds)
+        {
+            if (ownedIds.Add(claimId))
+            {
+                owned.AddRange(claimsById[claimId]);
+            }
+        }
+        return [.. owned];
     }
 
     private static void ValidateSummary(WorkerVerificationSummary? summary,
@@ -914,6 +966,47 @@ public static partial class WorkerProtocolJson
         }
 
         return Normalize(actual).SequenceEqual(Normalize(expected));
+    }
+
+    private sealed class OrdinalIdentityIndex<T>
+        where T : class
+    {
+        private readonly Dictionary<string, T> _byId = new(s_ordinal);
+        private bool _hasNull;
+        private T? _nullValue;
+
+        internal OrdinalIdentityIndex(
+            IEnumerable<T> values,
+            Func<T, string?> identity)
+        {
+            foreach (var value in values)
+            {
+                var id = identity(value);
+                if (id == null)
+                {
+                    if (!_hasNull)
+                    {
+                        _nullValue = value;
+                        _hasNull = true;
+                    }
+                }
+                else if (!_byId.ContainsKey(id))
+                {
+                    _byId.Add(id, value);
+                }
+            }
+        }
+
+        internal T? Find(string? id)
+        {
+            if (id == null)
+            {
+                return _hasNull ? _nullValue : null;
+            }
+            return _byId.TryGetValue(id, out var value)
+                ? value
+                : null;
+        }
     }
 
     private static string ManifestName<T>(T value) where T : struct, Enum
