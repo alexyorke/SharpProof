@@ -6,6 +6,11 @@ namespace SharpProof.ArchitectureTest;
 [TestFixture]
 public sealed class SbomReleaseIdentityTests
 {
+    private static readonly TimeSpan FixtureProcessTimeout =
+        TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan ProcessTerminationTimeout =
+        TimeSpan.FromSeconds(5);
+
     [Test]
     public void SbomFixtureProcessHasAnInternalWallTimeLimit()
     {
@@ -130,11 +135,82 @@ public sealed class SbomReleaseIdentityTests
             "Test-SharpProofSbomReleaseIdentityFixtures.ps1"));
         info.ArgumentList.Add("-Mutation");
         info.ArgumentList.Add(mutation);
-        using var process = Process.Start(info)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return (process.ExitCode, await output + Environment.NewLine + await error);
+        return await RunProcessAsync(info, FixtureProcessTimeout);
+    }
+
+    private static async Task<(int ExitCode, string Output)> RunProcessAsync(
+        ProcessStartInfo info,
+        TimeSpan timeout)
+    {
+        if (timeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(timeout),
+                timeout,
+                "The fixture process timeout must be positive.");
+        }
+
+        using var process = Process.Start(info) ??
+            throw new InvalidOperationException(
+                $"Could not start '{info.FileName}'.");
+        var output = process.StandardOutput.ReadToEndAsync(
+            CancellationToken.None);
+        var error = process.StandardError.ReadToEndAsync(
+            CancellationToken.None);
+        using var boundary = new CancellationTokenSource(timeout);
+        try
+        {
+            await process.WaitForExitAsync(boundary.Token);
+            var streams = await Task.WhenAll(output, error)
+                .WaitAsync(boundary.Token);
+            return (
+                process.ExitCode,
+                streams[0] + Environment.NewLine + streams[1]);
+        }
+        catch (OperationCanceledException exception)
+            when (boundary.IsCancellationRequested)
+        {
+            await TerminateProcessAsync(process, output, error);
+            throw new TimeoutException(
+                $"'{info.FileName}' did not exit within " +
+                $"{timeout.TotalSeconds:0.###} seconds.",
+                exception);
+        }
+        catch
+        {
+            await TerminateProcessAsync(process, output, error);
+            throw;
+        }
+    }
+
+    private static async Task TerminateProcessAsync(
+        Process process,
+        Task<string> output,
+        Task<string> error)
+    {
+        if (!process.HasExited)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException) when (process.HasExited)
+            {
+            }
+        }
+
+        using var cleanup = new CancellationTokenSource(
+            ProcessTerminationTimeout);
+        try
+        {
+            await process.WaitForExitAsync(cleanup.Token);
+            _ = await Task.WhenAll(output, error)
+                .WaitAsync(cleanup.Token);
+        }
+        catch (OperationCanceledException)
+            when (cleanup.IsCancellationRequested)
+        {
+        }
     }
 
     private static Task<(int ExitCode, string Output)> InvokeProcessRunnerAsync(
