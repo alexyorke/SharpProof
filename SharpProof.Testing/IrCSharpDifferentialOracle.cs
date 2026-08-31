@@ -113,7 +113,13 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         out string reason)
     {
         var variables = new SortedDictionary<int, IrVarId>();
-        if (!TryAppendExpression(new StringBuilder(), term, variables, out _, out reason))
+        var terms = new List<IrTerm>();
+        if (!TryCollectTerms(
+                term,
+                variables,
+                new HashSet<IrId>(),
+                terms,
+                out reason))
         {
             program = "";
             orderedVariables = [];
@@ -139,10 +145,10 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
             }
         }
 
-        var expression = new StringBuilder();
-        if (!TryAppendExpression(expression, term, variables, out var returnType, out reason))
+        if (!TryGetCSharpType(term.Type, out var returnType))
         {
             program = "";
+            reason = "The result type is outside the executable oracle subset.";
             return false;
         }
 
@@ -174,8 +180,16 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
             source.Append(variable.Value.ToString(CultureInfo.InvariantCulture));
         }
         source.AppendLine(") {");
+        foreach (var current in terms)
+        {
+            if (!TryAppendLazyDeclaration(source, current, out reason))
+            {
+                program = "";
+                return false;
+            }
+        }
         source.Append("        return checked(");
-        source.Append(expression);
+        AppendLazyValue(source, term);
         source.AppendLine(");");
         source.AppendLine("    }");
         source.AppendLine("}");
@@ -184,19 +198,99 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         return true;
     }
 
-    private bool TryAppendExpression(
-        StringBuilder builder,
+    private bool TryCollectTerms(
         IrTerm term,
         IDictionary<int, IrVarId> variables,
-        out string type,
+        ISet<IrId> visited,
+        ICollection<IrTerm> terms,
         out string reason)
     {
-        if (!TryGetCSharpType(term.Type, out type))
+        if (!visited.Add(term.Id))
+        {
+            reason = "";
+            return true;
+        }
+        if (!TryGetCSharpType(term.Type, out _))
         {
             reason = "The result type is outside the executable oracle subset.";
             return false;
         }
 
+        switch (term)
+        {
+            case IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm:
+                break;
+            case IrVariableTerm variable:
+                variables[variable.Variable.Value] = variable.Variable;
+                break;
+            case IrUnaryTerm unary when !TryCollectTerms(
+                unary.Operand, variables, visited, terms, out reason):
+                return false;
+            case IrUnaryTerm:
+                break;
+            case IrBinaryTerm binary when
+                !TryCollectTerms(binary.Left, variables, visited, terms, out reason) ||
+                !TryCollectTerms(binary.Right, variables, visited, terms, out reason):
+                return false;
+            case IrBinaryTerm:
+                break;
+            case IrConditionalTerm conditional when
+                !TryCollectTerms(
+                    conditional.Condition, variables, visited, terms, out reason) ||
+                !TryCollectTerms(
+                    conditional.WhenTrue, variables, visited, terms, out reason) ||
+                !TryCollectTerms(
+                    conditional.WhenFalse, variables, visited, terms, out reason):
+                return false;
+            case IrConditionalTerm:
+                break;
+            case IrCastTerm cast when !TryCollectTerms(
+                cast.Operand, variables, visited, terms, out reason):
+                return false;
+            case IrCastTerm:
+                break;
+            case IrLengthTerm length when !TryCollectTerms(
+                length.Value, variables, visited, terms, out reason):
+                return false;
+            case IrLengthTerm:
+                break;
+            case IrSequenceAccessTerm access when
+                !TryCollectTerms(
+                    access.Sequence, variables, visited, terms, out reason) ||
+                !TryCollectTerms(
+                    access.Index, variables, visited, terms, out reason):
+                return false;
+            case IrSequenceAccessTerm:
+                break;
+            case IrOpaqueTerm:
+                reason = "The term contains an opaque call.";
+                return false;
+            default:
+                reason = "The term kind is outside the executable oracle subset.";
+                return false;
+        }
+
+        terms.Add(term);
+        reason = "";
+        return true;
+    }
+
+    private bool TryAppendLazyDeclaration(
+        StringBuilder builder,
+        IrTerm term,
+        out string reason)
+    {
+        if (!TryGetCSharpType(term.Type, out var type))
+        {
+            reason = "The result type is outside the executable oracle subset.";
+            return false;
+        }
+
+        builder.Append("        var t");
+        builder.Append(term.Id.Value.ToString(CultureInfo.InvariantCulture));
+        builder.Append(" = new System.Lazy<");
+        builder.Append(type);
+        builder.Append(">(() => checked(");
         switch (term)
         {
             case IrBooleanTerm boolean:
@@ -216,91 +310,50 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
                 builder.Append(")null!)");
                 break;
             case IrVariableTerm variable:
-                variables[variable.Variable.Value] = variable.Variable;
                 builder.Append('v');
                 builder.Append(variable.Variable.Value.ToString(CultureInfo.InvariantCulture));
                 break;
             case IrUnaryTerm unary:
                 builder.Append('(');
                 builder.Append(unary.Operator == IrUnaryOperator.Not ? '!' : '-');
-                if (!TryAppendExpression(builder, unary.Operand, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, unary.Operand);
                 builder.Append(')');
                 break;
             case IrBinaryTerm binary:
                 builder.Append('(');
-                if (!TryAppendExpression(builder, binary.Left, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, binary.Left);
                 builder.Append(' ');
                 builder.Append(BinaryToken(binary.Operator));
                 builder.Append(' ');
-                if (!TryAppendExpression(builder, binary.Right, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, binary.Right);
                 builder.Append(')');
                 break;
             case IrConditionalTerm conditional:
                 builder.Append('(');
-                if (!TryAppendExpression(builder, conditional.Condition, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, conditional.Condition);
                 builder.Append(" ? ");
-                if (!TryAppendExpression(builder, conditional.WhenTrue, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, conditional.WhenTrue);
                 builder.Append(" : ");
-                if (!TryAppendExpression(builder, conditional.WhenFalse, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, conditional.WhenFalse);
                 builder.Append(')');
                 break;
             case IrCastTerm cast:
                 builder.Append("((");
                 builder.Append(type);
                 builder.Append(')');
-                if (!TryAppendExpression(builder, cast.Operand, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, cast.Operand);
                 builder.Append(')');
                 break;
             case IrLengthTerm length:
                 builder.Append('(');
-                if (!TryAppendExpression(builder, length.Value, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, length.Value);
                 builder.Append(").Length");
                 break;
             case IrSequenceAccessTerm access:
                 builder.Append('(');
-                if (!TryAppendExpression(builder, access.Sequence, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, access.Sequence);
                 builder.Append(")[");
-                if (!TryAppendExpression(builder, access.Index, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, access.Index);
                 builder.Append(']');
                 break;
             case IrOpaqueTerm:
@@ -310,9 +363,16 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
                 reason = "The term kind is outside the executable oracle subset.";
                 return false;
         }
-
+        builder.AppendLine("));");
         reason = "";
         return true;
+    }
+
+    private static void AppendLazyValue(StringBuilder builder, IrTerm term)
+    {
+        builder.Append('t');
+        builder.Append(term.Id.Value.ToString(CultureInfo.InvariantCulture));
+        builder.Append(".Value");
     }
 
     private bool TryGetCSharpType(IrTypeId type, out string name)
