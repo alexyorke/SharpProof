@@ -131,9 +131,8 @@ Priority definitions:
 - **BUG-285 [P1] - Worker timeout can signal a reused process ID:** LinuxWorkerProcess checks a managed process for exit and later sends SIGTERM through its numeric PID without retaining process identity. If the PID is recycled in that window, timeout or disposal can terminate an unrelated process while reporting a normal worker timeout.
 - **BUG-286 [P1] - Z3 resolver becomes visible before the verified handle:** ContainerNativeLibrary registers the DllImport resolver before publishing the verified Z3 handle. A concurrent first P/Invoke can observe zero and fail binding or fall back to ambient library probing.
 
-## P2 - Medium (120)
+## P2 - Medium (119)
 
-- **BUG-287 [P2] - Accessor preconditions are checked after noncompleting statements:** RequiresCallSiteDiscovery checks only for a stored flow state on accessor and list-pattern paths, bypassing the reachability-aware prefix gate. An accessor that cannot execute after a nonreturning statement can therefore produce a false SP0027 diagnostic and Refuted outcome.
 - **BUG-292 [P2] - AnalyzerSession drops cancellation during lazy compilation initialization:** AnalyzerSession checks cancellation only at construction and does not pass a token into lazy companion discovery or clause scanning. Canceled IDE and build callbacks can continue expensive whole-compilation work and block concurrent callbacks.
 - **BUG-295 [P2] - Assignable recursive patterns skip mandatory accessor completion:** OperationCompletionEvaluator checks recursive-pattern accessors only when the matched and input types are symbol-identical. Guaranteed base-type or interface matches can bypass a nonreturning accessor and retain unreachable suffix effects.
 - **BUG-307 [P2] - Callable lowering failures erase independent effect evidence:** CallableVerificationPolicy replaces every claim with callable-wide Unknown whenever body or postcondition lowering fails, even though independently authenticated effect artifacts survive production and decoding. Adding a supported precondition can therefore turn a proven effect-only claim into UnsupportedBody.
