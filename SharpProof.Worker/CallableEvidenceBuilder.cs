@@ -116,10 +116,21 @@ internal static class CallableEvidenceBuilder
                     WorkerClaimReason.UnsupportedBody);
             }
 
-            var predicate = Guard(
+            // Summary contracts can contain the same result terms as direct
+            // specifications. Apply the established result-domain projection
+            // before checking/solving them as well.
+            var projectedGuard = SpecResultDomainProjection.Rewrite(
                 factory,
                 summaryAssumption.Guard,
-                summaryAssumption.Predicate);
+                body.SpecResultProjections);
+            var projectedPredicate = SpecResultDomainProjection.Rewrite(
+                factory,
+                summaryAssumption.Predicate,
+                body.SpecResultProjections);
+            var predicate = Guard(
+                factory,
+                projectedGuard,
+                projectedPredicate);
             if (GetDepth(predicate) > maximumExpressionDepth)
             {
                 return CallableEvidenceBuildResult.Fail(
