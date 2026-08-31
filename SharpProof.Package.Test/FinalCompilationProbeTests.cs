@@ -126,6 +126,7 @@ public sealed class FinalCompilationProbeTests
             workspace.PackedProbeArtifactPath);
         var firstManifest = await CompilerManifestArtifact.ReadAsync(
             workspace.CompilerManifestPath);
+        AssertManifestBindsProbeInputs(firstOracle, firstManifest);
         Assert.That(
             firstOracle.SyntaxTreePaths,
             Has.Some.EndsWith(CompilerProbeContract.GlobalUsingsHintName));
@@ -303,6 +304,47 @@ public sealed class FinalCompilationProbeTests
             result.Output,
             Does.Contain(
                 "canonical Linux amd64 container"));
+    }
+
+    private static void AssertManifestBindsProbeInputs(
+        ProbeArtifact probe,
+        CompilerManifestArtifact manifest)
+    {
+        using var document = JsonDocument.Parse(manifest.Bytes);
+        var compilation = document.RootElement.GetProperty("compilation");
+        var trees = compilation.GetProperty("syntaxTrees")
+            .EnumerateArray()
+            .Select(tree => (
+                Path: tree.GetProperty("path").GetString() ?? string.Empty,
+                Sha256: tree.GetProperty("sha256").GetString() ?? string.Empty))
+            .ToArray();
+        foreach (var expectedSuffix in new[] { "Subject.cs", CompilerProbeContract.ContractHintName })
+        {
+            var probeTree = probe.SyntaxTrees
+                .Select(static text => JsonDocument.Parse(text))
+                .Single(tree => (tree.RootElement.GetProperty("path").GetString() ?? string.Empty)
+                    .EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase));
+            var probeHash = probeTree.RootElement.GetProperty("textSha256").GetString();
+            var manifestHash = trees.Single(tree => tree.Path.EndsWith(
+                expectedSuffix, StringComparison.OrdinalIgnoreCase)).Sha256;
+            Assert.That(manifestHash, Is.EqualTo(probeHash),
+                "compiler manifest syntax-tree provenance: " + expectedSuffix);
+            probeTree.Dispose();
+        }
+
+        var additionalPath = compilation.GetProperty("additionalFiles")
+            .EnumerateArray()
+            .Single(file => (file.GetProperty("path").GetString() ?? string.Empty)
+                .EndsWith(CompilerProbeContract.AdditionalFileName, StringComparison.OrdinalIgnoreCase));
+        var expectedAdditionalHash = Convert.ToHexString(SHA256.HashData(
+            Encoding.UTF8.GetBytes("initial-generator-input\n")));
+        Assert.That(
+            string.Equals(
+                additionalPath.GetProperty("sha256").GetString(),
+                expectedAdditionalHash,
+                StringComparison.OrdinalIgnoreCase),
+            Is.True,
+            "compiler manifest additional-file provenance");
     }
 
     public enum ProbeSuppression

@@ -91,10 +91,9 @@ internal static class ContractForValidationEngine
         // not returned by FindCandidates because they have no source tree in
         // the current compilation. Report each referenced participant in an
         // ambiguous target group so the diagnostic view matches resolution.
-        var sourceCompanions = companions
-            .Select(static companion => companion.Companion)
-            .ToHashSet((IEqualityComparer<INamedTypeSymbol>)
-                SymbolEqualityComparer.Default);
+        var sourceCompanions = new HashSet<INamedTypeSymbol>(
+            companions.Select(static companion => companion.Companion),
+            SymbolEqualityComparer.Default);
         foreach (var companion in relationships.Accepted)
         {
             cancellationToken.ThrowIfCancellationRequested();

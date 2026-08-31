@@ -681,7 +681,7 @@ internal static class CorpusGate
                 .OrderBy(static diagnostic => diagnostic, StringComparer.Ordinal));
     }
 
-    private static void ValidateUnknownReasonRatchet(
+    internal static void ValidateUnknownReasonRatchet(
         CorpusUnknownReasonRatchet ratchet,
         ImmutableArray<CorpusUnknownReasonCount> actual,
         int totalUnknownCount,
@@ -730,6 +730,18 @@ internal static class CorpusGate
                     $"Corpus Unknown reason '{item.Reason}' regressed from " +
                     $"the ratcheted maximum {maximum} to {item.Count}.");
             }
+        }
+
+        var observedReasons = actual
+            .Select(static item => item.Reason)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var reason in ratchet.MaximumByReason.Keys
+                     .Where(reason => !observedReasons.Contains(reason))
+                     .OrderBy(static reason => reason, StringComparer.Ordinal))
+        {
+            failures.Add(
+                $"Corpus Unknown reason '{reason}' is no longer observed; " +
+                "remove its stale ratchet ceiling.");
         }
     }
 

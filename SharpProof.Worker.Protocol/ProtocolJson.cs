@@ -182,14 +182,16 @@ public static partial class WorkerProtocolJson
     internal static WorkerProtocolValidationResult Validate(
         WorkerVerifyResponse? response, string expectedInputHash,
         WorkerClaimManifest? expectedManifest,
-        IWorkerResponseEvidenceAuthority evidenceAuthority)
+        IWorkerResponseEvidenceAuthority evidenceAuthority,
+        CancellationToken cancellationToken = default)
     {
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
         _ = evidenceAuthority ??
             throw new ArgumentNullException(nameof(evidenceAuthority));
         return ValidateResponse(
             response, expectedInputHash, expectedManifest, null, null, null,
-            evidenceAuthority: evidenceAuthority);
+            evidenceAuthority: evidenceAuthority,
+            cancellationToken: cancellationToken);
     }
     public static WorkerProtocolValidationResult ValidateForRequest(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
@@ -228,7 +230,8 @@ public static partial class WorkerProtocolJson
         WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
         WorkerVersionSummary expectedVersions,
         IWorkerResponseEvidenceAuthority evidenceAuthority,
-        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds)
+        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds,
+        CancellationToken cancellationToken = default)
     {
         RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
@@ -258,7 +261,7 @@ public static partial class WorkerProtocolJson
         return ValidateResponse(
             response, expectedInputHash, expectedManifest,
             expectedRequestHash, expectedRequest, expectedVersions,
-            maximumElapsedMilliseconds, evidenceAuthority);
+            maximumElapsedMilliseconds, evidenceAuthority, cancellationToken);
     }
 
     public static void Canonicalize(WorkerVerifyResponse response)
@@ -316,7 +319,8 @@ public static partial class WorkerProtocolJson
         string? expectedRequestHash, WorkerVerifyRequest? expectedRequest,
         WorkerVersionSummary? expectedVersions,
         long? maximumElapsedMilliseconds = null,
-        IWorkerResponseEvidenceAuthority? evidenceAuthority = null)
+        IWorkerResponseEvidenceAuthority? evidenceAuthority = null,
+        CancellationToken cancellationToken = default)
     {
         var errors = new Validator();
         if (response == null)
@@ -382,7 +386,7 @@ public static partial class WorkerProtocolJson
         {
             try
             {
-                foreach (var code in evidenceAuthority.Validate(response)
+                foreach (var code in evidenceAuthority.Validate(response, cancellationToken)
                              .Where(static code => !string.IsNullOrWhiteSpace(code))
                              .Distinct(s_ordinal))
                 {

@@ -20,10 +20,10 @@ public sealed class CompilerSourceLocationAuthorityTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        Assert.Throws<OperationCanceledException>(() =>
-            CompilerSourceLocationAuthority.HasValidLineMap(
+        Assert.Throws<OperationCanceledException>(
+            (Action)(() => CompilerSourceLocationAuthority.HasValidLineMap(
                 artifact.Compilation.SyntaxTrees.Single(),
-                cancellation.Token));
+                cancellation.Token)));
     }
 
     [Test]

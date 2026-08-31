@@ -337,6 +337,39 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void AuthenticatedPackageSpecResolutionChecksConditionalElisionShape()
+    {
+        var reference = MetadataReference.CreateFromFile(
+            typeof(Contract).Assembly.Location);
+        var compilation = CSharpCompilation.Create(
+            "AuthenticatedContractSpecConsumer",
+            references: PlatformReferences().Append(reference),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var resolved = new ApiSpecResolver(ApiSpecTable.Create([
+            ContractRequiresDeclaration(string.Empty)
+        ])).Resolve(compilation);
+        var contract = compilation.GetTypeByMetadataName(
+            "SharpProof.Attributes.Contract");
+        var requires = contract!.GetMembers("Requires")
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(resolved.Failures, Is.Empty);
+            Assert.That(resolved.Specs, Has.Length.EqualTo(1));
+            Assert.That(
+                requires.GetAttributes()
+                    .Where(attribute => attribute.AttributeClass?.ToDisplayString() ==
+                        "System.Diagnostics.ConditionalAttribute")
+                    .SelectMany(attribute => attribute.ConstructorArguments)
+                    .Select(argument => argument.Value),
+                Is.EquivalentTo(new object[] { Contract.ConditionalSymbol }));
+        }
+    }
+
+    [Test]
     public void SharpProofPackageSpecsRejectContractWithoutConditionalElision()
     {
         var package = CreateSharpProofPackageReference(
@@ -780,12 +813,12 @@ public sealed class ApiSpecTests
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
                 constructor.Parameters is [
-                {
-                    Type: INamedTypeSymbol
                     {
-                        MetadataName: "IEnumerable`1"
-                    }
-                }]);
+                        Type: INamedTypeSymbol
+                        {
+                            MetadataName: "IEnumerable`1"
+                        }
+                    }]);
 
         using (Assert.EnterMultipleScope())
         {

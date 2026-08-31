@@ -103,6 +103,47 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public void GeneratorCorpusCoversEverySupportedOperatorFamily()
+    {
+        var observed = new HashSet<GeneratedExpressionKind>();
+        for (var seed = 0; seed < 256; seed++)
+        {
+            var expression = new SmallCSharpCaseGenerator(seed).Next(
+                maximumDepth: 5).Expression;
+            Collect(expression, observed);
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Add));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Subtract));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Multiply));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Divide));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Remainder));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Conditional));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.AndAlso));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.OrElse));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Equal));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.NotEqual));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.LessThan));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.LessThanOrEqual));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.GreaterThan));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.GreaterThanOrEqual));
+        }
+
+        static void Collect(
+            GeneratedCSharpExpression expression,
+            ISet<GeneratedExpressionKind> observed)
+        {
+            observed.Add(expression.Kind);
+            foreach (var child in expression.Children)
+            {
+                Collect(child, observed);
+            }
+        }
+    }
+
+    [Test]
     public async Task ParallelismDoesNotChangeDeterministicOutcomes()
     {
         var serial = await FuzzRunner.RunAsync(

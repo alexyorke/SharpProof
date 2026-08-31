@@ -7,5 +7,6 @@ namespace SharpProof.Worker.Protocol;
 /// </summary>
 internal interface IWorkerResponseEvidenceAuthority
 {
-    IEnumerable<string> Validate(WorkerVerifyResponse response);
+    IEnumerable<string> Validate(WorkerVerifyResponse response,
+        CancellationToken cancellationToken = default);
 }

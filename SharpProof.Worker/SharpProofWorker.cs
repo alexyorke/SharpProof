@@ -417,16 +417,13 @@ public sealed class SharpProofWorker : IDisposable
             projectBoundary.Token.ThrowIfCancellationRequested();
             return response;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) { return Interrupted(snapshot); }
+        finally
         {
-            if (ownsInjectedBackendRunGate)
+            if (ownsInjectedBackendRunGate && projectBoundary.IsCancellationRequested)
             {
                 _injectedBackendPoisoned = true;
             }
-            return Interrupted(snapshot);
-        }
-        finally
-        {
             foreach (var lane in solverLanes)
             {
                 lane.DisposeOwnedBackend();

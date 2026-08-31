@@ -1,7 +1,9 @@
 using System.Text;
 using System.Text.Json;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
+using SharpProof.Analyzer;
 using SharpProof.Gates.Corpus;
 
 namespace SharpProof.Gates.Test;
@@ -9,6 +11,31 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusGateTests
 {
+    [Test]
+    public void UnknownReasonRatchetRejectsStaleCeilings()
+    {
+        var ratchet = new CorpusUnknownReasonRatchet(
+            0,
+            0,
+            1,
+            new Dictionary<string, int>(StringComparer.Ordinal)
+            {
+                ["SP0002"] = 1,
+                ["SP0047"] = 1
+            }.ToImmutableDictionary(StringComparer.Ordinal));
+        var actual = ImmutableArray.Create(
+            new CorpusUnknownReasonCount("SP0002", 1));
+        var failures = ImmutableArray.CreateBuilder<string>();
+
+        CorpusGate.ValidateUnknownReasonRatchet(
+            ratchet, actual, 1, 0, 0, failures);
+
+        Assert.That(
+            failures,
+            Has.Some.Contains("SP0047"));
+        Assert.That(failures, Has.Some.Contains("stale ratchet ceiling"));
+    }
+
     [Test]
     public void CorpusFileCountIncludesSourceIdentity()
     {

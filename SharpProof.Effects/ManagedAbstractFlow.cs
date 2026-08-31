@@ -1012,7 +1012,9 @@ internal sealed class ManagedAbstractFlow
     }
 
     internal static bool IsAcyclic(ControlFlowGraph graph)
-        => IsAcyclic(graph, included: null);
+    {
+        return IsAcyclic(graph, included: null);
+    }
 
     internal static bool IsAcyclic(
         ControlFlowGraph graph,
@@ -1033,7 +1035,9 @@ internal sealed class ManagedAbstractFlow
             marks[block.Ordinal] = 1;
             foreach (var (branch, _) in Successors(block))
             {
-                if (included != null && !included.Contains(branch.Ordinal))
+                if (included != null &&
+                    (branch.Destination == null ||
+                     !included.Contains(branch.Destination.Ordinal)))
                 {
                     continue;
                 }

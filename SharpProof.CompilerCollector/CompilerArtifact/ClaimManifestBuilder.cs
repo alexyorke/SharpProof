@@ -570,8 +570,8 @@ internal sealed partial class ClaimManifestBuilder(
                      // Callables without contract clauses do not participate in
                      // the manifest identity. Excluding them keeps an unrelated
                      // sibling from renumbering the callables that do.
-                     .Where(seed => _clauses.Create(seed.Method, null, cancellationToken)
-                         .Clauses.Length != 0)
+                     .Where(static seed => seed.Declaration?.ToString()
+                         .IndexOf("Contract.", StringComparison.Ordinal) >= 0)
                      .GroupBy(static seed => seed.Method.ContainingSymbol!,
                          SymbolEqualityComparer.Default))
         {
@@ -638,10 +638,17 @@ internal sealed partial class ClaimManifestBuilder(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var nested = unresolved.Pop();
+                // Clause-free nested callables are intentionally excluded from
+                // the stable ordinal sequence. They may still be visited while
+                // resolving a containing callable, so use a deterministic
+                // neutral ordinal rather than failing the entire manifest.
+                var ordinal = ordinals.TryGetValue(nested, out var value)
+                    ? value
+                    : 0;
                 parentId = SemanticClaimIdentity.CreateNestedCallableId(
                     parentId,
                     nested,
-                    ordinals[nested]);
+                    ordinal);
                 ids.Add(nested, parentId);
             }
         }

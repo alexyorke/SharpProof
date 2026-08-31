@@ -1056,20 +1056,25 @@ public sealed class ClaimManifestBuilderTests
     [Test]
     public void UnrelatedEarlierNestedCallableDoesNotRenumberClaimedCallable()
     {
-        static string Source(bool includeUnrelated) => $"""
+        static string Source(bool includeUnrelated)
+        {
+            return """
             using System;
             using SharpProof.Attributes;
-            public static class Subject {{
-                public static void Outer() {{
-                    {(includeUnrelated ? "Func<long, long> unrelated = value => value;" : "")}
-                    Func<long, long> selected = value => {{
+            public static class Subject {
+                public static void Outer() {
+                    PLACEHOLDER
+                    Func<long, long> selected = value => {
                         Contract.Ensures(Contract.Result<long>() == value);
                         return value;
-                    }};
+                    };
                     _ = selected(1);
-                }}
-            }}
-            """;
+                }
+            }
+            """.Replace("PLACEHOLDER", includeUnrelated
+                ? "Func<long, long> unrelated = value => value;"
+                : string.Empty, StringComparison.Ordinal);
+        }
 
         var without = Build(("Subject.cs", Source(false)));
         var with = Build(("Subject.cs", Source(true)));
