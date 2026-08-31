@@ -29,6 +29,43 @@ public sealed class ContractApiIdentityResolverTests
         }
     }
 
+    [Test]
+    public void ExactInMemoryPackagePayloadIsAccepted()
+    {
+        var assembly = typeof(SharpProof.Attributes.Contract).Assembly;
+        var reference = MetadataReference.CreateFromImage(
+            File.ReadAllBytes(assembly.Location));
+        var resolver = ContractApiIdentityResolver.ForCompilation(
+            CreateConsumer(reference));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reference.FilePath, Is.Null);
+            Assert.That(resolver.Contract, Is.Not.Null);
+            Assert.That(
+                resolver.ResolveAttribute(ContractApiMetadata.NotNull),
+                Is.Not.Null);
+        }
+    }
+
+    [Test]
+    public void UnapprovedInMemoryContractPayloadIsRejected()
+    {
+        var reference = MetadataReference.CreateFromImage(
+            EmitContractImage(validContractShape: true));
+        var resolver = ContractApiIdentityResolver.ForCompilation(
+            CreateConsumer(reference));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reference.FilePath, Is.Null);
+            Assert.That(resolver.Contract, Is.Null);
+            Assert.That(
+                resolver.ResolveAttribute(ContractApiMetadata.NotNull),
+                Is.Null);
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void UnapprovedContractPayloadRejectsSamePackageAttributes(
