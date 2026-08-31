@@ -1097,6 +1097,67 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public void CacheCapacityScanStopsAfterCancellation()
+    {
+        const string suffix = ".sharp-proof-cache.json";
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-capacity-cancel-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            for (var index = 0; index < 32; index++)
+            {
+                File.WriteAllText(
+                    Path.Combine(
+                        directory,
+                        index.ToString("x64", CultureInfo.InvariantCulture) + suffix),
+                    "entry");
+            }
+
+            var inputHash = new string('f', 64);
+            var publishedPath = Path.Combine(directory, inputHash + suffix);
+            var validatedEntries = 0;
+            VerificationCache.PathValidationOverride = (_, candidate) =>
+            {
+                if (!candidate.EndsWith(suffix, StringComparison.Ordinal) ||
+                    string.Equals(
+                        candidate,
+                        publishedPath,
+                        StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                if (Interlocked.Increment(ref validatedEntries) == 1)
+                {
+                    cancellation.Cancel();
+                }
+            };
+            var manifest = new WorkerClaimManifest();
+            WorkerProtocolJson.SealManifest(manifest);
+            var cache = new VerificationCache(directory, 1024 * 1024);
+
+            Func<Task> write = async () =>
+            {
+                await cache.TryWriteAsync(
+                    new WorkerVerifyResponse(),
+                    inputHash,
+                    manifest,
+                    cancellation.Token);
+            };
+            Assert.ThrowsAsync<OperationCanceledException>(write);
+            Assert.That(validatedEntries, Is.EqualTo(1));
+        }
+        finally
+        {
+            VerificationCache.PathValidationOverride = null;
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
     public async Task CacheWriteRollbackRestoresPreExistingExactKeyBytes()
     {
         var directory = Path.Combine(
