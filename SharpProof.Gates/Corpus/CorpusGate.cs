@@ -515,10 +515,9 @@ internal static class CorpusGate
         ImmutableArray<CorpusObservation> firstPass,
         CancellationToken cancellationToken)
     {
-        var selected = CorpusCatalog.Variants
-            .Select(variant => cases.First(item =>
-                item.Origin == CorpusOrigin.SyntheticMetamorphic &&
-                item.Variant == variant))
+        var selected = cases
+            .Where(static item =>
+                item.Origin == CorpusOrigin.SyntheticMetamorphic)
             .ToImmutableArray();
         var expected = firstPass.ToImmutableDictionary(
             static observation => observation.CaseId,
