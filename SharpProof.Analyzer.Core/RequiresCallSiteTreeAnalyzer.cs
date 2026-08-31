@@ -894,12 +894,31 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 if (operation is IFieldReferenceOperation field &&
                     field.Field.ContainingType?.IsTupleType == true)
                 {
-                    components.Add(field.Field.Name);
+                    components.Add(GetTupleElementName(field.Field));
                     continue;
                 }
                 break;
             }
             return components;
+        }
+
+        private static string GetTupleElementName(IFieldSymbol field)
+        {
+            if (field.ContainingType is not { IsTupleType: true } tuple)
+            {
+                return field.Name;
+            }
+            foreach (var element in tuple.TupleElements)
+            {
+                if (SymbolEqualityComparer.Default.Equals(element, field) ||
+                    SymbolEqualityComparer.Default.Equals(
+                        element.CorrespondingTupleField,
+                        field))
+                {
+                    return element.Name;
+                }
+            }
+            return field.Name;
         }
 
         private bool TryGetDeconstructionDestination(
