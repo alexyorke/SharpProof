@@ -8,6 +8,7 @@ public sealed class SharpProofWorker : IDisposable
 {
     private readonly ISmtBackend? _backend;
     private readonly Func<ISmtBackend>? _backendFactory;
+    private readonly uint? _configuredQueryRlimit;
     private readonly Func<long>? _readConsumedResourceCount;
     private readonly Channel<byte> _injectedBackendRunGate =
         CreateInjectedBackendRunGate();
@@ -31,6 +32,11 @@ public sealed class SharpProofWorker : IDisposable
         ArgumentNullException.ThrowIfNull(backendFactory);
         _backendFactory = backendFactory;
     }
+    private SharpProofWorker(Func<ISmtBackend> backendFactory, uint configuredQueryRlimit)
+        : this(backendFactory)
+    {
+        _configuredQueryRlimit = configuredQueryRlimit;
+    }
     public static SharpProofWorker Create(WorkerBudgets budgets)
     {
         ArgumentNullException.ThrowIfNull(budgets);
@@ -41,7 +47,7 @@ public sealed class SharpProofWorker : IDisposable
                     typeof(Microsoft.Z3.Context).Assembly);
                 return new IrSmtBackend(
                     new IrSmtBackendOptions(budgets.QueryRlimit));
-            });
+            }, budgets.QueryRlimit);
     }
     public async Task<WorkerVerifyResponse> VerifyAsync(
         WorkerVerifyRequest request, CancellationToken cancellationToken = default)
@@ -52,6 +58,15 @@ public sealed class SharpProofWorker : IDisposable
         if (!validation.IsValid)
         {
             return Failure(string.Empty, WorkerRunFailureReason.InvalidRequest, new WorkerBudgets(), started, validation.Errors);
+        }
+
+        if (_configuredQueryRlimit.HasValue &&
+            request.Budgets.QueryRlimit != _configuredQueryRlimit.Value)
+        {
+            return Failure(string.Empty, WorkerRunFailureReason.InvalidRequest,
+                request.Budgets, started,
+                Error("budgets.query_rlimit_mismatch",
+                    "The request query rlimit must match the worker creation limit."));
         }
 
         ArgumentNullException.ThrowIfNull(request);
