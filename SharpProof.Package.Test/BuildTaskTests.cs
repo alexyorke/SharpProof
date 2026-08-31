@@ -608,6 +608,115 @@ public sealed class BuildTaskTests
         }
     }
 
+    [TestCase("invocation-result")]
+    [TestCase("request")]
+    [TestCase("result")]
+    [TestCase("manifest")]
+    [Platform("Linux")]
+    public void PublishedResultValidatorRejectsOversizedProtocolFilesBeforeReading(
+        string oversizedMember)
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-result-size-");
+        try
+        {
+            var manifest = Path.Combine(
+                directory.FullName,
+                "compiler-manifest.json");
+            var requestPath = Path.Combine(
+                directory.FullName,
+                "request.json");
+            var resultPath = Path.Combine(
+                directory.FullName,
+                "result.json");
+            var invocationResultPath = Path.Combine(
+                directory.FullName,
+                "invocation-result.json");
+            var manifestBytes = "{}"u8.ToArray();
+            File.WriteAllBytes(manifest, manifestBytes);
+            var request = new WorkerVerifyRequest
+            {
+                CompilerManifest = new WorkerFileReference
+                {
+                    Path = manifest,
+                    Sha256 = WorkerProtocolJson.ComputeSha256(manifestBytes)
+                }
+            };
+            var responseManifest = new WorkerClaimManifest();
+            WorkerProtocolJson.SealManifest(responseManifest);
+            var response = new WorkerVerifyResponse
+            {
+                RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
+                InputHash = new('a', 64),
+                Manifest = responseManifest,
+                RunStatus = WorkerRunStatus.Complete,
+                FailureReason = WorkerRunFailureReason.None,
+                Summary = new WorkerVerificationSummary
+                {
+                    CacheStatus = WorkerCacheStatus.Miss,
+                    Versions = new WorkerVersionSummary
+                    {
+                        WorkerVersion = "build-task-test",
+                        ApiSpecVersion = "build-task-test"
+                    },
+                    Budgets = request.Budgets
+                }
+            };
+            Assert.That(
+                WorkerProtocolJson.Validate(request).IsValid,
+                Is.True);
+            Assert.That(
+                WorkerProtocolJson.Validate(response).IsValid,
+                Is.True);
+            File.WriteAllText(
+                requestPath,
+                WorkerProtocolJson.SerializeRequest(request));
+            File.WriteAllText(
+                resultPath,
+                WorkerProtocolJson.SerializeResponse(response));
+
+            var oversizedPath = oversizedMember switch
+            {
+                "invocation-result" => invocationResultPath,
+                "request" => requestPath,
+                "result" => resultPath,
+                "manifest" => manifest,
+                _ => throw new InvalidOperationException(
+                    "Unknown oversized protocol member.")
+            };
+            using (var stream = new FileStream(
+                       oversizedPath,
+                       FileMode.OpenOrCreate,
+                       FileAccess.Write,
+                       FileShare.None))
+            {
+                stream.SetLength(WorkerProtocolJson.MaximumJsonBytes + 1L);
+            }
+
+            var engine = new RecordingBuildEngine();
+            var task = new ValidatePublishedVerificationResult
+            {
+                BuildEngine = engine,
+                RequestPath = requestPath,
+                ResultPath = resultPath,
+                ManifestPath = manifest,
+                InvocationResultPath = oversizedMember == "invocation-result"
+                    ? invocationResultPath
+                    : null
+            };
+
+            Assert.That(task.Execute(), Is.False);
+            Assert.That(
+                engine.Errors.Single().Message,
+                Does.Contain(
+                    $"exceeds the {WorkerProtocolJson.MaximumJsonBytes} byte limit"));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [Test]
     [Platform("Linux")]
     public void PublishedResultValidatorRejectsACompleteResponseWithoutPayload()
