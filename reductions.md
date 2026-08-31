@@ -1,12 +1,14 @@
 # LOC Reduction Opportunities
 
-Findings from a parallel read-only survey of the solution (10 agents, disjoint areas).
+Findings from a parallel read-only survey of the solution (10 disjoint areas). No
+`.codex-reduction-*.md` reports were present when this synthesis was checked, so
+the repository evidence and file/line citations below are the source of truth.
 Goal: reduce total lines of code without losing features — all tests must still pass.
 Nothing here has been applied; each entry is a proposal with evidence.
 
 ## Summary
 
-70 findings across 10 disjoint areas. **Total estimated reduction: ~5,230 lines.**
+71 findings across 10 disjoint areas. **Total estimated reduction: ~5,230 lines.**
 
 | Area | Est. LOC |
 |---|---:|
@@ -44,6 +46,21 @@ Everything else is duplication, boilerplate, and accidental complexity.
 - **Generated files.** `*.generated.cs` comes from `scripts/Generate-*.ps1` and the `*.schema.json` models — change the generator template, never the output.
 - **Meta-analyzers.** The repo ships `SharpProofSoundnessAnalyzer` and `CancellationBoundaryAnalyzer`, which pin specific type and member names in the Worker/cancellation plumbing. Any rename there must be re-checked against `SharpProof.Meta.Analyzers.Test`.
 - **Estimates are estimates.** Each is a line count against the current formatting, not a measured diff.
+
+### Validation protocol
+
+Treat every entry as a proposal, not an approved deletion. For each change, first
+re-run the cited searches and confirm the exact caller/test set is unchanged;
+then run the smallest affected project test target and build. For shared helpers,
+MSBuild/compose/workflow changes, run the relevant architecture, packaging, and
+container-contract checks as well. Finish with the repository-prescribed broader
+gate (`docker compose run --rm tooling test-changed` or the applicable release
+gate), and inspect generated/package contents where the proposal touches them.
+Any public API, generated file, analyzer-pinned symbol, equality implementation,
+serialization shape, or deterministic test fixture should be classified
+*uncertain* until its compatibility check passes. Deletion candidates must also
+be re-searched after the edit and have their dedicated tests removed only when
+those tests exercise no remaining behavior.
 
 ---
 
