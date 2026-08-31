@@ -34,6 +34,13 @@ internal sealed class EffectMethodNodeBuilder
             return new EffectMethodNode(EffectSummaryOperations.UnknownBoundary(
                 EffectUncertainty.UnsupportedOperation), [], []);
         }
+        if (TryBuildNonCompletingStaticInitialization(
+                method,
+                cancellationToken,
+                out var initialization))
+        {
+            return initialization;
+        }
 
         var graph = TryCreateControlFlowGraph(root, cancellationToken);
         var abstractAnalysis = graph == null
@@ -165,6 +172,44 @@ internal sealed class EffectMethodNodeBuilder
             .OfType<IInvocationOperation>()
             .FirstOrDefault(static invocation =>
                 invocation.TargetMethod.MethodKind == MethodKind.Constructor);
+    }
+
+    private bool TryBuildNonCompletingStaticInitialization(
+        IMethodSymbol method,
+        CancellationToken cancellationToken,
+        out EffectMethodNode initialization)
+    {
+        initialization = default;
+        if (!method.IsStatic ||
+            method.MethodKind == MethodKind.StaticConstructor ||
+            method.ContainingType.IsGenericType ||
+            !SymbolEqualityComparer.Default.Equals(
+                method.ContainingAssembly,
+                _compilation.Assembly))
+        {
+            return false;
+        }
+
+        var constructor = method.ContainingType.StaticConstructors
+            .FirstOrDefault(static candidate =>
+                !candidate.IsImplicitlyDeclared &&
+                candidate.DeclaringSyntaxReferences.Length != 0);
+        if (constructor == null ||
+            HasLexicalThrow(constructor) ||
+            new DefiniteOperationFacts(
+                _compilation,
+                cancellationToken).MethodCanCompleteNormally(constructor))
+        {
+            return false;
+        }
+
+        var constructorNode = Build(constructor, cancellationToken);
+        initialization = new EffectMethodNode(
+            _session.WrapTypeInitializationFailures(
+                constructorNode.LocalSummary),
+            constructorNode.Calls,
+            []);
+        return true;
     }
 
     private EffectStep ScanConstructorMemberInitializers(
@@ -479,10 +524,7 @@ internal sealed class EffectMethodNodeBuilder
     private bool StaticConstructorCanAffectEntry(
         IMethodSymbol constructor)
     {
-        if (constructor.DeclaringSyntaxReferences.Any(reference =>
-            reference.GetSyntax().DescendantNodesAndSelf().Any(
-                static syntax => syntax is ThrowStatementSyntax or
-                    ThrowExpressionSyntax)))
+        if (HasLexicalThrow(constructor))
         {
             return true;
         }
@@ -491,6 +533,14 @@ internal sealed class EffectMethodNodeBuilder
                 _compilation,
                 CancellationToken.None).MethodCanCompleteNormally(
                     constructor);
+    }
+
+    private static bool HasLexicalThrow(IMethodSymbol constructor)
+    {
+        return constructor.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax().DescendantNodesAndSelf().Any(
+                static syntax => syntax is ThrowStatementSyntax or
+                    ThrowExpressionSyntax));
     }
 
     private static bool IsInitializableMember(
