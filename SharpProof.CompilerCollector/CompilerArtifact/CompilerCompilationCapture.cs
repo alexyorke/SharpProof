@@ -277,6 +277,11 @@ internal static class CompilerCompilationCapture
             _ => throw new InvalidDataException(
                 "A compiler reference identity is unavailable.")
         };
+        if (backingModules.Length > budget.MaximumModuleCount)
+        {
+            throw new InvalidDataException(
+                "A compiler reference exceeds the module count limit.");
+        }
         if (backingModules.Length > 1)
         {
             backingModules = [
@@ -364,6 +369,8 @@ internal static class CompilerCompilationCapture
         {
             _limits = limits;
         }
+
+        internal int MaximumModuleCount => _limits.MaximumModuleCount;
 
         internal void Consume(long sizeBytes)
         {
