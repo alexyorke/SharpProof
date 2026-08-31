@@ -333,6 +333,29 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task EmbeddedNullStringFailsClosedWithoutTruncation()
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("text", factory.StringType);
+        var goal = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.String("left\0right"),
+            factory.Variable(variable));
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(factory, goal, ProofDiagnosticKind.Precondition,
+                new SourceLocationId(0)));
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+    }
+
+    [Test]
     public async Task NullableStringConcatCannotProduceAFalseProof()
     {
         var factory = new IrFactory();

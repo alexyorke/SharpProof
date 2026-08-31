@@ -545,7 +545,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 IrBooleanTerm boolean => Defined(
                     Own(boolean.Value ? _context.MkTrue() : _context.MkFalse())),
                 IrIntegerTerm integer => Defined(Own(_context.MkInt(integer.Value))),
-                IrStringTerm text => Defined(Own(_context.MkString(_factory.GetString(text.Value)))),
+                IrStringTerm text => EncodeString(text),
                 IrVariableTerm variable => Defined(GetVariable(variable.Variable)),
                 IrUnaryTerm unary => EncodeUnary(unary),
                 IrBinaryTerm binary => EncodeBinary(binary),
@@ -556,6 +556,19 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             };
             _encoded.Add(term.Id, encoded);
             return encoded;
+        }
+
+        private EncodedValue EncodeString(IrStringTerm text)
+        {
+            var value = _factory.GetString(text.Value);
+            // Z3's native string constructor consumes a NUL-terminated
+            // buffer, so embedded NULs would otherwise be silently truncated.
+            if (value.IndexOf('\0') >= 0)
+            {
+                throw new UnsupportedIrEncodingException();
+            }
+
+            return Defined(Own(_context.MkString(value)));
         }
 
         private EncodedValue EncodeUnary(IrUnaryTerm unary)
