@@ -41,9 +41,14 @@ $retained = Read-SharpProofRetainedFuzzSeedManifest `
     -Path $retainedManifestPath
 $retainedSeeds = @($retained.Seeds)
 if (-not $PSBoundParameters.ContainsKey('RotatingSeed')) {
-    $RotatingSeed = [int][DateTime]::UtcNow.ToString(
-        'yyyyMMdd',
-        [Globalization.CultureInfo]::InvariantCulture)
+    # FuzzRunner advances each case seed by 397.  A calendar-shaped seed
+    # (yyyyMMdd) therefore causes dates 397 days apart to replay the same
+    # sequence.  Use a monotonic day number with a small quotient term so
+    # those campaign offsets are not congruent modulo the case stride.
+    $utcDay = [int][DateTime]::UtcNow.Date.Subtract(
+        [DateTime]::UnixEpoch).TotalDays
+    $RotatingSeed = checked($utcDay * 1009 + [int][Math]::Floor(
+        $utcDay / 397))
 }
 $effectiveRotatingCases = if ($RotatingCases -gt 0) {
     $RotatingCases
