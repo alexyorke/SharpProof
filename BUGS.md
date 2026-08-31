@@ -1,6 +1,6 @@
 # Bug backlog
 
-403 open bugs, reprioritized by impact, reachability, and affected scope.
+402 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (115)
+## P0 - Critical (114)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -28,7 +28,6 @@ Priority definitions:
 - **BUG-057 [P0] - Fuzz decoder integration check passes without decoder use:** FuzzRunnerEvidenceTests searches the campaign script for a decoder name that is already present in a dot-sourced filename. Removing or bypassing the actual strict decoder call leaves the gate green and can admit malformed runner JSON into campaign evidence.
 - **BUG-061 [P0] - IL summaries can bind to the wrong aliased assembly:** CompilerImplementationIlSummaryLowerer selects the first reference matching assembly identity and module name without verifying aliases or bound symbol identity. Calls through a later extern alias can receive an exact summary from a different assembly body with the same identity.
 - **BUG-070 [P0] - Leading goto selects an unreachable compiler body:** CompilerCallableLowerer searches operations after a leading goto and can choose the first later block without checking reachability. It may start exact verification at a dead return and prove or refute a postcondition from code that never executes.
-- **BUG-071 [P0] - Lifted nullable conversions ignore skipped operator calls:** Effects completion and exception analysis invoke the underlying user conversion unconditionally for lifted nullable conversions, even though a null operand skips that operator. Real normal paths can disappear from a Complete effect summary, enabling unsound purity or no-write conclusions.
 - **BUG-073 [P0] - Linux backslash paths collide in compiler provenance:** CompilerProbeSnapshot unconditionally rewrites backslashes to slashes, although backslash is a legal Linux filename character. Distinct syntax, reference, or additional-file paths can therefore serialize identically and authenticate the wrong compiler input.
 - **BUG-074 [P0] - Local-path validation accepts unsupported shared filesystems:** LinuxPathIdentity infers locality from a short blacklist and permits many remote or shared filesystem types. Publication then relies on local flock, rename, and durability semantics that those filesystems may not provide.
 - **BUG-075 [P0] - Lock exemptions suppress unrelated implicit calls:** OperationEffectScanner suppresses every implicit invocation beneath lock syntax instead of only synthesized monitor calls. User collection-initializer Add methods inside a lock can have writes, throws, and completion effects omitted, enabling false no-write and no-throw certification.
