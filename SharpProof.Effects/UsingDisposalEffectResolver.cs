@@ -512,13 +512,19 @@ internal sealed class UsingDisposalEffectResolver
 
     internal static bool IsDispatchUncertain(IMethodSymbol method)
     {
+        // A using statement invokes this method through IDisposable. Even when
+        // the current class implementation is nonvirtual, a derived type can
+        // list IDisposable again and install a different interface mapping.
+        var canReimplementInterface =
+            method.ContainingType?.TypeKind == TypeKind.Class;
         return !method.IsStatic &&
-            (method.IsVirtual ||
+            (canReimplementInterface ||
+             method.IsVirtual ||
              method.IsAbstract ||
              method.IsOverride ||
              method.ContainingType?.TypeKind == TypeKind.Interface) &&
             method.ContainingType?.IsSealed != true &&
-            !method.IsSealed;
+            (canReimplementInterface || !method.IsSealed);
     }
 
     private static bool IsInsideNestedCallable(
