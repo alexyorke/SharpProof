@@ -38,6 +38,33 @@ public static partial class WorkerProtocolJson
         return reader.ReadToEnd().TrimStart('\uFEFF');
     }
 
+    internal static string ComputeFileSha256(string path)
+    {
+        var expectedLength = new FileInfo(path).Length;
+        if (expectedLength <= 0 || expectedLength > MaximumJsonBytes)
+        {
+            throw new InvalidDataException("The JSON file exceeds the size limit.");
+        }
+
+        using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            bufferSize: 81920, options: FileOptions.SequentialScan);
+        if (file.Length != expectedLength)
+        {
+            throw new InvalidDataException("The JSON file changed while it was opened.");
+        }
+
+        using var bounded = new BoundedReadStream(file, MaximumJsonBytes,
+            $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+        using var buffer = new MemoryStream();
+        bounded.CopyTo(buffer);
+        if (bounded.ReadByte() != -1)
+        {
+            throw new InvalidDataException("The JSON file changed while it was read.");
+        }
+
+        return ComputeSha256(buffer.ToArray());
+    }
+
     internal static async Task<string> ReadUtf8FileAsync(
         string path, CancellationToken cancellationToken = default)
     {
