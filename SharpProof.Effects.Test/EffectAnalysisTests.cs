@@ -707,8 +707,8 @@ public sealed class EffectAnalysisTests
                 public static FormattableString Create(DeferredValue value) =>
                     $"{value}";
 
-                public static FormattableString EvaluateHole(
-                    DeferredValue value) => $"{Evaluate(value)}";
+                public static FormattableString EvaluateLaterHole(
+                    DeferredValue value) => $"{value}{Evaluate(value)}";
 
                 public static void ContinueAfterCreation(
                     DeferredValue value) {
@@ -719,7 +719,8 @@ public sealed class EffectAnalysisTests
             """);
         var session = new EffectAnalysisSession(compilation);
         var create = session.Analyze(Method(compilation, "Create"));
-        var evaluate = session.Analyze(Method(compilation, "EvaluateHole"));
+        var evaluate = session.Analyze(
+            Method(compilation, "EvaluateLaterHole"));
         var continuation = session.Analyze(
             Method(compilation, "ContinueAfterCreation"));
 
@@ -742,7 +743,7 @@ public sealed class EffectAnalysisTests
             Assert.That(
                 evaluate.Summary.Writes.Contains(EffectRegionId.Static()),
                 Is.True,
-                "hole evaluation");
+                "later hole evaluation");
             Assert.That(
                 evaluate.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
                 Is.False,
