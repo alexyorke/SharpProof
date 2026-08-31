@@ -11,7 +11,12 @@ namespace SharpProof.Meta.Analyzers;
 internal static class CacheSoundnessRules
 {
     private static readonly ImmutableHashSet<string> WriteMethods =
-        new[] { "Add", "AddOrUpdate", "GetOrAdd", "Set", "TryAdd", "TryUpdate", "TryWrite", "TryWriteAsync", "Write", "WriteAsync" }
+        new[]
+        {
+            "Add", "AddOrUpdate", "GetOrAdd", "Insert", "Put", "Set",
+            "SetAsync", "Store", "TryAdd", "TryUpdate", "TryWrite",
+            "TryWriteAsync", "Update", "Write", "WriteAsync"
+        }
             .ToImmutableHashSet(StringComparer.Ordinal);
 
     internal static void AnalyzeWrite(OperationAnalysisContext context, IInvocationOperation invocation)
