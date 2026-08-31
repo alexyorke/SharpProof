@@ -1086,6 +1086,52 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task NormalFinallyFlowCanConsumeTrackedDelegates()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int FinallyUse() {
+                    Func<int> callback = Reachable;
+                    try { _ = 0; }
+                    finally { _ = callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-1);
+                }
+
+                public static int FinallyReturn() {
+                    Func<int> callback = Reachable;
+                    try { return 0; }
+                    finally { _ = callback(); }
+
+                    int Reachable() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 2);
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EquivalentTo(new[]
+            {
+                source.IndexOf("Positive(-1)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal)
+            }));
+    }
+
+    [Test]
     public async Task PatternAliasesReachLocalFunctions()
     {
         const string source =

@@ -278,6 +278,35 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void MandatoryFinallyControlFlowCannotRemainExact()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long value) {
+                try { value = 1L; }
+                finally { value = 2L; }
+                return value;
+            }
+            """);
+        var parameter = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "value" }).Variable;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedControlFlow));
+            Assert.That(
+                lowered.Result.Program.Blocks
+                    .SelectMany(static block => block.Instructions)
+                    .OfType<IrHavocInstruction>()
+                    .SelectMany(static havoc => havoc.Variables),
+                Does.Contain(parameter));
+        }
+    }
+
+    [Test]
     public void InvocationLoweringPreservesReceiverAndSourceArgumentOrder()
     {
         var lowered = Lower(
