@@ -65,6 +65,13 @@ public sealed class PackageLayoutSmokeTests
         "SharpProof.CompilerCollector.dll"
     ];
 
+    private static readonly string[] ExpectedSourceAnalyzerProjectFileNames = [
+        "SharpProof.Attributes.csproj",
+        "SharpProof.Analyzer.csproj",
+        "SharpProof.ContractForGenerator.csproj",
+        "SharpProof.CompilerCollector.csproj"
+    ];
+
     private static readonly string[] ExpectedCollectorDependencyFileNames = [
         "Microsoft.Bcl.AsyncInterfaces.dll",
         "SharpProof.CompilerArtifact.dll",
@@ -757,6 +764,151 @@ public sealed class PackageLayoutSmokeTests
             includeCollector: true,
             ("SharpProofVerify", "true"),
             ("_SharpProofVerifierHostSupported", "false"));
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public async Task AnalyzerAndProjectIncludesPreserveSemicolonsInPaths()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Package.Semicolon.Test",
+            Guid.NewGuid().ToString("N"));
+        try
+        {
+            var repository = FindRepositoryRoot();
+            var packageRoot = Directory.CreateDirectory(
+                Path.Combine(root, "package;layout"));
+            var packageBuild = Directory.CreateDirectory(
+                Path.Combine(packageRoot.FullName, "buildTransitive"));
+            foreach (var fileName in new[] {
+                         "SharpProof.props",
+                         "SharpProof.targets"
+                     })
+            {
+                File.Copy(
+                    Path.Combine(
+                        repository,
+                        "SharpProof.Package",
+                        "buildTransitive",
+                        fileName),
+                    Path.Combine(packageBuild.FullName, fileName));
+            }
+
+            var packageProject = Path.Combine(root, "PackageConsumer.csproj");
+            var configuredPackageRoot = Path.Combine(
+                root,
+                "configured;package");
+            await File.WriteAllTextAsync(
+                packageProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <SharpProofVerify>true</SharpProofVerify>
+                    <SharpProofAnalyzerDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "analyzers"))}</SharpProofAnalyzerDirectory>
+                    <SharpProofCollectorDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "collector"))}</SharpProofCollectorDirectory>
+                    <_SharpProofSharedDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "shared"))}</_SharpProofSharedDirectory>
+                  </PropertyGroup>
+                  <Import Project="{EscapeMsBuildImportPath(Path.Combine(packageBuild.FullName, "SharpProof.props"))}" />
+                  <Import Project="{EscapeMsBuildImportPath(Path.Combine(packageBuild.FullName, "SharpProof.targets"))}" />
+                </Project>
+                """,
+                new UTF8Encoding(false));
+            var packageEvaluation = await RunDotNetAsync(
+                root,
+                "msbuild",
+                packageProject,
+                "-getItem:Analyzer",
+                "--nologo");
+            Assert.That(
+                packageEvaluation.ExitCode,
+                Is.Zero,
+                packageEvaluation.Output);
+            var packageAnalyzers = GetEvaluatedItemIdentities(
+                packageEvaluation.Output,
+                "Analyzer",
+                "SharpProofAnalyzerRole");
+
+            var sourceRoot = Directory.CreateDirectory(
+                Path.Combine(root, "source;tree"));
+            var sourceProps = Path.Combine(
+                sourceRoot.FullName,
+                "SharpProof.AnalyzerConsumer.props");
+            File.Copy(
+                Path.Combine(repository, "SharpProof.AnalyzerConsumer.props"),
+                sourceProps);
+            var sourceProject = Path.Combine(root, "SourceConsumer.csproj");
+            await File.WriteAllTextAsync(
+                sourceProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <SharpProofVerify>true</SharpProofVerify>
+                  </PropertyGroup>
+                  <Import Project="{EscapeMsBuildImportPath(sourceProps)}" />
+                </Project>
+                """,
+                new UTF8Encoding(false));
+            var sourceEvaluation = await RunDotNetAsync(
+                root,
+                "msbuild",
+                sourceProject,
+                "-getItem:Analyzer;ProjectReference",
+                "--nologo");
+            Assert.That(
+                sourceEvaluation.ExitCode,
+                Is.Zero,
+                sourceEvaluation.Output);
+            var sourceAnalyzers = GetEvaluatedItemIdentities(
+                sourceEvaluation.Output,
+                "Analyzer")
+                .Where(path =>
+                    ExpectedAnalyzerDependencyFileNames.Contains(
+                        Path.GetFileName(path),
+                        StringComparer.Ordinal) ||
+                    ExpectedCollectorDependencyFileNames.Contains(
+                        Path.GetFileName(path),
+                        StringComparer.Ordinal))
+                .ToArray();
+            var sourceProjects = GetEvaluatedItemIdentities(
+                sourceEvaluation.Output,
+                "ProjectReference");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    packageAnalyzers.Select(Path.GetFileName),
+                    Is.EquivalentTo(
+                        ExpectedAnalyzerEntryFileNames
+                            .Concat(ExpectedGeneratorEntryFileNames)
+                            .Concat(ExpectedAnalyzerDependencyFileNames)
+                            .Concat(ExpectedCollectorEntryFileNames)
+                            .Concat(ExpectedCollectorDependencyFileNames)));
+                Assert.That(
+                    packageAnalyzers,
+                    Has.All.Contains("configured;package"));
+                Assert.That(
+                    sourceAnalyzers.Select(Path.GetFileName),
+                    Is.EquivalentTo(
+                        ExpectedAnalyzerDependencyFileNames.Concat(
+                            ExpectedCollectorDependencyFileNames)));
+                Assert.That(
+                    sourceProjects.Select(Path.GetFileName),
+                    Is.EquivalentTo(ExpectedSourceAnalyzerProjectFileNames));
+                Assert.That(
+                    sourceAnalyzers.Concat(sourceProjects),
+                    Has.All.Contains("source;tree"));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 
     [Test]
@@ -2395,6 +2547,30 @@ public sealed class PackageLayoutSmokeTests
                     item.GetProperty("Identity").GetString()) + ".dll")
             .ToArray();
         return new(entryNames, dependencyNames);
+    }
+
+    private static string[] GetEvaluatedItemIdentities(
+        string output,
+        string itemName,
+        string? requiredMetadata = null)
+    {
+        using var document = JsonDocument.Parse(output);
+        return [.. document.RootElement
+            .GetProperty("Items")
+            .GetProperty(itemName)
+            .EnumerateArray()
+            .Where(item => requiredMetadata == null ||
+                item.TryGetProperty(requiredMetadata, out _))
+            .Select(static item =>
+                item.GetProperty("Identity").GetString() ?? string.Empty)];
+    }
+
+    private static string EscapeMsBuildImportPath(string path)
+    {
+        return SecurityElement.Escape(path)?.Replace(
+            ";",
+            "%3B",
+            StringComparison.Ordinal) ?? string.Empty;
     }
 
     private static void AssertPackagedAnalyzerItems(
