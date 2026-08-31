@@ -2,9 +2,8 @@ namespace SharpProof.Effects;
 
 /// <summary>
 /// Resolves the implicit formatting performed by built-in string
-/// concatenation. Roslyn represents the operation as a binary add with no
-/// operator method, so the runtime <c>ToString</c> dispatch is otherwise absent
-/// from the operation tree.
+/// concatenation and interpolation. Roslyn does not expose the runtime
+/// formatting dispatch as an invocation in either operation tree.
 /// </summary>
 internal static class StringConcatenationEffectResolver
 {
@@ -78,14 +77,23 @@ internal static class StringConcatenationEffectResolver
             return EffectSummaryOperations.Unsupported();
         }
 
+        var argumentRegions = Enumerable.Repeat(
+                EffectRegionSet.Empty,
+                formatted.Target.Parameters.Length)
+            .ToImmutableArray();
+        var actualArguments = Enumerable.Repeat<IOperation?>(
+                null,
+                formatted.Target.Parameters.Length)
+            .ToImmutableArray();
         return calls.Resolve(
             formatted.Target,
             classifyRegion(formatted.Operand, false),
-            ImmutableArray<EffectRegionSet>.Empty,
-            ImmutableArray<IOperation?>.Empty,
+            argumentRegions,
+            actualArguments,
             IsDispatchUncertain(
                 formatted.Target,
-                formatted.ReceiverType),
+                formatted.ReceiverType,
+                formatted.IsInterpolation),
             origin,
             formatted.Operand);
     }
@@ -106,7 +114,8 @@ internal static class StringConcatenationEffectResolver
             formatted.Target == null ||
             IsDispatchUncertain(
                 formatted.Target,
-                formatted.ReceiverType) ||
+                formatted.ReceiverType,
+                formatted.IsInterpolation) ||
             completionEvaluator.CanCompleteInvocation(
                 formatted.Target,
                 formatted.Operand,
@@ -129,7 +138,8 @@ internal static class StringConcatenationEffectResolver
         target = formatted.Target;
         dispatchUncertain = target != null && IsDispatchUncertain(
             target,
-            formatted.ReceiverType);
+            formatted.ReceiverType,
+            formatted.IsInterpolation);
         return formatted.IsRequired;
     }
 
@@ -149,15 +159,25 @@ internal static class StringConcatenationEffectResolver
                 operand,
                 Target: null,
                 ReceiverType: null,
-                IsRequired: false);
+                IsRequired: false,
+                IsInterpolation: false);
         }
 
         var receiverType = UnwrapNullable(operand.Type);
+        var isInterpolation = origin is IInterpolationOperation;
+        var target = isInterpolation &&
+            TryResolveIFormattableToString(
+                receiverType,
+                compilation,
+                out var formattingMethod)
+                ? formattingMethod
+                : ResolveToString(receiverType, compilation);
         return new(
             operand,
-            ResolveToString(receiverType, compilation),
+            target,
             receiverType,
-            IsRequired: true);
+            IsRequired: true,
+            IsInterpolation: isInterpolation);
     }
 
     private static IOperation UnwrapImplicitConversion(IOperation operation)
@@ -231,10 +251,106 @@ internal static class StringConcatenationEffectResolver
             method.ReturnType.SpecialType == SpecialType.System_String;
     }
 
+    private static bool TryResolveIFormattableToString(
+        ITypeSymbol? receiverType,
+        Compilation compilation,
+        out IMethodSymbol? target)
+    {
+        target = null;
+        if (receiverType == null)
+        {
+            return false;
+        }
+
+        var formattable = compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.IFormattable);
+        var formatProvider = compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.IFormatProvider);
+        if (formattable == null || formatProvider == null)
+        {
+            return false;
+        }
+
+        var interfaceMethod = formattable.GetMembers("ToString")
+            .OfType<IMethodSymbol>()
+            .SingleOrDefault(method =>
+                IsIFormattableToString(method, formatProvider));
+        if (interfaceMethod == null ||
+            !ImplementsIFormattable(receiverType, formattable))
+        {
+            return false;
+        }
+
+        target = receiverType is INamedTypeSymbol
+        {
+            TypeKind: not TypeKind.Interface
+        } named
+            ? named.FindImplementationForInterfaceMember(
+                interfaceMethod) as IMethodSymbol
+            : interfaceMethod;
+        return true;
+    }
+
+    private static bool ImplementsIFormattable(
+        ITypeSymbol receiverType,
+        INamedTypeSymbol formattable,
+        HashSet<ITypeSymbol>? visited = null)
+    {
+        visited ??= new HashSet<ITypeSymbol>(
+            SymbolEqualityComparer.Default);
+        if (!visited.Add(receiverType))
+        {
+            return false;
+        }
+
+        if (receiverType is INamedTypeSymbol named)
+        {
+            return SymbolEqualityComparer.Default.Equals(
+                    named.OriginalDefinition,
+                    formattable) ||
+                named.AllInterfaces.Any(@interface =>
+                    SymbolEqualityComparer.Default.Equals(
+                        @interface.OriginalDefinition,
+                        formattable));
+        }
+
+        return receiverType is ITypeParameterSymbol typeParameter &&
+            typeParameter.ConstraintTypes.Any(constraint =>
+                ImplementsIFormattable(
+                    constraint,
+                    formattable,
+                    visited));
+    }
+
+    private static bool IsIFormattableToString(
+        IMethodSymbol method,
+        INamedTypeSymbol formatProvider)
+    {
+        return method.MethodKind == MethodKind.Ordinary &&
+            !method.IsStatic &&
+            method.Arity == 0 &&
+            method.Parameters.Length == 2 &&
+            method.Parameters[0].Type.SpecialType ==
+                SpecialType.System_String &&
+            SymbolEqualityComparer.Default.Equals(
+                method.Parameters[1].Type,
+                formatProvider) &&
+            method.ReturnType.SpecialType == SpecialType.System_String;
+    }
+
     private static bool IsDispatchUncertain(
         IMethodSymbol method,
-        ITypeSymbol? receiverType)
+        ITypeSymbol? receiverType,
+        bool isInterpolation)
     {
+        if (isInterpolation &&
+            (receiverType is ITypeParameterSymbol ||
+             receiverType?.IsValueType != true &&
+             receiverType is not INamedTypeSymbol { IsSealed: true }))
+        {
+            return true;
+        }
+
         return receiverType?.IsValueType != true &&
             receiverType is not INamedTypeSymbol { IsSealed: true } &&
             !method.IsStatic &&
@@ -249,5 +365,6 @@ internal static class StringConcatenationEffectResolver
         IOperation Operand,
         IMethodSymbol? Target,
         ITypeSymbol? ReceiverType,
-        bool IsRequired);
+        bool IsRequired,
+        bool IsInterpolation);
 }

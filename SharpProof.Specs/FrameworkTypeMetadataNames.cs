@@ -24,6 +24,8 @@ public static class FrameworkTypeMetadataNames
     public const string InvalidOperationException =
         "System.InvalidOperationException";
     public const string IDisposable = "System.IDisposable";
+    public const string IFormattable = "System.IFormattable";
+    public const string IFormatProvider = "System.IFormatProvider";
     public const string ICriticalNotifyCompletion =
         "System.Runtime.CompilerServices.ICriticalNotifyCompletion";
     public const string INotifyCompletion =
