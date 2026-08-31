@@ -611,6 +611,13 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeProperty(SymbolAnalysisContext context)
     {
         var property = (IPropertySymbol)context.Symbol;
+        // Abstract (including static abstract interface) accessors have no
+        // storage in the declaring type. Their implementation owns any
+        // state, so they must not be classified as mutable static storage.
+        if (property.IsAbstract)
+        {
+            return;
+        }
         if (property.Type.SpecialType == SpecialType.System_String &&
             IsNamespaceOrNested(property.ContainingNamespace, "SharpProof", "Ir") &&
             IsAutoProperty(property, context.CancellationToken))
@@ -635,6 +642,10 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeEvent(SymbolAnalysisContext context)
     {
         var @event = (IEventSymbol)context.Symbol;
+        if (@event.IsAbstract)
+        {
+            return;
+        }
         if (IsForbiddenMutableStaticStorage(@event) &&
             IsFieldLikeEvent(@event, context.CancellationToken))
         {

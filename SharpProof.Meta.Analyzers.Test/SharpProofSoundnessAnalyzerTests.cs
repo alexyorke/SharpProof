@@ -391,6 +391,27 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheTryUpdateIgnoresComparisonArgument()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache {
+                internal void TryUpdate(string key, Answer value, Answer comparison) { }
+            }
+            sealed class C {
+                void M(ProofCache cache, Answer comparison) =>
+                    cache.TryUpdate("key", Answer.Proven, comparison);
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"),
+            Is.Zero);
+    }
+
+    [Test]
     public async Task SemanticCacheWritesDistinguishAliasVersions()
     {
         var diagnostics = await Analyze(
@@ -1319,6 +1340,23 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)),
                 Has.Some.Contains("Changed"));
         }
+    }
+
+    [Test]
+    public async Task AllowsStaticAbstractInterfaceMembersWithoutStorage()
+    {
+        const string source =
+            """
+            namespace SharpProof.Analyzer;
+            public interface IStorageFree {
+                static abstract int Value { get; }
+                static abstract event System.Action Changed;
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.That(diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Not.Contain("SPMETA002"));
     }
 
     [TestCase("SharpProof.Meta.Analyzers")]
