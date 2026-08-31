@@ -11,6 +11,7 @@ Priority definitions:
 
 ## P0 - Critical (45)
 
+- **BUG-108 [P0] - Portable member semantic IDs are not bound during canonical decoding:** PortableIrGraphCodec restores artifact-supplied documentation IDs after canonical re-encoding instead of binding them to declaring type, name, and signature. A shape-compatible call can impersonate an approved API and receive its specification, yielding an unsound proof.
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-052 [P0] - Final compilation snapshots erase source checksum metadata:** The final-compilation snapshot hashes source characters as UTF-8 and omits original encoding, checksum algorithm, and Roslyn checksum. Compilations with different PDB or source-provenance inputs can receive identical evidence, so the artifact cannot faithfully attest emitted debugging metadata.
 - **BUG-057 [P0] - Fuzz decoder integration check passes without decoder use:** FuzzRunnerEvidenceTests searches the campaign script for a decoder name that is already present in a dot-sourced filename. Removing or bypassing the actual strict decoder call leaves the gate green and can admit malformed runner JSON into campaign evidence.
