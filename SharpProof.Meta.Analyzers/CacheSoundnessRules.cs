@@ -16,6 +16,7 @@ internal static class CacheSoundnessRules
 
     internal static void AnalyzeWrite(OperationAnalysisContext context, IInvocationOperation invocation)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
         var root = Root(invocation);
         if (ForwardsNonCacheableSemanticAnswer(
                 invocation,
@@ -31,18 +32,23 @@ internal static class CacheSoundnessRules
                 invocation.Instance,
                 invocation.TargetMethod.ContainingType,
                 root,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)) ||
+                new LocalResolution(context.CancellationToken)) ||
             !invocation.Arguments.Any(argument =>
-                !IsGuardedCacheableResponse(invocation, argument.Value) &&
-                (IsNonCacheableSemanticAnswer(
-                     argument.Value,
-                     root,
-                     new HashSet<ILocalSymbol>(
-                         SymbolEqualityComparer.Default)) ||
-                 IsNonCacheableGetOrAddFactory(
-                     invocation,
-                     argument,
-                     root))))
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                return !IsGuardedCacheableResponse(
+                        invocation,
+                        argument.Value) &&
+                    (IsNonCacheableSemanticAnswer(
+                         argument.Value,
+                         root,
+                         new LocalResolution(context.CancellationToken)) ||
+                     IsNonCacheableGetOrAddFactory(
+                         invocation,
+                         argument,
+                         root,
+                         context.CancellationToken));
+            }))
         {
             return;
         }
@@ -63,6 +69,7 @@ internal static class CacheSoundnessRules
 
         foreach (var argument in invocation.Arguments)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var ordinal = argument.Parameter?.Ordinal ?? -1;
             if (ordinal < 0 ||
                 ordinal >= method.Parameters.Length ||
@@ -70,8 +77,7 @@ internal static class CacheSoundnessRules
                 !IsNonCacheableSemanticAnswer(
                     argument.Value,
                     root,
-                    new HashSet<ILocalSymbol>(
-                        SymbolEqualityComparer.Default)))
+                    new LocalResolution(cancellationToken)))
             {
                 continue;
             }
@@ -95,12 +101,14 @@ internal static class CacheSoundnessRules
     {
         foreach (var reference in method.DeclaringSyntaxReferences)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var declaration = reference.GetSyntax(cancellationToken);
             foreach (var invocation in declaration.DescendantNodesAndSelf()
                          .OfType<InvocationExpressionSyntax>()
                          .Where(candidate =>
                              !IsInsideNestedCallable(candidate, declaration)))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!WriteMethods.Contains(
                         GetInvokedName(invocation.Expression) ?? string.Empty) ||
                     !IsSyntacticCacheReceiver(invocation.Expression, method) ||
@@ -218,7 +226,8 @@ internal static class CacheSoundnessRules
     private static bool IsNonCacheableGetOrAddFactory(
         IInvocationOperation invocation,
         IArgumentOperation argument,
-        IOperation root)
+        IOperation root,
+        CancellationToken cancellationToken)
     {
         var factoryType = argument.Parameter?.Type ?? argument.Value.Type;
         if (!string.Equals(
@@ -238,14 +247,15 @@ internal static class CacheSoundnessRules
         return IsNonCacheableValueFactory(
             argument.Value,
             root,
-            new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+            new LocalResolution(cancellationToken));
     }
 
     private static bool IsNonCacheableValueFactory(
         IOperation operation,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolution resolving)
     {
+        resolving.CancellationToken.ThrowIfCancellationRequested();
         operation = UnwrapValue(operation);
         return operation switch
         {
@@ -255,7 +265,9 @@ internal static class CacheSoundnessRules
                     root,
                     resolving),
             IAnonymousFunctionOperation anonymous =>
-                IsNonCacheableAnonymousFactory(anonymous),
+                IsNonCacheableAnonymousFactory(
+                    anonymous,
+                    resolving.CancellationToken),
             IMethodReferenceOperation method =>
                 IsNonCacheableReturnedValue(
                     method.Method,
@@ -287,8 +299,10 @@ internal static class CacheSoundnessRules
     }
 
     private static bool IsNonCacheableAnonymousFactory(
-        IAnonymousFunctionOperation factory)
+        IAnonymousFunctionOperation factory,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var returns = factory.Body.DescendantsAndSelf()
             .OfType<IReturnOperation>()
             .Where(operation =>
@@ -297,18 +311,18 @@ internal static class CacheSoundnessRules
             .Where(static value => value != null)
             .Cast<IOperation>()
             .ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
         return returns.Length == 0 || returns.Any(value =>
             IsNonCacheableSemanticAnswer(
                 value,
                 factory.Body,
-                new HashSet<ILocalSymbol>(
-                    SymbolEqualityComparer.Default)));
+                new LocalResolution(cancellationToken)));
     }
 
     private static bool ResolveValueFactoryLocal(
         ILocalReferenceOperation reference,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolution resolving)
     {
         if (!resolving.Add(reference.Local))
         {
@@ -317,7 +331,10 @@ internal static class CacheSoundnessRules
 
         try
         {
-            var writes = GetReachingLocalValues(reference, root);
+            var writes = GetReachingLocalValues(
+                reference,
+                root,
+                resolving.CancellationToken);
             return writes.Length == 0 || writes.Any(value =>
                 IsNonCacheableValueFactory(value, root, resolving));
         }
@@ -329,13 +346,17 @@ internal static class CacheSoundnessRules
 
     internal static void AnalyzeAssignment(OperationAnalysisContext context)
     {
+        context.CancellationToken.ThrowIfCancellationRequested();
         var assignment = (IAssignmentOperation)context.Operation;
         var root = Root(assignment);
-        if (!IsCacheAssignmentTarget(assignment.Target, root) ||
+        if (!IsCacheAssignmentTarget(
+                assignment.Target,
+                root,
+                context.CancellationToken) ||
             !IsNonCacheableSemanticAnswer(
                 assignment.Value,
                 root,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)))
+                new LocalResolution(context.CancellationToken)))
         {
             return;
         }
@@ -345,10 +366,10 @@ internal static class CacheSoundnessRules
 
     private static bool IsCacheAssignmentTarget(
         IOperation target,
-        IOperation root)
+        IOperation root,
+        CancellationToken cancellationToken)
     {
-        var resolving = new HashSet<ILocalSymbol>(
-            SymbolEqualityComparer.Default);
+        var resolving = new LocalResolution(cancellationToken);
         return target switch
         {
             IPropertyReferenceOperation property => IsCacheReceiver(
@@ -487,8 +508,9 @@ internal static class CacheSoundnessRules
         IOperation? operation,
         ITypeSymbol? fallbackType,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolution resolving)
     {
+        resolving.CancellationToken.ThrowIfCancellationRequested();
         if (IsCacheType(fallbackType) || IsCacheType(operation?.Type))
         {
             return true;
@@ -526,7 +548,7 @@ internal static class CacheSoundnessRules
     private static bool ResolveCacheLocal(
         ILocalReferenceOperation reference,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolution resolving)
     {
         if (!resolving.Add(reference.Local))
         {
@@ -535,8 +557,12 @@ internal static class CacheSoundnessRules
 
         try
         {
-            return GetReachingLocalValues(reference, root).Any(value =>
-                IsCacheReceiver(value, null, root, resolving));
+            return GetReachingLocalValues(
+                    reference,
+                    root,
+                    resolving.CancellationToken)
+                .Any(value =>
+                    IsCacheReceiver(value, null, root, resolving));
         }
         finally
         {
@@ -558,8 +584,9 @@ internal static class CacheSoundnessRules
     private static bool IsNonCacheableSemanticAnswer(
         IOperation operation,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolution resolving)
     {
+        resolving.CancellationToken.ThrowIfCancellationRequested();
         if (TryClassifySemanticEnumConstant(operation, out var nonCacheable))
         {
             return nonCacheable;
@@ -666,8 +693,9 @@ internal static class CacheSoundnessRules
         IOperation operation,
         INamedTypeSymbol enumType,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolution resolving)
     {
+        resolving.CancellationToken.ThrowIfCancellationRequested();
         if (operation.ConstantValue is
             {
                 HasValue: true,
@@ -735,7 +763,7 @@ internal static class CacheSoundnessRules
         ILocalReferenceOperation reference,
         INamedTypeSymbol enumType,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolution resolving)
     {
         if (!resolving.Add(reference.Local))
         {
@@ -744,7 +772,10 @@ internal static class CacheSoundnessRules
 
         try
         {
-            var writes = GetReachingLocalValues(reference, root);
+            var writes = GetReachingLocalValues(
+                reference,
+                root,
+                resolving.CancellationToken);
             return writes.Length == 0 || writes.Any(value =>
                 IsNonCacheableNumericEnumValue(
                     value,
@@ -824,7 +855,7 @@ internal static class CacheSoundnessRules
     private static bool ResolveLocal(
         ILocalReferenceOperation reference,
         IOperation root,
-        HashSet<ILocalSymbol> resolving)
+        LocalResolution resolving)
     {
         if (!resolving.Add(reference.Local))
         {
@@ -832,7 +863,10 @@ internal static class CacheSoundnessRules
         }
         try
         {
-            var writes = GetReachingLocalValues(reference, root);
+            var writes = GetReachingLocalValues(
+                reference,
+                root,
+                resolving.CancellationToken);
             if (writes.Length == 0)
             {
                 return IsSemanticAnswerType(reference.Type);
@@ -851,50 +885,76 @@ internal static class CacheSoundnessRules
 
     private static IOperation[] GetReachingLocalValues(
         ILocalReferenceOperation reference,
-        IOperation root)
+        IOperation root,
+        CancellationToken cancellationToken)
     {
-        var graph = CreateControlFlowGraph(root);
+        cancellationToken.ThrowIfCancellationRequested();
+        var graph = CreateControlFlowGraph(root, cancellationToken);
         if (graph == null)
         {
-            return GetPriorLocalValues(reference, root);
+            return GetPriorLocalValues(
+                reference,
+                root,
+                cancellationToken);
         }
 
-        var target = graph.Blocks.FirstOrDefault(block =>
-            BlockOperations(block).Any(operation =>
-                operation.DescendantsAndSelf().Any(candidate =>
-                    IsSameLocalReference(candidate, reference))));
+        BasicBlock? target = null;
+        foreach (var block in graph.Blocks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (ContainsLocalReference(
+                    block,
+                    reference,
+                    cancellationToken))
+            {
+                target = block;
+                break;
+            }
+        }
         if (target == null)
         {
-            return GetPriorLocalValues(reference, root);
+            return GetPriorLocalValues(
+                reference,
+                root,
+                cancellationToken);
         }
 
-        var outputs = graph.Blocks.ToDictionary(
-            static block => block.Ordinal,
-            static _ => new HashSet<IOperation>());
-        var exceptionalInputs = graph.Blocks.ToDictionary(
-            static block => block.Ordinal,
-            static _ => new HashSet<IOperation>());
+        var outputs = CreateBlockStates(graph, cancellationToken);
+        var exceptionalInputs = CreateBlockStates(
+            graph,
+            cancellationToken);
         bool changed;
         do
         {
+            cancellationToken.ThrowIfCancellationRequested();
             changed = false;
-            var nextExceptionalInputs = graph.Blocks.ToDictionary(
-                static block => block.Ordinal,
-                static _ => new HashSet<IOperation>());
-            foreach (var block in graph.Blocks.Where(static block => block.IsReachable))
+            var nextExceptionalInputs = CreateBlockStates(
+                graph,
+                cancellationToken);
+            foreach (var block in graph.Blocks)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!block.IsReachable)
+                {
+                    continue;
+                }
                 var input = new HashSet<IOperation>(
                     exceptionalInputs[block.Ordinal]);
                 foreach (var predecessor in block.Predecessors)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     input.UnionWith(outputs[predecessor.Source.Ordinal]);
                 }
                 var exceptional = GetExceptionalLocalValues(
                     block,
                     reference.Local,
                     input,
-                    root);
-                foreach (var successor in ExceptionalSuccessors(graph, block))
+                    root,
+                    cancellationToken);
+                foreach (var successor in ExceptionalSuccessors(
+                             graph,
+                             block,
+                             cancellationToken))
                 {
                     nextExceptionalInputs[successor.Ordinal]
                         .UnionWith(exceptional);
@@ -904,7 +964,8 @@ internal static class CacheSoundnessRules
                     reference.Local,
                     input,
                     null,
-                    root);
+                    root,
+                    cancellationToken);
                 if (!outputs[block.Ordinal].SetEquals(output))
                 {
                     outputs[block.Ordinal] = output;
@@ -914,6 +975,7 @@ internal static class CacheSoundnessRules
 
             foreach (var block in graph.Blocks)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!exceptionalInputs[block.Ordinal].SetEquals(
                         nextExceptionalInputs[block.Ordinal]))
                 {
@@ -928,6 +990,7 @@ internal static class CacheSoundnessRules
             exceptionalInputs[target.Ordinal]);
         foreach (var predecessor in target.Predecessors)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             reaching.UnionWith(outputs[predecessor.Source.Ordinal]);
         }
         return TransferLocalValues(
@@ -935,22 +998,32 @@ internal static class CacheSoundnessRules
                 reference.Local,
                 reaching,
                 reference,
-                root)
+                root,
+                cancellationToken)
             .ToArray();
     }
 
-    private static ControlFlowGraph? CreateControlFlowGraph(IOperation root)
+    private static ControlFlowGraph? CreateControlFlowGraph(
+        IOperation root,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            return root switch
+            var graph = root switch
             {
-                IMethodBodyOperation method => ControlFlowGraph.Create(method),
+                IMethodBodyOperation method => ControlFlowGraph.Create(
+                    method,
+                    cancellationToken),
                 IConstructorBodyOperation constructor =>
-                    ControlFlowGraph.Create(constructor),
-                IBlockOperation block => ControlFlowGraph.Create(block),
+                    ControlFlowGraph.Create(constructor, cancellationToken),
+                IBlockOperation block => ControlFlowGraph.Create(
+                    block,
+                    cancellationToken),
                 _ => null
             };
+            cancellationToken.ThrowIfCancellationRequested();
+            return graph;
         }
         catch (Exception exception) when (
             exception is ArgumentException or InvalidOperationException)
@@ -959,17 +1032,53 @@ internal static class CacheSoundnessRules
         }
     }
 
+    private static bool ContainsLocalReference(
+        BasicBlock block,
+        ILocalReferenceOperation reference,
+        CancellationToken cancellationToken)
+    {
+        foreach (var operation in BlockOperations(block))
+        {
+            foreach (var candidate in operation.DescendantsAndSelf())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (IsSameLocalReference(candidate, reference))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static Dictionary<int, HashSet<IOperation>> CreateBlockStates(
+        ControlFlowGraph graph,
+        CancellationToken cancellationToken)
+    {
+        var states = new Dictionary<int, HashSet<IOperation>>();
+        foreach (var block in graph.Blocks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            states.Add(block.Ordinal, []);
+        }
+        return states;
+    }
+
     private static HashSet<IOperation> TransferLocalValues(
         BasicBlock block,
         ILocalSymbol local,
         IEnumerable<IOperation> input,
         ILocalReferenceOperation? before,
-        IOperation root)
+        IOperation root,
+        CancellationToken cancellationToken)
     {
         var result = new HashSet<IOperation>(input);
         foreach (var candidate in BlockOperations(block)
                      .SelectMany(operation =>
-                         InEvaluationOrder(operation, root)))
+                         InEvaluationOrder(
+                             operation,
+                             root,
+                             cancellationToken)))
         {
             if (before != null &&
                 IsSameLocalReference(candidate, before))
@@ -993,13 +1102,17 @@ internal static class CacheSoundnessRules
         BasicBlock block,
         ILocalSymbol local,
         IEnumerable<IOperation> input,
-        IOperation root)
+        IOperation root,
+        CancellationToken cancellationToken)
     {
         var state = new HashSet<IOperation>(input);
         var exceptional = new HashSet<IOperation>();
         foreach (var candidate in BlockOperations(block)
                      .SelectMany(operation =>
-                         InEvaluationOrder(operation, root)))
+                         InEvaluationOrder(
+                             operation,
+                             root,
+                             cancellationToken)))
         {
             if (OperationMayThrow(candidate))
             {
@@ -1063,13 +1176,15 @@ internal static class CacheSoundnessRules
 
     private static IEnumerable<BasicBlock> ExceptionalSuccessors(
         ControlFlowGraph graph,
-        BasicBlock block)
+        BasicBlock block,
+        CancellationToken cancellationToken)
     {
         var yielded = new HashSet<int>();
         for (var region = block.EnclosingRegion;
              region != null;
              region = region.EnclosingRegion)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (region.Kind != ControlFlowRegionKind.Try ||
                 region.EnclosingRegion is not { } owner)
             {
@@ -1082,6 +1197,7 @@ internal static class CacheSoundnessRules
                              ControlFlowRegionKind.FilterAndHandler or
                              ControlFlowRegionKind.Finally))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (yielded.Add(handler.FirstBlockOrdinal))
                 {
                     yield return graph.Blocks[handler.FirstBlockOrdinal];
@@ -1092,12 +1208,14 @@ internal static class CacheSoundnessRules
 
     private static IEnumerable<IOperation> InEvaluationOrder(
         IOperation operation,
-        IOperation root)
+        IOperation root,
+        CancellationToken cancellationToken)
     {
         var pending = new Stack<(IOperation Operation, bool ChildrenVisited)>();
         pending.Push((operation, false));
         while (pending.Count != 0)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var (current, childrenVisited) = pending.Pop();
             if (IsInsideNestedCallable(current, root))
             {
@@ -1113,6 +1231,7 @@ internal static class CacheSoundnessRules
             pending.Push((current, true));
             foreach (var child in current.ChildOperations.Reverse())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 pending.Push((child, false));
             }
         }
@@ -1243,16 +1362,26 @@ internal static class CacheSoundnessRules
 
     private static IOperation[] GetPriorLocalValues(
         ILocalReferenceOperation reference,
-        IOperation root)
+        IOperation root,
+        CancellationToken cancellationToken)
     {
-        return root.DescendantsAndSelf()
-            .Where(candidate =>
-                candidate.Syntax.SpanStart < reference.Syntax.SpanStart &&
-                !IsInsideNestedCallable(candidate, root))
-            .Select(candidate => GetLocalWriteValue(candidate, reference.Local))
-            .Where(static value => value != null)
-            .Cast<IOperation>()
-            .ToArray();
+        var values = new List<IOperation>();
+        foreach (var candidate in root.DescendantsAndSelf())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (candidate.Syntax.SpanStart >= reference.Syntax.SpanStart ||
+                IsInsideNestedCallable(candidate, root))
+            {
+                continue;
+            }
+
+            var value = GetLocalWriteValue(candidate, reference.Local);
+            if (value != null)
+            {
+                values.Add(value);
+            }
+        }
+        return [.. values];
     }
 
     private static bool IsInsideNestedCallable(IOperation operation, IOperation root)
@@ -1639,5 +1768,32 @@ internal static class CacheSoundnessRules
                 name.IndexOf("Failure", StringComparison.Ordinal) >= 0 ||
                 name.IndexOf("Failed", StringComparison.Ordinal) >= 0 ||
                 name.IndexOf("Abstain", StringComparison.Ordinal) >= 0);
+    }
+
+    private sealed class LocalResolution
+    {
+        private readonly HashSet<ILocalSymbol> _locals = new(
+            SymbolEqualityComparer.Default);
+
+        internal LocalResolution(CancellationToken cancellationToken)
+        {
+            CancellationToken = cancellationToken;
+        }
+
+        internal CancellationToken CancellationToken
+        {
+            get;
+        }
+
+        internal bool Add(ILocalSymbol local)
+        {
+            CancellationToken.ThrowIfCancellationRequested();
+            return _locals.Add(local);
+        }
+
+        internal void Remove(ILocalSymbol local)
+        {
+            _locals.Remove(local);
+        }
     }
 }
