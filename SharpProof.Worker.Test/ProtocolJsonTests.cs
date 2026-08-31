@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -23,6 +24,25 @@ public sealed class ProtocolJsonTests
         WorkerAssumptionKind.UserAssume,
         WorkerAssumptionKind.TrustedBoundary
     ];
+
+    [Test]
+    public void ValidResponseValidationDoesNotRescanManifestRows()
+    {
+        const int smallSize = 1024;
+        const int largeSize = 8192;
+        _ = MeasureValidation(CreateValidationScalingResponse(4));
+        var small = MeasureValidation(
+            CreateValidationScalingResponse(smallSize));
+        var large = MeasureValidation(
+            CreateValidationScalingResponse(largeSize));
+        var maximumLarge = small * 16 + TimeSpan.FromMilliseconds(250);
+
+        Assert.That(
+            large,
+            Is.LessThanOrEqualTo(maximumLarge),
+            $"small={small.TotalMilliseconds:F0} ms, " +
+            $"large={large.TotalMilliseconds:F0} ms");
+    }
 
     [Test]
     public void ProtocolSerializersRejectDocumentsBeyondReaderLimit()
@@ -2105,6 +2125,111 @@ public sealed class ProtocolJsonTests
         };
         WorkerProtocolJson.SealManifest(manifest);
         return manifest;
+    }
+
+    private static TimeSpan MeasureValidation(WorkerVerifyResponse response)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var validation = WorkerProtocolJson.Validate(response);
+        stopwatch.Stop();
+
+        Assert.That(
+            validation.Errors,
+            Is.Empty,
+            string.Join(
+                ", ",
+                validation.Errors.Select(static error => error.Code)));
+        return stopwatch.Elapsed;
+    }
+
+    private static WorkerVerifyResponse CreateValidationScalingResponse(
+        int size)
+    {
+        var callables = new WorkerCallableManifestEntry[size];
+        var claims = new WorkerClaimManifestEntry[size];
+        var callableResults = new WorkerCallableResult[size];
+        var claimResults = new WorkerClaimResult[size];
+        var idPrefix = new string('x', 32);
+        var location = new WorkerSourceLocation
+        {
+            Path = "Scaling.cs",
+            Length = 1,
+            Line = 1,
+            Column = 1
+        };
+        for (var index = 0; index < size; index++)
+        {
+            var suffix = index.ToString("D6", CultureInfo.InvariantCulture);
+            var callableId = "M:" + idPrefix + suffix;
+            var claimId = "claim:" + idPrefix + suffix;
+            callables[index] = new WorkerCallableManifestEntry
+            {
+                CallableId = callableId,
+                SelectedFeatures = [WorkerSelectedFeature.Contracts],
+                SelectionReasons = [
+                    WorkerSelectionReason.DiscoveredPostcondition
+                ],
+                Location = location,
+                ClaimIds = [claimId]
+            };
+            claims[index] = new WorkerClaimManifestEntry
+            {
+                ClaimId = claimId,
+                CallableId = callableId,
+                Kind = WorkerClaimKind.Postcondition,
+                Evidence = WorkerClaimEvidence.DirectClause,
+                Location = location
+            };
+            callableResults[index] = new WorkerCallableResult
+            {
+                CallableId = callableId,
+                Coverage = WorkerCallableCoverage.Complete,
+                Reason = WorkerCallableCoverageReason.None
+            };
+            claimResults[index] = new WorkerClaimResult
+            {
+                ClaimId = claimId,
+                Outcome = WorkerClaimOutcome.Proven,
+                Reason = WorkerClaimReason.None
+            };
+        }
+
+        var manifest = new WorkerClaimManifest
+        {
+            Callables = callables,
+            Claims = claims
+        };
+        manifest.Hash = WorkerProtocolJson.ComputeManifestHash(manifest);
+        return new WorkerVerifyResponse
+        {
+            InputHash = InputHash,
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = callableResults,
+            ClaimResults = claimResults,
+            Summary = new WorkerVerificationSummary
+            {
+                CallableCount = size,
+                ClaimCount = size,
+                OutcomeCounts = [
+                    new WorkerClaimOutcomeCount
+                    {
+                        Outcome = WorkerClaimOutcome.Proven,
+                        Count = size
+                    }
+                ],
+                ReasonCounts = [
+                    new WorkerClaimReasonCount
+                    {
+                        Reason = WorkerClaimReason.None,
+                        Count = size
+                    }
+                ],
+                CacheStatus = WorkerCacheStatus.Miss,
+                Versions = CreateExpectedVersions()
+            }
+        };
     }
 
     private static string ManifestHashAfter(
