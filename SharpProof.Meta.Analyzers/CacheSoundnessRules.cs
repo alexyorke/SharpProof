@@ -40,12 +40,7 @@ internal static class CacheSoundnessRules
     {
         var assignment = (IAssignmentOperation)context.Operation;
         var root = Root(assignment);
-        if (assignment.Target is not IPropertyReferenceOperation property ||
-            !IsCacheReceiver(
-                property.Instance,
-                property.Property.ContainingType,
-                root,
-                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)) ||
+        if (!IsCacheAssignmentTarget(assignment.Target, root) ||
             !IsNonCacheableSemanticAnswer(
                 assignment.Value,
                 root,
@@ -55,6 +50,28 @@ internal static class CacheSoundnessRules
         }
 
         Report(context, assignment.Syntax.GetLocation());
+    }
+
+    private static bool IsCacheAssignmentTarget(
+        IOperation target,
+        IOperation root)
+    {
+        var resolving = new HashSet<ILocalSymbol>(
+            SymbolEqualityComparer.Default);
+        return target switch
+        {
+            IPropertyReferenceOperation property => IsCacheReceiver(
+                property.Instance,
+                property.Property.ContainingType,
+                root,
+                resolving),
+            IFieldReferenceOperation field => IsCacheReceiver(
+                field.Instance,
+                field.Field.ContainingType,
+                root,
+                resolving),
+            _ => false
+        };
     }
 
     private static void Report(OperationAnalysisContext context, Location? location)
