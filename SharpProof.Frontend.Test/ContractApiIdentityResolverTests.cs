@@ -49,6 +49,17 @@ public sealed class ContractApiIdentityResolverTests
     }
 
     [Test]
+    public void DuplicateAuthenticReferenceViewsRemainAccepted()
+    {
+        var assembly = typeof(SharpProof.Attributes.Contract).Assembly;
+        var reference = MetadataReference.CreateFromFile(assembly.Location);
+        var resolver = ContractApiIdentityResolver.ForCompilation(
+            CreateConsumer(reference, duplicateReference: true));
+
+        Assert.That(resolver.Contract, Is.Not.Null);
+    }
+
+    [Test]
     public void UnapprovedInMemoryContractPayloadIsRejected()
     {
         var reference = MetadataReference.CreateFromImage(
@@ -142,7 +153,8 @@ public sealed class ContractApiIdentityResolverTests
     }
 
     private static CSharpCompilation CreateConsumer(
-        PortableExecutableReference contractReference)
+        PortableExecutableReference contractReference,
+        bool duplicateReference = false)
     {
         var tree = CSharpSyntaxTree.ParseText(
             """
@@ -164,7 +176,9 @@ public sealed class ContractApiIdentityResolverTests
         var compilation = CSharpCompilation.Create(
             "MalformedContractConsumer",
             [tree],
-            PlatformReferences.Add(contractReference),
+            duplicateReference
+                ? PlatformReferences.Add(contractReference).Add(contractReference)
+                : PlatformReferences.Add(contractReference),
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));

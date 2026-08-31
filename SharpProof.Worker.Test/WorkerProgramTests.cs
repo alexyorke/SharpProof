@@ -311,6 +311,12 @@ public sealed class WorkerProgramTests
             Assert.That(
                 Program.IsBackendUnavailable(new InvalidOperationException()),
                 Is.False);
+            Assert.That(
+                Program.IsBackendUnavailable(new FileNotFoundException()),
+                Is.False);
+            Assert.That(
+                Program.IsBackendUnavailable(new FileLoadException()),
+                Is.False);
         }
     }
 

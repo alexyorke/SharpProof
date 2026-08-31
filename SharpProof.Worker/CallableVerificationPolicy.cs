@@ -38,7 +38,11 @@ internal static class CallableVerificationPolicy
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
             var reason = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown)
-                ? WorkerCallableCoverageReason.SemanticUnknown
+                ? records.Any(static record =>
+                    record.Reason is WorkerClaimReason.InfrastructureFailure or
+                        WorkerClaimReason.MalformedBackendResult)
+                    ? WorkerCallableCoverageReason.InfrastructureFailure
+                    : WorkerCallableCoverageReason.SemanticUnknown
                 : WorkerCallableCoverageReason.None;
             return Result(target, reason, records);
         }

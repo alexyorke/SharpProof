@@ -196,17 +196,23 @@ internal sealed class ContractApiIdentityResolver
                     _compilation.GetAssemblyOrModuleSymbol(
                         reference)))
             .ToImmutableArray();
-        if (matches.Length != 1 ||
-            matches[0] is not PortableExecutableReference reference)
+        if (matches.IsDefaultOrEmpty ||
+            matches.Any(static reference => reference is not PortableExecutableReference))
         {
             return false;
         }
 
-        var trusted = reference.FilePath is { Length: > 0 } path
-            ? HasExpectedPayloadHash(path, out var unreadableReason)
-            : HasExpectedModuleVersionId(
-                reference,
-                out unreadableReason);
+        var trusted = true;
+        string? unreadableReason = null;
+        foreach (var match in matches.Cast<PortableExecutableReference>())
+        {
+            var current = match.FilePath is { Length: > 0 } path
+                ? HasExpectedPayloadHash(path, out var currentReason)
+                : HasExpectedModuleVersionId(match, out currentReason);
+            trusted &= current;
+            unreadableReason ??= currentReason;
+        }
+
         if (unreadableReason != null)
         {
             UnreadableContractApiReason = unreadableReason;
