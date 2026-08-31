@@ -10,6 +10,7 @@ using System.Text.Json;
 using SharpProof.BuildTasks;
 using SharpProof.Host;
 using SharpProof.Worker;
+using SharpProof.Worker.Launcher;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Package.Test;
@@ -1044,6 +1045,80 @@ public sealed class BuildTaskTests
             Assert.That(errorTask.Execute(), Is.True);
             Assert.That(errorTask.ExitCode, Is.Not.Zero);
             Assert.That(errorEngine.Messages, Is.Not.Empty);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [NonParallelizable]
+    public void WorkerLauncherReserveRequiresLauncherAndOptionPosition()
+    {
+        const int projectWallTimeMilliseconds = 1234;
+        var launcher = typeof(LauncherArguments).Assembly.Location;
+
+        using var valid = CreateTask(
+            launcher,
+            "verify",
+            "--project-wall-ms",
+            projectWallTimeMilliseconds.ToString(CultureInfo.InvariantCulture));
+        using var unrelated = CreateTask(
+            Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "unrelated-verifier.dll"),
+            "verify",
+            "--project-wall-ms",
+            projectWallTimeMilliseconds.ToString(CultureInfo.InvariantCulture));
+        using var misplaced = CreateTask(
+            launcher,
+            "verify",
+            "--worker",
+            "--project-wall-ms");
+        using var missingValue = CreateTask(
+            launcher,
+            "verify",
+            "--project-wall-ms");
+        using var malformedValue = CreateTask(
+            launcher,
+            "verify",
+            "--project-wall-ms",
+            "not-a-timeout");
+        using var mismatchedValue = CreateTask(
+            launcher,
+            "verify",
+            "--project-wall-ms",
+            (projectWallTimeMilliseconds + 1).ToString(
+                CultureInfo.InvariantCulture));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(HasWorkerLauncherBudget(valid), Is.True);
+            Assert.That(HasWorkerLauncherBudget(unrelated), Is.False);
+            Assert.That(HasWorkerLauncherBudget(misplaced), Is.False);
+            Assert.That(HasWorkerLauncherBudget(missingValue), Is.False);
+            Assert.That(HasWorkerLauncherBudget(malformedValue), Is.False);
+            Assert.That(HasWorkerLauncherBudget(mismatchedValue), Is.False);
+        }
+
+        RunVerifier CreateTask(params string[] arguments)
+        {
+            return new RunVerifier
+            {
+                ProjectWallTimeMilliseconds = projectWallTimeMilliseconds,
+                Arguments = arguments
+                    .Select(static argument => new TaskItem(argument))
+                    .ToArray()
+            };
+        }
+
+        static bool HasWorkerLauncherBudget(RunVerifier task)
+        {
+            var method = typeof(RunVerifier).GetMethod(
+                "HasWorkerLauncherBudgetArguments",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic) ??
+                throw new InvalidOperationException(
+                    "The worker-launcher budget classifier is unavailable.");
+            return (bool)(method.Invoke(task, null) ?? false);
         }
     }
 
