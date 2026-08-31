@@ -68,15 +68,38 @@ internal sealed class OperationNullnessEvaluator
             return false;
         }
 
+        var aliases = new List<ILocalSymbol> { local.Local };
+        bool IsAlias(ILocalSymbol candidate)
+        {
+            return aliases.Any(alias =>
+                SymbolEqualityComparer.Default.Equals(alias, candidate));
+        }
+
         foreach (var operation in _root.DescendantsAndSelf()
                      .Where(candidate =>
                          candidate.Syntax.SyntaxTree == origin.Syntax.SyntaxTree &&
                          candidate.Syntax.SpanStart >= declaration.Span.End &&
-                         candidate.Syntax.SpanStart < origin.Syntax.SpanStart))
+                         candidate.Syntax.SpanStart < origin.Syntax.SpanStart)
+                     .OrderBy(static candidate => candidate.Syntax.SpanStart)
+                     .ThenByDescending(static candidate => candidate.Syntax.Span.Length))
         {
+            if (operation is IVariableDeclaratorOperation
+                {
+                    Symbol.RefKind: RefKind.Ref,
+                    Initializer.Value: { } aliasInitializer
+                } aliasDeclarator &&
+                DefiniteOperationFacts.UnwrapHarmlessValue(aliasInitializer)
+                    is ILocalReferenceOperation aliasedLocal &&
+                IsAlias(aliasedLocal.Local))
+            {
+                aliases.Add(aliasDeclarator.Symbol);
+                continue;
+            }
+
             if (operation is IAssignmentOperation assignment &&
-                assignment.Target is ILocalReferenceOperation target &&
-                SymbolEqualityComparer.Default.Equals(target.Local, local.Local))
+                DefiniteOperationFacts.UnwrapHarmlessValue(assignment.Target)
+                    is ILocalReferenceOperation target &&
+                IsAlias(target.Local))
             {
                 return false;
             }
@@ -85,8 +108,17 @@ internal sealed class OperationNullnessEvaluator
                 {
                     Parameter.RefKind: not RefKind.None
                 } argument &&
-                argument.Value is ILocalReferenceOperation argumentValue &&
-                SymbolEqualityComparer.Default.Equals(argumentValue.Local, local.Local))
+                DefiniteOperationFacts.UnwrapHarmlessValue(argument.Value)
+                    is ILocalReferenceOperation argumentValue &&
+                IsAlias(argumentValue.Local))
+            {
+                return false;
+            }
+
+            if (operation is IInvocationOperation
+                {
+                    TargetMethod.MethodKind: MethodKind.LocalFunction
+                })
             {
                 return false;
             }

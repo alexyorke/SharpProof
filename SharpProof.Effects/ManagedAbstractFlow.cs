@@ -263,14 +263,30 @@ internal sealed class ManagedAbstractFlow
                 var assignedValue = valueHasMutation
                     ? TopForType(assignment.Type)
                     : EvaluateCore(assignment.Value, state);
-                state = SetStorage(
-                    state,
-                    assignment.Target,
-                    assignedValue);
-                state = SetStorage(
-                    state,
-                    result.ResolveCoalesceAssignmentTarget(assignment.Target),
-                    assignedValue);
+                if (DefiniteOperationFacts.UnwrapHarmlessValue(assignment.Target)
+                    is ILocalReferenceOperation
+                    {
+                        IsDeclaration: true,
+                        Local.RefKind: RefKind.Ref
+                    })
+                {
+                    // Roslyn lowers a ref-local declaration to an assignment.
+                    // Its target aliases storage that this domain does not
+                    // model, so subsequent writes through it can invalidate
+                    // any currently known local fact.
+                    state = state.Forget();
+                }
+                else
+                {
+                    state = SetStorage(
+                        state,
+                        assignment.Target,
+                        assignedValue);
+                    state = SetStorage(
+                        state,
+                        result.ResolveCoalesceAssignmentTarget(assignment.Target),
+                        assignedValue);
+                }
                 break;
             case ICompoundAssignmentOperation compound:
                 state = TransferMany(state, compound.ChildOperations, result, cancellationToken);
