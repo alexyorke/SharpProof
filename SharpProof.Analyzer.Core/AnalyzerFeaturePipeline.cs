@@ -479,7 +479,12 @@ internal static partial class AnalyzerFeaturePipeline
                 declaration,
                 context.SemanticModel,
                 context.CancellationToken,
-                out var constructor) ||
+                out var constructor) &&
+            !PrimaryConstructorCallableInventory.TryGetSynthesizedDefault(
+                declaration,
+                context.SemanticModel,
+                context.CancellationToken,
+                out constructor) ||
             AnalyzerGeneratedCodePolicy.IsGenerated(
                 constructor,
                 declaration.SyntaxTree,

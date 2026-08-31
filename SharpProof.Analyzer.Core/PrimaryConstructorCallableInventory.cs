@@ -37,6 +37,39 @@ internal static class PrimaryConstructorCallableInventory
         return true;
     }
 
+    internal static bool TryGetSynthesizedDefault(
+        TypeDeclarationSyntax declaration,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out IMethodSymbol constructor)
+    {
+        constructor = null!;
+        if (declaration.ParameterList != null ||
+            semanticModel.GetDeclaredSymbol(
+                declaration,
+                cancellationToken) is not INamedTypeSymbol
+                {
+                    TypeKind: TypeKind.Class
+                } type)
+        {
+            return false;
+        }
+
+        var matches = type.InstanceConstructors
+            .Where(static candidate =>
+                candidate.IsImplicitlyDeclared &&
+                candidate.Parameters.IsEmpty)
+            .ToArray();
+        if (matches.Length != 1)
+        {
+            return false;
+        }
+
+        constructor = ContractClauseInventoryBuilder.NormalizeCallable(
+            matches[0]);
+        return true;
+    }
+
     internal static bool IsDeclaration(
         IMethodSymbol method,
         SyntaxNode? declaration,
