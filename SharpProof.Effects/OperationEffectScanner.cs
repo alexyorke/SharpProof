@@ -258,8 +258,14 @@ internal sealed partial class OperationEffectScanner
         return operation switch
         {
             IAnonymousFunctionOperation or ILocalFunctionOperation or ILiteralOperation or
-                ILocalReferenceOperation or IInstanceReferenceOperation or IDefaultValueOperation or
+                IInstanceReferenceOperation or IDefaultValueOperation or
                 ITypeOfOperation or INameOfOperation or ISizeOfOperation => EffectSummary.Empty,
+            ILocalReferenceOperation local
+                when local.Local.RefKind != RefKind.None =>
+                EffectSummaryOperations.Read(
+                    _conversionOwnership.ClassifyRefLocalStorage(
+                        local.Local)),
+            ILocalReferenceOperation => EffectSummary.Empty,
             IFlowCaptureOperation capture => ScanFlowCapture(capture),
             IFlowCaptureReferenceOperation => EffectSummary.Empty,
             IParameterReferenceOperation parameter =>
