@@ -12,6 +12,19 @@ namespace SharpProof.Package.Test;
 public sealed class CompilerProbeSnapshotTests
 {
     [Test]
+    public async Task ProbeJsonEscapesNonAsciiProvenanceCanonically()
+    {
+        var compilation = CSharpCompilation.Create(
+            "ProbeConsumer",
+            [CSharpSyntaxTree.ParseText("class C {}", path: "café.cs")],
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]);
+        var output = await CaptureSnapshotAsync(
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json"), compilation);
+
+        Assert.That(output, Does.Contain("\\u00e9.cs"));
+    }
+
+    [Test]
     public async Task CompilationReferenceChangesProbeSnapshot()
     {
         var directory = Directory.CreateTempSubdirectory(
