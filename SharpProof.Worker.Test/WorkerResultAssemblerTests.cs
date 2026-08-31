@@ -32,6 +32,52 @@ public sealed class WorkerResultAssemblerTests
             $"target-last={targetLast.TotalMilliseconds:F0} ms");
     }
 
+    [Test]
+    public void IncompleteAssemblyToleratesNullManifestEntries()
+    {
+        var manifest = new WorkerClaimManifest
+        {
+            Callables =
+            [
+                null!,
+                new WorkerCallableManifestEntry
+                {
+                    CallableId = "callable",
+                    Assumptions = null!
+                }
+            ],
+            Claims =
+            [
+                null!,
+                new WorkerClaimManifestEntry
+                {
+                    ClaimId = "claim",
+                    CallableId = "callable",
+                    Kind = WorkerClaimKind.Postcondition
+                }
+            ]
+        };
+
+        var response = WorkerResultAssembler.CreateIncomplete(
+            WorkerProtocolVersions.EmptySha256,
+            WorkerProtocolVersions.EmptySha256,
+            manifest,
+            new WorkerBudgets(),
+            WorkerRunStatus.Failed,
+            WorkerRunFailureReason.MalformedResult,
+            WorkerCallableCoverageReason.InfrastructureFailure,
+            WorkerClaimReason.InfrastructureFailure);
+
+        Assert.That(response.CallableResults, Has.Length.EqualTo(1));
+        Assert.That(response.CallableResults[0].CallableId, Is.EqualTo("callable"));
+        Assert.That(response.CallableResults[0].Assumptions, Is.Empty);
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
+        Assert.That(response.ClaimResults[0].ClaimId, Is.EqualTo("claim"));
+        Assert.That(response.ClaimResults[0].Assumptions, Is.Empty);
+        Assert.That(response.Summary.CallableCount, Is.EqualTo(1));
+        Assert.That(response.Summary.ClaimCount, Is.EqualTo(1));
+    }
+
     private static TimeSpan MeasureCreateIncomplete(
         WorkerClaimManifest manifest,
         int expectedSize)
