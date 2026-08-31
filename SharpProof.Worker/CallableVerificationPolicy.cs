@@ -80,7 +80,7 @@ internal static class CallableVerificationPolicy
         return Result(target, callableReason, CallableClaimResultAssembler.Unknowns(target, claimReason));
     }
 
-    private static CallableVerificationResult FailedLowering(
+    internal static CallableVerificationResult FailedLowering(
         CompilerCallablePreparation target,
         CancellationToken cancellationToken)
     {

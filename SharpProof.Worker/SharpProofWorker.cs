@@ -229,7 +229,7 @@ public sealed class SharpProofWorker : IDisposable
             }
             var laneCreation = TryCreateLanes(
                 request.Budgets,
-                targets.Length,
+                CountSolverTargets(targets),
                 out solverLanes,
                 out var laneError);
             if (laneCreation != LaneCreationResult.Success)
@@ -255,6 +255,14 @@ public sealed class SharpProofWorker : IDisposable
             var orderedTargets = targets.OrderBy(
                 static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
             var results = new CallableVerificationResult[orderedTargets.Length];
+            for (var index = 0; index < orderedTargets.Length; index++)
+            {
+                if (!orderedTargets[index].IsSuccess)
+                {
+                    results[index] = CallableVerificationPolicy.FailedLowering(
+                        orderedTargets[index], projectBoundary.Token);
+                }
+            }
             var nextTarget = -1;
             var retirementSynchronization = new object();
             var retirementCallableReason = WorkerCallableCoverageReason.InfrastructureFailure;
@@ -290,6 +298,11 @@ public sealed class SharpProofWorker : IDisposable
                     if (index >= orderedTargets.Length)
                     {
                         return;
+                    }
+
+                    if (!orderedTargets[index].IsSuccess)
+                    {
+                        continue;
                     }
 
                     var result = await VerifyTargetAsync(lane.Verifier, orderedTargets[index], request.Budgets,
@@ -525,6 +538,12 @@ public sealed class SharpProofWorker : IDisposable
                 ? LaneCreationResult.BackendUnavailable
                 : LaneCreationResult.InfrastructureFailure;
         }
+    }
+
+    internal static int CountSolverTargets(
+        IEnumerable<CompilerCallablePreparation> targets)
+    {
+        return targets.Count(static target => target.IsSuccess);
     }
 
     private static VerificationLane CreateLane(
