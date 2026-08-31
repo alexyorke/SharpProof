@@ -33,6 +33,11 @@ internal sealed partial class OperationEffectScanner
                          _method) =>
                 EffectSummaryOperations.Write(
                     _conversionOwnership.ClassifyParameter(parameter.Parameter)),
+            ILocalReferenceOperation local
+                when local.Local.RefKind == RefKind.Ref =>
+                EffectSummaryOperations.Write(
+                    _conversionOwnership.ClassifyRefLocalStorage(
+                        local.Local)),
             ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation =>
                 EffectSummary.Empty,
             _ => EffectSummaryOperations.Join(
@@ -51,7 +56,12 @@ internal sealed partial class OperationEffectScanner
         }
 
         result = result.Then(ScanStep(assignment.Value));
-        return !result.CompletesNormally
+        return !result.CompletesNormally ||
+            assignment is
+            {
+                IsRef: true,
+                Target: ILocalReferenceOperation
+            }
             ? result.Summary
             : result.Then(new EffectStep(
                 ScanWriteTarget(assignment.Target, assignment.Value),

@@ -8,6 +8,8 @@ internal sealed class ConversionOwnershipClassifier
     private readonly CreationFlowCaptures _creationCaptures;
     private readonly Dictionary<ISymbol, EffectRegionSet> _localRegions =
         new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, EffectRegionSet> _refLocalStorageRegions =
+        new(SymbolEqualityComparer.Default);
     private readonly IMethodSymbol _method;
 
     internal ConversionOwnershipClassifier(
@@ -143,6 +145,21 @@ internal sealed class ConversionOwnershipClassifier
                 : declaredRegion;
     }
 
+    internal EffectRegionSet ClassifyRefLocalStorage(ILocalSymbol local)
+    {
+        if (SymbolEqualityComparer.Default.Equals(
+                local.ContainingSymbol?.OriginalDefinition,
+                _method.OriginalDefinition))
+        {
+            return _refLocalStorageRegions.TryGetValue(local, out var regions)
+                ? regions
+                : EffectRegionSet.Unknown;
+        }
+
+        var ordinal = local.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Start ?? 0;
+        return EffectRegionSet.Create(EffectRegionId.Captured(ordinal));
+    }
+
     private EffectRegionSet ClassifyManagedValueReachability(
         IOperation operation)
     {
@@ -208,6 +225,13 @@ internal sealed class ConversionOwnershipClassifier
             {
                 _localRegions.Add(declarator.Symbol, EffectRegionSet.Empty);
             }
+            if (declarator.Symbol.RefKind != RefKind.None &&
+                !_refLocalStorageRegions.ContainsKey(declarator.Symbol))
+            {
+                _refLocalStorageRegions.Add(
+                    declarator.Symbol,
+                    EffectRegionSet.Empty);
+            }
         }
 
         var changed = true;
@@ -219,6 +243,25 @@ internal sealed class ConversionOwnershipClassifier
                 if (!isReachable(operation))
                 {
                     continue;
+                }
+
+                if (TryGetRefLocalAliasSource(
+                        operation,
+                        out var refLocal,
+                        out var refSource))
+                {
+                    var discoveredStorage = ClassifyRefAliasSource(refSource);
+                    var previousStorage = _refLocalStorageRegions.TryGetValue(
+                        refLocal,
+                        out var existingStorage)
+                            ? existingStorage
+                            : EffectRegionSet.Empty;
+                    var joinedStorage = previousStorage.Union(discoveredStorage);
+                    if (joinedStorage != previousStorage)
+                    {
+                        _refLocalStorageRegions[refLocal] = joinedStorage;
+                        changed = true;
+                    }
                 }
 
                 if (operation is IInvocationOperation invocation)
@@ -462,6 +505,80 @@ internal sealed class ConversionOwnershipClassifier
                 _localRegions[source.Target] = joined;
                 changed = true;
             }
+        }
+    }
+
+    private EffectRegionSet ClassifyRefAliasSource(IOperation? operation)
+    {
+        if (operation == null)
+        {
+            return EffectRegionSet.Unknown;
+        }
+
+        operation = DefiniteOperationFacts.UnwrapHarmlessValue(operation);
+        return operation switch
+        {
+            ILocalReferenceOperation local
+                when local.Local.RefKind != RefKind.None =>
+                ClassifyRefLocalStorage(local.Local),
+            ILocalReferenceOperation local =>
+                ClassifyLocalStorage(local.Local),
+            IParameterReferenceOperation parameter
+                when parameter.Parameter.RefKind == RefKind.None &&
+                    SymbolEqualityComparer.Default.Equals(
+                        parameter.Parameter.ContainingSymbol?.OriginalDefinition,
+                        _method.OriginalDefinition) =>
+                EffectRegionSet.Empty,
+            IConditionalOperation conditional =>
+                ClassifyRefAliasSource(conditional.WhenTrue).Union(
+                    ClassifyRefAliasSource(conditional.WhenFalse)),
+            ICoalesceOperation coalesce =>
+                ClassifyRefAliasSource(coalesce.Value).Union(
+                    ClassifyRefAliasSource(coalesce.WhenNull)),
+            _ => ClassifyRegion(operation, aliasSource: true)
+        };
+    }
+
+    private EffectRegionSet ClassifyLocalStorage(ILocalSymbol local)
+    {
+        if (SymbolEqualityComparer.Default.Equals(
+                local.ContainingSymbol?.OriginalDefinition,
+                _method.OriginalDefinition))
+        {
+            return EffectRegionSet.Empty;
+        }
+
+        var ordinal = local.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Start ?? 0;
+        return EffectRegionSet.Create(EffectRegionId.Captured(ordinal));
+    }
+
+    private static bool TryGetRefLocalAliasSource(
+        IOperation operation,
+        out ILocalSymbol local,
+        out IOperation source)
+    {
+        switch (operation)
+        {
+            case IVariableDeclaratorOperation
+            {
+                Symbol.RefKind: not RefKind.None,
+                Initializer.Value: { } initializer
+            } declarator:
+                local = declarator.Symbol;
+                source = initializer;
+                return true;
+            case ISimpleAssignmentOperation
+            {
+                IsRef: true,
+                Target: ILocalReferenceOperation target
+            } assignment:
+                local = target.Local;
+                source = assignment.Value;
+                return true;
+            default:
+                local = null!;
+                source = null!;
+                return false;
         }
     }
 
