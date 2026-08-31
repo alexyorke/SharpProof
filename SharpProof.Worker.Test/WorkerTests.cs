@@ -5710,7 +5710,7 @@ public sealed class WorkerTests
     [TestCase("reuse", WorkerRunFailureReason.BackendUnavailable,
         WorkerClaimReason.BackendUnavailable, 2)]
     [TestCase("dispose", WorkerRunFailureReason.InfrastructureFailure,
-        WorkerClaimReason.InfrastructureFailure, 1)]
+        WorkerClaimReason.InfrastructureFailure, 2)]
     public async Task InvalidRenewalStateFailsClosedWithTypedEvidence(
         string scenario,
         WorkerRunFailureReason expectedFailure,

@@ -564,9 +564,6 @@ public sealed class SharpProofWorker : IDisposable
                 IDisposable? replacementOwner = null;
                 try
                 {
-                    var priorOwner = _ownedBackend;
-                    _ownedBackend = null;
-                    priorOwner?.Dispose();
                     var replacement = _backendFactory() ??
                         throw new InvalidOperationException("The backend factory returned null.");
                     if (ReferenceEquals(replacement, prior) ||
@@ -577,6 +574,13 @@ public sealed class SharpProofWorker : IDisposable
                         return LaneRenewalResult.BackendUnavailable;
                     }
 
+                    // Do not tear down the currently healthy backend until the
+                    // replacement has been accepted.  A factory can return an
+                    // instance already owned by another lane; disposing the
+                    // prior backend before this check can destroy live work.
+                    var priorOwner = _ownedBackend;
+                    _ownedBackend = null;
+                    priorOwner?.Dispose();
                     replacementOwner = replacement as IDisposable;
                     Backend = replacement;
                     Verifier = new CallableVerifier(replacement, maximumExpressionDepth);
