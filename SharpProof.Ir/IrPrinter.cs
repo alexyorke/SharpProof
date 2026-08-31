@@ -52,7 +52,11 @@ public sealed partial class IrPrinter(IrFactory factory)
 
     private string TypeName(IrTypeId type)
     {
-        return _factory.GetString(_factory.GetTypeInfo(type).Name);
+        // Keep display names unambiguous and safe to embed in the diagnostic
+        // grammar. The local type id disambiguates distinct semantic types
+        // that happen to have the same display name.
+        return Quote(_factory.GetString(_factory.GetTypeInfo(type).Name)) +
+            "#t" + type.Value.ToString(CultureInfo.InvariantCulture);
     }
 
     private static string Quote(string value)

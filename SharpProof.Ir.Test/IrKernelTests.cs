@@ -567,6 +567,24 @@ public sealed class IrKernelTests
     }
 
     [Test]
+    public void PrinterEscapesTypeNamesAndIncludesTypeIdentity()
+    {
+        var factory = new IrFactory();
+        var first = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(), "Widget\n\"One\"");
+        var second = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(), "Widget\n\"One\"");
+
+        var firstText = new IrPrinter(factory).Print(factory.Null(first));
+        var secondText = new IrPrinter(factory).Print(factory.Null(second));
+
+        Assert.That(firstText, Does.Not.Contain("\n"));
+        Assert.That(firstText, Does.Contain("\\n"));
+        Assert.That(firstText, Does.Contain("\\\"One\\\""));
+        Assert.That(secondText, Is.Not.EqualTo(firstText));
+    }
+
+    [Test]
     public void PrinterRejectsTermsBeyondItsFormattingDepthLimit()
     {
         var factory = new IrFactory();
