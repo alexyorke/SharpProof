@@ -8430,9 +8430,7 @@ public sealed class EffectAnalysisTests
             """);
         var session = new EffectAnalysisSession(compilation);
 
-        foreach (var methodName in new[] {
-                     "Anonymous", "Delegate", "NullDelegate"
-                 })
+        foreach (var methodName in new[] { "Anonymous", "Delegate" })
         {
             var method = Method(compilation, methodName);
             Assert.That(
@@ -8443,9 +8441,13 @@ public sealed class EffectAnalysisTests
         }
         Assert.That(
             session.Analyze(Method(compilation, "NullDelegate"))
-                .Summary.Throws.Types.Any(type =>
-                    type.ToDisplayString() == "System.NullReferenceException"),
-            Is.True);
+                .Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.Managed));
+        Assert.That(
+            session.Analyze(Method(compilation, "NullDelegate"))
+                .Summary.Throws.Types.Select(static type =>
+                    type.ToDisplayString()),
+            Is.EqualTo(["System.ArgumentException"]));
     }
 
     [Test]
