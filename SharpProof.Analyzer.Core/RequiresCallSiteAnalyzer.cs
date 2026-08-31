@@ -279,6 +279,10 @@ internal static partial class RequiresCallSiteAnalyzer
             var contractTarget =
                 candidate.TargetMethod.ReducedFrom ??
                 candidate.TargetMethod;
+            contractTarget = RequiresCallSiteDispatch.ResolveExactTarget(
+                contractTarget,
+                candidate.Instance,
+                cancellationToken);
             if ((contractTarget is
             { IsStatic: true } or
             { MethodKind: MethodKind.Constructor }) &&

@@ -61,6 +61,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 var target =
                     call.TargetMethod.ReducedFrom ??
                     call.TargetMethod;
+                target = RequiresCallSiteDispatch.ResolveExactTarget(
+                    target,
+                    call.Instance,
+                    cancellationToken);
                 if (hasPotentialPreconditions(target))
                 {
                     var owner = semanticModel.GetEnclosingSymbol(
