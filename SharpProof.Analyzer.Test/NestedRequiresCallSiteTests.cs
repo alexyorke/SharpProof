@@ -969,6 +969,45 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task NullMethodGroupOverwriteKeepsOldDelegateReachableInCatch()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private sealed class Target {
+                    public int Read() => 0;
+                }
+
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int CatchUse() {
+                    Func<int> callback = Reachable;
+                    Target target = null!;
+                    try { callback = target.Read; }
+                    catch (ArgumentException) { return callback(); }
+                    return callback();
+
+                    int Reachable() => Positive(-1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics.Single().Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-1)", StringComparison.Ordinal)));
+    }
+
+    [Test]
     public async Task ExceptionHandlersCanConsumeTrackedDelegates()
     {
         const string source =
