@@ -22,7 +22,10 @@ internal sealed partial class OperationEffectScanner
                     EffectAccess.Write,
                     valueIsStoredDirectly ? value : null),
             IParameterReferenceOperation parameter
-                when parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out =>
+                when parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out ||
+                     PrimaryConstructorParameterOwnership.IsReceiverBacked(
+                         parameter.Parameter,
+                         _method) =>
                 EffectSummaryOperations.Write(
                     _conversionOwnership.ClassifyParameter(parameter.Parameter)),
             ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation =>
