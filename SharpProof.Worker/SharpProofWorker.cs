@@ -12,6 +12,10 @@ public sealed class SharpProofWorker : IDisposable
     private readonly Channel<byte> _injectedBackendRunGate =
         CreateInjectedBackendRunGate();
     private bool _disposed;
+    // An injected backend cannot be renewed after interruption.  Once a run
+    // has timed out or been cancelled, fail closed rather than handing the
+    // potentially poisoned instance to a later request.
+    private bool _injectedBackendPoisoned;
     public SharpProofWorker(ISmtBackend backend) : this(
         backend, backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null)
     {
@@ -333,6 +337,10 @@ public sealed class SharpProofWorker : IDisposable
                             request.Budgets.MaximumExpressionDepth);
                         if (renewal != LaneRenewalResult.Success)
                         {
+                            if (renewal == LaneRenewalResult.Unsupported && _backend != null)
+                            {
+                                _injectedBackendPoisoned = true;
+                            }
                             RecordRetirement(
                                 renewal == LaneRenewalResult.Unsupported
                                     ? WorkerCallableCoverageReason.MethodTimeout
@@ -407,7 +415,14 @@ public sealed class SharpProofWorker : IDisposable
             projectBoundary.Token.ThrowIfCancellationRequested();
             return response;
         }
-        catch (OperationCanceledException) { return Interrupted(snapshot); }
+        catch (OperationCanceledException)
+        {
+            if (ownsInjectedBackendRunGate)
+            {
+                _injectedBackendPoisoned = true;
+            }
+            return Interrupted(snapshot);
+        }
         finally
         {
             foreach (var lane in solverLanes)
@@ -518,6 +533,11 @@ public sealed class SharpProofWorker : IDisposable
 
         if (_backend != null)
         {
+            if (_injectedBackendPoisoned)
+            {
+                error = "The injected SMT backend was interrupted and cannot be reused.";
+                return LaneCreationResult.InfrastructureFailure;
+            }
             lanes = [CreateLane(_backend, budgets.MaximumExpressionDepth, null, null,
                 _readConsumedResourceCount)];
             return LaneCreationResult.Success;

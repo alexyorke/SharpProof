@@ -751,7 +751,7 @@ internal sealed class EffectMethodNodeBuilder
             AddRegularSuccessor(block.ConditionalSuccessor);
         }
 
-        var result = ManagedAbstractFlow.IsAcyclic(graph)
+        var result = ManagedAbstractFlow.IsAcyclic(graph, visited)
             ? summary
             : EffectSummaryOperations.Join(
                 summary,

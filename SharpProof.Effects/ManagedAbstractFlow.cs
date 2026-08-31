@@ -1012,10 +1012,19 @@ internal sealed class ManagedAbstractFlow
     }
 
     internal static bool IsAcyclic(ControlFlowGraph graph)
+        => IsAcyclic(graph, included: null);
+
+    internal static bool IsAcyclic(
+        ControlFlowGraph graph,
+        ISet<int>? included)
     {
         var marks = new byte[graph.Blocks.Length];
         bool Visit(BasicBlock block)
         {
+            if (included != null && !included.Contains(block.Ordinal))
+            {
+                return true;
+            }
             if (marks[block.Ordinal] != 0)
             {
                 return marks[block.Ordinal] == 2;
@@ -1024,6 +1033,10 @@ internal sealed class ManagedAbstractFlow
             marks[block.Ordinal] = 1;
             foreach (var (branch, _) in Successors(block))
             {
+                if (included != null && !included.Contains(branch.Ordinal))
+                {
+                    continue;
+                }
                 if (!Visit(branch.Destination!))
                 {
                     return false;
@@ -1034,7 +1047,8 @@ internal sealed class ManagedAbstractFlow
             return true;
         }
         return graph.Blocks
-            .Where(static block => block.IsReachable)
+            .Where(block => block.IsReachable &&
+                (included == null || included.Contains(block.Ordinal)))
             .All(Visit);
     }
 

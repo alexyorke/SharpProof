@@ -508,6 +508,30 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void UnreachableDivergentCatchDoesNotFabricateDivergence()
+    {
+        var result = Analyze(
+            """
+            public static class Sample {
+                private static int state;
+                public static void Example() {
+                    try { state++; }
+                    catch (System.InvalidOperationException) { while (true) { } }
+                    state++;
+                }
+            }
+            """,
+            "Sample",
+            "Example");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Termination, Is.EqualTo(EffectTermination.Terminates));
+            Assert.That(result.Summary.Writes.Contains(EffectRegionId.Static()), Is.True);
+        }
+    }
+
+    [Test]
     public void CaughtThrowInsideFinallyDoesNotHideFollowingWrite()
     {
         var result = Analyze(
