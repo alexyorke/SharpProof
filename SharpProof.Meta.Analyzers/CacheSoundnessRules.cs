@@ -384,7 +384,17 @@ internal static class CacheSoundnessRules
         IOperation root,
         HashSet<ILocalSymbol> resolving)
     {
+        if (TryClassifySemanticEnumConstant(operation, out var nonCacheable))
+        {
+            return nonCacheable;
+        }
+
         operation = UnwrapValue(operation);
+        if (TryClassifySemanticEnumConstant(operation, out nonCacheable))
+        {
+            return nonCacheable;
+        }
+
         return operation switch
         {
             IFieldReferenceOperation field
@@ -426,6 +436,36 @@ internal static class CacheSoundnessRules
             _ => IsSemanticAnswerType(operation.Type) &&
                 operation.ConstantValue is not { HasValue: true }
         };
+    }
+
+    private static bool TryClassifySemanticEnumConstant(
+        IOperation operation,
+        out bool nonCacheable)
+    {
+        nonCacheable = false;
+        if (operation.Type is not INamedTypeSymbol
+            {
+                TypeKind: TypeKind.Enum
+            } enumType ||
+            !IsSemanticAnswerType(enumType) ||
+            operation.ConstantValue is not
+            {
+                HasValue: true,
+                Value: { } constantValue
+            })
+        {
+            return false;
+        }
+
+        var matchingMembers = enumType.GetMembers()
+            .OfType<IFieldSymbol>()
+            .Where(field =>
+                field.HasConstantValue &&
+                Equals(field.ConstantValue, constantValue))
+            .ToArray();
+        nonCacheable = matchingMembers.Length == 0 ||
+            matchingMembers.Any(field => IsNonCacheableName(field.Name));
+        return true;
     }
 
     private static bool ResolveLocal(
@@ -1092,6 +1132,7 @@ internal static class CacheSoundnessRules
                 name.IndexOf("TimedOut", StringComparison.Ordinal) >= 0 ||
                 name.IndexOf("Error", StringComparison.Ordinal) >= 0 ||
                 name.IndexOf("Failure", StringComparison.Ordinal) >= 0 ||
-                name.IndexOf("Failed", StringComparison.Ordinal) >= 0);
+                name.IndexOf("Failed", StringComparison.Ordinal) >= 0 ||
+                name.IndexOf("Abstain", StringComparison.Ordinal) >= 0);
     }
 }
