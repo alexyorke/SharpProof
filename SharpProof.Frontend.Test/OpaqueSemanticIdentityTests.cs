@@ -76,6 +76,66 @@ public sealed class OpaqueSemanticIdentityTests
         Assert.That(second.Term.Id, Is.Not.EqualTo(first.Term.Id));
     }
 
+    [Test]
+    public void OperandlessTypeOperationsIncludeTypeOperandInOpaqueIdentity()
+    {
+        var typeOfOperations = GetTargetExpression(
+                """
+                public static class Subject
+                {
+                    public static object Target(bool condition) =>
+                        condition ? typeof(string) : typeof(object);
+                }
+                """)
+            .DescendantsAndSelf()
+            .OfType<ITypeOfOperation>()
+            .ToArray();
+        Assert.That(typeOfOperations, Has.Length.EqualTo(2));
+
+        var typeOfFactory = new IrFactory();
+        var typeOfLowerer = new RoslynOperationLowerer(typeOfFactory);
+        var firstTypeOf = typeOfLowerer.Lower(typeOfOperations[0]);
+        var secondTypeOf = typeOfLowerer.Lower(typeOfOperations[1]);
+
+        AssertPureUnsupportedOperationAbstention(firstTypeOf);
+        AssertPureUnsupportedOperationAbstention(secondTypeOf);
+        Assert.That(secondTypeOf.Term, Is.Not.SameAs(firstTypeOf.Term));
+        Assert.That(
+            secondTypeOf.Term.Id,
+            Is.Not.EqualTo(firstTypeOf.Term.Id));
+
+        var sizeOfOperations = GetTargetExpression(
+                """
+                public static class Subject
+                {
+                    public static int Target() =>
+                        sizeof(int) + sizeof(uint);
+                }
+                """)
+            .DescendantsAndSelf()
+            .OfType<ISizeOfOperation>()
+            .ToArray();
+        Assert.That(sizeOfOperations, Has.Length.EqualTo(2));
+        Assert.That(
+            sizeOfOperations[0].ConstantValue.Value,
+            Is.EqualTo(4));
+        Assert.That(
+            sizeOfOperations[1].ConstantValue.Value,
+            Is.EqualTo(4));
+
+        var sizeOfFactory = new IrFactory();
+        var sizeOfLowerer = new RoslynOperationLowerer(sizeOfFactory);
+        var firstSizeOf = sizeOfLowerer.Lower(sizeOfOperations[0]);
+        var secondSizeOf = sizeOfLowerer.Lower(sizeOfOperations[1]);
+
+        AssertPureUnsupportedOperationAbstention(firstSizeOf);
+        AssertPureUnsupportedOperationAbstention(secondSizeOf);
+        Assert.That(secondSizeOf.Term, Is.Not.SameAs(firstSizeOf.Term));
+        Assert.That(
+            secondSizeOf.Term.Id,
+            Is.Not.EqualTo(firstSizeOf.Term.Id));
+    }
+
     private static void AssertPureConversionAbstention(
         FrontendLoweringResult result)
     {
