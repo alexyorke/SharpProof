@@ -1,6 +1,6 @@
 # Bug backlog
 
-405 open bugs, reprioritized by impact, reachability, and affected scope.
+404 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (117)
+## P0 - Critical (116)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -26,7 +26,6 @@ Priority definitions:
 - **BUG-052 [P0] - Final compilation snapshots erase source checksum metadata:** The final-compilation snapshot hashes source characters as UTF-8 and omits original encoding, checksum algorithm, and Roslyn checksum. Compilations with different PDB or source-provenance inputs can receive identical evidence, so the artifact cannot faithfully attest emitted debugging metadata.
 - **BUG-053 [P0] - Final compilation snapshots omit diagnostic policy:** The final-compilation snapshot omits general and per-ID diagnostic policy, warning level, and suppressed-diagnostic reporting. Distinct compiler configurations can produce identical attestation artifacts, allowing the package oracle to certify the wrong build behavior.
 - **BUG-057 [P0] - Fuzz decoder integration check passes without decoder use:** FuzzRunnerEvidenceTests searches the campaign script for a decoder name that is already present in a dot-sourced filename. Removing or bypassing the actual strict decoder call leaves the gate green and can admit malformed runner JSON into campaign evidence.
-- **BUG-060 [P0] - Generic static-constructor effects are replaced by an exception only:** EffectAnalysisSession replaces a source generic type initializer with only TypeInitializationException instead of summarizing its reads, writes, allocations, and capabilities or marking an unknown boundary. First static-field access can therefore be falsely certified nonallocating, capability-free, or nonwriting.
 - **BUG-061 [P0] - IL summaries can bind to the wrong aliased assembly:** CompilerImplementationIlSummaryLowerer selects the first reference matching assembly identity and module name without verifying aliases or bound symbol identity. Calls through a later extern alias can receive an exact summary from a different assembly body with the same identity.
 - **BUG-070 [P0] - Leading goto selects an unreachable compiler body:** CompilerCallableLowerer searches operations after a leading goto and can choose the first later block without checking reachability. It may start exact verification at a dead return and prove or refute a postcondition from code that never executes.
 - **BUG-071 [P0] - Lifted nullable conversions ignore skipped operator calls:** Effects completion and exception analysis invoke the underlying user conversion unconditionally for lifted nullable conversions, even though a null operand skips that operator. Real normal paths can disappear from a Complete effect summary, enabling unsound purity or no-write conclusions.
