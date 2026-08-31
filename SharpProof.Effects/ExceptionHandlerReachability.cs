@@ -481,19 +481,37 @@ internal sealed class ExceptionHandlerReachability(
                         Add);
                 var priorPhasesComplete = inConversionCompletes &&
                     canCompleteNormally(compound.Value);
-                var operatorCompletes = priorPhasesComplete &&
-                    (skipsOperator || AddCompoundCallablePotential(
-                            compound.OperatorMethod,
+                var isStringConcatenation =
+                    StringConcatenationEffectResolver
+                        .IsBuiltInStringConcatenation(compound);
+                var operatorCompletes = isStringConcatenation
+                    ? priorPhasesComplete &&
+                        AddFormattedValuePotential(
+                            compound.Target,
                             compound,
                             activeMethods,
                             depth,
-                            Add)) &&
-                    (skipsOperator || !(compound.OperatorKind is
-                            BinaryOperatorKind.Divide or
-                            BinaryOperatorKind.Remainder &&
-                        compound.Value.ConstantValue is
-                        { HasValue: true, Value: 0 }));
+                            Add) &&
+                        AddFormattedValuePotential(
+                            compound.Value,
+                            compound,
+                            activeMethods,
+                            depth,
+                            Add)
+                    : priorPhasesComplete &&
+                        (skipsOperator || AddCompoundCallablePotential(
+                                compound.OperatorMethod,
+                                compound,
+                                activeMethods,
+                                depth,
+                                Add)) &&
+                        (skipsOperator || !(compound.OperatorKind is
+                                BinaryOperatorKind.Divide or
+                                BinaryOperatorKind.Remainder &&
+                            compound.Value.ConstantValue is
+                            { HasValue: true, Value: 0 }));
                 if (priorPhasesComplete &&
+                    !isStringConcatenation &&
                     !skipsOperator &&
                     CanThrowUnknown(compound))
                 {
@@ -2876,6 +2894,37 @@ internal sealed class ExceptionHandlerReachability(
         return Union(
             result,
             GetCallableExceptions(target, activeMethods, depth + 1));
+    }
+
+    private bool AddFormattedValuePotential(
+        IOperation operand,
+        IOperation origin,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth,
+        Action<PotentialExceptions, IOperation> add)
+    {
+        add(
+            GetFormattedValueExceptions(
+                operand,
+                origin,
+                activeMethods,
+                depth),
+            origin);
+        if (!StringConcatenationEffectResolver
+            .TryResolveFormattedValueMethod(
+                operand,
+                origin,
+                compilation,
+                abstractFlow,
+                out var target,
+                out var dispatchUncertain))
+        {
+            return true;
+        }
+
+        return target == null ||
+            dispatchUncertain ||
+            canMethodCompleteNormally(target);
     }
 
     internal ReturnNullability GetReturnNullability(IMethodSymbol method)

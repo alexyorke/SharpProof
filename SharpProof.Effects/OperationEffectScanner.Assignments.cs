@@ -118,6 +118,12 @@ internal sealed partial class OperationEffectScanner
                 _conversionEffects.SkipsLiftedOperator(assignment)
                     ? EffectSummary.Empty
                     : ResolveCompoundOperatorEffects(assignment),
+                StringConcatenationEffectResolver.Resolve(
+                    assignment,
+                    _session.Compilation,
+                    _callResolver,
+                    _abstractFlow,
+                    _conversionOwnership.ClassifyRegion),
                 IntegralDivisionExceptions(
                     assignment.OperatorKind,
                     assignment.Type,

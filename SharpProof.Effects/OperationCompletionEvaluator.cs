@@ -976,6 +976,25 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
+        if (StringConcatenationEffectResolver
+            .IsBuiltInStringConcatenation(assignment))
+        {
+            return StringConcatenationEffectResolver
+                    .CanFormattedValueCompleteNormally(
+                        assignment.Target,
+                        assignment,
+                        _compilation,
+                        _abstractFlow,
+                        this) &&
+                StringConcatenationEffectResolver
+                    .CanFormattedValueCompleteNormally(
+                        assignment.Value,
+                        assignment,
+                        _compilation,
+                        _abstractFlow,
+                        this);
+        }
+
         return assignment.OperatorMethod == null ||
             CanCompleteInvocation(
                 assignment.OperatorMethod,

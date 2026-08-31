@@ -39,6 +39,14 @@ internal static class StringConcatenationEffectResolver
             binary.OperatorMethod == null;
     }
 
+    internal static bool IsBuiltInStringConcatenation(
+        ICompoundAssignmentOperation assignment)
+    {
+        return assignment.OperatorKind == BinaryOperatorKind.Add &&
+            assignment.Type?.SpecialType == SpecialType.System_String &&
+            assignment.OperatorMethod == null;
+    }
+
     internal static EffectSummary Resolve(
         IBinaryOperation binary,
         Compilation compilation,
@@ -72,6 +80,37 @@ internal static class StringConcatenationEffectResolver
             ResolveFormattedValue(
                 binary.RightOperand,
                 binary,
+                compilation,
+                calls,
+                flow,
+                classifyRegion));
+    }
+
+    internal static EffectSummary Resolve(
+        ICompoundAssignmentOperation assignment,
+        Compilation compilation,
+        EffectCallSiteResolver calls,
+        ManagedFlowResult? flow,
+        Func<IOperation?, bool, EffectRegionSet> classifyRegion)
+    {
+        if (!IsBuiltInStringConcatenation(assignment))
+        {
+            return EffectSummary.Empty;
+        }
+
+        return EffectSummaryOperations.Join(
+            EffectSummaryOperations.Allocate(
+                EffectAllocationKind.Managed),
+            ResolveFormattedValue(
+                assignment.Target,
+                assignment,
+                compilation,
+                calls,
+                flow,
+                classifyRegion),
+            ResolveFormattedValue(
+                assignment.Value,
+                assignment,
                 compilation,
                 calls,
                 flow,
