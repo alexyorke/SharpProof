@@ -1,6 +1,6 @@
 # Bug backlog
 
-392 open bugs, reprioritized by impact, reachability, and affected scope.
+391 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (104)
+## P0 - Critical (103)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -34,7 +34,6 @@ Priority definitions:
 - **BUG-078 [P0] - Malformed UTF-16 makes IR fingerprints non-injective:** IR metadata constructors accept lone UTF-16 surrogates that JSON encoding replaces with the same replacement character. Distinct accepted graphs can therefore serialize and fingerprint identically, breaking faithful round-trip and authenticated graph identity.
 - **BUG-079 [P0] - Manual support review survives semantic context changes:** OpenSourceCorpusImporter reuses support decisions by a method-declaration hash that excludes containing type, namespace, imports, path, and source commit. Identical text moved into a different semantic context can inherit an obsolete review status and silently invalidate coverage claims.
 - **BUG-080 [P0] - MaximumExpressionDepth is excluded from compiler evidence seals:** CompilerManifestArtifactProducer assigns MaximumExpressionDepth outside both compilation and feature-scope fingerprints, while worker validation checks only range and request parity. A modified artifact and request can change verifier cutoffs without invalidating authenticated compiler evidence.
-- **BUG-082 [P0] - Metadata exception construction hides reachable handlers:** ExceptionHandlerReachability treats every metadata constructor for an Exception-derived type as unable to throw. Matching catch handlers and their writes or allocations can be omitted while the effect summary remains complete, enabling false no-write or no-allocation certification.
 - **BUG-087 [P0] - MSBuild omits exact-invocation result validation:** The shipped verifier target never supplies InvocationResultPath to ValidatePublishedVerificationResult, so private per-invocation binding checks are skipped. Concurrent builds sharing publication paths can accept and advertise another invocation's internally valid verification evidence.
 - **BUG-088 [P0] - Mutable runtime paths invalidate containment authentication:** RunVerifier reduces the dotnet host and supervisor assembly to mutable pathnames before launch, without durable byte identity. Replacement between validation and launch can make lifecycle receipts describe code that did not enforce descendant cleanup.
 - **BUG-092 [P0] - Nested local functions can suppress list-pattern indexer calls:** Effects list-pattern completion can confuse a nested expression-bodied local function with a custom Length constant and skip the mandatory indexer call. Indexer effects and noncompletion can disappear from a Complete summary, falsely proving effect contracts.
