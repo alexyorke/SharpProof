@@ -636,6 +636,12 @@ internal static class ContractForSymbolMatcher
         {
             return (leftArray.Rank, leftArray.IsSZArray) ==
                    (rightArray.Rank, rightArray.IsSZArray) &&
+                   ArrayShapePartsMatch(
+                       leftArray.Sizes,
+                       rightArray.Sizes) &&
+                   ArrayShapePartsMatch(
+                       leftArray.LowerBounds,
+                       rightArray.LowerBounds) &&
                    TypesMatch(leftArray.ElementType, rightArray.ElementType,
                        leftScope, rightScope, normalizeMappedTypeParameters);
         }
@@ -669,6 +675,9 @@ internal static class ContractForSymbolMatcher
             !TypesMatch(leftNamed.ContainingType, rightNamed.ContainingType,
                 leftScope, rightScope, normalizeMappedTypeParameters) ||
             !leftNamed.TypeArguments.Select((argument, index) =>
+                    CustomModifiersMatch(
+                        leftNamed.GetTypeArgumentCustomModifiers(index),
+                        rightNamed.GetTypeArgumentCustomModifiers(index)) &&
                     TypesMatch(argument, rightNamed.TypeArguments[index],
                         leftScope, rightScope, normalizeMappedTypeParameters))
                 .All(static matches => matches))
@@ -682,6 +691,15 @@ internal static class ContractForSymbolMatcher
                        string.Equals(element.Name,
                            rightNamed.TupleElements[index].Name, StringComparison.Ordinal))
                    .All(static matches => matches);
+    }
+
+    private static bool ArrayShapePartsMatch(
+        ImmutableArray<int> left,
+        ImmutableArray<int> right)
+    {
+        return left.IsDefaultOrEmpty
+            ? right.IsDefaultOrEmpty
+            : !right.IsDefault && left.SequenceEqual(right);
     }
 
     private static bool FunctionPointerSignaturesMatch(
