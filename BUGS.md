@@ -1,6 +1,6 @@
 # Bug backlog
 
-420 open bugs, reprioritized by impact, reachability, and affected scope.
+419 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (132)
+## P0 - Critical (131)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -18,7 +18,6 @@ Priority definitions:
 - **BUG-031 [P0] - Contract API trust is not bound to referenced metadata:** ContractApiIdentityResolver accepts symbols from PortableExecutableReference metadata but hashes mutable contents reopened through FilePath. Mismatched or stale metadata can cross the trusted contract API boundary while an unrelated file supplies the expected digest.
 - **BUG-033 [P0] - Corpus importer attributes ignored files to the pinned commit:** OpenSourceCorpusImporter trusts clean git status but enumerates all on-disk C# files, including ignored untracked files. Such files can change corpus compilation and analyzer verdicts while the manifest falsely attributes the input to the pinned upstream commit.
 - **BUG-037 [P0] - Default API specifications accept unbound metadata identities:** ApiSpecResolver authenticates approved assemblies using only metadata name, public-key token, path substrings, and a name-matched reference attribute. An unrelated matching payload can receive trusted API effects, nullness, cardinality, or postconditions and drive an unsound Proven outcome.
-- **BUG-038 [P0] - Delegate arguments leave captured-local facts stale:** ManagedAbstractFlow havocs captured facts only when the call target itself is a delegate or local function, not when a delegate is passed by value to an ordinary call. Synchronous mutation through that argument can leave stale nullness and scalar facts that suppress real exceptions and effects.
 - **BUG-042 [P0] - Effect claims can bind locations from unrelated source trees:** CompilerEffectAuthority validates a claim location and source-tree tuple independently without proving they identify the same captured tree. It can accept an effect claim whose trusted diagnostic and replay attribution points to the wrong source code.
 - **BUG-043 [P0] - Effect evidence authority does not bind outcome or certainty:** CompilerResponseEvidenceAuthority validates an effect proof core without binding the response outcome, reason, and certainty to compiler evidence. A tampered response can convert Unknown or Refuted compiler effect evidence into an accepted Proven claim.
 - **BUG-044 [P0] - Effect replay accepts cross-tree provenance splicing:** CompilerEffectClaimArtifactCodec validates operation geometry and mapped-source geometry against separate syntax trees without requiring the tree ordinals to match. A malformed artifact can combine operation evidence from one tree with source authority from another and still pass replay validation.
