@@ -60,9 +60,15 @@ git clone https://github.com/aalhour/C-Sharp-Algorithms `
     C:\work\C-Sharp-Algorithms
 git -C C:\work\C-Sharp-Algorithms checkout `
     b82432474a916ac784cd1446eabcba615c333463
-.\SharpProof.Gates\Corpus\Import-OssCorpus.ps1 `
-    -UpstreamRoot C:\work\C-Sharp-Algorithms
+docker compose run --rm `
+    -v C:\work\C-Sharp-Algorithms:/upstream:ro tooling `
+    pwsh SharpProof.Gates/Corpus/Import-OssCorpus.ps1 `
+    -UpstreamRoot /upstream
 ```
+
+Run the importer through the canonical Linux tooling container; the upstream
+checkout is mounted read-only at `/upstream` so the generated files and
+validation use the same environment as the release gates.
 
 The command regenerates the source/provenance manifest, copied license, reviewed
 semantic expectations, and canonical analyzer snapshot using LF without a BOM.
