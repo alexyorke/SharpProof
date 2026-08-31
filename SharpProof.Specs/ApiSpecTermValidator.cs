@@ -11,6 +11,20 @@ internal static class ApiSpecTermValidator
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets)
     {
+        return Validate(
+            declaration,
+            variables,
+            facets,
+            new Dictionary<SpecTermDeclaration, TermFacts>(
+                DeclarationReferenceComparer.Instance));
+    }
+
+    private static TermFacts Validate(
+        SpecTermDeclaration declaration,
+        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+        ApiSpecFacets facets,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
+    {
         if (declaration == null)
         {
             throw new ArgumentException(
@@ -18,6 +32,22 @@ internal static class ApiSpecTermValidator
                 nameof(declaration));
         }
 
+        if (validated.TryGetValue(declaration, out var facts))
+        {
+            return facts;
+        }
+
+        facts = ValidateCore(declaration, variables, facets, validated);
+        validated.Add(declaration, facts);
+        return facts;
+    }
+
+    private static TermFacts ValidateCore(
+        SpecTermDeclaration declaration,
+        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+        ApiSpecFacets facets,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
+    {
         switch (declaration)
         {
             case SpecVariableDeclaration variable:
@@ -74,13 +104,13 @@ internal static class ApiSpecTermValidator
 
                 return new(nullValue.Type, true, false, null);
             case SpecUnaryDeclaration unary:
-                return ValidateUnary(unary, variables, facets);
+                return ValidateUnary(unary, variables, facets, validated);
             case SpecBinaryDeclaration binary:
-                return ValidateBinary(binary, variables, facets);
+                return ValidateBinary(binary, variables, facets, validated);
             case SpecConditionalDeclaration conditional:
-                return ValidateConditional(conditional, variables, facets);
+                return ValidateConditional(conditional, variables, facets, validated);
             case SpecLengthDeclaration length:
-                var value = Validate(length.Value, variables, facets);
+                var value = Validate(length.Value, variables, facets, validated);
                 if (value.Type is not (
                     IrTypeKind.String or IrTypeKind.Sequence))
                 {
@@ -104,9 +134,10 @@ internal static class ApiSpecTermValidator
     private static TermFacts ValidateUnary(
         SpecUnaryDeclaration unary,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
-        var operand = Validate(unary.Operand, variables, facets);
+        var operand = Validate(unary.Operand, variables, facets, validated);
         var expected = IrOperatorCatalog.Get(unary.Operator).Operand;
         if (operand.Type != expected || unary.Type != expected)
         {
@@ -139,10 +170,11 @@ internal static class ApiSpecTermValidator
     private static TermFacts ValidateBinary(
         SpecBinaryDeclaration binary,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
-        var left = Validate(binary.Left, variables, facets);
-        var right = Validate(binary.Right, variables, facets);
+        var left = Validate(binary.Left, variables, facets, validated);
+        var right = Validate(binary.Right, variables, facets, validated);
         var shape = IrOperatorCatalog.Get(binary.Operator);
         var operandTypesMatch = shape.Operand.HasValue
             ? left.Type == shape.Operand.Value &&
@@ -195,11 +227,12 @@ internal static class ApiSpecTermValidator
     private static TermFacts ValidateConditional(
         SpecConditionalDeclaration conditional,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
-        var condition = Validate(conditional.Condition, variables, facets);
-        var whenTrue = Validate(conditional.WhenTrue, variables, facets);
-        var whenFalse = Validate(conditional.WhenFalse, variables, facets);
+        var condition = Validate(conditional.Condition, variables, facets, validated);
+        var whenTrue = Validate(conditional.WhenTrue, variables, facets, validated);
+        var whenFalse = Validate(conditional.WhenFalse, variables, facets, validated);
         if (condition.Type != IrTypeKind.Boolean ||
             whenTrue.Type != whenFalse.Type ||
             conditional.Type != whenTrue.Type)
@@ -277,4 +310,24 @@ internal static class ApiSpecTermValidator
         bool IsNonNull,
         long? Integer,
         bool? Boolean = null);
+
+    private sealed class DeclarationReferenceComparer :
+        IEqualityComparer<SpecTermDeclaration>
+    {
+        internal static DeclarationReferenceComparer Instance { get; } =
+            new();
+
+        public bool Equals(
+            SpecTermDeclaration? left,
+            SpecTermDeclaration? right)
+        {
+            return ReferenceEquals(left, right);
+        }
+
+        public int GetHashCode(SpecTermDeclaration declaration)
+        {
+            return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(
+                declaration);
+        }
+    }
 }
