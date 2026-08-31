@@ -1268,6 +1268,47 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task RejectsReadonlyHoldersWithIndirectMutableState()
+    {
+        const string source =
+            """
+            using System;
+            using System.Text;
+            namespace SharpProof.Analyzer;
+            sealed class MutableLeaf {
+                internal int Value;
+            }
+            sealed class ReadonlyChildHolder {
+                internal readonly MutableLeaf Child = new();
+            }
+            class MutableBase {
+                internal int Value;
+            }
+            sealed class DerivedHolder : MutableBase { }
+            sealed class ReadOnlyByName {
+                internal int Value;
+            }
+            sealed class CallbackHolder {
+                internal event Action? Changed;
+                internal void Raise() => Changed?.Invoke();
+            }
+            static class C {
+                internal static readonly ReadonlyChildHolder Nested = new();
+                internal static readonly DerivedHolder Inherited = new();
+                internal static readonly ReadOnlyByName MisleadingName = new();
+                internal static readonly CallbackHolder Callbacks = new();
+                internal static readonly StringBuilder Metadata = new();
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA002"),
+            Is.EqualTo(5));
+    }
+
+    [Test]
     public async Task RejectsConstStringFieldInIr()
     {
         const string source =
