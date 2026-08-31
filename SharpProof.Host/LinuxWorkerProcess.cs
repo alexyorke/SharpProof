@@ -32,6 +32,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
     private const int SignalTerminate = 15;
     private const int PollMilliseconds = 25;
     private Process? _process;
+    private long _terminationDeadlineTimestamp;
 
     private LinuxWorkerProcess(Process process)
     {
@@ -98,6 +99,10 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         var process = _process ?? throw new ObjectDisposedException(
             nameof(LinuxWorkerProcess));
         var stopwatch = Stopwatch.StartNew();
+        Interlocked.Exchange(
+            ref _terminationDeadlineTimestamp,
+            Stopwatch.GetTimestamp() +
+                (long)(finalLimit.TotalSeconds * Stopwatch.Frequency));
         while (!process.WaitForExit(0))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -148,7 +153,14 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         if (!process.HasExited)
         {
             var stopwatch = Stopwatch.StartNew();
-            _ = Terminate(process, stopwatch, TimeSpan.FromSeconds(1));
+            var deadline = Interlocked.Read(ref _terminationDeadlineTimestamp);
+            var remaining = deadline == 0
+                ? TimeSpan.FromSeconds(1)
+                : TimeSpan.FromSeconds(Math.Max(
+                    0,
+                    (deadline - Stopwatch.GetTimestamp()) /
+                        (double)Stopwatch.Frequency));
+            _ = Terminate(process, stopwatch, remaining);
         }
         process.Dispose();
     }

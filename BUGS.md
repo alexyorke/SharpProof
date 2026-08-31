@@ -191,7 +191,6 @@ Priority definitions:
 - **BUG-420 [P2] - Value-position scalar mutations leave stale state:** Frontend value-position increments and compound assignments record an abstention but never update or havoc the mutated variable. The retained abstained program exposes stale state, although exact compiler admission rejects it.
 - **BUG-421 [P2] - Verification cache capacity is not reconciled on ordinary misses:** VerificationCache enforces MaximumBytes only after replayable hits or cacheable writes, returning early for missing, stale, malformed, or nonreplayable entries. An existing cache can remain above a reduced byte cap indefinitely when subsequent results are not cacheable.
 - **BUG-422 [P2] - Wide SMT encoding ignores cancellation and query budgets:** IrSmtBackend checks cancellation only around whole assumptions and goals, while recursive AST encoding receives no token and runs before the solver rlimit begins. A large shallow formula can continue consuming CPU and memory after cancellation or timeout.
-- **BUG-423 [P2] - Worker disposal restarts an exhausted cleanup budget:** LinuxWorkerProcess exhausts its final termination limit, then Dispose starts a new stopwatch and grants another hard-coded second. A stuck worker can exceed the advertised hard deadline during routine cleanup.
 
 ## P3 - Low (34)
 
