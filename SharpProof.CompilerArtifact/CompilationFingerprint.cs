@@ -422,7 +422,11 @@ internal static class CompilerDiagnosticArtifactOrdering
             .ThenBy(static item => item.Code, StringComparer.Ordinal)
             .ThenBy(static item => item.Message, StringComparer.Ordinal)
             .ThenBy(static item => item.Location.Line)
-            .ThenBy(static item => item.Location.Column)];
+            .ThenBy(static item => item.Location.Column)
+            .ThenBy(static item => item.SourceTreeOrdinal)
+            .ThenBy(static item => item.SourceTreePath, StringComparer.Ordinal)
+            .ThenBy(static item => item.SourceTreeSha256, StringComparer.Ordinal)
+            .ThenBy(static item => item.SourceLineMapSha256, StringComparer.Ordinal)];
     }
 
     internal static bool IsCanonical(CompilerDiagnosticArtifact[] diagnostics)
@@ -469,8 +473,15 @@ internal static class CompilerDiagnosticArtifactOrdering
         }
 
         result = left.Location.Line.CompareTo(right.Location.Line);
-        return result != 0
-            ? result
-            : left.Location.Column.CompareTo(right.Location.Column);
+        if (result != 0) return result;
+        result = left.Location.Column.CompareTo(right.Location.Column);
+        if (result != 0) return result;
+        result = left.SourceTreeOrdinal.CompareTo(right.SourceTreeOrdinal);
+        if (result != 0) return result;
+        result = StringComparer.Ordinal.Compare(left.SourceTreePath, right.SourceTreePath);
+        if (result != 0) return result;
+        result = StringComparer.Ordinal.Compare(left.SourceTreeSha256, right.SourceTreeSha256);
+        return result != 0 ? result :
+            StringComparer.Ordinal.Compare(left.SourceLineMapSha256, right.SourceLineMapSha256);
     }
 }
