@@ -17,10 +17,15 @@ internal sealed partial class OperationEffectScanner
                     EffectAccess.Write,
                     valueIsStoredDirectly ? value : null),
             IPropertyReferenceOperation property =>
-                ScanProperty(
-                    property,
-                    EffectAccess.Write,
-                    valueIsStoredDirectly ? value : null),
+                valueIsStoredDirectly
+                    ? ScanProperty(
+                        property,
+                        EffectAccess.Write,
+                        assignedValue: value)
+                    : ScanProperty(
+                        property,
+                        EffectAccess.Write,
+                        assignedValueRegion: EffectRegionSet.Unknown),
             IParameterReferenceOperation parameter
                 when parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out ||
                      PrimaryConstructorParameterOwnership.IsReceiverBacked(
