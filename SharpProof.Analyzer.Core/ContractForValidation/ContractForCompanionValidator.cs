@@ -226,7 +226,6 @@ internal static class ContractForCompanionValidator
                 method.Name,
                 GetSourceLocation(method, compilation, fallback),
                 diagnostics.Add);
-            return;
         }
 
         if (inventory.ImplementationBody == null)
