@@ -1293,8 +1293,44 @@ internal sealed class OperationCompletionEvaluator
             {
                 var truthOperator = ConditionalTruthOperatorFacts.Resolve(
                     binary);
-                return truthOperator == null ||
-                    CanMethodCompleteNormally(truthOperator);
+                if (truthOperator != null &&
+                    !CanMethodCompleteNormally(truthOperator))
+                {
+                    return false;
+                }
+
+                // A refined truth value only determines whether the right
+                // operand is skipped. When it is evaluated, both the right
+                // operand and the user-defined conditional operator are
+                // mandatory completion points.
+                var hasLeftValue = binary.LeftOperand.ConstantValue is
+                    { HasValue: true, Value: bool leftValue };
+                if (!hasLeftValue && _abstractFlow?.TryEvaluate(
+                        binary,
+                        binary.LeftOperand,
+                        out var abstractLeft) == true)
+                {
+                    hasLeftValue = abstractLeft.TryGetBoolean(out leftValue);
+                }
+
+                if (hasLeftValue)
+                {
+                    var shortCircuits = binary.OperatorKind ==
+                        BinaryOperatorKind.ConditionalAnd
+                            ? !leftValue
+                            : leftValue;
+                    if (shortCircuits)
+                    {
+                        return true;
+                    }
+                }
+
+                return CanCompleteNormally(binary.RightOperand) &&
+                    (binary.OperatorMethod == null ||
+                     CanCompleteInvocation(
+                         binary.OperatorMethod,
+                         instance: null,
+                         binary));
             }
 
             return true;
