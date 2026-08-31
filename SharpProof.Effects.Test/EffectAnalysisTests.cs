@@ -884,6 +884,29 @@ public sealed class EffectAnalysisTests
     }
 
     [Test]
+    public void UserDefinedStringAdditionUsesOperatorSummaryForAllocation()
+    {
+        var result = Analyze(
+            """
+            public sealed class Token {
+                public static string operator +(Token left, Token right) =>
+                    "cached";
+            }
+
+            public static class Sample {
+                public static string Combine(Token left, Token right) =>
+                    left + right;
+            }
+            """,
+            "Sample",
+            "Combine");
+
+        Assert.That(
+            result.Summary.Allocation,
+            Is.EqualTo(EffectAllocationKind.None));
+    }
+
+    [Test]
     public void StringCompoundAssignmentIncludesConcatenationEffects()
     {
         var compilation = EffectTestHost.CreateCompilation(
