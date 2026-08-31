@@ -989,6 +989,54 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task SemanticCacheWritesInspectVirtualAndInterfaceProducerImplementations()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown, Proven }
+            sealed class ProofCache {
+                internal void Write(Answer answer) { }
+            }
+            interface IAnswerSource {
+                Answer Create();
+                Answer Value { get; }
+            }
+            sealed class InterfaceAnswerSource : IAnswerSource {
+                public Answer Create() => Answer.Unknown;
+                public Answer Value => Answer.Unknown;
+            }
+            class AnswerSource {
+                internal virtual Answer Create() => Answer.Proven;
+                internal virtual Answer Value => Answer.Proven;
+            }
+            sealed class UnstableAnswerSource : AnswerSource {
+                internal override Answer Create() => Answer.Unknown;
+                internal override Answer Value => Answer.Unknown;
+            }
+            sealed class C {
+                void ThroughInterface(
+                    ProofCache cache,
+                    IAnswerSource source) {
+                    cache.Write(source.Create());
+                    cache.Write(source.Value);
+                }
+                void ThroughBase(
+                    ProofCache cache,
+                    AnswerSource source) {
+                    cache.Write(source.Create());
+                    cache.Write(source.Value);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic =>
+                diagnostic.Id == "SPMETA010"),
+            Is.EqualTo(4));
+    }
+
+    [Test]
     public async Task SemanticCacheWritesFollowGenericForwardedArguments()
     {
         var diagnostics = await Analyze(
