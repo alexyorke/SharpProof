@@ -441,8 +441,32 @@ internal static class CancellationBoundaryAnalyzer
 
     private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause)
     {
-        return clause.Block.Statements.FirstOrDefault() is
-            ThrowStatementSyntax { Expression: null };
+        if (clause.Block.Statements.FirstOrDefault() is not
+            ThrowStatementSyntax { } throwStatement)
+        {
+            return false;
+        }
+
+        if (throwStatement.Expression == null)
+        {
+            return true;
+        }
+
+        // `throw caught;` is equivalent to a bare rethrow when it is the
+        // caught exception itself. Do not authorize arbitrary expressions
+        // (including another exception or a method call) at this boundary.
+        var expression = throwStatement.Expression;
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            expression = parenthesized.Expression;
+        }
+
+        return clause.Declaration?.Identifier is { } identifier &&
+            expression is IdentifierNameSyntax thrownIdentifier &&
+            string.Equals(
+                identifier.ValueText,
+                thrownIdentifier.Identifier.ValueText,
+                StringComparison.Ordinal);
     }
 
     private static bool IsAuditedCancellationBoundary(

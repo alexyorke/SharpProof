@@ -1274,11 +1274,11 @@ public sealed class SharpProofSoundnessAnalyzerTests
                 private static readonly object Gate = new();
                 static void M() {
                     try { }
-                    catch (OperationCanceledException) { throw; }
+                    catch (OperationCanceledException cancellation) { throw cancellation; }
                 }
                 static void BroadCatchAfterCancellationRethrow() {
                     try { }
-                    catch (OperationCanceledException) { throw; }
+                    catch (OperationCanceledException cancellation) { throw (cancellation); }
                     catch (Exception) { }
                 }
             }
