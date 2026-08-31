@@ -154,6 +154,24 @@ internal sealed partial class OperationEffectScanner
             return result.Summary;
         }
 
+        if (getAwaiter.ReturnType.IsReferenceType)
+        {
+            var nullability = _handlerReachability
+                .GetReturnNullability(getAwaiter);
+            result = result.Then(new EffectStep(
+                nullability == ExceptionHandlerReachability
+                    .ReturnNullability.NonNull
+                    ? EffectSummary.Empty
+                    : Throw(
+                        FrameworkTypeMetadataNames.NullReferenceException),
+                nullability != ExceptionHandlerReachability
+                    .ReturnNullability.Null));
+            if (!result.CompletesNormally)
+            {
+                return result.Summary;
+            }
+        }
+
         var awaiter = EffectRegionSet.Create(
             EffectRegionId.Fresh(awaitOperation.Syntax.SpanStart));
         if (info.IsCompletedProperty?.GetMethod is not { } isCompleted ||

@@ -2788,7 +2788,7 @@ internal sealed class ExceptionHandlerReachability(
             GetCallableExceptions(target, activeMethods, depth + 1));
     }
 
-    private ReturnNullability GetReturnNullability(IMethodSymbol method)
+    internal ReturnNullability GetReturnNullability(IMethodSymbol method)
     {
         method = method.OriginalDefinition;
         if (method.DeclaringSyntaxReferences.Length != 1)
@@ -2860,7 +2860,7 @@ internal sealed class ExceptionHandlerReachability(
         return false;
     }
 
-    private enum ReturnNullability
+    internal enum ReturnNullability
     {
         Null,
         NonNull,
