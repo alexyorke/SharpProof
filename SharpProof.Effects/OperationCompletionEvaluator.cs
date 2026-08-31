@@ -1303,8 +1303,14 @@ internal sealed class OperationCompletionEvaluator
                 // operand is skipped. When it is evaluated, both the right
                 // operand and the user-defined conditional operator are
                 // mandatory completion points.
-                var hasLeftValue = binary.LeftOperand.ConstantValue is
-                    { HasValue: true, Value: bool leftValue };
+                var leftValue = false;
+                var hasLeftValue = binary.LeftOperand.ConstantValue.HasValue &&
+                    binary.LeftOperand.ConstantValue.Value is bool;
+                if (hasLeftValue &&
+                    binary.LeftOperand.ConstantValue.Value is bool constantLeftValue)
+                {
+                    leftValue = constantLeftValue;
+                }
                 if (!hasLeftValue && _abstractFlow?.TryEvaluate(
                         binary,
                         binary.LeftOperand,

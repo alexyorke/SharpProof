@@ -2004,6 +2004,21 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void ContainmentFailurePresentationPreservesDedicatedExitCode()
+    {
+        Assert.That(
+            LauncherPresentation.ExitCode(
+                WorkerRunStatus.Failed,
+                WorkerRunFailureReason.ContainmentFailure),
+            Is.EqualTo(125));
+        Assert.That(
+            LauncherPresentation.ExitCode(
+                WorkerRunStatus.Failed,
+                WorkerRunFailureReason.InfrastructureFailure),
+            Is.EqualTo(3));
+    }
+
+    [Test]
     public void SarifProjectionPreservesInfrastructureFailure()
     {
         var manifest = new WorkerClaimManifest();

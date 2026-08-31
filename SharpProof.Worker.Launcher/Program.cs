@@ -452,7 +452,9 @@ internal static class Program
         {
             Console.Error.WriteLine("SharpProof worker run " + response.RunStatus +
                 " (" + response.FailureReason + ").");
-            return LauncherPresentation.ExitCode(response.RunStatus);
+            return LauncherPresentation.ExitCode(
+                response.RunStatus,
+                response.FailureReason);
         }
         if (response.Errors.Length != 0)
         {
