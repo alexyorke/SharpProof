@@ -207,21 +207,21 @@ public sealed class IrFactory
     public IrMemberId GetOrCreateMember(IrIdentityId identity, IrTypeId declaringType, string name, IrTypeId returnType, bool isStatic,
         params IrTypeId[] parameterTypes)
     {
-        ValidateName(name, nameof(name));
         ArgumentNullGuard.NotNull(parameterTypes, nameof(parameterTypes));
+        var parameters = parameterTypes.ToImmutableArray();
+        ValidateName(name, nameof(name));
 
         lock (_gate)
         {
             EnsureScope(identity.Scope, nameof(identity));
             GetTypeInfoCore(declaringType, nameof(declaringType));
             GetTypeInfoCore(returnType, nameof(returnType));
-            foreach (var parameterType in parameterTypes)
+            foreach (var parameterType in parameters)
             {
                 GetTypeInfoCore(parameterType, nameof(parameterTypes));
             }
 
             var nameId = InternStringCore(name);
-            var parameters = parameterTypes.ToImmutableArray();
             var key = new StructuralKey(
                 default, declaringType.Value, identity.Value, returnType.Value, isStatic ? 1 : 0,
                 children: [.. parameters.Select(static value => value.Value)]);
@@ -650,6 +650,7 @@ public sealed class IrFactory
     private IrOpaqueTerm Opaque(IrMemberId member, IrTerm? receiver, IrTerm[] arguments, IrOpaquePurity purity, OperationId operation)
     {
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
+        var immutableArguments = arguments.ToImmutableArray();
 
         lock (_gate)
         {
@@ -658,7 +659,7 @@ public sealed class IrFactory
                 this,
                 memberInfo,
                 receiver,
-                arguments,
+                immutableArguments,
                 nameof(arguments),
                 opaque: true);
             if (purity == IrOpaquePurity.Pure)
@@ -674,7 +675,6 @@ public sealed class IrFactory
                 GetOperationInfoCore(operation, nameof(operation));
             }
 
-            var immutableArguments = arguments.ToImmutableArray();
             ImmutableArray<int> childIds =
                 [receiver?.Id.Value ?? -1, .. immutableArguments.Select(static value => value.Id.Value)];
             return Intern(new StructuralKey(
