@@ -31,6 +31,16 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         callable = ArgumentNullGuard.NotNull(callable, nameof(callable));
 
         callable = NormalizeCallable(callable);
+        if (implementationBody != null &&
+            !IsCallableBodyRoot(callable, implementationBody))
+        {
+            return new ContractClauseInventory(
+                callable,
+                _api != null,
+                hasRejectedContractApiUsage: true,
+                implementationBody: null,
+                clauses: []);
+        }
         return implementationBody == null
             ? _cache.GetOrAdd(callable, CreateUncached)
             : CreateCore(callable, implementationBody);
@@ -39,6 +49,26 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     private ContractClauseInventory CreateUncached(IMethodSymbol callable)
     {
         return CreateCore(callable, null);
+    }
+
+    private bool IsCallableBodyRoot(
+        IMethodSymbol callable,
+        IOperation implementationBody)
+    {
+        var candidate = GetBody(implementationBody.Syntax) ??
+            implementationBody.Syntax;
+        if (GetDeclaredBodies(callable).Any(body =>
+                HasSameSite(body, candidate)))
+        {
+            return true;
+        }
+
+        return candidate is CompilationUnitSyntax &&
+            _compilation.GetEntryPoint(CancellationToken.None) is { } entryPoint &&
+            HaveSameDefinition(callable, entryPoint) &&
+            entryPoint.Locations.Any(location =>
+                location.SourceTree == candidate.SyntaxTree &&
+                candidate.Span.Contains(location.SourceSpan));
     }
 
     private ContractClauseInventory CreateCore(
