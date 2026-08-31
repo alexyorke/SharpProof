@@ -160,10 +160,8 @@ internal static class PerformanceGate
         var retainedIncreaseMiB =
             (unannotatedAdvisoryRetained - baselineRetained) /
             (1024d * 1024d);
-        WarmEnabledAnalyzerRetentionPaths(
-            contract.Warmups,
-            cancellationToken);
         var enabledRetention = MeasureEnabledAnalyzerRetention(
+            contract.Warmups,
             cancellationToken);
 
         var editMeasurement = await MeasureIdeEditsAsync(
@@ -853,29 +851,37 @@ internal static class PerformanceGate
             .Length;
     }
 
-    private static void WarmEnabledAnalyzerRetentionPaths(
+    private static ImmutableArray<WeakReference<Compilation>>
+        WarmEnabledAnalyzerRetentionPaths(
         int warmups,
         CancellationToken cancellationToken)
     {
+        var compilations =
+            ImmutableArray.CreateBuilder<WeakReference<Compilation>>(warmups);
         for (var index = 0; index < warmups; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _ = AnalyzeEnabledCompilation(
+            compilations.Add(AnalyzeEnabledCompilation(
                 CreateEnabledSource(index),
                 $"EnabledRetentionWarmup_{index}",
-                cancellationToken);
+                cancellationToken));
         }
         ForceCollection();
+        return compilations.ToImmutable();
     }
 
     private static EnabledAnalyzerRetentionMeasurement
         MeasureEnabledAnalyzerRetention(
+            int warmups,
             CancellationToken cancellationToken)
     {
         ForceCollection();
         var before = GC.GetTotalMemory(forceFullCollection: true);
         var compilations =
-            new List<WeakReference<Compilation>>(RetainedCompilationCount);
+            new List<WeakReference<Compilation>>(
+                warmups + RetainedCompilationCount);
+        compilations.AddRange(
+            WarmEnabledAnalyzerRetentionPaths(warmups, cancellationToken));
         for (var index = 0; index < RetainedCompilationCount; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
