@@ -516,6 +516,10 @@ internal sealed partial class OperationEffectScanner
         }
 
         var result = EffectStep.Empty;
+        var defersFormatting = StringConcatenationEffectResolver
+            .DefersInterpolationFormatting(
+                interpolation,
+                _session.Compilation);
         foreach (var part in interpolation.Parts)
         {
             if (part is not IInterpolationOperation value)
@@ -529,20 +533,24 @@ internal sealed partial class OperationEffectScanner
                 return result.Summary;
             }
 
+            if (value.Alignment != null)
+            {
+                result = result.Then(ScanStep(value.Alignment));
+            }
+            if (result.CompletesNormally && value.FormatString != null)
+            {
+                result = result.Then(ScanStep(value.FormatString));
+            }
+            if (!result.CompletesNormally)
+            {
+                return result.Summary;
+            }
+            if (defersFormatting)
+            {
+                continue;
+            }
             if (value.Alignment != null || value.FormatString != null)
             {
-                if (value.Alignment != null)
-                {
-                    result = result.Then(ScanStep(value.Alignment));
-                }
-                if (result.CompletesNormally && value.FormatString != null)
-                {
-                    result = result.Then(ScanStep(value.FormatString));
-                }
-                if (!result.CompletesNormally)
-                {
-                    return result.Summary;
-                }
                 result = result.Then(new EffectStep(
                     EffectSummaryOperations.Unsupported(),
                     CompletesNormally: true));

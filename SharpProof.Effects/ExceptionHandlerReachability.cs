@@ -588,7 +588,11 @@ internal sealed class ExceptionHandlerReachability(
                     (interpolation.Alignment == null ||
                      canCompleteNormally(interpolation.Alignment)) &&
                     (interpolation.FormatString == null ||
-                     canCompleteNormally(interpolation.FormatString)))
+                     canCompleteNormally(interpolation.FormatString)) &&
+                    !StringConcatenationEffectResolver
+                        .DefersInterpolationFormatting(
+                            interpolation,
+                            compilation))
                 {
                     Add(
                         interpolation.Alignment != null ||

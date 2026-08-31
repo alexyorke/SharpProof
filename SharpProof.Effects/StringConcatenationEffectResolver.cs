@@ -7,6 +7,29 @@ namespace SharpProof.Effects;
 /// </summary>
 internal static class StringConcatenationEffectResolver
 {
+    private const string FormattableStringMetadataName =
+        "System.FormattableString";
+    private const string IFormattableMetadataName = "System.IFormattable";
+
+    internal static bool DefersInterpolationFormatting(
+        IInterpolatedStringOperation interpolation,
+        Compilation compilation)
+    {
+        return IsDeferredInterpolationType(
+                interpolation.Type,
+                compilation) ||
+            interpolation.Parent is IConversionOperation conversion &&
+            IsDeferredInterpolationType(conversion.Type, compilation);
+    }
+
+    internal static bool DefersInterpolationFormatting(
+        IInterpolationOperation interpolation,
+        Compilation compilation)
+    {
+        return interpolation.Parent is IInterpolatedStringOperation owner &&
+            DefersInterpolationFormatting(owner, compilation);
+    }
+
     internal static bool IsBuiltInStringConcatenation(
         IBinaryOperation binary)
     {
@@ -190,6 +213,27 @@ internal static class StringConcatenationEffectResolver
         }
 
         return operation;
+    }
+
+    private static bool IsDeferredInterpolationType(
+        ITypeSymbol? type,
+        Compilation compilation)
+    {
+        if (type == null)
+        {
+            return false;
+        }
+
+        var formattableString = compilation.GetTypeByMetadataName(
+            FormattableStringMetadataName);
+        var formattable = compilation.GetTypeByMetadataName(
+            IFormattableMetadataName);
+        return formattableString != null &&
+                SymbolEqualityComparer.Default.Equals(
+                    type,
+                    formattableString) ||
+            formattable != null &&
+                SymbolEqualityComparer.Default.Equals(type, formattable);
     }
 
     private static ITypeSymbol? UnwrapNullable(ITypeSymbol? type)
