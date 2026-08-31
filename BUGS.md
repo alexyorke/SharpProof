@@ -1,6 +1,6 @@
 # Bug backlog
 
-425 open bugs, reprioritized by impact, reachability, and affected scope.
+424 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (137)
+## P0 - Critical (136)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -19,7 +19,6 @@ Priority definitions:
 - **BUG-033 [P0] - Corpus importer attributes ignored files to the pinned commit:** OpenSourceCorpusImporter trusts clean git status but enumerates all on-disk C# files, including ignored untracked files. Such files can change corpus compilation and analyzer verdicts while the manifest falsely attributes the input to the pinned upstream commit.
 - **BUG-037 [P0] - Default API specifications accept unbound metadata identities:** ApiSpecResolver authenticates approved assemblies using only metadata name, public-key token, path substrings, and a name-matched reference attribute. An unrelated matching payload can receive trusted API effects, nullness, cardinality, or postconditions and drive an unsound Proven outcome.
 - **BUG-038 [P0] - Delegate arguments leave captured-local facts stale:** ManagedAbstractFlow havocs captured facts only when the call target itself is a delegate or local function, not when a delegate is passed by value to an ordinary call. Synchronous mutation through that argument can leave stale nullness and scalar facts that suppress real exceptions and effects.
-- **BUG-039 [P0] - Delegate combination omits managed allocation:** OperationEffectScanner models built-in delegate addition and subtraction without the managed allocation they may perform. ZeroAllocations and inherited nonallocating summaries can therefore be falsely proven.
 - **BUG-040 [P0] - Delegate subtraction marks removed methods reachable:** Requires local-call reachability treats the right side of delegate subtraction as the delegate's new stored value. A removed method group can be marked executable later, causing its dead local-function body to emit a false SP0027 Refuted outcome.
 - **BUG-041 [P0] - Diverging static constructors are erased from method entry:** EffectMethodNodeBuilder treats a source static constructor that never completes and has no lexical throw as unable to affect entry. Static methods on that type can be summarized as reachable and terminating even though type initialization diverges before their bodies run.
 - **BUG-042 [P0] - Effect claims can bind locations from unrelated source trees:** CompilerEffectAuthority validates a claim location and source-tree tuple independently without proving they identify the same captured tree. It can accept an effect claim whose trusted diagnostic and replay attribution points to the wrong source code.
