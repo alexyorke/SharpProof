@@ -501,6 +501,10 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             ControlFlowGraph graph,
             IOperation value)
         {
+            if (IsDirectDelegateRemovalOperand(value.Syntax))
+            {
+                return false;
+            }
             if (!TryGetLocalDestination(
                     value.Syntax,
                     out var initialLocal,
@@ -1161,6 +1165,19 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 }
             }
             return true;
+        }
+
+        private static bool IsDirectDelegateRemovalOperand(
+            SyntaxNode value)
+        {
+            var assignment = value.Ancestors()
+                .OfType<AssignmentExpressionSyntax>()
+                .FirstOrDefault(candidate =>
+                    candidate.IsKind(
+                        SyntaxKind.SubtractAssignmentExpression) &&
+                    candidate.Right.Span.Contains(value.Span));
+            return assignment != null &&
+                IsDirectDelegatePropagation(value, assignment);
         }
 
         private static bool IsNonExecutingObservation(
