@@ -118,6 +118,7 @@ public static partial class WorkerProtocolJson
         if (declaredType == "string")
         {
             RequireValueKind(value, JsonValueKind.String);
+            EnsureNoLoneSurrogates(value.GetString());
             return;
         }
         if (declaredType == "bool")
@@ -162,6 +163,7 @@ public static partial class WorkerProtocolJson
         {
             throw new JsonException("The declared JSON enum type is invalid.");
         }
+        EnsureNoLoneSurrogates(text);
         object parsed;
         try
         {
@@ -186,6 +188,29 @@ public static partial class WorkerProtocolJson
         {
             throw new JsonException(
                 $"JSON token kind '{expected}' is required.");
+        }
+    }
+
+    private static void EnsureNoLoneSurrogates(string? value)
+    {
+        if (value == null)
+        {
+            return;
+        }
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (char.IsHighSurrogate(value[index]))
+            {
+                if (index + 1 >= value.Length || !char.IsLowSurrogate(value[index + 1]))
+                {
+                    throw new JsonException("JSON strings must not contain lone UTF-16 surrogates.");
+                }
+                index++;
+            }
+            else if (char.IsLowSurrogate(value[index]))
+            {
+                throw new JsonException("JSON strings must not contain lone UTF-16 surrogates.");
+            }
         }
     }
 

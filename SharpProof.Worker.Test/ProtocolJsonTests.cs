@@ -88,6 +88,17 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void ProtocolDeserializersRejectLoneUtf16Surrogates()
+    {
+        var json = WorkerProtocolJson.SerializeRequest(CreateRequest())
+            .Replace("compiler.manifest.json", "\\uD800", StringComparison.Ordinal);
+
+        Assert.That(
+            (Action)(() => WorkerProtocolJson.DeserializeRequest(json)),
+            Throws.TypeOf<JsonException>());
+    }
+
+    [Test]
     public void BoundedUtf8FileReaderRejectsOversizedAndInvalidFiles()
     {
         var path = Path.Combine(
