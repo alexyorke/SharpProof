@@ -1,6 +1,6 @@
 # Bug backlog
 
-388 open bugs, reprioritized by impact, reachability, and affected scope.
+387 open bugs, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 
@@ -9,7 +9,7 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (100)
+## P0 - Critical (99)
 
 - **BUG-010 [P0] - Bind-mount aliases bypass publication-set exclusivity:** LinuxPathIdentity derives publication locks and marker identities from normalized path strings rather than physical filesystem identity. Two bind-mount aliases can acquire independent leases for the same destination, allowing concurrent replacement, deletion, or rollback into mixed published state.
 - **BUG-022 [P0] - Compiler reference hashes are not bound to consumed PE images:** CompilerProbeSnapshot cannot hash image-backed references and independently reopens file-backed paths after Roslyn may have cached different metadata. Its artifact can therefore identify different reference bytes than the compilation actually consumed.
@@ -37,7 +37,6 @@ Priority definitions:
 - **BUG-087 [P0] - MSBuild omits exact-invocation result validation:** The shipped verifier target never supplies InvocationResultPath to ValidatePublishedVerificationResult, so private per-invocation binding checks are skipped. Concurrent builds sharing publication paths can accept and advertise another invocation's internally valid verification evidence.
 - **BUG-088 [P0] - Mutable runtime paths invalidate containment authentication:** RunVerifier reduces the dotnet host and supervisor assembly to mutable pathnames before launch, without durable byte identity. Replacement between validation and launch can make lifecycle receipts describe code that did not enforce descendant cleanup.
 - **BUG-093 [P0] - Nested nameof properties are treated as executed accessors:** RequiresCallSiteDiscovery suppresses only property references directly parented by nameof, not nested receiver properties. It can replay a getter that never executes and emit a false SP0027 Refuted outcome.
-- **BUG-096 [P0] - Non-root operation subtrees are accepted as contract bodies:** ContractClauseInventoryBuilder accepts any supplied IOperation without proving it is the callable body root. A late or conditional contract invocation can be promoted to a valid prologue, suppressing placement failure and changing effective contract semantics.
 - **BUG-097 [P0] - Normal control flow bypasses mandatory finally regions:** RoslynProgramLowerer and nested-callable reachability follow only branch destinations and ignore ControlFlowBranch.FinallyRegions. Mandatory finally mutations can be erased while frontend lowering remains Exact, enabling false postcondition proofs and missed Requires diagnostics.
 - **BUG-098 [P0] - Null lifted operators are scanned as invoked:** Effects scanning invokes lifted user-defined operators even when a definitely null operand requires the runtime to skip them. A falsely nonreturning operator can suppress real suffix effects from a Complete summary and permit unsound effect claims.
 - **BUG-099 [P0] - Null method-group conversion uses the wrong exception model:** Effects models every null instance method-group receiver as throwing NullReferenceException, but a closed delegate to a nonvirtual instance method throws ArgumentException. Throws coverage and catch reachability can therefore omit the real exception and suppress effects in the matching catch.
