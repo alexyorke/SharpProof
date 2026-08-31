@@ -433,6 +433,79 @@ public sealed class AcyclicBlockPredicateExecutorTests
     }
 
     [Test]
+    public void SequentialSpecCallsDoNotConflateReusedArtifactTarget()
+    {
+        var factory = new IrFactory();
+        var result = factory.CreateVariable("result", factory.IntegerType);
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "Abs",
+            factory.IntegerType,
+            true,
+            factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var firstCall = builder.Call(
+            entry,
+            factory.CreateOperation(),
+            result,
+            member,
+            null,
+            factory.Integer(-1));
+        var secondCall = builder.Call(
+            entry,
+            factory.CreateOperation(),
+            result,
+            member,
+            null,
+            factory.Integer(-2));
+        builder.Return(
+            entry,
+            factory.CreateOperation(),
+            factory.Variable(result));
+        var specCalls = ImmutableDictionary<
+                IrInstructionId,
+                CompilerPreparedSpecCall>.Empty
+            .Add(firstCall.Id, Prepared(firstCall))
+            .Add(secondCall.Id, Prepared(secondCall));
+
+        var execution = new AcyclicBlockPredicateExecutor(
+            WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
+                [],
+                factory,
+                builder.Build(),
+                specCalls,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSummaryCall>.Empty,
+                ImmutableDictionary<IrVarId, IrTerm>.Empty,
+                ImmutableDictionary<IrVarId, IrVarId>.Empty);
+        var firstResult = IrTermAnalysis.CollectVariables(
+            execution.SpecAssumptions[0].Predicate).Single();
+        var secondResult = IrTermAnalysis.CollectVariables(
+            execution.SpecAssumptions[1].Predicate).Single();
+        var returned = (IrVariableTerm)execution.Returns.Single().ReturnTerm!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.IsSuccess, Is.True);
+            Assert.That(execution.SpecAssumptions, Has.Length.EqualTo(2));
+            Assert.That(firstResult, Is.Not.EqualTo(secondResult));
+            Assert.That(returned.Variable, Is.EqualTo(secondResult));
+        }
+
+        static CompilerPreparedSpecCall Prepared(IrCallInstruction call)
+        {
+            return new CompilerPreparedSpecCall(
+                call.Id,
+                "M:System.Math.Abs(System.Int32)",
+                "bcl.math.abs.int32",
+                false);
+        }
+    }
+
+    [Test]
     public void SpecCallArgumentDefinednessConstrainsSubsequentFlow()
     {
         var factory = new IrFactory();
