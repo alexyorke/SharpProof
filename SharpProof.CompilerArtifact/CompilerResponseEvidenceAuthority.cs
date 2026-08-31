@@ -144,9 +144,16 @@ internal sealed class CompilerResponseEvidenceAuthority :
         WorkerClaimResult result,
         HashSet<string> errors)
     {
-        var isEffect = target.EffectClaims.Any(
+        var effect = target.EffectClaims.FirstOrDefault(
             evidence => evidence.ClaimId == result.ClaimId);
-        var expectedCertainty = isEffect
+        if (effect != null &&
+            target.FailureReason != WorkerClaimReason.UnsupportedCallable)
+        {
+            ValidateFailedTargetEffectClaim(target, effect, result, errors);
+            return;
+        }
+
+        var expectedCertainty = effect != null
             ? WorkerEffectEvidenceCertainty.Unavailable
             : WorkerEffectEvidenceCertainty.Unspecified;
 
@@ -166,6 +173,44 @@ internal sealed class CompilerResponseEvidenceAuthority :
             target.Entry.Assumptions,
             [],
             errors);
+    }
+
+    private static void ValidateFailedTargetEffectClaim(
+        CompilerCallablePreparation target,
+        CompilerEffectClaimArtifact evidence,
+        WorkerClaimResult result,
+        HashSet<string> errors)
+    {
+        var replayFailed = evidence.Outcome == WorkerClaimOutcome.Refuted &&
+            result.Outcome == WorkerClaimOutcome.Unknown &&
+            result.Reason == WorkerClaimReason.CounterexampleReplayFailed &&
+            result.EffectCertainty ==
+                WorkerEffectEvidenceCertainty.Unavailable;
+        var matchesCompilerEvidence =
+            result.Outcome == evidence.Outcome &&
+            result.Reason == evidence.Reason &&
+            result.EffectCertainty == evidence.Certainty;
+        if (!replayFailed && !matchesCompilerEvidence)
+        {
+            errors.Add("response.evidence_authority");
+        }
+
+        IEnumerable<string> expectedUsed =
+            result.Outcome == WorkerClaimOutcome.Proven &&
+            result.EffectCertainty ==
+                WorkerEffectEvidenceCertainty.TrustedCompleteBoundary
+                    ? target.Entry.Assumptions
+                        .Where(static assumption =>
+                            assumption.Kind ==
+                                WorkerAssumptionKind.TrustedBoundary)
+                        .Select(static assumption => assumption.Id)
+                    : [];
+        ValidateAssumptionShape(
+            result.Assumptions,
+            target.Entry.Assumptions,
+            expectedUsed,
+            errors);
+        ValidateEffectClaim(target, evidence, result, errors);
     }
 
     private static void ValidateAssumptionShape(
