@@ -3,6 +3,60 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class InfiniteLoopExitCompletionTests
 {
+    [Test]
+    public void NonCompletingFinallyOverridesInfiniteLoopBreak()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static int s_state;
+
+                private static void Spin() {
+                    while (true) {
+                    }
+                }
+
+                private static void BreakThroughFinally() {
+                    while (true) {
+                        try {
+                            break;
+                        }
+                        finally {
+                            Spin();
+                        }
+                    }
+                }
+
+                public static void RunAfterFinally() {
+                    BreakThroughFinally();
+                    s_state++;
+                }
+            }
+            """);
+        var helper = EffectTestHost.RequireMethod(
+            compilation,
+            "Sample",
+            "BreakThroughFinally");
+        var caller = EffectTestHost.RequireMethod(
+            compilation,
+            "Sample",
+            "RunAfterFinally");
+        var facts = new DefiniteOperationFacts(
+            compilation,
+            System.Threading.CancellationToken.None);
+        var result = new EffectAnalysisSession(compilation).Analyze(caller);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                facts.MethodCanCompleteNormally(helper),
+                Is.False);
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.False);
+        }
+    }
+
     [TestCase("ReturnFromLoop", "RunAfterReturn")]
     [TestCase("GotoOutOfLoop", "RunAfterGoto")]
     [TestCase("RootBreak", "RunAfterBreak")]
