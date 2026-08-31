@@ -2827,6 +2827,123 @@ public sealed class WorkerTests
     }
 
     [Test]
+    public void ImplementationIlRejectsOversizedLocalSignatureBeforeMaterialization()
+    {
+        var localCount =
+            IrRelationalSummaryBuildLimits.Default.MaximumInstructions + 1;
+        var localDeclarations = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(0, localCount).Select(static index =>
+                $"int local{index};"));
+        using var project = TestProject.Create(
+            "public static class Subject { }");
+        var implementationPath = project.AddImplementationReference(
+            $$"""
+            public static class ExternalLocalBudget
+            {
+                public static int Read(int value)
+                {
+                    {{localDeclarations}}
+                    return value;
+                }
+            }
+            """,
+            OptimizationLevel.Debug);
+        using (var stream = File.OpenRead(implementationPath))
+        using (var image = new PEReader(stream))
+        {
+            var metadata = image.GetMetadataReader();
+            var methodHandle = metadata.MethodDefinitions.Single(handle =>
+                string.Equals(
+                    metadata.GetString(
+                        metadata.GetMethodDefinition(handle).Name),
+                    "Read",
+                    StringComparison.Ordinal));
+            var definition = metadata.GetMethodDefinition(methodHandle);
+            var body = image.GetMethodBody(
+                definition.RelativeVirtualAddress);
+            var signature = metadata.GetStandaloneSignature(
+                body.LocalSignature);
+            var signatureReader = metadata.GetBlobReader(
+                signature.Signature);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(body.GetILContent(), Has.Length.LessThan(32));
+                Assert.That(
+                    signatureReader.ReadSignatureHeader().Kind,
+                    Is.EqualTo(SignatureKind.LocalVariables));
+                Assert.That(
+                    signatureReader.ReadCompressedInteger(),
+                    Is.GreaterThan(
+                        IrRelationalSummaryBuildLimits.Default
+                            .MaximumInstructions));
+            }
+        }
+
+        var compilation = project.CreateCompilation();
+        var method = compilation.GetTypeByMetadataName(
+                "ExternalLocalBudget")!
+            .GetMembers("Read")
+            .OfType<IMethodSymbol>()
+            .Single();
+        var factory = new IrFactory();
+        var declaringType = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(),
+            "ExternalLocalBudget");
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            declaringType,
+            "Read",
+            factory.IntegerType,
+            isStatic: true,
+            factory.IntegerType);
+
+        var built = CompilerImplementationIlSummaryLowerer.TryBuild(
+            compilation,
+            factory,
+            method,
+            member,
+            static _ => false,
+            NoDependency,
+            CancellationToken.None,
+            out var summary,
+            out var reason);
+        var sentinel = factory.CreateVariable(
+            "sentinel",
+            factory.IntegerType);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(built, Is.False);
+            Assert.That(summary, Is.Null);
+            Assert.That(
+                reason,
+                Is.EqualTo(
+                    CompilerImplementationIlAbstentionReason
+                        .SummaryResourceLimit));
+            Assert.That(
+                sentinel.Value,
+                Is.EqualTo(2),
+                "Oversized metadata locals were materialized before " +
+                "the summary resource limit was applied.");
+        }
+
+        static bool NoDependency(
+            IMethodSymbol method,
+            IrMemberId member,
+            CancellationToken cancellationToken,
+            out IrRelationalSummary? summary)
+        {
+            _ = method;
+            _ = member;
+            _ = cancellationToken;
+            summary = null;
+            return false;
+        }
+    }
+
+    [Test]
     public async Task MixedSourceAndImplementationSummariesSealDependencyEvidence()
     {
         using var project = TestProject.Create(
