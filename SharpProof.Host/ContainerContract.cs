@@ -36,6 +36,7 @@ public sealed class ContainerContractInfo
 
 public static class ContainerContract
 {
+    private const int MaximumContractBytes = 16 * 1024;
     private const string DefaultContractPath =
         "/etc/sharpproof/container-contract.json";
     private const string EmbeddedToolchainName =
@@ -177,24 +178,57 @@ public static class ContainerContract
 
     private static JsonDocument ReadBoundedJson(string path)
     {
+        // Reject empty special files before open so a FIFO cannot block while
+        // waiting for a writer. The opened stream is bounded again below
+        // because this path metadata is only a preflight observation.
         var information = new FileInfo(path);
-        if (information.Length <= 0 || information.Length > 16 * 1024)
+        if (information.Length <= 0 ||
+            information.Length > MaximumContractBytes)
         {
             throw new InvalidDataException(
                 "The SharpProof container contract has an invalid size.");
         }
+
         using var stream = new FileStream(
             path,
             FileMode.Open,
             FileAccess.Read,
-            FileShare.Read);
+            FileShare.Read,
+            bufferSize: 4096,
+            options: FileOptions.SequentialScan);
+        return ReadBoundedJson(stream);
+    }
+
+    private static JsonDocument ReadBoundedJson(Stream stream)
+    {
+        var bytes = new byte[MaximumContractBytes + 1];
+        var length = 0;
+        while (length < bytes.Length)
+        {
+            var read = stream.Read(bytes, length, bytes.Length - length);
+            if (read == 0)
+            {
+                break;
+            }
+
+            length += read;
+        }
+
+        if (length <= 0 || length > MaximumContractBytes)
+        {
+            throw new InvalidDataException(
+                "The SharpProof container contract has an invalid size.");
+        }
+
         try
         {
-            return JsonDocument.Parse(stream, new JsonDocumentOptions
-            {
-                CommentHandling = JsonCommentHandling.Disallow,
-                AllowTrailingCommas = false
-            });
+            return JsonDocument.Parse(
+                bytes.AsMemory(0, length),
+                new JsonDocumentOptions
+                {
+                    CommentHandling = JsonCommentHandling.Disallow,
+                    AllowTrailingCommas = false
+                });
         }
         catch (JsonException exception)
         {
