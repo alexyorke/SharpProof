@@ -477,9 +477,7 @@ internal static class CorpusGate
         var byId = firstPass.ToImmutableDictionary(
             static observation => observation.CaseId,
             StringComparer.Ordinal);
-        foreach (var item in cases.Where(static item =>
-                     item.Origin == CorpusOrigin.SyntheticMetamorphic &&
-                     item.Variant == CorpusVariant.Baseline))
+        foreach (var item in cases)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var compilation = AnalyzerGateHost.CreateCompilation(
@@ -515,10 +513,7 @@ internal static class CorpusGate
         ImmutableArray<CorpusObservation> firstPass,
         CancellationToken cancellationToken)
     {
-        var selected = cases
-            .Where(static item =>
-                item.Origin == CorpusOrigin.SyntheticMetamorphic)
-            .ToImmutableArray();
+        var selected = cases;
         var expected = firstPass.ToImmutableDictionary(
             static observation => observation.CaseId,
             StringComparer.Ordinal);
