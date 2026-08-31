@@ -129,6 +129,62 @@ public sealed class ApiSpecValidationTests
             Has.Length.EqualTo(1));
     }
 
+    [TestCase(SpecEffect.ReadsReceiverState)]
+    [TestCase(SpecEffect.WritesReceiverState)]
+    [TestCase(SpecEffect.ReadsArgumentState)]
+    [TestCase(SpecEffect.WritesArgumentState)]
+    public void RegionalEffectsRequireCompatibleTargetShape(
+        SpecEffect effect)
+    {
+        var declaration = Declaration(
+            "incompatible-regional-effect-" + effect,
+            resultType: null,
+            SpecNullness.NotApplicable,
+            SpecCardinality.NotApplicable,
+            [],
+            effects: effect);
+
+        Assert.That(
+            () => ApiSpecTable.Create([declaration]),
+            Throws.ArgumentException.With.Message.Contains(
+                "effect facet does not apply to the declared target"));
+    }
+
+    [Test]
+    public void RegionalEffectsRemainValidForCompatibleTargetShapes()
+    {
+        var receiver = Declaration(
+            "compatible-receiver-effects",
+            resultType: null,
+            SpecNullness.NotApplicable,
+            SpecCardinality.NotApplicable,
+            [],
+            effects:
+                SpecEffect.ReadsReceiverState |
+                SpecEffect.WritesReceiverState,
+            isStatic: false);
+        var argument = Declaration(
+            "compatible-argument-effects",
+            resultType: null,
+            SpecNullness.NotApplicable,
+            SpecCardinality.NotApplicable,
+            [],
+            effects:
+                SpecEffect.ReadsArgumentState |
+                SpecEffect.WritesArgumentState,
+            parameterTypes: [IrTypeKind.Integer]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                ApiSpecTable.Create([receiver]).Templates,
+                Has.Length.EqualTo(1));
+            Assert.That(
+                ApiSpecTable.Create([argument]).Templates,
+                Has.Length.EqualTo(1));
+        });
+    }
+
     [Test]
     public void StaticallyUnreachablePartialBranchesAreTotal()
     {
@@ -234,7 +290,10 @@ public sealed class ApiSpecValidationTests
         IrTypeKind? resultType,
         SpecNullness nullness,
         SpecCardinality cardinality,
-        ImmutableArray<SpecTermDeclaration> postconditions)
+        ImmutableArray<SpecTermDeclaration> postconditions,
+        SpecEffect effects = SpecEffect.Unknown,
+        bool isStatic = true,
+        ImmutableArray<IrTypeKind>? parameterTypes = null)
     {
         return new ApiSpecDeclaration(
             new ApiSpecTarget(
@@ -243,14 +302,14 @@ public sealed class ApiSpecValidationTests
                 "Missing.Validation",
                 SpecTargetMemberKind.Method,
                 witness,
-                true,
+                isStatic,
                 0,
-                null,
-                [],
+                isStatic ? null : IrTypeKind.Reference,
+                parameterTypes ?? [],
                 resultType,
                 [new ApiSpecAssemblyIdentity("Missing", string.Empty)]),
             new ApiSpecFacets(
-                new SpecEffectFacet(SpecEffect.Unknown, Evidence),
+                new SpecEffectFacet(effects, Evidence),
                 new SpecAllocationFacet(
                     SpecAllocationBehavior.Unknown,
                     Evidence),
