@@ -277,6 +277,24 @@ public sealed class ProofKernelTests
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task BackendExceptionsBecomeTypedInfrastructureFailures(
+        bool throwSynchronously)
+    {
+        var fixture = CreateFixture();
+
+        var outcome = await new ProofKernel(
+                new ThrowingBackend(throwSynchronously))
+            .VerifyAsync(fixture.Query);
+
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(
+            ((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.InfrastructureFailure));
+        Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.False);
+    }
+
     [Test]
     public async Task MalformedUnsatCoreCannotCreateAProof()
     {
@@ -355,6 +373,25 @@ public sealed class ProofKernelTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_result);
+        }
+    }
+
+    private sealed class ThrowingBackend(bool throwSynchronously) : ISmtBackend
+    {
+        private readonly bool _throwSynchronously = throwSynchronously;
+
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_throwSynchronously)
+            {
+                throw new InvalidOperationException("Synchronous backend failure.");
+            }
+
+            return Task.FromException<BackendCheckResult>(
+                new InvalidOperationException("Asynchronous backend failure."));
         }
     }
 
