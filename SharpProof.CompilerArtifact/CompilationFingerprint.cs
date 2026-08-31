@@ -170,8 +170,8 @@ internal static class CompilationFingerprint
         switch (row.Origin)
         {
             case CompilerSummaryOrigin.Source:
-                return row.EvidenceIdentity.Length == 0 &&
-                    row.SourcePath != null &&
+                return row.EvidenceIdentity is { Length: 0 } &&
+                    row.SourcePath is { Length: > 0 } &&
                     WorkerProtocolJson.IsSha256(row.SourceTreeSha256) &&
                     row.SourceStart >= 0 &&
                     row.SourceLength > 0 &&
@@ -186,9 +186,9 @@ internal static class CompilationFingerprint
                         row.SourceStart <= tree.TextLength - row.SourceLength) == 1;
 
             case CompilerSummaryOrigin.ImplementationIl:
-                return row.EvidenceIdentity.Length == 0 &&
-                    row.SourcePath.Length == 0 &&
-                    row.SourceTreeSha256.Length == 0 &&
+                return row.EvidenceIdentity is { Length: 0 } &&
+                    row.SourcePath is { Length: 0 } &&
+                    row.SourceTreeSha256 is { Length: 0 } &&
                     row.SourceStart == -1 &&
                     row.SourceLength == -1 &&
                     row.OwningModuleName.Length > 0 &&
@@ -203,8 +203,8 @@ internal static class CompilationFingerprint
                         module.Sha256 == row.OwningModuleSha256) == 1;
 
             case CompilerSummaryOrigin.SpecificationPack:
-                return row.SourcePath.Length == 0 &&
-                    row.SourceTreeSha256.Length == 0 &&
+                return row.SourcePath is { Length: 0 } &&
+                    row.SourceTreeSha256 is { Length: 0 } &&
                     row.SourceStart == -1 &&
                     row.SourceLength == -1 &&
                     row.OwningModuleName.Length == 0 &&
