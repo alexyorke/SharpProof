@@ -19,49 +19,6 @@ function Add-SharpProofStaticGraphArgument {
     return @($Arguments) + '-graphBuild'
 }
 
-function Get-SharpProofTestProjectParallelism {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$RepositoryRoot
-    )
-
-    $override = [Environment]::GetEnvironmentVariable(
-        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
-        [EnvironmentVariableTarget]::Process)
-    $visibleProcessors = [Environment]::ProcessorCount
-    if ($visibleProcessors -lt 1) {
-        throw 'The container did not expose a positive processor count.'
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($override)) {
-        $value = 0
-        if (-not [int]::TryParse(
-                $override,
-                [Globalization.NumberStyles]::None,
-                [Globalization.CultureInfo]::InvariantCulture,
-                [ref]$value) -or
-            $value -lt 1 -or
-            $value -gt $visibleProcessors) {
-            throw (
-                'SHARPPROOF_TEST_PROJECT_PARALLELISM must be an integer ' +
-                "between 1 and the container-visible CPU count " +
-                "($visibleProcessors).")
-        }
-        return $value
-    }
-
-    $contract = Get-Content -LiteralPath (Join-Path `
-        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
-        ConvertFrom-Json
-    $divisor = [int]$contract.automation.testProjectCpuDivisor
-    if ($divisor -lt 1) {
-        throw 'The test-project CPU divisor must be positive.'
-    }
-
-    return [Math]::Max(1, [Math]::Floor($visibleProcessors / $divisor))
-}
-
 function Get-SharpProofParallelismOverride {
     param(
         [AllowEmptyString()][string]$Value,
@@ -83,6 +40,64 @@ function Get-SharpProofParallelismOverride {
     return $parsed
 }
 
+function Get-SharpProofCpuBudget {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string[]]$OverrideVariables,
+        [string]$DivisorProperty,
+        [string]$PercentProperty,
+        [string]$InvalidMessage,
+        [switch]$AllVisible
+    )
+
+    $visibleProcessors = [Environment]::ProcessorCount
+    if ($visibleProcessors -lt 1) {
+        throw 'The container did not expose a positive processor count.'
+    }
+    foreach ($variable in $OverrideVariables) {
+        $value = [Environment]::GetEnvironmentVariable(
+            $variable, [EnvironmentVariableTarget]::Process)
+        $override = Get-SharpProofParallelismOverride `
+            $value $visibleProcessors $variable
+        if ($null -ne $override) {
+            return $override
+        }
+    }
+    if ($AllVisible) {
+        return $visibleProcessors
+    }
+
+    $contract = Get-Content -LiteralPath (Join-Path `
+        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
+        ConvertFrom-Json
+    if (-not [string]::IsNullOrWhiteSpace($DivisorProperty)) {
+        $divisor = [int]$contract.automation.$DivisorProperty
+        if ($divisor -lt 1) {
+            throw $InvalidMessage
+        }
+        return [Math]::Max(
+            1, [Math]::Floor($visibleProcessors / $divisor))
+    }
+
+    $percent = [int]$contract.automation.$PercentProperty
+    if ($percent -lt 1 -or $percent -gt 100) {
+        throw $InvalidMessage
+    }
+    return [Math]::Max(
+        1, [Math]::Floor($visibleProcessors * $percent / 100.0))
+}
+
+function Get-SharpProofTestProjectParallelism {
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
+
+    return Get-SharpProofCpuBudget `
+        -RepositoryRoot $RepositoryRoot `
+        -OverrideVariables 'SHARPPROOF_TEST_PROJECT_PARALLELISM' `
+        -DivisorProperty 'testProjectCpuDivisor' `
+        -InvalidMessage 'The test-project CPU divisor must be positive.'
+}
+
 function Get-SharpProofSemanticTestParallelism {
     [CmdletBinding()]
     param(
@@ -90,26 +105,12 @@ function Get-SharpProofSemanticTestParallelism {
         [string]$RepositoryRoot
     )
 
-    $visibleProcessors = [Environment]::ProcessorCount
-    if ($visibleProcessors -lt 1) {
-        throw 'The container did not expose a positive processor count.'
-    }
-    $semanticOverride = [Environment]::GetEnvironmentVariable(
-        'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
-        [EnvironmentVariableTarget]::Process)
-    $override = [Environment]::GetEnvironmentVariable(
-        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
-        [EnvironmentVariableTarget]::Process)
-    if (-not [string]::IsNullOrWhiteSpace($semanticOverride)) {
-        return Get-SharpProofParallelismOverride $semanticOverride `
-            $visibleProcessors 'SHARPPROOF_SEMANTIC_TEST_PARALLELISM'
-    }
-    if (-not [string]::IsNullOrWhiteSpace($override)) {
-        return Get-SharpProofTestProjectParallelism `
-            -RepositoryRoot $RepositoryRoot
-    }
-
-    return $visibleProcessors
+    return Get-SharpProofCpuBudget `
+        -RepositoryRoot $RepositoryRoot `
+        -OverrideVariables @(
+            'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
+            'SHARPPROOF_TEST_PROJECT_PARALLELISM') `
+        -AllVisible
 }
 
 function Get-SharpProofPackageTestParallelism {
@@ -119,29 +120,12 @@ function Get-SharpProofPackageTestParallelism {
         [string]$RepositoryRoot
     )
 
-    $override = [Environment]::GetEnvironmentVariable(
-        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
-        [EnvironmentVariableTarget]::Process)
-    if (-not [string]::IsNullOrWhiteSpace($override)) {
-        return Get-SharpProofTestProjectParallelism `
-            -RepositoryRoot $RepositoryRoot
-    }
-
-    $visibleProcessors = [Environment]::ProcessorCount
-    if ($visibleProcessors -lt 1) {
-        throw 'The container did not expose a positive processor count.'
-    }
-    $contract = Get-Content -LiteralPath (Join-Path `
-        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
-        ConvertFrom-Json
-    $percent = [int]$contract.automation.packageTestCpuPercent
-    if ($percent -lt 1 -or $percent -gt 100) {
-        throw 'The package-test CPU percentage must be between 1 and 100.'
-    }
-
-    return [Math]::Max(
-        1,
-        [Math]::Floor($visibleProcessors * $percent / 100.0))
+    return Get-SharpProofCpuBudget `
+        -RepositoryRoot $RepositoryRoot `
+        -OverrideVariables 'SHARPPROOF_TEST_PROJECT_PARALLELISM' `
+        -PercentProperty 'packageTestCpuPercent' `
+        -InvalidMessage `
+            'The package-test CPU percentage must be between 1 and 100.'
 }
 
 function Get-SharpProofBuildParallelism {
@@ -151,29 +135,12 @@ function Get-SharpProofBuildParallelism {
         [string]$RepositoryRoot
     )
 
-    $sharedOverride = [Environment]::GetEnvironmentVariable(
-        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
-        [EnvironmentVariableTarget]::Process)
-    if (-not [string]::IsNullOrWhiteSpace($sharedOverride)) {
-        return Get-SharpProofTestProjectParallelism `
-            -RepositoryRoot $RepositoryRoot
-    }
-
-    $visibleProcessors = [Environment]::ProcessorCount
-    if ($visibleProcessors -lt 1) {
-        throw 'The container did not expose a positive processor count.'
-    }
-    $contract = Get-Content -LiteralPath (Join-Path `
-        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
-        ConvertFrom-Json
-    $percent = [int]$contract.automation.buildCpuPercent
-    if ($percent -lt 1 -or $percent -gt 100) {
-        throw 'The build CPU percentage must be between 1 and 100.'
-    }
-
-    return [Math]::Max(
-        1,
-        [Math]::Floor($visibleProcessors * $percent / 100.0))
+    return Get-SharpProofCpuBudget `
+        -RepositoryRoot $RepositoryRoot `
+        -OverrideVariables 'SHARPPROOF_TEST_PROJECT_PARALLELISM' `
+        -PercentProperty 'buildCpuPercent' `
+        -InvalidMessage `
+            'The build CPU percentage must be between 1 and 100.'
 }
 
 function Get-SharpProofTestAssemblyPath {
