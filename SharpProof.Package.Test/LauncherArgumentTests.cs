@@ -480,13 +480,7 @@ public sealed class LauncherArgumentTests
                 "--verify-policy", "advisory",
                 "--assumption-policy", "allow"
             ];
-            Assert.That(
-                LauncherArguments.TryParse(arguments, out var parsed),
-                Is.True);
-
-            Assert.That(
-                (Action)(() => parsed.CreateRequest(out _, out _)),
-                Throws.TypeOf<ArgumentException>());
+            AssertRequestProjectionRejects(arguments);
         }
         finally
         {
@@ -565,13 +559,7 @@ public sealed class LauncherArgumentTests
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"
         ];
-        Assert.That(
-            LauncherArguments.TryParse(arguments, out var parsed),
-            Is.True);
-
-        Assert.That(
-            (Action)(() => parsed.CreateRequest(out _, out _)),
-            Throws.TypeOf<ArgumentException>());
+        AssertRequestProjectionRejects(arguments);
     }
 
     [Test]
@@ -593,13 +581,7 @@ public sealed class LauncherArgumentTests
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"
         ];
-        Assert.That(
-            LauncherArguments.TryParse(arguments, out var parsed),
-            Is.True);
-
-        Assert.That(
-            (Action)(() => parsed.CreateRequest(out _, out _)),
-            Throws.TypeOf<ArgumentException>());
+        AssertRequestProjectionRejects(arguments);
     }
 
     [Test]
@@ -668,13 +650,7 @@ public sealed class LauncherArgumentTests
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"
         ];
-        Assert.That(
-            LauncherArguments.TryParse(arguments, out var parsed),
-            Is.True);
-
-        Assert.That(
-            (Action)(() => parsed.CreateRequest(out _, out _)),
-            Throws.TypeOf<ArgumentException>());
+        AssertRequestProjectionRejects(arguments);
     }
 
     [Test]
@@ -697,13 +673,7 @@ public sealed class LauncherArgumentTests
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"
         ];
-        Assert.That(
-            LauncherArguments.TryParse(arguments, out var parsed),
-            Is.True);
-
-        Assert.That(
-            (Action)(() => parsed.CreateRequest(out _, out _)),
-            Throws.TypeOf<ArgumentException>());
+        AssertRequestProjectionRejects(arguments);
     }
 
     [Test]
@@ -719,13 +689,7 @@ public sealed class LauncherArgumentTests
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"
         ];
-        Assert.That(
-            LauncherArguments.TryParse(arguments, out var parsed),
-            Is.True);
-
-        Assert.That(
-            (Action)(() => parsed.CreateRequest(out _, out _)),
-            Throws.TypeOf<ArgumentException>());
+        AssertRequestProjectionRejects(arguments);
     }
 
     [Test]
@@ -758,13 +722,7 @@ public sealed class LauncherArgumentTests
             "--verify-policy", "advisory",
             "--assumption-policy", "allow"
         ];
-        Assert.That(
-            LauncherArguments.TryParse(arguments, out var parsed),
-            Is.True);
-
-        Assert.That(
-            (Action)(() => parsed.CreateRequest(out _, out _)),
-            Throws.TypeOf<ArgumentException>());
+        AssertRequestProjectionRejects(arguments);
     }
 
     [Test]
@@ -2142,6 +2100,16 @@ public sealed class LauncherArgumentTests
             Kind = WorkerAssumptionKind.UserAssume,
             Used = true
         };
+    }
+
+    private static void AssertRequestProjectionRejects(string[] arguments)
+    {
+        Assert.That(
+            LauncherArguments.TryParse(arguments, out var parsed),
+            Is.True);
+        Assert.That(
+            (Action)(() => parsed.CreateRequest(out _, out _)),
+            Throws.TypeOf<ArgumentException>());
     }
 
     private static string[] ValidArguments()
