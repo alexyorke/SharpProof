@@ -208,6 +208,9 @@ internal static class CompilerCompilationCapture
                     ? "<compiler-generated>"
                     : tree.FilePath),
             Sha256 = ComputeTextSha256(text),
+            Encoding = text.Encoding?.WebName ?? string.Empty,
+            ChecksumAlgorithm = text.ChecksumAlgorithm.ToString(),
+            RoslynChecksum = BitConverter.ToString(text.GetChecksum()).Replace("-", string.Empty).ToLowerInvariant(),
             LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(lineMap),
             TextLength = text.Length,
             LineMap = lineMap,

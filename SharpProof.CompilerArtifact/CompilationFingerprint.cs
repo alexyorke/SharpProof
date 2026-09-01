@@ -288,6 +288,9 @@ internal static class CompilationFingerprint
         return value != null &&
         CompilerCaptureAuthority.IsCanonicalPath(value.Path) &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
+        value.Encoding is not null &&
+        value.ChecksumAlgorithm is "Sha1" or "Sha256" &&
+        IsChecksum(value.RoslynChecksum, value.ChecksumAlgorithm) &&
         WorkerProtocolJson.IsSha256(value.LineMapSha256) &&
         value.TextLength >= 0 &&
         CompilerSourceLocationAuthority.HasValidLineMap(value) &&
@@ -305,6 +308,13 @@ internal static class CompilationFingerprint
         CompilerCaptureAuthority.IsCanonicalEmptyTree(value) &&
         All(value.Features, ValidFeature) &&
             IsOrdered(value.Features, static feature => feature.Key, unique: true);
+    }
+
+    private static bool IsChecksum(string? value, string algorithm)
+    {
+        var length = algorithm == "Sha1" ? 40 : 64;
+        return value is not null && value.Length == length &&
+            value.All(static c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
     }
 
     private static bool ValidFeature(CompilerFeatureSnapshot? value)

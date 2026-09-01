@@ -3354,6 +3354,30 @@
           }
         },
         {
+          "name": "Encoding",
+          "jsonName": "encoding",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": { "kind": "stringEmpty" }
+        },
+        {
+          "name": "ChecksumAlgorithm",
+          "jsonName": "checksumAlgorithm",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": { "kind": "stringEmpty" }
+        },
+        {
+          "name": "RoslynChecksum",
+          "jsonName": "roslynChecksum",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": { "kind": "stringEmpty" }
+        },
+        {
           "name": "LineMapSha256",
           "jsonName": "lineMapSha256",
           "type": "string",

@@ -86,6 +86,9 @@ internal sealed class CompilerSyntaxTreeSnapshot
 {
     public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
+    public string Encoding { get; set; } = string.Empty;
+    public string ChecksumAlgorithm { get; set; } = string.Empty;
+    public string RoslynChecksum { get; set; } = string.Empty;
     public string LineMapSha256 { get; set; } = string.Empty;
     public int TextLength { get; set; }
     public CompilerSourceLineMapEntry[] LineMap { get; set; } = [];
