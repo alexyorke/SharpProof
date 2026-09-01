@@ -446,112 +446,94 @@ function Measure-RepositoryCSharpSyntax {
     }
 }
 
-Assert-Equal $contract.schemaVersion 4 'schemaVersion'
-Assert-Equal $contract.releaseLine '1.0.0-preview' 'releaseLine'
-Assert-Equal $contract.flagship 'effects' 'flagship'
-Assert-Equal $contract.analyzer.defaultProfile 'advisory' 'analyzer.defaultProfile'
-Assert-Equal $contract.analyzer.defaultFeatures 'all' 'analyzer.defaultFeatures'
-Assert-Equal $contract.analyzer.defaultVerifyPolicy 'advisory' 'analyzer.defaultVerifyPolicy'
-Assert-Equal $contract.analyzer.defaultAssumptionPolicy 'allow' 'analyzer.defaultAssumptionPolicy'
-Assert-Equal $contract.analyzer.defaultDiagnosticSeverity 'Info' 'analyzer.defaultDiagnosticSeverity'
-Assert-Equal $contract.analyzer.diagnosticsEnabledByDefault $true 'analyzer.diagnosticsEnabledByDefault'
-Assert-Equal $contract.analyzer.unsupportedUnannotatedCallableBehavior 'silent' 'analyzer.unsupportedUnannotatedCallableBehavior'
-Assert-Equal $contract.analyzer.unsupportedSelectedCallableDiagnostic 'SP0047' 'analyzer.unsupportedSelectedCallableDiagnostic'
-Assert-Equal $contract.automation.solutionBuildWallSeconds 600 'automation.solutionBuildWallSeconds'
-Assert-Equal $contract.automation.packageTestCpuPercent 75 'automation.packageTestCpuPercent'
-Assert-Equal $contract.mutationEvidence.schemaVersion 1 'mutationEvidence.schemaVersion'
+foreach ($assertion in @(
+        @{ Actual = $contract.schemaVersion; Expected = 4; Name = 'schemaVersion' },
+        @{ Actual = $contract.releaseLine; Expected = '1.0.0-preview'; Name = 'releaseLine' },
+        @{ Actual = $contract.flagship; Expected = 'effects'; Name = 'flagship' },
+        @{ Actual = $contract.analyzer.defaultProfile; Expected = 'advisory'; Name = 'analyzer.defaultProfile' },
+        @{ Actual = $contract.analyzer.defaultFeatures; Expected = 'all'; Name = 'analyzer.defaultFeatures' },
+        @{ Actual = $contract.analyzer.defaultVerifyPolicy; Expected = 'advisory'; Name = 'analyzer.defaultVerifyPolicy' },
+        @{ Actual = $contract.analyzer.defaultAssumptionPolicy; Expected = 'allow'; Name = 'analyzer.defaultAssumptionPolicy' },
+        @{ Actual = $contract.analyzer.defaultDiagnosticSeverity; Expected = 'Info'; Name = 'analyzer.defaultDiagnosticSeverity' },
+        @{ Actual = $contract.analyzer.diagnosticsEnabledByDefault; Expected = $true; Name = 'analyzer.diagnosticsEnabledByDefault' },
+        @{ Actual = $contract.analyzer.unsupportedUnannotatedCallableBehavior; Expected = 'silent'; Name = 'analyzer.unsupportedUnannotatedCallableBehavior' },
+        @{ Actual = $contract.analyzer.unsupportedSelectedCallableDiagnostic; Expected = 'SP0047'; Name = 'analyzer.unsupportedSelectedCallableDiagnostic' },
+        @{ Actual = $contract.automation.solutionBuildWallSeconds; Expected = 600; Name = 'automation.solutionBuildWallSeconds' },
+        @{ Actual = $contract.automation.packageTestCpuPercent; Expected = 75; Name = 'automation.packageTestCpuPercent' },
+        @{ Actual = $contract.mutationEvidence.schemaVersion; Expected = 1; Name = 'mutationEvidence.schemaVersion' })) {
+    Assert-Equal $assertion.Actual $assertion.Expected $assertion.Name
+}
 if ([int]$contract.mutationEvidence.expectedCatalogCount -le 0) {
     throw 'mutationEvidence.expectedCatalogCount must be positive.'
 }
 if ([string]$contract.mutationEvidence.expectedCatalogSha256 -notmatch '^[0-9a-f]{64}$') {
     throw 'mutationEvidence.expectedCatalogSha256 must be a lowercase SHA-256 digest.'
 }
-Assert-Equal $previewEvidence.schemaVersion 1 'previewEvidence.schemaVersion'
-Assert-Equal `
-    $previewEvidence.requiredHumanApprovals `
-    0 `
-    'previewEvidence.requiredHumanApprovals'
-Assert-Equal `
-    (@($previewEvidence.requiredEvidence) -join ',') `
-    'executable-regression,mutation-evidence,soundness-note-when-semantics-change,exact-commit-release-artifacts,debug-solution-gate,release-acceptance-gate' `
-    'previewEvidence.requiredEvidence'
-Assert-Equal `
-    (Get-MsBuildDefault $portableTargets 'SharpProofProfile' 'portable package') `
-    $contract.analyzer.defaultProfile `
-    'SharpProofProfile'
-Assert-Equal `
-    (Get-MsBuildDefault $portableTargets 'SharpProofFeatures' 'portable package') `
-    $contract.analyzer.defaultFeatures `
-    'SharpProofFeatures'
-Assert-Equal `
-    (Get-MsBuildDefault $verifierTargets 'SharpProofVerifyPolicy' 'verifier package') `
-    $contract.analyzer.defaultVerifyPolicy `
-    'SharpProofVerifyPolicy'
-Assert-Equal `
-    (Get-MsBuildDefault $verifierTargets 'SharpProofAssumptionPolicy' 'verifier package') `
-    $contract.analyzer.defaultAssumptionPolicy `
-    'SharpProofAssumptionPolicy'
-Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
-Assert-Equal $contract.worker.protocolVersion 11 'worker.protocolVersion'
-Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 18 'worker.compilerArtifactSchemaVersion'
-Assert-Equal $contract.worker.maximumCompilerReferenceModuleBytes 268435456 'worker.maximumCompilerReferenceModuleBytes'
-Assert-Equal $contract.worker.maximumCompilerReferenceClosureBytes 1073741824 'worker.maximumCompilerReferenceClosureBytes'
-Assert-Equal $contract.worker.maximumCompilerReferenceModules 4096 'worker.maximumCompilerReferenceModules'
-Assert-Equal $contract.worker.relationalSummarySchemaVersion 2 'worker.relationalSummarySchemaVersion'
-Assert-Equal $contract.worker.specificationPackSchemaVersion 1 'worker.specificationPackSchemaVersion'
-Assert-Equal $contract.worker.maximumParallelism 4 'worker.maximumParallelism'
-Assert-Equal $contract.worker.maximumExpressionDepth 64 'worker.maximumExpressionDepth'
-Assert-Equal $contract.worker.queryRlimit 3000000 'worker.queryRlimit'
-Assert-Equal $contract.worker.methodRlimit 20000000 'worker.methodRlimit'
-Assert-Equal $contract.worker.maximumMethodWallSeconds 10 'worker.maximumMethodWallSeconds'
-Assert-Equal $contract.worker.maximumProjectWallSeconds 300 'worker.maximumProjectWallSeconds'
-Assert-Equal $contract.worker.forcedTerminationMilliseconds 1000 'worker.forcedTerminationMilliseconds'
-Assert-Equal $contract.cache.schemaVersion 13 'cache.schemaVersion'
-Assert-Equal $contract.cache.enabledByDefault $true 'cache.enabledByDefault'
-Assert-Equal $contract.cache.maximumMiB 512 'cache.maximumMiB'
-Assert-Equal ($contract.cache.cacheableOutcomes -join ',') 'Refuted' 'cache.cacheableOutcomes'
-Assert-Equal `
-    (Get-MsBuildProperty $portableProps '_SharpProofPortablePackagePresent' 'portable package') `
-    'true' `
-    '_SharpProofPortablePackagePresent'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps '_SharpProofVerifierPackagePresent' 'verifier package') `
-    'true' `
-    '_SharpProofVerifierPackagePresent'
-Assert-Equal $packageManifest.schemaVersion 1 'package manifest schemaVersion'
-Assert-Equal `
-    (Get-MsBuildProperty $directoryBuildProps 'Deterministic' 'repository build') `
-    'true' `
-    'Deterministic'
-Assert-Equal `
-    (Get-MsBuildProperty $directoryBuildProps 'DebugSymbols' 'repository build') `
-    'true' `
-    'DebugSymbols'
-Assert-Equal `
-    (Get-MsBuildProperty $directoryBuildProps 'DebugType' 'repository build') `
-    'portable' `
-    'DebugType'
-Assert-Equal `
-    (Get-MsBuildProperty $directoryBuildProps 'EmbedUntrackedSources' 'repository build') `
-    'true' `
-    'EmbedUntrackedSources'
-Assert-Equal `
-    (Get-MsBuildProperty $packageMetadata 'PublishRepositoryUrl' 'package metadata') `
-    'true' `
-    'PublishRepositoryUrl'
-Assert-Equal `
-    (Get-MsBuildProperty $packageMetadata 'IncludeSymbols' 'package metadata') `
-    'true' `
-    'IncludeSymbols'
-Assert-Equal `
-    (Get-MsBuildProperty $packageMetadata 'SymbolPackageFormat' 'package metadata') `
-    'snupkg' `
-    'SymbolPackageFormat'
-Assert-Equal `
-    (Get-MsBuildProperty $packageMetadata 'EnablePackageValidation' 'package metadata') `
-    'true' `
-    'EnablePackageValidation'
+foreach ($assertion in @(
+        @{ Actual = $previewEvidence.schemaVersion; Expected = 1; Name = 'previewEvidence.schemaVersion' },
+        @{ Actual = $previewEvidence.requiredHumanApprovals; Expected = 0; Name = 'previewEvidence.requiredHumanApprovals' },
+        @{ Actual = @($previewEvidence.requiredEvidence) -join ','; Expected = 'executable-regression,mutation-evidence,soundness-note-when-semantics-change,exact-commit-release-artifacts,debug-solution-gate,release-acceptance-gate'; Name = 'previewEvidence.requiredEvidence' },
+        @{ Actual = $contract.supportedTargetFrameworks -join ','; Expected = 'netstandard2.0,net8.0,net472'; Name = 'supportedTargetFrameworks' },
+        @{ Actual = $contract.worker.protocolVersion; Expected = 11; Name = 'worker.protocolVersion' },
+        @{ Actual = $contract.worker.manifestSchemaVersion; Expected = 4; Name = 'worker.manifestSchemaVersion' },
+        @{ Actual = $contract.worker.compilerArtifactSchemaVersion; Expected = 18; Name = 'worker.compilerArtifactSchemaVersion' },
+        @{ Actual = $contract.worker.maximumCompilerReferenceModuleBytes; Expected = 268435456; Name = 'worker.maximumCompilerReferenceModuleBytes' },
+        @{ Actual = $contract.worker.maximumCompilerReferenceClosureBytes; Expected = 1073741824; Name = 'worker.maximumCompilerReferenceClosureBytes' },
+        @{ Actual = $contract.worker.maximumCompilerReferenceModules; Expected = 4096; Name = 'worker.maximumCompilerReferenceModules' },
+        @{ Actual = $contract.worker.relationalSummarySchemaVersion; Expected = 2; Name = 'worker.relationalSummarySchemaVersion' },
+        @{ Actual = $contract.worker.specificationPackSchemaVersion; Expected = 1; Name = 'worker.specificationPackSchemaVersion' },
+        @{ Actual = $contract.worker.maximumParallelism; Expected = 4; Name = 'worker.maximumParallelism' },
+        @{ Actual = $contract.worker.maximumExpressionDepth; Expected = 64; Name = 'worker.maximumExpressionDepth' },
+        @{ Actual = $contract.worker.queryRlimit; Expected = 3000000; Name = 'worker.queryRlimit' },
+        @{ Actual = $contract.worker.methodRlimit; Expected = 20000000; Name = 'worker.methodRlimit' },
+        @{ Actual = $contract.worker.maximumMethodWallSeconds; Expected = 10; Name = 'worker.maximumMethodWallSeconds' },
+        @{ Actual = $contract.worker.maximumProjectWallSeconds; Expected = 300; Name = 'worker.maximumProjectWallSeconds' },
+        @{ Actual = $contract.worker.forcedTerminationMilliseconds; Expected = 1000; Name = 'worker.forcedTerminationMilliseconds' },
+        @{ Actual = $contract.cache.schemaVersion; Expected = 13; Name = 'cache.schemaVersion' },
+        @{ Actual = $contract.cache.enabledByDefault; Expected = $true; Name = 'cache.enabledByDefault' },
+        @{ Actual = $contract.cache.maximumMiB; Expected = 512; Name = 'cache.maximumMiB' },
+        @{ Actual = $contract.cache.cacheableOutcomes -join ','; Expected = 'Refuted'; Name = 'cache.cacheableOutcomes' },
+        @{ Actual = $packageManifest.schemaVersion; Expected = 1; Name = 'package manifest schemaVersion' })) {
+    Assert-Equal $assertion.Actual $assertion.Expected $assertion.Name
+}
+
+foreach ($default in @(
+        @{ Document = $portableTargets; Property = 'SharpProofProfile'; Owner = 'portable package'; Expected = $contract.analyzer.defaultProfile },
+        @{ Document = $portableTargets; Property = 'SharpProofFeatures'; Owner = 'portable package'; Expected = $contract.analyzer.defaultFeatures },
+        @{ Document = $verifierTargets; Property = 'SharpProofVerifyPolicy'; Owner = 'verifier package'; Expected = $contract.analyzer.defaultVerifyPolicy },
+        @{ Document = $verifierTargets; Property = 'SharpProofAssumptionPolicy'; Owner = 'verifier package'; Expected = $contract.analyzer.defaultAssumptionPolicy })) {
+    Assert-Equal `
+        (Get-MsBuildDefault $default.Document $default.Property $default.Owner) `
+        $default.Expected `
+        $default.Property
+}
+
+$msBuildAssertions = @(
+    @{ Document = $portableProps; Property = '_SharpProofPortablePackagePresent'; Owner = 'portable package'; Expected = 'true' },
+    @{ Document = $verifierProps; Property = '_SharpProofVerifierPackagePresent'; Owner = 'verifier package'; Expected = 'true' },
+    @{ Document = $directoryBuildProps; Property = 'Deterministic'; Owner = 'repository build'; Expected = 'true' },
+    @{ Document = $directoryBuildProps; Property = 'DebugSymbols'; Owner = 'repository build'; Expected = 'true' },
+    @{ Document = $directoryBuildProps; Property = 'DebugType'; Owner = 'repository build'; Expected = 'portable' },
+    @{ Document = $directoryBuildProps; Property = 'EmbedUntrackedSources'; Owner = 'repository build'; Expected = 'true' },
+    @{ Document = $packageMetadata; Property = 'PublishRepositoryUrl'; Owner = 'package metadata'; Expected = 'true' },
+    @{ Document = $packageMetadata; Property = 'IncludeSymbols'; Owner = 'package metadata'; Expected = 'true' },
+    @{ Document = $packageMetadata; Property = 'SymbolPackageFormat'; Owner = 'package metadata'; Expected = 'snupkg' },
+    @{ Document = $packageMetadata; Property = 'EnablePackageValidation'; Owner = 'package metadata'; Expected = 'true' },
+    @{ Document = $verifierProps; Property = 'SharpProofVerifyQueryRlimit'; Owner = 'verifier package'; Expected = [string]$contract.worker.queryRlimit },
+    @{ Document = $verifierProps; Property = 'SharpProofVerifyMethodRlimit'; Owner = 'verifier package'; Expected = [string]$contract.worker.methodRlimit },
+    @{ Document = $verifierProps; Property = 'SharpProofVerifyMethodWallTimeMilliseconds'; Owner = 'verifier package'; Expected = [string]([int]$contract.worker.maximumMethodWallSeconds * 1000) },
+    @{ Document = $verifierProps; Property = 'SharpProofVerifyProjectWallTimeMilliseconds'; Owner = 'verifier package'; Expected = [string]([int]$contract.worker.maximumProjectWallSeconds * 1000) },
+    @{ Document = $verifierProps; Property = 'SharpProofVerifyMaxParallelism'; Owner = 'verifier package'; Expected = [string]$contract.worker.maximumParallelism },
+    @{ Document = $verifierProps; Property = 'SharpProofVerifyMaximumExpressionDepth'; Owner = 'verifier package'; Expected = [string]$contract.worker.maximumExpressionDepth },
+    @{ Document = $verifierProps; Property = 'SharpProofVerifyTerminationGraceMilliseconds'; Owner = 'verifier package'; Expected = [string]$contract.worker.forcedTerminationMilliseconds },
+    @{ Document = $verifierProps; Property = 'SharpProofVerifyCacheMaximumBytes'; Owner = 'verifier package'; Expected = [string]([int64]$contract.cache.maximumMiB * 1024 * 1024) },
+    @{ Document = $verifierProps; Property = 'SharpProofVerifyCacheEnabled'; Owner = 'verifier package'; Expected = ([string]$contract.cache.enabledByDefault).ToLowerInvariant() })
+foreach ($assertion in $msBuildAssertions) {
+    Assert-Equal `
+        (Get-MsBuildProperty $assertion.Document $assertion.Property $assertion.Owner) `
+        $assertion.Expected `
+        $assertion.Property
+}
 $expectedPackageProjects = @(
     'SharpProof.Attributes/SharpProof.Attributes.csproj',
     'SharpProof.Package/SharpProof.Package.csproj',
@@ -567,42 +549,6 @@ foreach ($packageProject in $expectedPackageProjects) {
         throw "Required package project is missing: $packageProject"
     }
 }
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyQueryRlimit' 'verifier package') `
-    ([string]$contract.worker.queryRlimit) `
-    'SharpProofVerifyQueryRlimit'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMethodRlimit' 'verifier package') `
-    ([string]$contract.worker.methodRlimit) `
-    'SharpProofVerifyMethodRlimit'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMethodWallTimeMilliseconds' 'verifier package') `
-    ([string]([int]$contract.worker.maximumMethodWallSeconds * 1000)) `
-    'SharpProofVerifyMethodWallTimeMilliseconds'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyProjectWallTimeMilliseconds' 'verifier package') `
-    ([string]([int]$contract.worker.maximumProjectWallSeconds * 1000)) `
-    'SharpProofVerifyProjectWallTimeMilliseconds'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaxParallelism' 'verifier package') `
-    ([string]$contract.worker.maximumParallelism) `
-    'SharpProofVerifyMaxParallelism'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyMaximumExpressionDepth' 'verifier package') `
-    ([string]$contract.worker.maximumExpressionDepth) `
-    'SharpProofVerifyMaximumExpressionDepth'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyTerminationGraceMilliseconds' 'verifier package') `
-    ([string]$contract.worker.forcedTerminationMilliseconds) `
-    'SharpProofVerifyTerminationGraceMilliseconds'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyCacheMaximumBytes' 'verifier package') `
-    ([string]([int64]$contract.cache.maximumMiB * 1024 * 1024)) `
-    'SharpProofVerifyCacheMaximumBytes'
-Assert-Equal `
-    (Get-MsBuildProperty $verifierProps 'SharpProofVerifyCacheEnabled' 'verifier package') `
-    ([string]$contract.cache.enabledByDefault).ToLowerInvariant() `
-    'SharpProofVerifyCacheEnabled'
 Push-Location $repositoryRoot
 try {
     $kernelPaths = @($contract.trustedKernel.paths)
