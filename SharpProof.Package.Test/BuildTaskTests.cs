@@ -2047,7 +2047,9 @@ public sealed class BuildTaskTests
             {
                 foreach (var member in new[]
                          {
-                             "request", "result", "manifest", "sarif"
+                             "request", "result", "manifest", "sarif",
+                             "invocation-request", "invocation-result",
+                             "invocation-manifest"
                          })
                 {
                     var root = Directory.CreateDirectory(Path.Combine(
@@ -2057,6 +2059,15 @@ public sealed class BuildTaskTests
                     var result = Path.Combine(root.FullName, "result.json");
                     var manifest = Path.Combine(root.FullName, "manifest.json");
                     var sarif = Path.Combine(root.FullName, "result.sarif");
+                    var invocationRequest = Path.Combine(
+                        root.FullName,
+                        "invocation-request.json");
+                    var invocationResult = Path.Combine(
+                        root.FullName,
+                        "invocation-result.json");
+                    var invocationManifest = Path.Combine(
+                        root.FullName,
+                        "invocation-manifest.json");
                     var compilerOutput = Path.Combine(root.FullName, compilerName);
                     Directory.CreateDirectory(
                         Path.GetDirectoryName(compilerOutput)!);
@@ -2074,6 +2085,15 @@ public sealed class BuildTaskTests
                         case "sarif":
                             sarif = compilerOutput;
                             break;
+                        case "invocation-request":
+                            invocationRequest = compilerOutput;
+                            break;
+                        case "invocation-result":
+                            invocationResult = compilerOutput;
+                            break;
+                        case "invocation-manifest":
+                            invocationManifest = compilerOutput;
+                            break;
                     }
                     var task = new InvalidatePublishedResult
                     {
@@ -2082,6 +2102,9 @@ public sealed class BuildTaskTests
                         RequestPath = request,
                         ManifestPath = manifest,
                         SarifPath = sarif,
+                        InvocationRequestPath = invocationRequest,
+                        InvocationResultPath = invocationResult,
+                        InvocationManifestPath = invocationManifest,
                         ProjectDirectory = root.FullName,
                         WorkerPath = worker,
                         LauncherPath = launcher,
@@ -2096,7 +2119,9 @@ public sealed class BuildTaskTests
                     Assert.That(File.Exists(compilerOutput), Is.False);
                     foreach (var publication in new[]
                              {
-                                 request, result, manifest, sarif
+                                 request, result, manifest, sarif,
+                                 invocationRequest, invocationResult,
+                                 invocationManifest
                              })
                     {
                         Assert.That(

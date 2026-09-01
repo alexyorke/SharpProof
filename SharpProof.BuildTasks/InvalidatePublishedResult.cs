@@ -183,6 +183,7 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
                  resolvedCachePath,
                  workerDirectory));
         var aliasesCompilerOutput = publicationPaths
+            .Concat(inputPaths)
             .Concat(publicationMarkerPaths)
             .Any(publication => compilerOutputPaths.Any(compilerOutput =>
                 string.Equals(
