@@ -11,6 +11,8 @@ internal static class SharpProofSymbolPackageValidator
 {
     private static readonly Guid SourceLinkKind = new(
         "CC110556-A091-4D38-9FEC-25AB9A351A6A");
+    private static readonly Guid EmbeddedSourceKind = new(
+        "0E8A571B-6926-466E-B4AD-8AB04611F5FE");
 
     public static void Validate(
         string packagePath,
@@ -267,7 +269,9 @@ internal static class SharpProofSymbolPackageValidator
 
         var sourceLinks = reader.CustomDebugInformation
             .Select(reader.GetCustomDebugInformation)
-            .Where(information => reader.GetGuid(information.Kind) == SourceLinkKind)
+            .Where(information =>
+                reader.GetGuid(information.Kind) == SourceLinkKind &&
+                information.Parent.Kind == HandleKind.ModuleDefinition)
             .ToArray();
         if (sourceLinks.Length != 1)
         {
@@ -300,6 +304,30 @@ internal static class SharpProofSymbolPackageValidator
             throw new InvalidDataException(
                 $"Portable PDB '{pdbEntry.FullName}' Source Link does not " +
                 "name the canonical repository commit.");
+        }
+
+        var embeddedDocuments = reader.CustomDebugInformation
+            .Select(reader.GetCustomDebugInformation)
+            .Where(information =>
+                reader.GetGuid(information.Kind) == EmbeddedSourceKind)
+            .Select(information => information.Parent)
+            .ToHashSet();
+        var sourceDocuments = reader.Documents
+            .Where(document => !embeddedDocuments.Contains(document))
+            .Select(document => reader.GetDocument(document))
+            .Select(document => Encoding.UTF8.GetString(
+                reader.GetBlobBytes(document.Name)))
+            .Select(static name => name.Replace('\\', '/'))
+            .ToArray();
+        if (sourceDocuments.Length == 0 || sourceDocuments.Any(document =>
+                !mappings.Any(mapping =>
+                document.StartsWith(
+                    mapping.Name.Replace('\\', '/')[..^1],
+                    StringComparison.Ordinal))))
+        {
+            throw new InvalidDataException(
+                $"Portable PDB '{pdbEntry.FullName}' Source Link does not " +
+                "cover every nonembedded document.");
         }
     }
 
