@@ -80,18 +80,6 @@ internal sealed record CorpusSeed(
     string Body,
     string AdditionalMembers);
 
-internal sealed record SnapshotExpectation(
-    string CaseId,
-    CorpusVerdict Verdict,
-    AnalyzerSemanticOutcome SemanticOutcome,
-    ImmutableArray<string> Diagnostics)
-{
-    internal string ToCanonicalLine()
-    {
-        return $"{CaseId}|{Verdict}|{SemanticOutcome}|{string.Join(",", Diagnostics)}";
-    }
-}
-
 internal sealed record ProvenToUnknownAllowance(
     string CaseId,
     string Reason);

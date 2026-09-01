@@ -90,7 +90,7 @@ internal static class CorpusSnapshotFormat
 
     internal static bool TryParseData(
         string? line,
-        out SnapshotExpectation expectation)
+        out CorpusObservation expectation)
     {
         expectation = null!;
         if (!IsData(line))
@@ -121,7 +121,7 @@ internal static class CorpusSnapshotFormat
                     diagnostic,
                     StringComparer.Ordinal)
             ];
-        expectation = new SnapshotExpectation(
+        expectation = new CorpusObservation(
             parts[0],
             verdict,
             semanticOutcome,

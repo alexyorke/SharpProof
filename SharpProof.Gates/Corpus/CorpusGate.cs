@@ -441,17 +441,6 @@ internal static class CorpusGate
     }
 
     private static bool Matches(
-        SnapshotExpectation expected,
-        CorpusObservation actual)
-    {
-        return expected.Verdict == actual.Verdict &&
-        expected.SemanticOutcome == actual.SemanticOutcome &&
-        expected.Diagnostics.SequenceEqual(
-            actual.Diagnostics,
-            StringComparer.Ordinal);
-    }
-
-    private static bool Matches(
         CorpusObservation expected,
         CorpusObservation actual)
     {
@@ -527,12 +516,12 @@ internal static class CorpusGate
                 $"Concurrent replay changed {observation.CaseId}.")];
     }
 
-    private static ImmutableDictionary<string, SnapshotExpectation> LoadSnapshot(
+    private static ImmutableDictionary<string, CorpusObservation> LoadSnapshot(
         string path)
     {
         var result = ImmutableDictionary.CreateBuilder<
             string,
-            SnapshotExpectation>(StringComparer.Ordinal);
+            CorpusObservation>(StringComparer.Ordinal);
         foreach (var rawLine in CorpusSnapshotFormat.ReadDataLines(path))
         {
             if (!CorpusSnapshotFormat.TryParseData(
