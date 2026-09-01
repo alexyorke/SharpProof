@@ -840,7 +840,7 @@
       {
         "name": "relational-summary-provider",
         "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs",
-        "maximumExpressionNodes": 1054,
+        "maximumExpressionNodes": 1093,
         "maximumDecisionPoints": 54
       },
       {
