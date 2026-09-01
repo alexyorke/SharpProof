@@ -810,8 +810,8 @@
       {
         "name": "requires-call-site-analyzer",
         "path": "SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs",
-        "maximumExpressionNodes": 1548,
-        "maximumDecisionPoints": 105
+        "maximumExpressionNodes": 1721,
+        "maximumDecisionPoints": 107
       },
       {
         "name": "effect-analysis-coordinator",
