@@ -185,6 +185,7 @@ public static partial class LinuxPathIdentity
         var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
         ValidatePublicationTopology(canonicalPaths);
         ValidatePublicationMetadataAliases(canonicalPaths);
+        var ancestorIdentity = CaptureAncestorIdentity(canonicalPaths);
         var markerPaths = canonicalPaths
             .Select(PublicationMarkerPath)
             .ToArray();
@@ -293,6 +294,7 @@ public static partial class LinuxPathIdentity
                 throw new IOException(
                     "SharpProof publication path identity changed while acquiring locks.");
             }
+            ConfirmAncestorIdentity(ancestorIdentity);
             BindPublicationSet(canonicalPaths);
             var lease = new PublicationLease([.. locks]);
             ownershipTransferred = true;
@@ -382,6 +384,51 @@ public static partial class LinuxPathIdentity
             .ToArray();
     }
 
+    // Path strings remain unchanged when a parent directory is renamed and
+    // replaced. Keep the physical identities of all existing ancestors and
+    // re-check them after taking the publication locks; otherwise the locks
+    // and markers can be left in the old tree while output is written to the
+    // replacement tree.
+    private static Dictionary<string, LinuxStat> CaptureAncestorIdentity(
+        string[] canonicalPaths)
+    {
+        var identities = new Dictionary<string, LinuxStat>(StringComparer.Ordinal);
+        foreach (var path in canonicalPaths)
+        {
+            var current = Path.GetDirectoryName(path) ?? "/";
+            while (true)
+            {
+                if (NativeMethods.LStat(current, out var information) != 0 ||
+                    (information.Mode & FileTypeMask) != FileTypeDirectory)
+                {
+                    throw new IOException("SharpProof publication path ancestors changed during identity capture.");
+                }
+                identities[current] = information;
+                if (current == "/")
+                {
+                    break;
+                }
+                current = Path.GetDirectoryName(current) ?? "/";
+            }
+        }
+        return identities;
+    }
+
+    private static void ConfirmAncestorIdentity(
+        Dictionary<string, LinuxStat> expected)
+    {
+        foreach (var pair in expected)
+        {
+            if (NativeMethods.LStat(pair.Key, out var actual) != 0 ||
+                (actual.Mode & FileTypeMask) != FileTypeDirectory ||
+                !SameFile(pair.Value, actual))
+            {
+                throw new IOException(
+                    "SharpProof publication path ancestor identity changed while acquiring locks.");
+            }
+        }
+    }
+
     private static void ValidatePublicationTopology(string[] canonicalPaths)
     {
         for (var index = 0; index < canonicalPaths.Length; index++)
@@ -437,12 +484,59 @@ public static partial class LinuxPathIdentity
         var utf8 = new UTF8Encoding(false, true);
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         hash.AppendData(PublicationPathIdentityDomain);
-        hash.AppendData(utf8.GetBytes(canonicalPath));
+        // Bind mounts can expose the same directory through multiple lexical
+        // paths.  Lock and marker names must therefore be based on the
+        // physical parent identity, not the alias pathname.
+        var parentIdentity = PhysicalPathIdentity(directory);
+        hash.AppendData(parentIdentity);
+        hash.AppendData(utf8.GetBytes(Path.GetFileName(canonicalPath)));
         var identity = Convert.ToHexString(hash.GetHashAndReset());
         return Path.Combine(
             directory,
             PublicationMetadataDirectory,
             identity + extension);
+    }
+
+    private static byte[] PhysicalPathIdentity(string path)
+    {
+        var current = path;
+        var suffix = new Stack<string>();
+        while (true)
+        {
+            if (NativeMethods.LStat(current, out var information) == 0)
+            {
+                if ((information.Mode & FileTypeMask) != FileTypeDirectory)
+                {
+                    throw new IOException("SharpProof publication parent must be a directory.");
+                }
+                using var buffer = new MemoryStream();
+                Span<byte> value = stackalloc byte[sizeof(ulong)];
+                BinaryPrimitives.WriteUInt64BigEndian(value, information.Device);
+                buffer.Write(value);
+                BinaryPrimitives.WriteUInt64BigEndian(value, information.Inode);
+                buffer.Write(value);
+                var utf8 = new UTF8Encoding(false, true);
+                foreach (var segment in suffix)
+                {
+                    var bytes = utf8.GetBytes(segment);
+                    buffer.Write(bytes);
+                    buffer.WriteByte(0);
+                }
+                return buffer.ToArray();
+            }
+            var error = Marshal.GetLastPInvokeError();
+            if (error != ErrorNoEntry)
+            {
+                throw new IOException($"SharpProof could not establish path identity (errno {error}).");
+            }
+            var parent = Path.GetDirectoryName(current);
+            if (string.IsNullOrEmpty(parent) || parent == current)
+            {
+                throw new IOException("SharpProof could not establish publication parent identity.");
+            }
+            suffix.Push(Path.GetFileName(current));
+            current = parent;
+        }
     }
 
     private static void ValidatePublicationMetadataAliases(
