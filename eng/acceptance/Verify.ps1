@@ -212,7 +212,7 @@ trap {
     Write-AcceptanceTimingEvidence `
         -Status failed `
         -Failure $_.Exception.Message
-    throw
+    throw $_.Exception.Message
 }
 
 function Invoke-SharpProofDotnet {
