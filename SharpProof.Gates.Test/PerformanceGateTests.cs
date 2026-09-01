@@ -752,27 +752,8 @@ public sealed class PerformanceGateTests
     [Test]
     public void AdvisoryPolicyRejectsSubstitutedAnalyzerEntryPoint()
     {
-        var root = RepositoryLayout.FindRoot();
-        var portableProps = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Package",
-            "buildTransitive",
-            "SharpProof.props"));
-        var portableTargets = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Package",
-            "buildTransitive",
-            "SharpProof.targets"));
-        var verifierProps = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Verifier",
-            "buildTransitive",
-            "SharpProof.Verifier.props"));
-        var verifierTargets = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Verifier",
-            "buildTransitive",
-            "SharpProof.Verifier.targets"));
+        var (portableProps, portableTargets, verifierProps, verifierTargets) =
+            LoadPolicyDocuments();
         var entryPoint = portableTargets.Descendants("Analyzer")
             .Single(analyzer => string.Equals(
                 analyzer.Element("SharpProofAnalyzerRole")?.Value,
@@ -794,27 +775,8 @@ public sealed class PerformanceGateTests
     [Test]
     public void AdvisoryPolicyRejectsAWidenedVerifierCondition()
     {
-        var root = RepositoryLayout.FindRoot();
-        var portableProps = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Package",
-            "buildTransitive",
-            "SharpProof.props"));
-        var portableTargets = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Package",
-            "buildTransitive",
-            "SharpProof.targets"));
-        var verifierProps = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Verifier",
-            "buildTransitive",
-            "SharpProof.Verifier.props"));
-        var verifierTargets = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Verifier",
-            "buildTransitive",
-            "SharpProof.Verifier.targets"));
+        var (portableProps, portableTargets, verifierProps, verifierTargets) =
+            LoadPolicyDocuments();
         var verifier = verifierTargets.Descendants("Target").Single(target =>
             string.Equals(
                 (string?)target.Attribute("Name"),
@@ -837,27 +799,8 @@ public sealed class PerformanceGateTests
     [Test]
     public void AdvisoryPolicyRejectsVerifierConditionWithoutOptIn()
     {
-        var root = RepositoryLayout.FindRoot();
-        var portableProps = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Package",
-            "buildTransitive",
-            "SharpProof.props"));
-        var portableTargets = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Package",
-            "buildTransitive",
-            "SharpProof.targets"));
-        var verifierProps = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Verifier",
-            "buildTransitive",
-            "SharpProof.Verifier.props"));
-        var verifierTargets = XDocument.Load(Path.Combine(
-            root,
-            "SharpProof.Verifier",
-            "buildTransitive",
-            "SharpProof.Verifier.targets"));
+        var (portableProps, portableTargets, verifierProps, verifierTargets) =
+            LoadPolicyDocuments();
         var verifier = verifierTargets.Descendants("Target").Single(target =>
             string.Equals(
                 (string?)target.Attribute("Name"),
@@ -957,6 +900,25 @@ public sealed class PerformanceGateTests
             Assert.That(result.IdeEdits, Is.EqualTo(2));
         }
         AssertProtocolEvidence(result, expectedSamples: 2);
+    }
+
+    private static (
+        XDocument PortableProps,
+        XDocument PortableTargets,
+        XDocument VerifierProps,
+        XDocument VerifierTargets) LoadPolicyDocuments()
+    {
+        var root = RepositoryLayout.FindRoot();
+        XDocument Load(string project, string file)
+        {
+            return XDocument.Load(
+                Path.Combine(root, project, "buildTransitive", file));
+        }
+        return (
+            Load("SharpProof.Package", "SharpProof.props"),
+            Load("SharpProof.Package", "SharpProof.targets"),
+            Load("SharpProof.Verifier", "SharpProof.Verifier.props"),
+            Load("SharpProof.Verifier", "SharpProof.Verifier.targets"));
     }
 
     private static void AssertProtocolEvidence(
