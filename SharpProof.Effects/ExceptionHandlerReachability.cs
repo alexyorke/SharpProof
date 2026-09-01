@@ -748,60 +748,39 @@ internal sealed class ExceptionHandlerReachability(
                 PushChildren(binary);
                 continue;
             }
-            if (operation is IUnaryOperation unary &&
-                unary.OperatorMethod is { } unaryOperator)
+            var operatorCall = operation switch
             {
-                if (canCompleteNormally(unary.Operand) &&
+                IUnaryOperation { OperatorMethod: { } method } unary =>
+                    (Method: method, Operand: unary.Operand),
+                IConversionOperation { OperatorMethod: { } method } conversion =>
+                    (Method: method, Operand: conversion.Operand),
+                _ => (Method: null, Operand: null)
+            };
+            if (operatorCall is { Method: { } operatorMethod, Operand: { } operand })
+            {
+                if (canCompleteNormally(operand) &&
                     !ConversionEffectClassifier.SkipsLiftedOperator(
-                        unary,
+                        operation,
                         abstractFlow))
                 {
                     if (AddStaticInitializationPotential(
-                            unaryOperator,
-                            unary,
+                            operatorMethod,
+                            operation,
                             Add))
                     {
                         Add(
                             GetOperatorExceptions(
-                                unaryOperator,
+                                operatorMethod,
                                 activeMethods,
                                 depth),
-                            unary);
+                            operation);
                     }
                 }
-                if (CanThrowUnknownAfterPrerequisites(unary))
+                if (CanThrowUnknownAfterPrerequisites(operation))
                 {
-                    Add(UnknownPotential, unary);
+                    Add(UnknownPotential, operation);
                 }
-                PushChildren(unary);
-                continue;
-            }
-            if (operation is IConversionOperation conversion &&
-                conversion.OperatorMethod is { } conversionOperator)
-            {
-                if (canCompleteNormally(conversion.Operand) &&
-                    !ConversionEffectClassifier.SkipsLiftedOperator(
-                        conversion,
-                        abstractFlow))
-                {
-                    if (AddStaticInitializationPotential(
-                            conversionOperator,
-                            conversion,
-                            Add))
-                    {
-                        Add(
-                            GetOperatorExceptions(
-                                conversionOperator,
-                                activeMethods,
-                                depth),
-                            conversion);
-                    }
-                }
-                if (CanThrowUnknownAfterPrerequisites(conversion))
-                {
-                    Add(UnknownPotential, conversion);
-                }
-                PushChildren(conversion);
+                PushChildren(operation);
                 continue;
             }
             if (operation is IConversionOperation builtInConversion)
@@ -1194,25 +1173,6 @@ internal sealed class ExceptionHandlerReachability(
                             out _),
                         delegateCreation);
                     PushChildren(delegateCreation);
-                    continue;
-                }
-            }
-            if (operation is IConversionOperation methodGroupConversion)
-            {
-                var conversionMethodReference = MethodGroupConversionFacts
-                    .GetDelegateConstructorCheckedTarget(
-                        methodGroupConversion);
-                if (conversionMethodReference?.Instance is
-                    { } conversionInstance)
-                {
-                    Add(
-                        GetPotentialNullReceiver(
-                            conversionMethodReference,
-                            conversionInstance,
-                            _argumentExceptionType,
-                            out _),
-                        methodGroupConversion);
-                    PushChildren(methodGroupConversion);
                     continue;
                 }
             }
