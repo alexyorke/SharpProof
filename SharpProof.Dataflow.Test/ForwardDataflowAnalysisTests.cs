@@ -86,9 +86,9 @@ public sealed class ForwardDataflowAnalysisTests
         var graph = new DataflowGraph<IntervalValue>(
             [
                 new(0, value => value),
-                new(1, value => domain.AddConstant(value, 1)),
-                new(2, value => domain.AddConstant(value, 1)),
-                new(3, value => domain.AddConstant(value, 1)),
+                new(1, value => AddConstant(domain, value, 1)),
+                new(2, value => AddConstant(domain, value, 1)),
+                new(3, value => AddConstant(domain, value, 1)),
                 new(4, value => value)
             ],
             [
@@ -245,9 +245,9 @@ public sealed class ForwardDataflowAnalysisTests
         return new(
             [
                 new(0, value => value),
-                new(1, value => domain.AddConstant(value, 1)),
-                new(2, value => domain.AddConstant(value, 2)),
-                new(3, value => domain.AddConstant(value, 1)),
+                new(1, value => AddConstant(domain, value, 1)),
+                new(2, value => AddConstant(domain, value, 2)),
+                new(3, value => AddConstant(domain, value, 1)),
                 new(4, value => value)
             ],
             [
@@ -270,7 +270,7 @@ public sealed class ForwardDataflowAnalysisTests
         var graph = new DataflowGraph<IntervalValue>(
             [
                 new(0, value => value),
-                new(1, value => domain.AddConstant(value, 1))
+                new(1, value => AddConstant(domain, value, 1))
             ],
             [
                 new(0, 1),
@@ -307,5 +307,29 @@ public sealed class ForwardDataflowAnalysisTests
         Assert.That(withMessage.Message, Is.EqualTo("explicit"));
         Assert.That(withInner.Message, Is.EqualTo("wrapped"));
         Assert.That(withInner.InnerException, Is.SameAs(inner));
+    }
+
+    private static IntervalValue AddConstant(
+        IntervalDomain domain, IntervalValue value, long addend)
+    {
+        if (value.IsBottom)
+        {
+            return domain.Bottom;
+        }
+
+        try
+        {
+            return domain.Range(
+                value.LowerBound.HasValue
+                    ? checked(value.LowerBound.Value + addend)
+                    : null,
+                value.UpperBound.HasValue
+                    ? checked(value.UpperBound.Value + addend)
+                    : null);
+        }
+        catch (OverflowException)
+        {
+            return domain.Top;
+        }
     }
 }

@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace SharpProof.Dataflow;
 
 /// <summary>
@@ -25,24 +23,4 @@ public abstract class ClosedAbstractDomain<T> : IAbstractDomain<T>
         return LessThanOrEqual(left, right) && LessThanOrEqual(right, left);
     }
 
-    public T Merge(T value1, T value2)
-    {
-        return Join(value1, value2);
-    }
-
-    public int Compare(T oldValue, T newValue, bool assertMonotonicity = false)
-    {
-        if (AreEquivalent(oldValue, newValue))
-        {
-            return 0;
-        }
-
-        if (LessThanOrEqual(oldValue, newValue))
-        {
-            return -1;
-        }
-
-        Debug.Assert(!assertMonotonicity);
-        return 1;
-    }
 }

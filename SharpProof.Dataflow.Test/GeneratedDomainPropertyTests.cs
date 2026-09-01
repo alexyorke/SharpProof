@@ -361,11 +361,10 @@ public sealed class GeneratedIntervalDomainPropertyTests
             Values,
             Seed + 1,
             [
-                ("AddConstant", value => _domain.AddConstant(value, 7)),
                 ("AssumeAtLeast", value => _domain.AssumeAtLeast(value, -17)),
                 ("AssumeAtMost", value => _domain.AssumeAtMost(value, 23))
             ],
-            [("Add", _domain.Add)]);
+            []);
     }
 
     [Test]
@@ -413,21 +412,6 @@ public sealed class GeneratedSequenceCardinalityDomainPropertyTests
             _domain,
             Values,
             Seed);
-    }
-
-    [Test]
-    public void GeneratedTransfersAreMonotone()
-    {
-        GeneratedDomainLawAssertions.AssertTransfersAreMonotone(
-            _domain,
-            Values,
-            Seed + 1,
-            [
-                ("Append", value => _domain.Append(value, 3)),
-                ("AssumeEmpty", _domain.AssumeEmpty),
-                ("AssumeNonEmpty", _domain.AssumeNonEmpty)
-            ],
-            [("Concat", _domain.Concat)]);
     }
 
     [Test]

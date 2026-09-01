@@ -180,42 +180,6 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
         return value.IsBottom ? Bottom : Top;
     }
 
-    public IntervalValue AddConstant(IntervalValue value, long addend)
-    {
-        return Add(value, Constant(addend));
-    }
-
-    public IntervalValue Add(IntervalValue left, IntervalValue right)
-    {
-        if (left.IsBottom || right.IsBottom)
-        {
-            return Bottom;
-        }
-
-        if (left.IsSingleton && right.IsSingleton)
-        {
-            try
-            {
-                return Constant(checked(left.SingletonValue + right.SingletonValue));
-            }
-            catch (OverflowException)
-            {
-                return Top;
-            }
-        }
-
-        if (!TryAddBounds(left, right, out var lower, out var upper))
-        {
-            return Top;
-        }
-
-        var modulus = BigInteger.GreatestCommonDivisor(left.Modulus, right.Modulus);
-        var remainder = modulus.IsZero
-            ? BigInteger.Zero
-            : Normalize(left.Remainder + right.Remainder, modulus);
-        return Create(lower, upper, modulus, remainder);
-    }
-
     public IntervalValue AssumeAtLeast(IntervalValue value, long lowerBound)
     {
         if (value.IsBottom)
@@ -277,30 +241,6 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
     private static long? HullUpper(long? left, long? right)
     {
         return left.HasValue && right.HasValue ? Math.Max(left.Value, right.Value) : null;
-    }
-
-    private static bool TryAddBounds(
-        IntervalValue left, IntervalValue right, out long? lower, out long? upper)
-    {
-        var minimum = new BigInteger(left.LowerBound ?? long.MinValue) +
-            new BigInteger(right.LowerBound ?? long.MinValue);
-        var maximum = new BigInteger(left.UpperBound ?? long.MaxValue) +
-            new BigInteger(right.UpperBound ?? long.MaxValue);
-        if (minimum < long.MinValue || minimum > long.MaxValue ||
-            maximum < long.MinValue || maximum > long.MaxValue)
-        {
-            lower = null;
-            upper = null;
-            return false;
-        }
-
-        lower = left.LowerBound.HasValue && right.LowerBound.HasValue
-            ? (long)minimum
-            : null;
-        upper = left.UpperBound.HasValue && right.UpperBound.HasValue
-            ? (long)maximum
-            : null;
-        return true;
     }
 
     private static bool TryCongruentBoundary(

@@ -78,9 +78,6 @@ public sealed class IntervalDomainTests
         var explicitLower = _domain.Range(long.MinValue, 5);
         var implicitUpper = _domain.Range(-5, null);
         var explicitUpper = _domain.Range(-5, long.MaxValue);
-        var addedLower = _domain.Add(
-            _domain.Range(long.MinValue, 0),
-            _domain.Range(0, 5));
 
         using (Assert.EnterMultipleScope())
         {
@@ -92,7 +89,6 @@ public sealed class IntervalDomainTests
             Assert.That(
                 explicitUpper.GetHashCode(),
                 Is.EqualTo(implicitUpper.GetHashCode()));
-            Assert.That(addedLower, Is.EqualTo(implicitLower));
         }
     }
 
@@ -125,12 +121,8 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
-    public void ArithmeticAndRefinementTransfersAreMonotone()
+    public void RefinementTransfersAreMonotone()
     {
-        DomainLawAssertions.AssertMonotone(
-            _domain,
-            Samples,
-            value => _domain.AddConstant(value, 3));
         DomainLawAssertions.AssertMonotone(
             _domain,
             Samples,
@@ -139,25 +131,6 @@ public sealed class IntervalDomainTests
             _domain,
             Samples,
             value => _domain.AssumeAtMost(value, 1));
-        DomainLawAssertions.AssertBinaryMonotone(_domain, Samples, _domain.Add);
-    }
-
-    [Test]
-    public void ArithmeticOverflowFailsClosed()
-    {
-        Assert.That(
-            _domain.Add(_domain.Constant(long.MaxValue), _domain.Constant(1)),
-            Is.EqualTo(_domain.Top));
-    }
-
-    [Test]
-    public void PotentialEndpointOverflowFailsClosed()
-    {
-        Assert.That(
-            _domain.Add(
-                _domain.Range(-485, 292),
-                _domain.Range(null, 386)),
-            Is.EqualTo(_domain.Top));
     }
 
     [Test]
@@ -185,13 +158,13 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
-    public void ClosedDomainFacadeUsesSharpProofJoinAndOrder()
+    public void ClosedDomainJoinAndOrderAreConsistent()
     {
         Assert.That(
-            _domain.Merge(_domain.Constant(2), _domain.Constant(6)),
-            Is.EqualTo(_domain.Join(_domain.Constant(2), _domain.Constant(6))));
-        Assert.That(
-            _domain.Compare(_domain.Bottom, _domain.Top),
-            Is.LessThan(0));
+            _domain.LessThanOrEqual(_domain.Bottom, _domain.Top),
+            Is.True);
+        Assert.That(_domain.AreEquivalent(
+            _domain.Join(_domain.Constant(2), _domain.Constant(6)),
+            _domain.Join(_domain.Constant(6), _domain.Constant(2))), Is.True);
     }
 }
