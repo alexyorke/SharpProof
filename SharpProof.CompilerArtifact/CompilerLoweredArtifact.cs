@@ -1128,75 +1128,11 @@ internal static class CompilerLoweredArtifact
                     row.EvidenceIdentity == identity)
                 .ToArray();
             return matches.Length == 1 &&
-                ValidSummaryEvidenceAuthority(matches[0], compilation);
+                CompilationFingerprint.ValidSummaryEvidenceRow(
+                    matches[0], compilation, authorityMode: true);
         }
 
         return false;
-    }
-
-    private static bool ValidSummaryEvidenceAuthority(
-        CompilerSummaryEvidenceSnapshot row,
-        CompilerCompilationSnapshot compilation)
-    {
-        if (!WorkerProtocolJson.IsSha256(row.EvidenceSha256) ||
-            !ValidSummaryCallIdentity(row.CallIdentity))
-        {
-            return false;
-        }
-
-        switch (row.Origin)
-        {
-            case CompilerSummaryOrigin.Source:
-                return row.EvidenceIdentity.Length == 0 &&
-                    row.SourceTreeSha256.Length == 64 &&
-                    WorkerProtocolJson.IsSha256(row.SourceTreeSha256) &&
-                    row.SourceStart >= 0 &&
-                    row.SourceLength > 0 &&
-                    row.OwningModuleName.Length == 0 &&
-                    row.OwningModuleMvid.Length == 0 &&
-                    row.OwningModuleSha256.Length == 0 &&
-                    row.MethodMetadataToken == -1 &&
-                    (compilation.SyntaxTrees ?? []).Count(tree =>
-                        tree != null &&
-                        tree.Path == row.SourcePath &&
-                        tree.Sha256 == row.SourceTreeSha256 &&
-                        row.SourceStart <= tree.TextLength - row.SourceLength) == 1;
-
-            case CompilerSummaryOrigin.ImplementationIl:
-                return row.EvidenceIdentity.Length == 0 &&
-                    row.SourcePath.Length == 0 &&
-                    row.SourceTreeSha256.Length == 0 &&
-                    row.SourceStart == -1 &&
-                    row.SourceLength == -1 &&
-                    row.OwningModuleName.Length > 0 &&
-                    Guid.TryParse(row.OwningModuleMvid, out _) &&
-                    row.OwningModuleSha256 == row.EvidenceSha256 &&
-                    row.MethodMetadataToken > 0 &&
-                    (compilation.References ?? []).SelectMany(
-                        static reference => reference?.Modules ?? [])
-                    .Count(module => module != null &&
-                        module.Name == row.OwningModuleName &&
-                        module.Mvid == row.OwningModuleMvid &&
-                        module.Sha256 == row.OwningModuleSha256) == 1;
-
-            case CompilerSummaryOrigin.SpecificationPack:
-                return row.SourcePath.Length == 0 &&
-                    row.SourceTreeSha256.Length == 0 &&
-                    row.SourceStart == -1 &&
-                    row.SourceLength == -1 &&
-                    row.OwningModuleName.Length == 0 &&
-                    row.OwningModuleMvid.Length == 0 &&
-                    row.OwningModuleSha256.Length == 0 &&
-                    row.MethodMetadataToken == -1 &&
-                    row.EvidenceSha256 == compilation.SpecificationPackCatalogSha256 &&
-                    ValidSummaryEvidenceIdentity(
-                        row.Origin,
-                        row.EvidenceIdentity,
-                        compilation);
-
-            default:
-                return false;
-        }
     }
 
     private static bool ValidDependencyEvidence(

@@ -39,6 +39,79 @@ internal static class CompilerImplementationIlSummaryLowerer
 {
     private const int MaximumIlBytes = 65536;
     private const int MaximumStack = 128;
+    private static readonly IReadOnlyDictionary<ILOpCode, IlOperandSize>
+        OperandSizes = new Dictionary<ILOpCode, IlOperandSize>
+        {
+            [ILOpCode.Ldarg_s] = IlOperandSize.Byte,
+            [ILOpCode.Ldloc_s] = IlOperandSize.Byte,
+            [ILOpCode.Stloc_s] = IlOperandSize.Byte,
+            [ILOpCode.Ldarg] = IlOperandSize.UInt16,
+            [ILOpCode.Ldloc] = IlOperandSize.UInt16,
+            [ILOpCode.Stloc] = IlOperandSize.UInt16,
+            [ILOpCode.Ldc_i4_s] = IlOperandSize.SByte,
+            [ILOpCode.Br_s] = IlOperandSize.SByte,
+            [ILOpCode.Brfalse_s] = IlOperandSize.SByte,
+            [ILOpCode.Brtrue_s] = IlOperandSize.SByte,
+            [ILOpCode.Beq_s] = IlOperandSize.SByte,
+            [ILOpCode.Bge_s] = IlOperandSize.SByte,
+            [ILOpCode.Bgt_s] = IlOperandSize.SByte,
+            [ILOpCode.Ble_s] = IlOperandSize.SByte,
+            [ILOpCode.Blt_s] = IlOperandSize.SByte,
+            [ILOpCode.Bne_un_s] = IlOperandSize.SByte,
+            [ILOpCode.Ldc_i4] = IlOperandSize.Int32,
+            [ILOpCode.Call] = IlOperandSize.Int32,
+            [ILOpCode.Br] = IlOperandSize.Int32,
+            [ILOpCode.Brfalse] = IlOperandSize.Int32,
+            [ILOpCode.Brtrue] = IlOperandSize.Int32,
+            [ILOpCode.Beq] = IlOperandSize.Int32,
+            [ILOpCode.Bge] = IlOperandSize.Int32,
+            [ILOpCode.Bgt] = IlOperandSize.Int32,
+            [ILOpCode.Ble] = IlOperandSize.Int32,
+            [ILOpCode.Blt] = IlOperandSize.Int32,
+            [ILOpCode.Bne_un] = IlOperandSize.Int32,
+            [ILOpCode.Ldc_i8] = IlOperandSize.Int64,
+            [ILOpCode.Nop] = IlOperandSize.None,
+            [ILOpCode.Ldarg_0] = IlOperandSize.None,
+            [ILOpCode.Ldarg_1] = IlOperandSize.None,
+            [ILOpCode.Ldarg_2] = IlOperandSize.None,
+            [ILOpCode.Ldarg_3] = IlOperandSize.None,
+            [ILOpCode.Ldloc_0] = IlOperandSize.None,
+            [ILOpCode.Ldloc_1] = IlOperandSize.None,
+            [ILOpCode.Ldloc_2] = IlOperandSize.None,
+            [ILOpCode.Ldloc_3] = IlOperandSize.None,
+            [ILOpCode.Stloc_0] = IlOperandSize.None,
+            [ILOpCode.Stloc_1] = IlOperandSize.None,
+            [ILOpCode.Stloc_2] = IlOperandSize.None,
+            [ILOpCode.Stloc_3] = IlOperandSize.None,
+            [ILOpCode.Ldc_i4_m1] = IlOperandSize.None,
+            [ILOpCode.Ldc_i4_0] = IlOperandSize.None,
+            [ILOpCode.Ldc_i4_1] = IlOperandSize.None,
+            [ILOpCode.Ldc_i4_2] = IlOperandSize.None,
+            [ILOpCode.Ldc_i4_3] = IlOperandSize.None,
+            [ILOpCode.Ldc_i4_4] = IlOperandSize.None,
+            [ILOpCode.Ldc_i4_5] = IlOperandSize.None,
+            [ILOpCode.Ldc_i4_6] = IlOperandSize.None,
+            [ILOpCode.Ldc_i4_7] = IlOperandSize.None,
+            [ILOpCode.Ldc_i4_8] = IlOperandSize.None,
+            [ILOpCode.Dup] = IlOperandSize.None,
+            [ILOpCode.Pop] = IlOperandSize.None,
+            [ILOpCode.Ret] = IlOperandSize.None,
+            [ILOpCode.Add] = IlOperandSize.None,
+            [ILOpCode.Sub] = IlOperandSize.None,
+            [ILOpCode.Mul] = IlOperandSize.None,
+            [ILOpCode.Div] = IlOperandSize.None,
+            [ILOpCode.Rem] = IlOperandSize.None,
+            [ILOpCode.And] = IlOperandSize.None,
+            [ILOpCode.Or] = IlOperandSize.None,
+            [ILOpCode.Xor] = IlOperandSize.None,
+            [ILOpCode.Neg] = IlOperandSize.None,
+            [ILOpCode.Ceq] = IlOperandSize.None,
+            [ILOpCode.Cgt] = IlOperandSize.None,
+            [ILOpCode.Clt] = IlOperandSize.None,
+            [ILOpCode.Add_ovf] = IlOperandSize.None,
+            [ILOpCode.Sub_ovf] = IlOperandSize.None,
+            [ILOpCode.Mul_ovf] = IlOperandSize.None
+        };
 
     internal static bool IsCandidate(
         CSharpCompilation compilation,
@@ -832,89 +905,23 @@ internal static class CompilerImplementationIlSummaryLowerer
                     return false;
                 }
 
-                long operand = 0;
-                switch (opCode)
+                if (!OperandSizes.TryGetValue(opCode, out var operandSize))
                 {
-                    case ILOpCode.Ldarg_s:
-                    case ILOpCode.Ldloc_s:
-                    case ILOpCode.Stloc_s:
-                        operand = reader.ReadByte();
-                        break;
-                    case ILOpCode.Ldarg:
-                    case ILOpCode.Ldloc:
-                    case ILOpCode.Stloc:
-                        operand = reader.ReadUInt16();
-                        break;
-                    case ILOpCode.Ldc_i4_s:
-                        operand = reader.ReadSByte();
-                        break;
-                    case ILOpCode.Ldc_i4:
-                    case ILOpCode.Call:
-                        operand = reader.ReadInt32();
-                        break;
-                    case ILOpCode.Ldc_i8:
-                        operand = reader.ReadInt64();
-                        break;
-                    case ILOpCode.Br_s:
-                    case ILOpCode.Brfalse_s:
-                    case ILOpCode.Brtrue_s:
-                    case ILOpCode.Beq_s:
-                    case ILOpCode.Bge_s:
-                    case ILOpCode.Bgt_s:
-                    case ILOpCode.Ble_s:
-                    case ILOpCode.Blt_s:
-                    case ILOpCode.Bne_un_s:
-                        operand = reader.ReadSByte();
-                        break;
-                    case ILOpCode.Br:
-                    case ILOpCode.Brfalse:
-                    case ILOpCode.Brtrue:
-                    case ILOpCode.Beq:
-                    case ILOpCode.Bge:
-                    case ILOpCode.Bgt:
-                    case ILOpCode.Ble:
-                    case ILOpCode.Blt:
-                    case ILOpCode.Bne_un:
-                        operand = reader.ReadInt32();
-                        break;
-                    case ILOpCode.Nop:
-                    case ILOpCode.Ldarg_0:
-                    case ILOpCode.Ldarg_1:
-                    case ILOpCode.Ldarg_2:
-                    case ILOpCode.Ldarg_3:
-                    case ILOpCode.Ldloc_0:
-                    case ILOpCode.Ldloc_1:
-                    case ILOpCode.Ldloc_2:
-                    case ILOpCode.Ldloc_3:
-                    case ILOpCode.Stloc_0:
-                    case ILOpCode.Stloc_1:
-                    case ILOpCode.Stloc_2:
-                    case ILOpCode.Stloc_3:
-                    case ILOpCode.Ldc_i4_m1:
-                    case >= ILOpCode.Ldc_i4_0 and <= ILOpCode.Ldc_i4_8:
-                    case ILOpCode.Dup:
-                    case ILOpCode.Pop:
-                    case ILOpCode.Ret:
-                    case ILOpCode.Add:
-                    case ILOpCode.Sub:
-                    case ILOpCode.Mul:
-                    case ILOpCode.Div:
-                    case ILOpCode.Rem:
-                    case ILOpCode.And:
-                    case ILOpCode.Or:
-                    case ILOpCode.Xor:
-                    case ILOpCode.Neg:
-                    case ILOpCode.Ceq:
-                    case ILOpCode.Cgt:
-                    case ILOpCode.Clt:
-                    case ILOpCode.Add_ovf:
-                    case ILOpCode.Sub_ovf:
-                    case ILOpCode.Mul_ovf:
-                        break;
-                    default:
-                        instructions = [];
-                        return false;
+                    instructions = [];
+                    return false;
                 }
+
+                var operand = operandSize switch
+                {
+                    IlOperandSize.None => 0,
+                    IlOperandSize.Byte => reader.ReadByte(),
+                    IlOperandSize.UInt16 => reader.ReadUInt16(),
+                    IlOperandSize.SByte => reader.ReadSByte(),
+                    IlOperandSize.Int32 => reader.ReadInt32(),
+                    IlOperandSize.Int64 => reader.ReadInt64(),
+                    _ => throw new InvalidOperationException(
+                        "Unknown IL operand size.")
+                };
 
                 var nextOffset = reader.Offset;
                 var instruction = new DecodedInstruction(
@@ -1641,6 +1648,16 @@ internal static class CompilerImplementationIlSummaryLowerer
             value = stack.Peek();
             return true;
         }
+    }
+
+    private enum IlOperandSize
+    {
+        None,
+        Byte,
+        UInt16,
+        SByte,
+        Int32,
+        Int64
     }
 
     private sealed class ScalarSignatureTypeProvider(

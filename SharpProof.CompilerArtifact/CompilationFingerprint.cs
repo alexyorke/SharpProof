@@ -150,9 +150,10 @@ internal static class CompilationFingerprint
         return true;
     }
 
-    private static bool ValidSummaryEvidenceRow(
+    internal static bool ValidSummaryEvidenceRow(
         CompilerSummaryEvidenceSnapshot row,
-        CompilerCompilationSnapshot snapshot)
+        CompilerCompilationSnapshot snapshot,
+        bool authorityMode = false)
     {
         // JSON deserialization can populate non-nullable string properties with
         // null. Validate the complete shape before the branch-specific checks
@@ -164,7 +165,10 @@ internal static class CompilationFingerprint
             row.SourcePath is null && row.SourceTreeSha256 is null ||
             row.OwningModuleName is null ||
             row.OwningModuleMvid is null ||
-            row.OwningModuleSha256 is null)
+            row.OwningModuleSha256 is null ||
+            authorityMode &&
+            (!WorkerProtocolJson.IsSha256(row.EvidenceSha256) ||
+             !ValidIdentity(row.CallIdentity)))
         {
             return false;
         }
@@ -174,6 +178,7 @@ internal static class CompilationFingerprint
             case CompilerSummaryOrigin.Source:
                 return row.EvidenceIdentity is { Length: 0 } &&
                     row.SourcePath is { Length: > 0 } &&
+                    (!authorityMode || row.SourceTreeSha256.Length == 64) &&
                     WorkerProtocolJson.IsSha256(row.SourceTreeSha256) &&
                     row.SourceStart >= 0 &&
                     row.SourceLength > 0 &&
@@ -194,7 +199,9 @@ internal static class CompilationFingerprint
                     row.SourceStart == -1 &&
                     row.SourceLength == -1 &&
                     row.OwningModuleName.Length > 0 &&
-                    Guid.TryParseExact(row.OwningModuleMvid, "D", out _) &&
+                    (authorityMode
+                        ? Guid.TryParse(row.OwningModuleMvid, out _)
+                        : Guid.TryParseExact(row.OwningModuleMvid, "D", out _)) &&
                     row.OwningModuleSha256 == row.EvidenceSha256 &&
                     row.MethodMetadataToken > 0 &&
                     (snapshot.References ?? []).SelectMany(
@@ -213,7 +220,11 @@ internal static class CompilationFingerprint
                     row.OwningModuleMvid.Length == 0 &&
                     row.OwningModuleSha256.Length == 0 &&
                     row.MethodMetadataToken == -1 &&
-                    row.EvidenceSha256 == snapshot.SpecificationPackCatalogSha256;
+                    row.EvidenceSha256 == snapshot.SpecificationPackCatalogSha256 &&
+                    (!authorityMode ||
+                     CompilerSpecificationPackAuthorityValidation.IsValidPackIdentity(
+                         row.EvidenceIdentity,
+                         snapshot.SpecificationPackIds));
 
             default:
                 return false;
