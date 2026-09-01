@@ -1235,6 +1235,9 @@ internal static class PerformanceGate
         var portableTargets = XDocument.Load(Path.Combine(
             portableRoot,
             "SharpProof.targets"));
+        var portableContract = XDocument.Load(Path.Combine(
+            portableRoot,
+            "SharpProof.ConsumerContract.props"));
         var verifierProps = XDocument.Load(Path.Combine(
             verifierRoot,
             "SharpProof.Verifier.props"));
@@ -1244,11 +1247,13 @@ internal static class PerformanceGate
         ValidateClosedPackagePolicy(
             portableProps,
             portableTargets,
+            portableContract,
             verifierProps,
             verifierTargets);
         ValidateAdvisoryPackagePolicy(
             portableProps,
             portableTargets,
+            portableContract,
             verifierProps,
             verifierTargets);
         ValidateEvaluatedAdvisoryPackagePolicy(
@@ -1259,13 +1264,26 @@ internal static class PerformanceGate
     private static void ValidateClosedPackagePolicy(
         XDocument portableProps,
         XDocument portableTargets,
+        XDocument portableContract,
         XDocument verifierProps,
         XDocument verifierTargets)
     {
+        var portableImports = portableTargets.Descendants("Import").ToArray();
+        if (portableImports.Length != 1 ||
+            !string.Equals(
+                (string?)portableImports[0].Attribute("Project"),
+                "$(_SharpProofConsumerContractPath)",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "The portable package must import only its canonical " +
+                "consumer contract.");
+        }
+
         foreach (var document in new[]
                  {
                      portableProps,
-                     portableTargets,
+                     portableContract,
                      verifierProps,
                      verifierTargets
                  })
@@ -1515,18 +1533,33 @@ internal static class PerformanceGate
         XDocument verifierProps,
         XDocument verifierTargets)
     {
+        ValidateAdvisoryPackagePolicy(
+            portableProps,
+            portableTargets,
+            portableTargets,
+            verifierProps,
+            verifierTargets);
+    }
+
+    internal static void ValidateAdvisoryPackagePolicy(
+        XDocument portableProps,
+        XDocument portableTargets,
+        XDocument portableContract,
+        XDocument verifierProps,
+        XDocument verifierTargets)
+    {
         var visibleProperties = portableProps
             .Descendants("CompilerVisibleProperty")
             .Select(static element => (string?)element.Attribute("Include"))
             .ToHashSet(StringComparer.Ordinal);
         var profile = FindDefaultProperty(
-            portableTargets,
+            portableContract,
             "SharpProofProfile");
         var features = FindDefaultProperty(
-            portableTargets,
+            portableContract,
             "SharpProofFeatures");
         var verify = FindDefaultProperty(
-            portableTargets,
+            portableContract,
             "SharpProofVerify");
         var analyzerGroups = portableTargets.Descendants("ItemGroup")
             .Where(static group =>

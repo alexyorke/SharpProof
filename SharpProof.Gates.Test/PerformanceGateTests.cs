@@ -570,91 +570,85 @@ public sealed class PerformanceGateTests
         string mutation)
     {
         var sourceRoot = RepositoryLayout.FindRoot();
-        var temporary = Directory.CreateTempSubdirectory(
+        using var temporary = new TempDirectory(
             "sharpproof-package-policy-");
-        try
-        {
-            foreach (var (package, file) in new[]
-                     {
-                         ("SharpProof.Package", "SharpProof.props"),
+        foreach (var (package, file) in new[]
+             {
+                     ("SharpProof.Package", "SharpProof.ConsumerContract.props"),
+                     ("SharpProof.Package", "SharpProof.props"),
                          ("SharpProof.Package", "SharpProof.targets"),
                          ("SharpProof.Verifier", "SharpProof.Verifier.props"),
                          ("SharpProof.Verifier", "SharpProof.Verifier.targets")
                      })
-            {
-                var destination = Path.Combine(
-                    temporary.FullName,
-                    package,
-                    "buildTransitive");
-                Directory.CreateDirectory(destination);
-                File.Copy(
-                    Path.Combine(
-                        sourceRoot,
-                        package,
-                        "buildTransitive",
-                        file),
-                    Path.Combine(destination, file));
-            }
-
-            var portableRoot = Path.Combine(
-                temporary.FullName,
-                "SharpProof.Package",
-                "buildTransitive");
-            var path = mutation == "executable-props-target"
-                ? Path.Combine(portableRoot, "SharpProof.props")
-                : Path.Combine(portableRoot, "SharpProof.targets");
-            var document = XDocument.Load(path);
-            switch (mutation)
-            {
-                case "conditional-override":
-                    document.Root!.Add(new XElement(
-                        "PropertyGroup",
-                        new XAttribute(
-                            "Condition",
-                            "'$(SharpProofProfile)' == 'advisory'"),
-                        new XElement("SharpProofProfile", "off")));
-                    break;
-                case "import":
-                    new XDocument(
-                        new XElement(
-                            "Project",
-                            new XElement(
-                                "PropertyGroup",
-                                new XElement(
-                                    "SharpProofProfile",
-                                    "off"))))
-                        .Save(Path.Combine(portableRoot, "override.targets"));
-                    document.Root!.Add(new XElement(
-                        "Import",
-                        new XAttribute("Project", "override.targets")));
-                    break;
-                case "executable-props-target":
-                    document.Root!.Add(new XElement(
-                        "Target",
-                        new XAttribute(
-                            "Name",
-                            "UnexpectedPackageWork"),
-                        new XAttribute("BeforeTargets", "CoreCompile"),
-                        new XElement(
-                            "Error",
-                            new XAttribute(
-                                "Text",
-                                "unexpected package work"))));
-                    break;
-                default:
-                    throw new InvalidOperationException(
-                        $"Unknown mutation '{mutation}'.");
-            }
-            document.Save(path);
-
-            Assert.Throws<InvalidDataException>((Action)(() =>
-                PerformanceGate.ValidateAdvisoryPackagePolicy(
-                temporary.FullName)));
-        }
-        finally
         {
-            temporary.Delete(recursive: true);
+            var destination = Path.Combine(
+                temporary.FullName,
+                package,
+                "buildTransitive");
+            Directory.CreateDirectory(destination);
+            File.Copy(
+                Path.Combine(
+                    sourceRoot,
+                    package,
+                    "buildTransitive",
+                    file),
+                Path.Combine(destination, file));
         }
+
+        var portableRoot = Path.Combine(
+            temporary.FullName,
+            "SharpProof.Package",
+            "buildTransitive");
+        var path = mutation == "executable-props-target"
+            ? Path.Combine(portableRoot, "SharpProof.props")
+            : Path.Combine(portableRoot, "SharpProof.targets");
+        var document = XDocument.Load(path);
+        switch (mutation)
+        {
+            case "conditional-override":
+                document.Root!.Add(new XElement(
+                    "PropertyGroup",
+                    new XAttribute(
+                        "Condition",
+                        "'$(SharpProofProfile)' == 'advisory'"),
+                    new XElement("SharpProofProfile", "off")));
+                break;
+            case "import":
+                new XDocument(
+                    new XElement(
+                        "Project",
+                        new XElement(
+                            "PropertyGroup",
+                            new XElement(
+                                "SharpProofProfile",
+                                "off"))))
+                    .Save(Path.Combine(portableRoot, "override.targets"));
+                document.Root!.Add(new XElement(
+                    "Import",
+                    new XAttribute("Project", "override.targets")));
+                break;
+            case "executable-props-target":
+                document.Root!.Add(new XElement(
+                    "Target",
+                    new XAttribute(
+                        "Name",
+                        "UnexpectedPackageWork"),
+                    new XAttribute("BeforeTargets", "CoreCompile"),
+                    new XElement(
+                        "Error",
+                        new XAttribute(
+                            "Text",
+                            "unexpected package work"))));
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unknown mutation '{mutation}'.");
+        }
+        document.Save(path);
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            PerformanceGate.ValidateAdvisoryPackagePolicy(
+            temporary.FullName)));
     }
 
     [TestCase(false)]

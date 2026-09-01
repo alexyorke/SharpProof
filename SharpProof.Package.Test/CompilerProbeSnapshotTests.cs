@@ -53,25 +53,18 @@ public sealed class CompilerProbeSnapshotTests
     [Test]
     public async Task CompilationReferenceChangesProbeSnapshot()
     {
-        var directory = Directory.CreateTempSubdirectory(
+        using var directory = new TempDirectory(
             "sharpproof-compilation-reference-");
-        try
-        {
-            var outputPath = Path.Combine(directory.FullName, "probe.json");
+        var outputPath = Path.Combine(directory.FullName, "probe.json");
 
-            var first = await CaptureSnapshotAsync(
-                outputPath,
-                "Referenced.First");
-            var second = await CaptureSnapshotAsync(
-                outputPath,
-                "Referenced.Second");
+        var first = await CaptureSnapshotAsync(
+            outputPath,
+            "Referenced.First");
+        var second = await CaptureSnapshotAsync(
+            outputPath,
+            "Referenced.Second");
 
-            Assert.That(second, Is.Not.EqualTo(first));
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
+        Assert.That(second, Is.Not.EqualTo(first));
     }
 
     [Test]
@@ -99,14 +92,12 @@ public sealed class CompilerProbeSnapshotTests
     [Test]
     public async Task ExecutableEntryPointSelectionChangesProbeSnapshot()
     {
-        var directory = Directory.CreateTempSubdirectory(
+        using var directory = new TempDirectory(
             "sharpproof-entry-point-probe-");
-        try
-        {
-            var outputPath = Path.Combine(directory.FullName, "probe.json");
-            var compilation = CSharpCompilation.Create(
-                "ProbeConsumer",
-                [CSharpSyntaxTree.ParseText(
+        var outputPath = Path.Combine(directory.FullName, "probe.json");
+        var compilation = CSharpCompilation.Create(
+            "ProbeConsumer",
+            [CSharpSyntaxTree.ParseText(
                     """
                     internal static class FirstEntryPoint {
                         public static void Main() { }
@@ -115,36 +106,31 @@ public sealed class CompilerProbeSnapshotTests
                         public static void Main() { }
                     }
                     """)],
-                [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
-                new CSharpCompilationOptions(OutputKind.ConsoleApplication));
+            [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)],
+            new CSharpCompilationOptions(OutputKind.ConsoleApplication));
 
-            var first = await CaptureSnapshotAsync(
-                outputPath,
-                compilation.WithOptions(compilation.Options.WithMainTypeName(
-                    "FirstEntryPoint")));
-            var second = await CaptureSnapshotAsync(
-                outputPath,
-                compilation.WithOptions(compilation.Options.WithMainTypeName(
-                    "SecondEntryPoint")));
+        var first = await CaptureSnapshotAsync(
+            outputPath,
+            compilation.WithOptions(compilation.Options.WithMainTypeName(
+                "FirstEntryPoint")));
+        var second = await CaptureSnapshotAsync(
+            outputPath,
+            compilation.WithOptions(compilation.Options.WithMainTypeName(
+                "SecondEntryPoint")));
 
-            using var firstDocument = JsonDocument.Parse(first);
-            using var secondDocument = JsonDocument.Parse(second);
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(second, Is.Not.EqualTo(first));
-                Assert.That(
-                    firstDocument.RootElement.GetProperty("options")
-                        .GetProperty("mainTypeName").GetString(),
-                    Is.EqualTo("FirstEntryPoint"));
-                Assert.That(
-                    secondDocument.RootElement.GetProperty("options")
-                        .GetProperty("mainTypeName").GetString(),
-                    Is.EqualTo("SecondEntryPoint"));
-            }
-        }
-        finally
+        using var firstDocument = JsonDocument.Parse(first);
+        using var secondDocument = JsonDocument.Parse(second);
+        using (Assert.EnterMultipleScope())
         {
-            directory.Delete(recursive: true);
+            Assert.That(second, Is.Not.EqualTo(first));
+            Assert.That(
+                firstDocument.RootElement.GetProperty("options")
+                    .GetProperty("mainTypeName").GetString(),
+                Is.EqualTo("FirstEntryPoint"));
+            Assert.That(
+                secondDocument.RootElement.GetProperty("options")
+                    .GetProperty("mainTypeName").GetString(),
+                Is.EqualTo("SecondEntryPoint"));
         }
     }
 
