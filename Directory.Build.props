@@ -31,29 +31,9 @@
 
   <PropertyGroup>
     <SharpProofProductionProject Condition="
-      '$(MSBuildProjectName)' == 'SharpProof.Analyzer' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Analyzer.Core' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Attributes' Or
-      '$(MSBuildProjectName)' == 'SharpProof.BuildTasks' Or
-      '$(MSBuildProjectName)' == 'SharpProof.CompilerCollector' Or
-      '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator' Or
-      '$(MSBuildProjectName)' == 'SharpProof.CompilerArtifact' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Contracts' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Dataflow' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Effects' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Frontend' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Fuzz' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Gates' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Host' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Ir' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Smt' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Specs' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Summaries' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Verify' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Worker' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Worker.Launcher' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Worker.Protocol'">true</SharpProofProductionProject>
+      '$(SharpProofTestProject)' != 'true' And
+      !$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectFullPath)', '[/\\](samples|eng[/\\]pilots)[/\\]')) And
+      !$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectName)', '^SharpProof\.(Testing|Package|Verifier|Smoke\.Net472|CompilerProbe\.TestAsset|PortableAnalyzer)$'))">true</SharpProofProductionProject>
     <SharpProofUsesIrIdentifiers Condition="
       '$(MSBuildProjectName)' == 'SharpProof.Analyzer.Core' Or
       '$(MSBuildProjectName)' == 'SharpProof.CompilerArtifact' Or

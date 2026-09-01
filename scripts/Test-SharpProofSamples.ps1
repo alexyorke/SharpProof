@@ -187,12 +187,18 @@ function Test-SampleProjectInventory {
             'SharpProof.Verifier'
         ),
         [StringComparer]::Ordinal)
+    [xml]$sharedProject = Get-Content -LiteralPath (
+        Join-Path $samplesRoot 'Directory.Build.props') -Raw
+    $sharedReferences = @($sharedProject.SelectNodes('//PackageReference'))
     foreach ($projectFile in $projectFiles) {
         [xml]$project = Get-Content -LiteralPath $projectFile.FullName -Raw
         if ($project.SelectNodes('//ProjectReference').Count -ne 0) {
             throw "Sample project references are forbidden: $($projectFile.FullName)"
         }
         $references = @($project.SelectNodes('//PackageReference'))
+        if ($projectFile.BaseName -cne 'Outcomes') {
+            $references += $sharedReferences
+        }
         if ($references.Count -eq 0) {
             throw "Sample project has no package reference: $($projectFile.FullName)"
         }

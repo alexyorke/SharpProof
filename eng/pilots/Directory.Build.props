@@ -14,8 +14,12 @@
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures>all</SharpProofFeatures>
     <SharpProofVerify>true</SharpProofVerify>
+    <OutputType>Library</OutputType>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="SharpProof"
+                      Version="$(SharpProofPilotVersion)"
+                      PrivateAssets="all" />
     <PackageReference Include="SharpProof.Verifier"
                       Version="$(SharpProofPilotVersion)"
                       PrivateAssets="all" />

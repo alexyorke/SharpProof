@@ -1,11 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>Library</OutputType>
-  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Serilog" Version="4.4.0" />
-    <PackageReference Include="SharpProof"
-                      Version="$(SharpProofPilotVersion)"
-                      PrivateAssets="all" />
   </ItemGroup>
 </Project>

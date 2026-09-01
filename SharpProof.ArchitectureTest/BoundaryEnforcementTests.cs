@@ -10,28 +10,14 @@ namespace SharpProof.ArchitectureTest;
 public sealed class BoundaryEnforcementTests
 {
     private static readonly string[] BannedApiProjects = [
-        "SharpProof.Analyzer",
-        "SharpProof.Analyzer.Core",
-        "SharpProof.Attributes",
-        "SharpProof.BuildTasks",
-        "SharpProof.CompilerArtifact",
-        "SharpProof.CompilerCollector",
-        "SharpProof.ContractForGenerator",
-        "SharpProof.Contracts",
-        "SharpProof.Dataflow",
-        "SharpProof.Effects",
-        "SharpProof.Frontend",
-        "SharpProof.Fuzz",
-        "SharpProof.Gates",
-        "SharpProof.Host",
-        "SharpProof.Ir",
-        "SharpProof.Meta.Analyzers",
-        "SharpProof.Smt",
-        "SharpProof.Specs",
-        "SharpProof.Summaries",
-        "SharpProof.Verify",
-        "SharpProof.Worker",
-        "SharpProof.Worker.Launcher",
+        "SharpProof.Analyzer", "SharpProof.Analyzer.Core", "SharpProof.Attributes",
+        "SharpProof.BuildTasks", "SharpProof.CompilerArtifact",
+        "SharpProof.CompilerCollector", "SharpProof.ContractForGenerator",
+        "SharpProof.Contracts", "SharpProof.Dataflow", "SharpProof.Effects",
+        "SharpProof.Frontend", "SharpProof.Fuzz", "SharpProof.Gates",
+        "SharpProof.Host", "SharpProof.Ir", "SharpProof.Meta.Analyzers",
+        "SharpProof.Smt", "SharpProof.Specs", "SharpProof.Summaries",
+        "SharpProof.Verify", "SharpProof.Worker", "SharpProof.Worker.Launcher",
         "SharpProof.Worker.Protocol"
     ];
 
@@ -62,19 +48,15 @@ public sealed class BoundaryEnforcementTests
         var marker = props
             .Descendants("SharpProofProductionProject")
             .Single();
-        var matches = Regex.Matches(
-            (string?)marker.Attribute("Condition") ?? string.Empty,
-            @"==\s*'([^']+)'");
-        var actual = matches
-            .Select(static match => match.Groups[1].Value)
-            .OrderBy(static value => value, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.That(
-            actual,
-            Is.EqualTo(BannedApiProjects.OrderBy(
-                static value => value,
-                StringComparer.Ordinal)));
+        var condition = (string?)marker.Attribute("Condition") ?? string.Empty;
+        Assert.That(condition,
+            Does.Contain("'$(SharpProofTestProject)' != 'true'")
+                .And.Contain("samples|eng")
+                .And.Contain("Testing|Package|Verifier")
+                .And.Contain("Smoke\\.Net472")
+                .And.Contain("CompilerProbe\\.TestAsset")
+                .And.Contain("PortableAnalyzer"));
+        Assert.That(condition, Does.Not.Contain("== 'SharpProof."));
 
         var scopedGroup = props
             .Descendants("ItemGroup")
