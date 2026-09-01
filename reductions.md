@@ -1505,3 +1505,68 @@ Method: normalized 14-line sliding-window hashing across all 1,058 non-generated
 >
 > **Reflow-only (excluded from all totals):** across the four files there are **553 multi-line `Assert.That` statements totalling 2,198 lines**, most wrapping purely for an ~80-column habit. Only the 78 counted in finding 1 represent substantive structural duplication; the rest is formatting, not redundancy.
 
+---
+
+## Deep pass: Specs + Specs.Test (round 5)
+
+**Estimated savings: ~325 LOC.**
+
+> **Hypothesis tested and rejected:** the API list is **not** duplicated across places. `SharpProof.Specs/DefaultApiSpecCatalog.json` is the single review source, and `DefaultApiSpecCatalog.generated.cs`, `docs/api-spec-catalog.generated.md` and `SharpProof.Specs.Test/ApiSpecRuntimeWitnesses.generated.cs` are all emitted from it by `scripts/Generate-ApiSpecCatalog.ps1` — all three are generated and must not be hand-edited. The runtime-witness *bodies* in `ApiSpecRuntimeOracleTests.cs` are genuinely hand-written oracles and **cannot** be derived from the catalog, which carries no executable edge data.
+
+### 1. Collapse the four `SharpProofPackageSpecsReject*` resolver tests
+- **Files:** `SharpProof.Specs.Test/ApiSpecTests.cs:373-491`
+- **Est. LOC saved:** ~70
+- **Why it's safe:** `…RejectContractWithoutConditionalElision` (`:373-399`), `…RejectVersionMismatch` (`:401-429`), `…RejectPublicKeyMismatch` (`:431-464`) and `…RejectMatchingIdentityAndContractShapeFromAnotherPayload` (`:466-491`) are byte-for-byte identical apart from three scalars fed into `CreateSharpProofPackageReference(CreateContractSource(version, includeConditionalAttributes), publicKey)` and the token passed to `ResolveContractRequires`. All four end in the same `Assert.Multiple` pair (`resolved.Specs` empty; `resolved.Failures.Single().Kind == UnapprovedReferenceFamily`) and the same `finally { Directory.Delete(package.Root, recursive: true); }`.
+- **⚠ Preserve:** the public-key case has two extra assertions (`publicKey Is.Not.Null.And.Not.Empty` at `:433`, `token Is.Not.Empty` at `:445`).
+- **Proposed change:** One `[TestCase]`-driven test parameterized by `(Version assemblyVersion, bool conditional, bool useHostPublicKey)` calling a shared `AssertPackageRejected`; keep the two public-key assertions inside an `if (useHostPublicKey)` branch so nothing is dropped.
+
+### 2. Give `GenerationWorkspace` an output-set record and an argument-list helper
+- **Files:** `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:781-830` (workspace); call sites `:80-95, :136-146, :186-198, :288-300`
+- **Est. LOC saved:** ~55
+- **Why it's safe:** The class exposes seven `internal string X { get; }` members as 4-line blocks (`:781-812`) that are just `First`/`Second` triples of source/documentation/runtime-witness paths, and four tests each repeat the same six-element `"-SourceOutputPath", …, "-RuntimeWitnessOutputPath", …` block verbatim. `RunGeneratorAsync` already takes `params string[]`, so the arguments are pure data with no ordering constraint beyond pairing.
+- **Proposed change:** Introduce `private readonly record struct GeneratorOutputs(string SourcePath, string DocumentationPath, string RuntimeWitnessPath)` with a `string[] Arguments()` method; expose `First`/`Second` on the workspace; replace the four blocks with `[.. workspace.First.Arguments()]`.
+
+### 3. Factor the three identical `Contract.Assume/Ensures/Requires` row witnesses
+- **Files:** `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:405-433, :435-460, :490-516`
+- **Est. LOC saved:** ~41
+- **Why it's safe:** The three factories are structurally identical: same `edgeInputs` literal `"false and true compiler-bound conditions"`, same `SpecEffect.WritesAmbientState` effect mutation, same `SpecAllocationBehavior.MayAllocate` allocation mutation over `[new AllocationEdge(PrepareGhostProbe, <preparedFalse>), new AllocationEdge(PrepareGhostProbe, <preparedTrue>)]`, and same `DoesNotThrowMutation` throws facet over `[ThrowEdge.For(<directFalse>), ThrowEdge.For(<directTrue>)]`. Only the four method-group arguments differ; the `[MethodImpl(NoInlining)]` invoke methods are untouched.
+- **Proposed change:** Add `ContractConditionRow(observe, preparedFalse, preparedTrue, directFalse, directTrue)` beside `ConstructorRow` (`:571-630`); reduce the three factories to one call each.
+
+### 4. Merge the two exact-type-agreement instantiation tests
+- **Files:** `SharpProof.Specs.Test/ApiSpecInstantiationCoverageTests.cs:404-443, :488-525`
+- **Est. LOC saved:** ~36
+- **Why it's safe:** The two differ only in the `IrTypeKind` fed to `CreateTemplate` and in how the two concrete IR types are built (`GetOrCreateReferenceType(CreateIdentity(), name)` vs `GetOrCreateSequenceType(...)`). Both end with the identical two assertions (`compatible.Status Is Succeeded`, `AssertFailure(incompatible, TypeMismatch)`) and the same two-parameter template shape.
+- **Proposed change:** One `[TestCaseSource]` taking `(IrTypeKind kind, Func<IrFactory, IrTypeId> makeA, Func<IrFactory, IrTypeId> makeB)`.
+
+### 5. Merge the two "null keeps the exact substituted operand type" tests
+- **Files:** `SharpProof.Specs.Test/ApiSpecInstantiationCoverageTests.cs:364-402, :445-486`
+- **Est. LOC saved:** ~35
+- **Why it's safe:** Both build the same single-parameter template with a `SpecNullDeclaration(declaredType)` on the left of a binary comparison and assert the same three things (`Succeeded`, `binary.Left.Type == exactType`, `binary.Right.Type == exactType`). Differences are the declared kind (`Sequence` vs `String`/`Reference`), the operator (`Equal` vs `NotEqual`), and how `exactType` is produced.
+- **Proposed change:** Extend the existing `[TestCase(IrTypeKind.String)] [TestCase(IrTypeKind.Reference)]` test with a `Sequence` case plus an `IrBinaryOperator` parameter; derive `exactType` from a small switch; delete the standalone sequence test.
+
+### 6. Fold `GeneratorRejectsMisspelledPostconditionsSibling` into the existing postconditions `[TestCase]`
+- **Files:** `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:210-262` and `:267-309`
+- **Est. LOC saved:** ~35
+- **Why it's safe:** Both parse `CatalogPath()`, `FirstOrDefault` the first declaration with non-empty `postconditions`, mutate that node, write it to `workspace.CatalogInputPath`, run the generator with the same six output arguments, then assert non-zero exit and `Does.Contain(<message>).And.Contain("postconditions"|"postcondition")`. The 12-line "find a declaration with postconditions or throw `InvalidDataException`" block is **byte-identical** in both (`:219-231` and `:271-283`). Only the mutation and the expected message differ.
+- **Proposed change:** A `[TestCaseSource]` of `(Action<JsonObject> mutate, string expectedError, string expectedProperty)` covering all three mutations; the "empty array + sibling" case keeps its own `"contains unexpected property"` expectation so no assertion is lost.
+
+### 7. Replace the six-`if` `Row(...)` facet builder with a filtered array
+- **Files:** `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:531-580`
+- **Est. LOC saved:** ~30
+- **Why it's safe:** `Row` takes six optional `IFacetWitness?` parameters and appends each non-null one in fixed order via six identical five-line `if` blocks. Order is preserved by argument order, and the only consumer of `RowWitness.Facets` order is `WitnessRegistryCoversEveryKnownFacetAndPostcondition`, which compares with `Is.EquivalentTo` (`:68`) — order-insensitive — and `Is.Unique`.
+- **Proposed change:** `ImmutableArray<IFacetWitness> facets = [.. new[] { effects, allocation, throws, nullness, cardinality, termination }.Where(static f => f != null)!];`
+
+### 8. Unify the duplicate `AllocationEdge` and `ThrowEdge` records
+- **Files:** `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:1741-1774`
+- **Est. LOC saved:** ~18
+- **Why it's safe:** The two nested records are textually identical — `sealed record X(Action Prepare, Action Invoke)` with the same two `For(Action)`/`For(Func<bool>)` factories. **Equality is irrelevant:** neither type is compared, hashed, or put in a set anywhere; both are only enumerated by `ObserveAllocation` (`:938`) and `ObserveThrows`/`ObserveTermination` (`:963`, `:1000`). They are never mixed in an overload set, so a single type resolves unambiguously. `ConstructorRow` (`:596-630`) already passes the *same* edge list to both the allocation and throws facets, so the split buys nothing.
+- **Proposed change:** One `private sealed record RuntimeEdge(Action Prepare, Action Invoke)`; mechanical rename at ~30 construction sites.
+
+### 9. Remove dead `GhostProbe.TouchObject`
+- **Files:** `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:1815-1819`
+- **Est. LOC saved:** ~5
+- **Why it's safe:** A targeted repo-wide grep for `TouchObject` (excluding `bin/`, `obj/`, `artifacts/`) returns **only the declaration** — no call site in any `.cs` or `.ps1`. Its sibling `TouchBoolean` is used by the contract edges; `TouchObject` is not.
+- **Proposed change:** Delete the method.
+
+> **⚠ Skipped deliberately:** the four exception-constructor witnesses (`ApiSpecRuntimeOracleTests.cs:245-316`) plus their `Observe*ConstructorEffect` wrappers (`:757-796`) look like ~65 lines of `Exception` vs `InvalidOperationException` duplication, but each edge depends on a *distinct typed static field* (`s_exceptionConstructorReceiver`, `s_invalidOperationExceptionConstructorReceiver`) reached from `[MethodImpl(NoInlining)]` invokers whose IL shape is exactly what `ObserveAllocation` measures via `GC.GetAllocatedBytesForCurrentThread`. Generifying them risks changing the allocation measurement.
+
