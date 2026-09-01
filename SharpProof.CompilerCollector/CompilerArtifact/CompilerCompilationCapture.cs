@@ -210,9 +210,8 @@ internal static class CompilerCompilationCapture
             Sha256 = ComputeTextSha256(text),
             Encoding = text.Encoding?.WebName ?? string.Empty,
             ChecksumAlgorithm = text.ChecksumAlgorithm.ToString(),
-            RoslynChecksum = BitConverter.ToString(text.GetChecksum().ToArray())
-                .Replace("-", string.Empty, StringComparison.Ordinal)
-                .ToLower(System.Globalization.CultureInfo.InvariantCulture),
+            RoslynChecksum = LowerHex(BitConverter.ToString(text.GetChecksum().ToArray())
+                .Replace("-", string.Empty)),
             LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(lineMap),
             TextLength = text.Length,
             LineMap = lineMap,
@@ -227,6 +226,19 @@ internal static class CompilerCompilationCapture
             Features = [.. parse.Features.OrderBy(static value => value.Key, StringComparer.Ordinal)
                 .Select(static value => new CompilerFeatureSnapshot { Key = value.Key, Value = value.Value })]
         };
+
+        static string LowerHex(string value)
+        {
+            var chars = value.ToCharArray();
+            for (var index = 0; index < chars.Length; index++)
+            {
+                if (chars[index] is >= 'A' and <= 'F')
+                {
+                    chars[index] = (char)(chars[index] + ('a' - 'A'));
+                }
+            }
+            return new string(chars);
+        }
     }
 
     private static string MappedPath(
