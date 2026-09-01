@@ -355,13 +355,7 @@ internal sealed class ExceptionHandlerReachability(
                             Add))
                     {
                         Add(
-                            accessor == null || accessor.IsVirtual ||
-                            accessor.IsAbstract
-                                ? UnknownPotential
-                                : GetCallableExceptions(
-                                    accessor,
-                                    activeMethods,
-                                    depth + 1),
+                            ResolveDispatch(accessor, activeMethods, depth),
                             eventAssignment);
                     }
                 }
@@ -556,7 +550,7 @@ internal sealed class ExceptionHandlerReachability(
                     if (operatorInitializationCompletes)
                     {
                         Add(
-                            GetOperatorExceptions(
+                            ResolveDispatch(
                                 incrementOperator,
                                 activeMethods,
                                 depth),
@@ -708,7 +702,7 @@ internal sealed class ExceptionHandlerReachability(
                         if (initializationCompletes)
                         {
                             Add(
-                                GetOperatorExceptions(
+                                ResolveDispatch(
                                     truthOperator,
                                     activeMethods,
                                     depth),
@@ -734,7 +728,7 @@ internal sealed class ExceptionHandlerReachability(
                             Add))
                     {
                         Add(
-                            GetOperatorExceptions(
+                            ResolveDispatch(
                                 binaryOperator,
                                 activeMethods,
                                 depth),
@@ -769,7 +763,7 @@ internal sealed class ExceptionHandlerReachability(
                             Add))
                     {
                         Add(
-                            GetOperatorExceptions(
+                            ResolveDispatch(
                                 operatorMethod,
                                 activeMethods,
                                 depth),
@@ -926,12 +920,7 @@ internal sealed class ExceptionHandlerReachability(
                     IMethodSymbol deconstruct)
                 {
                     Add(
-                        deconstruct.IsVirtual || deconstruct.IsAbstract
-                            ? UnknownPotential
-                            : GetCallableExceptions(
-                                deconstruct,
-                                activeMethods,
-                                depth + 1),
+                        ResolveDispatch(deconstruct, activeMethods, depth),
                         recursivePattern);
                     if (!deconstruct.IsVirtual &&
                         !deconstruct.IsAbstract &&
@@ -955,12 +944,7 @@ internal sealed class ExceptionHandlerReachability(
                                 listPattern,
                                 member)
                             ? EmptyPotential
-                            : member.IsVirtual || member.IsAbstract
-                            ? UnknownPotential
-                            : GetCallableExceptions(
-                                member,
-                                activeMethods,
-                                depth + 1),
+                            : ResolveDispatch(member, activeMethods, depth),
                         listPattern);
                 }
                 PushSequential(listPattern.Patterns);
@@ -1080,12 +1064,10 @@ internal sealed class ExceptionHandlerReachability(
                         if (phaseCompletes)
                         {
                             Add(
-                                getAwaiter.IsVirtual || getAwaiter.IsAbstract
-                                    ? UnknownPotential
-                                    : GetCallableExceptions(
-                                        getAwaiter,
-                                        activeMethods,
-                                        depth + 1),
+                                ResolveDispatch(
+                                    getAwaiter,
+                                    activeMethods,
+                                    depth),
                                 awaitOperation);
                             phaseCompletes =
                                 canMethodCompleteNormally(getAwaiter);
@@ -1115,13 +1097,10 @@ internal sealed class ExceptionHandlerReachability(
                     if (phaseCompletes)
                     {
                         Add(
-                            isCompleted == null || isCompleted.IsVirtual ||
-                            isCompleted.IsAbstract
-                                ? UnknownPotential
-                                : GetCallableExceptions(
-                                    isCompleted,
-                                    activeMethods,
-                                    depth + 1),
+                            ResolveDispatch(
+                                isCompleted,
+                                activeMethods,
+                                depth),
                             awaitOperation);
                         phaseCompletes = isCompleted == null ||
                             canMethodCompleteNormally(isCompleted);
@@ -1132,27 +1111,20 @@ internal sealed class ExceptionHandlerReachability(
                             knownSymbols.FindAwaitContinuationMethod(
                                 getAwaiter.ReturnType);
                         Add(
-                            continuation == null ||
-                            continuation.IsVirtual ||
-                            continuation.IsAbstract
-                                ? UnknownPotential
-                                : GetCallableExceptions(
-                                    continuation,
-                                    activeMethods,
-                                    depth + 1),
+                            ResolveDispatch(
+                                continuation,
+                                activeMethods,
+                                depth),
                             awaitOperation);
                     }
                     var getResult = info.GetResultMethod;
                     if (phaseCompletes)
                     {
                         Add(
-                            getResult == null || getResult.IsVirtual ||
-                            getResult.IsAbstract
-                                ? UnknownPotential
-                                : GetCallableExceptions(
-                                    getResult,
-                                    activeMethods,
-                                    depth + 1),
+                            ResolveDispatch(
+                                getResult,
+                                activeMethods,
+                                depth),
                             awaitOperation);
                     }
                 }
@@ -2073,12 +2045,7 @@ internal sealed class ExceptionHandlerReachability(
     {
         var setter = property.Property.SetMethod;
         add(
-            setter == null || setter.IsAbstract || setter.IsVirtual
-                ? UnknownPotential
-                : GetCallableExceptions(
-                    setter,
-                    activeMethods,
-                    depth + 1),
+            ResolveDispatch(setter, activeMethods, depth),
             origin);
     }
 
@@ -2921,16 +2888,16 @@ internal sealed class ExceptionHandlerReachability(
             return false;
         }
 
-        add(GetOperatorExceptions(method, activeMethods, depth), origin);
+        add(ResolveDispatch(method, activeMethods, depth), origin);
         return canMethodCompleteNormally(method);
     }
 
-    private PotentialExceptions GetOperatorExceptions(
-        IMethodSymbol method,
+    private PotentialExceptions ResolveDispatch(
+        IMethodSymbol? method,
         HashSet<IMethodSymbol> activeMethods,
         int depth)
     {
-        return method.IsAbstract || method.IsVirtual
+        return method == null || method.IsAbstract || method.IsVirtual
             ? UnknownPotential
             : GetCallableExceptions(method, activeMethods, depth + 1);
     }
