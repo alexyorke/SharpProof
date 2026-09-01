@@ -222,6 +222,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         var creation = (IObjectCreationOperation)context.Operation;
         var containingType = context.ContainingSymbol.ContainingType;
         if (IsSameType(creation.Type, symbols[KnownType.DiagnosticDescriptor]) &&
+            !creation.Syntax.SyntaxTree.FilePath.EndsWith(".generated.cs", StringComparison.OrdinalIgnoreCase) &&
             !IsAnyType(
                 containingType,
                 symbols,
