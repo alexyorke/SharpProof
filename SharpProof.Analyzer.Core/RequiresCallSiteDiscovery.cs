@@ -1658,14 +1658,19 @@ internal sealed partial class RequiresCallSiteDiscovery(
             yield break;
         }
 
+        IEnumerable<IOperation> Descend(IOperation child)
+        {
+            return ExecutableUnflowedDescendantsAndSelfCore(
+                child,
+                operationFacts);
+        }
+
         if (operationFacts != null && operation is IInvocationOperation invocation)
         {
             if (invocation.Instance is { } instance)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             instance,
-                             operationFacts))
+                         Descend(instance))
                 {
                     yield return descendant;
                 }
@@ -1677,9 +1682,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             foreach (var argument in invocation.Arguments)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             argument.Value,
-                             operationFacts))
+                         Descend(argument.Value))
                 {
                     yield return descendant;
                 }
@@ -1698,9 +1701,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             foreach (var argument in creation.Arguments)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             argument.Value,
-                             operationFacts))
+                         Descend(argument.Value))
                 {
                     yield return descendant;
                 }
@@ -1718,9 +1719,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             if (creation.Initializer != null)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             creation.Initializer,
-                             operationFacts))
+                         Descend(creation.Initializer))
                 {
                     yield return descendant;
                 }
@@ -1735,9 +1734,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             foreach (var item in initializer.Initializers)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             item,
-                             operationFacts))
+                         Descend(item))
                 {
                     yield return descendant;
                 }
@@ -1759,9 +1756,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             if (property.Instance is { } propertyInstance)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             propertyInstance,
-                             operationFacts))
+                         Descend(propertyInstance))
                 {
                     yield return descendant;
                 }
@@ -1773,9 +1768,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             foreach (var argument in property.Arguments)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             argument.Value,
-                             operationFacts))
+                         Descend(argument.Value))
                 {
                     yield return descendant;
                 }
@@ -1785,9 +1778,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 }
             }
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         assignment.Value,
-                         operationFacts))
+                     Descend(assignment.Value))
             {
                 yield return descendant;
             }
@@ -1804,9 +1795,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             if (propertyReference.Instance is { } propertyInstance)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             propertyInstance,
-                             operationFacts))
+                         Descend(propertyInstance))
                 {
                     yield return descendant;
                 }
@@ -1818,9 +1807,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             foreach (var argument in propertyReference.Arguments)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             argument.Value,
-                             operationFacts))
+                         Descend(argument.Value))
                 {
                     yield return descendant;
                 }
@@ -1838,9 +1825,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         {
             yield return factConditional;
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         factConditional.Condition,
-                         operationFacts))
+                     Descend(factConditional.Condition))
             {
                 yield return descendant;
             }
@@ -1858,9 +1843,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 if (branch != null)
                 {
                     foreach (var descendant in
-                             ExecutableUnflowedDescendantsAndSelfCore(
-                                 branch,
-                                 operationFacts))
+                             Descend(branch))
                     {
                         yield return descendant;
                     }
@@ -1878,9 +1861,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     continue;
                 }
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             branch,
-                             operationFacts))
+                         Descend(branch))
                 {
                     yield return descendant;
                 }
@@ -1896,9 +1877,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         {
             yield return factBinary;
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         factBinary.LeftOperand,
-                         operationFacts))
+                     Descend(factBinary.LeftOperand))
             {
                 yield return descendant;
             }
@@ -1913,9 +1892,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             if (!skipRight)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             factBinary.RightOperand,
-                             operationFacts))
+                         Descend(factBinary.RightOperand))
                 {
                     yield return descendant;
                 }
@@ -1927,9 +1904,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         {
             yield return factCoalesce;
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         factCoalesce.Value,
-                         operationFacts))
+                     Descend(factCoalesce.Value))
             {
                 yield return descendant;
             }
@@ -1941,9 +1916,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 factCoalesce.Value.ConstantValue.Value == null)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             factCoalesce.WhenNull,
-                             operationFacts))
+                         Descend(factCoalesce.WhenNull))
                 {
                     yield return descendant;
                 }
@@ -1956,9 +1929,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         {
             yield return factAccess;
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         factAccess.Operation,
-                         operationFacts))
+                     Descend(factAccess.Operation))
             {
                 yield return descendant;
             }
@@ -1969,9 +1940,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 yield break;
             }
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         factAccess.WhenNotNull,
-                         operationFacts))
+                     Descend(factAccess.WhenNotNull))
             {
                 yield return descendant;
             }
@@ -1985,9 +1954,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             { HasValue: true, Value: bool condition })
         {
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         conditional.Condition,
-                         operationFacts))
+                     Descend(conditional.Condition))
             {
                 yield return descendant;
             }
@@ -1997,9 +1964,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             if (branch != null)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             branch,
-                             operationFacts))
+                         Descend(branch))
                 {
                     yield return descendant;
                 }
@@ -2015,9 +1980,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             { HasValue: true, Value: bool left })
         {
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         binary.LeftOperand,
-                         operationFacts))
+                     Descend(binary.LeftOperand))
             {
                 yield return descendant;
             }
@@ -2025,9 +1988,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     BinaryOperatorKind.ConditionalOr))
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             binary.RightOperand,
-                             operationFacts))
+                         Descend(binary.RightOperand))
                 {
                     yield return descendant;
                 }
@@ -2039,18 +2000,14 @@ internal sealed partial class RequiresCallSiteDiscovery(
             coalesce.Value.ConstantValue.HasValue)
         {
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         coalesce.Value,
-                         operationFacts))
+                     Descend(coalesce.Value))
             {
                 yield return descendant;
             }
             if (coalesce.Value.ConstantValue.Value == null)
             {
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             coalesce.WhenNull,
-                             operationFacts))
+                         Descend(coalesce.WhenNull))
                 {
                     yield return descendant;
                 }
@@ -2063,9 +2020,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             { HasValue: true, Value: null })
         {
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         access.Operation,
-                         operationFacts))
+                     Descend(access.Operation))
             {
                 yield return descendant;
             }
@@ -2076,9 +2031,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
             switchExpression.Value.ConstantValue.HasValue)
         {
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         switchExpression.Value,
-                         operationFacts))
+                     Descend(switchExpression.Value))
             {
                 yield return descendant;
             }
@@ -2105,9 +2058,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 if (arm.Guard != null)
                 {
                     foreach (var descendant in
-                             ExecutableUnflowedDescendantsAndSelfCore(
-                                 arm.Guard,
-                                 operationFacts))
+                             Descend(arm.Guard))
                     {
                         yield return descendant;
                     }
@@ -2127,9 +2078,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     }
                 }
                 foreach (var descendant in
-                         ExecutableUnflowedDescendantsAndSelfCore(
-                             arm.Value,
-                             operationFacts))
+                         Descend(arm.Value))
                 {
                     yield return descendant;
                 }
@@ -2146,9 +2095,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
         foreach (var child in operation.ChildOperations)
         {
             foreach (var descendant in
-                     ExecutableUnflowedDescendantsAndSelfCore(
-                         child,
-                         operationFacts))
+                     Descend(child))
             {
                 yield return descendant;
             }
