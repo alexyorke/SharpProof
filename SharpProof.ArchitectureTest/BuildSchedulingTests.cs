@@ -557,6 +557,10 @@ public sealed class BuildSchedulingTests
     public void WorkerTestsRestoreOnlyTheWorkerProjectClosure()
     {
         var root = FindRepositoryRoot();
+        var workerProject = File.ReadAllText(Path.Combine(
+            root,
+            "SharpProof.Worker.Test",
+            "SharpProof.Worker.Test.csproj"));
         var container = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -578,6 +582,8 @@ public sealed class BuildSchedulingTests
                 block.Groups["body"].Value,
                 @"'restore',\s*\$workerTestProject"),
             Is.True);
+        Assert.That(workerProject,
+            Does.Contain("<RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation>"));
     }
 
     [Test]
