@@ -216,14 +216,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     {
                         continue;
                     }
-                    var candidate = new RequiresCallSiteCandidate(
+                    var candidate = CreateCandidate(
                         operation,
-                        operation.Syntax,
-                        call.TargetMethod,
-                        call.Instance,
-                        call.Arguments,
-                        call.ExplicitArguments,
-                        call.ImplicitIntegerArguments,
+                        call,
                         call.CanReplay && HasReplayableCallEvaluation(
                             operation,
                             call,
@@ -232,25 +227,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
                             flowAnalysis.IsComplete),
                         hasFlowState ? flowResult : null,
                         flowAnalysis.Status);
-                    var existingIndex = operation is IListPatternOperation
-                        ? -1
-                        : callSites.FindIndex(existing =>
-                            existing.Syntax.SyntaxTree ==
-                                operation.Syntax.SyntaxTree &&
-                            existing.Syntax.Span ==
-                                operation.Syntax.Span &&
-                            SymbolEqualityComparer.Default.Equals(
-                                existing.TargetMethod,
-                                candidate.TargetMethod));
-                    if (existingIndex < 0)
-                    {
-                        callSites.Add(candidate);
-                    }
-                    else if (!callSites[existingIndex].CanReplay &&
-                             candidate.CanReplay)
-                    {
-                        callSites[existingIndex] = candidate;
-                    }
+                    AddOrUpgrade(
+                        callSites,
+                        candidate,
+                        skipDeduplication: operation is IListPatternOperation);
                 }
             }
         }
@@ -276,27 +256,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
             foreach (var call in GetPropertyCalls(property).Where(static call =>
                          call.TargetMethod.MethodKind == MethodKind.PropertySet))
             {
-                if (callSites.Any(existing =>
-                        existing.Syntax.SyntaxTree ==
-                            property.Syntax.SyntaxTree &&
-                        existing.Syntax.Span == property.Syntax.Span &&
-                        SymbolEqualityComparer.Default.Equals(
-                            existing.TargetMethod,
-                            call.TargetMethod)))
-                {
-                    continue;
-                }
-
-                callSites.Add(new RequiresCallSiteCandidate(
+                AddOrUpgrade(callSites, CreateCandidate(
                     property,
-                    property.Syntax,
-                    call.TargetMethod,
-                    call.Instance,
-                    call.Arguments,
-                    call.ExplicitArguments,
-                    call.ImplicitIntegerArguments,
-                    CanReplay: false,
-                    Flow: null,
+                    call,
+                    canReplay: false,
+                    flow: null,
                     ManagedFlowStatus.BudgetExceeded));
             }
         }
@@ -325,14 +289,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                          flowResult,
                          cancellationToken))
             {
-                var candidate = new RequiresCallSiteCandidate(
+                var candidate = CreateCandidate(
                     operation,
-                    operation.Syntax,
-                    call.TargetMethod,
-                    call.Instance,
-                    call.Arguments,
-                    call.ExplicitArguments,
-                    call.ImplicitIntegerArguments,
+                    call,
                     call.CanReplay && HasReplayableCallEvaluation(
                         operation,
                         call,
@@ -340,27 +299,12 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         hasFlowState: false,
                         flowAnalysisIsComplete:
                             flowAnalysis.IsComplete),
-                    Flow: null,
+                    flow: null,
                     flowAnalysis.Status);
-                var existingIndex = callSites.FindIndex(existing =>
-                        existing.Syntax.SyntaxTree ==
-                            operation.Syntax.SyntaxTree &&
-                        (existing.Syntax.Span == operation.Syntax.Span ||
-                         existing.Operation?.IsImplicit == true &&
-                         operation.Syntax.Span.Contains(
-                             existing.Syntax.Span)) &&
-                        SymbolEqualityComparer.Default.Equals(
-                            existing.TargetMethod,
-                            call.TargetMethod));
-                if (existingIndex < 0)
-                {
-                    callSites.Add(candidate);
-                }
-                else if (!callSites[existingIndex].CanReplay &&
-                         candidate.CanReplay)
-                {
-                    callSites[existingIndex] = candidate;
-                }
+                AddOrUpgrade(
+                    callSites,
+                    candidate,
+                    allowImplicitContainment: true);
             }
         }
 
@@ -368,6 +312,53 @@ internal sealed partial class RequiresCallSiteDiscovery(
             .. callSites.OrderBy(
                 static candidate => candidate.Syntax.SpanStart)
         ];
+    }
+
+    private static RequiresCallSiteCandidate CreateCandidate(
+        IOperation operation,
+        RequiresCallTarget call,
+        bool canReplay,
+        ManagedFlowResult? flow,
+        ManagedFlowStatus flowStatus)
+    {
+        return new RequiresCallSiteCandidate(
+            operation,
+            operation.Syntax,
+            call.TargetMethod,
+            call.Instance,
+            call.Arguments,
+            call.ExplicitArguments,
+            call.ImplicitIntegerArguments,
+            canReplay,
+            flow,
+            flowStatus);
+    }
+
+    private static void AddOrUpgrade(
+        List<RequiresCallSiteCandidate> callSites,
+        RequiresCallSiteCandidate candidate,
+        bool allowImplicitContainment = false,
+        bool skipDeduplication = false)
+    {
+        var existingIndex = skipDeduplication
+            ? -1
+            : callSites.FindIndex(existing =>
+                existing.Syntax.SyntaxTree == candidate.Syntax.SyntaxTree &&
+                (existing.Syntax.Span == candidate.Syntax.Span ||
+                 allowImplicitContainment &&
+                 existing.Operation?.IsImplicit == true &&
+                 candidate.Syntax.Span.Contains(existing.Syntax.Span)) &&
+                SymbolEqualityComparer.Default.Equals(
+                    existing.TargetMethod,
+                    candidate.TargetMethod));
+        if (existingIndex < 0)
+        {
+            callSites.Add(candidate);
+        }
+        else if (!callSites[existingIndex].CanReplay && candidate.CanReplay)
+        {
+            callSites[existingIndex] = candidate;
+        }
     }
 
     private HashSet<(SyntaxTree Tree, int Start, int Length)>?
