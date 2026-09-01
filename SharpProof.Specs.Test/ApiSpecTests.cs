@@ -813,12 +813,12 @@ public sealed class ApiSpecTests
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
                 constructor.Parameters is [
+                {
+                    Type: INamedTypeSymbol
                     {
-                        Type: INamedTypeSymbol
-                        {
-                            MetadataName: "IEnumerable`1"
-                        }
-                    }]);
+                        MetadataName: "IEnumerable`1"
+                    }
+                }]);
 
         using (Assert.EnterMultipleScope())
         {
