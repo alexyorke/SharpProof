@@ -722,62 +722,22 @@ public static class IrRelationalSummaryBuilder
 
         private ImmutableArray<IrBlockId> CreateOrder()
         {
-            var active = new HashSet<IrBlockId>();
-            var complete = new HashSet<IrBlockId>();
-            var pending = new Stack<(IrBlockId Block, bool Exit)>();
-            var result = new List<IrBlockId>();
-            pending.Push((_program.Entry, false));
-            while (pending.Count != 0)
+            var result = IrBlockOrder.TryCreateAcyclicOrder(
+                _program, Spend, out var failure);
+            if (result.IsDefault)
             {
-                if (!Spend())
+                _reason = failure switch
                 {
-                    return default;
-                }
-
-                var frame = pending.Pop();
-                if (frame.Exit)
-                {
-                    active.Remove(frame.Block);
-                    if (complete.Add(frame.Block))
-                    {
-                        result.Add(frame.Block);
-                    }
-
-                    continue;
-                }
-
-                if (complete.Contains(frame.Block))
-                {
-                    continue;
-                }
-
-                if (!active.Add(frame.Block))
-                {
-                    _reason = IrSummaryAbstentionReason.CyclicControlFlow;
-                    return default;
-                }
-
-                pending.Push((frame.Block, true));
-                switch (_program.GetBlock(frame.Block).Terminator)
-                {
-                    case IrBranchInstruction branch:
-                        pending.Push((branch.WhenFalse, false));
-                        pending.Push((branch.WhenTrue, false));
-                        break;
-                    case IrGotoInstruction go:
-                        pending.Push((go.Target, false));
-                        break;
-                    case IrReturnInstruction:
-                        break;
-                    default:
-                        _reason =
-                            IrSummaryAbstentionReason.UnsupportedInstruction;
-                        return default;
-                }
+                    IrAcyclicOrderFailure.ResourceLimit =>
+                        IrSummaryAbstentionReason.ResourceLimit,
+                    IrAcyclicOrderFailure.CyclicControlFlow =>
+                        IrSummaryAbstentionReason.CyclicControlFlow,
+                    IrAcyclicOrderFailure.UnsupportedInstruction =>
+                        IrSummaryAbstentionReason.UnsupportedInstruction,
+                    _ => IrSummaryAbstentionReason.UnsupportedBody
+                };
             }
-
-            result.Reverse();
-            return [.. result];
+            return result;
         }
 
         private IrTerm? Substitute(
