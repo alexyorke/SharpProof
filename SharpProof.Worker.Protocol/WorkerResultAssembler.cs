@@ -151,7 +151,8 @@ internal static class WorkerResultAssembler
                     : claimReasons.Contains(WorkerClaimReason.CounterexampleReplayFailed)
                         ? WorkerRunFailureReason.CounterexampleReplayFailed
                         : WorkerRunFailureReason.None;
-        var failure = claimFailure == WorkerRunFailureReason.BackendUnavailable
+        var failure = claimFailure is WorkerRunFailureReason.BackendUnavailable or
+                WorkerRunFailureReason.MalformedResult
             ? claimFailure
             : callableFailure != WorkerRunFailureReason.None
                 ? callableFailure
@@ -248,7 +249,12 @@ internal static class WorkerResultAssembler
                     reason == WorkerClaimReason.UnsupportedContract)
                     ? WorkerCallableCoverageReason.UnsupportedContract
                     : reasons.Any(static reason =>
-                        reason == WorkerClaimReason.MethodTimeout)
+                        reason is WorkerClaimReason.InfrastructureFailure or
+                            WorkerClaimReason.BackendUnavailable or
+                            WorkerClaimReason.MalformedBackendResult)
+                        ? WorkerCallableCoverageReason.InfrastructureFailure
+                        : reasons.Any(static reason =>
+                            reason == WorkerClaimReason.MethodTimeout)
                         ? WorkerCallableCoverageReason.MethodTimeout
                         : reasons.Any(static reason =>
                             reason == WorkerClaimReason.ProjectTimeout)
@@ -272,7 +278,14 @@ internal static class WorkerResultAssembler
                     WorkerClaimReason.BackendUnavailable) &&
             callable.Coverage == WorkerCallableCoverage.Incomplete &&
             callable.Reason == WorkerCallableCoverageReason.InfrastructureFailure;
-        return matchesExpected || directInfrastructureFailure;
+        var compatibleSemanticFallback =
+            expected is WorkerCallableCoverageReason.UnsupportedCallable or
+                WorkerCallableCoverageReason.UnsupportedContract or
+                WorkerCallableCoverageReason.InfrastructureFailure &&
+            callable.Coverage == WorkerCallableCoverage.Incomplete &&
+            callable.Reason == WorkerCallableCoverageReason.SemanticUnknown;
+        return matchesExpected || directInfrastructureFailure ||
+            compatibleSemanticFallback;
     }
 
     private static (WorkerRunStatus Status, WorkerRunFailureReason Failure)?

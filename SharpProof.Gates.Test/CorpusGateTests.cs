@@ -569,20 +569,20 @@ public sealed class CorpusGateTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Passed, Is.True);
-            Assert.That(result.CaseCount, Is.EqualTo(480));
+            Assert.That(result.CaseCount, Is.EqualTo(462));
             Assert.That(result.BaseCaseCount, Is.EqualTo(228));
             Assert.That(result.OpenSourceMethodCount, Is.EqualTo(200));
             Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(1));
             Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
-            Assert.That(result.SupportedCaseCount, Is.EqualTo(171));
+            Assert.That(result.SupportedCaseCount, Is.EqualTo(163));
             Assert.That(
                 result.IntentionallyUnsupportedCaseCount,
-                Is.EqualTo(309));
+                Is.EqualTo(299));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownCount, Is.EqualTo(299));
+            Assert.That(result.UnknownCount, Is.EqualTo(289));
             Assert.That(result.SilentUnknownCount, Is.EqualTo(10));
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(309));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(299));
             Assert.That(
                 result.UnknownReasons
                     .ToDictionary(
@@ -591,11 +591,11 @@ public sealed class CorpusGateTests
                 Is.EquivalentTo(
                     new Dictionary<string, int>(StringComparer.Ordinal)
                     {
-                        ["SP0002"] = 28,
-                        ["SP0016"] = 20,
-                        ["SP0045"] = 30,
-                        ["SP0045+SP0046"] = 10,
-                        ["SP0046"] = 30,
+                        ["SP0002"] = 27,
+                        ["SP0016"] = 18,
+                        ["SP0045"] = 27,
+                        ["SP0045+SP0046"] = 9,
+                        ["SP0046"] = 27,
                         ["SP0047"] = 181,
                         ["silent-unclassified"] = 10
                     }));

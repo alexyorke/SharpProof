@@ -628,7 +628,7 @@ public sealed class EffectCounterexampleReplayTests
                 new CompilerSourceLineMapEntry
                 {
                     SourceStart = 0,
-                    SourceLength = 0,
+                    SourceLength = 9,
                     MappedPath = "MappedSubject.cs",
                     MappedLine = 0,
                     MappedColumn = 0
@@ -636,7 +636,7 @@ public sealed class EffectCounterexampleReplayTests
                 new CompilerSourceLineMapEntry
                 {
                     SourceStart = 10,
-                    SourceLength = 12,
+                    SourceLength = 90,
                     MappedPath = "MappedSubject.cs",
                     MappedLine = 6,
                     MappedColumn = 4

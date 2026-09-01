@@ -13,7 +13,7 @@ internal sealed class ContractApiIdentityResolver
     private const string AttributesAssemblyName =
         ContractApiMetadata.AttributesNamespace;
     private const string AttributesAssemblyMvidMetadataKey =
-        "SharpProof.Attributes.MVID";
+        ContractApiMetadata.AttributesAssemblyMvidMetadataKey;
     private static readonly ImmutableArray<byte>
         AttributesAssemblyPayloadSha256 =
             ReadExpectedPayloadSha256();

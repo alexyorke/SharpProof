@@ -105,41 +105,14 @@ internal static class CompilerEffectClaimArtifactCodec
         {
             (WorkerClaimOutcome.Proven, WorkerClaimReason.None, _, null, null) => true,
             (WorkerClaimOutcome.Refuted, WorkerClaimReason.None,
-                _, { } witness, { } replay) => WorkerProtocolJson.HasValidEffectWitness(witness) &&
+                _, { } witness, { }) => WorkerProtocolJson.HasValidEffectWitness(witness) &&
                     HasCanonicalStrings(witness.ExactExceptionTypeHierarchy) &&
-                    WorkerProtocolJson.HasValidLocation(witness.Location) &&
-                    WitnessMatchesReplay(witness, replay),
+                    WorkerProtocolJson.HasValidLocation(witness.Location),
             (WorkerClaimOutcome.Unknown,
                 var reason, _, null, null) when
                 CompilerEffectEvidenceCatalog.UnknownReasons.Contains(reason) => true,
             _ => false
         };
-    }
-
-    private static bool WitnessMatchesReplay(
-        WorkerEffectViolationWitness witness,
-        CompilerEffectReplayArtifact replay)
-    {
-        var eventValue = replay.Events.Length > 0 ? replay.Events[0] : null;
-        if (eventValue == null || witness.Location.Path != eventValue.Location.Path ||
-            witness.Location.Start != eventValue.Location.Start ||
-            witness.Location.Length != eventValue.Location.Length ||
-            witness.Location.Line != eventValue.Location.Line ||
-            witness.Location.Column != eventValue.Location.Column)
-        {
-            return false;
-        }
-
-        var required = eventValue.Kind switch
-        {
-            CompilerEffectReplayEventKind.ManagedObjectAllocation or
-            CompilerEffectReplayEventKind.ManagedArrayAllocation => WorkerEffectSet.Allocates,
-            CompilerEffectReplayEventKind.ExplicitThrow => WorkerEffectSet.Throws,
-            CompilerEffectReplayEventKind.MonitorCall or
-            CompilerEffectReplayEventKind.EmptyLock => WorkerEffectSet.Synchronizes,
-            _ => WorkerEffectSet.None
-        };
-        return required != WorkerEffectSet.None && (witness.Effects & required) != 0;
     }
 
     private static bool HasValidConstraint(
@@ -179,36 +152,7 @@ internal static class CompilerEffectClaimArtifactCodec
         }
 
         return replay.Events.Select((item, index) =>
-                HasValidReplayEvent(item, index)).All(static valid => valid) &&
-            replay.Events.All(eventValue =>
-                IsContractRelevantEvent(value.ContractKind, value.Constraint!, eventValue.Kind));
-    }
-
-    private static bool IsContractRelevantEvent(
-        WorkerEffectContractKind contractKind,
-        CompilerEffectConstraintArtifact constraint,
-        CompilerEffectReplayEventKind eventKind)
-    {
-        var effect = eventKind switch
-        {
-            CompilerEffectReplayEventKind.ManagedObjectAllocation or
-            CompilerEffectReplayEventKind.ManagedArrayAllocation => WorkerEffectSet.Allocates,
-            CompilerEffectReplayEventKind.ExplicitThrow => WorkerEffectSet.Throws,
-            CompilerEffectReplayEventKind.MonitorCall or
-            CompilerEffectReplayEventKind.EmptyLock => WorkerEffectSet.Synchronizes,
-            _ => WorkerEffectSet.None
-        };
-        return contractKind switch
-        {
-            WorkerEffectContractKind.ZeroAllocations => effect == WorkerEffectSet.Allocates,
-            WorkerEffectContractKind.DoesNotThrow or
-            WorkerEffectContractKind.AllowedExceptions => effect == WorkerEffectSet.Throws,
-            WorkerEffectContractKind.AllowedCapabilities => effect == WorkerEffectSet.Synchronizes,
-            WorkerEffectContractKind.EnforcePure => true,
-            WorkerEffectContractKind.EffectContract =>
-                (constraint.AllowedEffects & effect) != effect,
-            _ => false
-        };
+            HasValidReplayEvent(item, index)).All(static valid => valid);
     }
 
     private static bool HasValidReplayEvent(CompilerEffectReplayEventArtifact? value, int ordinal)

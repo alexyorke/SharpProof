@@ -62,11 +62,6 @@ internal static class CompilerSourceLocationAuthority
                 return false;
             }
 
-            // SourceLength is the physical line span, not an arbitrary bound.
-            // Without retaining source text, the only canonical relationship
-            // available is the line-start gap: a non-final line must account
-            // for exactly one LF or one CRLF terminator, while the final line
-            // must end at the captured text length.
             var nextStart = entryIndex + 1 < entries.Length
                 ? entries[entryIndex + 1]?.SourceStart ?? -1
                 : tree.TextLength;

@@ -151,7 +151,11 @@ public sealed class FuzzRunnerTests
         var parallel = await FuzzRunner.RunAsync(
             new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 4));
 
-        Assert.That(serial.Passed, Is.True);
+        Assert.That(
+            serial.Passed,
+            Is.True,
+            string.Join(Environment.NewLine, serial.Failures.Select(
+                static failure => failure.ToString())));
         Assert.That(parallel.Passed, Is.True);
         Assert.That(parallel.Agreements, Is.EqualTo(serial.Agreements));
         Assert.That(parallel.Abstentions, Is.EqualTo(serial.Abstentions));
@@ -349,7 +353,9 @@ public sealed class FuzzRunnerTests
 
         Assert.That(
             results.Select(static result => result.Status),
-            Is.All.EqualTo(FuzzOracleStatus.Agreement));
+            Is.All.EqualTo(FuzzOracleStatus.Agreement),
+            string.Join(Environment.NewLine, results.Select(
+                static result => result.Detail)));
         Assert.That(
             results[0].ExceptionKind,
             Is.EqualTo(IrExceptionKind.NullReference));

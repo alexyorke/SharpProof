@@ -1996,9 +1996,10 @@ public sealed class ProtocolJsonTests
 
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
             WorkerExecutionEnvelope.MaximumElapsedMilliseconds(request, 0)));
-        Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
+        Assert.That(
             WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
-                request, WorkerExecutionEnvelope.CleanupReserveMilliseconds)));
+                request, WorkerExecutionEnvelope.CleanupReserveMilliseconds),
+            Is.EqualTo((long)int.MaxValue + 1));
         Assert.That(
             WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
                 request, WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds),

@@ -37,13 +37,7 @@ internal static class CallableVerificationPolicy
                         methodBoundary.Token)))
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
-            var reason = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown)
-                ? records.Any(static record =>
-                    record.Reason is WorkerClaimReason.InfrastructureFailure or
-                        WorkerClaimReason.MalformedBackendResult)
-                    ? WorkerCallableCoverageReason.InfrastructureFailure
-                    : WorkerCallableCoverageReason.SemanticUnknown
-                : WorkerCallableCoverageReason.None;
+            var reason = ProjectCallableReason(records);
             return Result(target, reason, records);
         }
         catch (OperationCanceledException)
@@ -110,12 +104,34 @@ internal static class CallableVerificationPolicy
                     target,
                     index,
                     target.FailureReason)).ToImmutableArray();
-        var reason = claims.Length > 0 &&
-            claims.All(static claim =>
-                claim.Outcome != WorkerClaimOutcome.Unknown)
-                    ? WorkerCallableCoverageReason.None
-                    : WorkerCallableCoverageReason.SemanticUnknown;
+        var reason = claims.Length == 0
+            ? WorkerCallableCoverageReason.SemanticUnknown
+            : ProjectCallableReason(claims);
         return Result(target, reason, claims);
+    }
+
+    private static WorkerCallableCoverageReason ProjectCallableReason(
+        ImmutableArray<WorkerClaimResult> claims)
+    {
+        var unknownReasons = claims
+            .Where(static claim =>
+                claim.Outcome == WorkerClaimOutcome.Unknown)
+            .Select(static claim => claim.Reason)
+            .ToArray();
+        return unknownReasons.Length == 0
+            ? WorkerCallableCoverageReason.None
+            : unknownReasons.All(static value =>
+                value == WorkerClaimReason.UnsupportedCallable)
+                ? WorkerCallableCoverageReason.UnsupportedCallable
+                : unknownReasons.All(static value =>
+                    value == WorkerClaimReason.UnsupportedContract)
+                    ? WorkerCallableCoverageReason.UnsupportedContract
+                    : unknownReasons.Any(static value => value is
+                        WorkerClaimReason.InfrastructureFailure or
+                        WorkerClaimReason.BackendUnavailable or
+                        WorkerClaimReason.MalformedBackendResult)
+                        ? WorkerCallableCoverageReason.InfrastructureFailure
+                        : WorkerCallableCoverageReason.SemanticUnknown;
     }
 
     private static CallableVerificationResult Result(

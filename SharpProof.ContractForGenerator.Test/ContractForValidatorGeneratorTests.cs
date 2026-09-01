@@ -2072,7 +2072,9 @@ public sealed class ContractForValidatorGeneratorTests
     {
         Assert.That(
             run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo([diagnosticId]));
+            Is.EqualTo([diagnosticId]),
+            string.Join(Environment.NewLine, run.Diagnostics.Select(
+                static diagnostic => diagnostic.ToString())));
         return run.Diagnostics[0];
     }
 

@@ -1783,7 +1783,9 @@ public sealed class NestedRequiresCallSiteTests
             diagnostics.Select(static diagnostic =>
                 diagnostic.Id),
             Is.EqualTo(
-                Enumerable.Repeat("SP0027", count)));
+                Enumerable.Repeat("SP0027", count)),
+            string.Join(", ", diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start)));
     }
 
     private sealed class RecordingSessionFactory :

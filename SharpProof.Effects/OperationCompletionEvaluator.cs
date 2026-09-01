@@ -1337,6 +1337,16 @@ internal sealed class OperationCompletionEvaluator
                     return false;
                 }
 
+                if (truthOperator != null &&
+                    ConditionalTruthOperatorFacts.ReturnsConstant(
+                        _compilation,
+                        truthOperator,
+                        out var truthResult) &&
+                    truthResult)
+                {
+                    return true;
+                }
+
                 // A refined truth value only determines whether the right
                 // operand is skipped. When it is evaluated, both the right
                 // operand and the user-defined conditional operator are

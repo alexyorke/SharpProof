@@ -1215,6 +1215,13 @@ internal sealed class ManagedAbstractFlow
         {
             return false;
         }
+        if (statement is LocalFunctionStatementSyntax ||
+            operation.Syntax.Ancestors().TakeWhile(candidate =>
+                candidate != statement).Any(static candidate =>
+                    candidate is AnonymousFunctionExpressionSyntax))
+        {
+            return false;
+        }
 
         var model = SharpProof.Frontend.Host.CompilationModelProvider
             .GetSemanticModel(_compilation, block.SyntaxTree);
@@ -2111,6 +2118,11 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         {
             return true;
         }
+        if (!isImplicitConstructor &&
+            HasUnconditionalSelfInvocation(normalized))
+        {
+            return false;
+        }
         if (!_activeMethods.Add(normalized))
         {
             // This is a may-complete query. Recursive re-entry is uncertainty,
@@ -2155,6 +2167,46 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         finally
         {
             _activeMethods.Remove(normalized);
+        }
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1508:Avoid dead conditional code",
+        Justification = "The analyzer does not track the nullable expression " +
+            "selected from the declaration syntax.")]
+    private bool HasUnconditionalSelfInvocation(IMethodSymbol method)
+    {
+        try
+        {
+            var declaration = method.DeclaringSyntaxReferences[0]
+                .GetSyntax(cancellationToken);
+            ExpressionSyntax? expression = declaration switch
+            {
+                MethodDeclarationSyntax
+                { ExpressionBody.Expression: { } body } => body,
+                MethodDeclarationSyntax
+                { Body.Statements.Count: 1 } body when
+                    body.Body!.Statements[0] is ExpressionStatementSyntax
+                    { Expression: { } statement } => statement,
+                _ => null
+            };
+            if (expression == null)
+            {
+                return false;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, expression.SyntaxTree);
+            return model.GetOperation(expression, cancellationToken) is
+                IInvocationOperation invocation &&
+                SymbolEqualityComparer.Default.Equals(
+                    invocation.TargetMethod.OriginalDefinition,
+                    method.OriginalDefinition);
+        }
+        catch (ArgumentException)
+        {
+            return false;
         }
     }
 

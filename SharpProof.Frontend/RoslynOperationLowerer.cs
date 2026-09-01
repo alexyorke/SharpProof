@@ -946,6 +946,14 @@ public sealed class RoslynOperationLowerer
                     FrontendAbstention.UnsupportedType);
             }
 
+            // A conversion can be the first operation that gives an untyped
+            // null literal a supported domain. Lower the folded conversion,
+            // not its deliberately typeless operand.
+            if (operation.ConstantValue.HasValue)
+            {
+                return _owner.LowerConstant(operation);
+            }
+
             var operand = _owner.LowerCore(operation.Operand);
             if (!operand.Classification.IsExact)
             {
@@ -972,11 +980,6 @@ public sealed class RoslynOperationLowerer
             // reasons keep their existing split. LowerConstant is what guards
             // against the conversion itself carrying no constant, which is the
             // case for boxing.
-            if (operation.Operand.ConstantValue.HasValue)
-            {
-                return _owner.LowerConstant(operation);
-            }
-
             if (!operation.IsTryCast &&
                 operation.Conversion.IsReference &&
                 operation.Type?.SpecialType == SpecialType.System_String &&

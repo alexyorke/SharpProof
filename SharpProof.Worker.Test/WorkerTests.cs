@@ -449,7 +449,9 @@ public sealed class WorkerTests
                 response.ClaimResults.Select(static result =>
                     result.Reason),
                 Is.All.EqualTo(
-                    WorkerClaimReason.UnsupportedContract));
+                    WorkerClaimReason.UnsupportedContract),
+                string.Join(", ", response.Errors.Select(static error =>
+                    error.Code)));
             Assert.That(
                 response.ClaimResults.Select(static result =>
                     result.EffectCertainty),
@@ -1000,7 +1002,9 @@ public sealed class WorkerTests
             Assert.That(response.ClaimResults.Single().Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(response.ClaimResults.Single().Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedContract));
+                Is.EqualTo(WorkerClaimReason.UnsupportedContract),
+                string.Join(", ", response.Errors.Select(static error =>
+                    error.Code)));
             Assert.That(response.CallableResults.Single().Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Incomplete));
             Assert.That(response.CallableResults.Single().Reason,
@@ -1977,7 +1981,9 @@ public sealed class WorkerTests
 
         using var worker = new SharpProofWorker(backend);
         var response = await worker.VerifyAsync(request);
-        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.Errors, Is.Empty,
+            string.Join(", ", response.Errors.Select(static error =>
+                error.Code)));
         Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
         Assert.That(
             response.ClaimResults[0].Outcome,
@@ -1996,7 +2002,9 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
 
-        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.Errors, Is.Empty,
+            string.Join(", ", response.Errors.Select(static error =>
+                error.Code)));
         Assert.That(response.ClaimResults, Has.Length.EqualTo(cases.Length));
 
         var runtimeRequest = project.CreateRequest(
@@ -3597,7 +3605,7 @@ public sealed class WorkerTests
     }
 
     [Test]
-    public void DebugImplementationIlCoversLocalAndWideOperandForms()
+    public void DebugImplementationIlCoversLocalFormsAndBoundsWideSignatures()
     {
         var localDeclarations = string.Join(
             Environment.NewLine,
@@ -3693,8 +3701,7 @@ public sealed class WorkerTests
                  {
                      "VerifyRoundTrip",
                      "VerifyAssignmentValue",
-                     "VerifyManyLocals",
-                     "VerifyManyParameters"
+                     "VerifyManyLocals"
                  })
         {
             var lowerer = new CompilerCallableLowerer(compilation, new IrFactory());
@@ -3702,12 +3709,22 @@ public sealed class WorkerTests
             Assert.That(
                 preparation.IsSuccess,
                 Is.True,
-                targetName + ": " + lowerer.LastImplementationIlAbstention);
+                targetName + ": " + preparation.FailureReason + " / " +
+                lowerer.LastImplementationIlAbstention);
             Assert.That(
                 preparation.Body!.SummaryCalls.Values.Single().Origin,
                 Is.EqualTo(CompilerSummaryOrigin.ImplementationIl),
                 targetName);
         }
+
+        var wideLowerer = new CompilerCallableLowerer(
+            compilation,
+            new IrFactory());
+        var widePreparation = wideLowerer.Prepare(
+            targets["VerifyManyParameters"]);
+        Assert.That(
+            widePreparation.FailureReason,
+            Is.EqualTo(WorkerClaimReason.UnsupportedBody));
     }
 
     [Test]
@@ -4328,7 +4345,9 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
 
-        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.Errors, Is.Empty,
+            string.Join(", ", response.Errors.Select(static error =>
+                error.Code)));
         var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope())
         {
@@ -4436,7 +4455,9 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
 
-        Assert.That(response.Errors, Is.Empty);
+        Assert.That(response.Errors, Is.Empty,
+            string.Join(", ", response.Errors.Select(static error =>
+                error.Code)));
         var record = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope())
         {
@@ -4582,7 +4603,9 @@ public sealed class WorkerTests
                 Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(
                 response.ClaimResults.Single().Reason,
-                Is.EqualTo(claimReason));
+                Is.EqualTo(claimReason),
+                string.Join(", ", response.Errors.Select(static error =>
+                    error.Code)));
         }
     }
 
@@ -5016,13 +5039,16 @@ public sealed class WorkerTests
             VerificationCache.PathValidationOverride = null;
         }
 
-        var recomputed = await worker.VerifyAsync(request);
-        var cached = await worker.VerifyAsync(request);
+        var recoveredBackend = new SpuriousModelBackend();
+        using var recoveredWorker = new SharpProofWorker(recoveredBackend);
+        var recomputed = await recoveredWorker.VerifyAsync(request);
+        var cached = await recoveredWorker.VerifyAsync(request);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(recomputed.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
             Assert.That(cached.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
-            Assert.That(backend.CallCount, Is.EqualTo(2));
+            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(recoveredBackend.CallCount, Is.EqualTo(1));
         }
     }
 

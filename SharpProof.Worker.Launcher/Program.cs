@@ -151,6 +151,17 @@ internal static class Program
                 expectedVersions, launcherFailure.Status, launcherFailure.Reason,
                 launcherFailure.Code, launcherFailure.Message).ConfigureAwait(false);
         }
+        else if (exitCode == 0)
+        {
+            await PromotePreManifestProjectTimeoutAsync(
+                    arguments.ResultPath,
+                    request,
+                    artifact,
+                    expectedInputHash,
+                    expectedVersions,
+                    arguments.TerminationGraceMilliseconds)
+                .ConfigureAwait(false);
+        }
         var resultExitCode = ValidateAndReport(arguments.ResultPath, request, expectedInputHash,
             artifact.Manifest, expectedVersions,
             out var validResponse, out var validatedResponse,
@@ -817,6 +828,70 @@ internal static class Program
             [new WorkerProtocolError { Code = code, Message = message }],
             expectedVersions);
         return AtomicFile.WriteUtf8Async(path, WorkerProtocolJson.SerializeResponse(response));
+    }
+
+    private static async Task PromotePreManifestProjectTimeoutAsync(
+        string path,
+        WorkerVerifyRequest request,
+        CompilerManifestArtifact artifact,
+        string expectedInputHash,
+        WorkerVersionSummary expectedVersions,
+        int terminationGraceMilliseconds)
+    {
+        WorkerVerifyResponse? response;
+        try
+        {
+            response = WorkerProtocolJson.DeserializeResponse(
+                WorkerProtocolJson.ReadUtf8File(path));
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or IOException or
+                InvalidDataException or UnauthorizedAccessException or
+                JsonException)
+        {
+            return;
+        }
+
+        var emptyManifest = WorkerResultAssembler.EmptyManifest();
+        var requestHash = WorkerProtocolJson.ComputeRequestHash(request);
+        if (response is not
+            {
+                RunStatus: WorkerRunStatus.TimedOut,
+                FailureReason: WorkerRunFailureReason.None,
+                CallableResults.Length: 0,
+                ClaimResults.Length: 0,
+                Errors.Length: 1
+            } ||
+            response.Errors[0].Code != "worker.timeout" ||
+            !WorkerProtocolJson.ValidateForRequest(
+                    response,
+                    requestHash,
+                    WorkerResultAssembler.EmptyInputHash,
+                    emptyManifest,
+                    request,
+                    expectedVersions,
+                    terminationGraceMilliseconds)
+                .IsValid)
+        {
+            return;
+        }
+
+        var promoted = WorkerResultAssembler.CreateIncomplete(
+            expectedInputHash,
+            requestHash,
+            artifact.Manifest,
+            request.Budgets,
+            WorkerRunStatus.TimedOut,
+            WorkerRunFailureReason.None,
+            WorkerCallableCoverageReason.ProjectTimeout,
+            WorkerClaimReason.ProjectTimeout,
+            errors: null,
+            expectedVersions,
+            response.Summary.ElapsedMilliseconds);
+        await AtomicFile.WriteUtf8Async(
+                path,
+                WorkerProtocolJson.SerializeResponse(promoted))
+            .ConfigureAwait(false);
     }
 
     private static void DeleteIfExists(string? path)

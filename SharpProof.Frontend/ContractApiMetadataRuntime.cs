@@ -5,6 +5,8 @@ namespace SharpProof.Frontend;
 /// </summary>
 internal static partial class ContractApiMetadata
 {
+    internal const string AttributesAssemblyMvidMetadataKey =
+        "SharpProof.Attributes.MVID";
     internal static bool IsContractMethodCandidateName(string name)
     {
         return ContractMethodCandidateNames.Contains(

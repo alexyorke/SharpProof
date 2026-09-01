@@ -169,7 +169,8 @@ internal static class ContractForCompanionValidator
                     candidate,
                     candidate.Name);
             }
-            else if (matches.IsDefaultOrEmpty &&
+            else if (targetSurfaceIsComplete &&
+                     matches.IsDefaultOrEmpty &&
                      diagnosed.Add(candidate))
             {
                 Diagnose(

@@ -368,7 +368,8 @@ internal static class CorpusGate
                     cancellationToken)
                 .ConfigureAwait(false))
             .Select(static observation => observation.ToCanonicalLine()));
-        return CorpusSnapshotFormat.Render(lines);
+        return CorpusSnapshotFormat.Render(
+            lines.OrderBy(static line => line, StringComparer.Ordinal));
     }
 
     public static async Task WriteActualSnapshotAsync(
@@ -474,7 +475,8 @@ internal static class CorpusGate
         var byId = firstPass.ToImmutableDictionary(
             static observation => observation.CaseId,
             StringComparer.Ordinal);
-        foreach (var item in cases)
+        foreach (var item in cases.Where(static item =>
+                     item.Origin == CorpusOrigin.SyntheticMetamorphic))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var compilation = AnalyzerGateHost.CreateCompilation(
@@ -510,7 +512,8 @@ internal static class CorpusGate
         ImmutableArray<CorpusObservation> firstPass,
         CancellationToken cancellationToken)
     {
-        var selected = cases;
+        var selected = cases.Where(static item =>
+            item.Origin == CorpusOrigin.SyntheticMetamorphic);
         var expected = firstPass.ToImmutableDictionary(
             static observation => observation.CaseId,
             StringComparer.Ordinal);

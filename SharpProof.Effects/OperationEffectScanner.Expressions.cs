@@ -515,6 +515,14 @@ internal sealed partial class OperationEffectScanner
             {
                 return left.Summary;
             }
+            if (ConditionalTruthOperatorFacts.ReturnsConstant(
+                    _session.Compilation,
+                    truthOperator,
+                    out var truthResult) &&
+                truthResult)
+            {
+                return left.Summary;
+            }
         }
         if (isConditional &&
             TryGetBoolean(binary, binary.LeftOperand, out var leftValue))
