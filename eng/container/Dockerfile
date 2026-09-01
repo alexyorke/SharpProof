@@ -80,27 +80,3 @@ WORKDIR /workspace/SharpProof
 USER sharpproof
 ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
 CMD ["dev"]
-
-FROM toolchain AS build
-ENV SHARPPROOF_REPO_ROOT=/src
-WORKDIR /src
-COPY --chown=sharpproof:sharpproof . .
-USER sharpproof
-RUN dotnet restore SharpProof.sln --locked-mode \
-    && dotnet build SharpProof.sln --configuration Debug --no-restore
-ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
-CMD ["build"]
-
-FROM build AS test
-ENV SHARPPROOF_REPO_ROOT=/src
-WORKDIR /src
-USER sharpproof
-ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
-CMD ["portable-tests"]
-
-FROM build AS package
-ENV SHARPPROOF_REPO_ROOT=/src
-WORKDIR /src
-USER sharpproof
-ENTRYPOINT ["/usr/local/bin/sharpproof-container"]
-CMD ["pack"]

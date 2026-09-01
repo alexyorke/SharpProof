@@ -72,12 +72,14 @@ public sealed class ContainerAuthorityScriptTests
                     .And.Contain("/home/sharpproof/.nuget/packages")
                     .And.Contain("useradd --uid \"${USER_UID}\""));
             AssertStage(stages["dev"], "/workspace/SharpProof", "dev");
-            AssertStage(stages["build"], "/src", "build");
-            AssertStage(stages["test"], "/src", "portable-tests");
-            AssertStage(stages["package"], "/src", "pack");
-            Assert.That(
-                stages["build"],
-                Does.Contain("COPY --chown=sharpproof:sharpproof . ."));
+            Assert.That(stages.Keys, Is.EquivalentTo([
+                "powershell",
+                "test-runtime",
+                "minimum-sdk",
+                "minimum-framework",
+                "toolchain",
+                "dev"
+            ]));
             Assert.That(
                 compose,
                 Does.Contain("SHARPPROOF_REPO_ROOT: /workspace/SharpProof")
@@ -133,24 +135,6 @@ public sealed class ContainerAuthorityScriptTests
         yield return Case("missing-nuget-state", value => value.Replace(
             "        /home/sharpproof/.local/share/NuGet \\\n",
             string.Empty,
-            StringComparison.Ordinal));
-        yield return Case("build-root-mismatch", value => value.Replace(
-            "ENV SHARPPROOF_REPO_ROOT=/src\nWORKDIR /src\n" +
-            "COPY --chown=sharpproof:sharpproof . .",
-            "ENV SHARPPROOF_REPO_ROOT=/workspace/SharpProof\nWORKDIR /src\n" +
-            "COPY --chown=sharpproof:sharpproof . .",
-            StringComparison.Ordinal));
-        yield return Case("package-root-inherited-decoy", value => value.Replace(
-            "FROM build AS package\nENV SHARPPROOF_REPO_ROOT=/src",
-            "FROM build AS package\n# ENV SHARPPROOF_REPO_ROOT=/src",
-            StringComparison.Ordinal));
-        yield return Case("test-root-user", value => value.Replace(
-            "FROM build AS test\nENV SHARPPROOF_REPO_ROOT=/src\nWORKDIR /src\nUSER sharpproof",
-            "FROM build AS test\nENV SHARPPROOF_REPO_ROOT=/src\nWORKDIR /src\nUSER root",
-            StringComparison.Ordinal));
-        yield return Case("build-unowned-copy", value => value.Replace(
-            "COPY --chown=sharpproof:sharpproof . .",
-            "COPY . .",
             StringComparison.Ordinal));
     }
 

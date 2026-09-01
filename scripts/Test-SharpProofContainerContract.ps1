@@ -164,10 +164,7 @@ function Assert-DockerfileAuthority {
         'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
         'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
         'FROM ${DOTNET_SDK_IMAGE} AS toolchain',
-        'FROM toolchain AS dev',
-        'FROM toolchain AS build',
-        'FROM build AS test',
-        'FROM build AS package')
+        'FROM toolchain AS dev')
     if ($actualStages.Count -cne $expectedStages.Count) {
         throw 'The Dockerfile must contain exactly the canonical build stages.'
     }
@@ -203,21 +200,6 @@ function Assert-DockerfileAuthority {
             From = 'FROM toolchain AS dev'
             Root = '/workspace/SharpProof'
             Command = 'dev'
-        },
-        [pscustomobject]@{
-            From = 'FROM toolchain AS build'
-            Root = '/src'
-            Command = 'build'
-        },
-        [pscustomobject]@{
-            From = 'FROM build AS test'
-            Root = '/src'
-            Command = 'portable-tests'
-        },
-        [pscustomobject]@{
-            From = 'FROM build AS package'
-            Root = '/src'
-            Command = 'pack'
         })
     foreach ($stage in $stageContracts) {
         $stageLines = Get-DockerfileStageLines `
@@ -249,14 +231,6 @@ function Assert-DockerfileAuthority {
             "CMD [`"$($stage.Command)`"]" `
             "$($stage.Command) default command"
     }
-    $buildLines = Get-DockerfileStageLines `
-        -Lines $lines `
-        -FromLine 'FROM toolchain AS build'
-    Assert-SingleMatchingLine `
-        $buildLines `
-        '^COPY .+ \. \.$' `
-        'COPY --chown=sharpproof:sharpproof . .' `
-        'Build source ownership'
 }
 
 function Assert-ComposeAuthority {
