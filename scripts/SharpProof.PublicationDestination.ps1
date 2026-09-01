@@ -261,8 +261,8 @@ function New-SharpProofPublicationActionAuthority {
         throw 'Only registry publication has a main remote state.'
     }
     if ($Mode -ceq 'registry' -and
-        $MainState -cnotin @('Absent', 'Unchecked')) {
-        throw 'Registry main state must be Absent or Unchecked.'
+        $MainState -cnotin @('Absent', 'Present', 'Unchecked')) {
+        throw 'Registry main state must be Absent, Present, or Unchecked.'
     }
     if ($Mode -ceq 'fixture') {
         if ([string]::IsNullOrEmpty($FixtureMainState)) {
@@ -303,6 +303,7 @@ function New-SharpProofPublicationActionAuthority {
                 mainAction = if ($MainState -ceq 'Absent') {
                     'Push'
                 }
+                elseif ($MainState -ceq 'Present') { 'Resume' }
                 else { 'PreflightThenPush' }
                 symbolsState = 'Unchecked'
                 symbolsAction = 'CollisionOnPush'
@@ -383,9 +384,10 @@ function Invoke-SharpProofMainPackagePreflight {
                 "NuGet PackageBaseAddress returned HTTP $status for " +
                 "$($Package.packageId) $($Package.version).")
         }
-        throw (
-            "Remote main package already exists; publication is " +
-            "non-overwriting: $($Package.packageId) $($Package.version).")
+        return [pscustomobject][ordered]@{
+            state = 'Present'
+            remoteUrl = $remoteUrl
+        }
     }
     finally {
         if ([IO.File]::Exists($temporaryPath)) {

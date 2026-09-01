@@ -188,18 +188,11 @@ public static partial class LinuxPathIdentity
         var markerPaths = canonicalPaths
             .Select(PublicationMarkerPath)
             .ToArray();
-        var markerCount = markerPaths.Count(File.Exists);
-        var publicationMembersAbsent = canonicalPaths.All(static path =>
-            !File.Exists(path) && !Directory.Exists(path));
-        if (markerCount == 0 && publicationMembersAbsent)
+        if (markerPaths.All(static path => !File.Exists(path)) &&
+            canonicalPaths.All(static path =>
+                !File.Exists(path) && !Directory.Exists(path)))
         {
             return;
-        }
-        if (markerCount != markerPaths.Length &&
-            !publicationMembersAbsent)
-        {
-            throw new IOException(
-                "SharpProof cannot reset an incomplete publication set.");
         }
 
         using var lease = AcquirePublicationSet(

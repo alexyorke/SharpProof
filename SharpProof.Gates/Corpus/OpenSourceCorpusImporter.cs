@@ -25,6 +25,29 @@ internal static class OpenSourceCorpusImporter
     private const string LicenseRelativePath =
         "third-party/aalhour-C-Sharp-Algorithms-LICENSE.txt";
     private const int TargetMethodCount = 200;
+    private const string ReviewedMitLicense = """
+The MIT License (MIT)
+
+Copyright (c) 2015 Ahmad Alhour
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+""";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -114,13 +137,7 @@ internal static class OpenSourceCorpusImporter
                         "LICENSE",
                         cancellationToken)
                     .ConfigureAwait(false)));
-        if (!licenseText.StartsWith(
-                "The MIT License (MIT)",
-                StringComparison.Ordinal))
-        {
-            throw new InvalidDataException(
-                "The upstream license no longer has the reviewed MIT form.");
-        }
+        ValidateReviewedMitLicense(licenseText);
 
         var (files, candidates) = await DiscoverSourcesAsync(
                 resolvedUpstreamRoot,
@@ -207,6 +224,18 @@ internal static class OpenSourceCorpusImporter
                 new CorpusFileUpdate(licenseTargetPath, licenseContent),
                 new CorpusFileUpdate(manifestPath, manifest)
             ]);
+    }
+
+    internal static void ValidateReviewedMitLicense(string licenseText)
+    {
+        if (!string.Equals(
+                OpenSourceCorpusCatalog.NormalizeLineEndings(licenseText).TrimEnd('\n'),
+                ReviewedMitLicense.TrimEnd('\n'),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "The upstream license no longer has the reviewed MIT form.");
+        }
     }
 
     private static ImmutableDictionary<string, CorpusSupport>
@@ -493,18 +522,20 @@ internal static class OpenSourceCorpusImporter
         return output.ToArray();
     }
 
-    private static string NormalizeRepositoryUrl(string value)
+    internal static string NormalizeRepositoryUrl(string value)
     {
-        return value.Trim()
+        var normalized = value.Trim()
             .TrimEnd('/')
             .Replace(
                 "git@github.com:",
                 "https://github.com/",
                 StringComparison.OrdinalIgnoreCase)
-            .Replace(
+            .TrimEnd('/');
+        return normalized.EndsWith(
                 ".git",
-                string.Empty,
-                StringComparison.OrdinalIgnoreCase);
+                StringComparison.OrdinalIgnoreCase)
+            ? normalized[..^4]
+            : normalized;
     }
 
     private static async Task VerifyCommitBelongsToApprovedRemoteAsync(

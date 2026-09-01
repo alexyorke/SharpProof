@@ -58,6 +58,10 @@ internal static class WorkerBinaryIdentity
             Directory.CreateDirectory(stagingDirectory);
             using var dependency = OpenRead(ChangeExtension(path, ".deps.json"));
             var components = RuntimeComponents(path, dependency);
+            dependency.Position = 0;
+            var dependencyBytes = ReadSnapshotBytes(
+                dependency,
+                MaximumDependenciesBytes);
             stagedHandles = new FileStream[components.Count];
             using var hash = new CanonicalHashWriter();
             hash.Add("SharpProof.WorkerBinarySet", 1);
@@ -65,9 +69,14 @@ internal static class WorkerBinaryIdentity
 #pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
             foreach (var component in components)
             {
-                var sourceBytes = CompilerManifestArtifactFile.ReadAllBytes(
-                    component.Value,
-                    MaximumComponentBytes);
+                var sourceBytes = string.Equals(
+                        component.Key,
+                        GetFileName(ChangeExtension(path, ".deps.json")),
+                        StringComparison.Ordinal)
+                    ? dependencyBytes
+                    : CompilerManifestArtifactFile.ReadAllBytes(
+                        component.Value,
+                        MaximumComponentBytes);
                 var sourceLength = sourceBytes.LongLength;
                 ValidateComponentLength(component.Key, sourceLength, ref totalBytes);
                 var stagedPath = Combine(
@@ -87,9 +96,12 @@ internal static class WorkerBinaryIdentity
                         component.Key,
                         stagedRead.Length,
                         ref stagedTotalBytes);
-                    EnsureStagedComponentConsistency(
-                        component.Value,
-                        stagedPath);
+                    if (!ReferenceEquals(sourceBytes, dependencyBytes))
+                    {
+                        EnsureStagedComponentConsistency(
+                            component.Value,
+                            stagedPath);
+                    }
                     hash.Add(component.Key).Add(stagedRead);
                 }
                 stagedHandles[stagedCount++] = OpenRead(stagedPath);
@@ -188,6 +200,34 @@ internal static class WorkerBinaryIdentity
             throw new InvalidDataException(
                 "A worker runtime component changed during staging.");
         }
+    }
+
+    private static byte[] ReadSnapshotBytes(FileStream stream, long maximumBytes)
+    {
+        if (stream.Length <= 0 || stream.Length > maximumBytes)
+        {
+            throw new InvalidDataException(
+                "The worker runtime component exceeds the byte limit.");
+        }
+
+        var bytes = new byte[checked((int)stream.Length)];
+        var offset = 0;
+        while (offset < bytes.Length)
+        {
+            var read = stream.Read(bytes, offset, bytes.Length - offset);
+            if (read == 0)
+            {
+                throw new InvalidDataException(
+                    "A worker runtime component changed while it was read.");
+            }
+            offset += read;
+        }
+        if (stream.ReadByte() >= 0)
+        {
+            throw new InvalidDataException(
+                "A worker runtime component changed while it was read.");
+        }
+        return bytes;
     }
 
     private static SortedDictionary<string, string> RuntimeComponents(

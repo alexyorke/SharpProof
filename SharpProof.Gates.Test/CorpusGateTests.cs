@@ -12,6 +12,31 @@ namespace SharpProof.Gates.Test;
 public sealed class CorpusGateTests
 {
     [Test]
+    public void OssImporterRejectsMitLicenseWithAppendedRestrictions()
+    {
+        var license = File.ReadAllText(Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "..", "..", "..", "..", "SharpProof.Gates", "Corpus",
+            "third-party", "aalhour-C-Sharp-Algorithms-LICENSE.txt"));
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            OpenSourceCorpusImporter.ValidateReviewedMitLicense(
+                license + "\nAdditional restriction: no commercial use.\n")));
+    }
+
+    [TestCase("https://github.com/aalhour/C-Sharp-Algorithms.git", "https://github.com/aalhour/C-Sharp-Algorithms")]
+    [TestCase("git@github.com:aalhour/C-Sharp-Algorithms.git", "https://github.com/aalhour/C-Sharp-Algorithms")]
+    [TestCase("https://github.com/aalhour/C-Sharp-Algorithms.git-mirror", "https://github.com/aalhour/C-Sharp-Algorithms.git-mirror")]
+    public void OssImporterRepositoryUrlNormalizationOnlyRemovesTerminalGitSuffix(
+        string input,
+        string expected)
+    {
+        Assert.That(
+            OpenSourceCorpusImporter.NormalizeRepositoryUrl(input),
+            Is.EqualTo(expected));
+    }
+
+    [Test]
     public void UnknownReasonRatchetRejectsStaleCeilings()
     {
         var ratchet = new CorpusUnknownReasonRatchet(
