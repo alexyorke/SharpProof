@@ -2023,38 +2023,11 @@ internal sealed class ExceptionHandlerReachability(
 
     private bool StaticInitializationMayComplete(INamedTypeSymbol type)
     {
-        foreach (var member in type.GetMembers())
-        {
-            var isStaticInitializable = member switch
-            {
-                IFieldSymbol field => field.IsStatic && !field.IsConst,
-                IPropertySymbol property => property.IsStatic,
-                IEventSymbol @event => @event.IsStatic,
-                _ => false
-            };
-            if (!isStaticInitializable)
-            {
-                continue;
-            }
-            foreach (var reference in member.DeclaringSyntaxReferences)
-            {
-                var expression = EffectProjections.GetInitializerExpression(
-                    reference.GetSyntax());
-                if (expression == null)
-                {
-                    continue;
-                }
-                var model = SharpProof.Frontend.Host.CompilationModelProvider
-                    .GetSemanticModel(compilation, expression.SyntaxTree);
-                var operation = model.GetOperation(expression);
-                if (operation != null &&
-                    !_staticInitializationFacts.MayCompleteNormally(operation))
-                {
-                    return false;
-                }
-            }
-        }
-        return type.StaticConstructors.All(canMethodCompleteNormally);
+        return EffectMethodNodeBuilder.AllStaticInitializersSatisfy(
+                type,
+                compilation,
+                _staticInitializationFacts.MayCompleteNormally) &&
+            type.StaticConstructors.All(canMethodCompleteNormally);
     }
 
     private bool IsDefinitelyNull(IOperation origin, IOperation value)

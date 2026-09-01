@@ -1200,41 +1200,13 @@ internal sealed class OperationCompletionEvaluator
             return true;
         }
 
-        foreach (var typeMember in type.GetMembers())
-        {
-            var isStaticInitializable = typeMember switch
-            {
-                IFieldSymbol field => field.IsStatic && !field.IsConst,
-                IPropertySymbol property => property.IsStatic,
-                IEventSymbol @event => @event.IsStatic,
-                _ => false
-            };
-            if (!isStaticInitializable)
-            {
-                continue;
-            }
-            foreach (var reference in typeMember.DeclaringSyntaxReferences)
-            {
-                var expression = EffectProjections.GetInitializerExpression(
-                    reference.GetSyntax());
-                if (expression == null)
-                {
-                    continue;
-                }
-                var model = SharpProof.Frontend.Host.CompilationModelProvider
-                    .GetSemanticModel(_compilation, expression.SyntaxTree);
-                var operation = model.GetOperation(expression);
-                if (operation != null &&
-                    !_staticInitializationFacts.MayCompleteNormally(operation))
-                {
-                    return false;
-                }
-            }
-        }
-
-        return type.StaticConstructors.All(constructor =>
-            constructor.DeclaringSyntaxReferences.Length == 0 ||
-            _completionFacts.MethodCanCompleteNormally(constructor));
+        return EffectMethodNodeBuilder.AllStaticInitializersSatisfy(
+                type,
+                _compilation,
+                _staticInitializationFacts.MayCompleteNormally) &&
+            type.StaticConstructors.All(constructor =>
+                constructor.DeclaringSyntaxReferences.Length == 0 ||
+                _completionFacts.MethodCanCompleteNormally(constructor));
     }
 
     private bool CanCompleteConditionalAccess(

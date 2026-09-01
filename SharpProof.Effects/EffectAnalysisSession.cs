@@ -396,37 +396,9 @@ public sealed class EffectAnalysisSession
         var facts = new DefiniteOperationFacts(
             _compilation,
             CancellationToken.None);
-        foreach (var member in type.GetMembers())
-        {
-            var isStaticInitializable = member switch
-            {
-                IFieldSymbol field => field.IsStatic && !field.IsConst,
-                IPropertySymbol property => property.IsStatic,
-                IEventSymbol @event => @event.IsStatic,
-                _ => false
-            };
-            if (!isStaticInitializable)
-            {
-                continue;
-            }
-            foreach (var reference in member.DeclaringSyntaxReferences)
-            {
-                var expression = EffectProjections.GetInitializerExpression(
-                    reference.GetSyntax());
-                if (expression == null)
-                {
-                    continue;
-                }
-                var model = SharpProof.Frontend.Host.CompilationModelProvider
-                    .GetSemanticModel(_compilation, expression.SyntaxTree);
-                if (model.GetOperation(expression) is { } operation &&
-                    !facts.MayCompleteNormally(operation))
-                {
-                    return true;
-                }
-            }
-        }
-        return type.StaticConstructors.Any(
+        return !EffectMethodNodeBuilder.AllStaticInitializersSatisfy(
+                type, _compilation, facts.MayCompleteNormally) ||
+            type.StaticConstructors.Any(
             constructor => constructor.DeclaringSyntaxReferences.Length != 0 &&
                 !facts.MethodCanCompleteNormally(constructor));
     }

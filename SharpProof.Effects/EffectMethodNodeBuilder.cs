@@ -407,6 +407,42 @@ internal sealed class EffectMethodNodeBuilder
             CancellationToken.None);
     }
 
+    internal static bool AllStaticInitializersSatisfy(
+        INamedTypeSymbol type,
+        Compilation compilation,
+        Func<IOperation, bool> predicate)
+    {
+        foreach (var member in type.GetMembers())
+        {
+            var initializable = member switch
+            {
+                IFieldSymbol field => field.IsStatic && !field.IsConst,
+                IPropertySymbol property => property.IsStatic,
+                IEventSymbol @event => @event.IsStatic,
+                _ => false
+            };
+            if (!initializable)
+            {
+                continue;
+            }
+
+            foreach (var reference in member.DeclaringSyntaxReferences)
+            {
+                var expression = EffectProjections.GetInitializerExpression(
+                    reference.GetSyntax());
+                if (expression != null &&
+                    SharpProof.Frontend.Host.CompilationModelProvider
+                        .GetSemanticModel(compilation, expression.SyntaxTree)
+                        .GetOperation(expression) is { } operation &&
+                    !predicate(operation))
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private static bool HasPotentialStaticInitialization(
         INamedTypeSymbol type,
         ResolvedApiSpecTable apiSpecs,
