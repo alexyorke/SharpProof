@@ -260,6 +260,7 @@ public static partial class LinuxPathIdentity
         var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
         ValidatePublicationTopology(canonicalPaths);
         ValidatePublicationMetadataAliases(canonicalPaths);
+        var ancestorIdentity = CaptureAncestorIdentity(canonicalPaths);
         var lockPaths = canonicalPaths
             .Select(PublicationLockNameForCanonicalPath)
             .OrderBy(static path => path, StringComparer.Ordinal)
