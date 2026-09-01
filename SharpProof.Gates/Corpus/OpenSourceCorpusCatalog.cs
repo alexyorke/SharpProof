@@ -101,36 +101,6 @@ internal static class OpenSourceCorpusCatalog
             .Trim();
     }
 
-    internal static string ComputeSupportContextSha256(
-        MethodDeclarationSyntax method,
-        OpenSourceCorpusFile sourceFile,
-        string commit,
-        string path)
-    {
-        var root = method.SyntaxTree.GetCompilationUnitRoot();
-        var namespaces = method.Ancestors()
-            .OfType<BaseNamespaceDeclarationSyntax>()
-            .Select(static item => item.Name.ToString())
-            .Reverse();
-        var types = method.Ancestors()
-            .OfType<TypeDeclarationSyntax>()
-            .Select(static item => item.Identifier.ValueText)
-            .Reverse();
-        var usings = root.Usings.Select(static item => item.ToString())
-            .OrderBy(static item => item, StringComparer.Ordinal);
-        var context = string.Join("\n", [
-            "support-context-v1",
-            commit,
-            path,
-            sourceFile.ContentSha256,
-            string.Join(".", namespaces),
-            string.Join(".", types),
-            string.Join("\n", usings),
-            GetDeclaration(method)
-        ]);
-        return ComputeSha256(context);
-    }
-
     private static void Validate(
         OpenSourceCorpusDocument document,
         string corpusDirectory)
