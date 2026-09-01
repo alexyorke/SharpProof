@@ -28,6 +28,8 @@ $resolvedOutput = Resolve-SharpProofContainedPath `
 $logicalOutput = [IO.Path]::GetRelativePath(
     $repositoryRoot,
     [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDirectory))).Replace('\', '/')
+$evidenceLease = Enter-SharpProofFuzzEvidenceLease `
+    -OutputDirectory $resolvedOutput
 Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput
 $sourceCommit = Get-SharpProofCleanFuzzSourceCommit `
     -RepositoryRoot $repositoryRoot
@@ -269,3 +271,4 @@ $summary = [pscustomobject][ordered]@{
 Complete-SharpProofFuzzEvidence `
     -OutputDirectory $resolvedOutput `
     -Summary $summary
+Exit-SharpProofFuzzEvidenceLease -Lease $evidenceLease

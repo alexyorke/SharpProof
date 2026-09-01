@@ -87,6 +87,24 @@ try {
         throw 'Unrelated fuzz output was changed.'
     }
 
+    $lease = Enter-SharpProofFuzzEvidenceLease `
+        -OutputDirectory $root -TimeoutSeconds 0
+    $overlapRejected = $false
+    try {
+        [void](Enter-SharpProofFuzzEvidenceLease `
+            -OutputDirectory $root -TimeoutSeconds 0)
+    }
+    catch {
+        $overlapRejected = $_.Exception.Message -like
+            'Timed out acquiring fuzz evidence lease:*'
+    }
+    finally {
+        Exit-SharpProofFuzzEvidenceLease -Lease $lease
+    }
+    if (-not $overlapRejected) {
+        throw 'Overlapping fuzz evidence leases were accepted.'
+    }
+
     $manifest = Join-Path $root 'retained-seeds.json'
     [IO.File]::WriteAllText(
         $manifest,

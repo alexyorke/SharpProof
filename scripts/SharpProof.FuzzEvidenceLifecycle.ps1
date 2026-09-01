@@ -205,6 +205,48 @@ function Initialize-SharpProofFuzzEvidence {
     }
 }
 
+function Enter-SharpProofFuzzEvidenceLease {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputDirectory,
+
+        [ValidateRange(0, 3600)]
+        [int]$TimeoutSeconds = 120
+    )
+
+    [IO.Directory]::CreateDirectory($OutputDirectory) | Out-Null
+    $lockPath = Join-Path $OutputDirectory '.campaign.lock'
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ($true) {
+        try {
+            # FileShare.None makes the lock a process-held lease over the
+            # whole namespace, including initialization and publication.
+            return [IO.FileStream]::new(
+                $lockPath,
+                [IO.FileMode]::OpenOrCreate,
+                [IO.FileAccess]::ReadWrite,
+                [IO.FileShare]::None)
+        }
+        catch [IO.IOException] {
+            if ([DateTime]::UtcNow -ge $deadline) {
+                throw "Timed out acquiring fuzz evidence lease: $lockPath"
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+}
+
+function Exit-SharpProofFuzzEvidenceLease {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [IO.FileStream]$Lease
+    )
+
+    $Lease.Dispose()
+}
+
 function Publish-SharpProofFuzzEvidence {
     [CmdletBinding()]
     param(
