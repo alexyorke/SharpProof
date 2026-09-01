@@ -26,7 +26,11 @@ if ($relativeEvidence.StartsWith('../', [StringComparison]::Ordinal) -or
     [IO.Path]::IsPathRooted($relativeEvidence)) {
     throw 'Qualification gate evidence must remain inside the repository.'
 }
-$evidence = Get-Content -LiteralPath $resolvedEvidence -Raw |
+# Read the evidence once and derive every value from that immutable byte
+# snapshot.  Reopening the mutable pathname for length/hash after validation
+# would permit an atomic replacement to bind a different generation.
+$evidenceBytes = [IO.File]::ReadAllBytes($resolvedEvidence)
+$evidence = [Text.Encoding]::UTF8.GetString($evidenceBytes) |
     ConvertFrom-Json -ErrorAction Stop
 $packageArtifacts = @()
 if ($Gate -in @(
@@ -120,10 +124,9 @@ $receipt = [ordered]@{
     commit = $commit
     evidence = [ordered]@{
         path = $relativeEvidence
-        bytes = [int64](Get-Item -LiteralPath $resolvedEvidence).Length
-        sha256 = (Get-FileHash `
-            -LiteralPath $resolvedEvidence `
-            -Algorithm SHA256).Hash.ToLowerInvariant()
+        bytes = [int64]$evidenceBytes.Length
+        sha256 = ([Security.Cryptography.SHA256]::HashData($evidenceBytes) |
+            ForEach-Object { $_.ToString('x2') }) -join ''
     }
 }
 if ($packageArtifacts.Count -ne 0) {
