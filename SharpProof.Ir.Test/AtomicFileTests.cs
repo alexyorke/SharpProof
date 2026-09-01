@@ -1,5 +1,4 @@
 using System.Text;
-using System.Runtime.Versioning;
 using NUnit.Framework;
 using SharpProof.Ir;
 
@@ -52,7 +51,6 @@ public sealed class AtomicFileTests
     }
 
     [Test]
-    [SupportedOSPlatform("linux")]
     public void ReplacingDestinationPreservesUnixMode()
     {
         if (!OperatingSystem.IsLinux())
