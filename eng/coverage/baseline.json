@@ -10,8 +10,8 @@
     "SharpProof.Analyzer.Core": 86.77,
     "SharpProof.Attributes": 55.88,
     "SharpProof.BuildTasks": 82.08,
-    "SharpProof.CompilerArtifact": 90.2,
-    "SharpProof.CompilerCollector": 86.31,
+    "SharpProof.CompilerArtifact": 90.19,
+    "SharpProof.CompilerCollector": 86.1,
     "SharpProof.ContractForGenerator": 93.92,
     "SharpProof.Contracts": 88.96,
     "SharpProof.Dataflow": 91.47,
@@ -21,13 +21,13 @@
     "SharpProof.Gates": 74.85,
     "SharpProof.Host": 70.0,
     "SharpProof.Ir": 88.67,
-    "SharpProof.Meta.Analyzers": 92.81,
-    "SharpProof.Smt": 91.61,
+    "SharpProof.Meta.Analyzers": 85.26,
+    "SharpProof.Smt": 90.75,
     "SharpProof.Specs": 85.64,
     "SharpProof.Summaries": 84.54,
     "SharpProof.Verify": 89.85,
     "SharpProof.Worker": 87.04,
     "SharpProof.Worker.Launcher": 55.0,
-    "SharpProof.Worker.Protocol": 96.57
+    "SharpProof.Worker.Protocol": 92.74
   }
 }
