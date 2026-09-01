@@ -73,7 +73,11 @@ public sealed class CallableCounterexampleReplayerTests
             [new CompilerPreparedClause(CompilerContractKind.Ensures, factory.Boolean(false),
                 CompilerContractEvidence.CompilerBoundInvocation, "claim", null)],
             [], WorkerClaimReason.None,
-            CompilerPreparedBody.ProgramBody(builder.Build(), [], [], []));
+            CompilerPreparedBody.ProgramBody(
+                builder.Build(),
+                ImmutableDictionary<IrVarId, IrVarId>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty));
 
         Assert.That(CallableCounterexampleReplayer.Replay(
             target, 0, ImmutableDictionary<IrVarId, IrValue>.Empty),
