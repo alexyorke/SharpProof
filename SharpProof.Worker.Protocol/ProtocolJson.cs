@@ -1062,7 +1062,9 @@ public static partial class WorkerProtocolJson
 
     internal static string ComputeSha256(byte[] bytes)
     {
-        return SharpProof.Ir.HashEncoding.ComputeSha256Hex(bytes);
+        using var hash = SHA256.Create();
+        return string.Concat(hash.ComputeHash(bytes).Select(static value =>
+            value.ToString("x2", CultureInfo.InvariantCulture)));
     }
     internal static bool IsDefined<T>(T value, T unspecified) where T : struct, Enum
     {

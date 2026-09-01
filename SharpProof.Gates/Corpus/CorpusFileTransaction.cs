@@ -44,7 +44,7 @@ internal static class CorpusFileTransaction
         }
 
         var transactionId = Guid.NewGuid().ToString("N");
-        var entries = new TransactionEntry[updates.Count];
+        var entries = new List<TransactionEntry>(updates.Count);
         var markerPath = Path.Combine(transactionRoot, MarkerName);
         var markerPublished = false;
         try
@@ -76,21 +76,21 @@ internal static class CorpusFileTransaction
                         Utf8.GetBytes(updates[index].Content),
                         cancellationToken)
                     .ConfigureAwait(false);
-                entries[index] = new TransactionEntry(
+                entries.Add(new TransactionEntry(
                     destination,
                     staged,
                     backup,
-                    existed);
+                    existed));
             }
 
             cancellationToken.ThrowIfCancellationRequested();
             await WriteMarkerAsync(
                     markerPath,
-                    new TransactionMarker(SchemaVersion, entries),
+                    new TransactionMarker(SchemaVersion, entries.ToArray()),
                     cancellationToken)
                 .ConfigureAwait(false);
             markerPublished = true;
-            for (var index = 0; index < entries.Length; index++)
+            for (var index = 0; index < entries.Count; index++)
             {
                 beforePublish?.Invoke(index);
                 File.Move(
@@ -196,11 +196,11 @@ internal static class CorpusFileTransaction
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static void Restore(IEnumerable<TransactionEntry?> entries)
+    private static void Restore(IEnumerable<TransactionEntry> entries)
     {
-        foreach (var entry in entries.Where(static entry => entry != null))
+        foreach (var entry in entries)
         {
-            if (entry!.DestinationExisted)
+            if (entry.DestinationExisted)
             {
                 if (!File.Exists(entry.BackupPath))
                 {
@@ -240,11 +240,11 @@ internal static class CorpusFileTransaction
         }
     }
 
-    private static void Cleanup(IEnumerable<TransactionEntry?> entries)
+    private static void Cleanup(IEnumerable<TransactionEntry> entries)
     {
-        foreach (var entry in entries.Where(static entry => entry != null))
+        foreach (var entry in entries)
         {
-            TryDelete(entry!.StagedPath);
+            TryDelete(entry.StagedPath);
             TryDelete(entry.BackupPath);
         }
     }
