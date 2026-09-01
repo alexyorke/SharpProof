@@ -1,8 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
-using System.Reflection.Metadata;
-using System.Reflection.PortableExecutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -14,17 +12,9 @@ using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Gates.Performance;
 
-internal sealed record WorkerPerformanceBinaryEvidence(
-    string Path,
-    string Sha256,
-    string AssemblyIdentity,
-    Guid ModuleVersionId);
-
 internal sealed record WorkerPerformanceMeasurements(
     double[] CancellationLatencies,
-    double ForcedTerminationMilliseconds,
-    WorkerPerformanceBinaryEvidence WorkerBinary,
-    WorkerPerformanceBinaryEvidence LauncherBinary);
+    double ForcedTerminationMilliseconds);
 
 internal static class WorkerPerformanceProbe
 {
@@ -40,10 +30,6 @@ internal static class WorkerPerformanceProbe
         CancellationToken cancellationToken)
     {
         using var workspace = WorkerProbeWorkspace.Create();
-        var workerPath = FindBuiltAssembly(repositoryRoot, "SharpProof.Worker");
-        var launcherPath = FindBuiltAssembly(repositoryRoot, "SharpProof.Worker.Launcher");
-        var workerBinary = ReadBinaryEvidence(workerPath);
-        var launcherBinary = ReadBinaryEvidence(launcherPath);
         await VerifyCooperativeLauncherCancellationAsync(
                 repositoryRoot,
                 workspace,
@@ -62,9 +48,7 @@ internal static class WorkerPerformanceProbe
             .ConfigureAwait(false);
         return new WorkerPerformanceMeasurements(
             cancellationLatencies,
-            forcedTermination,
-            workerBinary,
-            launcherBinary);
+            forcedTermination);
     }
 
     internal static async Task<double> MeasureForcedTerminationAsync(
@@ -79,25 +63,6 @@ internal static class WorkerPerformanceProbe
                 contract,
                 cancellationToken)
             .ConfigureAwait(false);
-    }
-
-    private static WorkerPerformanceBinaryEvidence ReadBinaryEvidence(string path)
-    {
-        var fullPath = Path.GetFullPath(path);
-        if (!File.Exists(fullPath))
-            throw new FileNotFoundException("Measured performance binary was not found.", fullPath);
-        using var stream = File.OpenRead(fullPath);
-        using var peReader = new PEReader(stream);
-        var metadata = peReader.GetMetadataReader();
-        var module = metadata.GetModuleDefinition();
-        var assembly = metadata.GetAssemblyDefinition();
-        var identity = new AssemblyName(metadata.GetString(assembly.Name)).FullName
-            ?? metadata.GetString(assembly.Name);
-        return new WorkerPerformanceBinaryEvidence(
-            fullPath,
-            Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(fullPath))).ToLowerInvariant(),
-            identity,
-            metadata.GetGuid(module.Mvid));
     }
 
     private static async Task<double[]> MeasureWorkerCancellationAsync(
