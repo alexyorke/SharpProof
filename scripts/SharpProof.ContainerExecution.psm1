@@ -62,6 +62,27 @@ function Get-SharpProofTestProjectParallelism {
     return [Math]::Max(1, [Math]::Floor($visibleProcessors / $divisor))
 }
 
+function Get-SharpProofParallelismOverride {
+    param(
+        [AllowEmptyString()][string]$Value,
+        [Parameter(Mandatory = $true)][int]$VisibleProcessors,
+        [Parameter(Mandatory = $true)][string]$VariableName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $null
+    }
+    $parsed = 0
+    if (-not [int]::TryParse($Value, [Globalization.NumberStyles]::None,
+            [Globalization.CultureInfo]::InvariantCulture, [ref]$parsed) -or
+        $parsed -lt 1 -or $parsed -gt $VisibleProcessors) {
+        throw (
+            "$VariableName must be an integer between 1 and the " +
+            "container-visible CPU count ($VisibleProcessors).")
+    }
+    return $parsed
+}
+
 function Get-SharpProofSemanticTestParallelism {
     [CmdletBinding()]
     param(
@@ -69,18 +90,25 @@ function Get-SharpProofSemanticTestParallelism {
         [string]$RepositoryRoot
     )
 
+    $visibleProcessors = [Environment]::ProcessorCount
+    if ($visibleProcessors -lt 1) {
+        throw 'The container did not expose a positive processor count.'
+    }
+    $semanticOverride = [Environment]::GetEnvironmentVariable(
+        'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
+        [EnvironmentVariableTarget]::Process)
     $override = [Environment]::GetEnvironmentVariable(
         'SHARPPROOF_TEST_PROJECT_PARALLELISM',
         [EnvironmentVariableTarget]::Process)
+    if (-not [string]::IsNullOrWhiteSpace($semanticOverride)) {
+        return Get-SharpProofParallelismOverride $semanticOverride `
+            $visibleProcessors 'SHARPPROOF_SEMANTIC_TEST_PARALLELISM'
+    }
     if (-not [string]::IsNullOrWhiteSpace($override)) {
         return Get-SharpProofTestProjectParallelism `
             -RepositoryRoot $RepositoryRoot
     }
 
-    $visibleProcessors = [Environment]::ProcessorCount
-    if ($visibleProcessors -lt 1) {
-        throw 'The container did not expose a positive processor count.'
-    }
     return $visibleProcessors
 }
 

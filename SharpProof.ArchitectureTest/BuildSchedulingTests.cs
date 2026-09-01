@@ -440,13 +440,18 @@ public sealed class BuildSchedulingTests
         var command = $$"""
             Import-Module '{{escapedModule}}' -Force
             $env:SHARPPROOF_TEST_PROJECT_PARALLELISM = $null
+            $env:SHARPPROOF_SEMANTIC_TEST_PARALLELISM = $null
             $automatic = Get-SharpProofSemanticTestParallelism -RepositoryRoot '{{escapedRoot}}'
             $env:SHARPPROOF_TEST_PROJECT_PARALLELISM = '1'
             $capped = Get-SharpProofSemanticTestParallelism -RepositoryRoot '{{escapedRoot}}'
+            $env:SHARPPROOF_TEST_PROJECT_PARALLELISM = $null
+            $env:SHARPPROOF_SEMANTIC_TEST_PARALLELISM = '1'
+            $semanticCapped = Get-SharpProofSemanticTestParallelism -RepositoryRoot '{{escapedRoot}}'
             [ordered]@{
                 visible = [Environment]::ProcessorCount
                 automatic = $automatic
                 capped = $capped
+                semanticCapped = $semanticCapped
             } | ConvertTo-Json -Compress
             """;
 
@@ -485,6 +490,7 @@ public sealed class BuildSchedulingTests
                 result.GetProperty("automatic").GetInt32(),
                 Is.EqualTo(result.GetProperty("visible").GetInt32()));
             Assert.That(result.GetProperty("capped").GetInt32(), Is.EqualTo(1));
+            Assert.That(result.GetProperty("semanticCapped").GetInt32(), Is.EqualTo(1));
             Assert.That(
                 semantic,
                 Does.Contain("Get-SharpProofSemanticTestParallelism"));

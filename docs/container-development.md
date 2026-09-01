@@ -161,7 +161,8 @@ obtain that workspace using container Git; Git remains unnecessary on the host.
 through MSBuild's project scheduler.
 
 Containers use all CPUs available to Docker and up to 40960 MiB by default.
-Semantic-test scheduling uses every container-visible CPU.
+Semantic-test scheduling uses every container-visible CPU (or the value of
+`SHARPPROOF_SEMANTIC_TEST_PARALLELISM`, between 1 and the visible CPU count).
 The persistent workspace serializes commands.
 Package integration tests use 75% of container-visible CPU lanes by default.
 Other test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
@@ -175,7 +176,10 @@ Override the
 Docker budget with
 `SHARPPROOF_CONTAINER_CPU_LIMIT` and `SHARPPROOF_CONTAINER_MEMORY_LIMIT`; the
 lane count follows the CPUs visible to .NET. Use
-`SHARPPROOF_TEST_PROJECT_PARALLELISM` only for profiling or diagnosis.
+`SHARPPROOF_TEST_PROJECT_PARALLELISM` only for profiling or diagnosis. To cap
+semantic-test scheduling without changing other test/build lanes, use
+`SHARPPROOF_SEMANTIC_TEST_PARALLELISM` (an integer from 1 through the
+container-visible CPU count).
 When set, that override caps semantic and other test-project concurrency as
 well as parallel prerequisite-build lanes.
 The lane count is per container: when several agents share one Docker VM, cap
