@@ -2739,6 +2739,13 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             return false;
         }
 
+        if (ConversionEffectClassifier.SkipsLiftedOperator(
+                binary,
+                flow: null))
+        {
+            return ChildrenMayCompleteNormally(binary);
+        }
+
         if (binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or
                 BinaryOperatorKind.ConditionalOr &&
             binary.OperatorMethod != null)
