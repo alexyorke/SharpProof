@@ -127,7 +127,8 @@ internal static partial class VerifierProcessSupervisor
             var cleanup = StopDescendants(
                 Environment.ProcessId,
                 CleanupMilliseconds,
-                descriptorReserves: descriptorReserves);
+                descriptorReserves: descriptorReserves.Skip(1).ToArray(),
+                supervisorPidFd: descriptorReserves[0]);
             var hadDescendants = cleanup.HadDescendants;
             var retryDelayMilliseconds = 10;
             while (!cleanup.Complete)
@@ -138,7 +139,8 @@ internal static partial class VerifierProcessSupervisor
                     5000);
                 cleanup = StopDescendants(
                     Environment.ProcessId,
-                    RetryCleanupMilliseconds);
+                    RetryCleanupMilliseconds,
+                    supervisorPidFd: descriptorReserves[0]);
                 hadDescendants |= cleanup.HadDescendants;
             }
             if (!process.HasExited && !process.WaitForExit(1000))
@@ -206,13 +208,26 @@ internal static partial class VerifierProcessSupervisor
         int maximumMilliseconds,
         Func<int, int>? openPidFd = null,
         Func<int, int, int>? sendSignal = null,
-        IReadOnlyList<int>? descriptorReserves = null)
+        IReadOnlyList<int>? descriptorReserves = null,
+        int supervisorPidFd = -1)
     {
         CloseDescriptors(descriptorReserves ?? []);
         var foundAny = false;
         var deadline = Stopwatch.StartNew();
         while (deadline.ElapsedMilliseconds < maximumMilliseconds)
         {
+            // A numeric PID is not an identity once the process has exited.
+            // If the retained pidfd no longer names the original supervisor,
+            // do not scan that PID's descendants: it may have been recycled
+            // for an unrelated process.
+            if (supervisorPidFd >= 0 &&
+                (sendSignal?.Invoke(supervisorPidFd, SignalNone) ??
+                 SendPidFdSignal(supervisorPidFd, SignalNone)) != 0)
+            {
+                return new DescendantStopResult(
+                    foundAny,
+                    Complete: true);
+            }
             var parents = ReadProcessParents();
             var discovered = DescendantProcessIds(supervisorId, parents);
             if (discovered.Count == 0)

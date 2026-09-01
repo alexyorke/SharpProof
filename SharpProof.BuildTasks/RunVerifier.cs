@@ -1020,7 +1020,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 Math.Min(RemainingMilliseconds(
                     terminationStopwatch,
                     terminationWaitMilliseconds),
-                    LauncherProcessReserveMilliseconds));
+                    LauncherProcessReserveMilliseconds),
+                supervisorPidFd: _processGroupPidFd);
             if (SendPidFdSignal(_processGroupPidFd, SignalStop) == 0)
             {
                 // The stopped session leader keeps this process-group identity
