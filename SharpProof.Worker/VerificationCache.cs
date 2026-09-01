@@ -252,7 +252,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ValidatePath(directory, lockPath);
         Directory.CreateDirectory(directory);
         ValidatePath(directory, lockPath);
-        var mutex = new Mutex(false, "SharpProof.VerificationCache." + HashText(Path.GetFullPath(directory)));
+        var mutex = new Semaphore(1, 1, "SharpProof.VerificationCache." + HashText(Path.GetFullPath(directory)));
         if (!mutex.WaitOne(0))
         {
             mutex.Dispose();
@@ -278,7 +278,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         }
     }
 
-    private sealed class CacheLock(Mutex mutex, FileStream file)
+    private sealed class CacheLock(Semaphore mutex, FileStream file)
     {
         public void Dispose()
         {
