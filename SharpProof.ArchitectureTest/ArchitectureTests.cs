@@ -1622,6 +1622,18 @@ public sealed class ArchitectureTests
                 "NativeLibrary.Load(Z3ImportName);",
                 StringComparison.Ordinal),
             Is.True);
+
+        var handlePublication = host.IndexOf(
+            "Volatile.Write(ref _z3Handle, handle);",
+            StringComparison.Ordinal);
+        var resolverRegistration = host.IndexOf(
+            "NativeLibrary.SetDllImportResolver(",
+            StringComparison.Ordinal);
+        Assert.That(
+            handlePublication >= 0 &&
+            resolverRegistration > handlePublication,
+            Is.True,
+            "The resolver must not become visible before its verified handle is published.");
     }
 
     [Test]

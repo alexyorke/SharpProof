@@ -29,11 +29,11 @@ public static class ContainerNativeLibrary
                 ContainerContract.ResolveZ3LibraryRequired());
             try
             {
+                _z3Assembly = z3Assembly;
+                Volatile.Write(ref _z3Handle, handle);
                 NativeLibrary.SetDllImportResolver(
                     z3Assembly,
                     ResolveZ3Import);
-                _z3Assembly = z3Assembly;
-                Volatile.Write(ref _z3Handle, handle);
             }
             catch (OperationCanceledException)
             {
@@ -41,6 +41,8 @@ public static class ContainerNativeLibrary
             }
             catch
             {
+                Volatile.Write(ref _z3Handle, IntPtr.Zero);
+                _z3Assembly = null;
                 NativeLibrary.Free(handle);
                 throw;
             }
