@@ -78,6 +78,14 @@ internal static class ConditionalTruthOperatorFacts
         {
             expression = operatorReturned;
         }
+        else if (declaration is OperatorDeclarationSyntax
+        { Body: { } operatorBlock } &&
+            TryGetReturnAfterHarmlessDiscards(
+                operatorBlock,
+                out var returnedAfterDiscards))
+        {
+            expression = returnedAfterDiscards;
+        }
         if (expression == null)
         {
             return false;
@@ -93,5 +101,33 @@ internal static class ConditionalTruthOperatorFacts
         }
 
         return false;
+    }
+
+    private static bool TryGetReturnAfterHarmlessDiscards(
+        BlockSyntax body,
+        out ExpressionSyntax? expression)
+    {
+        expression = null;
+        if (body.Statements.Count == 0 ||
+            body.Statements[body.Statements.Count - 1] is not
+                ReturnStatementSyntax
+            { Expression: { } returned } ||
+            body.Statements.Take(body.Statements.Count - 1).Any(
+                static statement => statement is not ExpressionStatementSyntax
+                {
+                    Expression: AssignmentExpressionSyntax
+                    {
+                        Left: IdentifierNameSyntax
+                        {
+                            Identifier.ValueText: "_"
+                        }
+                    }
+                }))
+        {
+            return false;
+        }
+
+        expression = returned;
+        return true;
     }
 }

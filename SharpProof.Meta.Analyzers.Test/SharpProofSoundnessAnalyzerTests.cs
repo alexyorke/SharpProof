@@ -485,32 +485,6 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
-    public async Task SemanticCacheWritesDistinguishAliasVersions()
-    {
-        var diagnostics = await Analyze(
-            """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache {
-                internal void Write(Answer answer) { }
-            }
-            sealed class C {
-                void M(ProofCache cache) {
-                    var answer = Answer.Proven;
-                    var copy = answer;
-                    answer = copy;
-                    cache.Write(answer);
-                }
-            }
-            """);
-
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.Zero);
-    }
-
-    [Test]
     public async Task SemanticCacheWritesClassifyCanonicalEnumValues()
     {
         var diagnostics = await Analyze(

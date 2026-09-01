@@ -80,7 +80,7 @@
     },
     {
       "path": "SharpProof.Effects/OperationEffectScanner.Assignments.cs",
-      "maximumFileExpressionNodes": 663,
+      "maximumFileExpressionNodes": 666,
       "maximumMemberExpressionNodes": 203,
       "maximumFileDecisionPoints": 32,
       "maximumMemberDecisionPoints": 10

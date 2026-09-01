@@ -2363,8 +2363,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 MayCompleteNormally(@lock.LockedValue) &&
                 MayCompleteNormally(@lock.Body),
             IBinaryOperation binary =>
-                ChildrenMayCompleteNormally(binary) &&
-                !IsDefinitelyZeroDivision(binary),
+                BinaryMayCompleteNormally(binary),
             IUnaryOperation or IConversionOperation or
                 IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
                 ISimpleAssignmentOperation or IArrayElementReferenceOperation or
@@ -2730,6 +2729,45 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     private bool ChildrenMayCompleteNormally(IOperation operation)
     {
         return operation.ChildOperations.All(MayCompleteNormally);
+    }
+
+    private bool BinaryMayCompleteNormally(IBinaryOperation binary)
+    {
+        if (!MayCompleteNormally(binary.LeftOperand) ||
+            IsDefinitelyZeroDivision(binary))
+        {
+            return false;
+        }
+
+        if (binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or
+                BinaryOperatorKind.ConditionalOr &&
+            binary.OperatorMethod != null)
+        {
+            var truthOperator = ConditionalTruthOperatorFacts.Resolve(binary);
+            if (truthOperator != null &&
+                !MethodCanCompleteNormally(truthOperator))
+            {
+                return false;
+            }
+
+            if (truthOperator == null ||
+                !ConditionalTruthOperatorFacts.ReturnsConstant(
+                    compilation,
+                    truthOperator,
+                    out var truthResult))
+            {
+                // An unknown truth result retains the short-circuit path.
+                return true;
+            }
+
+            return truthResult ||
+                MayCompleteNormally(binary.RightOperand) &&
+                MethodCanCompleteNormally(binary.OperatorMethod);
+        }
+
+        return MayCompleteNormally(binary.RightOperand) &&
+            (binary.OperatorMethod == null ||
+             MethodCanCompleteNormally(binary.OperatorMethod));
     }
 
     private static bool IsDefinitelyZeroDivision(IBinaryOperation binary)

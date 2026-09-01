@@ -932,6 +932,7 @@ internal static class CacheSoundnessRules
                 return IsSemanticAnswerType(reference.Type);
             }
             return writes.Any(value =>
+                IsSelfReference(value, reference.Local) ||
                 IsNonCacheableSemanticAnswer(
                     value,
                     root,

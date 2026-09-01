@@ -23,6 +23,7 @@ public sealed class ReducedExtensionReceiverCompletionTests
                 }
 
                 public static void Exercise(Box suffix) {
+                    if (suffix is null) return;
                     InvokeExtension();
                     suffix.Value++;
                 }

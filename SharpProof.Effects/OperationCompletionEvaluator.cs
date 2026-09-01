@@ -1344,10 +1344,18 @@ internal sealed class OperationCompletionEvaluator
                     ConditionalTruthOperatorFacts.ReturnsConstant(
                         _compilation,
                         truthOperator,
-                        out var truthResult) &&
-                    truthResult)
+                        out var truthResult))
                 {
-                    return true;
+                    if (truthResult)
+                    {
+                        return true;
+                    }
+
+                    return CanCompleteNormally(binary.RightOperand) &&
+                        CanCompleteInvocation(
+                            binary.OperatorMethod,
+                            instance: null,
+                            binary);
                 }
 
                 // A refined truth value only determines whether the right
