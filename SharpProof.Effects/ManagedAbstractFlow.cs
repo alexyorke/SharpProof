@@ -262,15 +262,10 @@ internal sealed class ManagedAbstractFlow
                         : EvaluateCore(capture.Value, state));
                 break;
             case ISimpleAssignmentOperation assignment:
-                var aliasesUntrackedStorage = IsUntrackedRefLocal(assignment.Target);
-                if (aliasesUntrackedStorage)
-                {
-                    // Roslyn lowers ref-local declarations and writes through
-                    // ref locals to assignments. The target aliases storage
-                    // that this domain cannot identify, so facts must remain
-                    // forgotten after the alias enters the flow.
-                    state = state.WithUntrackedAlias();
-                }
+                state = MarkUntrackedAlias(
+                    state,
+                    assignment.Target,
+                    out var aliasesUntrackedStorage);
 
                 var valueHasMutation = ManagedMutationFacts.HasMutation(
                     assignment.Value);
@@ -291,11 +286,10 @@ internal sealed class ManagedAbstractFlow
                 }
                 break;
             case ICompoundAssignmentOperation compound:
-                var compoundAliasesUntrackedStorage = IsUntrackedRefLocal(compound.Target);
-                if (compoundAliasesUntrackedStorage)
-                {
-                    state = state.WithUntrackedAlias();
-                }
+                state = MarkUntrackedAlias(
+                    state,
+                    compound.Target,
+                    out var compoundAliasesUntrackedStorage);
 
                 state = TransferMany(state, compound.ChildOperations, result, cancellationToken);
                 if (!compoundAliasesUntrackedStorage)
@@ -304,11 +298,10 @@ internal sealed class ManagedAbstractFlow
                 }
                 break;
             case IIncrementOrDecrementOperation increment:
-                var incrementAliasesUntrackedStorage = IsUntrackedRefLocal(increment.Target);
-                if (incrementAliasesUntrackedStorage)
-                {
-                    state = state.WithUntrackedAlias();
-                }
+                state = MarkUntrackedAlias(
+                    state,
+                    increment.Target,
+                    out var incrementAliasesUntrackedStorage);
 
                 state = Transfer(state, increment.Target, result, cancellationToken);
                 if (!incrementAliasesUntrackedStorage)
@@ -952,6 +945,17 @@ internal sealed class ManagedAbstractFlow
     {
         return DefiniteOperationFacts.UnwrapHarmlessValue(operation) is ILocalReferenceOperation local &&
             IsUntrackedManagedReference(local.Local.RefKind);
+    }
+
+    private static ManagedFlowState MarkUntrackedAlias(
+        ManagedFlowState state,
+        IOperation target,
+        out bool aliased)
+    {
+        aliased = IsUntrackedRefLocal(target);
+        // Roslyn lowers ref-local declarations and writes through ref locals
+        // to assignments whose storage this domain cannot identify.
+        return aliased ? state.WithUntrackedAlias() : state;
     }
 
     private static bool IsUntrackedManagedReference(RefKind refKind)
@@ -1662,35 +1666,32 @@ internal readonly record struct ManagedAbstractValue(
 
     internal static ManagedAbstractValue TopForType(ITypeSymbol? type)
     {
-        if (type?.SpecialType == SpecialType.System_Boolean)
-        {
-            return BooleanUnknown;
-        }
-
-        if (IntegerType(type, out var integer))
-        {
-            return Integer(IntervalValue.Range(integer.Minimum, integer.Maximum));
-        }
-
-        return type?.IsReferenceType is true || IsNullableType(type)
-            ? Reference(NullnessValue.MaybeNull)
-            : Unknown;
+        return ValueForType(type, useDefault: false);
     }
 
     internal static ManagedAbstractValue DefaultForType(ITypeSymbol? type)
     {
+        return ValueForType(type, useDefault: true);
+    }
+
+    private static ManagedAbstractValue ValueForType(
+        ITypeSymbol? type,
+        bool useDefault)
+    {
         if (type?.SpecialType == SpecialType.System_Boolean)
         {
-            return Boolean(false);
+            return useDefault ? Boolean(false) : BooleanUnknown;
         }
 
-        if (IntegerType(type, out _))
+        if (IntegerType(type, out var integer))
         {
-            return Integer(IntervalValue.Constant(0));
+            return Integer(useDefault
+                ? IntervalValue.Constant(0)
+                : IntervalValue.Range(integer.Minimum, integer.Maximum));
         }
 
         return type?.IsReferenceType is true || IsNullableType(type)
-            ? Null
+            ? useDefault ? Null : Reference(NullnessValue.MaybeNull)
             : Unknown;
     }
 
