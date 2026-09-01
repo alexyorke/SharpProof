@@ -690,7 +690,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             Report(context, MetaDiagnosticDescriptors.StringFieldInIr, property.Locations.FirstOrDefault(), property.Name);
         }
-
         if ((property.SetMethod != null || IsMutableStorageType(
                 property.Type,
                 context.CancellationToken)) &&
