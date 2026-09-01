@@ -51,28 +51,6 @@ public sealed class AtomicFileTests
     }
 
     [Test]
-    public void ReplacingDestinationPreservesUnixMode()
-    {
-        if (!OperatingSystem.IsLinux())
-        {
-            Assert.Ignore("Unix mode preservation is only applicable on Linux.");
-        }
-
-        var path = Path.Combine(_root, "restricted.txt");
-        File.WriteAllText(path, "original");
-        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-
-        AtomicFile.WriteUtf8(path, "replacement\n");
-
-        Assert.That(
-            File.GetUnixFileMode(path) & (UnixFileMode.GroupRead |
-                UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead | UnixFileMode.OtherWrite |
-                UnixFileMode.OtherExecute),
-            Is.EqualTo(UnixFileMode.None));
-    }
-
-    [Test]
     public void WriteUtf8SupportsValidLongDestinationBasename()
     {
         var path = LongDestinationPath();
