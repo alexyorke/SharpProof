@@ -421,6 +421,13 @@ internal static class Program
                 "SharpProof worker result is inconsistent with its process exit code.");
             return 3;
         }
+        if (workerExitCode is not (null or 0) &&
+            response?.RunStatus == WorkerRunStatus.Complete)
+        {
+            Console.Error.WriteLine(
+                "SharpProof worker result is inconsistent with its process exit code.");
+            return 3;
+        }
         validResponse = true;
         ArgumentNullException.ThrowIfNull(response);
         WorkerProtocolJson.Canonicalize(response);
