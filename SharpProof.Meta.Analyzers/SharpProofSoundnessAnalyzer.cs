@@ -229,8 +229,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 KnownType.MetaDiagnosticDescriptors,
                 KnownType.AnalyzerDiagnosticDescriptors,
                 KnownType.ContractForDiagnosticDescriptors) &&
-            !(containingType?.Name == "ContractForDiagnosticDescriptors" &&
-              IsNamespaceOrNested(containingType.ContainingNamespace, "SharpProof", "Analyzer", "Core", "ContractForValidation")))
+            containingType?.Name != "ContractForDiagnosticDescriptors")
         {
             Report(context, MetaDiagnosticDescriptors.DescriptorConstruction, creation.Syntax.GetLocation());
         }
