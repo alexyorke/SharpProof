@@ -165,6 +165,79 @@ public sealed class OperationCompletionWaveFiveRegressionTests
         }
     }
 
+    [Test]
+    public void LiftedNullDivisionByZeroCanReachFollowingWrites()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                private static int state;
+
+                public static void Binary() {
+                    int? left = null;
+                    _ = left / 0;
+                    state++;
+                }
+
+                public static void Compound() {
+                    int? left = null;
+                    left /= 0;
+                    state++;
+                }
+
+                public static void Unknown(int? left) {
+                    _ = left / 0;
+                    state++;
+                }
+            }
+            """);
+        var binary = EffectTestHost.RequireMethod(
+            compilation,
+            "Sample",
+            "Binary");
+        var compound = EffectTestHost.RequireMethod(
+            compilation,
+            "Sample",
+            "Compound");
+        var unknown = EffectTestHost.RequireMethod(
+            compilation,
+            "Sample",
+            "Unknown");
+        var binaryOperation = GetOperation(compilation, binary)
+            .DescendantsAndSelf()
+            .OfType<IBinaryOperation>()
+            .Single();
+        var compoundOperation = GetOperation(compilation, compound)
+            .DescendantsAndSelf()
+            .OfType<ICompoundAssignmentOperation>()
+            .Single();
+        var unknownOperation = GetOperation(compilation, unknown)
+            .DescendantsAndSelf()
+            .OfType<IBinaryOperation>()
+            .Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(binaryOperation.IsLifted, Is.True);
+            Assert.That(compoundOperation.IsLifted, Is.True);
+            Assert.That(
+                CreateCompletionEvaluator(compilation, binary)
+                    .CanCompleteNormally(binaryOperation),
+                Is.True);
+            Assert.That(
+                CreateCompletionEvaluator(compilation, compound)
+                    .CanCompleteCompoundOperator(compoundOperation),
+                Is.True);
+            Assert.That(
+                CreateCompletionEvaluator(compilation, unknown)
+                    .CanCompleteNormally(unknownOperation),
+                Is.True);
+            Assert.That(HasStaticWrite(compilation, binary), Is.True);
+            Assert.That(HasStaticWrite(compilation, compound), Is.True);
+            Assert.That(HasStaticWrite(compilation, unknown), Is.True);
+        }
+    }
+
     private static IOperation GetOperation(
         Compilation compilation,
         IMethodSymbol method)
