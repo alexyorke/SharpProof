@@ -22,13 +22,38 @@ if ($null -eq (Get-Command gh -ErrorAction SilentlyContinue)) {
 }
 
 function Invoke-GitHubJson {
-    param([Parameter(Mandatory = $true)][string]$Endpoint)
+    param(
+        [Parameter(Mandatory = $true)][string]$Endpoint,
+        [switch]$Paginate
+    )
 
-    $output = & gh api $Endpoint 2>&1
+    $arguments = @('api')
+    if ($Paginate) {
+        $arguments += @('--paginate', '--slurp')
+    }
+    $arguments += $Endpoint
+    $output = & gh @arguments 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "GitHub API request failed for '$Endpoint': $output"
     }
-    return ($output -join "`n") | ConvertFrom-Json
+    $json = ($output -join "`n") | ConvertFrom-Json
+    if (-not $Paginate) {
+        return $json
+    }
+    # --slurp wraps each paginated response in an outer array. List endpoints
+    # need their pages flattened; object endpoints are returned unchanged.
+    $pages = @($json)
+    if ($pages.Count -eq 1 -and $pages[0] -isnot [array]) {
+        return $pages[0]
+    }
+    $items = [Collections.Generic.List[object]]::new()
+    foreach ($page in $pages) {
+        if ($page -is [array]) {
+            foreach ($item in $page) { $items.Add($item) }
+        }
+        else { $items.Add($page) }
+    }
+    return $items.ToArray()
 }
 
 function Require-SetMembers {
@@ -172,7 +197,7 @@ $workflowEvidence = @($contract.workflowJobs | ForEach-Object {
         }
         [pscustomobject]@{ id = $jobId; canonicalSha256 = $actualHash }
     })
-$rulesets = @(Invoke-GitHubJson "repos/$repository/rulesets")
+$rulesets = @(Invoke-GitHubJson "repos/$repository/rulesets" -Paginate)
 $activeTagRulesets = @($rulesets |
     Where-Object { $_.target -ceq 'tag' -and $_.enforcement -ceq 'active' })
 if ($activeTagRulesets.Count -ne 1) {
@@ -254,7 +279,7 @@ foreach ($required in $contract.environments) {
         throw "Environment '$name' must use explicit tag policies."
     }
     $policies = Invoke-GitHubJson (
-        "repos/$repository/environments/$escapedName/deployment-branch-policies")
+        "repos/$repository/environments/$escapedName/deployment-branch-policies") -Paginate
     $actualRefs = @($policies.branch_policies | ForEach-Object {
             ([string]$_.type) + ':' + ([string]$_.name)
         })
@@ -266,14 +291,14 @@ foreach ($required in $contract.environments) {
         -Expected $expectedRefs `
         -Owner "Environment '$name' deployment ref policies"
 
-    $variables = Invoke-GitHubJson "repos/$repository/environments/$escapedName/variables"
+    $variables = Invoke-GitHubJson "repos/$repository/environments/$escapedName/variables" -Paginate
     $actualVariables = @($variables.variables | ForEach-Object { [string]$_.name })
     Require-SetMembers `
         -Actual $actualVariables `
         -Expected @($required.variables) `
         -Owner "Environment '$name' variables"
 
-    $secrets = Invoke-GitHubJson "repos/$repository/environments/$escapedName/secrets"
+    $secrets = Invoke-GitHubJson "repos/$repository/environments/$escapedName/secrets" -Paginate
     $actualSecrets = @($secrets.secrets | ForEach-Object { [string]$_.name })
     $requiredSecrets = @($required.secrets)
     Require-SetMembers `

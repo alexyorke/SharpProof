@@ -153,7 +153,8 @@ try {
         -Destination (Join-Path $fixture '.github/workflows/package-consumers.yml')
     @'
 #!/bin/sh
-case "$2" in
+for endpoint do :; done
+case "$endpoint" in
   repos/alexyorke/SharpProof/rulesets) file="rulesets" ;;
   repos/alexyorke/SharpProof/rulesets/7) file="ruleset" ;;
   */environments/nuget.private-preview/deployment-branch-policies) file="private-policies" ;;
