@@ -71,6 +71,11 @@
     <PackageReference Include="NUnit3TestAdapter" />
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestRepository.cs"
              Link="TestRepository.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.ArchitectureTest' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Gates.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TempDirectory.cs"
              Link="TempDirectory.cs" />
   </ItemGroup>
