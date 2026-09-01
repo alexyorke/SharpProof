@@ -105,7 +105,6 @@
       "SharpProof.Frontend/OperationSupport.catalog.json",
       "SharpProof.Ir/IrModel.schema.json",
       "SharpProof.Package/SharpProof.nuspec",
-      "SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props",
       "SharpProof.Package/buildTransitive/SharpProof.props",
       "SharpProof.Package/buildTransitive/SharpProof.targets",
       "SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1",
@@ -165,6 +164,10 @@
       "scripts/Invoke-SharpProofTrustedMutationsParallel.ps1",
       "scripts/New-SharpProofReleaseEvidence.ps1",
       "scripts/Publish-SharpProofRelease.ps1",
+      "scripts/SharpProof.ContainerExecution.psm1",
+      "scripts/SharpProof.MutationBaselines.psm1",
+      "scripts/SharpProof.MutationEvidence.psm1",
+      "scripts/SharpProof.MutationScheduling.psm1",
       "scripts/SharpProof.PackageIdentity.psm1",
       "scripts/SharpProof.PublicationDestination.ps1",
       "scripts/SharpProof.PublicationPlanTopology.ps1",
@@ -216,7 +219,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-      "inventorySha256": "e6d419fd54aec7cb1ceaab46b61cf2c28a4b21a0fb7f8a7d8795e53459c938cb",
+      "inventorySha256": "e0ebfafc4b6f863c915e84fdda328873aad0957aad053057a654a591eab3356d",
     "components": [
       {
         "name": "discovery",

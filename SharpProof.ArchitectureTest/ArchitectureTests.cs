@@ -780,6 +780,7 @@ public sealed class ArchitectureTests
         string[] buildFilePaths =
         [
             "SharpProof.Package/buildTransitive/SharpProof.props",
+            "SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props",
             "SharpProof.Package/buildTransitive/SharpProof.targets",
             "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props",
             "SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets"
@@ -809,9 +810,8 @@ public sealed class ArchitectureTests
             .Concat(retired)
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
-        var compilerVisible = XDocument.Parse(buildFiles[0])
-            .Descendants("CompilerVisibleProperty")
-            .Concat(XDocument.Parse(buildFiles[2])
+        var compilerVisible = buildFiles
+            .SelectMany(static text => XDocument.Parse(text)
                 .Descendants("CompilerVisibleProperty"))
             .Select(static value => value.Attribute("Include")?.Value)
             .Where(static value => value != null)
@@ -1057,7 +1057,7 @@ public sealed class ArchitectureTests
                     "'artifacts/mutation/trusted-mutations.json'"));
             Assert.That(
                 container,
-                Does.Contain("-OutputPath $mutationOutput"));
+                Does.Contain("OutputPath = $mutationOutput"));
             Assert.That(
                 container,
                 Does.Contain(

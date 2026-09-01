@@ -18,10 +18,18 @@ $derived = @(Get-SharpProofReleaseAuthorityClosure -RepositoryRoot $repositoryRo
 $declared = @($contract.releaseAuthorityClosure.paths | ForEach-Object {
         [string]$_
     })
+$missing = @($derived | Where-Object { $declared -cnotcontains $_ })
+$extra = @($declared | Where-Object { $derived -cnotcontains $_ })
 if ($declared.Count -ne @($declared | Select-Object -Unique).Count -or
     $derived.Count -ne $declared.Count -or
-    @($derived | Where-Object { $declared -cnotcontains $_ }).Count -ne 0) {
-    throw 'The declared release-authority closure does not equal the independently derived closure.'
+    $missing.Count -ne 0) {
+    $details = @(
+        "derived=$($derived.Count)",
+        "declared=$($declared.Count)",
+        "missing=$($missing.Count): $($missing -join ', ')",
+        "extra=$($extra.Count): $($extra -join ', ')"
+    ) -join '; '
+    throw "The declared release-authority closure does not equal the independently derived closure: $details"
 }
 $tcb = @(Get-SharpProofTcbPaths -Contract $contract -ProductionInventory $productionInventory)
 foreach ($path in $derived) {

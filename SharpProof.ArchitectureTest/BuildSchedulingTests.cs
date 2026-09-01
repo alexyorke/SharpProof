@@ -630,15 +630,15 @@ public sealed class BuildSchedulingTests
         {
             Assert.That(container, Does.Contain("$arguments += '--no-build'"));
             Assert.That(container, Does.Contain(
-                "$semanticArguments.NoBuild = $true"));
+                "$semanticArguments = New-TestInvocationArguments"));
             Assert.That(container, Does.Contain(
                 "$semanticArguments.TestFilter = $TestFilter"));
             Assert.That(container, Does.Contain(
-                "$packageArguments.NoBuild = $true"));
+                "$packageArguments = New-TestInvocationArguments"));
             Assert.That(container, Does.Contain(
                 "'-NoBuild is supported only for test commands"));
             Assert.That(container, Does.Contain(
-                "$changedArguments.NoBuild = $true"));
+                "$changedArguments = New-TestInvocationArguments"));
         }
     }
 

@@ -60,7 +60,7 @@ function Get-SharpProofReleaseAuthorityClosure {
                     $value -match '(?i)^scripts/.+\.cs$') {
                     $references.Add($value)
                 }
-                elseif ($value -match '(?i)^[A-Za-z0-9_.-]+\.ps1$' -or
+                elseif ($value -match '(?i)^[A-Za-z0-9_.-]+\.psm?1$' -or
                     $value -ceq 'SharpProof.SymbolPackageValidator.cs') {
                     $references.Add((Split-Path $path -Parent).Replace('\', '/') + '/' + $value)
                 }
@@ -77,17 +77,18 @@ function Get-SharpProofReleaseAuthorityClosure {
             }
             foreach ($match in [regex]::Matches(
                     $text,
-                    '(?m)^\s*uses:\s*\./(?<path>\.github/actions/[A-Za-z0-9_./-]+)\s*(?:#.*)?$')) {
+                    '(?m)^\s*(?:-\s*)?uses:\s*\./(?<path>\.github/actions/[A-Za-z0-9_./-]+)\s*(?:#.*)?$')) {
                 $action = $match.Groups['path'].Value.TrimEnd('/') + '/action.yml'
                 $references.Add($action)
             }
         }
-
         foreach ($reference in $references) {
             $canonical = $reference.Replace('\', '/')
             if ($canonical.StartsWith('./', [StringComparison]::Ordinal)) {
                 $canonical = $canonical.Substring(2)
             }
+            $canonical = ([IO.Path]::GetRelativePath(
+                $root, [IO.Path]::GetFullPath((Join-Path $root $canonical)))).Replace('\', '/')
             $isSourceCandidate = $canonical -notmatch '(?:^|/)(?:bin|obj|artifacts)/' -and
                 (Test-Path -LiteralPath (Join-Path $root $canonical) -PathType Leaf)
             if ($canonical -cne 'eng/acceptance/contract.json' -and
