@@ -18,6 +18,9 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class BuildTaskTests
 {
+    private static readonly string DotNetHost =
+        Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
+
     [Test]
     public async System.Threading.Tasks.Task
         MissingCompilerHostVersionFailsClosedUnlessProfileIsOff()
@@ -424,16 +427,7 @@ public sealed class BuildTaskTests
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "System.Console.Out.Write(\"partial\");");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 2000,
-                TerminationGraceMilliseconds = 1
-            };
+            using var task = CreateVerifier(directory, helper, 2000, 1);
 
             Assert.That(task.Execute(), Is.True);
             Assert.That(task.ExitCode, Is.EqualTo(0));
@@ -460,18 +454,9 @@ public sealed class BuildTaskTests
                 (RunVerifier.MaximumCapturedOutputCharacters + 1)
                     .ToString(CultureInfo.InvariantCulture) +
                 ")); System.Threading.Thread.Sleep(5000);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 5000,
-                TerminationGraceMilliseconds = 1000,
-                ContainmentAuthenticationFailureOverride = message =>
-                    Volatile.Write(ref containmentFailure, message)
-            };
+            using var task = CreateVerifier(directory, helper, 5000, 1000);
+            task.ContainmentAuthenticationFailureOverride = message =>
+                Volatile.Write(ref containmentFailure, message);
             var stopwatch = Stopwatch.StartNew();
 
             Assert.That(task.Execute(), Is.True);
@@ -514,17 +499,8 @@ public sealed class BuildTaskTests
                 (RunVerifier.MaximumCapturedOutputCharacters + 1)
                     .ToString(CultureInfo.InvariantCulture) +
                 ")); System.Threading.Thread.Sleep(1500);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 5000,
-                TerminationGraceMilliseconds = 1,
-                TryTerminateOverride = static (_, _, _) => false
-            };
+            using var task = CreateVerifier(directory, helper, 5000, 1);
+            task.TryTerminateOverride = static (_, _, _) => false;
             var stopwatch = Stopwatch.StartNew();
 
             Assert.That(task.Execute(), Is.True);
@@ -977,16 +953,12 @@ public sealed class BuildTaskTests
                 exitCode.ToString(CultureInfo.InvariantCulture) +
                 ";");
             var engine = new RecordingBuildEngine();
-            using var task = new RunVerifier
-            {
-                BuildEngine = engine,
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 2000,
-                TerminationGraceMilliseconds = 1000
-            };
+            using var task = CreateVerifier(
+                directory,
+                helper,
+                2000,
+                1000,
+                engine);
 
             Assert.That(task.Execute(), Is.True);
 
@@ -1196,24 +1168,16 @@ public sealed class BuildTaskTests
             const int projectWallTimeMilliseconds = 2000;
             const int terminationGraceMilliseconds = 1000;
             var helper = CreateTimedProcessAssembly(directory.FullName);
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                // Let the instrumented supervisor and child finish managed
-                // startup before exercising the whole-process deadline.
-                ProjectWallTimeMilliseconds = projectWallTimeMilliseconds,
-                // Container scheduling can delay authenticated descendant
-                // cleanup beyond a single scheduler quantum. Keep the
-                // fixture's cleanup reserve realistic while retaining a
-                // bounded wall assertion with one second of scheduler slack.
-                TerminationGraceMilliseconds = terminationGraceMilliseconds,
-                ContainmentAuthenticationFailureOverride = message =>
-                    Volatile.Write(ref containmentFailure, message)
-            };
+            // Let the instrumented supervisor and child finish managed startup
+            // before exercising the whole-process deadline. The cleanup reserve
+            // also allows for container scheduling delay.
+            using var task = CreateVerifier(
+                directory,
+                helper,
+                projectWallTimeMilliseconds,
+                terminationGraceMilliseconds);
+            task.ContainmentAuthenticationFailureOverride = message =>
+                Volatile.Write(ref containmentFailure, message);
             var maximumElapsed = TimeSpan.FromMilliseconds(
                 RunVerifier.ComputeProcessTimeout(
                     projectWallTimeMilliseconds,
@@ -1259,17 +1223,8 @@ public sealed class BuildTaskTests
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "System.Threading.Thread.Sleep(900);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 1200,
-                TerminationGraceMilliseconds = 50,
-                PreLaunchSetupOverride = () => Thread.Sleep(1500)
-            };
+            using var task = CreateVerifier(directory, helper, 1200, 50);
+            task.PreLaunchSetupOverride = () => Thread.Sleep(1500);
 
             Assert.That(task.Execute(), Is.True);
             Assert.That(task.ExitCode, Is.Zero);
@@ -1294,16 +1249,11 @@ public sealed class BuildTaskTests
                 directory.FullName,
                 "System.IO.File.WriteAllText(\"started.txt\", \"started\"); " +
                 "System.Threading.Thread.Sleep(3000);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = int.MaxValue,
-                TerminationGraceMilliseconds = 1
-            };
+            using var task = CreateVerifier(
+                directory,
+                helper,
+                int.MaxValue,
+                1);
 
             Assert.That(task.Execute(), Is.True);
             Thread.Sleep(250);
@@ -1339,18 +1289,9 @@ public sealed class BuildTaskTests
                 "var child = Process.Start(start)!; " +
                 "File.WriteAllText(\"descendant.pid\", child.Id.ToString()); " +
                 "Thread.Sleep(800);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                // Let the instrumented supervisor and child finish managed
-                // startup before asserting descendant cleanup behavior.
-                ProjectWallTimeMilliseconds = 2000,
-                TerminationGraceMilliseconds = 50
-            };
+            // Let the instrumented supervisor and child finish managed
+            // startup before asserting descendant cleanup behavior.
+            using var task = CreateVerifier(directory, helper, 2000, 50);
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             Assert.That(task.Execute(), Is.True);
@@ -1402,16 +1343,7 @@ public sealed class BuildTaskTests
                 "start.UseShellExecute = false; Process.Start(start); " +
                 "var wait = Stopwatch.StartNew(); " +
                 "while (!System.IO.File.Exists(\"daemon.pid\") && wait.ElapsedMilliseconds < 500) Thread.Sleep(1);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 1000,
-                TerminationGraceMilliseconds = 1
-            };
+            using var task = CreateVerifier(directory, helper, 1000, 1);
 
             Assert.That(task.Execute(), Is.True);
             Assert.That(File.Exists(pidPath), Is.True);
@@ -1504,17 +1436,8 @@ public sealed class BuildTaskTests
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "using System.Threading; Thread.Sleep(1500);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 10,
-                TerminationGraceMilliseconds = 1,
-                TryTerminateOverride = static (_, _, _) => false
-            };
+            using var task = CreateVerifier(directory, helper, 10, 1);
+            task.TryTerminateOverride = static (_, _, _) => false;
 
             Assert.That(task.Execute(), Is.True);
             using (Assert.EnterMultipleScope())
@@ -1548,17 +1471,8 @@ public sealed class BuildTaskTests
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "using System.Threading; Thread.Sleep(1500);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 300000,
-                TerminationGraceMilliseconds = 1,
-                TryTerminateOverride = static (_, _, _) => false
-            };
+            using var task = CreateVerifier(directory, helper, 300000, 1);
+            task.TryTerminateOverride = static (_, _, _) => false;
             var execution = System.Threading.Tasks.Task.Run(task.Execute);
             Assert.That(
                 SpinWait.SpinUntil(
@@ -1605,16 +1519,7 @@ public sealed class BuildTaskTests
                 "var wait = Stopwatch.StartNew(); while (!System.IO.File.Exists(\"daemon.pid\") && wait.ElapsedMilliseconds < 500) Thread.Sleep(1); " +
                 "Native.Kill(Native.GetParent(), 9); Thread.Sleep(1000); " +
                 "internal static class Native { [DllImport(\"libc\", EntryPoint=\"getppid\")] internal static extern int GetParent(); [DllImport(\"libc\", EntryPoint=\"kill\")] internal static extern int Kill(int processId, int signal); }");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                ProjectWallTimeMilliseconds = 2000,
-                TerminationGraceMilliseconds = 1
-            };
+            using var task = CreateVerifier(directory, helper, 2000, 1);
 
             Assert.That(task.Execute(), Is.True);
             Assert.That(File.Exists(pidPath), Is.True);
@@ -1655,16 +1560,9 @@ public sealed class BuildTaskTests
             var helper = CreateTimedProcessAssembly(
                 directory.FullName,
                 "using System.IO; File.WriteAllText(\"started.txt\", \"started\");");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments = [new TaskItem(helper)],
-                OpenPidFdOverride = static _ =>
-                    throw new InvalidOperationException("forced pidfd failure")
-            };
+            using var task = CreateVerifier(directory, helper);
+            task.OpenPidFdOverride = static _ =>
+                throw new InvalidOperationException("forced pidfd failure");
 
             Assert.That(task.Execute(), Is.True);
 
@@ -1704,18 +1602,9 @@ public sealed class BuildTaskTests
         {
             var helper = CreateTimedProcessAssembly(directory.FullName);
             var containmentFailure = string.Empty;
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments =
-                [
-                    new TaskItem(helper)
-                ],
-                ContainmentAuthenticationFailureOverride = message =>
-                    containmentFailure = message
-            };
+            using var task = CreateVerifier(directory, helper);
+            task.ContainmentAuthenticationFailureOverride = message =>
+                containmentFailure = message;
 
             var execution = System.Threading.Tasks.Task.Run(task.Execute);
             Assert.That(
@@ -2389,6 +2278,24 @@ public sealed class BuildTaskTests
         {
             directory.Delete(recursive: true);
         }
+    }
+
+    private static RunVerifier CreateVerifier(
+        DirectoryInfo directory,
+        string helper,
+        int wallTimeMilliseconds = 300000,
+        int graceMilliseconds = 1000,
+        RecordingBuildEngine? buildEngine = null)
+    {
+        return new RunVerifier
+        {
+            BuildEngine = buildEngine ?? new RecordingBuildEngine(),
+            Executable = DotNetHost,
+            WorkingDirectory = directory.FullName,
+            Arguments = [new TaskItem(helper)],
+            ProjectWallTimeMilliseconds = wallTimeMilliseconds,
+            TerminationGraceMilliseconds = graceMilliseconds
+        };
     }
 
     private sealed class RecordingBuildEngine : IBuildEngine
