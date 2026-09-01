@@ -189,6 +189,47 @@ public static class ContainerContract
         return library;
     }
 
+    internal static IntPtr LoadZ3LibraryRequired()
+    {
+        var contract = ValidateRequired();
+        var nativeRoot = Environment.GetEnvironmentVariable(
+            "SHARPPROOF_NATIVE_ROOT");
+        if (string.IsNullOrWhiteSpace(nativeRoot))
+        {
+            nativeRoot = "/opt/sharpproof/native";
+        }
+        var library = LinuxPathIdentity.RequireLocalPath(Path.Combine(
+            nativeRoot,
+            "z3",
+            contract.Z3Version,
+            "linux-x64",
+            "libz3.so"));
+        using var stream = new FileStream(
+            library,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 4096,
+            options: FileOptions.SequentialScan);
+        var hash = Convert.ToHexString(SHA256.HashData(stream));
+        if (!string.Equals(hash, contract.Z3LibrarySha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "The SharpProof Z3 native payload hash does not match the container contract.");
+        }
+
+        if (!OperatingSystem.IsLinux())
+        {
+            throw new PlatformNotSupportedException(
+                "Verified descriptor loading requires Linux.");
+        }
+
+        // The descriptor remains open through dlopen, so /proc/self/fd points
+        // at the bytes that were hashed even if the directory entry is replaced.
+        var descriptorPath = $"/proc/self/fd/{stream.SafeFileHandle.DangerousGetHandle().ToInt64()}";
+        return NativeLibrary.Load(descriptorPath);
+    }
+
     private static JsonDocument ReadEmbeddedToolchain()
     {
         var stream = typeof(ContainerContract).Assembly.GetManifestResourceStream(

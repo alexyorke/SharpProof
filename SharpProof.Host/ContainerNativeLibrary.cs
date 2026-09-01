@@ -25,8 +25,10 @@ public static class ContainerNativeLibrary
                 return;
             }
 
-            var handle = NativeLibrary.Load(
-                ContainerContract.ResolveZ3LibraryRequired());
+            // Validate and dlopen the same open file description. Loading by
+            // pathname after validation permits an attacker to replace the
+            // path in between and have the process map unverified bytes.
+            var handle = ContainerContract.LoadZ3LibraryRequired();
             try
             {
                 NativeLibrary.SetDllImportResolver(
