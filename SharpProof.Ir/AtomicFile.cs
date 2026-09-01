@@ -1,7 +1,20 @@
+using System.Reflection;
+
 namespace SharpProof.Ir;
 internal static class AtomicFile
 {
     private static readonly UTF8Encoding Utf8 = new(false);
+    private static readonly MethodInfo? GetUnixFileMode = FindUnixModeMethod(
+        "GetUnixFileMode", parameterCount: 1);
+    private static readonly MethodInfo? SetUnixFileMode = FindUnixModeMethod(
+        "SetUnixFileMode", parameterCount: 2);
+
+    private static MethodInfo? FindUnixModeMethod(string name, int parameterCount)
+    {
+        return typeof(File).GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .FirstOrDefault(method => method.Name == name &&
+                method.GetParameters().Length == parameterCount);
+    }
 
     internal static string PrepareStaged(string path)
     {
@@ -44,11 +57,37 @@ internal static class AtomicFile
     {
         if (File.Exists(destination))
         {
+            PreserveDestinationMode(temporary, destination);
             File.Replace(temporary, destination, null);
         }
         else
         {
             File.Move(temporary, destination);
+        }
+    }
+
+    private static void PreserveDestinationMode(string temporary, string destination)
+    {
+        // SharpProof.Ir targets netstandard2.0, while the Unix mode APIs are
+        // available only on newer runtimes. Invoke them when present so the
+        // replacement inode inherits the administrator-selected mode.
+        if (GetUnixFileMode == null || SetUnixFileMode == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var mode = GetUnixFileMode.Invoke(null, new object[] { destination });
+            SetUnixFileMode.Invoke(null, new[] { temporary, mode! });
+        }
+        catch (TargetInvocationException exception) when (
+            exception.InnerException is PlatformNotSupportedException ||
+            exception.InnerException is IOException ||
+            exception.InnerException is UnauthorizedAccessException)
+        {
+            // Non-Unix runtimes and filesystems without mode support retain
+            // their platform-native replacement behavior.
         }
     }
 
