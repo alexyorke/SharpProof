@@ -1936,3 +1936,46 @@ That number is worth stating plainly because it sets expectations correctly: thi
 
 > **Implication for prioritisation.** Because the total is small relative to the codebase, the case for applying any given finding rests on *maintenance* value — one helper instead of 49 copies that have already drifted into four different error messages — rather than on line count. Findings whose only benefit is a smaller number, particularly the reformatting items this document flags as not recommended, are not worth their diff.
 
+---
+
+## Deep pass: samples, pilots, and the small projects (round 7)
+
+**Estimated savings: ~115 LOC** (~129 if the `ApproximatedJustification` doc slot is confirmed dead).
+
+Every "unused" claim below was grepped across **all tracked file types** with no pathspec restriction — `.cs .ps1 .psm1 .json .yml .md .props .targets .csproj .slnx` — excluding only `obj/` and `bin/`. This is deliberate: the verification pass showed that the one badly wrong claim in this document came from a grep scoped to a single file type.
+
+### 1. Dead private method `LinuxPathIdentity.ConfirmAncestorIdentity` — and a latent soundness gap
+- **Files:** `SharpProof.Host/LinuxPathIdentity.cs:448-461` (method), `:263` (`var ancestorIdentity = CaptureAncestorIdentity(...)` — local never read)
+- **Est. LOC saved:** ~15
+- **Why it's safe:** `git grep -n "ConfirmAncestorIdentity"` with no pathspec returns **zero** hits outside the declaration. Same for the local `ancestorIdentity` — assigned at `:263`, never read anywhere in the file.
+- **⚠ This is more than dead code.** The capture/confirm pair was evidently never wired up: locks are acquired at `:274-287` and **the captured ancestor identity is never re-confirmed afterwards**. Deleting the method is safe, but the TOCTOU protection it was written to provide does not currently exist. Worth a separate issue rather than a silent deletion.
+- **Proposed change:** Delete `ConfirmAncestorIdentity`; change `:263` to a bare `CaptureAncestorIdentity(canonicalPaths);` — its ancestor-is-a-directory validation throw at `:435` is a real side effect and must be kept.
+
+### 2. `IrRelationalSummary.ExceptionalExits` is write-only and redundant with `IrSummaryEffect.MayThrow`
+- **Files:** `SharpProof.Summaries/IrRelationalSummary.cs:40-43` (`IrSummaryExceptionKind`), `:128-145` (`IrExceptionalSummaryExit`), `:155`, `:166`, `:184`; `IrRelationalSummaryBuilder.cs:271-276` and the `exceptional` ctor argument at `:281`
+- **Est. LOC saved:** ~33
+- **Why it's safe:** `git grep -n "ExceptionalExits\|IrExceptionalSummaryExit\|IrSummaryExceptionKind"` across all tracked file types yields hits **only** in those two files — nothing ever *reads* `.ExceptionalExits`. The value is also fully determined by `_mayThrow`, already surfaced on the same object at `IrRelationalSummaryBuilder.cs:295` as `IrSummaryEffect.MayThrow`. `IrSummaryExceptionKind` has exactly one member (`UnknownRuntime`) and `Condition` is always passed `null`. `SharpProof.Summaries` is `IsPackable=false` (csproj `:5`), so this is not shipped public API.
+- **Proposed change:** Drop the class, the single-valued enum, the constructor parameter/property, and the builder block that manufactures it; consumers already read `Effects == IrSummaryEffect.MayThrow`. *(This is a third write-only facet in the same file, alongside the previously reported `IrSummaryCompleteness`/`IrSummaryTermination`.)*
+
+### 3. Collapse three identical "variable binding abstains" oracle tests
+- **Files:** `SharpProof.Testing.Test/IrCSharpDifferentialOracleTests.cs:143-166, :168-191, :193-216`
+- **Est. LOC saved:** ~45
+- **Why it's safe:** The three tests are byte-for-byte identical except for the declared variable type (`IntegerType`/`IntegerType`/`ObjectType`) and the bound value (`null!` / `CreateBooleanValue(true)` / `CreateStringValue("text")`). All three assert the exact same triple: `DifferentialStatus.Abstained`, `IrEvaluationStatus.Unsupported`, `IrUnsupportedReason.InvalidVariableValue`. 72 lines today.
+- **Proposed change:** One `[TestCase]`-parameterized test taking a selector for the (variable type, bound value) pair, keeping all three cases and the same three assertions.
+
+### 4. Collapse the two "undefined goal is typed separately" ProofKernel tests
+- **Files:** `SharpProof.Verify.Test/ProofKernelTests.cs:179-202, :204-227`
+- **Est. LOC saved:** ~22
+- **Why it's safe:** Both build the identical divide-by-zero predicate, model, and stub backend, differing only in `ProofDiagnosticKind.Postcondition` vs `.InternalConsistency` and the expected `AbstentionReason`. The second even omits the (redundant) `OutcomeCachePolicy.IsCacheable` assertion. This mirrors the exact `switch` at `SharpProof.Verify/ProofKernel.cs:103-110`, so one parameterized test covers both arms.
+- **Proposed change:** A single test with two `[TestCase]` rows.
+
+### 5. Never-constructed `ApproximatedJustification` / `ApproximationReason` — lower confidence
+- **Files:** `SharpProof.Verify/Evidence.cs:3-11` (enum), `:78-81` (class)
+- **Est. LOC saved:** ~14 production (plus ~5 test lines at `ProofKernelTests.cs:311-316` and `ArchitectureTests.cs:475`)
+- **Why it's safe, with caveat:** Grep across all tracked file types returns only the declaration, two *negative* type-shape assertions (`Is.False` that it is assignable to `ProofJustification`), and prose in `docs/unknown-reasons.md:74,83`. Nothing ever constructs one, so no `ApproximationReason` value is ever produced or consumed. `SharpProof.Verify` is `IsPackable=false`.
+- **⚠ Caveat:** `docs/unknown-reasons.md:83` calls the non-`ProofJustification` relationship deliberate, so this may be an intentionally reserved design slot. **Confirm with the doc owner before deleting.**
+- **Proposed change:** If the slot is not load-bearing, delete both types, the two guard tests, and the doc paragraph. Otherwise leave it and treat this entry as documentation of the gap.
+
+> ### Negative result: `samples/`, `eng/pilots/` and `.opencode/` contain nothing removable
+> **Do not propose sample or pilot deletions.** All 8 sample projects are named explicitly in `scripts/Test-SharpProofSamples.ps1`, which *asserts* the count is exactly 8 (`:169-172`) and that `SharpProof.Samples.slnx` matches disk exactly (`:207-215`). All 5 pilots are enumerated in `eng/pilots/catalog.json` and consumed by `PilotAuthorityTests.cs`, `Test-SharpProofPilots.ps1`, `Test-SharpProofPilotReport.ps1`, `Test-SharpProofPilotAuthorityFixtures.ps1`, `Get-SharpProofPilotPackageAuthority.ps1`, and `.github/workflows/package-consumers.yml`. `.opencode/` is asserted live by `OpenCodePluginDependencyTests.cs` and referenced from `opencode.json`. Every sample/pilot source file is 10-34 lines, so even a duplicate-teaching argument buys almost nothing while forcing edits to a hard-coded inventory count.
+
