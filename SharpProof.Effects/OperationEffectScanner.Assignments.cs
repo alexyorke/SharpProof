@@ -56,7 +56,12 @@ internal sealed partial class OperationEffectScanner
         }
 
         result = result.Then(ScanStep(assignment.Value));
-        return !result.CompletesNormally || assignment.IsRef
+        return !result.CompletesNormally ||
+            assignment is
+            {
+                IsRef: true,
+                Target: ILocalReferenceOperation
+            }
             ? result.Summary
             : result.Then(new EffectStep(
                 ScanWriteTarget(assignment.Target, assignment.Value),
