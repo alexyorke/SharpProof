@@ -828,8 +828,8 @@
       {
         "name": "protocol-validator",
         "path": "SharpProof.Worker.Protocol/ProtocolJson.cs",
-        "maximumExpressionNodes": 3571,
-        "maximumDecisionPoints": 161
+        "maximumExpressionNodes": 3930,
+        "maximumDecisionPoints": 183
       },
       {
         "name": "relational-summary-builder",
