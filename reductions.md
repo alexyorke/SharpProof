@@ -8,7 +8,7 @@ Nothing here has been applied; each entry is a proposal with evidence.
 
 ## Summary
 
-140 findings across seven labeled rounds, 20 disjoint areas. **Total estimated reduction: ~10,108 lines.**
+141 findings across six labeled rounds, 20 disjoint areas. **Total estimated reduction: ~10,138 lines.**
 
 Round one split the C# solution by project. Round two covered what that split could not see: the 36k-line PowerShell tooling layer, the code generators and their output, the four largest single files, cross-project duplication, and the docs.
 
@@ -1693,6 +1693,18 @@ Method: extracted every quoted literal of ≥25 characters from all non-generate
 - **Confidence:** Low pending packaging validation.
 - **Rationale:** The project repeats NuGet metadata already present in the nuspec, including `PackageId`, title, description, release notes, copyright, and tags. Removing the project-side duplicates may reduce configuration without changing the package, but NuGet/MSBuild may consume project metadata independently.
 - **Validation:** Compare pack outputs and resulting package metadata before and after the change; run package metadata tests. Leave `NuspecProperties` and other packaging controls unchanged. Do not remove anything until the comparison proves byte- and behavior-equivalent package metadata.
+
+---
+
+## Round 9 — Shared generated-header emitter
+
+### 1. Centralize repeated generated C# header emission
+
+- **Files:** `scripts/GeneratedFileHelpers.ps1`; repeated blocks at `Generate-AnalyzerDiagnosticCatalog.ps1:37-42`, `Generate-BoundContractModel.ps1:52-57`, `Generate-EffectContractMappings.ps1:40-44`, `Generate-CompilerArtifactModel.ps1:143-148`, `Generate-DiagnosticDescriptors.ps1:151-155`, `Generate-OperationSupportCatalog.ps1:33-37`, `Generate-DeclarativeModels.ps1:192-197`, `Generate-LauncherArguments.ps1:244-250,377-381`, `Generate-IrModel.ps1:199-205`, `Generate-ProjectionCatalog.ps1:80-85`, `Generate-ProtocolModel.ps1:477-481,1132-1136`
+- **Est. LOC saved:** ~30 net script LOC, after implementing the helper.
+- **Confidence:** Medium-high.
+- **Rationale:** These generators already dot-source `GeneratedFileHelpers.ps1` and repeat the same semantic four-line generated-file header, with generator-specific source text and occasional input-line data. A helper accepting the output list, generator path, and optional input line can centralize the repeated emission without changing generated content. Exclude ApiSpec, ContractApi, and Scalar variants because their header syntax/content differs.
+- **Validation:** Run all affected generator scripts or the repository generation check, confirm generated outputs are byte-identical, and run each generator-specific test target.
 ---
 
 ## Deep pass: Effects.Test remainder (round 6)
@@ -1886,4 +1898,41 @@ The discard at `:1028-1030` is **confirmed**. But the `*JsonProperties` arrays a
 > 3. **Line numbers drift.** Four separate spot-checks found correct *content* at wrong *line numbers*. Re-locate by content, never by line number.
 >
 > The confirmed items are safe. The unexamined majority of this document has **not** been through this pass, and by extrapolation roughly one in five of its riskiest claims may not survive contact with the code. **Re-run the cited evidence before applying anything, exactly as the Validation protocol above prescribes.**
+---
+
+## Scale: what this audit is a percentage of
+
+Measured against `git ls-files` (tracked files only — `artifacts/`, `bin/`, `obj/` and the two untracked stale output directories are excluded).
+
+| Category | Lines |
+|---|---:|
+| **All tracked files** | **291,726** |
+| C# — test projects (`*.Test/`, `ArchitectureTest/`) | 123,814 |
+| C# — production | 95,058 |
+| C# — of which generated (`*.generated.cs`) | 7,392 |
+| PowerShell (`.ps1` + `.psm1`) | ~36,000 |
+| JSON | ~22,000 |
+| Markdown | ~8,900 |
+
+### Three things this reframes
+
+**1. There is more test code than production code.** 123,814 vs 95,058 lines — tests are **57%** of the C# in this solution. That is not a criticism; for a verification toolchain with soundness obligations it may be exactly right. But it explains the shape of this entire audit: nearly every high-volume finding landed in a test project, not because tests are worse code, but because that is where the mass is. Any reduction effort that only looks at production code is looking at the smaller half.
+
+**2. The five largest test projects hold 91,000 lines — 74% of all test code.**
+
+| Project | Lines |
+|---|---:|
+| `SharpProof.Worker.Test` | 28,963 |
+| `SharpProof.Analyzer.Test` | 17,565 |
+| `SharpProof.Effects.Test` | 16,787 |
+| `SharpProof.Package.Test` | 16,439 |
+| `SharpProof.ArchitectureTest` | 12,253 |
+
+All five have now had dedicated deep passes. Effort spent anywhere else in the test tree has a much lower ceiling.
+
+**3. The proposed reduction is a single-digit percentage.** Even taking the headline totals at face value — before the double-counting correction and before the ⛔ refutations — the document proposes on the order of 11,000 lines against 291,726 tracked, i.e. roughly **3-4%**. Against C# alone it is closer to 5%.
+
+That number is worth stating plainly because it sets expectations correctly: this audit does not describe a bloated codebase. It describes a large, disciplined one with a normal amount of accumulated duplication, concentrated in test scaffolding, plus a handful of genuinely dead members. Six independent reachability sweeps across different areas found **zero** unreferenced types or methods in most of them; the confirmed dead code totals a few hundred lines out of 291,726.
+
+> **Implication for prioritisation.** Because the total is small relative to the codebase, the case for applying any given finding rests on *maintenance* value — one helper instead of 49 copies that have already drifted into four different error messages — rather than on line count. Findings whose only benefit is a smaller number, particularly the reformatting items this document flags as not recommended, are not worth their diff.
 
