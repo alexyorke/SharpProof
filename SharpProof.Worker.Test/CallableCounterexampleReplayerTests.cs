@@ -62,6 +62,25 @@ public sealed class CallableCounterexampleReplayerTests
     }
 
     [Test]
+    public void ReplayRejectsAnArbitraryReturnValueFromAVoidCallable()
+    {
+        var factory = new IrFactory();
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(42));
+        var target = new CompilerCallablePreparation(factory,
+            new WorkerCallableManifestEntry { CallableId = "void", ClaimIds = ["claim"] },
+            [new CompilerPreparedClause(CompilerContractKind.Ensures, factory.Boolean(false),
+                CompilerContractEvidence.CompilerBoundInvocation, "claim", null)],
+            [], WorkerClaimReason.None,
+            CompilerPreparedBody.ProgramBody(builder.Build(), [], [], []));
+
+        Assert.That(CallableCounterexampleReplayer.Replay(
+            target, 0, ImmutableDictionary<IrVarId, IrValue>.Empty),
+            Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
+    }
+
+    [Test]
     public void ReplayAllowsACallOutsideTheConcretePath()
     {
         var fixture = Create(static (factory, _, _, _) => factory.Boolean(false),

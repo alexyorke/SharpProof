@@ -64,7 +64,8 @@ internal static class CallableCounterexampleReplayer
                 }
                 var results = target.Variables.Where(static variable =>
                     variable.Role == CompilerVariableRole.Result).ToArray();
-                if (results.Length > 1 || results.Length == 1 &&
+                if (results.Length == 0 && execution.ReturnValue != null ||
+                    results.Length > 1 || results.Length == 1 &&
                     (execution.ReturnValue == null || execution.ReturnValue.Type !=
                      factory.GetVariableInfo(results[0].Variable).Type))
                 {
