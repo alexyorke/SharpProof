@@ -101,6 +101,27 @@ internal static class OpenSourceCorpusImporter
                 $"expected {RepositoryUrl}.");
         }
 
+        // The origin URL is editable local metadata.  Confirm that the
+        // checked-out commit is actually advertised by that remote before
+        // attributing imported bytes to the approved repository.
+        var advertisedRefs = await ReadGitAsync(
+                resolvedUpstreamRoot,
+                ["ls-remote", "origin"],
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!advertisedRefs
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(static line => line.Split('\t', 2)[0].Trim())
+            .Any(hash => string.Equals(
+                hash,
+                commit,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidDataException(
+                $"The upstream HEAD {commit} is not advertised by the " +
+                "approved origin.");
+        }
+
         var licenseSourcePath = Path.Combine(resolvedUpstreamRoot, "LICENSE");
         if (!File.Exists(licenseSourcePath))
         {
@@ -123,6 +144,7 @@ internal static class OpenSourceCorpusImporter
 
         var (files, candidates) = await DiscoverSourcesAsync(
                 resolvedUpstreamRoot,
+                commit,
                 cancellationToken)
             .ConfigureAwait(false);
         var selected = SelectDiverseCandidates(candidates, TargetMethodCount);
@@ -153,7 +175,7 @@ internal static class OpenSourceCorpusImporter
                     $"OSS{index + 1:D4}",
                     CorpusVerdict.SilentUnknown,
                     existingSupport.TryGetValue(
-                        candidate.DeclarationSha256,
+                        candidate.SupportContextSha256,
                         out var support)
                         ? support
                         : CorpusSupport.Unspecified))
@@ -218,16 +240,38 @@ internal static class OpenSourceCorpusImporter
             File.ReadAllText(manifestPath),
             JsonOptions) ?? throw new InvalidDataException(
             "The existing OSS corpus manifest is empty.");
+        var files = existing.Files.ToDictionary(
+            static file => $"{file.SourceId}|{file.Path}",
+            StringComparer.Ordinal);
+        var sources = existing.Sources.ToDictionary(
+            static source => source.Id,
+            StringComparer.Ordinal);
         return existing.Methods.ToImmutableDictionary(
-            static method => method.DeclarationSha256,
+            method => OpenSourceCorpusCatalog.ComputeSupportContextSha256(
+                FindDeclaration(files[$"{method.SourceId}|{method.Path}"], method),
+                files[$"{method.SourceId}|{method.Path}"],
+                sources[method.SourceId].Commit,
+                method.Path),
             static method => method.Support,
             StringComparer.Ordinal);
+    }
+
+    private static MethodDeclarationSyntax FindDeclaration(
+        OpenSourceCorpusFile file,
+        OpenSourceCorpusMethod method)
+    {
+        var root = CSharpSyntaxTree.ParseText(
+            file.Content,
+            AnalyzerGateHost.ParseOptions,
+            file.Path).GetCompilationUnitRoot();
+        return OpenSourceCorpusCatalog.FindDeclaration(root, method);
     }
 
     private static async Task<(
         ImmutableArray<OpenSourceCorpusFile> Files,
         ImmutableArray<ImportCandidate> Candidates)> DiscoverSourcesAsync(
         string upstreamRoot,
+        string commit,
         CancellationToken cancellationToken)
     {
         var sourceRoots = new[] {
@@ -304,6 +348,15 @@ internal static class OpenSourceCorpusImporter
                         lineSpan.StartLinePosition.Line + 1,
                         lineSpan.EndLinePosition.Line + 1,
                         hash,
+                        OpenSourceCorpusCatalog.ComputeSupportContextSha256(
+                            method,
+                            new OpenSourceCorpusFile(
+                                SourceId,
+                                relativePath,
+                                string.Empty,
+                                content),
+                            commit,
+                            relativePath),
                         method.Identifier.ValueText));
             }
         }
@@ -464,6 +517,7 @@ internal static class OpenSourceCorpusImporter
         int StartLine,
         int EndLine,
         string DeclarationSha256,
+        string SupportContextSha256,
         string MethodName)
     {
         internal OpenSourceCorpusMethod ToMethod(
