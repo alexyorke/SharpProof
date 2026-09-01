@@ -1620,3 +1620,33 @@ Method: normalized 14-line sliding-window hashing across all 1,058 non-generated
 > **No verbose immutable carriers to convert:** the hand-written `SharpProof.Contracts` types are `partial` behaviour extensions on generated types with no state of their own.
 > **No `Does.Contain` literal run:** only **22** such assertions across both test projects, and the two actual loops (`ContractBinderTests.cs:1632`, `ContractForValidatorGeneratorTests.cs:2058`) are already table-driven over a `forbidden` array. The ArchitectureTest pattern has no analogue here — a second independent rejection of that hypothesis.
 
+---
+
+## Round 6 — Duplicated string literals (corroborating measurement)
+
+Method: extracted every quoted literal of ≥25 characters from all non-generated `.cs` files and grouped by value, keeping those appearing in **3 or more distinct files**. Result: **42 such literals.** This is not a large independent reduction, but it is strong *corroborating* evidence for two findings already recorded, and it surfaces a drift problem nobody reported.
+
+### 1. The repository-root error message exists in FOUR divergent spellings across 47 files
+- **Files:** `"Repository root not found."` (22 files), `"Could not find the repository root."` (10), `"Repository root was not found."` (10), `"Could not find repository root."` (5)
+- **Est. LOC saved:** — (subsumed by the `RepositoryPaths.Root` consolidation already recorded; **not double-counted**)
+- **Why this matters:** The ~49-copy `RepositoryRoot()` finding rested on the claim that the copies are cosmetically different but semantically identical. This measurement **proves the divergence empirically**: the same failure condition is phrased four different ways, which is exactly the fingerprint of hand-copied code drifting apart. It also strengthens the safety argument for consolidating — no test can be asserting on this message text, because there is no single message text to assert on.
+- **Proposed change:** None beyond the already-proposed `RepositoryPaths.Root`. Recorded so the consolidation's justification is evidence-backed rather than asserted.
+
+### 2. `TRUSTED_PLATFORM_ASSEMBLIES` appears in 24 distinct files
+- **Files:** 24 files, plus `"Trusted platform assemblies are unavailable."` in 12 of them
+- **Est. LOC saved:** — (subsumed by the 26-site `TrustedPlatformReferences` finding; **not double-counted**)
+- **Why this matters:** Independent confirmation, by literal-frequency rather than by reading, of the cross-project sweep's 26-site count. The two methods agree to within the two sites that build the string dynamically. Note that here the error message has **not** drifted — all 12 use identical text — which is why that finding's "parameterize the modifiers" approach is safe.
+
+### 3. Script names hardcoded as literals across many C# test files
+- **Files:** `"Invoke-SharpProofContainer.ps1"` (8 files), `"New-SharpProofReleaseEvidence.ps1"` (6), `"Publish-SharpProofRelease.ps1"` (6), `"Test-SharpProofReleaseArtifacts.ps1"` (5)
+- **Est. LOC saved:** ~15
+- **Why it's safe:** These are the fixture-script names driven by the ArchitectureTest pwsh runner. They are already going to be centralised if the `PwshFixtures` consolidation is taken — at which point each script name naturally becomes a single `[TestCase]` argument rather than a literal repeated across files. Recorded as a small additional increment on that finding, not a separate refactor.
+- **Proposed change:** Fold into the `PwshFixtures` change; do not do separately.
+
+### 4. `"+ Guid.NewGuid().ToString("` in 22 files
+- **Files:** 22 distinct files
+- **Est. LOC saved:** — (already covered)
+- **Why this matters:** Corroborates the temp-directory/workspace scaffolding findings recorded for Package.Test, Gates.Test, and ArchitectureTest — the unique-directory idiom is repo-wide, not confined to the three projects that were examined for it. Any shared `TempDirectory`/`CreateTestRoot` helper should be placed in `eng/testing/` rather than per-project, so all 22 sites can use it.
+
+> **Method note.** Literal-frequency analysis is cheap and is good at exactly one thing: proving whether hand-copied code has *drifted*. It found no new large reductions — the top 14 results are all already-known duplication — which is itself a useful negative: it means the remaining duplication in this repo is structural rather than textual, and will not be found by any further text-matching technique. Reading-based analysis is now the only productive method left for this codebase.
+
