@@ -1245,3 +1245,158 @@ those tests exercise no remaining behavior.
 > - **`eng/acceptance/preview-interface.v1.json`:** all 26 `msbuildProperties` are referenced in `SharpProof.Package`/`SharpProof.Verifier` props/targets. `retiredMsbuildProperties` is a deliberate absence guard — left alone.
 > - **`SharpProof.DeclarativeModels.catalog.json` / `SharpProof.Projection.catalog.json`:** every declared record, class, container and projection method name resolves to a use outside its own generated file. (`LauncherPresentation.EffectKind` initially flagged but is consumed by `ClaimKind` at `SharpProof.Worker.Launcher/LauncherProjections.generated.cs:43`.)
 
+
+---
+
+## Round 4 — Additional findings
+
+These findings were synthesized from the nine `.codex-round4-*.md` reports and
+deduplicated against the entries above. Reports that found no credible new
+opportunity were not repeated.
+
+### 1. Share the duplicated `dev`/`loop` Compose environment declaration
+
+- **Files:** `compose.yaml:38-51` (`dev`) and `compose.yaml:56-70` (`loop`)
+- **Est. LOC saved:** ~8-10
+- **Why it's safe:** Both services repeat the same development values for
+  `NUGET_PACKAGES`, `DOTNET_CLI_HOME`, `DOTNET_CLI_USE_MSBUILD_SERVER`,
+  `SHARPPROOF_REPO_ROOT`, and test parallelism. Their origin/ref/container,
+  mounts, and loop-specific source/artifact settings remain distinct.
+- **Proposed change:** Add a narrowly scoped environment anchor for the shared
+  interactive-development variables and merge it into both services, retaining
+  service-specific entries inline.
+- **Confidence:** Medium; Compose mapping-merge behavior and the contract
+  parser must accept the chosen syntax.
+- **Validation needed:** Run `docker compose config` and
+  `scripts/Test-SharpProofContainerContract.ps1`; verify that
+  `SHARPPROOF_DEV_CONTAINER`, loop mounts, and all service-specific variables
+  remain present.
+
+### 2. Inline the default-timeout `RunDotnetAsync` forwarding overload
+
+- **Files:** `SharpProof.Gates/Performance/PerformanceGate.cs:612-624`, with
+  callers at `:437-447`, `:576-586`, and `:594-604`
+- **Est. LOC saved:** ~13
+- **Why it's safe:** The four-parameter overload only forwards to the
+  five-parameter implementation with `PackageBuildProcessTimeout`. All visible
+  callers use the four-parameter form and no caller supplies a custom timeout.
+- **Proposed change:** Pass `PackageBuildProcessTimeout` at each caller and
+  delete the forwarding overload.
+- **Confidence:** High.
+- **Validation needed:** Re-search `RunDotnetAsync(`, confirm every call has the
+  intended timeout, run `tooling test -Target SharpProof.Gates.Test
+  -TestFilter PerformanceGateTests`, and build the affected project.
+
+### 3. Remove nullable noise from transaction recovery entries
+
+- **Files:** `SharpProof.Gates/Corpus/CorpusFileTransaction.cs:41-42, 73-78,
+  101-105, 118-140, 193-243, 261-269`
+- **Est. LOC saved:** ~8-12
+- **Why it's safe:** The staging array is fully assigned before publication;
+  normal restore runs only after `markerPublished`, and recovery rejects
+  invalid or empty markers before calling `Restore`. The nullable collection
+  shape therefore adds filters and null-forgiving operators without representing
+  a valid published state.
+- **Proposed change:** Change `Restore` and `Cleanup` to
+  `IEnumerable<TransactionEntry>`, remove null filters/null-forgiving operators,
+  and preserve the existing publication and marker validation order.
+- **Confidence:** Medium-high; compiler nullable-flow behavior for the local
+  staging array should be checked.
+- **Validation needed:** Run the corpus rollback and interrupted-batch tests,
+  the targeted `SharpProof.Gates.Test` suite, the affected build, and inspect
+  nullable warnings.
+
+### 4. Collapse the root README's duplicate documentation navigation
+
+- **Files:** `README.md:212-231`; duplicate destinations in
+  `docs/README.md:6-20`
+- **Est. LOC saved:** ~13
+- **Why it's safe:** The root README already directs readers to the documentation
+  map, then repeats six links that the map owns. Repository search found no
+  machine consumer of this list; the README verifier checks links and anchors,
+  not the list's presence.
+- **Proposed change:** Replace the repeated list with one sentence linking to
+  `docs/README.md`, retaining surrounding support-boundary and policy text.
+- **Confidence:** High.
+- **Validation needed:** Run the README/documentation link verifier and confirm
+  all six destinations remain reachable from `docs/README.md`.
+
+### 5. Remove duplicated sample-matrix instructions from getting started
+
+- **Files:** `docs/getting-started.md:121-134`; authoritative detail in
+  `samples/README.md:18-34`
+- **Est. LOC saved:** ~14 (or ~8 if a short link remains)
+- **Why it's safe:** Both sections describe the same packaged sample matrix and
+  validation behavior, while the dedicated sample guide also contains the
+  release-candidate `-PackageSource` mode and fixture runner.
+- **Proposed change:** Keep the authoritative command and behavior description
+  in `samples/README.md`; reduce the getting-started section to a short link.
+- **Confidence:** Medium; the differing `tooling samples` versus
+  `tooling dev -lc` forms may encode an intentional wrapper distinction.
+- **Validation needed:** Confirm the supported public invocation, then run the
+  documentation link/check workflow and the sample command documented as
+  authoritative.
+
+### 6. Remove repeated fixed-baseline prose from the usefulness audit
+
+- **Files:** `docs/code-usefulness-audit.md:14-18,34-45`; ledger begins at `:187`
+- **Est. LOC saved:** ~20
+- **Why it's safe:** The opening scope and fixed-baseline table repeat tracked
+  file counts and line metrics already represented by the ledger and metrics
+  sections. The ledger remains the line-level historical evidence.
+- **Proposed change:** Reduce the baseline table to the audit date/commit and a
+  pointer to the ledger/metrics, preserving the exact historical values in the
+  remaining evidence section.
+- **Confidence:** Medium-high.
+- **Validation needed:** Recompute and compare the baseline numbers before the
+  edit; verify the audit's internal references and documentation checks.
+---
+
+## Round 5 — Repo-wide clone detection (window-hash sweep)
+
+Method: normalized 14-line sliding-window hashing across all 1,058 non-generated `.cs` files, keeping only windows that are fully non-blank and not repetitive filler, then reporting hashes that occur in **more than one file**. This found 32 distinct cross-file duplicate block families. Most confirm findings already recorded above (the process runner, `RepositoryRoot()`, `OperationMayThrow`); the items below are the ones **not** previously reported.
+
+### 1. `AnalyzerConfigOptions` / `AnalyzerConfigOptionsProvider` reimplemented in 8 files
+- **Files:** `SharpProof.Analyzer.Test/AnalyzerTestHost.cs:266-302` (`TestOptionsProvider` + `TestOptions`, 37 lines), `SharpProof.Gates/AnalyzerGateHost.cs:241-283` (`GateOptionsProvider` + `GateOptions`, 45 lines), `SharpProof.ContractForGenerator.Test/GeneratorTestHost.cs:229-259` (`TestAnalyzerConfigOptionsProvider` + `TestAnalyzerConfigOptions`, 31 lines), `SharpProof.Analyzer.Test/AnalyzerConfigurationUnitTests.cs:116` (`DictionaryOptions` + `DictionaryProvider`). Four further implementations exist at `SharpProof.Analyzer.Test/AnalyzerModeAndEffectTests.cs:3754` (`FailingOptionsProvider`), `FinalCompilationCollectorTests.cs:1396` (`TreeOptionsProvider`), `SharpProof.Package.Test/CompilerProbeInputConsistencyTests.cs:115` (`ProbeOptionsProvider`), `CompilerProbeSnapshotTests.cs:185` (`OutputPathOptionsProvider`).
+- **Est. LOC saved:** ~90
+- **Why it's safe:** The `TestOptions` (`AnalyzerTestHost.cs:287-302`) and `GateOptions` (`AnalyzerGateHost.cs:264-279`) bodies are **character-for-character identical** apart from the class name — same primary constructor `(IReadOnlyDictionary<string, string> values)`, same `TryGetValue` with the same `values.TryGetValue(key, out var found)` / `value = string.Empty; return false` shape. `GeneratorTestHost.cs:249-259` and `AnalyzerConfigurationUnitTests.cs:116` are the same dictionary-backed lookup written two more ways (`values.TryGetValue(key, out value!)`). This is a **production/test boundary crossing**: `SharpProof.Gates` is production code carrying a private copy of what a test host also defines.
+- **⚠ Only four of the eight are duplicates.** The other four have deliberately distinct behaviour and must stay: `FailingOptionsProvider` exists to *throw* (it tests failure handling), `TreeOptionsProvider` maps per-syntax-tree options, `ProbeOptionsProvider` and `OutputPathOptionsProvider` return a single fixed value. Do not fold those in.
+- **Proposed change:** Put one dictionary-backed `AnalyzerConfigOptions` + provider pair in `eng/testing/` (linked into the test projects, as `DiagnosticDescriptorCatalogAssertions.cs` already is) and a mirror in `SharpProof.Testing` for `SharpProof.Gates`; delete the four plain copies. Keep the four behaviour-specific providers.
+
+### 2. Nine-site fixture-invocation block inside ArchitectureTest
+- **Files:** `SharpProof.ArchitectureTest/DevCheckCommandPlanTests.cs:83`, `DocumentationSupportContractTests.cs:34`, `PublicationDestinationAuthorityTests.cs:74` and `:76`, `PublicationPlanIdentityTests.cs:62`, `PublicationPlanTopologyTests.cs:52`, plus 3 more
+- **Est. LOC saved:** — (already counted)
+- **Why it's noted:** This is the **largest single duplicate family in the repo** by site count (9 files sharing one identical 14-line window, and a second 7-file family overlapping it). It independently confirms, by a completely different method, the ArchitectureTest `PwshFixtures` finding recorded above — that finding's ~400-line estimate is corroborated, not additional. Recorded here only as cross-validation.
+
+### 3. Cross-project duplication between `Effects.Test` and `Specs.Test`
+- **Files:** `SharpProof.Effects.Test/EffectAnalysisTests.cs:8332`, `SharpProof.Effects.Test/MetadataApiSpecTypeInitializationTests.cs:63`, `SharpProof.Specs.Test/ApiSpecTests.cs:1061`
+- **Est. LOC saved:** ~30
+- **Why it's safe:** A 14-line identical block spanning two *different test projects*, so neither project's own deep pass would see it. Both projects already link shared sources from `eng/testing/`, which is the natural home.
+- **Proposed change:** Read the three sites and hoist the shared block into `eng/testing/`. Verify first that the Specs copy has not diverged semantically — the window match proves 14 identical lines, not identical intent.
+
+### 4. Three-site duplicate within `SharpProof.Specs.Test`
+- **Files:** `SharpProof.Specs.Test/ApiSpecConditionalNullInstantiationTests.cs:90`, `ApiSpecExpressionDepthTests.cs:79`, `ApiSpecInstantiationCoverageTests.cs:606`
+- **Est. LOC saved:** ~30
+- **Why it's safe:** Identical 14-line arrange window across three fixtures in one project — the classic "helper exists or should" shape seen repeatedly in this repo.
+- **Proposed change:** Extract to a fixture-level helper in `SharpProof.Specs.Test`.
+
+### 5. Two-site duplicate within `SharpProof.Effects.Test`
+- **Files:** `SharpProof.Effects.Test/ExceptionHandlerReachabilityTests.cs:71` and `:149`, `StaticFieldTypeInitializationTests.cs:216`
+- **Est. LOC saved:** ~30
+- **Why it's safe:** The same 14-line block appears twice within one file and once in a sibling — an intra-file duplicate is the strongest possible signal that a helper is missing.
+- **Proposed change:** Extract one helper used by all three sites.
+
+### 6. `Analyzer.Test` ↔ `Contracts.Test` shared preamble
+- **Files:** `SharpProof.Analyzer.Test/ContractApiIdentityAnalyzerTests.cs:13`, `SharpProof.Contracts.Test/ContractBinderTests.cs:1503`
+- **Est. LOC saved:** ~20
+- **Why it's safe:** Cross-project, so invisible to either project's own pass. Both projects can link from `eng/testing/`.
+- **Proposed change:** Hoist after confirming the two copies have not diverged.
+
+> **Method note for future passes.** Window-hashing found real duplication that both identifier-frequency scanning and per-project reading missed, and it is cheap (one pass over 1,058 files). It is also self-limiting: it detects *exact* normalized matches only, so near-duplicates that differ by a renamed variable — the majority of what the reading-based agents found — are invisible to it. The two methods are complementary; neither alone is sufficient.
+
+### 7. Repo-wide `Assert.That(` wrapping — measured, not recommended
+- **Files:** 4,327 sites across all test projects. Densest: `EffectAnalysisTests.cs` (425), `WorkerTests.cs` (359), `AnalyzerModeAndEffectTests.cs` (213), `WorkerMsBuildIntegrationTests.cs` (210), `ArchitectureTests.cs` (182), `ClaimManifestBuilderTests.cs` (167), `PackageLayoutSmokeTests.cs` (153)
+- **Est. LOC saved:** potentially ~3,000-4,000 — **not counted in this document's total**
+- **Why it is recorded but not recommended:** Every one of these is a `Assert.That(` head whose arguments were wrapped onto following lines despite `.editorconfig:13` permitting 140 columns. Rewrapping is behaviour-preserving and would remove several thousand lines, but it is **pure formatting churn**: it improves nothing, produces an unreviewable diff across every test file in the solution, and would conflict with all other work in flight. Recorded so the number is known and nobody rediscovers it as a "win".
+- **Proposed change:** If ever done, do it as a mechanical formatter pass in one isolated commit touching nothing else — never by hand, and never mixed with a substantive change.
+
