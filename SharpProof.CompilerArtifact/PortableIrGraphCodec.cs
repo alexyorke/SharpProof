@@ -126,36 +126,13 @@ internal static partial class PortableIrGraphCodec
             decoded.Roots,
             externalVariables,
             cancellationToken).Graph;
-        // Documentation IDs are metadata attached after the portable graph is
-        // encoded.  Bind them to the complete member shape when rebuilding the
-        // canonical image; copying by row index lets a shape-compatible member
-        // impersonate the approved declaration.
         if (canonical.Members.Length == graph.Members.Length)
         {
-            var consumed = new bool[graph.Members.Length];
-            for (var canonicalIndex = 0;
-                 canonicalIndex < canonical.Members.Length;
-                 canonicalIndex++)
+            for (var index = 0; index < canonical.Members.Length; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var canonicalMember = canonical.Members[canonicalIndex];
-                var match = -1;
-                for (var graphIndex = 0; graphIndex < graph.Members.Length; graphIndex++)
-                {
-                    if (!consumed[graphIndex] &&
-                        SameMemberShape(canonicalMember, graph.Members[graphIndex]))
-                    {
-                        match = graphIndex;
-                        break;
-                    }
-                }
-
-                if (match >= 0)
-                {
-                    consumed[match] = true;
-                    canonicalMember.DocumentationCommentId =
-                        graph.Members[match].DocumentationCommentId;
-                }
+                canonical.Members[index].DocumentationCommentId =
+                    graph.Members[index].DocumentationCommentId;
             }
         }
         var actual = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
@@ -169,16 +146,6 @@ internal static partial class PortableIrGraphCodec
         Require(
             actual.SequenceEqual(expected),
             "Portable IR metadata is not the canonical encoder image.");
-    }
-
-    private static bool SameMemberShape(PortableIrMember left, PortableIrMember right)
-    {
-        return left.Identity == right.Identity &&
-            left.DeclaringType == right.DeclaringType &&
-            left.Name == right.Name &&
-            left.ReturnType == right.ReturnType &&
-            left.IsStatic == right.IsStatic &&
-            left.ParameterTypes.AsSpan().SequenceEqual(right.ParameterTypes);
     }
 
     private static InvalidDataException Bad(string message, Exception? inner = null)
