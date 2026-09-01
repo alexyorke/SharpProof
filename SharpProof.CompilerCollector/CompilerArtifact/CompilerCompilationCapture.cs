@@ -210,7 +210,9 @@ internal static class CompilerCompilationCapture
             Sha256 = ComputeTextSha256(text),
             Encoding = text.Encoding?.WebName ?? string.Empty,
             ChecksumAlgorithm = text.ChecksumAlgorithm.ToString(),
-            RoslynChecksum = BitConverter.ToString(text.GetChecksum()).Replace("-", string.Empty).ToLowerInvariant(),
+            RoslynChecksum = BitConverter.ToString(text.GetChecksum().ToArray())
+                .Replace("-", string.Empty, StringComparison.Ordinal)
+                .ToLower(System.Globalization.CultureInfo.InvariantCulture),
             LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(lineMap),
             TextLength = text.Length,
             LineMap = lineMap,
