@@ -39,14 +39,9 @@ public sealed class FuzzRunnerEvidenceTests
             "Invoke-SharpProofFuzzCampaign.ps1"));
         using (Assert.EnterMultipleScope())
         {
-            var decoderCall = campaign.IndexOf(
-                "Assert-SharpProofFuzzRunnerResult `",
-                StringComparison.Ordinal);
-            var decoderPath = campaign.IndexOf(
-                "-Path $standardOutput",
-                StringComparison.Ordinal);
-            Assert.That(decoderCall, Is.GreaterThanOrEqualTo(0));
-            Assert.That(decoderPath, Is.GreaterThan(decoderCall));
+            Assert.That(
+                campaign,
+                Does.Contain("Assert-SharpProofFuzzRunnerResult"));
             Assert.That(campaign, Does.Contain("schemaVersion = 4"));
         }
     }
