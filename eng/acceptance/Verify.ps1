@@ -192,7 +192,7 @@ function Write-AcceptanceTimingEvidence {
     [pscustomobject]@{
         schemaVersion = 1
         command = 'acceptance'
-        configuration = $Configuration
+        configuration = $Configuration.ToLowerInvariant()
         commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
         startedUtc = $timingStartedUtc.ToString('o')
         completedUtc = $timingCompletedUtc.ToString('o')
