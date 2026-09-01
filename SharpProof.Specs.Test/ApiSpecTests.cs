@@ -1014,8 +1014,7 @@ public sealed class ApiSpecTests
         var name = typeof(object).Assembly.GetName();
         return new ApiSpecAssemblyIdentity(
             name.Name!,
-            string.Concat((name.GetPublicKeyToken() ?? []).Select(static value =>
-                value.ToString("x2", System.Globalization.CultureInfo.InvariantCulture))));
+            HashEncoding.ToLowerHex(name.GetPublicKeyToken() ?? []));
     }
 
     private static ResolvedApiSpecTable ResolveContractRequires(

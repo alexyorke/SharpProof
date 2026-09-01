@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
+using SharpProof.Ir;
 using SharpProof.Verify;
 using SharpProof.Worker;
 using SharpProof.Worker.Protocol;
@@ -680,8 +681,7 @@ internal static class WorkerPerformanceProbe
 
         private static string LowerSha(byte[] bytes)
         {
-            return string.Concat(SHA256.HashData(bytes).Select(static value =>
-                value.ToString("x2", CultureInfo.InvariantCulture)));
+            return HashEncoding.ComputeSha256Hex(bytes);
         }
 
         internal string RequestPath(string runName)

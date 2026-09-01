@@ -144,8 +144,7 @@ internal sealed class CanonicalHashWriter : IDisposable
         }
 
         _finished = true;
-        return string.Concat(_hash.GetHashAndReset().Select(static value =>
-            value.ToString("x2", CultureInfo.InvariantCulture)));
+        return HashEncoding.ToLowerHex(_hash.GetHashAndReset());
     }
     public void Dispose()
     {

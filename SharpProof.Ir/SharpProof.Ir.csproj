@@ -17,9 +17,12 @@
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
     <InternalsVisibleTo Include="SharpProof.Effects" />
     <InternalsVisibleTo Include="SharpProof.Frontend" />
+    <InternalsVisibleTo Include="SharpProof.Gates" />
     <InternalsVisibleTo Include="SharpProof.Specs" />
+    <InternalsVisibleTo Include="SharpProof.Specs.Test" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
   </ItemGroup>
 </Project>

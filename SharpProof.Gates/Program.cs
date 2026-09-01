@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using SharpProof.Gates.Corpus;
 using SharpProof.Gates.Performance;
+using SharpProof.Ir;
 
 namespace SharpProof.Gates;
 
@@ -167,9 +168,7 @@ internal static class Program
 
     private static string Sha256(string path)
     {
-        return string.Concat(
-            SHA256.HashData(File.ReadAllBytes(path)).Select(static value =>
-                value.ToString("x2", CultureInfo.InvariantCulture)));
+        return HashEncoding.ComputeSha256Hex(File.ReadAllBytes(path));
     }
 }
 

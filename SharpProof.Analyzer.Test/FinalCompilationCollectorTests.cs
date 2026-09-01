@@ -1301,8 +1301,7 @@ public sealed class FinalCompilationCollectorTests
     {
         using var stream = File.OpenRead(path);
         using var hash = SHA256.Create();
-        return string.Concat(hash.ComputeHash(stream).Select(
-            static value => value.ToString("x2", CultureInfo.InvariantCulture)));
+        return SharpProof.Ir.HashEncoding.ToLowerHex(hash.ComputeHash(stream));
     }
 
     private static byte[] PatchAscii(

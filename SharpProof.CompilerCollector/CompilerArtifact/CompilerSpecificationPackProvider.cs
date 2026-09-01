@@ -328,8 +328,7 @@ internal sealed class CompilerSpecificationPackProvider
         var identity = assembly.Identity;
         var token = identity.PublicKeyToken.IsDefaultOrEmpty
             ? string.Empty
-            : string.Concat(identity.PublicKeyToken.Select(static value =>
-                value.ToString("x2", CultureInfo.InvariantCulture)));
+            : HashEncoding.ToLowerHex(identity.PublicKeyToken);
         return approved.Any(candidate =>
             candidate.Name == identity.Name &&
             candidate.PublicKeyToken == token);

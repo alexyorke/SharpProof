@@ -9,6 +9,8 @@
     <PackageReference Include="System.Text.Json" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\SharpProof.Ir\HashEncoding.cs"
+             Link="HashEncoding.cs" />
     <Compile Update="ProtocolModel.generated.cs">
       <AutoGen>true</AutoGen>
       <DesignTime>true</DesignTime>

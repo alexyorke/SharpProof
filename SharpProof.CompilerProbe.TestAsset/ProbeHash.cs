@@ -11,23 +11,12 @@ internal static class ProbeHash
     {
         using var stream = System.IO.File.OpenRead(path);
         using var algorithm = SHA256.Create();
-        return Hex(algorithm.ComputeHash(stream));
+        return SharpProof.Ir.HashEncoding.ToLowerHex(
+            algorithm.ComputeHash(stream));
     }
 
     internal static string Bytes(byte[] value)
     {
-        using var algorithm = SHA256.Create();
-        return Hex(algorithm.ComputeHash(value));
-    }
-
-    private static string Hex(byte[] value)
-    {
-        var result = new StringBuilder(value.Length * 2);
-        foreach (var item in value)
-        {
-            result.Append(item.ToString("x2", CultureInfo.InvariantCulture));
-        }
-
-        return result.ToString();
+        return SharpProof.Ir.HashEncoding.ComputeSha256Hex(value);
     }
 }

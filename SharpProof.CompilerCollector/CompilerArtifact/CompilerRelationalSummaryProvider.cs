@@ -345,10 +345,7 @@ internal sealed class CompilerRelationalSummaryProvider
     {
         var text = declaration.SyntaxTree.GetText(cancellationToken)
             .ToString(declaration.FullSpan);
-        using var hash = SHA256.Create();
-        var bytes = hash.ComputeHash(Encoding.UTF8.GetBytes(text));
-        return string.Concat(bytes.Select(static value =>
-            value.ToString("x2", CultureInfo.InvariantCulture)));
+        return HashEncoding.ComputeSha256Hex(Encoding.UTF8.GetBytes(text));
     }
 
     private static CompilerSummaryEvidenceAuthority? CreateAuthority(

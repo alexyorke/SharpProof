@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis;
 using SharpProof.Effects;
+using SharpProof.Ir;
 namespace SharpProof.Specs;
 public enum ApiSpecResolutionFailureKind
 {
@@ -225,8 +226,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
         Compilation compilation, IAssemblySymbol assembly, ApiSpecTarget target)
     {
         var identity = assembly.Identity;
-        var token = string.Concat(identity.PublicKeyToken.Select(static value =>
-            value.ToString("x2", CultureInfo.InvariantCulture)));
+        var token = HashEncoding.ToLowerHex(identity.PublicKeyToken);
         bool IdentityMatches(ApiSpecAssemblyIdentity approved)
         {
             return string.Equals(approved.Name, identity.Name, StringComparison.Ordinal) &&

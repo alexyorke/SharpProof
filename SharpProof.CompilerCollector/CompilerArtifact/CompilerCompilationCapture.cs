@@ -544,13 +544,10 @@ internal static class CompilerCompilationCapture
             hash.TransformBlock(buffer, 0, count, buffer, 0);
         }
         hash.TransformFinalBlock([], 0, 0);
-        return string.Concat(hash.Hash!.Select(static value =>
-            value.ToString("x2", CultureInfo.InvariantCulture)));
+        return HashEncoding.ToLowerHex(hash.Hash!);
     }
     private static string Hash(byte[] bytes)
     {
-        using var hash = System.Security.Cryptography.SHA256.Create();
-        return string.Concat(hash.ComputeHash(bytes).Select(static value =>
-            value.ToString("x2", CultureInfo.InvariantCulture)));
+        return HashEncoding.ComputeSha256Hex(bytes);
     }
 }

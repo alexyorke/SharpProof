@@ -11,6 +11,8 @@
     <NoWarn>$(NoWarn);RS1035;RS2008</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\SharpProof.Ir\HashEncoding.cs"
+             Link="HashEncoding.cs" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
