@@ -1,5 +1,9 @@
 # SharpProof comprehensive audit register
 
+> Historical archive: this file records an earlier audit state. It is not an
+> active queue; use the [current documentation map](../../../docs/README.md)
+> and [release evidence](../../../eng/release/README.md) for current guidance.
+
 This register bounds the audit started from merged `master` at
 `9b5342c0be2123b339dc4ba77c196ba2646e1cd4`. A supported-surface defect is
 closed only when an executable regression discriminates the baseline behavior

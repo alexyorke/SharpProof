@@ -34,11 +34,13 @@ internal readonly partial record struct LanguageSubsetDecision(
 );
 
 internal readonly partial record struct RequiresCallSiteCandidate(
-    IOperation Operation,
+    IOperation? Operation,
+    SyntaxNode Syntax,
     IMethodSymbol TargetMethod,
     IOperation? Instance,
     ImmutableArray<IArgumentOperation> Arguments,
     ImmutableDictionary<int, IOperation> ExplicitArguments,
+    ImmutableDictionary<int, long> ImplicitIntegerArguments,
     bool CanReplay,
     ManagedFlowResult? Flow,
     ManagedFlowStatus FlowStatus
@@ -76,6 +78,7 @@ internal sealed partial class RequiresCallSiteDiscovery
         IOperation? Instance,
         ImmutableArray<IArgumentOperation> Arguments,
         ImmutableDictionary<int, IOperation> ExplicitArguments,
+        ImmutableDictionary<int, long> ImplicitIntegerArguments,
         bool CanReplay
     );
 }

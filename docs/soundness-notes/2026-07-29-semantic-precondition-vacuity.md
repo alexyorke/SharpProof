@@ -1,5 +1,9 @@
 # Semantic vacuity evidence - 2026-07-29
 
+> Historical evidence: this note records a dated checkpoint. It is not a
+> current product guide; see the [documentation map](../README.md) and
+> [coverage and limits](../coverage-and-limits.md).
+
 ## Problem
 
 The worker previously recognized contradictory preconditions only when their

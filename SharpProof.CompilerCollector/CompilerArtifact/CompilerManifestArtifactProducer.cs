@@ -22,7 +22,8 @@ internal static class CompilerManifestArtifactProducer
         snapshot.SpecificationPackCatalogSha256 =
             specificationPackAuthority.SpecificationPackCatalogSha256;
         var diagnostics = compilation.GetDiagnostics(cancellationToken)
-            .Where(static item => item.Severity == DiagnosticSeverity.Error)
+            .Where(static item => item.Severity == DiagnosticSeverity.Error &&
+                !item.IsSuppressed)
             .Select(item => CreateDiagnostic(item, snapshot));
         var diagnosticArtifacts =
             CompilerDiagnosticArtifactOrdering.Canonicalize(diagnostics);
@@ -77,7 +78,7 @@ internal static class CompilerManifestArtifactProducer
                 specificationPackAuthority.SpecificationPackCatalogSha256,
             Features = features,
             CompilationSha256 = CompilationFingerprint.ComputeSha256(
-                snapshot, diagnosticArtifacts),
+                snapshot, diagnosticArtifacts, maximumExpressionDepth),
             Compilation = snapshot,
             Manifest = discovery.Manifest,
             MaximumExpressionDepth = maximumExpressionDepth,

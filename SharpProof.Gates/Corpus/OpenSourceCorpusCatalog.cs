@@ -25,6 +25,7 @@ internal static class OpenSourceCorpusCatalog
     internal static OpenSourceCorpusDocument Load(string repositoryRoot)
     {
         var corpusDirectory = GetCorpusDirectory(repositoryRoot);
+        CorpusFileTransaction.Recover(corpusDirectory);
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
         if (!File.Exists(manifestPath))
         {
@@ -82,6 +83,15 @@ internal static class OpenSourceCorpusCatalog
             "Corpus");
     }
 
+    internal static int CountSourceFiles(
+        IEnumerable<OpenSourceCorpusMethod> methods)
+    {
+        return methods
+            .Select(static method => method.SourceId + "|" + method.Path)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+    }
+
     internal static string GetDeclaration(MethodDeclarationSyntax method)
     {
         return NormalizeLineEndings(
@@ -112,6 +122,8 @@ internal static class OpenSourceCorpusCatalog
             throw new InvalidDataException(
                 "The OSS corpus must contain its pinned upstream source files.");
         }
+
+        ValidateSourceIds(document.Sources);
 
         if (document.Methods.Length is < MinimumMethodCount or > MaximumMethodCount)
         {
@@ -263,6 +275,26 @@ internal static class OpenSourceCorpusCatalog
         }
     }
 
+    internal static void ValidateSourceIds(
+        IEnumerable<OpenSourceCorpusSource> sources)
+    {
+        var sourceIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var source in sources)
+        {
+            if (string.IsNullOrWhiteSpace(source.Id))
+            {
+                throw new InvalidDataException(
+                    "OSS corpus source IDs must not be empty.");
+            }
+
+            if (!sourceIds.Add(source.Id))
+            {
+                throw new InvalidDataException(
+                    $"Duplicate OSS corpus source ID: {source.Id}.");
+            }
+        }
+    }
+
     internal static MethodDeclarationSyntax FindDeclaration(
         CompilationUnitSyntax root,
         OpenSourceCorpusMethod method)
@@ -325,8 +357,7 @@ internal static class OpenSourceCorpusCatalog
         ValidateRelativePath(source.LicenseFile, $"source {source.Id} license");
         var licensePath = Path.GetFullPath(
             Path.Combine(corpusDirectory, source.LicenseFile));
-        var relative = Path.GetRelativePath(corpusDirectory, licensePath);
-        ValidateRelativePath(relative, $"source {source.Id} resolved license");
+        EnsureContained(corpusDirectory, licensePath);
         if (!File.Exists(licensePath))
         {
             throw new InvalidDataException(
@@ -350,11 +381,99 @@ internal static class OpenSourceCorpusCatalog
     {
         if (string.IsNullOrWhiteSpace(path) ||
             Path.IsPathRooted(path) ||
-            path.Split('/', '\\').Any(static part => part == ".."))
+            path.Split('/', '\\').Any(static part => part == "..") ||
+            path.Contains('|', StringComparison.Ordinal) ||
+            path.Any(static character => character is '\r' or '\n' ||
+                char.IsControl(character)))
         {
             throw new InvalidDataException(
                 $"OSS corpus {description} path must be relative and contained.");
         }
+    }
+
+    internal static void EnsureContained(string root, string path)
+    {
+        var lexicalRoot = Path.GetFullPath(root);
+        var lexicalPath = Path.GetFullPath(path);
+        var lexicalRelative = Path.GetRelativePath(lexicalRoot, lexicalPath);
+        if (Path.IsPathRooted(lexicalRelative) ||
+            lexicalRelative.Split(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar)
+                .Any(static part => part == ".."))
+        {
+            throw new InvalidDataException(
+                $"Generated OSS corpus path escaped its directory: {path}");
+        }
+
+        var resolvedRoot = ResolvePath(lexicalRoot);
+        var resolvedPath = ResolvePath(lexicalPath);
+        var resolvedRelative = Path.GetRelativePath(resolvedRoot, resolvedPath);
+        if (Path.IsPathRooted(resolvedRelative) ||
+            resolvedRelative.Split(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar)
+                .Any(static part => part == ".."))
+        {
+            throw new InvalidDataException(
+                $"Generated OSS corpus path follows a link outside its directory: {path}");
+        }
+    }
+
+    private static string ResolvePath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var current = Path.GetPathRoot(fullPath) ?? string.Empty;
+        var relative = Path.GetRelativePath(current, fullPath);
+        foreach (var part in relative.Split(
+                     Path.DirectorySeparatorChar,
+                     Path.AltDirectorySeparatorChar))
+        {
+            if (part.Length == 0 || part == ".")
+            {
+                continue;
+            }
+
+            var candidate = Path.Combine(current, part);
+            var link = ResolveLink(candidate);
+            if (link != null)
+            {
+                current = link;
+                continue;
+            }
+            current = candidate;
+        }
+
+        return Path.GetFullPath(current);
+    }
+
+    private static string? ResolveLink(string path)
+    {
+        foreach (FileSystemInfo info in new FileSystemInfo[] { new FileInfo(path), new DirectoryInfo(path) })
+        {
+            try
+            {
+                var target = info.ResolveLinkTarget(returnFinalTarget: true);
+                if (target != null)
+                {
+                    return target.FullName;
+                }
+            }
+            catch (FileNotFoundException)
+            {
+            }
+            catch (DirectoryNotFoundException)
+            {
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+
+        return null;
     }
 
     private static bool IsLowerHex(string value, int length)

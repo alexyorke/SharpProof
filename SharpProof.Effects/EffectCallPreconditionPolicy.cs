@@ -21,6 +21,7 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         CompanionTypes = new();
     private readonly Compilation _compilation;
     private readonly bool _includeSourceCompanions;
+    private readonly CancellationToken _cancellationToken;
     private readonly INamedTypeSymbol? _contract;
     private readonly INamedTypeSymbol? _inRange;
     private readonly INamedTypeSymbol? _notNull;
@@ -37,11 +38,14 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
 
     internal ConservativeEffectCallPreconditionPolicy(
         Compilation compilation,
-        bool includeSourceCompanions = true)
+        bool includeSourceCompanions = true,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _compilation = ArgumentNullGuard.NotNull(
             compilation, nameof(compilation));
         _includeSourceCompanions = includeSourceCompanions;
+        _cancellationToken = cancellationToken;
         var identity =
             ContractApiIdentityResolver.ForCompilation(compilation);
         _contract = identity.Contract;
@@ -54,14 +58,15 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         _typesWithCompanions =
             CompanionTypes.GetValue(
                 compilation,
-                static value => new(
+                value => new(
                     () => FindTypesWithCompanions(
                         value,
                         ContractApiIdentityResolver
                             .ForCompilation(value)
                             .ResolveAttribute(
                                 ContractApiMetadata
-                                    .ContractFor)),
+                                    .ContractFor),
+                        cancellationToken),
                     LazyThreadSafetyMode
                         .ExecutionAndPublication));
     }
@@ -83,7 +88,8 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
     internal bool HasPotentialPreconditions(
         IMethodSymbol method)
     {
-        method = EffectAnalysisSession.NormalizeMethod(method);
+        _cancellationToken.ThrowIfCancellationRequested();
+        method = EffectAnalysisSession.NormalizeMethodConstruction(method);
         return _potentialPreconditions.GetOrAdd(
             method,
             HasPotentialPreconditionsCore);
@@ -92,7 +98,8 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
     internal bool HasPotentialDirectOrClosedPreconditions(
         IMethodSymbol method)
     {
-        method = EffectAnalysisSession.NormalizeMethod(method);
+        _cancellationToken.ThrowIfCancellationRequested();
+        method = EffectAnalysisSession.NormalizeMethodConstruction(method);
         return _directOrClosedPreconditions.GetOrAdd(
             method,
             HasPotentialDirectOrClosedPreconditionsCore);
@@ -101,16 +108,28 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
     private bool HasPotentialPreconditionsCore(
         IMethodSymbol method)
     {
-        return HasPotentialDirectOrClosedPreconditions(method) ||
-            (_includeSourceCompanions ||
-             method.DeclaringSyntaxReferences.IsEmpty) &&
-            _typesWithCompanions.Value.Contains(
-                method.ContainingType.OriginalDefinition);
+        _cancellationToken.ThrowIfCancellationRequested();
+        if (HasPotentialDirectOrClosedPreconditions(method))
+        {
+            return true;
+        }
+        if (!_includeSourceCompanions &&
+            !method.DeclaringSyntaxReferences.IsEmpty)
+        {
+            return false;
+        }
+
+        var containingType = method.ContainingType;
+        var companionTypes = _typesWithCompanions.Value;
+        return companionTypes.Contains(containingType) ||
+            containingType.IsGenericType &&
+            companionTypes.Contains(containingType.OriginalDefinition);
     }
 
     private bool HasPotentialDirectOrClosedPreconditionsCore(
         IMethodSymbol method)
     {
+        _cancellationToken.ThrowIfCancellationRequested();
         return method.Parameters.Any(parameter =>
                 parameter.RefKind != RefKind.Out &&
                 parameter.GetAttributes().Any(
@@ -129,7 +148,9 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         foreach (var syntaxReference in
                  method.DeclaringSyntaxReferences)
         {
-            var syntax = syntaxReference.GetSyntax();
+            _cancellationToken.ThrowIfCancellationRequested();
+            var syntax = syntaxReference.GetSyntax(
+                _cancellationToken);
             var model =
                 SharpProof.Frontend.Host
                     .CompilationModelProvider
@@ -142,17 +163,21 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
                              Microsoft.CodeAnalysis.CSharp.Syntax
                                  .InvocationExpressionSyntax>())
             {
+                _cancellationToken.ThrowIfCancellationRequested();
                 var enclosing = model.GetEnclosingSymbol(
-                    invocationSyntax.SpanStart);
+                    invocationSyntax.SpanStart,
+                    _cancellationToken);
                 if (enclosing is not IMethodSymbol owner ||
                     !SymbolEqualityComparer.Default.Equals(
                         EffectAnalysisSession.NormalizeMethod(owner),
-                        method))
+                        EffectAnalysisSession.NormalizeMethod(method)))
                 {
                     continue;
                 }
 
-                if (model.GetOperation(invocationSyntax) is
+                if (model.GetOperation(
+                        invocationSyntax,
+                        _cancellationToken) is
                     IInvocationOperation invocation &&
                     invocation.TargetMethod.OriginalDefinition is
                     {
@@ -190,8 +215,10 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
     private static ImmutableHashSet<INamedTypeSymbol>
         FindTypesWithCompanions(
             Compilation compilation,
-            INamedTypeSymbol? contractFor)
+            INamedTypeSymbol? contractFor,
+            CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var result = ImmutableHashSet.CreateBuilder<
             INamedTypeSymbol>(
             SymbolEqualityComparer.Default);
@@ -201,10 +228,12 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
         }
 
         foreach (var type in SharpProof.Frontend.ReferencedTypeSymbols
-                     .GetAll(compilation))
+                     .GetAll(compilation, cancellationToken))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var attribute in type.GetAttributes())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!SymbolEqualityComparer.Default.Equals(
                         attribute.AttributeClass
                             ?.OriginalDefinition,
@@ -221,7 +250,9 @@ internal sealed class ConservativeEffectCallPreconditionPolicy
                     continue;
                 }
 
-                result.Add(target.OriginalDefinition);
+                result.Add(target.IsUnboundGenericType
+                    ? target.OriginalDefinition
+                    : target);
             }
         }
 

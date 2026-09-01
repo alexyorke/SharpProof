@@ -3,9 +3,12 @@ namespace SharpProof.Effects;
 internal sealed class ConversionOwnershipClassifier
 {
     private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures;
+    private readonly ConditionalTruthOperatorFlowCaptures _conditionalTruthCaptures;
     private readonly Compilation _compilation;
     private readonly CreationFlowCaptures _creationCaptures;
     private readonly Dictionary<ISymbol, EffectRegionSet> _localRegions =
+        new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, EffectRegionSet> _refLocalStorageRegions =
         new(SymbolEqualityComparer.Default);
     private readonly IMethodSymbol _method;
 
@@ -13,11 +16,13 @@ internal sealed class ConversionOwnershipClassifier
         IMethodSymbol method,
         Compilation compilation,
         CoalesceAssignmentFlowCaptures coalesceCaptures,
+        ConditionalTruthOperatorFlowCaptures conditionalTruthCaptures,
         CreationFlowCaptures creationCaptures)
     {
         _method = method;
         _compilation = compilation;
         _coalesceCaptures = coalesceCaptures;
+        _conditionalTruthCaptures = conditionalTruthCaptures;
         _creationCaptures = creationCaptures;
     }
 
@@ -47,6 +52,11 @@ internal sealed class ConversionOwnershipClassifier
                     capture,
                     out var captured) =>
                 ClassifyRegion(captured, aliasSource),
+            IFlowCaptureReferenceOperation capture
+                when _conditionalTruthCaptures.TryResolve(
+                    capture,
+                    out var truthOperand) =>
+                ClassifyRegion(truthOperand, aliasSource),
             IFlowCaptureReferenceOperation => EffectRegionSet.Unknown,
             IFieldReferenceOperation { Field.IsStatic: true } => EffectRegionSet.Create(EffectRegionId.Static()),
             IFieldReferenceOperation
@@ -72,6 +82,29 @@ internal sealed class ConversionOwnershipClassifier
             IParenthesizedOperation parenthesized when aliasSource => ClassifyRegion(parenthesized.Operand, true),
             _ => EffectRegionSet.Unknown
         };
+    }
+
+    /// <summary>
+    /// Classifies state reachable through a call argument, including reference
+    /// fields copied as part of a managed value type.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ClassifyRegion"/> describes ownership of the value itself.
+    /// That distinction keeps writes to an ordinary by-value struct copy local.
+    /// A call boundary can also write objects referenced by fields of that copy,
+    /// so managed value arguments need a separate reachability classification.
+    /// </remarks>
+    internal EffectRegionSet ClassifyCallArgumentRegion(
+        IOperation? operation)
+    {
+        return operation?.Type is
+        {
+            IsValueType: true,
+            IsUnmanagedType: false,
+            IsRefLikeType: false
+        }
+            ? ClassifyManagedValueReachability(operation)
+            : ClassifyRegion(operation);
     }
 
     internal EffectRegionSet ClassifyParameter(IParameterSymbol parameter)
@@ -105,10 +138,78 @@ internal sealed class ConversionOwnershipClassifier
                 EffectRegionId.Captured(parameter.Ordinal));
         }
 
-        return parameter.Type.IsRefLikeType &&
+        return (parameter.Type.IsReferenceType ||
+                parameter.Type.IsRefLikeType) &&
             _localRegions.TryGetValue(parameter, out var learnedRegions)
                 ? declaredRegion.Union(learnedRegions)
                 : declaredRegion;
+    }
+
+    internal EffectRegionSet ClassifyRefLocalStorage(ILocalSymbol local)
+    {
+        if (SymbolEqualityComparer.Default.Equals(
+                local.ContainingSymbol?.OriginalDefinition,
+                _method.OriginalDefinition))
+        {
+            return _refLocalStorageRegions.TryGetValue(local, out var regions)
+                ? regions
+                : EffectRegionSet.Unknown;
+        }
+
+        var ordinal = local.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Start ?? 0;
+        return EffectRegionSet.Create(EffectRegionId.Captured(ordinal));
+    }
+
+    private EffectRegionSet ClassifyManagedValueReachability(
+        IOperation operation)
+    {
+        return operation switch
+        {
+            IConversionOperation { OperatorMethod: null } conversion =>
+                ClassifyCallArgumentRegion(conversion.Operand),
+            IParenthesizedOperation parenthesized =>
+                ClassifyCallArgumentRegion(parenthesized.Operand),
+            IParameterReferenceOperation parameter =>
+                ReachableParameterRegion(parameter.Parameter),
+            IInstanceReferenceOperation =>
+                EffectRegionSet.Create(EffectRegionId.Receiver),
+            IFieldReferenceOperation { Field.IsStatic: true } =>
+                EffectRegionSet.Create(EffectRegionId.Static()),
+            IFieldReferenceOperation { Instance: { } instance } =>
+                ClassifyCallArgumentRegion(instance),
+            IConditionalOperation conditional =>
+                ClassifyCallArgumentRegion(conditional.WhenTrue).Union(
+                    ClassifyCallArgumentRegion(conditional.WhenFalse)),
+            ICoalesceOperation coalesce =>
+                ClassifyCallArgumentRegion(coalesce.Value).Union(
+                    ClassifyCallArgumentRegion(coalesce.WhenNull)),
+            ITupleOperation tuple =>
+                tuple.Elements.Aggregate(
+                    EffectRegionSet.Empty,
+                    (regions, element) => regions.Union(
+                        ClassifyCallArgumentRegion(element))),
+            IFlowCaptureReferenceOperation capture
+                when _coalesceCaptures.TryResolve(
+                    capture,
+                    out var captured) =>
+                ClassifyCallArgumentRegion(captured),
+            ILiteralOperation or IDefaultValueOperation =>
+                EffectRegionSet.Empty,
+            _ => EffectRegionSet.Unknown
+        };
+    }
+
+    private EffectRegionSet ReachableParameterRegion(
+        IParameterSymbol parameter)
+    {
+        var declaredRegion = ClassifyParameter(parameter);
+        return !declaredRegion.IsEmpty ||
+            !SymbolEqualityComparer.Default.Equals(
+                parameter.ContainingSymbol?.OriginalDefinition,
+                _method.OriginalDefinition)
+                ? declaredRegion
+                : EffectRegionSet.Create(
+                    EffectRegionId.Parameter(parameter.Ordinal));
     }
 
     internal void BuildLocalRegions(
@@ -124,6 +225,13 @@ internal sealed class ConversionOwnershipClassifier
             {
                 _localRegions.Add(declarator.Symbol, EffectRegionSet.Empty);
             }
+            if (declarator.Symbol.RefKind != RefKind.None &&
+                !_refLocalStorageRegions.ContainsKey(declarator.Symbol))
+            {
+                _refLocalStorageRegions.Add(
+                    declarator.Symbol,
+                    EffectRegionSet.Empty);
+            }
         }
 
         var changed = true;
@@ -135,6 +243,25 @@ internal sealed class ConversionOwnershipClassifier
                 if (!isReachable(operation))
                 {
                     continue;
+                }
+
+                if (TryGetRefLocalAliasSource(
+                        operation,
+                        out var refLocal,
+                        out var refSource))
+                {
+                    var discoveredStorage = ClassifyRefAliasSource(refSource);
+                    var previousStorage = _refLocalStorageRegions.TryGetValue(
+                        refLocal,
+                        out var existingStorage)
+                            ? existingStorage
+                            : EffectRegionSet.Empty;
+                    var joinedStorage = previousStorage.Union(discoveredStorage);
+                    if (joinedStorage != previousStorage)
+                    {
+                        _refLocalStorageRegions[refLocal] = joinedStorage;
+                        changed = true;
+                    }
                 }
 
                 if (operation is IInvocationOperation invocation)
@@ -381,6 +508,80 @@ internal sealed class ConversionOwnershipClassifier
         }
     }
 
+    private EffectRegionSet ClassifyRefAliasSource(IOperation? operation)
+    {
+        if (operation == null)
+        {
+            return EffectRegionSet.Unknown;
+        }
+
+        operation = DefiniteOperationFacts.UnwrapHarmlessValue(operation);
+        return operation switch
+        {
+            ILocalReferenceOperation local
+                when local.Local.RefKind != RefKind.None =>
+                ClassifyRefLocalStorage(local.Local),
+            ILocalReferenceOperation local =>
+                ClassifyLocalStorage(local.Local),
+            IParameterReferenceOperation parameter
+                when parameter.Parameter.RefKind == RefKind.None &&
+                    SymbolEqualityComparer.Default.Equals(
+                        parameter.Parameter.ContainingSymbol?.OriginalDefinition,
+                        _method.OriginalDefinition) =>
+                EffectRegionSet.Empty,
+            IConditionalOperation conditional =>
+                ClassifyRefAliasSource(conditional.WhenTrue).Union(
+                    ClassifyRefAliasSource(conditional.WhenFalse)),
+            ICoalesceOperation coalesce =>
+                ClassifyRefAliasSource(coalesce.Value).Union(
+                    ClassifyRefAliasSource(coalesce.WhenNull)),
+            _ => ClassifyRegion(operation, aliasSource: true)
+        };
+    }
+
+    private EffectRegionSet ClassifyLocalStorage(ILocalSymbol local)
+    {
+        if (SymbolEqualityComparer.Default.Equals(
+                local.ContainingSymbol?.OriginalDefinition,
+                _method.OriginalDefinition))
+        {
+            return EffectRegionSet.Empty;
+        }
+
+        var ordinal = local.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Start ?? 0;
+        return EffectRegionSet.Create(EffectRegionId.Captured(ordinal));
+    }
+
+    private static bool TryGetRefLocalAliasSource(
+        IOperation operation,
+        out ILocalSymbol local,
+        out IOperation source)
+    {
+        switch (operation)
+        {
+            case IVariableDeclaratorOperation
+            {
+                Symbol.RefKind: not RefKind.None,
+                Initializer.Value: { } initializer
+            } declarator:
+                local = declarator.Symbol;
+                source = initializer;
+                return true;
+            case ISimpleAssignmentOperation
+            {
+                IsRef: true,
+                Target: ILocalReferenceOperation target
+            } assignment:
+                local = target.Local;
+                source = assignment.Value;
+                return true;
+            default:
+                local = null!;
+                source = null!;
+                return false;
+        }
+    }
+
     private static bool IsSimpleSetterTarget(
         IPropertyReferenceOperation property)
     {
@@ -465,32 +666,83 @@ internal sealed class ConversionOwnershipClassifier
 
     private bool MethodMayIntroduceUnknownRefAlias(IMethodSymbol method)
     {
-        method = method.ReducedFrom ?? method;
+        return MethodMayIntroduceUnknownRefAlias(
+            method,
+            new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default));
+    }
+
+    private bool MethodMayIntroduceUnknownRefAlias(
+        IMethodSymbol method,
+        HashSet<IMethodSymbol> activeMethods)
+    {
+        method = (method.ReducedFrom ?? method).OriginalDefinition;
         if (method.DeclaringSyntaxReferences.Length != 1)
         {
             return true;
         }
+        if (activeMethods.Count >= EffectCallGraph.MaximumCallGraphDepth)
+        {
+            return true;
+        }
+        if (!activeMethods.Add(method))
+        {
+            return false;
+        }
 
-        var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
-        var model = SharpProof.Frontend.Host.CompilationModelProvider
-            .GetSemanticModel(_compilation, declaration.SyntaxTree);
-        var root = model.GetOperation(declaration);
-        if (root == null)
+        try
+        {
+            var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(_compilation, declaration.SyntaxTree);
+            var root = model.GetOperation(declaration);
+            if (root == null)
+            {
+                return true;
+            }
+
+            foreach (var assignment in root.DescendantsAndSelf()
+                         .OfType<ISimpleAssignmentOperation>()
+                         .Where(static assignment => assignment.IsRef))
+            {
+                if (!IsCallMappedRefSource(assignment.Value, method))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var invocation in root.DescendantsAndSelf()
+                         .OfType<IInvocationOperation>()
+                         .Where(CanRebindRefLikeStorage))
+            {
+                if (MethodMayIntroduceUnknownRefAlias(
+                        invocation.TargetMethod,
+                        activeMethods))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            activeMethods.Remove(method);
+        }
+    }
+
+    private static bool CanRebindRefLikeStorage(
+        IInvocationOperation invocation)
+    {
+        if (invocation.Instance?.Type?.IsRefLikeType == true ||
+            !invocation.TargetMethod.IsStatic &&
+            invocation.TargetMethod.ContainingType?.IsRefLikeType == true)
         {
             return true;
         }
 
-        foreach (var assignment in root.DescendantsAndSelf()
-                     .OfType<ISimpleAssignmentOperation>()
-                     .Where(static assignment => assignment.IsRef))
-        {
-            if (!IsCallMappedRefSource(assignment.Value, method))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return invocation.Arguments.Any(static argument =>
+            argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
+            argument.Value.Type?.IsRefLikeType == true);
     }
 
     private static bool IsCallMappedRefSource(
@@ -546,13 +798,27 @@ internal sealed class ConversionOwnershipClassifier
             return ClassifyRegion(operation.Operand, aliasSource);
         }
 
-        // Boxing creates a new object containing a copy of the value. The box is
-        // locally owned, even when the source is a ref parameter, so mutations
-        // through an interface/object view must not be attributed to the caller.
+        // Concrete value-type boxing creates a locally owned copy. Roslyn also
+        // classifies a type-parameter-to-interface conversion as boxing when the
+        // type parameter permits both value and reference instantiations; retain
+        // the operand ownership for the reference-instantiation path.
         if (conversion.IsBoxing)
         {
-            return EffectRegionSet.Create(
+            var fresh = EffectRegionSet.Create(
                 EffectRegionId.Fresh(operation.Syntax.SpanStart));
+            if (operation.Operand.Type is ITypeParameterSymbol typeParameter)
+            {
+                var operand = ClassifyRegion(operation.Operand, aliasSource);
+                if (typeParameter.IsReferenceType)
+                {
+                    return operand;
+                }
+                if (!typeParameter.IsValueType)
+                {
+                    return fresh.Union(operand);
+                }
+            }
+            return fresh;
         }
 
         // Unboxing, nullable, numeric, enum, and identity conversions whose

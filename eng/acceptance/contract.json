@@ -22,6 +22,9 @@
     "solutionTestWallSeconds": 1800,
     "mutationShardWallSeconds": 3600,
     "testProjectCpuDivisor": 2,
+    "packageTestCpuPercent": 75,
+    "buildCpuPercent": 75,
+    "productionInventoryMaxParallelism": 8,
     "mutationParallelism": 4,
     "mutationDefaultWeight": 1,
     "acceptanceTimingPhases": [
@@ -53,18 +56,18 @@
   "container": {
     "contractVersion": 1,
     "platform": "linux/amd64",
-    "defaultCpuCount": 16,
+    "defaultCpuLimit": 0,
     "defaultMemoryMiB": 40960
   },
   "mutationEvidence": {
     "schemaVersion": 1,
     "expectedCatalogCount": 261,
-    "expectedCatalogSha256": "66c1d833f29a5f6f6997ba443f0d3f077b6d1094f16b7ba28deeeee32fa5fa81"
+    "expectedCatalogSha256": "1c48975c834342e490f2fa6bd042c29e6f8d8c408866eb917c78a4b90061c2e1"
   },
   "worker": {
     "protocolVersion": 11,
     "manifestSchemaVersion": 4,
-    "compilerArtifactSchemaVersion": 15,
+    "compilerArtifactSchemaVersion": 18,
     "maximumCompilerReferenceModuleBytes": 268435456,
     "maximumCompilerReferenceClosureBytes": 1073741824,
     "maximumCompilerReferenceModules": 4096,
@@ -210,7 +213,7 @@
   },
   "trustedComputingBase": {
     "measurement": "Exact path ownership; complexity is measured separately from formatting with Roslyn syntax metrics.",
-      "inventorySha256": "bfe6906b52cc86d83a1e9279889fa48e75a69a4b4d40358cc433d7917a0dd9a7",
+      "inventorySha256": "e6d419fd54aec7cb1ceaab46b61cf2c28a4b21a0fb7f8a7d8795e53459c938cb",
     "components": [
       {
         "name": "discovery",
@@ -500,6 +503,7 @@
           "SharpProof.Effects/CreationFlowCaptures.cs",
           "SharpProof.Effects/ConversionOwnershipClassifier.cs",
           "SharpProof.Effects/OperationEffectScanner.Assignments.cs",
+          "SharpProof.Effects/OperationEffectScanner.Expressions.cs",
           "SharpProof.Effects/OperationEffectScanner.cs",
           "SharpProof.Effects/OperationCompletionEvaluator.cs",
           "SharpProof.Effects/ExceptionHandlerReachability.cs",
@@ -765,10 +769,10 @@
   },
   "productionComplexity": {
     "measurement": "Aggregate Roslyn expression nodes, decision points, and members across handwritten production C#; whitespace, comments, line wrapping, and optional braces are excluded.",
-    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. 2026-08-08: bounded relational interprocedural verification added one reusable typed-IR summary engine, an isolated exact implementation-PE decoder, and a strict data-driven specification-pack parser; source, IL, and audited packs now share one Z3 composition path instead of growing method-specific verifier branches. Dead dependency-graph scaffolding was removed, production roots are derived from Directory.Build.props, and each new semantic layer has its own narrow ratchet below. 2026-08-08 audit: atomic publication ownership and cancellation, total malformed-evidence and cache validation, worker cancellation/evidence checks, and the non-entrypoint analyzer Core boundary added supported-surface safeguards with mutation-discriminating regressions. 2026-08-10 consolidation: the duplicated portable-analyzer compilation was deleted, entry points now share one Core implementation, generated ContractFor companions are checked on the final compilation, and compiler references gained explicit module, closure, and count limits; ceilings:113800/6050/3900.",
-    "maximumExpressionNodes": 113800,
-    "maximumDecisionPoints": 6050,
-    "maximumMembers": 3900
+    "ceilingRationale": "2026-08-07: extracting the cancellable verifier runner and invalidator from unmeasured inline MSBuild XML into the directly testable SharpProof.BuildTasks assembly moved that trusted-boundary logic under the production C# ratchet. 2026-08-08: bounded relational interprocedural verification added one reusable typed-IR summary engine, an isolated exact implementation-PE decoder, and a strict data-driven specification-pack parser; source, IL, and audited packs now share one Z3 composition path instead of growing method-specific verifier branches. Dead dependency-graph scaffolding was removed, production roots are derived from Directory.Build.props, and each new semantic layer has its own narrow ratchet below. 2026-08-08 audit: atomic publication ownership and cancellation, total malformed-evidence and cache validation, worker cancellation/evidence checks, and the non-entrypoint analyzer Core boundary added supported-surface safeguards with mutation-discriminating regressions. 2026-08-10 consolidation: the duplicated portable-analyzer compilation was deleted, entry points now share one Core implementation, generated ContractFor companions are checked on the final compilation, and compiler references gained explicit module, closure, and count limits; 2026-08-24 usefulness audit: the previously broken production gate now measures every distinct shared-source parse view, accepts numeric Roslyn language versions, and records the current audited tree without double-counting physical files; the post-audit dead-source cleanup removed three expression nodes. 2026-08-29: implicit primary-constructor base calls gained one nullable operation carrier and one syntax-backed candidate path so Requires checking covers the compiler-synthesized call. 2026-08-30 remediation: completed non-security bug fixes expanded implicit Requires-call discovery, bounded and hardened SMT cancellation and resource accounting, made publication and corpus updates transactional, and strengthened compiler-artifact validation. 2026-08-31 validation: the ratchet was refreshed to the audited canonical inventory after the accumulated analyzer, effect-flow, worker-protocol, corpus-publication, and manifest-bound timeout-promotion fixes; ceilings:218226/12839/5799. 2026-09-01 branch integration: alias-version cache analysis and phase-aware conditional-operator completion added bounded program-point, lifted-operator, and control-flow logic; ceilings:218647/12875/5808.",
+    "maximumExpressionNodes": 218647,
+    "maximumDecisionPoints": 12875,
+    "maximumMembers": 5808
   },
   "productionCoordinatorComplexity": {
     "measurement": "Roslyn expression nodes and decision points in coordination layers; whitespace, comments, line wrapping, and optional braces are excluded.",
@@ -788,8 +792,8 @@
       {
         "name": "soundness-meta-analyzer",
         "path": "SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs",
-        "maximumExpressionNodes": 2370,
-        "maximumDecisionPoints": 145
+        "maximumExpressionNodes": 2676,
+        "maximumDecisionPoints": 162
       },
       {
         "name": "ir-factory",
@@ -806,8 +810,8 @@
       {
         "name": "requires-call-site-analyzer",
         "path": "SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs",
-        "maximumExpressionNodes": 1450,
-        "maximumDecisionPoints": 105
+        "maximumExpressionNodes": 1721,
+        "maximumDecisionPoints": 107
       },
       {
         "name": "effect-analysis-coordinator",
@@ -824,31 +828,31 @@
       {
         "name": "protocol-validator",
         "path": "SharpProof.Worker.Protocol/ProtocolJson.cs",
-        "maximumExpressionNodes": 3450,
-        "maximumDecisionPoints": 135
+        "maximumExpressionNodes": 3930,
+        "maximumDecisionPoints": 183
       },
       {
         "name": "relational-summary-builder",
         "path": "SharpProof.Summaries/IrRelationalSummaryBuilder.cs",
-        "maximumExpressionNodes": 1950,
-        "maximumDecisionPoints": 120
+        "maximumExpressionNodes": 2154,
+        "maximumDecisionPoints": 134
       },
       {
         "name": "relational-summary-provider",
         "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs",
-        "maximumExpressionNodes": 800,
-        "maximumDecisionPoints": 50
+        "maximumExpressionNodes": 1093,
+        "maximumDecisionPoints": 54
       },
       {
         "name": "implementation-il-summary-lowerer",
         "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs",
-        "maximumExpressionNodes": 4150,
+        "maximumExpressionNodes": 4172,
         "maximumDecisionPoints": 340
       },
       {
         "name": "specification-pack-provider",
         "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs",
-        "maximumExpressionNodes": 2000,
+        "maximumExpressionNodes": 2076,
         "maximumDecisionPoints": 125
       }
     ]

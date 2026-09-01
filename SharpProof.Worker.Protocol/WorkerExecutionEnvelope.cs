@@ -10,7 +10,7 @@ public static class WorkerExecutionEnvelope
         int terminationGraceMilliseconds)
     {
         _ = request ?? throw new ArgumentNullException(nameof(request));
-        if (terminationGraceMilliseconds < 1 ||
+        if (terminationGraceMilliseconds <= 0 ||
             terminationGraceMilliseconds > WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds)
         {
             throw new ArgumentOutOfRangeException(nameof(terminationGraceMilliseconds));

@@ -162,6 +162,57 @@ public sealed class AcyclicBlockPredicateExecutorTests
     }
 
     [Test]
+    public void BranchPredicatesRequireTheConditionToCompleteNormally()
+    {
+        var factory = new IrFactory();
+        var divisor = factory.CreateVariable("divisor", factory.IntegerType);
+        var condition = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.Binary(
+                IrBinaryOperator.Divide,
+                factory.Integer(1),
+                factory.Variable(divisor)),
+            factory.Integer(1));
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var whenTrue = builder.CreateBlock("true");
+        var whenFalse = builder.CreateBlock("false");
+        builder.Branch(
+            entry,
+            factory.CreateOperation(),
+            condition,
+            whenTrue,
+            whenFalse);
+        builder.Return(whenTrue, factory.CreateOperation(), factory.Integer(1));
+        builder.Return(whenFalse, factory.CreateOperation(), factory.Integer(2));
+
+        var execution = Execute(factory, builder.Build(), [divisor]);
+        var completion = IrSemanticTerms.ConstrainSuccessfulEvaluation(
+            factory,
+            factory.Boolean(true),
+            condition);
+        var expectedTrue = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            completion,
+            condition);
+        var expectedFalse = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            completion,
+            factory.Unary(IrUnaryOperator.Not, condition));
+        var predicatesByResult = execution.Returns.ToDictionary(
+            static returned => ((IrIntegerTerm)returned.ReturnTerm!).Value,
+            static returned => returned.Predicate);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.IsSuccess, Is.True);
+            Assert.That(execution.Returns, Has.Length.EqualTo(2));
+            Assert.That(predicatesByResult[1], Is.SameAs(expectedTrue));
+            Assert.That(predicatesByResult[2], Is.SameAs(expectedFalse));
+        }
+    }
+
+    [Test]
     public async Task CycleProducesTypedUnknownWithoutInvokingTheBackend()
     {
         var factory = new IrFactory();
@@ -378,6 +429,79 @@ public sealed class AcyclicBlockPredicateExecutorTests
             Assert.That(limited.Reason, Is.EqualTo(WorkerClaimReason.ResourceLimit));
             Assert.That(exact.IsSuccess, Is.True);
             Assert.That(exact.Returns, Has.Length.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void SequentialSpecCallsDoNotConflateReusedArtifactTarget()
+    {
+        var factory = new IrFactory();
+        var result = factory.CreateVariable("result", factory.IntegerType);
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "Abs",
+            factory.IntegerType,
+            true,
+            factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var firstCall = builder.Call(
+            entry,
+            factory.CreateOperation(),
+            result,
+            member,
+            null,
+            factory.Integer(-1));
+        var secondCall = builder.Call(
+            entry,
+            factory.CreateOperation(),
+            result,
+            member,
+            null,
+            factory.Integer(-2));
+        builder.Return(
+            entry,
+            factory.CreateOperation(),
+            factory.Variable(result));
+        var specCalls = ImmutableDictionary<
+                IrInstructionId,
+                CompilerPreparedSpecCall>.Empty
+            .Add(firstCall.Id, Prepared(firstCall))
+            .Add(secondCall.Id, Prepared(secondCall));
+
+        var execution = new AcyclicBlockPredicateExecutor(
+            WorkerBudgets.DefaultMaximumExpressionDepth).Execute(
+                [],
+                factory,
+                builder.Build(),
+                specCalls,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSummaryCall>.Empty,
+                ImmutableDictionary<IrVarId, IrTerm>.Empty,
+                ImmutableDictionary<IrVarId, IrVarId>.Empty);
+        var firstResult = IrTermAnalysis.CollectVariables(
+            execution.SpecAssumptions[0].Predicate).Single();
+        var secondResult = IrTermAnalysis.CollectVariables(
+            execution.SpecAssumptions[1].Predicate).Single();
+        var returned = (IrVariableTerm)execution.Returns.Single().ReturnTerm!;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(execution.IsSuccess, Is.True);
+            Assert.That(execution.SpecAssumptions, Has.Length.EqualTo(2));
+            Assert.That(firstResult, Is.Not.EqualTo(secondResult));
+            Assert.That(returned.Variable, Is.EqualTo(secondResult));
+        }
+
+        static CompilerPreparedSpecCall Prepared(IrCallInstruction call)
+        {
+            return new CompilerPreparedSpecCall(
+                call.Id,
+                "M:System.Math.Abs(System.Int32)",
+                "bcl.math.abs.int32",
+                false);
         }
     }
 

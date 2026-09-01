@@ -8,10 +8,10 @@ internal static class CompilationFingerprint
         "SHARPPROOF_CONTRACTS";
     private const string SyntaxTreeSnapshotDomain =
         "SharpProof.CompilerSyntaxTreeSnapshot";
-    private const int SyntaxTreeSnapshotVersion = 1;
+    private const int SyntaxTreeSnapshotVersion = 2;
     private const string SourceLineMapDomain =
         "SharpProof.CompilerSourceLineMap";
-    private const int SourceLineMapVersion = 1;
+    private const int SourceLineMapVersion = 2;
 
     internal static string ComputeLineMapSha256(
         CompilerSourceLineMapEntry[] entries)
@@ -45,14 +45,16 @@ internal static class CompilationFingerprint
 
     internal static string ComputeSha256(
         CompilerCompilationSnapshot snapshot,
-        CompilerDiagnosticArtifact[] diagnostics)
+        CompilerDiagnosticArtifact[] diagnostics,
+        int maximumExpressionDepth = WorkerBudgets.DefaultMaximumExpressionDepth)
     {
         snapshot = ArgumentNullGuard.NotNull(snapshot, nameof(snapshot));
 
         using var hash = new CanonicalHashWriter();
         hash.Add(
             "SharpProof.CompilerCompilationSnapshot",
-            9,
+            10,
+            "budget.expression_depth", maximumExpressionDepth,
             JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options),
             JsonSerializer.Serialize(
                 CompilerDiagnosticArtifactOrdering.Canonicalize(
@@ -152,11 +154,26 @@ internal static class CompilationFingerprint
         CompilerSummaryEvidenceSnapshot row,
         CompilerCompilationSnapshot snapshot)
     {
+        // JSON deserialization can populate non-nullable string properties with
+        // null. Validate the complete shape before the branch-specific checks
+        // below, so malformed evidence is rejected rather than throwing while
+        // reading Length or comparing a field.
+        if (row.CallIdentity is null ||
+            row.EvidenceIdentity is null ||
+            row.EvidenceSha256 is null ||
+            row.SourcePath is null && row.SourceTreeSha256 is null ||
+            row.OwningModuleName is null ||
+            row.OwningModuleMvid is null ||
+            row.OwningModuleSha256 is null)
+        {
+            return false;
+        }
+
         switch (row.Origin)
         {
             case CompilerSummaryOrigin.Source:
-                return row.EvidenceIdentity.Length == 0 &&
-                    row.SourcePath != null &&
+                return row.EvidenceIdentity is { Length: 0 } &&
+                    row.SourcePath is { Length: > 0 } &&
                     WorkerProtocolJson.IsSha256(row.SourceTreeSha256) &&
                     row.SourceStart >= 0 &&
                     row.SourceLength > 0 &&
@@ -171,9 +188,9 @@ internal static class CompilationFingerprint
                         row.SourceStart <= tree.TextLength - row.SourceLength) == 1;
 
             case CompilerSummaryOrigin.ImplementationIl:
-                return row.EvidenceIdentity.Length == 0 &&
-                    row.SourcePath.Length == 0 &&
-                    row.SourceTreeSha256.Length == 0 &&
+                return row.EvidenceIdentity is { Length: 0 } &&
+                    row.SourcePath is { Length: 0 } &&
+                    row.SourceTreeSha256 is { Length: 0 } &&
                     row.SourceStart == -1 &&
                     row.SourceLength == -1 &&
                     row.OwningModuleName.Length > 0 &&
@@ -188,8 +205,8 @@ internal static class CompilationFingerprint
                         module.Sha256 == row.OwningModuleSha256) == 1;
 
             case CompilerSummaryOrigin.SpecificationPack:
-                return row.SourcePath.Length == 0 &&
-                    row.SourceTreeSha256.Length == 0 &&
+                return row.SourcePath is { Length: 0 } &&
+                    row.SourceTreeSha256 is { Length: 0 } &&
                     row.SourceStart == -1 &&
                     row.SourceLength == -1 &&
                     row.OwningModuleName.Length == 0 &&
@@ -239,6 +256,7 @@ internal static class CompilationFingerprint
     {
         return value != null &&
         Enum.IsDefined(typeof(CompilerOutputKind), value.OutputKind) &&
+        value.MainTypeName != null &&
         Enum.IsDefined(typeof(CompilerOptimizationLevel), value.OptimizationLevel) &&
         Enum.IsDefined(typeof(CompilerPlatform), value.Platform) &&
         Enum.IsDefined(typeof(CompilerNullableContext), value.NullableContext) &&
@@ -270,6 +288,9 @@ internal static class CompilationFingerprint
         return value != null &&
         CompilerCaptureAuthority.IsCanonicalPath(value.Path) &&
         WorkerProtocolJson.IsSha256(value.Sha256) &&
+        value.Encoding is not null &&
+        value.ChecksumAlgorithm is "Sha1" or "Sha256" &&
+        IsChecksum(value.RoslynChecksum, value.ChecksumAlgorithm) &&
         WorkerProtocolJson.IsSha256(value.LineMapSha256) &&
         value.TextLength >= 0 &&
         CompilerSourceLocationAuthority.HasValidLineMap(value) &&
@@ -287,6 +308,13 @@ internal static class CompilationFingerprint
         CompilerCaptureAuthority.IsCanonicalEmptyTree(value) &&
         All(value.Features, ValidFeature) &&
             IsOrdered(value.Features, static feature => feature.Key, unique: true);
+    }
+
+    private static bool IsChecksum(string? value, string algorithm)
+    {
+        var length = algorithm == "Sha1" ? 40 : 64;
+        return value is not null && value.Length == length &&
+            value.All(static c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
     }
 
     private static bool ValidFeature(CompilerFeatureSnapshot? value)
@@ -406,7 +434,11 @@ internal static class CompilerDiagnosticArtifactOrdering
             .ThenBy(static item => item.Code, StringComparer.Ordinal)
             .ThenBy(static item => item.Message, StringComparer.Ordinal)
             .ThenBy(static item => item.Location.Line)
-            .ThenBy(static item => item.Location.Column)];
+            .ThenBy(static item => item.Location.Column)
+            .ThenBy(static item => item.SourceTreeOrdinal)
+            .ThenBy(static item => item.SourceTreePath, StringComparer.Ordinal)
+            .ThenBy(static item => item.SourceTreeSha256, StringComparer.Ordinal)
+            .ThenBy(static item => item.SourceLineMapSha256, StringComparer.Ordinal)];
     }
 
     internal static bool IsCanonical(CompilerDiagnosticArtifact[] diagnostics)
@@ -453,8 +485,27 @@ internal static class CompilerDiagnosticArtifactOrdering
         }
 
         result = left.Location.Line.CompareTo(right.Location.Line);
-        return result != 0
-            ? result
-            : left.Location.Column.CompareTo(right.Location.Column);
+        if (result != 0)
+        {
+            return result;
+        }
+        result = left.Location.Column.CompareTo(right.Location.Column);
+        if (result != 0)
+        {
+            return result;
+        }
+        result = left.SourceTreeOrdinal.CompareTo(right.SourceTreeOrdinal);
+        if (result != 0)
+        {
+            return result;
+        }
+        result = StringComparer.Ordinal.Compare(left.SourceTreePath, right.SourceTreePath);
+        if (result != 0)
+        {
+            return result;
+        }
+        result = StringComparer.Ordinal.Compare(left.SourceTreeSha256, right.SourceTreeSha256);
+        return result != 0 ? result :
+            StringComparer.Ordinal.Compare(left.SourceLineMapSha256, right.SourceLineMapSha256);
     }
 }

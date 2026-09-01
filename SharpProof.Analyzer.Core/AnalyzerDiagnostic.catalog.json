@@ -8,6 +8,12 @@
       "reason": "Contract.Old cannot be nested inside Contract.Old"
     },
     {
+      "failure": "NestedOld",
+      "isOld": false,
+      "argument": "<nesting>",
+      "reason": "Contract.Result cannot be nested inside Contract.Old"
+    },
+    {
       "failure": "InvalidIntrinsicSignature",
       "isOld": true,
       "argument": "<signature>",

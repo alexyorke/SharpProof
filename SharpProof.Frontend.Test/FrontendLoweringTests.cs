@@ -311,6 +311,39 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void StructThisCannotMasqueradeAsAnExactReferenceValue()
+    {
+        AssertClassification(
+            """
+            public struct Token {
+                public Token Target() => this;
+            }
+            """,
+            FrontendSubsetDecision.ClosedAbstention,
+            FrontendAbstention.UnsupportedType);
+    }
+
+    [Test]
+    public void NullPointerConversionCannotMasqueradeAsAnExactNullReference()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            public static unsafe int* Target() => null;
+            """,
+            allowUnsafe: true);
+
+        var result = compiled.Lower();
+
+        Assert.That(result.Term, Is.Not.TypeOf<IrNullTerm>());
+        Assert.That(
+            result.Classification.Decision,
+            Is.EqualTo(FrontendSubsetDecision.ClosedAbstention));
+        Assert.That(
+            result.Classification.Abstention,
+            Is.EqualTo(FrontendAbstention.UnsupportedType));
+    }
+
+    [Test]
     public void BoxingConversionsOfConstantsCannotLowerToNull()
     {
         foreach (var expression in new[] { "(object)5", "(object)\"x\"", "(object)true" })
@@ -354,6 +387,27 @@ public sealed class FrontendLoweringTests
             """
             public interface IItem {}
             public static bool Target(IItem left, IItem right) => left == right;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+    }
+
+    [Test]
+    public void AssignableReferenceEqualityUsesTheCommonComparisonType()
+    {
+        AssertClassification(
+            """
+            public static bool Target(object left, string right) =>
+                left == right;
+            """,
+            FrontendSubsetDecision.Exact,
+            FrontendAbstention.None);
+        AssertClassification(
+            """
+            public class Base {}
+            public sealed class Derived : Base {}
+            public static bool Target(Base left, Derived right) =>
+                left != right;
             """,
             FrontendSubsetDecision.Exact,
             FrontendAbstention.None);
@@ -461,6 +515,30 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void NamedArgumentsForExpressionOpaqueInvocationsUseParameterOrdinal()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            private static long Add(long first, long second) => first;
+            public static long Target(long value) =>
+                Add(second: value, first: 3L);
+            """);
+        var result = new RoslynOperationLowerer(
+            compiled.Factory,
+            static method => method.Name == "Add")
+            .Lower(compiled.TargetExpression);
+
+        AssertOpaque(
+            result,
+            IrOpaquePurity.Pure,
+            FrontendAbstention.UnsupportedInvocationShape);
+        var opaque = (IrOpaqueTerm)result.Term;
+        Assert.That(opaque.Arguments, Has.Length.EqualTo(2));
+        Assert.That(((IrIntegerTerm)opaque.Arguments[0]).Value, Is.EqualTo(3L));
+        Assert.That(opaque.Arguments[1], Is.TypeOf<IrVariableTerm>());
+    }
+
+    [Test]
     public void PureOpaqueIdentityIsStructuralAndImpureIdentityIsPerOccurrence()
     {
         using var pure = CompiledMethod.Create(
@@ -536,6 +614,33 @@ public sealed class FrontendLoweringTests
         Assert.That(second, Is.TypeOf<IrOpaqueTerm>());
         Assert.That(second, Is.Not.SameAs(first));
         Assert.That(second.Id, Is.Not.EqualTo(first.Id));
+    }
+
+    [Test]
+    public void PureOpaqueIdentitySeparatesDistinctConstantFields()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            private const long First = 1L;
+            private const long Second = 2L;
+            public static long Target() => First + Second;
+            """);
+        var fields = compiled.TargetExpression
+            .DescendantsAndSelf()
+            .OfType<IFieldReferenceOperation>()
+            .ToArray();
+        Assert.That(fields, Has.Length.EqualTo(2));
+
+        var lowerer = new RoslynOperationLowerer(compiled.Factory);
+        var first = lowerer.Lower(fields[0]);
+        var second = lowerer.Lower(fields[1]);
+
+        Assert.That(first.Term, Is.TypeOf<IrOpaqueTerm>());
+        Assert.That(second.Term, Is.TypeOf<IrOpaqueTerm>());
+        Assert.That(((IrOpaqueTerm)first.Term).Purity, Is.EqualTo(IrOpaquePurity.Pure));
+        Assert.That(((IrOpaqueTerm)second.Term).Purity, Is.EqualTo(IrOpaquePurity.Pure));
+        Assert.That(second.Term, Is.Not.SameAs(first.Term));
+        Assert.That(second.Term.Id, Is.Not.EqualTo(first.Term.Id));
     }
 
     [Test]
@@ -799,6 +904,38 @@ public sealed class FrontendLoweringTests
     }
 
     [Test]
+    public void UnsupportedLeftAssociatedFallbackLowersEachOperationOnce()
+    {
+        using var compiled = CompiledMethod.Create(
+            """
+            public static long Target(long value) =>
+                value + 1L + 2L + 3L + 4L + 5L + 6L + 7L + 8L + 9L + 10L + 11L + 12L;
+            """);
+        var operations = compiled.TargetExpression
+            .DescendantsAndSelf()
+            .ToArray();
+        var visits = 0;
+        var lowerer = new RoslynOperationLowerer(compiled.Factory)
+        {
+            CustomLowering = _ =>
+            {
+                visits++;
+                return default;
+            }
+        };
+
+        var result = lowerer.Lower(compiled.TargetExpression);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Classification.Abstention,
+                Is.EqualTo(FrontendAbstention.UncheckedOverflowSemantics));
+            Assert.That(visits, Is.LessThanOrEqualTo(operations.Length));
+        }
+    }
+
+    [Test]
     public void OperationKindClassifierSnapshotIsClosedAndExhaustive()
     {
         var kinds = OperationSubsetClassifier.GetKnownOperationKinds();
@@ -833,7 +970,15 @@ public sealed class FrontendLoweringTests
         Assert.That(
             snapshotHash,
             Is.EqualTo(
-                "4C2849F3D16A580C09BBB46C9526EBC1404405C9FA54A4056D631269AE2BC736"));
+                "423FE9D03A156149D96290A64F84A1B53F7FBD0F5EA8C1BC4AC9A19B72416641"));
+    }
+
+    [Test]
+    public void FieldReferencesAreAdmittedToContractExpressionStage()
+    {
+        Assert.That(
+            OperationSubsetClassifier.Classify(OperationKind.FieldReference).IsExact,
+            Is.True);
     }
 
     [Test]
@@ -969,6 +1114,31 @@ public sealed class FrontendLoweringTests
             FrontendAbstention.UncheckedOverflowSemantics);
     }
 
+    [Test]
+    public void DeepExactExpressionAbstainsBeforeRecursiveLoweringExhaustsTheStack()
+    {
+        var expression = string.Join(
+            " + ",
+            Enumerable.Repeat("1L", 300).Prepend("value"));
+        using var compiled = CompiledMethod.Create(
+            "public static long Target(long value) => checked(" +
+            expression +
+            ");");
+
+        var result = compiled.Lower();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Classification.Decision,
+                Is.EqualTo(FrontendSubsetDecision.ClosedAbstention));
+            Assert.That(
+                result.Classification.Abstention,
+                Is.EqualTo(FrontendAbstention.ExpressionDepthLimit));
+            Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
+        }
+    }
+
     private static void AssertClassification(
         string members,
         FrontendSubsetDecision decision,
@@ -1031,7 +1201,8 @@ public sealed class FrontendLoweringTests
 
         internal static CompiledMethod Create(
             string members,
-            bool returnExpressionOnly = true)
+            bool returnExpressionOnly = true,
+            bool allowUnsafe = false)
         {
             var source =
                 """
@@ -1053,6 +1224,7 @@ public sealed class FrontendLoweringTests
                     OutputKind.DynamicallyLinkedLibrary,
                     optimizationLevel: OptimizationLevel.Release,
                     checkOverflow: false,
+                    allowUnsafe: allowUnsafe,
                     nullableContextOptions: NullableContextOptions.Enable));
             var diagnostics = compilation.GetDiagnostics()
                 .Where(static diagnostic =>

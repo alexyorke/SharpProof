@@ -12,9 +12,11 @@ internal sealed class ExceptionHandlerReachability(
     Func<ICompoundAssignmentOperation, bool> canCompoundValueComplete,
     Func<IIncrementOrDecrementOperation, bool> canIncrementValueComplete,
     Func<IWithOperation, bool> canWithCloneComplete,
+    ConversionEffectClassifier conversionEffects,
     Func<IListPatternOperation, IReadOnlyList<IMethodSymbol>>
         getReachableListPatternMembers,
     ResolvedApiSpecTable apiSpecs,
+    EffectKnownSymbols knownSymbols,
     Func<IMethodSymbol, bool> isKnownNonThrowing)
 {
     private readonly Dictionary<CatchClauseSyntax, CatchReachability> _cache = new();
@@ -23,6 +25,9 @@ internal sealed class ExceptionHandlerReachability(
     private readonly INamedTypeSymbol? _nullReferenceExceptionType =
         compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.NullReferenceException);
+    private readonly INamedTypeSymbol? _argumentExceptionType =
+        compilation.GetTypeByMetadataName(
+            FrameworkTypeMetadataNames.ArgumentException);
     private readonly INamedTypeSymbol? _argumentNullExceptionType =
         compilation.GetTypeByMetadataName(
             FrameworkTypeMetadataNames.ArgumentNullException);
@@ -34,6 +39,8 @@ internal sealed class ExceptionHandlerReachability(
             FrameworkTypeMetadataNames.SwitchExpressionException);
     private readonly DefiniteOperationFacts _staticInitializationFacts =
         new(compilation, CancellationToken.None);
+    private readonly ExternalEffectResolver _externalEffects =
+        new(compilation, apiSpecs);
 
     internal bool IsReachable(CatchClauseSyntax target, bool inFilter)
     {
@@ -176,8 +183,10 @@ internal sealed class ExceptionHandlerReachability(
                 if (thrown.Exception is not { } exception)
                 {
                     Add(
-                        FromThrowSet(
-                            EffectExceptionFlow.ResolveRethrow(thrown)),
+                        GetRethrowExceptions(
+                            thrown,
+                            activeMethods,
+                            depth),
                         thrown);
                     continue;
                 }
@@ -190,21 +199,15 @@ internal sealed class ExceptionHandlerReachability(
                         keepEscaping),
                     exception);
                 var operandCompletes = canCompleteNormally(exception);
-                if (operandCompletes &&
-                    (abstractFlow?.ProvesNull(thrown, exception) == true ||
-                     exception.ConstantValue is
-                     { HasValue: true, Value: null }) &&
-                    _nullReferenceExceptionType is { } nullReferenceException)
+                if (!operandCompletes)
                 {
-                    Add(
-                        new PotentialExceptions(
-                            ImmutableHashSet.Create<INamedTypeSymbol>(
-                                SymbolEqualityComparer.Default,
-                                nullReferenceException),
-                            Unknown: false),
-                        thrown);
+                    continue;
                 }
-                else if (operandCompletes &&
+
+                var definitelyNull =
+                    abstractFlow?.ProvesNull(thrown, exception) == true ||
+                    DefiniteOperationFacts.IsDefinitelyNull(exception);
+                if (!definitelyNull &&
                     DefiniteOperationFacts.UnwrapHarmlessValue(exception).Type
                     is INamedTypeSymbol type)
                 {
@@ -214,6 +217,36 @@ internal sealed class ExceptionHandlerReachability(
                                 SymbolEqualityComparer.Default,
                                 type),
                             Unknown: false),
+                        thrown);
+                }
+                else if (!definitelyNull &&
+                    DefiniteOperationFacts.UnwrapHarmlessValue(exception).Type
+                    is ITypeParameterSymbol typeParameter &&
+                    _exceptionType is { } exceptionType &&
+                    compilation.ClassifyCommonConversion(
+                        typeParameter,
+                        exceptionType).IsImplicit)
+                {
+                    Add(UnknownPotential, thrown);
+                }
+                else if (!definitelyNull)
+                {
+                    Add(UnknownPotential, thrown);
+                }
+
+                var definitelyNonNull =
+                    abstractFlow?.ProvesNonNull(thrown, exception) == true ||
+                    DefiniteOperationFacts.IsDefinitelyNonNull(exception);
+                if (!definitelyNonNull)
+                {
+                    Add(
+                        _nullReferenceExceptionType is { } nullReferenceException
+                            ? new PotentialExceptions(
+                                ImmutableHashSet.Create<INamedTypeSymbol>(
+                                    SymbolEqualityComparer.Default,
+                                    nullReferenceException),
+                                Unknown: false)
+                            : UnknownPotential,
                         thrown);
                 }
                 continue;
@@ -248,7 +281,8 @@ internal sealed class ExceptionHandlerReachability(
                     if (initializationCompletes)
                     {
                         Add(
-                            invocation.IsVirtual
+                            OperationEffectScanner.IsDispatchUncertain(
+                                invocation)
                                 ? UnknownPotential
                                 : GetCallableExceptions(
                                     invocation.TargetMethod,
@@ -448,36 +482,65 @@ internal sealed class ExceptionHandlerReachability(
             }
             if (operation is ICompoundAssignmentOperation compound)
             {
-                var priorPhasesComplete =
-                    canCompleteNormally(compound.Target) &&
+                var targetCompletes = canCompleteNormally(compound.Target);
+                var skipsOperator =
+                    ConversionEffectClassifier.SkipsLiftedOperator(
+                        compound,
+                        abstractFlow);
+                var inConversionCompletes = targetCompletes &&
+                    AddCompoundCallablePotential(
+                        compound.InConversion.MethodSymbol,
+                        compound,
+                        activeMethods,
+                        depth,
+                        Add);
+                var priorPhasesComplete = inConversionCompletes &&
                     canCompleteNormally(compound.Value);
-                var operatorInitializationCompletes = true;
-                if (priorPhasesComplete &&
-                    compound.OperatorMethod is { } compoundOperator)
-                {
-                    operatorInitializationCompletes =
-                        AddStaticInitializationPotential(
-                            compoundOperator,
+                var isStringConcatenation =
+                    StringConcatenationEffectResolver
+                        .IsBuiltInStringConcatenation(compound);
+                var operatorCompletes = isStringConcatenation
+                    ? priorPhasesComplete &&
+                        AddFormattedValuePotential(
+                            compound.Target,
                             compound,
-                            Add);
-                    if (operatorInitializationCompletes)
-                    {
-                        Add(
-                            GetOperatorExceptions(
-                                compoundOperator,
+                            activeMethods,
+                            depth,
+                            Add) &&
+                        AddFormattedValuePotential(
+                            compound.Value,
+                            compound,
+                            activeMethods,
+                            depth,
+                            Add)
+                    : priorPhasesComplete &&
+                        (skipsOperator || AddCompoundCallablePotential(
+                                compound.OperatorMethod,
+                                compound,
                                 activeMethods,
-                                depth),
-                            compound);
-                    }
-                }
-                if (CanThrowUnknownAfterPrerequisites(compound))
+                                depth,
+                                Add)) &&
+                        (skipsOperator || !(compound.OperatorKind is
+                                BinaryOperatorKind.Divide or
+                                BinaryOperatorKind.Remainder &&
+                            compound.Value.ConstantValue is
+                            { HasValue: true, Value: 0 }));
+                if (priorPhasesComplete &&
+                    !isStringConcatenation &&
+                    !skipsOperator &&
+                    CanThrowUnknown(compound))
                 {
                     Add(UnknownPotential, compound);
                 }
-                var operatorCompletes =
-                    operatorInitializationCompletes &&
-                    canCompoundValueComplete(compound);
-                if (priorPhasesComplete && operatorCompletes &&
+                var outConversionCompletes = operatorCompletes &&
+                    AddCompoundCallablePotential(
+                        compound.OutConversion.MethodSymbol,
+                        compound,
+                        activeMethods,
+                        depth,
+                        Add);
+                if (outConversionCompletes &&
+                    canCompoundValueComplete(compound) &&
                     compound.Target is IPropertyReferenceOperation property)
                 {
                     AddPropertySetterExceptions(
@@ -496,6 +559,9 @@ internal sealed class ExceptionHandlerReachability(
                     canCompleteNormally(increment.Target);
                 var operatorInitializationCompletes = true;
                 if (priorPhasesComplete &&
+                    !ConversionEffectClassifier.SkipsLiftedOperator(
+                        increment,
+                        abstractFlow) &&
                     increment.OperatorMethod is { } incrementOperator)
                 {
                     operatorInitializationCompletes =
@@ -539,31 +605,41 @@ internal sealed class ExceptionHandlerReachability(
                     canCompleteNormally(argument.Value));
                 if (argumentsComplete)
                 {
+                    var constructor = creation.Constructor;
+                    var isExceptionType = IsExceptionType(creation.Type);
+                    var metadataExceptionType = isExceptionType &&
+                        creation.Type is
+                        { DeclaringSyntaxReferences.Length: 0 };
+                    var unsourcedExceptionConstructor = isExceptionType &&
+                        constructor is
+                        { DeclaringSyntaxReferences.Length: 0 };
+                    var hasApiSpec = constructor != null &&
+                        apiSpecs.TryGet(constructor, out _);
                     var initializationCompletes = true;
-                    if (creation.Constructor is { } constructor &&
-                        !IsExceptionType(creation.Type))
+                    if (constructor != null &&
+                        !metadataExceptionType)
                     {
                         initializationCompletes =
                             AddStaticInitializationPotential(
-                            constructor,
-                            creation,
-                            Add);
+                                constructor,
+                                creation,
+                                Add);
                     }
                     if (initializationCompletes)
                     {
                         var constructorExceptions =
-                            creation.Constructor == null
+                            constructor == null
                                 ? UnknownPotential
-                                : GetCallableExceptions(
-                                    creation.Constructor,
-                                    activeMethods,
-                                    depth + 1);
-                        if (IsExceptionType(creation.Type) &&
-                            creation.Constructor is
-                            { DeclaringSyntaxReferences.Length: 0 })
-                        {
-                            constructorExceptions = EmptyPotential;
-                        }
+                                : unsourcedExceptionConstructor
+                                    ? metadataExceptionType && hasApiSpec
+                                        ? FromThrowSet(
+                                            _externalEffects.Resolve(
+                                                constructor).Throws)
+                                        : EmptyPotential
+                                    : GetCallableExceptions(
+                                        constructor,
+                                        activeMethods,
+                                        depth + 1);
                         Add(
                             constructorExceptions,
                             creation);
@@ -572,11 +648,101 @@ internal sealed class ExceptionHandlerReachability(
                 PushChildren(creation);
                 continue;
             }
+            if (operation is IInterpolationOperation interpolation)
+            {
+                if (canCompleteNormally(interpolation.Expression) &&
+                    (interpolation.Alignment == null ||
+                     canCompleteNormally(interpolation.Alignment)) &&
+                    (interpolation.FormatString == null ||
+                     canCompleteNormally(interpolation.FormatString)) &&
+                    !StringConcatenationEffectResolver
+                        .DefersInterpolationFormatting(
+                            interpolation,
+                            compilation))
+                {
+                    Add(
+                        interpolation.Alignment != null ||
+                        interpolation.FormatString != null
+                            ? UnknownPotential
+                            : GetFormattedValueExceptions(
+                                interpolation.Expression,
+                                interpolation,
+                                activeMethods,
+                                depth),
+                        interpolation);
+                }
+                PushChildren(interpolation);
+                continue;
+            }
+            if (operation is IBinaryOperation concatenation &&
+                StringConcatenationEffectResolver
+                    .IsBuiltInStringConcatenation(concatenation))
+            {
+                if (canCompleteNormally(concatenation.LeftOperand) &&
+                    canCompleteNormally(concatenation.RightOperand))
+                {
+                    Add(
+                        GetFormattedValueExceptions(
+                            concatenation.LeftOperand,
+                            concatenation,
+                            activeMethods,
+                            depth),
+                        concatenation);
+                    Add(
+                        GetFormattedValueExceptions(
+                            concatenation.RightOperand,
+                            concatenation,
+                            activeMethods,
+                            depth),
+                        concatenation);
+                }
+                PushChildren(concatenation);
+                continue;
+            }
             if (operation is IBinaryOperation binary &&
                 binary.OperatorMethod is { } binaryOperator)
             {
-                if (canCompleteNormally(binary.LeftOperand) &&
-                    canCompleteNormally(binary.RightOperand))
+                var skipsOperator =
+                    ConversionEffectClassifier.SkipsLiftedOperator(
+                        binary,
+                        abstractFlow);
+                var priorPhasesComplete =
+                    canCompleteNormally(binary.LeftOperand);
+                if (binary.OperatorKind is
+                        BinaryOperatorKind.ConditionalAnd or
+                        BinaryOperatorKind.ConditionalOr)
+                {
+                    var truthOperator =
+                        ConditionalTruthOperatorFacts.Resolve(binary);
+                    if (priorPhasesComplete && truthOperator != null)
+                    {
+                        var initializationCompletes =
+                            AddStaticInitializationPotential(
+                                truthOperator,
+                                binary,
+                                Add);
+                        if (initializationCompletes)
+                        {
+                            Add(
+                                GetOperatorExceptions(
+                                    truthOperator,
+                                    activeMethods,
+                                    depth),
+                                binary);
+                        }
+                        priorPhasesComplete = initializationCompletes &&
+                            canMethodCompleteNormally(truthOperator);
+                    }
+                    else if (priorPhasesComplete)
+                    {
+                        Add(UnknownPotential, binary);
+                        priorPhasesComplete = false;
+                    }
+                }
+
+                if (priorPhasesComplete &&
+                    canCompleteNormally(binary.RightOperand) &&
+                    !skipsOperator)
                 {
                     if (AddStaticInitializationPotential(
                             binaryOperator,
@@ -601,7 +767,10 @@ internal sealed class ExceptionHandlerReachability(
             if (operation is IUnaryOperation unary &&
                 unary.OperatorMethod is { } unaryOperator)
             {
-                if (canCompleteNormally(unary.Operand))
+                if (canCompleteNormally(unary.Operand) &&
+                    !ConversionEffectClassifier.SkipsLiftedOperator(
+                        unary,
+                        abstractFlow))
                 {
                     if (AddStaticInitializationPotential(
                             unaryOperator,
@@ -626,7 +795,10 @@ internal sealed class ExceptionHandlerReachability(
             if (operation is IConversionOperation conversion &&
                 conversion.OperatorMethod is { } conversionOperator)
             {
-                if (canCompleteNormally(conversion.Operand))
+                if (canCompleteNormally(conversion.Operand) &&
+                    !ConversionEffectClassifier.SkipsLiftedOperator(
+                        conversion,
+                        abstractFlow))
                 {
                     if (AddStaticInitializationPotential(
                             conversionOperator,
@@ -646,6 +818,31 @@ internal sealed class ExceptionHandlerReachability(
                     Add(UnknownPotential, conversion);
                 }
                 PushChildren(conversion);
+                continue;
+            }
+            if (operation is IConversionOperation builtInConversion)
+            {
+                if (canCompleteNormally(builtInConversion.Operand))
+                {
+                    var conversionKind = Microsoft.CodeAnalysis.CSharp
+                        .CSharpExtensions.GetConversion(builtInConversion);
+                    if (conversionKind.IsUnboxing ||
+                        conversionKind is { IsReference: true, IsExplicit: true } &&
+                        !builtInConversion.IsTryCast)
+                    {
+                        Add(
+                            FromThrowSet(
+                                conversionEffects.Classify(
+                                    builtInConversion,
+                                    conversionKind).Throws),
+                            builtInConversion);
+                    }
+                }
+                if (CanThrowUnknownAfterPrerequisites(builtInConversion))
+                {
+                    Add(UnknownPotential, builtInConversion);
+                }
+                PushChildren(builtInConversion);
                 continue;
             }
             if (operation is IUsingOperation or IUsingDeclarationOperation)
@@ -737,9 +934,10 @@ internal sealed class ExceptionHandlerReachability(
                                 accessor == null || accessor.IsVirtual ||
                                 accessor.IsAbstract
                                     ? UnknownPotential
-                                    : accessor.DeclaringSyntaxReferences.Length == 0 &&
-                                        propertyReference.Property.ContainingType
-                                            ?.IsRefLikeType == true
+                                    : SwitchExpressionFacts
+                                        .IsCompilerIntrinsicRefLikeMember(
+                                            compilation,
+                                            accessor)
                                     ? EmptyPotential
                                     : GetCallableExceptions(
                                         accessor,
@@ -752,17 +950,49 @@ internal sealed class ExceptionHandlerReachability(
                 PushChildren(propertyReference);
                 continue;
             }
+            if (operation is IRecursivePatternOperation recursivePattern)
+            {
+                var instance = SwitchExpressionFacts.GetGoverningValue(
+                    recursivePattern);
+                if (instance != null &&
+                    IsDefinitelyNull(recursivePattern, instance))
+                {
+                    continue;
+                }
+                if (recursivePattern.DeconstructSymbol is
+                    IMethodSymbol deconstruct)
+                {
+                    Add(
+                        deconstruct.IsVirtual || deconstruct.IsAbstract
+                            ? UnknownPotential
+                            : GetCallableExceptions(
+                                deconstruct,
+                                activeMethods,
+                                depth + 1),
+                        recursivePattern);
+                    if (!deconstruct.IsVirtual &&
+                        !deconstruct.IsAbstract &&
+                        !canMethodCompleteNormally(deconstruct))
+                    {
+                        continue;
+                    }
+                }
+                PushSequential(recursivePattern.ChildOperations);
+                continue;
+            }
             if (operation is IListPatternOperation listPattern)
             {
                 var members = getReachableListPatternMembers(listPattern);
                 foreach (var member in members)
                 {
-                    if (member.DeclaringSyntaxReferences.Length == 0)
-                    {
-                        continue;
-                    }
                     Add(
-                        member.IsVirtual || member.IsAbstract
+                        SwitchExpressionFacts
+                            .IsCompilerIntrinsicListPatternMember(
+                                compilation,
+                                listPattern,
+                                member)
+                            ? EmptyPotential
+                            : member.IsVirtual || member.IsAbstract
                             ? UnknownPotential
                             : GetCallableExceptions(
                                 member,
@@ -944,6 +1174,22 @@ internal sealed class ExceptionHandlerReachability(
                         phaseCompletes = isCompleted == null ||
                             canMethodCompleteNormally(isCompleted);
                     }
+                    if (phaseCompletes && getAwaiter != null)
+                    {
+                        var continuation =
+                            knownSymbols.FindAwaitContinuationMethod(
+                                getAwaiter.ReturnType);
+                        Add(
+                            continuation == null ||
+                            continuation.IsVirtual ||
+                            continuation.IsAbstract
+                                ? UnknownPotential
+                                : GetCallableExceptions(
+                                    continuation,
+                                    activeMethods,
+                                    depth + 1),
+                            awaitOperation);
+                    }
                     var getResult = info.GetResultMethod;
                     if (phaseCompletes)
                     {
@@ -961,17 +1207,55 @@ internal sealed class ExceptionHandlerReachability(
                 PushChildren(awaitOperation);
                 continue;
             }
-            if (operation is IMethodReferenceOperation methodReference &&
-                methodReference.Instance is { } methodInstance &&
-                !methodReference.Method.IsStatic)
+            if (operation is IDelegateCreationOperation delegateCreation)
+            {
+                var delegateMethodReference = MethodGroupConversionFacts
+                    .GetDelegateConstructorCheckedTarget(delegateCreation);
+                if (delegateMethodReference?.Instance is { } delegateInstance)
+                {
+                    Add(
+                        GetPotentialNullReceiver(
+                            delegateMethodReference,
+                            delegateInstance,
+                            _argumentExceptionType,
+                            out _),
+                        delegateCreation);
+                    PushChildren(delegateCreation);
+                    continue;
+                }
+            }
+            if (operation is IConversionOperation methodGroupConversion)
+            {
+                var conversionMethodReference = MethodGroupConversionFacts
+                    .GetDelegateConstructorCheckedTarget(
+                        methodGroupConversion);
+                if (conversionMethodReference?.Instance is
+                    { } conversionInstance)
+                {
+                    Add(
+                        GetPotentialNullReceiver(
+                            conversionMethodReference,
+                            conversionInstance,
+                            _argumentExceptionType,
+                            out _),
+                        methodGroupConversion);
+                    PushChildren(methodGroupConversion);
+                    continue;
+                }
+            }
+            if (operation is IMethodReferenceOperation referencedMethod &&
+                referencedMethod.Instance is { } methodInstance &&
+                !referencedMethod.Method.IsStatic &&
+                !MethodGroupConversionFacts
+                    .UsesDelegateConstructorNullCheck(referencedMethod))
             {
                 Add(
                     GetPotentialNullReceiver(
-                        methodReference,
+                        referencedMethod,
                         methodInstance,
                         out _),
-                    methodReference);
-                PushChildren(methodReference);
+                    referencedMethod);
+                PushChildren(referencedMethod);
                 continue;
             }
             if (CanThrowUnknownAfterPrerequisites(operation))
@@ -994,180 +1278,11 @@ internal sealed class ExceptionHandlerReachability(
 
         void PushChildren(IOperation operation)
         {
-            switch (operation)
-            {
-                case INameOfOperation or ITypeOfOperation or
-                    ISizeOfOperation:
-                    return;
-                case IBlockOperation block:
-                    PushSequential(block.Operations);
-                    return;
-                case ISimpleAssignmentOperation assignment:
-                    var inputs = GetSimpleAssignmentTargetInputs(
-                        assignment.Target).ToArray();
-                    if (inputs.All(canCompleteNormally))
-                    {
-                        remaining.Push(assignment.Value);
-                    }
-                    PushSequential(inputs);
-                    return;
-                case IBinaryOperation
-                {
-                    OperatorMethod: null,
-                    OperatorKind: BinaryOperatorKind.ConditionalAnd or
-                            BinaryOperatorKind.ConditionalOr
-                } binary:
-                    var leftCompletes = canCompleteNormally(
-                        binary.LeftOperand);
-                    var leftConstant = binary.LeftOperand.ConstantValue is
-                    { HasValue: true, Value: bool leftValue }
-                            ? leftValue
-                            : (bool?)null;
-                    var evaluatesRight = leftCompletes &&
-                        (binary.OperatorKind ==
-                            BinaryOperatorKind.ConditionalAnd
-                                ? leftConstant != false
-                                : leftConstant != true);
-                    if (evaluatesRight)
-                    {
-                        remaining.Push(binary.RightOperand);
-                    }
-                    remaining.Push(binary.LeftOperand);
-                    return;
-                case IConditionalOperation conditional:
-                    if (!canCompleteNormally(conditional.Condition))
-                    {
-                        remaining.Push(conditional.Condition);
-                        return;
-                    }
-                    var condition = conditional.Condition.ConstantValue is
-                    { HasValue: true, Value: bool conditionValue }
-                            ? conditionValue
-                            : (bool?)null;
-                    if (condition != true &&
-                        conditional.WhenFalse is { } whenFalse)
-                    {
-                        remaining.Push(whenFalse);
-                    }
-                    if (condition != false)
-                    {
-                        remaining.Push(conditional.WhenTrue);
-                    }
-                    remaining.Push(conditional.Condition);
-                    return;
-                case ICoalesceOperation coalesce:
-                    var valueCompletes = canCompleteNormally(coalesce.Value);
-                    var definitelyNonNull =
-                        DefiniteOperationFacts.IsDefinitelyNonNull(
-                            coalesce.Value) ||
-                        abstractFlow?.ProvesNonNull(
-                            coalesce,
-                            coalesce.Value) == true;
-                    if (valueCompletes && !definitelyNonNull)
-                    {
-                        remaining.Push(coalesce.WhenNull);
-                    }
-                    remaining.Push(coalesce.Value);
-                    return;
-                case ICoalesceAssignmentOperation coalesce:
-                    var targetCompletes = canCompleteNormally(
-                        coalesce.Target);
-                    var targetIsNonNull =
-                        DefiniteOperationFacts.IsDefinitelyNonNull(
-                            coalesce.Target) ||
-                        abstractFlow?.ProvesNonNull(
-                            coalesce,
-                            coalesce.Target) == true;
-                    if (targetCompletes && !targetIsNonNull)
-                    {
-                        remaining.Push(coalesce.Value);
-                    }
-                    remaining.Push(coalesce.Target);
-                    return;
-                case IConditionalAccessOperation access:
-                    var receiverCompletes = canCompleteNormally(
-                        access.Operation);
-                    var receiverIsNull =
-                        DefiniteOperationFacts.IsDefinitelyNull(
-                            access.Operation) ||
-                        abstractFlow?.ProvesNull(
-                            access,
-                            access.Operation) == true;
-                    if (receiverCompletes && !receiverIsNull)
-                    {
-                        remaining.Push(access.WhenNotNull);
-                    }
-                    remaining.Push(access.Operation);
-                    return;
-                case IWithOperation withOperation:
-                    if (canWithCloneComplete(withOperation) &&
-                        withOperation.Initializer is { } initializer)
-                    {
-                        remaining.Push(initializer);
-                    }
-                    remaining.Push(withOperation.Operand);
-                    return;
-                case IObjectCreationOperation creation:
-                    if (creation.Initializer != null &&
-                        creation.Arguments.All(argument =>
-                            canCompleteNormally(argument.Value)) &&
-                        creation.Constructor is { } constructor &&
-                        canMethodCompleteNormally(constructor))
-                    {
-                        remaining.Push(creation.Initializer);
-                    }
-                    PushSequential(creation.Arguments);
-                    return;
-                case ILockOperation @lock:
-                    if (canCompleteNormally(@lock.LockedValue) &&
-                        !IsDefinitelyNull(@lock, @lock.LockedValue))
-                    {
-                        remaining.Push(@lock.Body);
-                    }
-                    remaining.Push(@lock.LockedValue);
-                    return;
-                case ISwitchOperation @switch:
-                    if (canCompleteNormally(@switch.Value))
-                    {
-                        var constant = @switch.Value.ConstantValue;
-                        var cases = GetReachableSwitchCases(
-                            @switch,
-                            constant.HasValue,
-                            constant.Value,
-                            scheduledSwitchBodies,
-                            switchCaseReachability);
-                        PushAll(cases);
-                    }
-                    remaining.Push(@switch.Value);
-                    return;
-                case ISwitchCaseOperation @case
-                    when switchCaseReachability.TryGetValue(
-                        @case,
-                    out var reachability):
-                    if (reachability.BodyReachable)
-                    {
-                        PushSequential(@case.Body);
-                    }
-                    PushAll(reachability.Clauses);
-                    return;
-                case ISwitchExpressionOperation @switch:
-                    if (canCompleteNormally(@switch.Value))
-                    {
-                        PushAll(SwitchExpressionFacts.GetReachableArms(
-                            @switch,
-                            canCompleteNormally,
-                            DefiniteOperationFacts.IsDefinitelyNonNull(
-                                @switch.Value) ||
-                            abstractFlow?.ProvesNonNull(
-                                @switch,
-                                @switch.Value) == true));
-                    }
-                    remaining.Push(@switch.Value);
-                    return;
-                default:
-                    PushSequential(operation.ChildOperations);
-                    return;
-            }
+            PushChildrenCore(
+                operation,
+                remaining,
+                scheduledSwitchBodies,
+                switchCaseReachability);
         }
 
         void PushSequential(IEnumerable<IOperation> children)
@@ -1190,6 +1305,250 @@ internal sealed class ExceptionHandlerReachability(
             {
                 remaining.Push(child);
             }
+        }
+    }
+
+    // Keep this large control-flow dispatcher out of the captured traversal
+    // closure. CA1508 otherwise constructs an expensive interprocedural flow
+    // graph for the local function during every qualifying build.
+    private void PushChildrenCore(
+        IOperation operation,
+        Stack<IOperation> remaining,
+        HashSet<ISwitchCaseOperation> scheduledSwitchBodies,
+        Dictionary<ISwitchCaseOperation, SwitchCaseReachability>
+            switchCaseReachability)
+    {
+        switch (operation)
+        {
+            case INameOfOperation or ITypeOfOperation or ISizeOfOperation:
+                return;
+            case IBlockOperation block:
+                PushSequentialCore(block.Operations, remaining);
+                return;
+            case ISimpleAssignmentOperation assignment:
+                var inputs = GetSimpleAssignmentTargetInputs(
+                    assignment.Target).ToArray();
+                if (inputs.All(canCompleteNormally))
+                {
+                    remaining.Push(assignment.Value);
+                }
+                PushSequentialCore(inputs, remaining);
+                return;
+            case IBinaryOperation
+            {
+                OperatorMethod: not null,
+                OperatorKind: BinaryOperatorKind.ConditionalAnd or
+                        BinaryOperatorKind.ConditionalOr
+            } binary:
+                if (canCompleteNormally(binary.LeftOperand) &&
+                    ConditionalTruthOperatorFacts.Resolve(binary) is
+                    { } truthOperator &&
+                    canMethodCompleteNormally(truthOperator))
+                {
+                    remaining.Push(binary.RightOperand);
+                }
+                remaining.Push(binary.LeftOperand);
+                return;
+            case IBinaryOperation
+            {
+                OperatorMethod: null,
+                OperatorKind: BinaryOperatorKind.ConditionalAnd or
+                        BinaryOperatorKind.ConditionalOr
+            } binary:
+                var leftCompletes = canCompleteNormally(binary.LeftOperand);
+                var leftConstant = binary.LeftOperand.ConstantValue is
+                { HasValue: true, Value: bool leftValue }
+                        ? leftValue
+                        : (bool?)null;
+                var evaluatesRight = leftCompletes &&
+                    (binary.OperatorKind == BinaryOperatorKind.ConditionalAnd
+                        ? leftConstant != false
+                        : leftConstant != true);
+                if (evaluatesRight)
+                {
+                    remaining.Push(binary.RightOperand);
+                }
+                remaining.Push(binary.LeftOperand);
+                return;
+            case IConditionalOperation conditional:
+                if (!canCompleteNormally(conditional.Condition))
+                {
+                    remaining.Push(conditional.Condition);
+                    return;
+                }
+                var condition = conditional.Condition.ConstantValue is
+                { HasValue: true, Value: bool conditionValue }
+                        ? conditionValue
+                        : (bool?)null;
+                if (condition != true &&
+                    conditional.WhenFalse is { } whenFalse)
+                {
+                    remaining.Push(whenFalse);
+                }
+                if (condition != false)
+                {
+                    remaining.Push(conditional.WhenTrue);
+                }
+                remaining.Push(conditional.Condition);
+                return;
+            case ICoalesceOperation coalesce:
+                var valueCompletes = canCompleteNormally(coalesce.Value);
+                var definitelyNonNull =
+                    DefiniteOperationFacts.IsDefinitelyNonNull(
+                        coalesce.Value) ||
+                    abstractFlow?.ProvesNonNull(
+                        coalesce,
+                        coalesce.Value) == true;
+                if (valueCompletes && !definitelyNonNull)
+                {
+                    remaining.Push(coalesce.WhenNull);
+                }
+                remaining.Push(coalesce.Value);
+                return;
+            case ICoalesceAssignmentOperation coalesce:
+                var targetCompletes = canCompleteNormally(coalesce.Target);
+                var targetIsNonNull =
+                    DefiniteOperationFacts.IsDefinitelyNonNull(
+                        coalesce.Target) ||
+                    abstractFlow?.ProvesNonNull(
+                        coalesce,
+                        coalesce.Target) == true;
+                if (targetCompletes && !targetIsNonNull)
+                {
+                    remaining.Push(coalesce.Value);
+                }
+                remaining.Push(coalesce.Target);
+                return;
+            case ICompoundAssignmentOperation compound:
+                if (canCompleteNormally(compound.Target) &&
+                    (compound.InConversion.MethodSymbol == null ||
+                     canMethodCompleteNormally(
+                         compound.InConversion.MethodSymbol)))
+                {
+                    remaining.Push(compound.Value);
+                }
+                remaining.Push(compound.Target);
+                return;
+            case IConditionalAccessOperation access:
+                var receiverCompletes = canCompleteNormally(
+                    access.Operation);
+                var receiverIsNull =
+                    DefiniteOperationFacts.IsDefinitelyNull(
+                        access.Operation) ||
+                    abstractFlow?.ProvesNull(
+                        access,
+                        access.Operation) == true;
+                if (receiverCompletes && !receiverIsNull)
+                {
+                    remaining.Push(access.WhenNotNull);
+                }
+                remaining.Push(access.Operation);
+                return;
+            case IWithOperation withOperation:
+                if (canWithCloneComplete(withOperation) &&
+                    withOperation.Initializer is { } initializer)
+                {
+                    remaining.Push(initializer);
+                }
+                remaining.Push(withOperation.Operand);
+                return;
+            case IObjectCreationOperation creation:
+                if (creation.Initializer != null &&
+                    creation.Arguments.All(argument =>
+                        canCompleteNormally(argument.Value)) &&
+                    creation.Constructor is { } constructor &&
+                    canMethodCompleteNormally(constructor))
+                {
+                    remaining.Push(creation.Initializer);
+                }
+                PushSequentialCore(creation.Arguments, remaining);
+                return;
+            case ILockOperation @lock:
+                if (canCompleteNormally(@lock.LockedValue) &&
+                    !IsDefinitelyNull(@lock, @lock.LockedValue))
+                {
+                    remaining.Push(@lock.Body);
+                }
+                remaining.Push(@lock.LockedValue);
+                return;
+            case ISwitchOperation @switch:
+                if (canCompleteNormally(@switch.Value))
+                {
+                    var constant = @switch.Value.ConstantValue;
+                    var cases = GetReachableSwitchCases(
+                        @switch,
+                        constant.HasValue,
+                        constant.Value,
+                        scheduledSwitchBodies,
+                        switchCaseReachability);
+                    PushAllCore(cases, remaining);
+                }
+                remaining.Push(@switch.Value);
+                return;
+            case ISwitchCaseOperation @case
+                when switchCaseReachability.TryGetValue(
+                    @case,
+                    out var reachability):
+                if (reachability.BodyReachable)
+                {
+                    PushSequentialCore(@case.Body, remaining);
+                }
+                PushAllCore(reachability.Clauses, remaining);
+                return;
+            case ISwitchExpressionOperation @switch:
+                if (canCompleteNormally(@switch.Value))
+                {
+                    var inputDefinitelyNonNull =
+                        DefiniteOperationFacts.IsDefinitelyNonNull(
+                            @switch.Value) ||
+                        abstractFlow?.ProvesNonNull(
+                            @switch,
+                            @switch.Value) == true;
+                    PushAllCore(
+                        SwitchExpressionFacts.GetEvaluatedPatternOnlyArms(
+                                @switch,
+                                canCompleteNormally,
+                                inputDefinitelyNonNull)
+                            .Select(static arm => arm.Pattern),
+                        remaining);
+                    PushAllCore(
+                        SwitchExpressionFacts.GetReachableArms(
+                            @switch,
+                            canCompleteNormally,
+                            inputDefinitelyNonNull),
+                        remaining);
+                }
+                remaining.Push(@switch.Value);
+                return;
+            default:
+                PushSequentialCore(operation.ChildOperations, remaining);
+                return;
+        }
+    }
+
+    private void PushSequentialCore(
+        IEnumerable<IOperation> children,
+        Stack<IOperation> remaining)
+    {
+        var reachable = new List<IOperation>();
+        foreach (var child in children)
+        {
+            reachable.Add(child);
+            if (!canCompleteNormally(child))
+            {
+                break;
+            }
+        }
+        PushAllCore(reachable, remaining);
+    }
+
+    private static void PushAllCore(
+        IEnumerable<IOperation> children,
+        Stack<IOperation> remaining)
+    {
+        foreach (var child in children.Reverse())
+        {
+            remaining.Push(child);
         }
     }
 
@@ -1366,6 +1725,8 @@ internal sealed class ExceptionHandlerReachability(
             : null;
         var labeledInvocations = target.DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
+            .Where(static syntax => !syntax.Ancestors().Any(static ancestor =>
+                ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
             .Select(syntax => model.GetOperation(syntax))
             .Where(static operation => operation != null)
             .Cast<IOperation>()
@@ -1378,6 +1739,8 @@ internal sealed class ExceptionHandlerReachability(
             labeledInvocations = methodSyntax.DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
                 .Where(invocation => invocation.SpanStart > target.Span.End)
+                .Where(static syntax => !syntax.Ancestors().Any(static ancestor =>
+                    ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
                 .Select(syntax => model.GetOperation(syntax))
                 .Where(static operation => operation != null)
                 .Cast<IOperation>()
@@ -1558,9 +1921,76 @@ internal sealed class ExceptionHandlerReachability(
             : finallyExceptions;
     }
 
+    internal EffectThrowSet ResolveRethrow(IThrowOperation thrown)
+    {
+        var potential = GetRethrowExceptions(
+            thrown,
+            new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
+            depth: 0);
+        return EffectThrowSet.Create(potential.Known, potential.Unknown);
+    }
+
+    private PotentialExceptions GetRethrowExceptions(
+        IThrowOperation thrown,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth)
+    {
+        ICatchClauseOperation? catchOperation = null;
+        for (var current = thrown.Parent; current != null; current = current.Parent)
+        {
+            if (current is IAnonymousFunctionOperation or ILocalFunctionOperation)
+            {
+                return UnknownPotential;
+            }
+            if (current is ICatchClauseOperation @catch)
+            {
+                catchOperation = @catch;
+                break;
+            }
+        }
+
+        if (catchOperation?.Syntax is not CatchClauseSyntax target ||
+            target.Parent is not TryStatementSyntax @try)
+        {
+            return UnknownPotential;
+        }
+
+        var model = SharpProof.Frontend.Host.CompilationModelProvider
+            .GetSemanticModel(compilation, @try.SyntaxTree);
+        if (model.GetOperation(@try.Block) is not { } protectedBlock)
+        {
+            return UnknownPotential;
+        }
+
+        var incoming = GetPotentialExceptions(
+            protectedBlock,
+            activeMethods,
+            depth,
+            keepEscaping: false);
+        return new PotentialExceptions(
+            incoming.Known
+                .Where(type => CanKnownReach(type, target, @try, model))
+                .ToImmutableHashSet<INamedTypeSymbol>(
+                    SymbolEqualityComparer.Default),
+            incoming.Unknown && CanUnknownReach(target, @try, model));
+    }
+
     private PotentialExceptions GetPotentialNullReceiver(
         IOperation origin,
         IOperation instance,
+        out bool dereferenceCompletes)
+    {
+        return GetPotentialNullReceiver(
+            origin,
+            instance,
+            _nullReferenceExceptionType,
+            out dereferenceCompletes);
+    }
+
+    private PotentialExceptions GetPotentialNullReceiver(
+        IOperation origin,
+        IOperation instance,
+        INamedTypeSymbol? exceptionType,
         out bool dereferenceCompletes)
     {
         if (!canCompleteNormally(instance))
@@ -1584,14 +2014,14 @@ internal sealed class ExceptionHandlerReachability(
         {
             return EmptyPotential;
         }
-        if (_nullReferenceExceptionType is not { } nullReferenceException)
+        if (exceptionType == null)
         {
             return UnknownPotential;
         }
         return new PotentialExceptions(
             ImmutableHashSet.Create<INamedTypeSymbol>(
                 SymbolEqualityComparer.Default,
-                nullReferenceException),
+                exceptionType),
             Unknown: false);
     }
 
@@ -1791,15 +2221,20 @@ internal sealed class ExceptionHandlerReachability(
                 ITypeSymbol Type,
                 IOperation Resource,
                 IOperation Origin)>();
-            var acquisitionFailed = false;
+            var allInitializersComplete = true;
+            var reachableDisposalCount = 0;
             foreach (var declarator in group.Declarations
                          .SelectMany(static declaration =>
                              declaration.Declarators))
             {
                 var resource = declarator.Initializer?.Value;
+                if (resource != null && CanExitAbruptly(resource, resource))
+                {
+                    reachableDisposalCount = acquired.Count;
+                }
                 if (!canCompleteNormally(resource))
                 {
-                    acquisitionFailed = true;
+                    allInitializersComplete = false;
                     break;
                 }
                 if (resource != null)
@@ -1810,11 +2245,15 @@ internal sealed class ExceptionHandlerReachability(
                         declarator));
                 }
             }
-            if (!scopeExitReachable && !acquisitionFailed)
+            if (scopeExitReachable && allInitializersComplete)
+            {
+                reachableDisposalCount = acquired.Count;
+            }
+            if (reachableDisposalCount == 0)
             {
                 return EmptyPotential;
             }
-            foreach (var item in acquired.AsEnumerable().Reverse())
+            foreach (var item in acquired.Take(reachableDisposalCount).Reverse())
             {
                 var disposal = GetDisposalExceptions(
                     item.Type,
@@ -2352,33 +2791,49 @@ internal sealed class ExceptionHandlerReachability(
                 return result;
             }
         }
-        if (info.MoveNextMethod is not { } moveNext)
+        var moveNextExceptions = EmptyPotential;
+        var moveNextCompletes = true;
+        if (info.MoveNextMethod is { } moveNext)
+        {
+            moveNextExceptions = GetImplicitCallableExceptions(
+                moveNext,
+                forEach,
+                activeMethods,
+                depth,
+                out moveNextCompletes);
+            result = Union(result, moveNextExceptions);
+            if (moveNextCompletes &&
+                info.CurrentProperty?.GetMethod is { } getCurrent)
+            {
+                result = Union(
+                    result,
+                    GetImplicitCallableExceptions(
+                        getCurrent,
+                        forEach,
+                        activeMethods,
+                        depth,
+                        out reachesBody));
+            }
+            else
+            {
+                reachesBody = moveNextCompletes;
+            }
+        }
+        else
         {
             reachesBody = true;
-            return result;
         }
-        var moveNextExceptions = GetImplicitCallableExceptions(
-            moveNext,
-            forEach,
-            activeMethods,
-            depth,
-            out var moveNextCompletes);
-        result = Union(result, moveNextExceptions);
-        if (moveNextCompletes &&
-            info.CurrentProperty?.GetMethod is { } getCurrent)
+        if (reachesBody &&
+            info.ElementConversion.MethodSymbol is { } elementConversion)
         {
             result = Union(
                 result,
                 GetImplicitCallableExceptions(
-                    getCurrent,
+                    elementConversion,
                     forEach,
                     activeMethods,
                     depth,
                     out reachesBody));
-        }
-        else
-        {
-            reachesBody = moveNextCompletes;
         }
         if ((moveNextCompletes || moveNextExceptions.Unknown ||
              !moveNextExceptions.Known.IsEmpty) &&
@@ -2426,7 +2881,72 @@ internal sealed class ExceptionHandlerReachability(
                     depth + 1));
     }
 
-    private ReturnNullability GetReturnNullability(IMethodSymbol method)
+    private PotentialExceptions GetFormattedValueExceptions(
+        IOperation operand,
+        IOperation origin,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth)
+    {
+        if (!StringConcatenationEffectResolver.TryResolveFormattedValueMethod(
+                operand,
+                origin,
+                compilation,
+                abstractFlow,
+                out var target,
+                out var dispatchUncertain))
+        {
+            return EmptyPotential;
+        }
+        if (target == null || dispatchUncertain)
+        {
+            return UnknownPotential;
+        }
+
+        var result = EmptyPotential;
+        if (!AddStaticInitializationPotential(
+                target,
+                origin,
+                (potential, _) => result = Union(result, potential)))
+        {
+            return result;
+        }
+        return Union(
+            result,
+            GetCallableExceptions(target, activeMethods, depth + 1));
+    }
+
+    private bool AddFormattedValuePotential(
+        IOperation operand,
+        IOperation origin,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth,
+        Action<PotentialExceptions, IOperation> add)
+    {
+        add(
+            GetFormattedValueExceptions(
+                operand,
+                origin,
+                activeMethods,
+                depth),
+            origin);
+        if (!StringConcatenationEffectResolver
+            .TryResolveFormattedValueMethod(
+                operand,
+                origin,
+                compilation,
+                abstractFlow,
+                out var target,
+                out var dispatchUncertain))
+        {
+            return true;
+        }
+
+        return target == null ||
+            dispatchUncertain ||
+            canMethodCompleteNormally(target);
+    }
+
+    internal ReturnNullability GetReturnNullability(IMethodSymbol method)
     {
         method = method.OriginalDefinition;
         if (method.DeclaringSyntaxReferences.Length != 1)
@@ -2498,7 +3018,7 @@ internal sealed class ExceptionHandlerReachability(
         return false;
     }
 
-    private enum ReturnNullability
+    internal enum ReturnNullability
     {
         Null,
         NonNull,
@@ -2538,17 +3058,11 @@ internal sealed class ExceptionHandlerReachability(
         int depth)
     {
         method = method.OriginalDefinition;
-        if (isKnownNonThrowing(method) ||
-            method is
-            {
-                MethodKind: MethodKind.Constructor,
-                IsImplicitlyDeclared: true
-            })
+        if (isKnownNonThrowing(method))
         {
             return EmptyPotential;
         }
-        if (depth > 32 ||
-            method.DeclaringSyntaxReferences.Length != 1)
+        if (depth > 32)
         {
             return UnknownPotential;
         }
@@ -2559,6 +3073,25 @@ internal sealed class ExceptionHandlerReachability(
 
         try
         {
+            if (method is
+                {
+                    MethodKind: MethodKind.Constructor,
+                    IsImplicitlyDeclared: true
+                })
+            {
+                return EffectMethodNodeBuilder
+                    .IsSourceImplicitParameterlessConstructor(method)
+                    ? GetImplicitConstructorExceptions(
+                        method,
+                        activeMethods,
+                        depth)
+                    : EmptyPotential;
+            }
+            if (method.DeclaringSyntaxReferences.Length != 1)
+            {
+                return UnknownPotential;
+            }
+
             var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
             var model = SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(compilation, declaration.SyntaxTree);
@@ -2582,6 +3115,26 @@ internal sealed class ExceptionHandlerReachability(
         }
     }
 
+    private PotentialExceptions GetImplicitConstructorExceptions(
+        IMethodSymbol constructor,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth)
+    {
+        if (constructor.ContainingType.IsValueType)
+        {
+            return EmptyPotential;
+        }
+
+        var baseConstructor = EffectMethodNodeBuilder
+            .GetUniqueParameterlessBaseConstructor(constructor);
+        return baseConstructor == null
+            ? UnknownPotential
+            : GetCallableExceptions(
+                baseConstructor,
+                activeMethods,
+                depth + 1);
+    }
+
     internal bool CanMethodThrow(IMethodSymbol method)
     {
         var potential = GetCallableExceptions(
@@ -2589,6 +3142,26 @@ internal sealed class ExceptionHandlerReachability(
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
             depth: 0);
         return potential.Unknown || !potential.Known.IsEmpty;
+    }
+
+    private bool AddCompoundCallablePotential(
+        IMethodSymbol? method,
+        IOperation origin,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth,
+        Action<PotentialExceptions, IOperation> add)
+    {
+        if (method == null)
+        {
+            return true;
+        }
+        if (!AddStaticInitializationPotential(method, origin, add))
+        {
+            return false;
+        }
+
+        add(GetOperatorExceptions(method, activeMethods, depth), origin);
+        return canMethodCompleteNormally(method);
     }
 
     private PotentialExceptions GetOperatorExceptions(
@@ -2627,6 +3200,13 @@ internal sealed class ExceptionHandlerReachability(
             throws.IncludesUnknown);
     }
 
+    private bool IsExceptionType(ITypeSymbol? type)
+    {
+        return type is INamedTypeSymbol named &&
+            _exceptionType is { } exception &&
+            EffectTypeFacts.IsDerivedFrom(named, exception);
+    }
+
     private static PotentialExceptions Union(
         PotentialExceptions left,
         PotentialExceptions right)
@@ -2658,13 +3238,6 @@ internal sealed class ExceptionHandlerReachability(
             ImmutableHashSet.Create<INamedTypeSymbol>(
                 SymbolEqualityComparer.Default),
             Unknown: false);
-
-    private bool IsExceptionType(ITypeSymbol? type)
-    {
-        return type is INamedTypeSymbol named &&
-            _exceptionType is { } exception &&
-            EffectTypeFacts.IsDerivedFrom(named, exception);
-    }
 
     private static PotentialExceptions UnknownPotential =>
         new(
@@ -2715,7 +3288,10 @@ internal sealed class ExceptionHandlerReachability(
 
     private bool CanThrowUnknownAfterPrerequisites(IOperation operation)
     {
-        if (!CanThrowUnknown(operation))
+        if (!CanThrowUnknown(operation) ||
+            ConversionEffectClassifier.SkipsLiftedOperator(
+                operation,
+                abstractFlow))
         {
             return false;
         }
@@ -2747,7 +3323,11 @@ internal sealed class ExceptionHandlerReachability(
     {
         foreach (var @catch in @try.Catches)
         {
-            if (!CatchesKnownType(@catch, thrown, model))
+            var typeSelection = GetKnownTypeSelection(
+                @catch,
+                thrown,
+                model);
+            if (typeSelection == CatchSelection.Never)
             {
                 continue;
             }
@@ -2755,7 +3335,8 @@ internal sealed class ExceptionHandlerReachability(
             {
                 return true;
             }
-            if (GetFilterSelection(@catch, model) == CatchSelection.Always)
+            if (typeSelection == CatchSelection.Always &&
+                GetFilterSelection(@catch, model) == CatchSelection.Always)
             {
                 return false;
             }
@@ -2783,18 +3364,27 @@ internal sealed class ExceptionHandlerReachability(
         return false;
     }
 
-    private static bool CatchesKnownType(
+    private static CatchSelection GetKnownTypeSelection(
         CatchClauseSyntax @catch,
         INamedTypeSymbol thrown,
         SemanticModel model)
     {
         if (@catch.Declaration == null)
         {
-            return true;
+            return CatchSelection.Always;
         }
-        return model.GetTypeInfo(@catch.Declaration.Type).Type is
-            INamedTypeSymbol caught &&
-            EffectTypeFacts.IsDerivedFrom(thrown, caught);
+        if (model.GetTypeInfo(@catch.Declaration.Type).Type is not
+            INamedTypeSymbol caught)
+        {
+            return CatchSelection.Maybe;
+        }
+        if (EffectTypeFacts.IsDerivedFrom(thrown, caught))
+        {
+            return CatchSelection.Always;
+        }
+        return EffectTypeFacts.IsDerivedFrom(caught, thrown)
+            ? CatchSelection.Maybe
+            : CatchSelection.Never;
     }
 
     private bool CatchesAllExceptions(

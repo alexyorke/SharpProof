@@ -39,7 +39,7 @@ public static class CompilerIdentityBridge
         {
             return factory.InternExternalIdentity(
                 CreateSemanticOperationIdentity(factory, operation),
-                OperationSemanticIdentityComparer);
+                EqualityComparer<OperationSemanticIdentity>.Default);
         }
 
         return factory.InternExternalIdentity(
@@ -117,10 +117,6 @@ public static class CompilerIdentityBridge
             CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
     }
 
-    private static readonly IEqualityComparer<OperationSemanticIdentity>
-        OperationSemanticIdentityComparer =
-            EqualityComparer<OperationSemanticIdentity>.Default;
-
     private static OperationSemanticIdentity CreateSemanticOperationIdentity(
         IrFactory factory,
         IOperation operation)
@@ -130,11 +126,38 @@ public static class CompilerIdentityBridge
             operation.Type == null
                 ? default
                 : InternType(factory, operation.Type),
+            operation switch
+            {
+                ITypeOfOperation typeOf =>
+                    InternType(factory, typeOf.TypeOperand),
+                ISizeOfOperation sizeOf =>
+                    InternType(factory, sizeOf.TypeOperand),
+                _ => default
+            },
             (operation as IBinaryOperation)?.OperatorKind,
             (operation as IUnaryOperation)?.OperatorKind,
             (operation as IInstanceReferenceOperation)?.ReferenceKind,
             CompilerIdentityProjections.IsChecked(operation),
-            CompilerIdentityProjections.IsLifted(operation));
+            CompilerIdentityProjections.IsLifted(operation),
+            CompilerIdentityProjections.IsTryCast(operation),
+            UnsupportedConstantIdentity(operation));
+    }
+
+    private static string? UnsupportedConstantIdentity(IOperation operation)
+    {
+        // Unsupported constants still participate in pure opaque-term
+        // interning. Preserve their payload so distinct values cannot become
+        // the same semantic term merely because their CLR types match.
+        if (!operation.ConstantValue.HasValue)
+        {
+            return null;
+        }
+        return operation.ConstantValue.Value switch
+        {
+            null => "<null>",
+            IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+            object value => value.ToString()
+        };
     }
 
     public static string CreateSymbolDisplay(ISymbol? symbol)
@@ -205,18 +228,19 @@ public static class CompilerIdentityBridge
     }
 
     private readonly struct OperationSemanticIdentity(
-        OperationKind kind, IrIdentityId type,
+        OperationKind kind, IrIdentityId type, IrIdentityId typeOperand,
         BinaryOperatorKind? binaryOperator,
         UnaryOperatorKind? unaryOperator,
         InstanceReferenceKind? instanceReference,
-        bool isChecked, bool isLifted)
+        bool isChecked, bool isLifted, bool isTryCast, string? constantIdentity)
         : IEquatable<OperationSemanticIdentity>
     {
         private readonly (
-            OperationKind, IrIdentityId, BinaryOperatorKind?,
-            UnaryOperatorKind?, InstanceReferenceKind?, bool, bool) _value =
-            (kind, type, binaryOperator, unaryOperator, instanceReference,
-             isChecked, isLifted);
+            OperationKind, IrIdentityId, IrIdentityId,
+            BinaryOperatorKind?, UnaryOperatorKind?,
+            InstanceReferenceKind?, bool, bool, bool, string?) _value =
+            (kind, type, typeOperand, binaryOperator, unaryOperator,
+             instanceReference, isChecked, isLifted, isTryCast, constantIdentity);
 
         public bool Equals(OperationSemanticIdentity other)
         {

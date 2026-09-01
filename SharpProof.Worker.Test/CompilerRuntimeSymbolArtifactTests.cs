@@ -30,7 +30,9 @@ public sealed class CompilerRuntimeSymbolArtifactTests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(artifact.SchemaVersion, Is.EqualTo(15));
+                Assert.That(
+                    artifact.SchemaVersion,
+                    Is.EqualTo(CompilerManifestArtifactVersions.Current));
                 Assert.That(
                     tree.PreprocessorSymbols,
                     Does.Contain(Contract.ConditionalSymbol));
@@ -104,13 +106,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
         var compilation = CSharpCompilation.Create(
             "CompilerRuntimeSymbolArtifactTests",
             [CSharpSyntaxTree.ParseText(source, parse, "Subject.cs")],
-            ((string)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES")!)
-                .Split(Path.PathSeparator)
-                .Append(typeof(Contract).Assembly.Location)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(static path =>
-                    MetadataReference.CreateFromFile(path)),
+            WorkerTestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions:

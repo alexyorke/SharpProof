@@ -475,8 +475,15 @@ internal static partial class SemanticClaimIdentity
         }
         else
         {
-            writer.Add(constant.Values.Length);
-            foreach (var value in constant.Values)
+            // Roslyn represents an ill-formed array argument with a default
+            // Values array.  Treat it as an empty array for identity purposes;
+            // fingerprinting must never turn a compiler diagnostic into an
+            // exception while walking metadata.
+            var values = constant.Values.IsDefault
+                ? ImmutableArray<TypedConstant>.Empty
+                : constant.Values;
+            writer.Add(values.Length);
+            foreach (var value in values)
             {
                 WriteTypedConstant(writer, value, context);
             }

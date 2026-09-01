@@ -107,7 +107,12 @@ $packageArtifacts = @(Get-SharpProofPilotPackageAuthority `
     -ExpectedVersion $version `
     -ExpectedCommit $head)
 $runId = [Guid]::NewGuid().ToString('N')
-$runRoot = Join-Path $repositoryRoot "artifacts/pilots/runs/$runId"
+# Container task workspaces redirect artifacts to the host mount. Use the
+# physical target for verifier-owned caches and requests so SharpProof's
+# publication paths never traverse that infrastructure symlink.
+$artifactsRoot = Resolve-SharpProofPhysicalPath (
+    Join-Path $repositoryRoot 'artifacts')
+$runRoot = Join-Path $artifactsRoot "pilots/runs/$runId"
 $nugetCache = Join-Path $runRoot 'nuget'
 $dotnetHome = Join-Path $runRoot 'dotnet-home'
 $qualificationStartedUtc = [DateTimeOffset]::UtcNow
@@ -248,7 +253,7 @@ foreach ($pilot in $catalog.pilots) {
             if ($matches.Count -ne 1) {
                 throw "Pilot '$($pilot.id)' has an incoherent manifest/result claim set."
             }
-            [ordered]@{
+            [pscustomobject]@{
                 claimId = [string]$manifestClaim.claimId
                 kind = [string]$manifestClaim.kind
                 outcome = [string]$matches[0].outcome
@@ -264,14 +269,24 @@ foreach ($pilot in $catalog.pilots) {
     $diagnosticText = Get-Content -LiteralPath $buildLog -Raw
     $negativeProbePassed = $null
     if ([string]$pilot.category -eq 'contract-heavy') {
+        $negativeArtifactDirectory = Join-Path $runRoot "negative/$($pilot.id)"
+        [IO.Directory]::CreateDirectory($negativeArtifactDirectory) | Out-Null
+        $negativeRequestPath = Join-Path $negativeArtifactDirectory 'request.json'
+        $negativeResultPath = Join-Path $negativeArtifactDirectory 'result.json'
+        $negativeManifestPath = Join-Path $negativeArtifactDirectory 'compiler-manifest.json'
+        $negativeSarifPath = Join-Path $negativeArtifactDirectory 'result.sarif'
         $negativeLog = Join-Path $logDirectory "$($pilot.id)-negative.log"
         $negative = Invoke-PilotDotNet `
             -WorkingDirectory $projectDirectory `
             -LogPath $negativeLog `
             -Arguments (@(
-                'build', $project, '-c', 'Release', '--no-restore', '--nologo',
-                '-p:SharpProofVerify=false',
-                '-p:DefineConstants=SHARPPROOF_NEGATIVE_PROBE') + $common)
+            'build', $project, '-c', 'Release', '--no-restore', '--nologo',
+            '-p:SharpProofVerify=false',
+            "-p:SharpProofVerifyRequestFile=$negativeRequestPath",
+            "-p:SharpProofVerifyResultFile=$negativeResultPath",
+            "-p:SharpProofCompilerManifestFile=$negativeManifestPath",
+            "-p:SharpProofVerifySarifFile=$negativeSarifPath",
+            '-p:DefineConstants=SHARPPROOF_NEGATIVE_PROBE') + $common)
         $negativeText = Get-Content -LiteralPath $negativeLog -Raw
         $negativeProbePassed = $negative.exitCode -ne 0 -and
             $negativeText.Contains('SP0027', [StringComparison]::Ordinal)

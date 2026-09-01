@@ -37,7 +37,12 @@ internal sealed class ConversionEffectClassifier(
 
         if (conversion.IsUserDefined)
         {
-            return ClassifyNullableAndCheckedConversion(operation);
+            // Checked user-defined conversions select a different user method;
+            // they do not add an intrinsic numeric overflow check. The
+            // scanner owns every effect of the selected operator method.
+            return ClassifyNullableConversion(
+                operation,
+                EffectSummary.Empty);
         }
 
         if (conversion.IsReference)
@@ -54,7 +59,9 @@ internal sealed class ConversionEffectClassifier(
 
         if (conversion.IsNullable)
         {
-            return ClassifyNullableAndCheckedConversion(operation);
+            return ClassifyNullableConversion(
+                operation,
+                CheckedOverflow(operation.IsChecked, operation));
         }
 
         if (conversion is { IsNumeric: true } or { IsEnumeration: true })
@@ -71,7 +78,19 @@ internal sealed class ConversionEffectClassifier(
         { IsAnonymousFunction: true } or
         { IsMethodGroup: true })
         {
-            return EffectSummaryOperations.Allocate(EffectAllocationKind.Managed);
+            var allocation = EffectSummaryOperations.Allocate(
+                EffectAllocationKind.Managed);
+            var methodReference = conversion.IsMethodGroup
+                ? MethodGroupConversionFacts
+                    .GetDelegateConstructorCheckedTarget(operation)
+                : null;
+            return methodReference?.Instance is { } instance &&
+                !IsDefinitelyNonNull(operation, instance) &&
+                !DefiniteOperationFacts.IsDefinitelyNonNull(instance)
+                    ? EffectSummaryOperations.Join(
+                        allocation,
+                        Throw(FrameworkTypeMetadataNames.ArgumentException))
+                    : allocation;
         }
 
         if (conversion is
@@ -106,8 +125,18 @@ internal sealed class ConversionEffectClassifier(
 
     internal bool SkipsLiftedOperator(IOperation operation)
     {
+        return SkipsLiftedOperator(operation, abstractFlow);
+    }
+
+    internal static bool SkipsLiftedOperator(
+        IOperation operation,
+        ManagedFlowResult? flow)
+    {
         var operands = operation switch
         {
+            IConversionOperation conversion when
+                IsLiftedNullableUserConversion(conversion) =>
+                [conversion.Operand],
             IBinaryOperation { IsLifted: true } binary =>
                 [binary.LeftOperand, binary.RightOperand],
             IUnaryOperation { IsLifted: true } unary =>
@@ -121,11 +150,28 @@ internal sealed class ConversionEffectClassifier(
 
         return operands.Any(operand =>
             ManagedAbstractValue.IsNullableType(operand.Type) &&
-            abstractFlow?.TryEvaluate(
-                operation,
-                operand,
-                out var value) == true &&
-            value.IsDefinitelyNull);
+            (operand.ConstantValue is { HasValue: true, Value: null } ||
+                flow?.TryEvaluate(
+                    operation,
+                    operand,
+                    out var value) == true &&
+                value.IsDefinitelyNull));
+    }
+
+    internal static bool IsLiftedNullableUserConversion(
+        IConversionOperation operation)
+    {
+        return operation.OperatorMethod is
+        {
+            Parameters.Length: 1,
+            ReturnType.IsValueType: true
+        } method &&
+            method.Parameters[0].Type.IsValueType &&
+            !ManagedAbstractValue.IsNullableType(
+                method.Parameters[0].Type) &&
+            !ManagedAbstractValue.IsNullableType(method.ReturnType) &&
+            ManagedAbstractValue.IsNullableType(operation.Operand.Type) &&
+            ManagedAbstractValue.IsNullableType(operation.Type);
     }
 
     private EffectSummary ClassifyBoxing(IConversionOperation operation)
@@ -219,6 +265,16 @@ internal sealed class ConversionEffectClassifier(
 
         var source = preserved.Operand.Type;
         var target = GetUnderlyingType(operation.Type);
+        if (ManagedAbstractValue.IsNullableType(source))
+        {
+            if (!ManagedAbstractValue.IsNullableType(operation.Type))
+            {
+                return false;
+            }
+
+            source = GetUnderlyingType(source);
+        }
+
         return source != null && target != null &&
             SymbolEqualityComparer.Default.Equals(source, target);
     }
@@ -234,10 +290,10 @@ internal sealed class ConversionEffectClassifier(
             : type;
     }
 
-    private EffectSummary ClassifyNullableAndCheckedConversion(
-        IConversionOperation operation)
+    private EffectSummary ClassifyNullableConversion(
+        IConversionOperation operation,
+        EffectSummary result)
     {
-        var result = CheckedOverflow(operation.IsChecked, operation);
         if (ManagedAbstractValue.IsNullableType(operation.Operand.Type) &&
             !ManagedAbstractValue.IsNullableType(operation.Type) &&
             !IsDefinitelyNonNull(operation, operation.Operand))

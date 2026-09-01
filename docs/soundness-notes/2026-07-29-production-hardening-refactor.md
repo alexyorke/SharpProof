@@ -1,5 +1,9 @@
 # Production hardening and coordinator refactor
 
+> Historical evidence: this note records a dated checkpoint. It is not a
+> current product guide; see the [documentation map](../README.md) and
+> [coverage and limits](../coverage-and-limits.md).
+
 Date: 2026-07-29
 
 This tranche preserved the bounded preview semantics while reducing several

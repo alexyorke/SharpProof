@@ -16,12 +16,17 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     ICancelableTask, IDisposable
 {
     internal const int LauncherProcessReserveMilliseconds = 1000;
-    // The supervisor and worker launcher run from this instrumentable
-    // assembly. Keep additional bounded room for their final timeout
-    // publication and authenticated cleanup when coverage or a heavily loaded
-    // host slows managed startup. Direct task callers retain their original
+    private const int StructuredSemanticFailureExitCode = 6;
+    // The worker launcher can legitimately spend the full publication lease
+    // timeout after its worker budget expires. Keep that wait outside the
+    // worker budget, followed by the existing bounded room for finalization
+    // and authenticated cleanup. Direct task callers retain their original
     // deadline semantics.
-    private const int WorkerLauncherProcessReserveMilliseconds = 5000;
+    private const int WorkerLauncherPublicationWaitMilliseconds = 30000;
+    private const int WorkerLauncherFinalizationReserveMilliseconds = 5000;
+    private const int WorkerLauncherProcessReserveMilliseconds =
+        WorkerLauncherPublicationWaitMilliseconds +
+        WorkerLauncherFinalizationReserveMilliseconds;
     private const int CleanupAuthenticationWaitMilliseconds = 5000;
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
     internal const int OutputDrainPollingMilliseconds = 25;
@@ -53,6 +58,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     internal Func<int, int>? OpenPidFdOverride { get; set; }
     internal Func<Process?, int, int, bool>? TryTerminateOverride { get; set; }
     internal Action<string>? ContainmentAuthenticationFailureOverride { get; set; }
+    internal Action? PreLaunchSetupOverride { get; set; }
 
     internal static int RetainedCleanupAnchorCount =>
         RetainedCleanupAnchors.Count;
@@ -147,8 +153,17 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             var verifierTimeout = workerLauncherBudget
                 ? processTimeout
                 : processTimeout - LauncherProcessReserveMilliseconds;
-            var processStopwatch = Stopwatch.StartNew();
+            PreLaunchSetupOverride?.Invoke();
             var resolvedExecutable = ResolveDotNetHost(Executable);
+            var executableIdentity = GetFileIdentity(resolvedExecutable);
+            var supervisorAssembly = ResolveSupervisorAssemblyRequired();
+            var supervisorIdentity = GetFileIdentity(supervisorAssembly);
+            if (GetFileIdentity(resolvedExecutable) != executableIdentity ||
+                GetFileIdentity(supervisorAssembly) != supervisorIdentity)
+            {
+                throw new InvalidOperationException(
+                    "SharpProof verifier runtime changed after validation.");
+            }
             supervisorNonce = CreateSupervisorNonce();
             process = new Process
             {
@@ -165,7 +180,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             };
             process.StartInfo.ArgumentList.Add(resolvedExecutable);
             process.StartInfo.ArgumentList.Add(
-                ResolveSupervisorAssemblyRequired());
+                supervisorAssembly);
             process.StartInfo.ArgumentList.Add("--supervise-verifier");
             process.StartInfo.ArgumentList.Add(resolvedExecutable);
             foreach (var argument in Arguments)
@@ -214,6 +229,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     ProcessGateStartMessage + " " + supervisorNonce);
                 process.StandardInput.Close();
             }
+            var processStopwatch = Stopwatch.StartNew();
             var timedOut = !WaitForExitOrCancellation(
                 process,
                 Math.Min(
@@ -372,6 +388,11 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             }
             process?.Dispose();
         }
+        // The launcher reserves exit 6 for a completed semantic policy
+        // failure. A diagnostic observed before any other nonzero exit is
+        // partial and must not suppress the target's infrastructure error.
+        HasStructuredError &=
+            ExitCode == StructuredSemanticFailureExitCode;
         return true;
     }
 
@@ -836,11 +857,77 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private bool HasWorkerLauncherBudgetArguments()
     {
-        return Arguments.Any(static argument =>
-            string.Equals(
-                argument.ItemSpec,
-                "--project-wall-ms",
-                StringComparison.Ordinal));
+        if (Arguments.Length < 4 ||
+            !IsWorkerLauncherPath(Arguments[0].ItemSpec) ||
+            !string.Equals(
+                Arguments[1].ItemSpec,
+                "verify",
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        for (var index = 2; index + 1 < Arguments.Length; index += 2)
+        {
+            if (string.Equals(
+                    Arguments[index].ItemSpec,
+                    "--project-wall-ms",
+                    StringComparison.Ordinal) &&
+                int.TryParse(
+                    Arguments[index + 1].ItemSpec,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var projectWallTimeMilliseconds) &&
+                projectWallTimeMilliseconds == ProjectWallTimeMilliseconds)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsWorkerLauncherPath(string path)
+    {
+        try
+        {
+            var assemblyDirectory = Path.GetDirectoryName(
+                typeof(RunVerifier).Assembly.Location);
+            if (assemblyDirectory == null)
+            {
+                return false;
+            }
+            var candidate = Path.GetFullPath(path);
+            var trusted = Path.Combine(
+                assemblyDirectory,
+                "SharpProof.Worker.Launcher.dll");
+            return string.Equals(candidate, trusted, StringComparison.Ordinal) ||
+                string.Equals(
+                    Path.GetFileName(candidate),
+                    Path.GetFileName(trusted),
+                    StringComparison.Ordinal) &&
+                File.Exists(candidate);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+        catch (PathTooLongException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static string ResolveSupervisorAssemblyRequired()
@@ -948,7 +1035,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 Math.Min(RemainingMilliseconds(
                     terminationStopwatch,
                     terminationWaitMilliseconds),
-                    LauncherProcessReserveMilliseconds));
+                    LauncherProcessReserveMilliseconds),
+                supervisorPidFd: _processGroupPidFd);
             if (SendPidFdSignal(_processGroupPidFd, SignalStop) == 0)
             {
                 // The stopped session leader keeps this process-group identity
@@ -1253,6 +1341,12 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         LinuxPathIdentity.Canonicalize(
             Path.Combine(directoryPath, "host", "fxr"));
         return resolved;
+    }
+
+    private static string GetFileIdentity(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream));
     }
 
     private static partial class NativeMethods

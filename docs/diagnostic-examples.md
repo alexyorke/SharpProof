@@ -237,7 +237,7 @@ artifact lowering, serialization, or write failure. The diagnostic is an error
 because the required closed compiler evidence is missing. It is an
 infrastructure failure, never a contract or proof outcome.
 
-Compiler artifact schema version 15 includes the sealed selected-claim manifest,
+Compiler artifact schema version 18 includes the sealed selected-claim manifest,
 compiler diagnostics, source/generated-tree hashes and parse evidence, and,
 for each supported selected callable, bound contract/spec metadata plus
 portable whole-body lowered CFG/IR. It contains no source text. The worker
@@ -348,6 +348,20 @@ A companion `Contract.Requires`, `Ensures`, or `Assume` call is not a direct,
 reachable statement in the method's contiguous contract prologue. Conditional,
 nested-callable, unreachable, late, and structurally nested clauses do not
 describe the target member.
+
+<a id="spcf0009"></a>
+### SPCF0009 - ContractFor companion targets itself
+
+The companion and target are the same type. A ContractFor companion must be a
+distinct type so its specification members cannot be mistaken for the target's
+executable implementation.
+
+<a id="spcf0010"></a>
+### SPCF0010 - cyclic ContractFor relationship
+
+The companion-to-target edge participates in a cycle. Every edge in the cycle
+is rejected so no cyclic companion can supply contracts or suppress analysis of
+its executable method bodies.
 
 ## What diagnostics do not mean
 

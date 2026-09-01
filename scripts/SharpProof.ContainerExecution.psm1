@@ -1,6 +1,24 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Add-SharpProofStaticGraphArgument {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    if ($Arguments.Count -lt 2 -or
+        $Arguments[0] -notin @('build', 'test') -or
+        [IO.Path]::GetExtension($Arguments[1]) -notin @('.sln', '.slnf') -or
+        $Arguments -contains '-graphBuild' -or
+        $Arguments -contains '/graphBuild') {
+        return $Arguments
+    }
+
+    return @($Arguments) + '-graphBuild'
+}
+
 function Get-SharpProofTestProjectParallelism {
     [CmdletBinding()]
     param(
@@ -42,6 +60,368 @@ function Get-SharpProofTestProjectParallelism {
     }
 
     return [Math]::Max(1, [Math]::Floor($visibleProcessors / $divisor))
+}
+
+function Get-SharpProofParallelismOverride {
+    param(
+        [AllowEmptyString()][string]$Value,
+        [Parameter(Mandatory = $true)][int]$VisibleProcessors,
+        [Parameter(Mandatory = $true)][string]$VariableName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $null
+    }
+    $parsed = 0
+    if (-not [int]::TryParse($Value, [Globalization.NumberStyles]::None,
+            [Globalization.CultureInfo]::InvariantCulture, [ref]$parsed) -or
+        $parsed -lt 1 -or $parsed -gt $VisibleProcessors) {
+        throw (
+            "$VariableName must be an integer between 1 and the " +
+            "container-visible CPU count ($VisibleProcessors).")
+    }
+    return $parsed
+}
+
+function Get-SharpProofSemanticTestParallelism {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $visibleProcessors = [Environment]::ProcessorCount
+    if ($visibleProcessors -lt 1) {
+        throw 'The container did not expose a positive processor count.'
+    }
+    $semanticOverride = [Environment]::GetEnvironmentVariable(
+        'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
+        [EnvironmentVariableTarget]::Process)
+    $override = [Environment]::GetEnvironmentVariable(
+        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
+        [EnvironmentVariableTarget]::Process)
+    if (-not [string]::IsNullOrWhiteSpace($semanticOverride)) {
+        return Get-SharpProofParallelismOverride $semanticOverride `
+            $visibleProcessors 'SHARPPROOF_SEMANTIC_TEST_PARALLELISM'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($override)) {
+        return Get-SharpProofTestProjectParallelism `
+            -RepositoryRoot $RepositoryRoot
+    }
+
+    return $visibleProcessors
+}
+
+function Get-SharpProofPackageTestParallelism {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $override = [Environment]::GetEnvironmentVariable(
+        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
+        [EnvironmentVariableTarget]::Process)
+    if (-not [string]::IsNullOrWhiteSpace($override)) {
+        return Get-SharpProofTestProjectParallelism `
+            -RepositoryRoot $RepositoryRoot
+    }
+
+    $visibleProcessors = [Environment]::ProcessorCount
+    if ($visibleProcessors -lt 1) {
+        throw 'The container did not expose a positive processor count.'
+    }
+    $contract = Get-Content -LiteralPath (Join-Path `
+        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
+        ConvertFrom-Json
+    $percent = [int]$contract.automation.packageTestCpuPercent
+    if ($percent -lt 1 -or $percent -gt 100) {
+        throw 'The package-test CPU percentage must be between 1 and 100.'
+    }
+
+    return [Math]::Max(
+        1,
+        [Math]::Floor($visibleProcessors * $percent / 100.0))
+}
+
+function Get-SharpProofBuildParallelism {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $sharedOverride = [Environment]::GetEnvironmentVariable(
+        'SHARPPROOF_TEST_PROJECT_PARALLELISM',
+        [EnvironmentVariableTarget]::Process)
+    if (-not [string]::IsNullOrWhiteSpace($sharedOverride)) {
+        return Get-SharpProofTestProjectParallelism `
+            -RepositoryRoot $RepositoryRoot
+    }
+
+    $visibleProcessors = [Environment]::ProcessorCount
+    if ($visibleProcessors -lt 1) {
+        throw 'The container did not expose a positive processor count.'
+    }
+    $contract = Get-Content -LiteralPath (Join-Path `
+        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
+        ConvertFrom-Json
+    $percent = [int]$contract.automation.buildCpuPercent
+    if ($percent -lt 1 -or $percent -gt 100) {
+        throw 'The build CPU percentage must be between 1 and 100.'
+    }
+
+    return [Math]::Max(
+        1,
+        [Math]::Floor($visibleProcessors * $percent / 100.0))
+}
+
+function Get-SharpProofTestAssemblyPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectPath,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('Debug', 'Release')]
+        [string]$Configuration
+    )
+
+    $normalizedProjectPath = $ProjectPath.Replace('\', '/')
+    $project = if ([IO.Path]::IsPathRooted($normalizedProjectPath)) {
+        [IO.Path]::GetFullPath($normalizedProjectPath)
+    }
+    else {
+        [IO.Path]::GetFullPath((Join-Path (Get-Location) $normalizedProjectPath))
+    }
+    if (-not (Test-Path -LiteralPath $project -PathType Leaf)) {
+        throw "Test project was not found: '$ProjectPath'."
+    }
+
+    [xml]$document = Get-Content -LiteralPath $project -Raw
+    $frameworks = @(
+        $document.SelectNodes("//*[local-name()='TargetFramework']") |
+            ForEach-Object { [string]$_.InnerText } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($frameworks.Count -ne 1) {
+        throw (
+            'Direct vstest requires exactly one TargetFramework in ' +
+            "'$ProjectPath'; use dotnet test for multi-target projects.")
+    }
+    $assemblyName = @(
+        $document.SelectNodes("//*[local-name()='AssemblyName']") |
+            ForEach-Object { [string]$_.InnerText } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -First 1)
+    if ($assemblyName.Count -eq 0) {
+        $assemblyName = [IO.Path]::GetFileNameWithoutExtension($project)
+    }
+    $assembly = Join-Path (Split-Path -Parent $project) (
+        'bin/' + $Configuration + '/' + $frameworks[0] + '/' +
+        $assemblyName + '.dll')
+    if (-not (Test-Path -LiteralPath $assembly -PathType Leaf)) {
+        throw (
+            "Built test assembly was not found at '$assembly'; run a " +
+            'matching build before using -NoBuild.')
+    }
+    return [IO.Path]::GetFullPath($assembly)
+}
+
+function Stop-SharpProofCompilerServer {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SharedCompilationId
+    )
+
+    $dotnetCommand = Get-Command `
+        dotnet `
+        -CommandType Application `
+        -ErrorAction Stop | Select-Object -First 1
+    $dotnetItem = Get-Item -LiteralPath $dotnetCommand.Source
+    $dotnetTarget = $dotnetItem.ResolveLinkTarget($true)
+    $dotnetPath = if ($null -eq $dotnetTarget) {
+        $dotnetItem.FullName
+    }
+    else {
+        $dotnetTarget.FullName
+    }
+    $sdkVersionOutput = @(& $dotnetPath --version)
+    if ($LASTEXITCODE -ne 0 -or $sdkVersionOutput.Count -ne 1) {
+        throw 'Could not resolve the active .NET SDK compiler server.'
+    }
+    $sdkVersion = ([string]$sdkVersionOutput[0]).Trim()
+    if ([string]::IsNullOrWhiteSpace($sdkVersion)) {
+        throw 'The active .NET SDK version was empty.'
+    }
+    $compilerServer = Join-Path `
+        ([IO.Path]::GetDirectoryName($dotnetPath)) `
+        "sdk/$sdkVersion/Roslyn/bincore/VBCSCompiler.dll"
+    if (-not (Test-Path -LiteralPath $compilerServer -PathType Leaf)) {
+        throw "The active Roslyn compiler server was not found: $compilerServer"
+    }
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $dotnetPath
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in @(
+            'exec',
+            $compilerServer,
+            "-pipename:$SharedCompilationId",
+            '-shutdown')) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw "Could not stop compiler server $SharedCompilationId."
+        }
+        $standardOutput = $process.StandardOutput.ReadToEndAsync()
+        $standardError = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(10000)) {
+            $process.Kill($true)
+            $process.WaitForExit()
+            throw "Compiler server $SharedCompilationId did not stop promptly."
+        }
+        $stdout = $standardOutput.GetAwaiter().GetResult()
+        $stderr = $standardError.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            throw (
+                "Compiler server $SharedCompilationId shutdown failed with " +
+                "exit code $($process.ExitCode): $stdout$stderr")
+        }
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
+function Invoke-SharpProofParallelDotnetBuilds {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Builds,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 1024)]
+        [int]$Parallelism,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 86400)]
+        [int]$TimeoutSeconds
+    )
+
+    if ($Builds.Count -eq 0) {
+        return
+    }
+    if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
+        throw 'Parallel builds require the canonical Linux container.'
+    }
+
+    $lanesPerBuild = [Math]::Max(
+        1,
+        [Math]::Floor($Parallelism / $Builds.Count))
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $running = [Collections.Generic.List[object]]::new()
+    $compilerServerScope = [Guid]::NewGuid().ToString('N')
+    try {
+        foreach ($build in $Builds) {
+            $name = [string]$build.Name
+            $arguments = @($build.Arguments)
+            if ([string]::IsNullOrWhiteSpace($name) -or
+                $arguments.Count -lt 2 -or
+                [string]$arguments[0] -cne 'build') {
+                throw 'Parallel build entries require a name and build arguments.'
+            }
+            $sharedCompilationId =
+                "sharpproof-parallel-$compilerServerScope-$name"
+            $arguments += @(
+                "/m:$lanesPerBuild",
+                '/nodeReuse:false',
+                '-p:UseSharedCompilation=true',
+                "-p:SharedCompilationId=$sharedCompilationId")
+            $effectiveArguments = @(
+                Add-SharpProofStaticGraphArgument -Arguments $arguments)
+            $startInfo = [Diagnostics.ProcessStartInfo]::new()
+            $startInfo.FileName = 'dotnet'
+            $startInfo.WorkingDirectory = $RepositoryRoot
+            $startInfo.UseShellExecute = $false
+            $startInfo.CreateNoWindow = $true
+            $startInfo.RedirectStandardOutput = $true
+            $startInfo.RedirectStandardError = $true
+            $startInfo.Environment['UseSharedCompilation'] = 'true'
+            $startInfo.Environment['SharedCompilationId'] =
+                $sharedCompilationId
+            $startInfo.Environment['MSBUILDDISABLENODEREUSE'] = '1'
+            foreach ($argument in $effectiveArguments) {
+                [void]$startInfo.ArgumentList.Add($argument)
+            }
+            $process = [Diagnostics.Process]::new()
+            $process.StartInfo = $startInfo
+            if (-not $process.Start()) {
+                $process.Dispose()
+                throw "Could not start build $name."
+            }
+            $running.Add([pscustomobject]@{
+                Name = $name
+                Arguments = $effectiveArguments
+                SharedCompilationId = $sharedCompilationId
+                Process = $process
+                StandardOutput = $process.StandardOutput.ReadToEndAsync()
+                StandardError = $process.StandardError.ReadToEndAsync()
+            })
+        }
+
+        foreach ($active in $running) {
+            $remaining = $deadline - [DateTime]::UtcNow
+            if ($remaining -le [TimeSpan]::Zero -or
+                -not $active.Process.WaitForExit(
+                    [int][Math]::Ceiling($remaining.TotalMilliseconds))) {
+                throw "Parallel builds exceeded $TimeoutSeconds seconds."
+            }
+        }
+
+        $failures = [Collections.Generic.List[string]]::new()
+        foreach ($active in $running) {
+            $stdout = $active.StandardOutput.GetAwaiter().GetResult()
+            $stderr = $active.StandardError.GetAwaiter().GetResult()
+            Write-Host "--- Build $($active.Name) ---"
+            if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                Write-Host $stdout.TrimEnd()
+            }
+            if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                Write-Host $stderr.TrimEnd()
+            }
+            if ($active.Process.ExitCode -ne 0) {
+                $failures.Add(
+                    "$($active.Name) exited $($active.Process.ExitCode): " +
+                    ($active.Arguments -join ' '))
+            }
+        }
+        if ($failures.Count -ne 0) {
+            throw "Parallel builds failed:`n$($failures -join "`n")"
+        }
+        foreach ($active in $running) {
+            Stop-SharpProofCompilerServer `
+                -SharedCompilationId $active.SharedCompilationId
+        }
+    }
+    finally {
+        foreach ($active in $running) {
+            if (-not $active.Process.HasExited) {
+                $active.Process.Kill($true)
+                $active.Process.WaitForExit()
+            }
+            $active.Process.Dispose()
+        }
+    }
 }
 
 function New-SharpProofIsolatedTestOutput {
@@ -101,5 +481,11 @@ function New-SharpProofIsolatedTestOutput {
 }
 
 Export-ModuleMember -Function @(
+    'Add-SharpProofStaticGraphArgument',
+    'Get-SharpProofBuildParallelism',
+    'Get-SharpProofPackageTestParallelism',
+    'Get-SharpProofSemanticTestParallelism',
     'Get-SharpProofTestProjectParallelism',
+    'Get-SharpProofTestAssemblyPath',
+    'Invoke-SharpProofParallelDotnetBuilds',
     'New-SharpProofIsolatedTestOutput')

@@ -46,6 +46,19 @@ public sealed class SequenceCardinalityDomainTests
     }
 
     [Test]
+    public void MaximumLengthEndpointCanonicalizesToSequenceTop()
+    {
+        var explicitMaximum = _domain.Create(
+            SequenceCardinalityKind.Top,
+            IntervalValue.Range(0, long.MaxValue));
+
+        Assert.That(explicitMaximum, Is.EqualTo(SequenceCardinalityValue.Top));
+        Assert.That(
+            _domain.AreEquivalent(explicitMaximum, SequenceCardinalityValue.Top),
+            Is.True);
+    }
+
+    [Test]
     public void EmptyAndNonEmptyJoinToTopWithLengthHull()
     {
         var joined = _domain.Join(
@@ -79,6 +92,20 @@ public sealed class SequenceCardinalityDomainTests
 
         Assert.That(appended, Is.EqualTo(SequenceCardinalityValue.KnownLength(1)));
         Assert.That(concatenated, Is.EqualTo(SequenceCardinalityValue.KnownLength(5)));
+    }
+
+    [Test]
+    public void UnboundedNonEmptyLengthsRetainTheirLowerBoundAfterTransforms()
+    {
+        var appended = _domain.Append(SequenceCardinalityValue.NonEmpty);
+        var concatenated = _domain.Concat(
+            SequenceCardinalityValue.NonEmpty,
+            SequenceCardinalityValue.NonEmpty);
+
+        Assert.That(appended.Kind, Is.EqualTo(SequenceCardinalityKind.NonEmpty));
+        Assert.That(appended.Length.LowerBound, Is.EqualTo(2));
+        Assert.That(concatenated.Kind, Is.EqualTo(SequenceCardinalityKind.NonEmpty));
+        Assert.That(concatenated.Length.LowerBound, Is.EqualTo(2));
     }
 
     [Test]

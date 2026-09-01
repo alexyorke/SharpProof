@@ -192,7 +192,13 @@
         ["Proven","None","VacuousEntry","ContradictoryPreconditions",true,"*","*"],
         ["Refuted","None","DefiniteViolation","None",false,"*","*"],
         ["Unknown","EffectSummaryIncomplete","IncompleteMayEffectSummary","None",false,"*","*"],
+        ["Unknown","EffectSummaryIncomplete","TrustedCompleteBoundary","None",false,true,true],
         ["Unknown","EffectContractNotEstablished","CompleteMayEffectSummary","None",false,"*","*"],
+        ["Unknown","EffectContractNotEstablished","TrustedCompleteBoundary","None",false,true,true],
+        ["Unknown","ResourceLimit","IncompleteMayEffectSummary","None",false,"*","*"],
+        ["Unknown","ResourceLimit","TrustedCompleteBoundary","None",false,true,true],
+        ["Unknown","UnsupportedBody","IncompleteMayEffectSummary","None",false,"*","*"],
+        ["Unknown","UnsupportedBody","TrustedCompleteBoundary","None",false,true,true],
         ["Unknown","*","Unavailable","None",false,"*","*"]
       ]
     },
@@ -450,7 +456,9 @@
       "rules": [
         {"code":"valid","condition":{"op":"all","conditions":[
           {"op":"nonBlank","property":"Code"},
-          {"op":"nonBlank","property":"Message"}
+          {"op":"singleLine","property":"Code"},
+          {"op":"nonBlank","property":"Message"},
+          {"op":"singleLine","property":"Message"}
         ]}}
       ]
     }

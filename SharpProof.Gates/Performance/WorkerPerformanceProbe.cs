@@ -76,7 +76,9 @@ internal static class WorkerPerformanceProbe
             outerCancellationToken.ThrowIfCancellationRequested();
             var backend = new CancellationProbeBackend();
             using var worker = new SharpProofWorker(backend);
-            using var cancellation = new CancellationTokenSource();
+            using var cancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    outerCancellationToken);
             var verification = worker.VerifyAsync(
                 workspace.CreateCancellationRequest(),
                 cancellation.Token);
@@ -84,8 +86,11 @@ internal static class WorkerPerformanceProbe
                 .ConfigureAwait(false);
 
             var stopwatch = Stopwatch.StartNew();
-            await cancellation.CancelAsync().ConfigureAwait(false);
-            var response = await verification.ConfigureAwait(false);
+            var response = await CancelAndAwaitWorkerAsync(
+                    verification,
+                    cancellation,
+                    outerCancellationToken)
+                .ConfigureAwait(false);
             stopwatch.Stop();
             if (!IsCompleteCancellation(response))
             {
@@ -96,6 +101,19 @@ internal static class WorkerPerformanceProbe
             latencies[index] = stopwatch.Elapsed.TotalMilliseconds;
         }
         return latencies;
+    }
+
+    internal static async Task<WorkerVerifyResponse> CancelAndAwaitWorkerAsync(
+        Task<WorkerVerifyResponse> verification,
+        CancellationTokenSource cancellation,
+        CancellationToken outerCancellationToken)
+    {
+        await cancellation.CancelAsync()
+            .WaitAsync(outerCancellationToken)
+            .ConfigureAwait(false);
+        return await verification
+            .WaitAsync(outerCancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static bool IsCompleteCancellation(WorkerVerifyResponse response)
@@ -160,17 +178,24 @@ internal static class WorkerPerformanceProbe
                 .ConfigureAwait(false)) ??
             throw new InvalidOperationException(
                 "The real worker produced no timeout response.");
-        if (response.Errors.Length != 0 ||
-            response.RunStatus != WorkerRunStatus.TimedOut ||
-            !response.ClaimResults.Any(static result =>
-                result.Reason == WorkerClaimReason.ProjectTimeout) &&
-            !response.CallableResults.Any(static result =>
-                result.Reason ==
-                WorkerCallableCoverageReason.ProjectTimeout))
+        if (!IsCompleteProjectTimeout(response))
         {
             throw new InvalidOperationException(
                 "The real worker did not report a cooperative project timeout.");
         }
+    }
+
+    internal static bool IsCompleteProjectTimeout(
+        WorkerVerifyResponse response)
+    {
+        return response.Errors.Length == 0 &&
+            response.RunStatus == WorkerRunStatus.TimedOut &&
+            WorkerProtocolJson.Validate(response).IsValid &&
+            (response.ClaimResults.Any(static result =>
+                result.Reason == WorkerClaimReason.ProjectTimeout) ||
+            response.CallableResults.Any(static result =>
+                result.Reason ==
+                WorkerCallableCoverageReason.ProjectTimeout));
     }
 
     private static async Task<double> MeasureForcedTerminationCoreAsync(
@@ -217,6 +242,12 @@ internal static class WorkerPerformanceProbe
             var stopwatch = Stopwatch.StartNew();
             var waitLimit = checked(
                 (int)contract.ForcedTerminationMilliseconds + 10_000);
+            // Begin observing the worker before waiting for the launcher. If
+            // the worker exits first, reopening only after launcher exit can
+            // accidentally inspect a process that reused its numeric PID.
+            var workerExit = Task.Run(
+                () => WaitForProcessExit(workerProcessId, waitLimit),
+                boundary.Token);
 #pragma warning disable CA1849 // The deadline probe intentionally uses kernel waits.
             if (!process.WaitForExit(waitLimit))
             {
@@ -224,9 +255,7 @@ internal static class WorkerPerformanceProbe
                     "The launcher did not reach its hard deadline.");
             }
 
-            WaitForProcessExit(
-                workerProcessId,
-                Math.Max(0, waitLimit - (int)stopwatch.ElapsedMilliseconds));
+            await workerExit.WaitAsync(boundary.Token).ConfigureAwait(false);
 #pragma warning restore CA1849
             stopwatch.Stop();
             var output = await standardOutput.ConfigureAwait(false);

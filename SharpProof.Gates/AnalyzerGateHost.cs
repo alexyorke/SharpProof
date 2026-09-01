@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -108,7 +109,7 @@ internal static class AnalyzerGateHost
             bool concurrentAnalysis,
             CancellationToken cancellationToken = default)
     {
-        var factory = new RecordingAnalyzerSessionFactory();
+        var factory = new RecordingAnalyzerSessionFactory(compilation);
         var diagnostics = await AnalyzeAsync(
                 compilation,
                 new SharpProofAnalyzer(factory),
@@ -276,12 +277,22 @@ internal static class AnalyzerGateHost
         }
     }
 
-    private sealed class RecordingAnalyzerSessionFactory
+    private sealed class RecordingAnalyzerSessionFactory(
+        Compilation compilation)
         : IAnalyzerSessionFactory
     {
+        private readonly ImmutableDictionary<SyntaxTree, int> _treeOrdinals =
+            compilation.SyntaxTrees
+                .Select(static (tree, ordinal) => (tree, ordinal))
+                .ToImmutableDictionary(
+                    static item => item.tree,
+                    static item => item.ordinal,
+                    (IEqualityComparer<SyntaxTree>)
+                        ReferenceEqualityComparer.Instance);
         private readonly ConcurrentDictionary<
             MethodOutcomeKey,
-            AnalyzerSemanticOutcome> _outcomes = new();
+            AnalyzerSemanticOutcome> _outcomes =
+                new(MethodOutcomeKeyComparer.Instance);
 
         public AnalyzerSession Create(
             Compilation compilation,
@@ -298,8 +309,14 @@ internal static class AnalyzerGateHost
         internal ImmutableArray<AnalyzerMethodSemanticOutcome> GetOutcomes()
         {
             return [.. _outcomes
-                .OrderBy(static pair => pair.Key.SourceStart)
-                .ThenBy(static pair => pair.Key.MethodName, StringComparer.Ordinal)
+                .OrderBy(
+                    static pair => pair.Key.SourceFilePath,
+                    StringComparer.Ordinal)
+                .ThenBy(static pair => pair.Key.SourceTreeOrdinal)
+                .ThenBy(static pair => pair.Key.SourceStart)
+                .ThenBy(
+                    static pair => pair.Key.MethodName,
+                    StringComparer.Ordinal)
                 .Select(static pair => new AnalyzerMethodSemanticOutcome(
                     pair.Key.MethodName,
                     pair.Key.Accessibility,
@@ -311,13 +328,22 @@ internal static class AnalyzerGateHost
             IMethodSymbol method,
             AnalyzerSemanticOutcome outcome)
         {
-            var sourceStart = method.Locations
-                .FirstOrDefault(static location => location.IsInSource)
-                ?.SourceSpan.Start ?? -1;
+            var sourceLocation = method.Locations
+                .FirstOrDefault(static location => location.IsInSource);
+            var sourceTree = sourceLocation?.SourceTree;
+            var sourceFilePath = sourceTree?.FilePath ?? string.Empty;
+            var sourceTreeOrdinal = sourceTree != null &&
+                _treeOrdinals.TryGetValue(sourceTree, out var ordinal)
+                    ? ordinal
+                    : int.MaxValue;
             var key = new MethodOutcomeKey(
+                method,
+                sourceTree,
+                sourceFilePath,
+                sourceTreeOrdinal,
                 method.MetadataName,
                 method.DeclaredAccessibility,
-                sourceStart);
+                sourceLocation?.SourceSpan.Start ?? -1);
             _outcomes.AddOrUpdate(
                 key,
                 outcome,
@@ -326,8 +352,39 @@ internal static class AnalyzerGateHost
         }
 
         private readonly record struct MethodOutcomeKey(
+            IMethodSymbol Method,
+            SyntaxTree? SourceTree,
+            string SourceFilePath,
+            int SourceTreeOrdinal,
             string MethodName,
             Accessibility Accessibility,
             int SourceStart);
+
+        private sealed class MethodOutcomeKeyComparer
+            : IEqualityComparer<MethodOutcomeKey>
+        {
+            internal static MethodOutcomeKeyComparer Instance { get; } = new();
+
+            public bool Equals(MethodOutcomeKey left, MethodOutcomeKey right)
+            {
+                return ReferenceEquals(left.SourceTree, right.SourceTree) &&
+                    left.SourceStart == right.SourceStart &&
+                    SymbolEqualityComparer.Default.Equals(
+                        left.Method,
+                        right.Method);
+            }
+
+            public int GetHashCode(MethodOutcomeKey key)
+            {
+                var hash = new HashCode();
+                hash.Add(
+                    key.SourceTree == null
+                        ? 0
+                        : RuntimeHelpers.GetHashCode(key.SourceTree));
+                hash.Add(key.SourceStart);
+                hash.Add(SymbolEqualityComparer.Default.GetHashCode(key.Method));
+                return hash.ToHashCode();
+            }
+        }
     }
 }

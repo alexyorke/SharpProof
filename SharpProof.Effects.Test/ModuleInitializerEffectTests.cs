@@ -4,6 +4,34 @@ namespace SharpProof.Effects.Test;
 public sealed class ModuleInitializerEffectTests
 {
     [Test]
+    public void SourceDefinedModuleInitializerAttributeIsDiscovered()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            using System;
+            namespace System.Runtime.CompilerServices {
+                [AttributeUsage(AttributeTargets.Method)]
+                internal sealed class ModuleInitializerAttribute : Attribute { }
+            }
+            public static class Startup {
+                [System.Runtime.CompilerServices.ModuleInitializer]
+                internal static void Initialize() =>
+                    throw new InvalidOperationException();
+            }
+            public static class Sample {
+                public static void Entry() { }
+            }
+            """);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(
+            EffectTestHost.RequireMethod(compilation, "Sample", "Entry"));
+
+        Assert.That(
+            result.Summary.Throws.Types.Select(static type => type.ToDisplayString()),
+            Does.Contain("System.InvalidOperationException"));
+    }
+
+    [Test]
     public void SourceModuleInitializerEffectsPrecedeOrdinaryEntryPoints()
     {
         var compilation = EffectTestHost.CreateCompilation(

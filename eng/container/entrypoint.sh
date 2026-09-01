@@ -126,21 +126,44 @@ case "${command_name}" in
       # bits. Ignore their synthetic working-tree modes in the disposable clone;
       # real mode changes committed between Git trees remain part of comparisons.
       git -C "${task_root}" config core.filemode false
-      while IFS= read -r -d '' deleted_path; do
-        rm -f -- "${task_root}/${deleted_path}"
-      done < <(git -C "${repo_root}" diff \
-        --no-renames --name-only --diff-filter=D -z HEAD --)
+      if ! git -C "${repo_root}" diff --quiet HEAD --; then
+        git -C "${repo_root}" diff \
+          --binary --full-index --no-ext-diff HEAD -- . |
+          git -C "${task_root}" apply \
+            --binary --whitespace=nowarn -
+      fi
+      while IFS= read -r -d '' untracked_path; do
+        mkdir -p -- "${task_root}/$(dirname -- "${untracked_path}")"
+        cp -a -- \
+          "${repo_root}/${untracked_path}" \
+          "${task_root}/${untracked_path}"
+      done < <(git -C "${repo_root}" ls-files \
+        --others --exclude-standard -z --)
+      # Package jobs download nupkg/snupkg inputs under nupkgs/. Those file
+      # extensions are intentionally ignored by Git, so the general untracked
+      # copy above cannot see them. Preserve only ignored package-job inputs;
+      # do not broaden the snapshot to other ignored build output.
+      while IFS= read -r -d '' package_path; do
+        mkdir -p -- "${task_root}/$(dirname -- "${package_path}")"
+        cp -a -- \
+          "${repo_root}/${package_path}" \
+          "${task_root}/${package_path}"
+      done < <(git -C "${repo_root}" ls-files \
+        --others --ignored --exclude-standard -z -- nupkgs/)
+    else
+      tar \
+        --exclude='./artifacts' \
+        --exclude='./.git' \
+        --exclude='*/bin' \
+        --exclude='*/bin/*' \
+        --exclude='*/obj' \
+        --exclude='*/obj/*' \
+        --exclude='./.vs' \
+        --exclude='./.baseline-check' \
+        --exclude='./.claude' \
+        --exclude='./.claude/*' \
+        -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
     fi
-    tar \
-      --exclude='./artifacts' \
-      --exclude='./.git' \
-      --exclude='*/bin' \
-      --exclude='*/bin/*' \
-      --exclude='*/obj' \
-      --exclude='*/obj/*' \
-      --exclude='./.vs' \
-      --exclude='./.baseline-check' \
-      -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
     ln -s "${repo_root}/artifacts" "${task_root}/artifacts"
     if [[ "${source_has_git}" = "true" ]] &&
       [[ -d "${task_root}/.git" ]]; then

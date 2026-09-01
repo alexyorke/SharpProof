@@ -33,10 +33,19 @@ public sealed class IrProgramBuilder(IrFactory factory)
     public IrMemberLocation MemberLocation(IrMemberId member, IrTerm? receiver, params IrTerm[] arguments)
     {
         ArgumentNullGuard.NotNull(arguments, nameof(arguments));
+        ImmutableArray<IrTerm> immutableArguments = [.. arguments];
 
         var memberInfo = _factory.GetMemberInfo(member);
-        _factory.ValidateCallShape(memberInfo, receiver, arguments, nameof(arguments));
-        return new IrMemberLocation(memberInfo.ReturnType, member, receiver, [.. arguments]);
+        _factory.ValidateCallShape(
+            memberInfo,
+            receiver,
+            immutableArguments,
+            nameof(arguments));
+        return new IrMemberLocation(
+            memberInfo.ReturnType,
+            member,
+            receiver,
+            immutableArguments);
     }
 
     public IrSequenceLocation SequenceLocation(IrTerm sequence, IrTerm index)

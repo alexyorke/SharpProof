@@ -80,6 +80,42 @@ for ($index = 0; $index -lt $parallelism; $index++) {
 $campaignTimer = [Diagnostics.Stopwatch]::StartNew()
 $shardTimings = [Collections.Generic.List[object]]::new()
 
+function Test-ExactStringSequence {
+    param(
+        [AllowEmptyCollection()][string[]]$Left,
+        [AllowEmptyCollection()][string[]]$Right
+    )
+
+    if (@($Left).Count -ne @($Right).Count) {
+        return $false
+    }
+    for ($index = 0; $index -lt @($Left).Count; $index++) {
+        if ([string]$Left[$index] -cne [string]$Right[$index]) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Resolve-ShardReceiptPath {
+    param(
+        [Parameter(Mandatory = $true)][object]$Shard,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw 'Mutation shard receipt path is empty.'
+    }
+    $resolved = [IO.Path]::GetFullPath((Join-Path `
+            (Split-Path -Parent $Shard.Path) $Path))
+    if (-not $resolved.StartsWith(
+            $repositoryPrefix,
+            [StringComparison]::Ordinal)) {
+        throw 'Mutation shard receipt path leaves the repository.'
+    }
+    return $resolved
+}
+
 function Test-CompleteShard([object]$Shard) {
     if (-not (Test-Path -LiteralPath $Shard.Path -PathType Leaf)) {
         return $false
@@ -87,22 +123,100 @@ function Test-CompleteShard([object]$Shard) {
     try {
         $evidence = Get-Content -LiteralPath $Shard.Path -Raw |
             ConvertFrom-Json
-        return [int]$evidence.schemaVersion -eq 2 -and
-            [string]$evidence.commit -eq $ExpectedCommit -and
-            [string]$evidence.configuration -eq $Configuration -and
-            [string]$evidence.selection -eq 'selected' -and
-            [int]$evidence.catalogCount -eq $catalogCount -and
-            [string]$evidence.catalogSha256 -eq $catalogSha256 -and
-            [int]$evidence.mutationCount -gt 0 -and
-            [int]$evidence.mutationCount -eq [int]$evidence.killedCount -and
-            @($evidence.mutations | Where-Object {
-                    [string]$_.baselineInvocationSha256 -notmatch
-                        '^[0-9a-f]{64}$' -or
-                    [string]$_.assertionProvenanceSha256 -notmatch
-                        '^[0-9a-f]{64}$' -or
-                    @($_.baselineSelectedTests).Count -eq 0 -or
-                    [string]$_.baselineTrxSha256 -notmatch '^[0-9a-f]{64}$'
-                }).Count -eq 0
+        $rows = @($evidence.mutations)
+        if ([int]$evidence.schemaVersion -ne 2 -or
+            [string]$evidence.commit -ne $ExpectedCommit -or
+            [string]$evidence.configuration -ne $Configuration -or
+            [string]$evidence.selection -ne 'selected' -or
+            [int]$evidence.catalogCount -ne $catalogCount -or
+            [string]$evidence.catalogSha256 -ne $catalogSha256 -or
+            [int]$evidence.mutationCount -le 0 -or
+            [int]$evidence.mutationCount -ne $rows.Count -or
+            [int]$evidence.killedCount -ne $rows.Count) {
+            return $false
+        }
+
+        $baselineGroups = @{}
+        foreach ($row in $rows) {
+            $test = [string]$row.test
+            if (-not $test.StartsWith(
+                    'FullyQualifiedName~',
+                    [StringComparison]::Ordinal)) {
+                return $false
+            }
+            $method = $test.Substring('FullyQualifiedName~'.Length)
+            $log = Resolve-ShardReceiptPath `
+                -Shard $Shard -Path ([string]$row.log)
+            $trx = Resolve-ShardReceiptPath `
+                -Shard $Shard -Path ([string]$row.trx)
+            $baselineTrx = Resolve-ShardReceiptPath `
+                -Shard $Shard -Path ([string]$row.baselineTrx)
+            if (-not [bool]$row.killed -or [int]$row.exitCode -eq 0 -or
+                -not [IO.File]::Exists($log) -or
+                -not [IO.File]::Exists($trx) -or
+                -not [IO.File]::Exists($baselineTrx) -or
+                (Get-FileHash -LiteralPath $log -Algorithm SHA256).
+                    Hash.ToLowerInvariant() -cne [string]$row.logSha256 -or
+                (Get-FileHash -LiteralPath $trx -Algorithm SHA256).
+                    Hash.ToLowerInvariant() -cne [string]$row.trxSha256 -or
+                (Get-FileHash -LiteralPath $baselineTrx -Algorithm SHA256).
+                    Hash.ToLowerInvariant() -cne
+                    [string]$row.baselineTrxSha256 -or
+                [string]$row.baselineInvocationSha256 -cne
+                    (Get-SharpProofMutationBaselineInvocation `
+                        -Project ([string]$row.project) `
+                        -Filter $test `
+                        -Configuration $Configuration).Sha256) {
+                return $false
+            }
+
+            $mutation = Read-SharpProofMutationTestEvidence `
+                -TrxPath $trx `
+                -EvidenceName ([string]$row.name) `
+                -Mode Mutation `
+                -ProcessExitCode ([int]$row.exitCode) `
+                -ExpectedMethodName $method `
+                -ExpectedLedger @($row.baselineSelectedTests)
+            if ([int]$row.executedCount -ne $mutation.executedCount -or
+                [int]$row.failedCount -ne $mutation.failedCount -or
+                [int]$row.assertionFailureCount -ne
+                    $mutation.assertionFailureCount -or
+                [string]$row.assertionProvenanceSha256 -cne
+                    [string]$mutation.assertionProvenanceSha256 -or
+                -not (Test-ExactStringSequence `
+                    -Left @($row.selectedTests) `
+                    -Right @($mutation.testLedger))) {
+                return $false
+            }
+
+            if (-not $baselineGroups.ContainsKey($baselineTrx)) {
+                $baselineGroups[$baselineTrx] =
+                    [Collections.Generic.List[object]]::new()
+            }
+            $baselineGroups[$baselineTrx].Add([pscustomobject]@{
+                Method = $method
+                Ledger = @($row.baselineSelectedTests)
+            })
+        }
+
+        foreach ($entry in $baselineGroups.GetEnumerator()) {
+            $methods = @($entry.Value.Method | Sort-Object -Unique)
+            $baseline = Read-SharpProofMutationTestEvidence `
+                -TrxPath ([string]$entry.Key) `
+                -EvidenceName ('baseline for ' + [IO.Path]::GetFileName(
+                        [string]$entry.Key)) `
+                -Mode Baseline `
+                -ProcessExitCode 0 `
+                -ExpectedMethodName $methods
+            foreach ($expected in $entry.Value) {
+                if (-not (Test-ExactStringSequence `
+                        -Left @($expected.Ledger) `
+                        -Right @($baseline.testLedgers[$expected.Method]))) {
+                    return $false
+                }
+            }
+        }
+        return $true
     }
     catch {
         return $false
@@ -353,19 +467,28 @@ foreach ($result in $orderedResults) {
 }
 
 $temporaryOutput = $output + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
-[pscustomobject]@{
-    schemaVersion = 2
-    commit = $ExpectedCommit
-    configuration = $Configuration
-    selection = 'full'
-    catalogCount = $catalogCount
-    catalogSha256 = $catalogSha256
-    mutationCount = $orderedResults.Count
-    killedCount = @($orderedResults | Where-Object killed).Count
-    mutations = @($orderedResults)
-} | ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
-Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
+try {
+    [pscustomobject]@{
+        schemaVersion = 2
+        commit = $ExpectedCommit
+        configuration = $Configuration
+        selection = 'full'
+        catalogCount = $catalogCount
+        catalogSha256 = $catalogSha256
+        mutationCount = $orderedResults.Count
+        killedCount = @($orderedResults | Where-Object killed).Count
+        mutations = @($orderedResults)
+    } | ConvertTo-Json -Depth 5 |
+        Set-Content -LiteralPath $temporaryOutput -Encoding utf8NoBOM
+    & (Join-Path $PSScriptRoot 'Test-SharpProofMutationCatalog.ps1') `
+        -EvidencePath $temporaryOutput `
+        -ExpectedCommit $ExpectedCommit
+    Move-Item -LiteralPath $temporaryOutput -Destination $output -Force
+}
+finally {
+    Remove-Item -LiteralPath $temporaryOutput `
+        -Force -ErrorAction SilentlyContinue
+}
 $campaignTimer.Stop()
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null

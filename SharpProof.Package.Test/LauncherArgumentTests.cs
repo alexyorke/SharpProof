@@ -14,6 +14,8 @@ namespace SharpProof.Package.Test;
 [TestFixture]
 public sealed class LauncherArgumentTests
 {
+    private const string SarifProjectDirectory = "/source";
+
     [Test]
     [NonParallelizable]
     public void LinuxWorkerReceivesTheExactStartupRelease()
@@ -64,8 +66,8 @@ public sealed class LauncherArgumentTests
             Assert.That(completion.ExitCode, Is.EqualTo(124));
             Assert.That(
                 stopwatch.Elapsed,
-                Is.LessThan(TimeSpan.FromMilliseconds(1_350)),
-                "The final deadline must include exactly one termination grace.");
+                Is.LessThan(TimeSpan.FromMilliseconds(1_800)),
+                "The final deadline must not restart the full 1.1-second cleanup budget.");
         }
     }
 
@@ -202,6 +204,38 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void LinuxWorkerDeadlinePreservesAnExitObservedBeforeTermination()
+    {
+        if (!OperatingSystem.IsLinux() ||
+            RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
+        }
+
+        using var process = System.Diagnostics.Process.Start(
+            new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "/bin/sh",
+                UseShellExecute = false,
+                ArgumentList = { "-c", "exit 17" }
+            })!;
+        process.WaitForExit();
+
+        var completion = LinuxWorkerProcess.CompleteAtDeadline(
+            process,
+            System.Diagnostics.Stopwatch.StartNew(),
+            TimeSpan.FromSeconds(1));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                completion.Kind,
+                Is.EqualTo(LinuxWorkerCompletionKind.Exited));
+            Assert.That(completion.ExitCode, Is.EqualTo(17));
+        }
+    }
+
+    [Test]
     public void UnknownOptionIsRejected()
     {
         string[] arguments = [
@@ -213,6 +247,36 @@ public sealed class LauncherArgumentTests
         Assert.That(
             LauncherArguments.TryParse(arguments, out _),
             Is.False);
+    }
+
+    [Test]
+    [NonParallelizable]
+    public async Task UnsupportedPreflightReturnsControlledContainmentExit()
+    {
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        try
+        {
+            Console.SetError(error);
+            var exitCode = await Program.RunMain(
+                ValidArguments(),
+                static _ => string.Empty,
+                validatePreflight: static _ =>
+                    throw new PlatformNotSupportedException(
+                        "SharpProof containment is unsupported."));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(125));
+                Assert.That(
+                    error.ToString(),
+                    Does.Contain("SharpProof containment is unsupported."));
+            }
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
     }
 
     [Test]
@@ -389,6 +453,44 @@ public sealed class LauncherArgumentTests
             Assert.That(
                 WorkerCachePath.Resolve(absolutePath, projectDirectory),
                 Is.EqualTo(Path.GetFullPath(absolutePath)));
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void RequestProjectionRejectsDirectoryResultBeforeManifestRead()
+    {
+        var root = Directory.CreateTempSubdirectory(
+            "sharpproof-directory-result-");
+        var workerDirectory = Path.Combine(root.FullName, "worker");
+        var ioDirectory = Path.Combine(root.FullName, "io");
+        var resultDirectory = Path.Combine(ioDirectory, "result.json");
+        Directory.CreateDirectory(workerDirectory);
+        Directory.CreateDirectory(resultDirectory);
+        try
+        {
+            string[] arguments = [
+                "verify",
+                "--worker", Path.Combine(workerDirectory, "worker.dll"),
+                "--request", Path.Combine(ioDirectory, "request.json"),
+                "--result", resultDirectory,
+                "--compiler-manifest", Path.Combine(
+                    ioDirectory,
+                    "missing-compiler-manifest.json"),
+                "--verify-policy", "advisory",
+                "--assumption-policy", "allow"
+            ];
+            Assert.That(
+                LauncherArguments.TryParse(arguments, out var parsed),
+                Is.True);
+
+            Assert.That(
+                (Action)(() => parsed.CreateRequest(out _, out _)),
+                Throws.TypeOf<ArgumentException>());
+        }
+        finally
+        {
+            root.Delete(recursive: true);
         }
     }
 
@@ -1040,6 +1142,121 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void MalformedProtocolErrorsCannotInjectLauncherLogLines()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".json");
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        try
+        {
+            var response = new WorkerVerifyResponse
+            {
+                Errors = [new WorkerProtocolError {
+                    Code = "worker.infrastructure",
+                    Message = "failure\nSharpProof forged: false status"
+                }]
+            };
+            File.WriteAllText(
+                path,
+                WorkerProtocolJson.SerializeResponse(response));
+
+            Console.SetError(error);
+            var exitCode = Program.ValidateAndReport(
+                path,
+                new WorkerVerifyRequest(),
+                null,
+                null,
+                null,
+                out var validResponse,
+                out var validatedResponse);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exitCode, Is.EqualTo(3));
+                Assert.That(validResponse, Is.False);
+                Assert.That(validatedResponse, Is.Null);
+                Assert.That(
+                    error.ToString(),
+                    Does.Not.Contain(
+                        Environment.NewLine +
+                        "SharpProof forged: false status"));
+            }
+        }
+        finally
+        {
+            Console.SetError(originalError);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void WorkerResultFifoIsRejectedBeforeBlockingOpen()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            Guid.NewGuid().ToString("N") + ".fifo");
+        try
+        {
+            using (var process = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "mkfifo",
+                    UseShellExecute = false,
+                    ArgumentList = { path }
+                })!)
+            {
+                process.WaitForExit();
+                Assert.That(process.ExitCode, Is.Zero);
+            }
+
+            var validation = Task.Run(() => Program.ValidateAndReport(
+                path,
+                new WorkerVerifyRequest(),
+                null,
+                null,
+                null,
+                out _,
+                out _));
+            var completed = Task.WhenAny(validation, Task.Delay(500))
+                .GetAwaiter()
+                .GetResult();
+            if (!ReferenceEquals(completed, validation))
+            {
+                using (var writer = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Write,
+                    FileShare.ReadWrite))
+                {
+                    writer.WriteByte((byte)'{');
+                }
+
+                var unblocked = Task.WhenAny(validation, Task.Delay(5000))
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.That(unblocked, Is.SameAs(validation));
+                _ = validation.Exception;
+            }
+
+            Assert.That(
+                completed,
+                Is.SameAs(validation),
+                "Worker-result validation must not wait for a FIFO writer.");
+            Assert.That(validation.GetAwaiter().GetResult(), Is.EqualTo(3));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
     [Platform("Linux")]
     public void DotNetHostMustBeAbsoluteInstalledAndOutsideProject()
     {
@@ -1459,8 +1676,10 @@ public sealed class LauncherArgumentTests
             AssumptionPolicy = WorkerAssumptionPolicy.Error
         };
 
-        var first = SarifProjection.Serialize(request, response);
-        var second = SarifProjection.Serialize(request, response);
+        var first = SarifProjection.Serialize(
+            request, response, SarifProjectDirectory);
+        var second = SarifProjection.Serialize(
+            request, response, SarifProjectDirectory);
 
         Assert.That(second, Is.EqualTo(first));
         using var document = JsonDocument.Parse(first);
@@ -1559,7 +1778,8 @@ public sealed class LauncherArgumentTests
         var request = new WorkerVerifyRequest();
 
         using var vacuity = JsonDocument.Parse(
-            SarifProjection.Serialize(request, response));
+            SarifProjection.Serialize(
+                request, response, SarifProjectDirectory));
         Assert.That(
             ResultEvidence(vacuity).GetProperty("vacuity").GetString(),
             Is.EqualTo("NoModeledNormalReturn"));
@@ -1579,7 +1799,8 @@ public sealed class LauncherArgumentTests
             WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
 
         using var certainty = JsonDocument.Parse(
-            SarifProjection.Serialize(request, response));
+            SarifProjection.Serialize(
+                request, response, SarifProjectDirectory));
         Assert.That(
             ResultEvidence(certainty).GetProperty("effectCertainty").GetString(),
             Is.EqualTo("CompleteMayEffectSummary"));
@@ -1607,7 +1828,8 @@ public sealed class LauncherArgumentTests
                 }
             };
         using var refuted = JsonDocument.Parse(
-            SarifProjection.Serialize(request, response));
+            SarifProjection.Serialize(
+                request, response, SarifProjectDirectory));
         var projected = refuted.RootElement.GetProperty("runs")[0]
             .GetProperty("results")[0];
         using (Assert.EnterMultipleScope())
@@ -1683,7 +1905,8 @@ public sealed class LauncherArgumentTests
         using var document = JsonDocument.Parse(
             SarifProjection.Serialize(
                 new WorkerVerifyRequest { VerifyPolicy = policy },
-                response));
+                response,
+                SarifProjectDirectory));
         var result = document.RootElement.GetProperty("runs")[0]
             .GetProperty("results")[0];
 
@@ -1781,6 +2004,21 @@ public sealed class LauncherArgumentTests
     }
 
     [Test]
+    public void ContainmentFailurePresentationPreservesDedicatedExitCode()
+    {
+        Assert.That(
+            LauncherPresentation.ExitCode(
+                WorkerRunStatus.Failed,
+                WorkerRunFailureReason.ContainmentFailure),
+            Is.EqualTo(125));
+        Assert.That(
+            LauncherPresentation.ExitCode(
+                WorkerRunStatus.Failed,
+                WorkerRunFailureReason.InfrastructureFailure),
+            Is.EqualTo(3));
+    }
+
+    [Test]
     public void SarifProjectionPreservesInfrastructureFailure()
     {
         var manifest = new WorkerClaimManifest();
@@ -1819,7 +2057,8 @@ public sealed class LauncherArgumentTests
                 {
                     AssumptionPolicy = WorkerAssumptionPolicy.Warn
                 },
-                response));
+                response,
+                SarifProjectDirectory));
         var invocation = document.RootElement.GetProperty("runs")[0]
             .GetProperty("invocations")[0];
 

@@ -1,0 +1,83 @@
+<Project>
+  <!--
+    This file is imported by Directory.Build.targets, after NuGet's generated
+    imports.  That ordering lets package consumers and explicit source-tree
+    consumers opt out of the source-built analyzer without duplicate analyzer
+    loads.  The self-application command enables this property only for its
+    isolated audit builds; ordinary repository builds remain unchanged.
+  -->
+  <PropertyGroup Condition="'$(SharpProofSelfApplication)' == 'true'">
+    <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
+    <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
+    <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
+    <SharpProofSpecificationPacks Condition="'$(SharpProofSpecificationPacks)' == ''"></SharpProofSpecificationPacks>
+    <_SharpProofSelfRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../..'))</_SharpProofSelfRepositoryRoot>
+    <_SharpProofSelfAnalyzerDirectory>$([System.IO.Path]::Combine('$(_SharpProofSelfRepositoryRoot)', 'SharpProof.Analyzer', 'bin', '$(Configuration)', 'netstandard2.0'))</_SharpProofSelfAnalyzerDirectory>
+    <_SharpProofSelfGeneratorDirectory>$([System.IO.Path]::Combine('$(_SharpProofSelfRepositoryRoot)', 'SharpProof.ContractForGenerator', 'bin', '$(Configuration)', 'netstandard2.0'))</_SharpProofSelfGeneratorDirectory>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="
+      '$(SharpProofSelfApplication)' == 'true' AND
+      '$(SharpProofTestProject)' == 'true'">
+    <!--
+      These tests intentionally compile invalid placeholder calls so they can
+      assert SP0024.  Keep the negative fixture in the source while allowing
+      the containing test assembly to compile under the self-application lane.
+    -->
+    <NoWarn>$(NoWarn);SP0024</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup Condition="
+      '$(SharpProofSelfApplication)' == 'true' AND
+      '$(_SharpProofAnalyzerConsumerPresent)' != 'true' AND
+      '$(_SharpProofPortablePackagePresent)' != 'true'">
+    <CompilerVisibleProperty Include="SharpProofProfile" />
+    <CompilerVisibleProperty Include="SharpProofFeatures" />
+    <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
+    <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
+    <CompilerVisibleProperty Include="SharpProofSpecificationPacks" />
+    <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
+    <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
+    <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
+    <CompilerVisibleProperty Include="SharpProofVerifyMaximumExpressionDepth" />
+
+    <Analyzer Include="$(_SharpProofSelfAnalyzerDirectory)/SharpProof.Analyzer.dll">
+      <SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>
+    </Analyzer>
+    <Analyzer Include="$(_SharpProofSelfGeneratorDirectory)/SharpProof.ContractForGenerator.dll">
+      <SharpProofAnalyzerRole>Generator</SharpProofAnalyzerRole>
+    </Analyzer>
+    <Analyzer Include="
+        $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Analyzer.Core.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Contracts.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Dataflow.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Effects.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Frontend.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Ir.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/SharpProof.Specs.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/System.Buffers.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/System.Collections.Immutable.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/System.Memory.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/System.Numerics.Vectors.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/System.Reflection.Metadata.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/System.Runtime.CompilerServices.Unsafe.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/System.Text.Encoding.CodePages.dll;
+        $(_SharpProofSelfAnalyzerDirectory)/System.Threading.Tasks.Extensions.dll">
+      <SharpProofAnalyzerRole>Dependency</SharpProofAnalyzerRole>
+      <Visible>false</Visible>
+    </Analyzer>
+  </ItemGroup>
+
+  <Target Name="_SharpProofValidateSelfApplication"
+          BeforeTargets="CoreCompile"
+          Condition="
+            '$(SharpProofSelfApplication)' == 'true' AND
+            '$(_SharpProofAnalyzerConsumerPresent)' != 'true' AND
+            '$(_SharpProofPortablePackagePresent)' != 'true' AND
+            '$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('$(_SharpProofSelfAnalyzerDirectory)/SharpProof.Analyzer.dll')"
+           Text="SharpProof self-application requires a bootstrapped analyzer at '$(_SharpProofSelfAnalyzerDirectory)'. Run the self-apply container command to build the analyzer first." />
+    <Error Condition="!Exists('$(_SharpProofSelfGeneratorDirectory)/SharpProof.ContractForGenerator.dll')"
+           Text="SharpProof self-application requires a bootstrapped contract generator at '$(_SharpProofSelfGeneratorDirectory)'. Run the self-apply container command to build the generator first." />
+  </Target>
+</Project>

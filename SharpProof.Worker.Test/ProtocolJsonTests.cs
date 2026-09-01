@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -25,6 +26,79 @@ public sealed class ProtocolJsonTests
     ];
 
     [Test]
+    public void ValidResponseValidationDoesNotRescanManifestRows()
+    {
+        const int smallSize = 1024;
+        const int largeSize = 8192;
+        _ = MeasureValidation(CreateValidationScalingResponse(4));
+        var small = MeasureValidation(
+            CreateValidationScalingResponse(smallSize));
+        var large = MeasureValidation(
+            CreateValidationScalingResponse(largeSize));
+        var maximumLarge = small * 16 + TimeSpan.FromMilliseconds(250);
+
+        Assert.That(
+            large,
+            Is.LessThanOrEqualTo(maximumLarge),
+            $"small={small.TotalMilliseconds:F0} ms, " +
+            $"large={large.TotalMilliseconds:F0} ms");
+    }
+
+    [Test]
+    public void ProtocolCanonicalizationDoesNotRescanManifestRows()
+    {
+        const int smallSize = 512;
+        const int largeSize = 4096;
+        _ = MeasureCanonicalization(CreateValidationScalingResponse(4));
+        var small = MeasureCanonicalization(
+            CreateValidationScalingResponse(smallSize));
+        var large = MeasureCanonicalization(
+            CreateValidationScalingResponse(largeSize));
+        var maximumLarge = small * 16 + TimeSpan.FromMilliseconds(250);
+
+        Assert.That(
+            large,
+            Is.LessThanOrEqualTo(maximumLarge),
+            $"small={small.TotalMilliseconds:F0} ms, " +
+            $"large={large.TotalMilliseconds:F0} ms");
+    }
+
+    [Test]
+    public void ProtocolSerializersRejectDocumentsBeyondReaderLimit()
+    {
+        var oversizedValue = new string(
+            'x',
+            WorkerProtocolJson.MaximumJsonBytes);
+        var request = CreateRequest();
+        request.CompilerManifest.Path = oversizedValue;
+        var response = CreateResponse(CreateManifest());
+        response.ClaimResults[0].ProofCore = [oversizedValue];
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(WorkerProtocolJson.Validate(request).IsValid, Is.True);
+            Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+            Assert.That(
+                (Action)(() => WorkerProtocolJson.SerializeRequest(request)),
+                Throws.TypeOf<InvalidDataException>());
+            Assert.That(
+                (Action)(() => WorkerProtocolJson.SerializeResponse(response)),
+                Throws.TypeOf<InvalidDataException>());
+        }
+    }
+
+    [Test]
+    public void ProtocolDeserializersRejectLoneUtf16Surrogates()
+    {
+        var json = WorkerProtocolJson.SerializeRequest(CreateRequest())
+            .Replace("compiler.manifest.json", "\\uD800", StringComparison.Ordinal);
+
+        Assert.That(
+            (Action)(() => WorkerProtocolJson.DeserializeRequest(json)),
+            Throws.TypeOf<JsonException>());
+    }
+
+    [Test]
     public void BoundedUtf8FileReaderRejectsOversizedAndInvalidFiles()
     {
         var path = Path.Combine(
@@ -49,6 +123,124 @@ public sealed class ProtocolJsonTests
             {
                 File.Delete(path);
             }
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void BoundedUtf8FileReaderRejectsGrowthAfterOpen()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "protocol-json-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllBytes(
+                path,
+                new byte[WorkerProtocolJson.MaximumJsonBytes]);
+
+            using (var reader = OpenReader())
+            {
+                AppendByte();
+                Assert.Throws<InvalidDataException>(
+                    (Action)(() => reader.ReadToEnd()));
+            }
+
+            File.WriteAllBytes(
+                path,
+                new byte[WorkerProtocolJson.MaximumJsonBytes]);
+            using (var reader = OpenReader())
+            {
+                AppendByte();
+                Func<Task> readAsync = async () =>
+                    await reader.ReadToEndAsync();
+                Assert.ThrowsAsync<InvalidDataException>(
+                    readAsync);
+            }
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+
+        StreamReader OpenReader()
+        {
+            var method = typeof(WorkerProtocolJson).GetMethod(
+                "OpenJsonReader",
+                System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Static)!;
+            return (StreamReader)method.Invoke(null, [path])!;
+        }
+
+        void AppendByte()
+        {
+            using var writer = new FileStream(
+                path,
+                FileMode.Append,
+                FileAccess.Write,
+                FileShare.ReadWrite);
+            writer.WriteByte((byte)' ');
+            writer.Flush(flushToDisk: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public void BoundedUtf8FileReaderRejectsFifoBeforeBlockingOpen()
+    {
+        var path = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "protocol-json-" + Guid.NewGuid().ToString("N") + ".fifo");
+        try
+        {
+            using (var process = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "mkfifo",
+                    UseShellExecute = false,
+                    ArgumentList = { path }
+                })!)
+            {
+                process.WaitForExit();
+                Assert.That(process.ExitCode, Is.Zero);
+            }
+
+            var read = Task.Run(() => WorkerProtocolJson.ReadUtf8File(path));
+            var completed = Task.WhenAny(read, Task.Delay(500))
+                .GetAwaiter()
+                .GetResult();
+            if (!ReferenceEquals(completed, read))
+            {
+                using (var writer = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Write,
+                    FileShare.ReadWrite))
+                {
+                    writer.WriteByte((byte)'{');
+                }
+
+                var unblocked = Task.WhenAny(read, Task.Delay(5000))
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.That(unblocked, Is.SameAs(read));
+                _ = read.Exception;
+            }
+
+            Assert.That(
+                completed,
+                Is.SameAs(read),
+                "Opening a FIFO must not wait for a writer.");
+            Assert.That(
+                (Action)(() => _ = read.GetAwaiter().GetResult()),
+                Throws.TypeOf<InvalidDataException>());
+        }
+        finally
+        {
+            File.Delete(path);
         }
     }
 
@@ -172,7 +364,9 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(roundTrip.SchemaVersion, Is.EqualTo(15));
+            Assert.That(
+                roundTrip.SchemaVersion,
+                Is.EqualTo(CompilerManifestArtifactVersions.Current));
             Assert.That(roundTrip.ProtocolVersion, Is.EqualTo("11"));
             Assert.That(roundTrip.Manifest.Hash, Is.EqualTo(manifest.Hash));
             Assert.That(roundTrip.Manifest.Callables[0].Assumptions, Has.Length.EqualTo(2));
@@ -462,6 +656,49 @@ public sealed class ProtocolJsonTests
                     WorkerEffectEvidenceCertainty.DefiniteViolation),
                 Is.False);
         }
+    }
+
+    [TestCase(
+        WorkerClaimReason.EffectSummaryIncomplete,
+        WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)]
+    [TestCase(
+        WorkerClaimReason.EffectContractNotEstablished,
+        WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)]
+    [TestCase(
+        WorkerClaimReason.ResourceLimit,
+        WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)]
+    [TestCase(
+        WorkerClaimReason.ResourceLimit,
+        WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)]
+    [TestCase(
+        WorkerClaimReason.UnsupportedBody,
+        WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary)]
+    [TestCase(
+        WorkerClaimReason.UnsupportedBody,
+        WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)]
+    public void AcceptedUnknownEffectTuplePassesFullResponseValidation(
+        WorkerClaimReason reason,
+        WorkerEffectEvidenceCertainty certainty)
+    {
+        var response = CreateResponse(CreateEffectManifest());
+        SetUnknown(response, reason);
+        response.ClaimResults[0].EffectCertainty = certainty;
+        response.CallableResults[0].Coverage =
+            WorkerCallableCoverage.Incomplete;
+        response.CallableResults[0].Reason =
+            WorkerCallableCoverageReason.SemanticUnknown;
+        if (certainty == WorkerEffectEvidenceCertainty.TrustedCompleteBoundary)
+        {
+            response.ClaimResults[0].Assumptions.Single(static assumption =>
+                assumption.Kind == WorkerAssumptionKind.TrustedBoundary).Used = true;
+        }
+        response.Summary = CreateSummary(response);
+
+        var validation = WorkerProtocolJson.Validate(response);
+
+        Assert.That(
+            validation.Errors.Select(static error => error.Code),
+            Is.Empty);
     }
 
     [Test]
@@ -816,6 +1053,29 @@ public sealed class ProtocolJsonTests
         }
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public void OversizedNumericEnumStringsAreRejectedAsMalformedJson(
+        bool request)
+    {
+        const string oversized = "9999999999999999999999999999999999999999";
+        var json = request
+            ? WorkerProtocolJson.SerializeRequest(CreateRequest()).Replace(
+                "\"verifyPolicy\":\"Advisory\"",
+                $"\"verifyPolicy\":\"{oversized}\"",
+                StringComparison.Ordinal)
+            : WorkerProtocolJson.SerializeResponse(
+                    CreateResponse(CreateManifest()))
+                .Replace(
+                    "\"outcome\":\"Proven\"",
+                    $"\"outcome\":\"{oversized}\"",
+                    StringComparison.Ordinal);
+
+        Assert.That(
+            (Action)(() => DeserializeByRoot(json)),
+            Throws.TypeOf<JsonException>());
+    }
+
     [Test]
     public void OmittedNestedManifestSchemaVersionIsRejectedDuringDeserialization()
     {
@@ -1064,12 +1324,43 @@ public sealed class ProtocolJsonTests
         WorkerProtocolJson.SealManifest(emptyManifest);
         response = CreateResponse(emptyManifest);
         Assert.That(ValidateForRequest(response).IsValid, Is.True);
+    }
+
+    [Test]
+    public void SchemaValidIncompleteUnsupportedContractProjectionIsAccepted()
+    {
+        var response = CreateResponse(CreateManifest());
+        SetUnknown(response, WorkerClaimReason.UnsupportedContract);
         response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
         response.CallableResults[0].Reason =
-            WorkerCallableCoverageReason.SemanticUnknown;
-        Assert.That(
-            ValidateForRequest(response).Errors.Select(static error => error.Code),
-            Does.Contain("response.callable_projection"));
+            WorkerCallableCoverageReason.UnsupportedContract;
+        response.Summary = CreateSummary(response);
+
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
+    }
+
+    [TestCase(WorkerCallableCoverageReason.UnsupportedCallable)]
+    [TestCase(WorkerCallableCoverageReason.UnsupportedContract)]
+    [TestCase(WorkerCallableCoverageReason.SemanticUnknown)]
+    [TestCase(WorkerCallableCoverageReason.InfrastructureFailure)]
+    public void SchemaValidIncompleteClaimlessProjectionIsAccepted(
+        WorkerCallableCoverageReason reason)
+    {
+        var manifest = CreateManifest();
+        manifest.Callables[0].ClaimIds = [];
+        manifest.Claims = [];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
+        response.CallableResults[0].Reason = reason;
+        if (reason == WorkerCallableCoverageReason.InfrastructureFailure)
+        {
+            response.RunStatus = WorkerRunStatus.Failed;
+            response.FailureReason =
+                WorkerRunFailureReason.InfrastructureFailure;
+        }
+
+        Assert.That(ValidateForRequest(response).IsValid, Is.True);
     }
 
     [Test]
@@ -1311,6 +1602,43 @@ public sealed class ProtocolJsonTests
         Assert.That(ValidateForRequest(response).IsValid, Is.True);
     }
 
+    [Test]
+    public void ProtocolErrorsRejectControlAndLineSeparatorCharacters()
+    {
+        var manifest = CreateManifest();
+        manifest.Callables = [];
+        manifest.Claims = [];
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = CreateResponse(manifest);
+        response.RunStatus = WorkerRunStatus.Failed;
+        response.FailureReason = WorkerRunFailureReason.InfrastructureFailure;
+        response.Errors = [new WorkerProtocolError {
+            Code = "worker.infrastructure",
+            Message = "failure"
+        }];
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+
+        foreach (var separator in new[]
+        {
+            "\n", "\r", "\t", "\u001b", "\u2028", "\u2029"
+        })
+        {
+            response.Errors[0].Code = "worker" + separator + "infrastructure";
+            Assert.That(
+                WorkerProtocolJson.Validate(response).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("response.errors"));
+
+            response.Errors[0].Code = "worker.infrastructure";
+            response.Errors[0].Message = "failure" + separator + "forged";
+            Assert.That(
+                WorkerProtocolJson.Validate(response).Errors
+                    .Select(static error => error.Code),
+                Does.Contain("response.errors"));
+            response.Errors[0].Message = "failure";
+        }
+    }
+
     [TestCase("worker.timeout", WorkerRunStatus.TimedOut)]
     [TestCase("worker.canceled", WorkerRunStatus.Canceled)]
     public void EmptyManifestInterruptionRequiresExactEvidence(
@@ -1463,6 +1791,44 @@ public sealed class ProtocolJsonTests
     }
 
     [Test]
+    public void ManifestRejectsEffectClaimsBeforePostconditions()
+    {
+        var manifest = CreateManifest();
+        var postcondition = manifest.Claims[0];
+        postcondition.Ordinal = 1;
+        manifest.Claims = [
+            new WorkerClaimManifestEntry {
+                ClaimId = "claim.identity.effect.0",
+                CallableId = postcondition.CallableId,
+                Ordinal = 0,
+                Kind = WorkerClaimKind.Effect,
+                Evidence = WorkerClaimEvidence.Attribute,
+                EffectContractKind = WorkerEffectContractKind.DoesNotThrow,
+                Location = postcondition.Location
+            },
+            postcondition
+        ];
+        manifest.Callables[0].SelectedFeatures = [
+            WorkerSelectedFeature.Contracts,
+            WorkerSelectedFeature.Effects
+        ];
+        manifest.Callables[0].SelectionReasons = [
+            WorkerSelectionReason.DiscoveredPostcondition,
+            WorkerSelectionReason.ExplicitAnnotation
+        ];
+        manifest.Callables[0].ClaimIds = [
+            "claim.identity.effect.0",
+            postcondition.ClaimId
+        ];
+        WorkerProtocolJson.SealManifest(manifest);
+
+        Assert.That(
+            WorkerProtocolJson.ValidateManifest(manifest).Errors
+                .Select(static error => error.Code),
+            Is.EqualTo(["manifest.claim_order"]));
+    }
+
+    [Test]
     public void NullProtocolRootsAndArrayRequestsAreRejected()
     {
         var request = WorkerProtocolJson.Validate((WorkerVerifyRequest?)null);
@@ -1593,8 +1959,8 @@ public sealed class ProtocolJsonTests
             Does.Contain("response.elapsed_unrepresentable"));
     }
 
-    [TestCase(1, 300001L)]
-    [TestCase(100, 300001L)]
+    [TestCase(101, 300001L)]
+    [TestCase(200, 300100L)]
     [TestCase(1000, 300900L)]
     public void RequestBoundElapsedTimeUsesTheActualLauncherGrace(
         int terminationGraceMilliseconds,
@@ -1630,6 +1996,10 @@ public sealed class ProtocolJsonTests
 
         Assert.Throws<ArgumentOutOfRangeException>((Action)(() =>
             WorkerExecutionEnvelope.MaximumElapsedMilliseconds(request, 0)));
+        Assert.That(
+            WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
+                request, WorkerExecutionEnvelope.CleanupReserveMilliseconds),
+            Is.EqualTo((long)int.MaxValue + 1));
         Assert.That(
             WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
                 request, WorkerLauncherDefaults.MaximumTerminationGraceMilliseconds),
@@ -1820,6 +2190,123 @@ public sealed class ProtocolJsonTests
         };
         WorkerProtocolJson.SealManifest(manifest);
         return manifest;
+    }
+
+    private static TimeSpan MeasureValidation(WorkerVerifyResponse response)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var validation = WorkerProtocolJson.Validate(response);
+        stopwatch.Stop();
+
+        Assert.That(
+            validation.Errors,
+            Is.Empty,
+            string.Join(
+                ", ",
+                validation.Errors.Select(static error => error.Code)));
+        return stopwatch.Elapsed;
+    }
+
+    private static TimeSpan MeasureCanonicalization(
+        WorkerVerifyResponse response)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        WorkerProtocolJson.Canonicalize(response);
+        stopwatch.Stop();
+
+        Assert.That(response.ClaimResults, Has.Length.EqualTo(
+            response.Manifest.Claims.Length));
+        return stopwatch.Elapsed;
+    }
+
+    private static WorkerVerifyResponse CreateValidationScalingResponse(
+        int size)
+    {
+        var callables = new WorkerCallableManifestEntry[size];
+        var claims = new WorkerClaimManifestEntry[size];
+        var callableResults = new WorkerCallableResult[size];
+        var claimResults = new WorkerClaimResult[size];
+        var idPrefix = new string('x', 32);
+        var location = new WorkerSourceLocation
+        {
+            Path = "Scaling.cs",
+            Length = 1,
+            Line = 1,
+            Column = 1
+        };
+        for (var index = 0; index < size; index++)
+        {
+            var suffix = index.ToString("D6", CultureInfo.InvariantCulture);
+            var callableId = "M:" + idPrefix + suffix;
+            var claimId = "claim:" + idPrefix + suffix;
+            callables[index] = new WorkerCallableManifestEntry
+            {
+                CallableId = callableId,
+                SelectedFeatures = [WorkerSelectedFeature.Contracts],
+                SelectionReasons = [
+                    WorkerSelectionReason.DiscoveredPostcondition
+                ],
+                Location = location,
+                ClaimIds = [claimId]
+            };
+            claims[index] = new WorkerClaimManifestEntry
+            {
+                ClaimId = claimId,
+                CallableId = callableId,
+                Kind = WorkerClaimKind.Postcondition,
+                Evidence = WorkerClaimEvidence.DirectClause,
+                Location = location
+            };
+            callableResults[index] = new WorkerCallableResult
+            {
+                CallableId = callableId,
+                Coverage = WorkerCallableCoverage.Complete,
+                Reason = WorkerCallableCoverageReason.None
+            };
+            claimResults[index] = new WorkerClaimResult
+            {
+                ClaimId = claimId,
+                Outcome = WorkerClaimOutcome.Proven,
+                Reason = WorkerClaimReason.None
+            };
+        }
+
+        var manifest = new WorkerClaimManifest
+        {
+            Callables = callables,
+            Claims = claims
+        };
+        manifest.Hash = WorkerProtocolJson.ComputeManifestHash(manifest);
+        return new WorkerVerifyResponse
+        {
+            InputHash = InputHash,
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.Complete,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = callableResults,
+            ClaimResults = claimResults,
+            Summary = new WorkerVerificationSummary
+            {
+                CallableCount = size,
+                ClaimCount = size,
+                OutcomeCounts = [
+                    new WorkerClaimOutcomeCount
+                    {
+                        Outcome = WorkerClaimOutcome.Proven,
+                        Count = size
+                    }
+                ],
+                ReasonCounts = [
+                    new WorkerClaimReasonCount
+                    {
+                        Reason = WorkerClaimReason.None,
+                        Count = size
+                    }
+                ],
+                CacheStatus = WorkerCacheStatus.Miss,
+                Versions = CreateExpectedVersions()
+            }
+        };
     }
 
     private static string ManifestHashAfter(

@@ -5,14 +5,15 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerFeatureScopeFingerprint
 {
     private const string Domain = "SharpProof.CompilerFeatureScope";
-    private const int Version = 2;
+    private const int Version = 3;
 
     internal static string ComputeSha256(CompilerManifestArtifact artifact)
     {
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
 
         using var hash = new CanonicalHashWriter();
-        hash.Add(Domain, Version, (int)artifact.Features);
+        hash.Add(Domain, Version, (int)artifact.Features,
+            "budget.expression_depth", artifact.MaximumExpressionDepth);
         AddJson(hash, artifact.Manifest);
 
         var callables = artifact.Callables;
@@ -90,6 +91,13 @@ internal static class CompilerFeatureScopeFingerprint
         foreach (var effect in effects ?? [])
         {
             AddJson(hash, effect);
+        }
+
+        var authorities = callable.EffectAuthorities;
+        hash.Add(authorities?.Length ?? -1);
+        foreach (var authority in authorities ?? [])
+        {
+            AddJson(hash, authority);
         }
     }
 

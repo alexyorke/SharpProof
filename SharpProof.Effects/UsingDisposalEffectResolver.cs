@@ -62,6 +62,7 @@ internal sealed class UsingDisposalEffectResolver
                         canCompleteNormally,
                         canMethodCompleteNormally,
                         canMethodThrow,
+                        canExitAbruptly,
                         canCompleteNormally(@using.Body) ||
                         canExitAbruptly(@using.Body, @using.Body)),
                 IUsingDeclarationOperation declaration =>
@@ -72,6 +73,7 @@ internal sealed class UsingDisposalEffectResolver
                         canCompleteNormally,
                         canMethodCompleteNormally,
                         canMethodThrow,
+                        canExitAbruptly,
                         CanReachDeclarationDisposal(
                             declaration,
                             canCompleteNormally,
@@ -235,6 +237,7 @@ internal sealed class UsingDisposalEffectResolver
         Func<IOperation?, bool> canCompleteNormally,
         Func<IMethodSymbol, bool> canMethodCompleteNormally,
         Func<IMethodSymbol, bool> canMethodThrow,
+        Func<IOperation, IOperation, bool> canExitAbruptly,
         bool scopeExitReachable)
     {
         if (resources is not IVariableDeclarationGroupOperation group)
@@ -260,14 +263,19 @@ internal sealed class UsingDisposalEffectResolver
             ITypeSymbol Type,
             IOperation Resource,
             IOperation Origin)>();
-        var acquisitionFailed = false;
+        var allInitializersComplete = true;
+        var reachableDisposalCount = 0;
         foreach (var declarator in group.Declarations
                      .SelectMany(static declaration => declaration.Declarators))
         {
             var resource = declarator.Initializer?.Value;
+            if (resource != null && canExitAbruptly(resource, resource))
+            {
+                reachableDisposalCount = acquired.Count;
+            }
             if (!canCompleteNormally(resource))
             {
-                acquisitionFailed = true;
+                allInitializersComplete = false;
                 break;
             }
             if (resource != null)
@@ -278,12 +286,16 @@ internal sealed class UsingDisposalEffectResolver
                     declarator));
             }
         }
-        if (!scopeExitReachable && !acquisitionFailed)
+        if (scopeExitReachable && allInitializersComplete)
+        {
+            reachableDisposalCount = acquired.Count;
+        }
+        if (reachableDisposalCount == 0)
         {
             return EffectSummary.Empty;
         }
         var summary = EffectSummary.Empty;
-        foreach (var item in acquired.AsEnumerable().Reverse())
+        foreach (var item in acquired.Take(reachableDisposalCount).Reverse())
         {
             var disposal = ResolveResource(
                 item.Type,
@@ -500,13 +512,19 @@ internal sealed class UsingDisposalEffectResolver
 
     internal static bool IsDispatchUncertain(IMethodSymbol method)
     {
+        // A using statement invokes this method through IDisposable. Even when
+        // the current class implementation is nonvirtual, a derived type can
+        // list IDisposable again and install a different interface mapping.
+        var canReimplementInterface =
+            method.ContainingType?.TypeKind == TypeKind.Class;
         return !method.IsStatic &&
-            (method.IsVirtual ||
+            (canReimplementInterface ||
+             method.IsVirtual ||
              method.IsAbstract ||
              method.IsOverride ||
              method.ContainingType?.TypeKind == TypeKind.Interface) &&
             method.ContainingType?.IsSealed != true &&
-            !method.IsSealed;
+            (canReimplementInterface || !method.IsSealed);
     }
 
     private static bool IsInsideNestedCallable(

@@ -12,6 +12,34 @@ namespace SharpProof.Worker.Test;
 public sealed class CompilerSourceLocationAuthorityTests
 {
     [Test]
+    public void LineMapValidationHonorsCancellationBeforeScanningEveryEntry()
+    {
+        var artifact = CreateArtifact(
+            "#line 17 \"mapped.cs\"\n" +
+            "internal static class Subject { static int M() { return ; } }\n");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(
+            (Action)(() => CompilerSourceLocationAuthority.HasValidLineMap(
+                artifact.Compilation.SyntaxTrees.Single(),
+                cancellation.Token)));
+    }
+
+    [Test]
+    public void LineMapValidationRejectsNoncanonicalSourceLength()
+    {
+        var artifact = CreateArtifact("class Subject {}\nclass Other {}\n");
+        var tree = artifact.Compilation.SyntaxTrees.Single();
+        tree.LineMap[0].SourceLength++;
+        tree.LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(tree.LineMap);
+
+        Assert.That(
+            CompilerSourceLocationAuthority.HasValidLineMap(tree),
+            Is.False);
+    }
+
+    [Test]
     public void ProducerBindsCompilerDiagnosticsToPhysicalTreeAndLineMap()
     {
         var artifact = CreateArtifact(
@@ -131,6 +159,60 @@ public sealed class CompilerSourceLocationAuthorityTests
             CompilerSourceLocationAuthority.HasValidLocationGeometry(
                 exactEnd,
                 tree),
+            Is.True);
+    }
+
+    [Test]
+    public void LineMapPreservesEnhancedDirectiveCharacterOffsets()
+    {
+        const string source =
+            "internal static class Subject { static void M() {\n" +
+            "#line (5,3)-(5,17) 11 \"template.dsl\"\n" +
+            "output.Add(Greet(\"Hello\"));\n" +
+            "#line default\n" +
+            "} }\n";
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "EnhancedLineDirective.g.cs"));
+        var token = tree.GetRoot().DescendantTokens()
+            .Single(static candidate => candidate.ValueText == "Greet");
+        var expected = tree.GetMappedLineSpan(token.Span);
+        var snapshot = CompilerCompilationCapture.CaptureTree(
+            tree,
+            CancellationToken.None);
+
+        Assert.That(
+            CompilerSourceLocationAuthority.TryMap(
+                snapshot.LineMap,
+                token.SpanStart,
+                out var mappedPath,
+                out var mappedLine,
+                out var mappedColumn),
+            Is.True);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(mappedPath, Is.EqualTo(expected.Path));
+            Assert.That(mappedLine, Is.EqualTo(expected.StartLinePosition.Line));
+            Assert.That(mappedColumn, Is.EqualTo(expected.StartLinePosition.Character));
+        }
+
+        var artifact = CreateArtifact(source);
+        var mappedDiagnostics = artifact.CompilerDiagnostics
+            .Where(static diagnostic => diagnostic.Location.Path == "template.dsl")
+            .ToArray();
+        Assert.That(mappedDiagnostics, Is.Not.Empty);
+        Assert.That(
+            mappedDiagnostics.All(diagnostic =>
+                CompilerSourceLocationAuthority.IsBound(
+                    diagnostic.Location,
+                    diagnostic.SourceTreeOrdinal,
+                    diagnostic.SourceTreePath,
+                    diagnostic.SourceTreeSha256,
+                    diagnostic.SourceLineMapSha256,
+                    artifact.Compilation)),
             Is.True);
     }
 
@@ -295,18 +377,6 @@ public sealed class CompilerSourceLocationAuthorityTests
         string source,
         bool includeContractReference)
     {
-        var paths = ((string)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Where(path => includeContractReference ||
-                string.Equals(
-                    path,
-                    typeof(object).Assembly.Location,
-                    StringComparison.OrdinalIgnoreCase))
-            .Append(includeContractReference
-                ? typeof(Contract).Assembly.Location
-                : typeof(object).Assembly.Location)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
         return CSharpCompilation.Create(
             "CompilerSourceLocationAuthorityTest",
             [CSharpSyntaxTree.ParseText(
@@ -315,7 +385,9 @@ public sealed class CompilerSourceLocationAuthorityTests
                 Path.Combine(
                     TestContext.CurrentContext.WorkDirectory,
                     "SourceAuthoritySubject.cs"))],
-            paths.Select(static path => MetadataReference.CreateFromFile(path)),
+            includeContractReference
+                ? WorkerTestMetadataReferences.WithSharpProof
+                : WorkerTestMetadataReferences.CoreLibraryOnly,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 }

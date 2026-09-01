@@ -1,13 +1,33 @@
+using System.Collections.Concurrent;
+
 namespace SharpProof.Worker;
 
 internal sealed partial class VerificationCache(string directory, long maximumBytes)
 {
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim>
+        ProcessLocks = new(StringComparer.Ordinal);
     private readonly string _directory = Path.GetFullPath(
         ArgumentNullGuard.NotNull(directory, nameof(directory)));
     private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
         maximumBytes, nameof(maximumBytes));
+    private static readonly Comparer<(
+        DateTime LastWriteTimeUtc,
+        string Name)> CapacityPriorityComparer = Comparer<(
+            DateTime LastWriteTimeUtc,
+            string Name)>.Create(static (left, right) =>
+            {
+                var timeComparison = left.LastWriteTimeUtc.CompareTo(
+                    right.LastWriteTimeUtc);
+                return timeComparison != 0
+                    ? timeComparison
+                    : StringComparer.Ordinal.Compare(left.Name, right.Name);
+            });
     internal static Action<string, string>? PathValidationOverride;
     internal static Action? TransactionRollbackOverride;
+    // Set for the most recent read so the worker can distinguish an
+    // operational cache failure from an ordinary miss. Each cache instance
+    // is scoped to one worker request.
+    internal bool LastReadUnavailable { get; private set; }
 
     internal async Task<WorkerVerifyResponse?> TryReadAsync(
         string inputHash,
@@ -16,14 +36,25 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         WorkerBudgets budgets,
         CancellationToken cancellationToken)
     {
+        LastReadUnavailable = false;
         var path = GetPath(inputHash);
         var staged = new List<StagedEntry>();
         var committed = false;
-        FileStream? cacheLock = null;
+        CacheLock? cacheLock = null;
         try
         {
             cacheLock = AcquireLock(_directory);
+            RecoverInterruptedTransactions(cancellationToken);
             ValidatePath(path);
+            if (!File.Exists(path))
+            {
+                if (TryStageCapacity(path, staged, cancellationToken))
+                {
+                    committed = true;
+                    DiscardStaged(staged);
+                }
+                return null;
+            }
             var file = new FileInfo(path);
             if (file.Length > Math.Min(
                     _maximumBytes,
@@ -90,8 +121,26 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         }
         catch (Exception exception) when (exception is
             ArgumentException or JsonException or IOException or InvalidDataException or
-                UnauthorizedAccessException)
+                UnauthorizedAccessException or OverflowException)
         {
+            // A miss is still a cache maintenance opportunity. In
+            // particular, a cache opened with a newly reduced limit must not
+            // retain stale entries merely because the requested key is absent
+            // or malformed.
+            try
+            {
+                if (TryStageCapacity(path, staged, cancellationToken))
+                {
+                    committed = true;
+                    DiscardStaged(staged);
+                }
+            }
+            catch (Exception maintenanceException) when (maintenanceException is
+                ArgumentException or IOException or UnauthorizedAccessException or
+                OverflowException)
+            {
+            }
+            LastReadUnavailable = true;
             return null;
         }
         finally
@@ -114,7 +163,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             {
                 if (cacheLock != null)
                 {
-                    await cacheLock.DisposeAsync().ConfigureAwait(false);
+                    cacheLock.Dispose();
                 }
             }
         }
@@ -129,10 +178,11 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         string? path = null;
         var published = false;
         var committed = false;
-        FileStream? cacheLock = null;
+        CacheLock? cacheLock = null;
         try
         {
             cacheLock = AcquireLock(_directory);
+            RecoverInterruptedTransactions(cancellationToken);
             var payload = JsonSerializer.Serialize(new CachePayload(
                 manifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
             var envelope = new CacheEnvelope(WorkerCacheVersions.Current,
@@ -203,37 +253,132 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             {
                 if (cacheLock != null)
                 {
-                    await cacheLock.DisposeAsync().ConfigureAwait(false);
+                    cacheLock.Dispose();
                 }
             }
         }
     }
 
-    private static FileStream AcquireLock(string directory)
+    private static CacheLock AcquireLock(string directory)
     {
         var lockPath = Path.Combine(directory, ".sharp-proof-cache.lock");
         ValidatePath(directory, lockPath);
         Directory.CreateDirectory(directory);
         ValidatePath(directory, lockPath);
-        var cacheLock = new FileStream(
-            lockPath,
-            FileMode.OpenOrCreate,
-            FileAccess.ReadWrite,
-            FileShare.None);
+        var lockIdentity = HashText(Path.GetFullPath(directory));
+        var processLock = ProcessLocks.GetOrAdd(
+            lockIdentity,
+            static _ => new SemaphoreSlim(1, 1));
+        if (!processLock.Wait(0))
+        {
+            throw new IOException("The verification cache is locked.");
+        }
+        FileStream? cacheLock = null;
         var ownershipTransferred = false;
         try
         {
+            cacheLock = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             ValidatePath(directory, lockPath);
             ownershipTransferred = true;
-            return cacheLock;
+            return new CacheLock(processLock, cacheLock);
         }
         finally
         {
             if (!ownershipTransferred)
             {
-                cacheLock.Dispose();
+                cacheLock?.Dispose();
+                processLock.Release();
             }
         }
+    }
+
+    private sealed class CacheLock(SemaphoreSlim processLock, FileStream file)
+    {
+        public void Dispose()
+        {
+            file.Dispose();
+            processLock.Release();
+        }
+    }
+
+    private void RecoverInterruptedTransactions(CancellationToken cancellationToken)
+    {
+        foreach (var file in new DirectoryInfo(_directory).EnumerateFiles(
+                     "*", SearchOption.TopDirectoryOnly))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!TryGetOwnedTransactionOriginal(file.Name, out var originalName))
+            {
+                continue;
+            }
+
+            var originalPath = Path.Combine(_directory, originalName);
+            ValidatePath(file.FullName);
+            ValidatePath(originalPath);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (File.Exists(originalPath))
+            {
+                File.Delete(file.FullName);
+            }
+            else
+            {
+                File.Move(file.FullName, originalPath);
+            }
+        }
+    }
+
+    private static bool TryGetOwnedTransactionOriginal(
+        string fileName,
+        out string originalName)
+    {
+        originalName = string.Empty;
+        foreach (var suffix in new[] { ".rollback", ".eviction" })
+        {
+            if (!fileName.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var markerLength = 1 + 32 + suffix.Length;
+            if (fileName.Length <= markerLength)
+            {
+                continue;
+            }
+
+            var markerStart = fileName.Length - markerLength;
+            if (fileName[markerStart] != '.' ||
+                !IsHexMarker(fileName, markerStart + 1))
+            {
+                continue;
+            }
+
+            var candidate = fileName[..markerStart];
+            if (IsOwnedCacheEntry(candidate))
+            {
+                originalName = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsHexDigit(char value)
+    {
+        return value is >= '0' and <= '9' or >= 'a' and <= 'f';
+    }
+
+    private static bool IsHexMarker(string value, int start)
+    {
+        for (var index = start; index < start + 32; index++)
+        {
+            if (!IsHexDigit(value[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private bool TryStageCapacity(
@@ -242,46 +387,56 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var files = new DirectoryInfo(_directory)
-            .EnumerateFiles("*.sharp-proof-cache.json", SearchOption.TopDirectoryOnly)
-            .Where(static file => IsOwnedCacheEntry(file.Name))
-            .OrderBy(static file => file.LastWriteTimeUtc)
-            .ThenBy(static file => file.Name, StringComparer.Ordinal)
-            .ToArray();
+        var files = new PriorityQueue<
+            (FileInfo File, long Length),
+            (DateTime LastWriteTimeUtc, string Name)>(
+                CapacityPriorityComparer);
         long total = 0;
-        foreach (var file in files)
-        {
-            ValidatePath(file.FullName);
-            checked
-            {
-                total += file.Length;
-            }
-        }
-        foreach (var file in files)
+        foreach (var file in new DirectoryInfo(_directory).EnumerateFiles(
+                     "*.sharp-proof-cache.json",
+                     SearchOption.TopDirectoryOnly))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (total <= _maximumBytes)
+            if (!IsOwnedCacheEntry(file.Name))
             {
-                break;
+                continue;
             }
+
+            ValidatePath(file.FullName);
+            cancellationToken.ThrowIfCancellationRequested();
+            var priority = (file.LastWriteTimeUtc, file.Name);
+            var length = file.Length;
+            checked
+            {
+                total += length;
+            }
+            files.Enqueue((file, length), priority);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        while (total > _maximumBytes &&
+               files.TryDequeue(out var entry, out _))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.Equals(
-                    file.FullName,
+                    entry.File.FullName,
                     protectedPath,
                     StringComparison.Ordinal))
             {
                 continue;
             }
 
-            ValidatePath(file.FullName);
-            var length = file.Length;
-            var stagedPath = file.FullName + "." +
+            ValidatePath(entry.File.FullName);
+            cancellationToken.ThrowIfCancellationRequested();
+            var stagedPath = entry.File.FullName + "." +
                 Guid.NewGuid().ToString("N") + ".eviction";
             ValidatePath(stagedPath);
-            File.Move(file.FullName, stagedPath);
-            staged.Add(new StagedEntry(file.FullName, stagedPath));
-            total -= length;
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(entry.File.FullName, stagedPath);
+            staged.Add(new StagedEntry(entry.File.FullName, stagedPath));
+            total -= entry.Length;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return total <= _maximumBytes;
     }
 
@@ -515,9 +670,17 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                          CompilerVariableRole.Parameter))
         {
             var type = target.Factory.GetVariableInfo(variable.Variable).Type;
-            if ((type != target.Factory.BooleanType &&
-                 type != target.Factory.IntegerType) ||
-                !result.ContainsKey(variable.Variable))
+            // Replay models intentionally contain only values needed by the
+            // counterexample. Non-scalar inputs cannot be materialized by the
+            // scalar model codec, but that is harmless when the replay does
+            // not reference them. Scalar inputs remain mandatory so missing
+            // values cannot be mistaken for a concrete execution.
+            if (type != target.Factory.BooleanType &&
+                type != target.Factory.IntegerType)
+            {
+                continue;
+            }
+            if (!result.ContainsKey(variable.Variable))
             {
                 return false;
             }

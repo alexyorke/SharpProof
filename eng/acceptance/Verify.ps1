@@ -192,7 +192,7 @@ function Write-AcceptanceTimingEvidence {
     [pscustomobject]@{
         schemaVersion = 1
         command = 'acceptance'
-        configuration = $Configuration
+        configuration = $Configuration.ToLowerInvariant()
         commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
         startedUtc = $timingStartedUtc.ToString('o')
         completedUtc = $timingCompletedUtc.ToString('o')
@@ -213,6 +213,22 @@ trap {
         -Status failed `
         -Failure $_.Exception.Message
     throw
+}
+
+function Invoke-SharpProofDotnet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [int]$TimeoutSeconds = 300
+    )
+
+    & $wrapperPath `
+        -TimeoutSeconds $TimeoutSeconds `
+        @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    }
 }
 
 Start-AcceptanceTimingPhase -Name 'restore'
@@ -353,22 +369,6 @@ function Get-MsBuildDefault {
     return $nodes[0].InnerText
 }
 
-function Invoke-SharpProofDotnet {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$Arguments,
-
-        [int]$TimeoutSeconds = 300
-    )
-
-    & $wrapperPath `
-        -TimeoutSeconds $TimeoutSeconds `
-        @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
-}
-
 function Assert-RepositoryPaths {
     param(
         [Parameter(Mandatory = $true)]
@@ -416,11 +416,8 @@ function Measure-RepositoryCSharpSyntax {
     )
 
     Assert-RepositoryPaths -Paths $Paths -Scope $Scope
-    $syntaxTokens = 0
-    $syntaxNodes = 0
     $expressionNodes = 0
     $decisionPoints = 0
-    $members = 0
     foreach ($untypedRelativePath in $Paths) {
         $relativePath = [string]$untypedRelativePath
         if (-not $relativePath.EndsWith(
@@ -440,18 +437,12 @@ function Measure-RepositoryCSharpSyntax {
             $parseOptions = New-SharpProofCSharpParseOptions -LanguageVersion ([string]$optionMatches[0].parseOptions.languageVersion) -PreprocessorSymbols @($optionMatches[0].parseOptions.preprocessorSymbols | ForEach-Object { [string]$_ })
         }
         $metrics = Measure-CSharpSourceText -Source (Get-Content -LiteralPath $fullPath -Raw) -Path $relativePath -ParseOptions $parseOptions
-        $syntaxTokens += $metrics.syntaxTokens
-        $syntaxNodes += $metrics.syntaxNodes
         $expressionNodes += $metrics.expressionNodes
         $decisionPoints += $metrics.decisionPoints
-        $members += $metrics.members
     }
     return [pscustomobject]@{
-        syntaxTokens = $syntaxTokens
-        syntaxNodes = $syntaxNodes
         expressionNodes = $expressionNodes
         decisionPoints = $decisionPoints
-        members = $members
     }
 }
 
@@ -467,6 +458,7 @@ Assert-Equal $contract.analyzer.diagnosticsEnabledByDefault $true 'analyzer.diag
 Assert-Equal $contract.analyzer.unsupportedUnannotatedCallableBehavior 'silent' 'analyzer.unsupportedUnannotatedCallableBehavior'
 Assert-Equal $contract.analyzer.unsupportedSelectedCallableDiagnostic 'SP0047' 'analyzer.unsupportedSelectedCallableDiagnostic'
 Assert-Equal $contract.automation.solutionBuildWallSeconds 600 'automation.solutionBuildWallSeconds'
+Assert-Equal $contract.automation.packageTestCpuPercent 75 'automation.packageTestCpuPercent'
 Assert-Equal $contract.mutationEvidence.schemaVersion 1 'mutationEvidence.schemaVersion'
 if ([int]$contract.mutationEvidence.expectedCatalogCount -le 0) {
     throw 'mutationEvidence.expectedCatalogCount must be positive.'
@@ -502,7 +494,7 @@ Assert-Equal `
 Assert-Equal ($contract.supportedTargetFrameworks -join ',') 'netstandard2.0,net8.0,net472' 'supportedTargetFrameworks'
 Assert-Equal $contract.worker.protocolVersion 11 'worker.protocolVersion'
 Assert-Equal $contract.worker.manifestSchemaVersion 4 'worker.manifestSchemaVersion'
-Assert-Equal $contract.worker.compilerArtifactSchemaVersion 15 'worker.compilerArtifactSchemaVersion'
+Assert-Equal $contract.worker.compilerArtifactSchemaVersion 18 'worker.compilerArtifactSchemaVersion'
 Assert-Equal $contract.worker.maximumCompilerReferenceModuleBytes 268435456 'worker.maximumCompilerReferenceModuleBytes'
 Assert-Equal $contract.worker.maximumCompilerReferenceClosureBytes 1073741824 'worker.maximumCompilerReferenceClosureBytes'
 Assert-Equal $contract.worker.maximumCompilerReferenceModules 4096 'worker.maximumCompilerReferenceModules'

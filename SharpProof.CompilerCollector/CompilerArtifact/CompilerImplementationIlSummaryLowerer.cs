@@ -257,6 +257,10 @@ internal static class CompilerImplementationIlSummaryLowerer
         out ModuleMetadata module,
         out string modulePath)
     {
+        var found = false;
+        PortableExecutableReference foundReference = null!;
+        ModuleMetadata foundModule = null!;
+        var foundPath = string.Empty;
         foreach (var candidate in compilation.References
                      .OfType<PortableExecutableReference>())
         {
@@ -286,15 +290,32 @@ internal static class CompilerImplementationIlSummaryLowerer
                     continue;
                 }
 
-                reference = candidate;
-                module = current;
-                modulePath = index == 0
+                var candidatePath = index == 0
                     ? Path.GetFullPath(candidate.FilePath)
                     : CompilerCompilationCapture.ResolveSiblingModule(
                         candidate.FilePath,
                         name);
-                return true;
+                if (found)
+                {
+                    reference = null!;
+                    module = null!;
+                    modulePath = string.Empty;
+                    return false;
+                }
+
+                found = true;
+                foundReference = candidate;
+                foundModule = current;
+                foundPath = candidatePath;
             }
+        }
+
+        if (found)
+        {
+            reference = foundReference;
+            module = foundModule;
+            modulePath = foundPath;
+            return true;
         }
 
         reference = null!;
@@ -482,6 +503,13 @@ internal static class CompilerImplementationIlSummaryLowerer
             }
 
             var leaderArray = leaders.ToArray();
+            // Instructions are already decoded in offset order.  Keep an
+            // offset-to-index map so each basic block can walk its contiguous
+            // slice once instead of filtering the complete instruction list.
+            var instructionIndexes = instructions
+                .Select((instruction, index) =>
+                    new KeyValuePair<int, int>(instruction.Offset, index))
+                .ToDictionary(static pair => pair.Key, static pair => pair.Value);
             for (var blockIndex = 0;
                  blockIndex < leaderArray.Length;
                  blockIndex++)
@@ -506,9 +534,12 @@ internal static class CompilerImplementationIlSummaryLowerer
                 }
 
                 var terminated = false;
-                foreach (var instruction in instructions.Where(item =>
-                             item.Offset >= start && item.Offset < end))
+                var instructionIndex = instructionIndexes[start];
+                for (; instructionIndex < instructions.Length &&
+                       instructions[instructionIndex].Offset < end;
+                     instructionIndex++)
                 {
+                    var instruction = instructions[instructionIndex];
                     if (!ExecuteInstruction(
                             instruction,
                             block,
@@ -518,6 +549,11 @@ internal static class CompilerImplementationIlSummaryLowerer
                             stack,
                             builder,
                             out terminated))
+                    {
+                        return null;
+                    }
+
+                    if (stack.Count > _body.MaxStack)
                     {
                         return null;
                     }
@@ -891,9 +927,13 @@ internal static class CompilerImplementationIlSummaryLowerer
                     opCode,
                     operand,
                     nextOffset);
+                // A malformed image can encode a displacement whose checked
+                // addition overflows Int32. Treat that exactly like any other
+                // invalid branch target so collection remains fail-closed.
                 if (instruction.IsBranch &&
-                    (instruction.BranchTarget < 0 ||
-                     instruction.BranchTarget >= reader.Length))
+                    (!TryGetBranchTarget(instruction, out var branchTarget) ||
+                     branchTarget < 0 ||
+                     branchTarget >= reader.Length))
                 {
                     instructions = [];
                     return false;
@@ -904,6 +944,22 @@ internal static class CompilerImplementationIlSummaryLowerer
 
             instructions = result.ToImmutable();
             return !instructions.IsEmpty;
+        }
+
+        private static bool TryGetBranchTarget(
+            DecodedInstruction instruction,
+            out int target)
+        {
+            try
+            {
+                target = instruction.BranchTarget;
+                return true;
+            }
+            catch (OverflowException)
+            {
+                target = -1;
+                return false;
+            }
         }
 
         private bool TryDecodeLocals(
@@ -917,6 +973,24 @@ internal static class CompilerImplementationIlSummaryLowerer
 
             var signature = _reader.GetStandaloneSignature(
                 _body.LocalSignature);
+            var signatureReader = _reader.GetBlobReader(
+                signature.Signature);
+            if (signatureReader.ReadSignatureHeader().Kind !=
+                SignatureKind.LocalVariables)
+            {
+                locals = [];
+                return false;
+            }
+
+            if (signatureReader.ReadCompressedInteger() >
+                IrRelationalSummaryBuildLimits.Default.MaximumInstructions)
+            {
+                FailureReason = CompilerImplementationIlAbstentionReason
+                    .SummaryResourceLimit;
+                locals = [];
+                return false;
+            }
+
             locals = signature.DecodeLocalSignature(
                 new ScalarSignatureTypeProvider(_factory),
                 genericContext: null);
@@ -977,9 +1051,10 @@ internal static class CompilerImplementationIlSummaryLowerer
 
             var terms = arguments.Select(static value => value.Term)
                 .ToArray();
+            IrTerm? receiver = null;
             var member = _mapper.GetMember(
                 target,
-                receiver: null,
+                ref receiver,
                 "call:",
                 target.ReturnType,
                 terms);

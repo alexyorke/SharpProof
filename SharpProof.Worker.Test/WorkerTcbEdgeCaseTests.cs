@@ -19,6 +19,43 @@ namespace SharpProof.Worker.Test;
 public sealed class WorkerTcbEdgeCaseTests
 {
     [Test]
+    public async Task OrdinaryCacheMissReconcilesReducedCapacity()
+    {
+        var directory = Directory.CreateTempSubdirectory(
+            "sharpproof-cache-miss-capacity-");
+        try
+        {
+            var oldest = Path.Combine(
+            directory.FullName,
+            new string('a', 64) + ".sharp-proof-cache.json");
+            var newest = Path.Combine(
+            directory.FullName,
+            new string('b', 64) + ".sharp-proof-cache.json");
+            await File.WriteAllTextAsync(oldest, new string('x', 100));
+            await File.WriteAllTextAsync(newest, new string('y', 100));
+            File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddMinutes(-1));
+            File.SetLastWriteTimeUtc(newest, DateTime.UtcNow);
+
+            var cache = new VerificationCache(directory.FullName, 150);
+            var result = await cache.TryReadAsync(
+            new string('c', 64),
+            new WorkerClaimManifest { Claims = [] },
+            [],
+            new WorkerBudgets(),
+            CancellationToken.None);
+
+            Assert.That(result, Is.Null);
+            Assert.That(
+                Directory.GetFiles(directory.FullName, "*.sharp-proof-cache.json"),
+                Is.EqualTo(new[] { newest }));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public void SymbolicLinkIsRejectedBeforeTraversal()
     {
         if (!OperatingSystem.IsLinux())
@@ -375,6 +412,42 @@ public sealed class WorkerTcbEdgeCaseTests
     }
 
     [Test]
+    public async Task SemanticPreconditionContradictionShortCircuitsUnsupportedBody()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.IntegerType);
+        var variable = factory.Variable(value);
+        var target = CreateTarget(
+            factory,
+            [
+                Requires(factory.Binary(
+                    IrBinaryOperator.GreaterThan,
+                    variable,
+                    factory.Integer(0))),
+                Requires(factory.Binary(
+                    IrBinaryOperator.LessThan,
+                    variable,
+                    factory.Integer(0))),
+                Ensures(factory.Boolean(false))
+            ],
+            [Parameter(value)],
+            body: null);
+
+        var result = await VerifyWithSmtAsync(target);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                result.Vacuity,
+                Is.EqualTo(
+                    WorkerVacuityKind.ContradictoryPreconditions));
+            Assert.That(result.ProofCore, Is.Not.Empty);
+        }
+    }
+
+    [Test]
     public async Task ResultSourceDomainCannotCreatePreconditionVacuity()
     {
         var factory = new IrFactory();
@@ -659,6 +732,43 @@ public sealed class WorkerTcbEdgeCaseTests
         {
             Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
             Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.MalformedBackendResult));
+        }
+    }
+
+    [Test]
+    public void ClaimAssumptionsDoNotAliasManifestOrSiblingEvidence()
+    {
+        var target = CreateTrivialTarget();
+        target.Entry.Assumptions =
+        [
+            new WorkerAssumptionEvidence
+            {
+                Id = "assumption",
+                Kind = WorkerAssumptionKind.UserAssume
+            }
+        ];
+        var first = CallableClaimResultAssembler.Unknown(
+            target,
+            0,
+            WorkerClaimReason.UnsupportedExpression);
+        var sibling = CallableClaimResultAssembler.Unknown(
+            target,
+            0,
+            WorkerClaimReason.UnsupportedExpression);
+
+        first.Assumptions[0].Id = "mutated";
+        first.Assumptions[0].Used = true;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                first.Assumptions[0],
+                Is.Not.SameAs(target.Entry.Assumptions[0]));
+            Assert.That(first.Assumptions[0], Is.Not.SameAs(sibling.Assumptions[0]));
+            Assert.That(target.Entry.Assumptions[0].Id, Is.EqualTo("assumption"));
+            Assert.That(target.Entry.Assumptions[0].Used, Is.False);
+            Assert.That(sibling.Assumptions[0].Id, Is.EqualTo("assumption"));
+            Assert.That(sibling.Assumptions[0].Used, Is.False);
         }
     }
 
@@ -1052,6 +1162,67 @@ public sealed class WorkerTcbEdgeCaseTests
             Assert.That(
                 Directory.GetFiles(directory, "*.sharp-proof-cache.json"),
                 Is.Empty);
+        }
+        finally
+        {
+            VerificationCache.PathValidationOverride = null;
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void CacheCapacityScanStopsAfterCancellation()
+    {
+        const string suffix = ".sharp-proof-cache.json";
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "worker-cache-capacity-cancel-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            for (var index = 0; index < 32; index++)
+            {
+                File.WriteAllText(
+                    Path.Combine(
+                        directory,
+                        index.ToString("x64", CultureInfo.InvariantCulture) + suffix),
+                    "entry");
+            }
+
+            var inputHash = new string('f', 64);
+            var publishedPath = Path.Combine(directory, inputHash + suffix);
+            var validatedEntries = 0;
+            VerificationCache.PathValidationOverride = (_, candidate) =>
+            {
+                if (!candidate.EndsWith(suffix, StringComparison.Ordinal) ||
+                    string.Equals(
+                        candidate,
+                        publishedPath,
+                        StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                if (Interlocked.Increment(ref validatedEntries) == 1)
+                {
+                    cancellation.Cancel();
+                }
+            };
+            var manifest = new WorkerClaimManifest();
+            WorkerProtocolJson.SealManifest(manifest);
+            var cache = new VerificationCache(directory, 1024 * 1024);
+
+            Func<Task> write = async () =>
+            {
+                await cache.TryWriteAsync(
+                    new WorkerVerifyResponse(),
+                    inputHash,
+                    manifest,
+                    cancellation.Token);
+            };
+            Assert.ThrowsAsync<OperationCanceledException>(write);
+            Assert.That(validatedEntries, Is.EqualTo(1));
         }
         finally
         {

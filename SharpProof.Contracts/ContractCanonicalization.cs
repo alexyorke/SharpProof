@@ -11,65 +11,79 @@ internal sealed class ContractCanonicalization(
     internal Func<ITypeSymbol?, ITypeSymbol?> CreateTypeSpecializer(
         IMethodSymbol source)
     {
-        var substitutions = new Dictionary<ITypeParameterSymbol, ITypeSymbol>(
-            SymbolEqualityComparer.Default);
-        var signatureTypes = new Dictionary<ITypeSymbol, ITypeSymbol>(
-            SymbolEqualityComparer.IncludeNullability);
-        AddParameters(
-            source.OriginalDefinition.TypeParameters,
-            source.TypeArguments);
-        for (var type = source.ContainingType;
-             type != null;
-             type = type.ContainingType)
+        return new TypeSpecializer(_compilation, source).Specialize;
+    }
+
+    // Keep recursive specialization in an object instead of captured local
+    // functions. CA1508 otherwise builds a pathological dataflow graph for
+    // this code during every qualifying compilation.
+    private sealed class TypeSpecializer
+    {
+        private readonly Compilation _compilation;
+        private readonly Dictionary<ITypeParameterSymbol, ITypeSymbol>
+            _substitutions = new(SymbolEqualityComparer.Default);
+        private readonly Dictionary<ITypeSymbol, ITypeSymbol> _signatureTypes =
+            new(SymbolEqualityComparer.IncludeNullability);
+
+        internal TypeSpecializer(
+            Compilation compilation,
+            IMethodSymbol source)
         {
+            _compilation = compilation;
             AddParameters(
-                type.OriginalDefinition.TypeParameters,
-                type.TypeArguments);
-        }
-        AddSignatureType(
-            source.OriginalDefinition.ReturnType,
-            source.ReturnType);
-        for (var index = 0; index < source.Parameters.Length; index++)
-        {
-            AddSignatureType(
-                source.OriginalDefinition.Parameters[index].Type,
-                source.Parameters[index].Type);
-        }
-        var partialCounterpart =
-            source.OriginalDefinition.PartialImplementationPart ??
-            source.OriginalDefinition.PartialDefinitionPart;
-        if (partialCounterpart != null)
-        {
-            AddParameters(
-                partialCounterpart.TypeParameters,
+                source.OriginalDefinition.TypeParameters,
                 source.TypeArguments);
+            for (var type = source.ContainingType;
+                 type != null;
+                 type = type.ContainingType)
+            {
+                AddParameters(
+                    type.OriginalDefinition.TypeParameters,
+                    type.TypeArguments);
+            }
             AddSignatureType(
-                partialCounterpart.ReturnType,
+                source.OriginalDefinition.ReturnType,
                 source.ReturnType);
             for (var index = 0; index < source.Parameters.Length; index++)
             {
                 AddSignatureType(
-                    partialCounterpart.Parameters[index].Type,
+                    source.OriginalDefinition.Parameters[index].Type,
                     source.Parameters[index].Type);
+            }
+            var partialCounterpart =
+                source.OriginalDefinition.PartialImplementationPart ??
+                source.OriginalDefinition.PartialDefinitionPart;
+            if (partialCounterpart != null)
+            {
+                AddParameters(
+                    partialCounterpart.TypeParameters,
+                    source.TypeArguments);
+                AddSignatureType(
+                    partialCounterpart.ReturnType,
+                    source.ReturnType);
+                for (var index = 0; index < source.Parameters.Length; index++)
+                {
+                    AddSignatureType(
+                        partialCounterpart.Parameters[index].Type,
+                        source.Parameters[index].Type);
+                }
             }
         }
 
-        return Specialize;
-
-        ITypeSymbol? Specialize(ITypeSymbol? type)
+        internal ITypeSymbol? Specialize(ITypeSymbol? type)
         {
             if (type == null)
             {
                 return null;
             }
 
-            if (signatureTypes.TryGetValue(type, out var signatureType))
+            if (_signatureTypes.TryGetValue(type, out var signatureType))
             {
                 return signatureType;
             }
 
             if (type is ITypeParameterSymbol parameter &&
-                substitutions.TryGetValue(parameter, out var replacement))
+                _substitutions.TryGetValue(parameter, out var replacement))
             {
                 return type.NullableAnnotation == NullableAnnotation.Annotated
                     ? replacement.WithNullableAnnotation(
@@ -189,25 +203,25 @@ internal sealed class ContractCanonicalization(
             }
         }
 
-        void AddParameters(
+        private void AddParameters(
             ImmutableArray<ITypeParameterSymbol> parameters,
             ImmutableArray<ITypeSymbol> arguments)
         {
             for (var index = 0; index < parameters.Length; index++)
             {
-                substitutions[parameters[index]] = arguments[index];
+                _substitutions[parameters[index]] = arguments[index];
             }
         }
 
-        void AddSignatureType(
+        private void AddSignatureType(
             ITypeSymbol original,
             ITypeSymbol constructed)
         {
-            if (signatureTypes.ContainsKey(original))
+            if (_signatureTypes.ContainsKey(original))
             {
                 return;
             }
-            signatureTypes.Add(original, constructed);
+            _signatureTypes.Add(original, constructed);
 
             switch (original, constructed)
             {
@@ -239,12 +253,11 @@ internal sealed class ContractCanonicalization(
                     break;
                 case (INamedTypeSymbol originalNamed,
                       INamedTypeSymbol constructedNamed):
-                    if (originalNamed.ContainingType != null &&
-                        constructedNamed.ContainingType != null)
+                    if (originalNamed.ContainingType is { } originalContaining)
                     {
                         AddSignatureType(
-                            originalNamed.ContainingType,
-                            constructedNamed.ContainingType);
+                            originalContaining,
+                            constructedNamed.ContainingType!);
                     }
                     for (var index = 0;
                          index < originalNamed.TypeArguments.Length;

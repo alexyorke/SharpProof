@@ -163,7 +163,10 @@ public sealed class ArchitectureTests
                 "SharpProof.Specs"
             ],
             ["SharpProof.Attributes"] = [],
-            ["SharpProof.BuildTasks"] = ["SharpProof.Host"],
+            ["SharpProof.BuildTasks"] = [
+                "SharpProof.Host",
+                "SharpProof.Worker.Protocol"
+            ],
             ["SharpProof.Host"] = [],
             ["SharpProof.Ir"] = [],
             ["SharpProof.Meta.Analyzers"] = [],
@@ -1216,13 +1219,19 @@ public sealed class ArchitectureTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(container.GetProperty("defaultCpuCount").GetInt32(),
-                Is.EqualTo(16));
+            Assert.That(container.GetProperty("defaultCpuLimit").GetInt32(),
+                Is.Zero);
             Assert.That(container.GetProperty("defaultMemoryMiB").GetInt32(),
                 Is.EqualTo(40 * 1024));
             Assert.That(
                 automation.GetProperty("testProjectCpuDivisor").GetInt32(),
                 Is.EqualTo(2));
+            Assert.That(
+                automation.GetProperty("packageTestCpuPercent").GetInt32(),
+                Is.EqualTo(75));
+            Assert.That(
+                automation.GetProperty("buildCpuPercent").GetInt32(),
+                Is.EqualTo(75));
             Assert.That(
                 automation.GetProperty("mutationParallelism").GetInt32(),
                 Is.EqualTo(4));
@@ -1235,8 +1244,12 @@ public sealed class ArchitectureTests
                     .EnumerateObject()
                     .Select(static property => property.Value.GetInt32()),
                 Is.All.Positive);
-            Assert.That(compose, Does.Contain("CPU_LIMIT:-16"));
+            Assert.That(compose, Does.Contain("CPU_LIMIT:-0"));
             Assert.That(compose, Does.Contain("MEMORY_LIMIT:-40g"));
+            Assert.That(
+                compose,
+                Does.Contain("SHARPPROOF_TEST_PROJECT_PARALLELISM"));
+            Assert.That(compose, Does.Contain("SHARPPROOF_TMPFS_SIZE"));
             Assert.That(execution, Does.Contain("Environment]::ProcessorCount"));
             Assert.That(
                 execution,
@@ -1264,6 +1277,19 @@ public sealed class ArchitectureTests
             Assert.That(
                 packageTests,
                 Does.Contain("workerMethods = $workerMethodTimings"));
+            Assert.That(
+                packageTests,
+                Does.Contain(
+                    "$directVstest = -not $coverageEnabled -and"));
+            Assert.That(
+                packageTests,
+                Does.Contain("'/TestCaseFilter:' + $shard.Filter"));
+            Assert.That(
+                packageTests,
+                Does.Contain("'/ResultsDirectory:' + ("));
+            Assert.That(
+                packageTests,
+                Does.Contain("Join-Path $results $shard.Name)"));
             Assert.That(
                 mutationDriver,
                 Does.Contain("Get-SharpProofMutationBaselinePlan"));
@@ -1424,6 +1450,29 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void CanonicalTaskSetupCopiesOnlyWorkingTreeDeltas()
+    {
+        var entrypoint = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "eng",
+            "container",
+            "entrypoint.sh"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                entrypoint,
+                Does.Contain("--binary --full-index --no-ext-diff HEAD"));
+            Assert.That(
+                entrypoint,
+                Does.Contain("--binary --whitespace=nowarn -"));
+            Assert.That(
+                entrypoint,
+                Does.Contain("--others --exclude-standard -z --"));
+        }
+    }
+
+    [Test]
     public void RepositoryMsBuildEntryPointsRejectHostExecution()
     {
         var targets = File.ReadAllText(Path.Combine(
@@ -1459,7 +1508,7 @@ public sealed class ArchitectureTests
             archiveExpansion,
             StringComparison.Ordinal);
         var restore = mutationDriver.IndexOf(
-            "$restoreExit = Invoke-IsolatedDotnet",
+            "$restoreRun = Invoke-IsolatedDotnet",
             archiveExpansion,
             StringComparison.Ordinal);
         var baseline = mutationDriver.IndexOf(
@@ -1573,6 +1622,18 @@ public sealed class ArchitectureTests
                 "NativeLibrary.Load(Z3ImportName);",
                 StringComparison.Ordinal),
             Is.True);
+
+        var handlePublication = host.IndexOf(
+            "Volatile.Write(ref _z3Handle, handle);",
+            StringComparison.Ordinal);
+        var resolverRegistration = host.IndexOf(
+            "NativeLibrary.SetDllImportResolver(",
+            StringComparison.Ordinal);
+        Assert.That(
+            handlePublication >= 0 &&
+            resolverRegistration > handlePublication,
+            Is.True,
+            "The resolver must not become visible before its verified handle is published.");
     }
 
     [Test]
@@ -1660,8 +1721,11 @@ public sealed class ArchitectureTests
         var performanceIndex = containerCommands.IndexOf(
             "scripts/Invoke-SharpProofGateEvidence.ps1",
             StringComparison.Ordinal);
-        var broadTestsIndex = containerCommands.IndexOf(
-            "SharpProof.Dev.Tests.slnf",
+        var semanticTestsIndex = containerCommands.IndexOf(
+            "scripts/Invoke-SharpProofSemanticTests.ps1",
+            StringComparison.Ordinal);
+        var packageTestsIndex = containerCommands.IndexOf(
+            "scripts/Invoke-SharpProofPackageTests.ps1",
             StringComparison.Ordinal);
         using (Assert.EnterMultipleScope())
         {
@@ -1688,8 +1752,9 @@ public sealed class ArchitectureTests
                     "${{ github.run_attempt }}"));
             Assert.That(performanceIndex, Is.GreaterThanOrEqualTo(0));
             Assert.That(
-                broadTestsIndex,
+                semanticTestsIndex,
                 Is.GreaterThan(performanceIndex));
+            Assert.That(packageTestsIndex, Is.GreaterThan(semanticTestsIndex));
         }
 
         Assert.That(
@@ -2332,7 +2397,7 @@ public sealed class ArchitectureTests
                     .And.Contain("$retained.Seeds")
                     .And.Contain("Invoke-FuzzRun")
                     .And.Contain("yyyyMMdd")
-                    .And.Contain("schemaVersion = 3")
+                    .And.Contain("schemaVersion = 4")
                     .And.Contain("commit = $sourceCommit")
                     .And.Contain("rotatingCases = $effectiveRotatingCases")
                     .And.Contain("retainedCasesPerSeed = $effectiveRetainedCases")

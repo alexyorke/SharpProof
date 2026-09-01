@@ -1,4 +1,6 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json.Nodes;
 using NUnit.Framework;
 using SharpProof.Host;
@@ -10,6 +12,49 @@ namespace SharpProof.Worker.Test;
 [NonParallelizable]
 public sealed class ContainerContractTests
 {
+    [Test]
+    public void OpenedContractStreamEnforcesTheActualByteLimit()
+    {
+        var parseOpenedStream = typeof(ContainerContract).GetMethod(
+            "ReadBoundedJson",
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            [typeof(Stream)],
+            modifiers: null);
+        Assert.That(
+            parseOpenedStream,
+            Is.Not.Null,
+            "The size bound must be applied to the opened file descriptor.");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(
+            new string(' ', 16 * 1024) + "{}"));
+
+        var exception = Assert.Throws<TargetInvocationException>(
+            (Action)(() =>
+                _ = parseOpenedStream!.Invoke(null, [stream])));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                exception!.InnerException,
+                Is.TypeOf<InvalidDataException>());
+            Assert.That(
+                exception.InnerException!.Message,
+                Does.Contain("invalid size"));
+        }
+    }
+
+    [Test]
+    public void RequiredContractNormalizesMalformedJsonAsInvalidData()
+    {
+        AssertInvalidContractPayload("{");
+    }
+
+    [Test]
+    public void RequiredContractNormalizesNonObjectJsonAsInvalidData()
+    {
+        AssertInvalidContractPayload("[]");
+    }
+
     [Test]
     public void RequiredContractRejectsMissingAndMalformedMarkers()
     {
@@ -55,6 +100,7 @@ public sealed class ContainerContractTests
                     contract["z3LibraryBytes"]!.GetValue<long>() + 1,
                 contract => contract["platform"] = " ",
                 contract => contract["platform"] = "linux/arm64"
+                ,contract => contract.Remove("dotnetTestRuntimeVersion")
             };
             foreach (var mutate in mutations)
             {
@@ -64,6 +110,13 @@ public sealed class ContainerContractTests
                 Assert.Throws<InvalidDataException>(
                     (Action)(() => ContainerContract.ValidateRequired()));
             }
+
+            File.WriteAllText(
+                candidate,
+                canonicalJson.TrimEnd('}', '\n', '\r') +
+                ",\"unexpected\":true}");
+            Assert.Throws<InvalidDataException>(
+                (Action)(() => ContainerContract.ValidateRequired()));
 
             Environment.SetEnvironmentVariable(
                 "SHARPPROOF_CONTAINER_CONTRACT",
@@ -130,5 +183,40 @@ public sealed class ContainerContractTests
             "SharpProof.ContainerContract." + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static void AssertInvalidContractPayload(string payload)
+    {
+        var originalContainer = Environment.GetEnvironmentVariable(
+            "SHARPPROOF_CONTAINER");
+        var originalContract = Environment.GetEnvironmentVariable(
+            "SHARPPROOF_CONTAINER_CONTRACT");
+        var root = CreateTemporaryDirectory();
+        var candidate = Path.Combine(root, "contract.json");
+
+        try
+        {
+            File.WriteAllText(candidate, payload);
+            Environment.SetEnvironmentVariable("SHARPPROOF_CONTAINER", "1");
+            Environment.SetEnvironmentVariable(
+                "SHARPPROOF_CONTAINER_CONTRACT",
+                candidate);
+
+            var exception = Assert.Throws<InvalidDataException>(
+                (Action)(() => ContainerContract.ValidateRequired()));
+            Assert.That(
+                exception!.Message,
+                Does.StartWith("The SharpProof container contract"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(
+                "SHARPPROOF_CONTAINER",
+                originalContainer);
+            Environment.SetEnvironmentVariable(
+                "SHARPPROOF_CONTAINER_CONTRACT",
+                originalContract);
+            Directory.Delete(root, recursive: true);
+        }
     }
 }

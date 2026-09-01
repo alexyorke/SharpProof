@@ -163,6 +163,22 @@ public sealed class LinuxPublicationSetTests
     }
 
     [Test]
+    public void ResetPublicationSetRemovesOwnedMembersAndMarkers()
+    {
+        using var directory = TemporaryDirectory.Create();
+        var paths = CreatePaths(directory.Path, "reset-sync");
+        using (LinuxPathIdentity.AcquirePublicationSet(
+                   paths, TimeSpan.FromSeconds(1)))
+        {
+        }
+        LinuxPathIdentity.ResetPublicationSet(paths, TimeSpan.FromSeconds(1));
+        Assert.That(paths, Has.All.Matches<string>(path => !File.Exists(path)));
+        Assert.That(
+            paths.Select(LinuxPathIdentity.PublicationMarkerPath),
+            Has.All.Matches<string>(path => !File.Exists(path)));
+    }
+
+    [Test]
     public void SameSetInDifferentOrdersSerializesWithoutDeadlock()
     {
         using var directory = TemporaryDirectory.Create();
@@ -631,6 +647,19 @@ public sealed class LinuxPublicationSetTests
 
         Assert.That(canonical, Is.EqualTo(Path.GetFullPath(result)));
         Assert.That(canonical, Has.Length.GreaterThan(260));
+    }
+
+    [Test]
+    public void RequireLocalPathRejectsUnsupportedVirtualFilesystem()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        Assert.That(
+            (Action)(() => LinuxPathIdentity.RequireLocalPath("/proc")),
+            Throws.ArgumentException);
     }
 
     [Test]

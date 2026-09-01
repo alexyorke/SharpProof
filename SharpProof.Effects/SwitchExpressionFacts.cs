@@ -44,10 +44,92 @@ internal static class SwitchExpressionFacts
         };
     }
 
+    internal static bool IsCompilerIntrinsicListPatternMember(
+        Compilation compilation,
+        IListPatternOperation pattern,
+        IMethodSymbol method)
+    {
+        if (method.DeclaringSyntaxReferences.Length != 0)
+        {
+            return false;
+        }
+
+        return pattern.InputType is IArrayTypeSymbol ||
+            IsCompilerIntrinsicRefLikeMember(compilation, method);
+    }
+
+    internal static bool IsCompilerIntrinsicRefLikeMember(
+        Compilation compilation,
+        IMethodSymbol method)
+    {
+        return method.DeclaringSyntaxReferences.Length == 0 &&
+            (IsRuntimeSpanMember(compilation, method, FrameworkTypeMetadataNames.Span) ||
+             IsRuntimeSpanMember(
+                 compilation,
+                 method,
+                 FrameworkTypeMetadataNames.ReadOnlySpan));
+    }
+
+    private static bool IsRuntimeSpanMember(
+        Compilation compilation,
+        IMethodSymbol method,
+        string metadataName)
+    {
+        var runtimeType = compilation
+            .GetSpecialType(SpecialType.System_Object)
+            .ContainingAssembly
+            .GetTypeByMetadataName(metadataName);
+        if (runtimeType == null ||
+            !SymbolEqualityComparer.Default.Equals(
+                method.ContainingType.OriginalDefinition,
+                runtimeType.OriginalDefinition))
+        {
+            return false;
+        }
+
+        return runtimeType.GetMembers().Any(member => member switch
+        {
+            IMethodSymbol candidate => SymbolEqualityComparer.Default.Equals(
+                method.OriginalDefinition,
+                candidate.OriginalDefinition),
+            IPropertySymbol { GetMethod: { } getter } =>
+                SymbolEqualityComparer.Default.Equals(
+                    method.OriginalDefinition,
+                    getter.OriginalDefinition),
+            _ => false
+        });
+    }
+
     internal static IReadOnlyList<ISwitchExpressionArmOperation> GetReachableArms(
         ISwitchExpressionOperation operation,
         Func<IOperation?, bool> canCompleteNormally,
         bool inputDefinitelyNonNull = false)
+    {
+        return GetArms(
+            operation,
+            canCompleteNormally,
+            inputDefinitelyNonNull,
+            patternOnly: false);
+    }
+
+    internal static IReadOnlyList<ISwitchExpressionArmOperation>
+        GetEvaluatedPatternOnlyArms(
+            ISwitchExpressionOperation operation,
+            Func<IOperation?, bool> canCompleteNormally,
+            bool inputDefinitelyNonNull = false)
+    {
+        return GetArms(
+            operation,
+            canCompleteNormally,
+            inputDefinitelyNonNull,
+            patternOnly: true);
+    }
+
+    private static List<ISwitchExpressionArmOperation> GetArms(
+        ISwitchExpressionOperation operation,
+        Func<IOperation?, bool> canCompleteNormally,
+        bool inputDefinitelyNonNull,
+        bool patternOnly)
     {
         if (!canCompleteNormally(operation.Value))
         {
@@ -59,10 +141,11 @@ internal static class SwitchExpressionFacts
 
         if (operation.Value.ConstantValue is not { HasValue: true } constant)
         {
-            return GetReachableArmsForUnknownValue(
+            return GetArmsForUnknownValue(
                 operation,
                 canCompleteNormally,
-                inputDefinitelyNonNull);
+                inputDefinitelyNonNull,
+                patternOnly);
         }
 
         var reachable = new List<ISwitchExpressionArmOperation>();
@@ -70,7 +153,7 @@ internal static class SwitchExpressionFacts
         {
             var pattern = GetPatternSelection(arm.Pattern, constant.Value);
             var selection = GetArmSelection(arm, constant.Value);
-            if (selection != SwitchExpressionSelection.Never)
+            if (ShouldIncludeArm(selection, patternOnly))
             {
                 reachable.Add(arm);
             }
@@ -88,6 +171,15 @@ internal static class SwitchExpressionFacts
             }
         }
         return reachable;
+    }
+
+    private static bool ShouldIncludeArm(
+        SwitchExpressionSelection selection,
+        bool patternOnly)
+    {
+        return patternOnly
+            ? selection == SwitchExpressionSelection.Never
+            : selection != SwitchExpressionSelection.Never;
     }
 
     internal static bool HasReachableUnmatchedPath(
@@ -171,10 +263,11 @@ internal static class SwitchExpressionFacts
     }
 
     private static List<ISwitchExpressionArmOperation>
-        GetReachableArmsForUnknownValue(
+        GetArmsForUnknownValue(
             ISwitchExpressionOperation operation,
             Func<IOperation?, bool> canCompleteNormally,
-            bool inputDefinitelyNonNull)
+            bool inputDefinitelyNonNull,
+            bool patternOnly)
     {
         var reachable = new List<ISwitchExpressionArmOperation>();
         foreach (var arm in operation.Arms)
@@ -184,7 +277,7 @@ internal static class SwitchExpressionFacts
                 operation.Value.Type,
                 inputDefinitelyNonNull);
             var selection = ApplyGuard(pattern, arm.Guard);
-            if (selection != SwitchExpressionSelection.Never)
+            if (ShouldIncludeArm(selection, patternOnly))
             {
                 reachable.Add(arm);
             }

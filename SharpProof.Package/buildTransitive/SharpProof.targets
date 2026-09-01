@@ -5,6 +5,7 @@
     <_SharpProofContractForGeneratorPath Condition="'$(_SharpProofTestContractForGeneratorPath)' == '' and ('$(_SharpProofContractForGeneratorPath)' == '' or '$(_SharpProofContractForGeneratorPathWasDefault)' == 'true')">$(_SharpProofAnalyzerDirectory)/SharpProof.ContractForGenerator.dll</_SharpProofContractForGeneratorPath>
     <_SharpProofContractForGeneratorPath Condition="'$(_SharpProofTestContractForGeneratorPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestContractForGeneratorPath)'))</_SharpProofContractForGeneratorPath>
     <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
+    <_SharpProofSharedDirectory>$([System.IO.Path]::GetFullPath('$(_SharpProofSharedDirectory)'))</_SharpProofSharedDirectory>
     <_SharpProofCompilerCollectorPathConfigured>$([System.String]::Copy('$(SharpProofCompilerCollectorPath)').Trim())</_SharpProofCompilerCollectorPathConfigured>
     <SharpProofCompilerCollectorPath Condition="'$(_SharpProofCompilerCollectorPathConfigured)' == ''">$(_SharpProofCollectorDirectory)/SharpProof.CompilerCollector.dll</SharpProofCompilerCollectorPath>
     <SharpProofCompilerCollectorPath>$([System.IO.Path]::GetFullPath('$(SharpProofCompilerCollectorPath)'))</SharpProofCompilerCollectorPath>
@@ -64,6 +65,8 @@
   <Target Name="_SharpProofValidateConfiguration"
           BeforeTargets="CoreCompile"
           Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' == ''"
+           Text="SharpProof could not verify the compiler host because NETCoreSdkVersion is unset. SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). Set SharpProofProfile=off to omit the analyzer when the compiler host cannot be verified." />
     <Error Condition="'$(_SharpProofProfileNormalized)' != 'off' AND '$(NETCoreSdkVersion)' != '' AND $([MSBuild]::VersionLessThan('$(NETCoreSdkVersion)', '9.0.300'))"
            Text="SharpProof analysis requires .NET SDK 9.0.300 or newer (Roslyn 4.14 or newer). Set SharpProofProfile=off to omit the analyzer on an older compiler host." />
     <Error Condition="'$(SharpProofMode)' != ''"

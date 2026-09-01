@@ -1,6 +1,8 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.Analyzer.Configuration;
 
@@ -95,6 +97,91 @@ public sealed class AdvisoryActivationTests
     }
 
     [Test]
+    public void AdvisoryTextScanObservesCancellationWithinBoundedReads()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var text = new CancellingSourceText(
+            SourceText.From(new string(' ', 100_000), Encoding.UTF8),
+            cancellation,
+            cancelPosition: 64);
+        var tree = CSharpSyntaxTree.ParseText(
+            text,
+            path: "large-generated.cs");
+        Assert.That(tree.GetText(), Is.SameAs(text));
+        var compilation = AnalyzerTestHost.CreateCompilation(
+                string.Empty,
+                [])
+            .RemoveAllSyntaxTrees()
+            .AddSyntaxTrees(tree);
+        text.Arm();
+
+        Func<Task> analyze = async () =>
+        {
+            _ = await AnalyzerTestHost.AnalyzeAsync(
+                compilation,
+                mode: null,
+                analyzer: new SharpProofAnalyzer(
+                    new RecordingSessionFactory()),
+                cancellationToken: cancellation.Token);
+        };
+
+        Assert.ThrowsAsync<OperationCanceledException>(analyze);
+        Assert.That(
+            text.ReadsAfterCancellation,
+            Is.LessThanOrEqualTo(512));
+    }
+
+    [Test]
+    public async Task EarlyContractCallCannotHideLaterSymbolValidation()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            internal static class EarlyContractCall {
+                internal static void Activate() {
+                    Contract.Requires(true);
+                }
+            }
+
+            public interface IFixture {
+                [return: Positive]
+                int SelectedContract();
+            }
+
+            public abstract class Fixture {
+                [DoesNotThrow]
+                public abstract void SelectedEffect();
+            }
+
+            public static class NativeFixture {
+                [AllowedCapabilities(SharpProofCapability.None)]
+                public static extern int SelectedExtern();
+            }
+            """,
+            ["SP0047"]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factory.CreateCount, Is.EqualTo(1));
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(Enumerable.Repeat("SP0047", 3)));
+            Assert.That(
+                diagnostics.Select(static diagnostic =>
+                    diagnostic.GetMessage(
+                        System.Globalization.CultureInfo.InvariantCulture)),
+                Has.All.Contain("MissingOperationRoot"));
+        }
+    }
+
+    [Test]
     public async Task CompilationReferenceNestedParameterContractActivatesCallAnalysis()
     {
         var external = AnalyzerTestHost.CreateCompilation(
@@ -141,6 +228,92 @@ public sealed class AdvisoryActivationTests
             Assert.That(
                 diagnostics.Select(static diagnostic => diagnostic.Id),
                 Does.Not.Contain("AD0001"));
+        }
+    }
+
+    [Test]
+    public async Task CompilationReferenceRequiresClauseActivatesCallAnalysis()
+    {
+        var external = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            namespace External.Contracts {
+                public static class Guard {
+                    public static void RequirePositive(int value) {
+                        Contract.Requires(value > 0);
+                    }
+                }
+            }
+            """,
+            []);
+        var caller = AnalyzerTestHost.CreateCompilation(
+            """
+            internal static class Caller {
+                internal static void Call() {
+                    External.Contracts.Guard.RequirePositive(-1);
+                }
+            }
+            """,
+            ["SP0027"],
+            [external.ToMetadataReference()]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            caller,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factory.CreateCount, Is.EqualTo(1));
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0027"]));
+        }
+    }
+
+    [Test]
+    public async Task CompilationReferenceAccessorContractActivatesCallAnalysis()
+    {
+        var external = AnalyzerTestHost.CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            namespace External.Contracts {
+                public sealed class Container {
+                    public int Value {
+                        [param: Positive]
+                        set { }
+                    }
+                }
+            }
+            """,
+            []);
+        var caller = AnalyzerTestHost.CreateCompilation(
+            """
+            internal static class Caller {
+                internal static void Call(
+                    External.Contracts.Container value) {
+                    value.Value = -1;
+                }
+            }
+            """,
+            ["SP0027"],
+            [external.ToMetadataReference()]);
+        var factory = new RecordingSessionFactory();
+
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            caller,
+            mode: null,
+            analyzer: new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(factory.CreateCount, Is.EqualTo(1));
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0027"]));
         }
     }
 
@@ -325,6 +498,64 @@ public sealed class AdvisoryActivationTests
                 compilation,
                 configuration,
                 cancellationToken);
+        }
+    }
+
+    private sealed class CancellingSourceText(
+        SourceText inner,
+        CancellationTokenSource cancellation,
+        int cancelPosition) : SourceText
+    {
+        private readonly SourceText _inner = inner;
+        private readonly CancellationTokenSource _cancellation = cancellation;
+        private readonly int _cancelPosition = cancelPosition;
+        private int _armed;
+        private int _cancelledByText;
+        private int _readsAfterCancellation;
+
+        public override Encoding? Encoding => _inner.Encoding;
+
+        public override int Length => _inner.Length;
+
+        public override char this[int position]
+        {
+            get
+            {
+                if (Volatile.Read(ref _armed) != 0 &&
+                    position >= _cancelPosition &&
+                    Interlocked.Exchange(ref _cancelledByText, 1) == 0)
+                {
+                    _cancellation.Cancel();
+                }
+
+                if (Volatile.Read(ref _cancelledByText) != 0)
+                {
+                    Interlocked.Increment(ref _readsAfterCancellation);
+                }
+
+                return _inner[position];
+            }
+        }
+
+        internal int ReadsAfterCancellation =>
+            Volatile.Read(ref _readsAfterCancellation);
+
+        internal void Arm()
+        {
+            Volatile.Write(ref _armed, 1);
+        }
+
+        public override void CopyTo(
+            int sourceIndex,
+            char[] destination,
+            int destinationIndex,
+            int count)
+        {
+            _inner.CopyTo(
+                sourceIndex,
+                destination,
+                destinationIndex,
+                count);
         }
     }
 

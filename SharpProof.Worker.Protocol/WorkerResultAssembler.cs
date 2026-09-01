@@ -22,8 +22,8 @@ internal static class WorkerResultAssembler
             ClaimResults = claims,
             Summary = new WorkerVerificationSummary
             {
-                CallableCount = manifest.Callables.Length,
-                ClaimCount = manifest.Claims.Length,
+                CallableCount = callables.Length,
+                ClaimCount = claims.Length,
                 OutcomeCounts = [.. claims.GroupBy(static claim => claim.Outcome)
                     .Select(static group => new WorkerClaimOutcomeCount { Outcome = group.Key, Count = group.Count() })],
                 ReasonCounts = [.. claims.GroupBy(static claim => claim.Reason)
@@ -32,7 +32,7 @@ internal static class WorkerResultAssembler
                 CacheHit = cacheStatus == WorkerCacheStatus.Hit,
                 CacheStatus = cacheStatus,
                 Versions = versions ?? new WorkerVersionSummary { WorkerVersion = "unavailable", ApiSpecVersion = "unavailable" },
-                Budgets = budgets,
+                Budgets = CloneBudgets(budgets),
                 ElapsedMilliseconds = Math.Max(0, elapsedMilliseconds)
             },
             Errors = errors?.ToArray() ?? []
@@ -41,21 +41,52 @@ internal static class WorkerResultAssembler
         return response;
     }
 
+    private static WorkerBudgets CloneBudgets(WorkerBudgets value)
+    {
+        if (value is null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+
+        return new WorkerBudgets
+        {
+            QueryRlimit = value.QueryRlimit,
+            MethodRlimit = value.MethodRlimit,
+            MethodWallTimeMilliseconds = value.MethodWallTimeMilliseconds,
+            ProjectWallTimeMilliseconds = value.ProjectWallTimeMilliseconds,
+            MaxParallelism = value.MaxParallelism,
+            MaximumExpressionDepth = value.MaximumExpressionDepth
+        };
+    }
+
     internal static WorkerVerifyResponse CreateIncomplete(
         string inputHash, string requestHash, WorkerClaimManifest manifest, WorkerBudgets budgets,
         WorkerRunStatus status, WorkerRunFailureReason failureReason, WorkerCallableCoverageReason callableReason,
         WorkerClaimReason claimReason, IEnumerable<WorkerProtocolError>? errors = null,
         WorkerVersionSummary? versions = null, long elapsedMilliseconds = 0)
     {
+        var callables = (manifest.Callables ?? [])
+            .OfType<WorkerCallableManifestEntry>()
+            .ToArray();
+        var claims = (manifest.Claims ?? [])
+            .OfType<WorkerClaimManifestEntry>()
+            .ToArray();
+        var assumptionsByCallable = callables
+            .Where(static callable =>
+                !string.IsNullOrWhiteSpace(callable.CallableId))
+            .ToLookup(
+                static callable => callable.CallableId,
+                static callable => callable.Assumptions ?? [],
+                StringComparer.Ordinal);
         return Create(inputHash, manifest, status, failureReason,
-            manifest.Callables.Select(callable => new WorkerCallableResult
+            callables.Select(callable => new WorkerCallableResult
             {
                 CallableId = callable.CallableId,
                 Coverage = WorkerCallableCoverage.Incomplete,
                 Reason = callableReason,
-                Assumptions = callable.Assumptions
+                Assumptions = callable.Assumptions ?? []
             }),
-            manifest.Claims.Select(claim => new WorkerClaimResult
+            claims.Select(claim => new WorkerClaimResult
             {
                 ClaimId = claim.ClaimId,
                 Outcome = WorkerClaimOutcome.Unknown,
@@ -66,8 +97,10 @@ internal static class WorkerResultAssembler
                 // This runs on the failure path, where the manifest may already be
                 // malformed. A claim naming an absent callable must not turn a
                 // reported failure into an unhandled exception.
-                Assumptions = manifest.Callables.FirstOrDefault(callable =>
-                    callable.CallableId == claim.CallableId)?.Assumptions ?? []
+                Assumptions = string.IsNullOrWhiteSpace(claim.CallableId)
+                    ? []
+                    : assumptionsByCallable[claim.CallableId]
+                        .FirstOrDefault() ?? []
             }),
             budgets, WorkerCacheStatus.Disabled, elapsedMilliseconds, errors, requestHash, versions);
     }
@@ -118,7 +151,8 @@ internal static class WorkerResultAssembler
                     : claimReasons.Contains(WorkerClaimReason.CounterexampleReplayFailed)
                         ? WorkerRunFailureReason.CounterexampleReplayFailed
                         : WorkerRunFailureReason.None;
-        var failure = claimFailure == WorkerRunFailureReason.BackendUnavailable
+        var failure = claimFailure is WorkerRunFailureReason.BackendUnavailable or
+                WorkerRunFailureReason.MalformedResult
             ? claimFailure
             : callableFailure != WorkerRunFailureReason.None
                 ? callableFailure
@@ -169,16 +203,27 @@ internal static class WorkerResultAssembler
 
     internal static bool MatchesCallableProjection(
         WorkerCallableResult callable,
-        WorkerClaimManifest manifest,
-        IEnumerable<WorkerClaimResult> claims,
+        WorkerClaimResult[] owned,
         WorkerRunStatus runStatus,
         WorkerRunFailureReason failureReason,
         bool hasErrors)
     {
-        var ownedIds = manifest.Callables.FirstOrDefault(entry =>
-            entry.CallableId == callable.CallableId)?.ClaimIds ?? [];
-        var owned = claims.Where(claim =>
-            ownedIds.Contains(claim.ClaimId, StringComparer.Ordinal)).ToArray();
+        if (owned.Length == 0 &&
+            !(runStatus == WorkerRunStatus.Failed && hasErrors))
+        {
+            return (callable.Coverage, callable.Reason) is
+                (WorkerCallableCoverage.Complete,
+                    WorkerCallableCoverageReason.None)
+                or (WorkerCallableCoverage.Incomplete,
+                    WorkerCallableCoverageReason.UnsupportedCallable)
+                or (WorkerCallableCoverage.Incomplete,
+                    WorkerCallableCoverageReason.UnsupportedContract)
+                or (WorkerCallableCoverage.Incomplete,
+                    WorkerCallableCoverageReason.SemanticUnknown)
+                or (WorkerCallableCoverage.Incomplete,
+                    WorkerCallableCoverageReason.InfrastructureFailure);
+        }
+
         WorkerCallableCoverageReason expected;
         if (runStatus == WorkerRunStatus.Failed && hasErrors)
         {
@@ -186,8 +231,8 @@ internal static class WorkerResultAssembler
                 ? WorkerCallableCoverageReason.MissingClaimResult
                 : WorkerCallableCoverageReason.InfrastructureFailure;
         }
-        else if (owned.Length == 0 ||
-            owned.All(static claim => claim.Outcome != WorkerClaimOutcome.Unknown))
+        else if (owned.All(static claim =>
+            claim.Outcome != WorkerClaimOutcome.Unknown))
         {
             expected = WorkerCallableCoverageReason.None;
         }
@@ -200,16 +245,24 @@ internal static class WorkerResultAssembler
             expected = reasons.All(static reason =>
                     reason == WorkerClaimReason.UnsupportedCallable)
                 ? WorkerCallableCoverageReason.UnsupportedCallable
-                : reasons.Any(static reason =>
-                    reason == WorkerClaimReason.MethodTimeout)
-                    ? WorkerCallableCoverageReason.MethodTimeout
+                : reasons.All(static reason =>
+                    reason == WorkerClaimReason.UnsupportedContract)
+                    ? WorkerCallableCoverageReason.UnsupportedContract
                     : reasons.Any(static reason =>
-                        reason == WorkerClaimReason.ProjectTimeout)
-                        ? WorkerCallableCoverageReason.ProjectTimeout
+                        reason is WorkerClaimReason.InfrastructureFailure or
+                            WorkerClaimReason.BackendUnavailable or
+                            WorkerClaimReason.MalformedBackendResult)
+                        ? WorkerCallableCoverageReason.InfrastructureFailure
                         : reasons.Any(static reason =>
-                            reason == WorkerClaimReason.Canceled)
-                            ? WorkerCallableCoverageReason.Canceled
-                            : WorkerCallableCoverageReason.SemanticUnknown;
+                            reason == WorkerClaimReason.MethodTimeout)
+                        ? WorkerCallableCoverageReason.MethodTimeout
+                        : reasons.Any(static reason =>
+                            reason == WorkerClaimReason.ProjectTimeout)
+                            ? WorkerCallableCoverageReason.ProjectTimeout
+                            : reasons.Any(static reason =>
+                                reason == WorkerClaimReason.Canceled)
+                                ? WorkerCallableCoverageReason.Canceled
+                                : WorkerCallableCoverageReason.SemanticUnknown;
         }
 
         var matchesExpected = callable.Coverage ==
@@ -225,7 +278,14 @@ internal static class WorkerResultAssembler
                     WorkerClaimReason.BackendUnavailable) &&
             callable.Coverage == WorkerCallableCoverage.Incomplete &&
             callable.Reason == WorkerCallableCoverageReason.InfrastructureFailure;
-        return matchesExpected || directInfrastructureFailure;
+        var compatibleSemanticFallback =
+            expected is WorkerCallableCoverageReason.UnsupportedCallable or
+                WorkerCallableCoverageReason.UnsupportedContract or
+                WorkerCallableCoverageReason.InfrastructureFailure &&
+            callable.Coverage == WorkerCallableCoverage.Incomplete &&
+            callable.Reason == WorkerCallableCoverageReason.SemanticUnknown;
+        return matchesExpected || directInfrastructureFailure ||
+            compatibleSemanticFallback;
     }
 
     private static (WorkerRunStatus Status, WorkerRunFailureReason Failure)?

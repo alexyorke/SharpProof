@@ -12,6 +12,7 @@ using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
+using SharpProof.CompilerArtifact;
 using SharpProof.CompilerProbe.TestAsset;
 using SharpProof.Worker;
 
@@ -62,6 +63,13 @@ public sealed class PackageLayoutSmokeTests
 
     private static readonly string[] ExpectedCollectorEntryFileNames = [
         "SharpProof.CompilerCollector.dll"
+    ];
+
+    private static readonly string[] ExpectedSourceAnalyzerProjectFileNames = [
+        "SharpProof.Attributes.csproj",
+        "SharpProof.Analyzer.csproj",
+        "SharpProof.ContractForGenerator.csproj",
+        "SharpProof.CompilerCollector.csproj"
     ];
 
     private static readonly string[] ExpectedCollectorDependencyFileNames = [
@@ -212,8 +220,7 @@ public sealed class PackageLayoutSmokeTests
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false",
-            "-p:UseSharedCompilation=false");
+            "/nodeReuse:false");
         Assert.That(publish.ExitCode, Is.Zero, publish.Output);
         Assert.That(
             Directory.EnumerateFiles(
@@ -613,8 +620,7 @@ public sealed class PackageLayoutSmokeTests
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false",
-            "-p:UseSharedCompilation=false");
+            "/nodeReuse:false");
         Assert.That(analyzerBuild.ExitCode, Is.Zero, analyzerBuild.Output);
         Assert.That(analyzerBuild.Output, Does.Contain("SP0045"));
 
@@ -627,7 +633,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true");
         Assert.That(
             explicitVerification.ExitCode,
@@ -647,7 +652,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofProfile=strict");
         Assert.That(strict.ExitCode, Is.Not.Zero, strict.Output);
         Assert.That(
@@ -714,7 +718,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true",
             "-p:_SharpProofVerifierHostSupported=false");
         Assert.That(unsupported.ExitCode, Is.Not.Zero, unsupported.Output);
@@ -761,6 +764,190 @@ public sealed class PackageLayoutSmokeTests
             includeCollector: true,
             ("SharpProofVerify", "true"),
             ("_SharpProofVerifierHostSupported", "false"));
+    }
+
+    [Test]
+    [Platform("Linux")]
+    public async Task AnalyzerAndProjectIncludesPreserveSemicolonsInPaths()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Package.Semicolon.Test",
+            Guid.NewGuid().ToString("N"));
+        try
+        {
+            var repository = FindRepositoryRoot();
+            var packageRoot = Directory.CreateDirectory(
+                Path.Combine(root, "package;layout"));
+            var packageBuild = Directory.CreateDirectory(
+                Path.Combine(packageRoot.FullName, "buildTransitive"));
+            foreach (var fileName in new[] {
+                         "SharpProof.props",
+                         "SharpProof.targets"
+                     })
+            {
+                File.Copy(
+                    Path.Combine(
+                        repository,
+                        "SharpProof.Package",
+                        "buildTransitive",
+                        fileName),
+                    Path.Combine(packageBuild.FullName, fileName));
+            }
+
+            var packageProject = Path.Combine(root, "PackageConsumer.csproj");
+            var configuredPackageRoot = Path.Combine(
+                root,
+                "configured;package");
+            await File.WriteAllTextAsync(
+                packageProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <SharpProofVerify>true</SharpProofVerify>
+                    <SharpProofAnalyzerDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "analyzers"))}</SharpProofAnalyzerDirectory>
+                    <SharpProofCollectorDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "collector"))}</SharpProofCollectorDirectory>
+                    <_SharpProofSharedDirectory>{SecurityElement.Escape(Path.Combine(configuredPackageRoot, "shared"))}</_SharpProofSharedDirectory>
+                  </PropertyGroup>
+                  <Import Project="{EscapeMsBuildImportPath(Path.Combine(packageBuild.FullName, "SharpProof.props"))}" />
+                  <Import Project="{EscapeMsBuildImportPath(Path.Combine(packageBuild.FullName, "SharpProof.targets"))}" />
+                </Project>
+                """,
+                new UTF8Encoding(false));
+            var packageEvaluation = await RunDotNetAsync(
+                root,
+                "msbuild",
+                packageProject,
+                "-getItem:Analyzer",
+                "--nologo");
+            Assert.That(
+                packageEvaluation.ExitCode,
+                Is.Zero,
+                packageEvaluation.Output);
+            var packageAnalyzers = GetEvaluatedItemIdentities(
+                packageEvaluation.Output,
+                "Analyzer",
+                "SharpProofAnalyzerRole");
+
+            var sourceRoot = Directory.CreateDirectory(
+                Path.Combine(root, "source;tree"));
+            var sourceProps = Path.Combine(
+                sourceRoot.FullName,
+                "SharpProof.AnalyzerConsumer.props");
+            File.Copy(
+                Path.Combine(repository, "SharpProof.AnalyzerConsumer.props"),
+                sourceProps);
+            var sourceProject = Path.Combine(root, "SourceConsumer.csproj");
+            await File.WriteAllTextAsync(
+                sourceProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <SharpProofVerify>true</SharpProofVerify>
+                  </PropertyGroup>
+                  <Import Project="{EscapeMsBuildImportPath(sourceProps)}" />
+                </Project>
+                """,
+                new UTF8Encoding(false));
+            var sourceEvaluation = await RunDotNetAsync(
+                root,
+                "msbuild",
+                sourceProject,
+                "-getItem:Analyzer;ProjectReference",
+                "--nologo");
+            Assert.That(
+                sourceEvaluation.ExitCode,
+                Is.Zero,
+                sourceEvaluation.Output);
+            var sourceAnalyzers = GetEvaluatedItemIdentities(
+                sourceEvaluation.Output,
+                "Analyzer")
+                .Where(path =>
+                    ExpectedAnalyzerDependencyFileNames.Contains(
+                        Path.GetFileName(path),
+                        StringComparer.Ordinal) ||
+                    ExpectedCollectorDependencyFileNames.Contains(
+                        Path.GetFileName(path),
+                        StringComparer.Ordinal))
+                .ToArray();
+            var sourceProjects = GetEvaluatedItemIdentities(
+                sourceEvaluation.Output,
+                "ProjectReference");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    packageAnalyzers.Select(Path.GetFileName),
+                    Is.EquivalentTo(
+                        ExpectedAnalyzerEntryFileNames
+                            .Concat(ExpectedGeneratorEntryFileNames)
+                            .Concat(ExpectedAnalyzerDependencyFileNames)
+                            .Concat(ExpectedCollectorEntryFileNames)
+                            .Concat(ExpectedCollectorDependencyFileNames)));
+                Assert.That(
+                    packageAnalyzers,
+                    Has.All.Contains("configured;package"));
+                Assert.That(
+                    sourceAnalyzers.Select(Path.GetFileName),
+                    Is.EquivalentTo(
+                        ExpectedAnalyzerDependencyFileNames.Concat(
+                            ExpectedCollectorDependencyFileNames)));
+                Assert.That(
+                    sourceProjects.Select(Path.GetFileName),
+                    Is.EquivalentTo(ExpectedSourceAnalyzerProjectFileNames));
+                Assert.That(
+                    sourceAnalyzers.Concat(sourceProjects),
+                    Has.All.Contains("source;tree"));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public async Task SourceConsumerAnalyzerDependenciesUseMappedConfiguration()
+    {
+        using var workspace = PackageWorkspace.Create();
+        var solution = workspace.WriteMappedSourceConsumerSolution();
+
+        var evaluation = await RunDotNetAsync(
+            workspace.ConsumerDirectory,
+            "msbuild",
+            solution,
+            "-target:Consumer:CaptureMappedAnalyzerItems",
+            "-property:Configuration=Debug",
+            "-property:Platform=Any CPU",
+            "-property:DesignTimeBuild=true",
+            "--nologo");
+
+        Assert.That(evaluation.ExitCode, Is.Zero, evaluation.Output);
+        Assert.That(
+            await File.ReadAllLinesAsync(
+                workspace.MappedProjectConfigurationsPath),
+            Does.Contain("SharpProof.Analyzer|Release")
+                .And.Contain("SharpProof.ContractForGenerator|Release"));
+
+        var dependencyPaths = (await File.ReadAllLinesAsync(
+                workspace.MappedAnalyzerItemsPath))
+            .Where(path => ExpectedAnalyzerDependencyFileNames.Contains(
+                Path.GetFileName(path),
+                StringComparer.Ordinal))
+            .ToArray();
+        Assert.That(
+            dependencyPaths.Select(Path.GetFileName),
+            Is.EquivalentTo(ExpectedAnalyzerDependencyFileNames));
+        Assert.That(
+            dependencyPaths,
+            Has.All.Matches<string>(path => path.Contains(
+                Path.Combine("bin", "Release", "netstandard2.0"),
+                StringComparison.Ordinal)));
     }
 
     [TestCase(
@@ -883,7 +1070,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true");
         Assert.That(
             verification.ExitCode,
@@ -914,7 +1100,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true",
             "-p:SharpProofVerifyCacheEnabled=true");
         Assert.That(
@@ -942,7 +1127,7 @@ public sealed class PackageLayoutSmokeTests
                 manifest.RootElement
                     .GetProperty("schemaVersion")
                     .GetInt32(),
-                Is.EqualTo(15));
+                Is.EqualTo(CompilerManifestArtifactVersions.Current));
             var effectClaims = manifest.RootElement
                 .GetProperty("callables")
                 .EnumerateArray()
@@ -1062,7 +1247,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true",
             "-p:SharpProofVerifyCacheEnabled=false",
             "-p:SharpProofVerifySarifFile=" + workspace.SarifPath);
@@ -1157,7 +1341,6 @@ public sealed class PackageLayoutSmokeTests
             "--no-restore",
             "--nologo",
             "/nodeReuse:false",
-            "-p:UseSharedCompilation=false",
             "-p:SharpProofVerify=true",
             "-p:_SharpProofVerifierProcessArchitecture=X86");
 
@@ -1436,8 +1619,7 @@ public sealed class PackageLayoutSmokeTests
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false",
-            "-p:UseSharedCompilation=false");
+            "/nodeReuse:false");
     }
 
     private static async Task<PackagedAnalyzerItem[]>
@@ -1514,8 +1696,7 @@ public sealed class PackageLayoutSmokeTests
             "Release",
             "--no-restore",
             "--nologo",
-            "/nodeReuse:false",
-            "-p:UseSharedCompilation=false"
+            "/nodeReuse:false"
         };
         arguments.AddRange(properties.Select(static property =>
             "-p:" + property.Name + "=" + property.Value));
@@ -2276,6 +2457,8 @@ public sealed class PackageLayoutSmokeTests
         {
             startInfo.ArgumentList.Add(argument);
         }
+        startInfo.Environment["SharedCompilationId"] =
+            CreateSharedCompilationServerId(workingDirectory);
 
         using var process = Process.Start(startInfo)!;
         var standardOutput = process.StandardOutput.ReadToEndAsync();
@@ -2285,6 +2468,18 @@ public sealed class PackageLayoutSmokeTests
             process.ExitCode,
             (await standardOutput) + Environment.NewLine +
             (await standardError));
+    }
+
+    private static string CreateSharedCompilationServerId(
+        string workingDirectory)
+    {
+        var identity =
+            typeof(PackageLayoutSmokeTests).Assembly.ManifestModule
+                .ModuleVersionId.ToString("N") + "\n" +
+            Path.GetFullPath(workingDirectory);
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
+        return "sharpproof-package-layout-" +
+            Convert.ToHexString(hash.AsSpan(0, 16));
     }
 
     private static PackagedAnalyzerItem[]
@@ -2352,6 +2547,30 @@ public sealed class PackageLayoutSmokeTests
                     item.GetProperty("Identity").GetString()) + ".dll")
             .ToArray();
         return new(entryNames, dependencyNames);
+    }
+
+    private static string[] GetEvaluatedItemIdentities(
+        string output,
+        string itemName,
+        string? requiredMetadata = null)
+    {
+        using var document = JsonDocument.Parse(output);
+        return [.. document.RootElement
+            .GetProperty("Items")
+            .GetProperty(itemName)
+            .EnumerateArray()
+            .Where(item => requiredMetadata == null ||
+                item.TryGetProperty(requiredMetadata, out _))
+            .Select(static item =>
+                item.GetProperty("Identity").GetString() ?? string.Empty)];
+    }
+
+    private static string EscapeMsBuildImportPath(string path)
+    {
+        return SecurityElement.Escape(path)?.Replace(
+            ";",
+            "%3B",
+            StringComparison.Ordinal) ?? string.Empty;
     }
 
     private static void AssertPackagedAnalyzerItems(
@@ -2519,6 +2738,12 @@ public sealed class PackageLayoutSmokeTests
         {
             get;
         }
+        internal string MappedAnalyzerItemsPath => Path.Combine(
+            ConsumerDirectory,
+            "mapped-analyzers.txt");
+        internal string MappedProjectConfigurationsPath => Path.Combine(
+            ConsumerDirectory,
+            "mapped-project-configurations.txt");
 
         internal static PackageWorkspace Create()
         {
@@ -2773,6 +2998,108 @@ public sealed class PackageLayoutSmokeTests
                 </Project>
                 """,
                 new System.Text.UTF8Encoding(false));
+        }
+
+        internal string WriteMappedSourceConsumerSolution()
+        {
+            var repository = FindRepositoryRoot();
+            var consumerProps = SecurityElement.Escape(Path.Combine(
+                repository,
+                "SharpProof.AnalyzerConsumer.props"));
+            var analyzerItemsPath = SecurityElement.Escape(
+                MappedAnalyzerItemsPath);
+            var configurationsPath = SecurityElement.Escape(
+                MappedProjectConfigurationsPath);
+            File.WriteAllText(
+                ConsumerProject,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <Import Project="{consumerProps}" />
+                  <Target Name="CaptureMappedAnalyzerItems"
+                          DependsOnTargets="AssignProjectConfiguration">
+                    <WriteLinesToFile File="{analyzerItemsPath}"
+                                      Lines="@(Analyzer)"
+                                      Overwrite="true" />
+                    <WriteLinesToFile File="{configurationsPath}"
+                                      Lines="@(ProjectReferenceWithConfiguration->'%(Filename)|%(Configuration)')"
+                                      Overwrite="true" />
+                  </Target>
+                </Project>
+                """,
+                new System.Text.UTF8Encoding(false));
+
+            const string consumerGuid =
+                "{2D442BC0-F301-4913-B82B-178DB3AE1012}";
+            const string attributesGuid =
+                "{7B5B2351-815A-4416-A221-7D14948A120B}";
+            const string analyzerGuid =
+                "{07A87750-C6BB-401D-B53D-1D9890F6FF3C}";
+            const string generatorGuid =
+                "{7F668C71-D5B2-48B7-8C57-FE9CDBED2FE5}";
+            const string projectTypeGuid =
+                "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
+            var attributesProject = GetSolutionPath(
+                repository,
+                "SharpProof.Attributes",
+                "SharpProof.Attributes.csproj");
+            var analyzerProject = GetSolutionPath(
+                repository,
+                "SharpProof.Analyzer",
+                "SharpProof.Analyzer.csproj");
+            var generatorProject = GetSolutionPath(
+                repository,
+                "SharpProof.ContractForGenerator",
+                "SharpProof.ContractForGenerator.csproj");
+            var solution = Path.Combine(
+                ConsumerDirectory,
+                "MappedConsumer.sln");
+            File.WriteAllText(
+                solution,
+                $"""
+                Microsoft Visual Studio Solution File, Format Version 12.00
+                # Visual Studio Version 17
+                VisualStudioVersion = 17.0.31903.59
+                MinimumVisualStudioVersion = 10.0.40219.1
+                Project("{projectTypeGuid}") = "Consumer", "Consumer.csproj", "{consumerGuid}"
+                EndProject
+                Project("{projectTypeGuid}") = "SharpProof.Attributes", "{attributesProject}", "{attributesGuid}"
+                EndProject
+                Project("{projectTypeGuid}") = "SharpProof.Analyzer", "{analyzerProject}", "{analyzerGuid}"
+                EndProject
+                Project("{projectTypeGuid}") = "SharpProof.ContractForGenerator", "{generatorProject}", "{generatorGuid}"
+                EndProject
+                Global
+                    GlobalSection(SolutionConfigurationPlatforms) = preSolution
+                        Debug|Any CPU = Debug|Any CPU
+                    EndGlobalSection
+                    GlobalSection(ProjectConfigurationPlatforms) = postSolution
+                        {consumerGuid}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                        {consumerGuid}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                        {attributesGuid}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+                        {attributesGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
+                        {analyzerGuid}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+                        {analyzerGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
+                        {generatorGuid}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+                        {generatorGuid}.Debug|Any CPU.Build.0 = Release|Any CPU
+                    EndGlobalSection
+                EndGlobal
+                """,
+                new System.Text.UTF8Encoding(false));
+            return solution;
+
+            string GetSolutionPath(
+                string root,
+                string projectDirectory,
+                string projectFile)
+            {
+                return Path.GetRelativePath(
+                        ConsumerDirectory,
+                        Path.Combine(root, projectDirectory, projectFile))
+                    .Replace('/', '\\');
+            }
         }
 
         internal void WriteLinkedMappedVerifierConsumer(string version)

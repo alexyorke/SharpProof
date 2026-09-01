@@ -64,7 +64,8 @@ internal static class CallableCounterexampleReplayer
                 }
                 var results = target.Variables.Where(static variable =>
                     variable.Role == CompilerVariableRole.Result).ToArray();
-                if (results.Length > 1 || results.Length == 1 &&
+                if (results.Length == 0 && execution.ReturnValue != null ||
+                    results.Length > 1 || results.Length == 1 &&
                     (execution.ReturnValue == null || execution.ReturnValue.Type !=
                      factory.GetVariableInfo(results[0].Variable).Type))
                 {
@@ -96,6 +97,22 @@ internal static class CallableCounterexampleReplayer
 
                 final[variable.Variable] = value;
             }
+
+            foreach (var variable in target.Variables)
+            {
+                if (!final.TryGetValue(variable.Variable, out var value))
+                {
+                    continue;
+                }
+
+                if (!CompilerSourceIntegerDomain.Contains(
+                        variable.SourceIntegerInterval,
+                        value))
+                {
+                    return WorkerClaimReason.CounterexampleReplayFailed;
+                }
+            }
+
             var evaluated = new IrInterpreter(factory).Evaluate(
                 ensures[claimOrdinal].Condition, final, cancellationToken);
             return evaluated.Status == IrEvaluationStatus.Exception ? WorkerClaimReason.PostconditionMayBeUndefined :

@@ -119,7 +119,9 @@ public sealed partial class ApiSpecTable
         var variableArray = variables.ToImmutable();
         var bySlot = variableArray.ToImmutableDictionary(
             static variable => (variable.Role, variable.Ordinal));
-        var facets = NormalizeFacets(declaration.Facets);
+        var facets = NormalizeFacets(
+            declaration.Facets,
+            declaration.Target);
         var postconditions = declaration.Postconditions.Select(postcondition =>
         {
             if (postcondition == null)
@@ -185,6 +187,21 @@ public sealed partial class ApiSpecTable
         ValidateDefined(target.MemberKind, nameof(target.MemberKind));
         _ = ArgumentNullGuard.RequireNonnegative(
             target.GenericArity, nameof(declaration));
+        if (target.MemberKind == SpecTargetMemberKind.Constructor &&
+            target.IsStatic)
+        {
+            throw new ArgumentException(
+                "Spec constructors must be instance members.",
+                nameof(declaration));
+        }
+
+        if (target.MemberKind == SpecTargetMemberKind.PropertyGet &&
+            target.GenericArity != 0)
+        {
+            throw new ArgumentException(
+                "Spec properties cannot declare generic arity.",
+                nameof(declaration));
+        }
 
         if (target.ParameterTypes.IsDefault)
         {
@@ -209,7 +226,13 @@ public sealed partial class ApiSpecTable
                 throw new ArgumentException("Approved assembly identities are invalid.", nameof(declaration));
             }
         }
-        if (target.ApprovedAssemblies.Distinct().Count() != target.ApprovedAssemblies.Length)
+        if (target.ApprovedAssemblies
+                .Select(static assembly =>
+                    assembly.Name + "\u001f" +
+                    assembly.PublicKeyToken.ToUpperInvariant() + "\u001f" +
+                    (int)assembly.ReferenceFamily)
+                .Distinct(StringComparer.Ordinal)
+                .Count() != target.ApprovedAssemblies.Length)
         {
             throw new ArgumentException("Approved assembly identities must be unique.", nameof(declaration));
         }
@@ -248,7 +271,9 @@ public sealed partial class ApiSpecTable
         }
     }
 
-    private static ApiSpecFacets NormalizeFacets(ApiSpecFacets facets)
+    private static ApiSpecFacets NormalizeFacets(
+        ApiSpecFacets facets,
+        ApiSpecTarget target)
     {
         ValidateEvidence(facets.Effects?.Evidence, nameof(facets));
         ValidateEvidence(facets.Allocation?.Evidence, nameof(facets));
@@ -273,10 +298,45 @@ public sealed partial class ApiSpecTable
             throw new ArgumentException("Unknown effects cannot be combined with known effects.", nameof(facets));
         }
 
+        if (((effects.Effects & (
+                 SpecEffect.ReadsReceiverState |
+                 SpecEffect.WritesReceiverState)) != 0 &&
+             target.IsStatic) ||
+            ((effects.Effects & (
+                 SpecEffect.ReadsArgumentState |
+                 SpecEffect.WritesArgumentState)) != 0 &&
+             target.ParameterTypes.IsDefaultOrEmpty))
+        {
+            throw new ArgumentException(
+                "The effect facet does not apply to the declared target.",
+                nameof(facets));
+        }
+
         ValidateDefined(allocation.Behavior, nameof(facets));
         ValidateDefined(throws.Behavior, nameof(facets));
         ValidateDefined(nullness.Result, nameof(facets));
         ValidateDefined(cardinality.Result, nameof(facets));
+        if (nullness.Result is not (
+                SpecNullness.Unknown or
+                SpecNullness.NotApplicable) &&
+            (!target.ResultType.HasValue ||
+             !IrTermServices.IsNullable(target.ResultType.Value)))
+        {
+            throw new ArgumentException(
+                "The nullness facet does not apply to the declared result type.",
+                nameof(facets));
+        }
+
+        if (cardinality.Result is not (
+                SpecCardinality.Unknown or
+                SpecCardinality.NotApplicable) &&
+            target.ResultType != IrTypeKind.Sequence)
+        {
+            throw new ArgumentException(
+                "The cardinality facet does not apply to the declared result type.",
+                nameof(facets));
+        }
+
         if (throws.ExceptionMetadataNames.IsDefault)
         {
             throw new ArgumentException("Throw exception names must be initialized.", nameof(facets));

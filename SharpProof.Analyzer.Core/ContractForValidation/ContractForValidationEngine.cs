@@ -5,7 +5,8 @@ internal static class ContractForValidationEngine
     internal static ImmutableArray<Diagnostic> Validate(
         Compilation compilation,
         ImmutableArray<INamedTypeSymbol> candidates,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<SyntaxTree, bool>? includeTree = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (candidates.IsDefaultOrEmpty)
@@ -42,12 +43,32 @@ internal static class ContractForValidationEngine
             compilation,
             candidates,
             diagnostics,
+            includeTree,
             cancellationToken);
+        var relationships = ContractForSymbolMatcher
+            .ClassifyCompanionRelationships(
+                ContractForSymbolMatcher.DiscoverCompanionRelationships(
+                    compilation,
+                    cancellationToken),
+                cancellationToken);
+        var accepted = ImmutableArray.CreateBuilder<ResolvedCompanion>();
+        foreach (var companion in companions)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (ContractForCompanionValidator.ValidateRelationship(
+                    companion,
+                    relationships,
+                    diagnostics))
+            {
+                accepted.Add(companion);
+            }
+        }
+
+        companions = accepted.ToImmutable();
         var clauses = ContractClauseInventoryBuilder.ForCompilation(compilation);
         var overlapping = FindOverlappingCompanions(
             companions,
-            ContractForSymbolMatcher.DiscoverCompanions(
-                compilation, cancellationToken),
+            relationships.Accepted,
             cancellationToken);
         foreach (var companion in companions)
         {
@@ -65,6 +86,10 @@ internal static class ContractForValidationEngine
             diagnostics.Add(At(ContractForDiagnosticDescriptors.DuplicateCompanion,
                 companion.AttributeLocation, companion.Target.Name));
         }
+
+        // Metadata companions participate in overlap detection, but analyzer
+        // diagnostics may only point into the compilation being analyzed. The
+        // source participant above is the actionable location for the group.
         return Order(diagnostics);
     }
 
@@ -150,6 +175,7 @@ internal static class ContractForValidationEngine
         Compilation compilation,
         ImmutableArray<INamedTypeSymbol> candidates,
         List<Diagnostic> diagnostics,
+        Func<SyntaxTree, bool>? includeTree,
         CancellationToken cancellationToken)
     {
         var result = ImmutableArray.CreateBuilder<ResolvedCompanion>();
@@ -157,7 +183,8 @@ internal static class ContractForValidationEngine
                      (IEqualityComparer<INamedTypeSymbol>)SymbolEqualityComparer.Default))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var attributes = ContractForSymbolMatcher.GetAttributes(companion, contractFor);
+            var attributes = ContractForSymbolMatcher.GetAttributes(
+                companion, contractFor, includeTree);
             var fallback = ContractForCompanionValidator.GetSourceLocation(
                 companion, compilation, Location.None);
             if (attributes.Length != 1)

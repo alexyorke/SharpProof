@@ -37,13 +37,6 @@ function Invoke-GitText {
     return ($output -join [Environment]::NewLine).Trim()
 }
 
-function Invoke-DotNetText {
-    param([Parameter(Mandatory = $true)] [string[]]$Arguments)
-    $output = @(& dotnet @Arguments 2>&1)
-    if ($LASTEXITCODE -ne 0) { throw ('Production inventory MSBuild query failed: ' + ($output -join [Environment]::NewLine)) }
-    return ($output -join [Environment]::NewLine).Trim()
-}
-
 function Resolve-RepositoryPath {
     param([Parameter(Mandatory = $true)] [string]$Candidate, [Parameter(Mandatory = $true)] [string]$Description)
     if ([string]::IsNullOrWhiteSpace($Candidate)) { throw "Production inventory path is blank: '$Description'." }
@@ -62,10 +55,60 @@ function Get-CanonicalFileRecord {
     return [pscustomobject][ordered]@{ path = $RelativePath; sha256 = Get-Sha256Hex -Path $fullPath; generated = $Generated; generatedReason = $GeneratedReason }
 }
 
-function Get-MsBuildQuery {
-    param([Parameter(Mandatory = $true)] [string]$ProjectPath)
-    $json = Invoke-DotNetText -Arguments @('msbuild', $ProjectPath, '-nologo', "-p:Configuration=$Configuration", '-p:DesignTimeBuild=false', '-getProperty:MSBuildProjectName,SharpProofProductionProject,AssemblyName,TargetFramework,TargetPath,LangVersion,DefineConstants,Nullable,ImplicitUsings,AllowUnsafeBlocks,DebugType,EnableDefaultCompileItems', '-getItem:Compile,Analyzer,AdditionalFiles')
-    try { return $json | ConvertFrom-Json } catch { throw "Production inventory received malformed MSBuild JSON for '$ProjectPath': $($_.Exception.Message)" }
+function Get-InventoryParallelism {
+    $executionModule = Join-Path $resolvedRepositoryRoot 'scripts/SharpProof.ContainerExecution.psm1'
+    if (-not (Test-Path -LiteralPath $executionModule -PathType Leaf)) {
+        return 1
+    }
+
+    Import-Module $executionModule -Force
+    $available = Get-SharpProofTestProjectParallelism `
+        -RepositoryRoot $resolvedRepositoryRoot
+    $contractPath = Join-Path $resolvedRepositoryRoot 'eng/acceptance/contract.json'
+    $contract = Get-Content -LiteralPath $contractPath -Raw |
+        ConvertFrom-Json
+    $maximum = [int]$contract.automation.productionInventoryMaxParallelism
+    if ($maximum -lt 1) {
+        throw 'The production-inventory parallelism cap must be positive.'
+    }
+
+    return [Math]::Min($available, $maximum)
+}
+
+function Get-MsBuildQueries {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$ProjectRelativePaths
+    )
+
+    $parallelism = Get-InventoryParallelism
+    $results = @(
+        $ProjectRelativePaths |
+            ForEach-Object -Parallel {
+                $projectRelativePath = [string]$_
+                $projectPath = Join-Path `
+                    $using:resolvedRepositoryRoot `
+                    ($projectRelativePath.Replace(
+                        '/',
+                        [IO.Path]::DirectorySeparatorChar))
+                $arguments = @(
+                    'msbuild',
+                    $projectPath,
+                    '-nologo',
+                    "-p:Configuration=$using:Configuration",
+                    '-p:DesignTimeBuild=false',
+                    '-getProperty:MSBuildProjectName,SharpProofProductionProject,AssemblyName,TargetFramework,TargetPath,LangVersion,DefineConstants,Nullable,ImplicitUsings,AllowUnsafeBlocks,DebugType,EnableDefaultCompileItems',
+                    '-getItem:Compile,Analyzer,AdditionalFiles')
+                $output = @(& dotnet @arguments 2>&1)
+                [pscustomobject][ordered]@{
+                    projectRelativePath = $projectRelativePath
+                    projectPath = $projectPath
+                    exitCode = $LASTEXITCODE
+                    output = ($output -join [Environment]::NewLine).Trim()
+                }
+            } -ThrottleLimit $parallelism)
+
+    return @($results | Sort-Object projectRelativePath)
 }
 
 function Get-ItemPath {
@@ -295,9 +338,18 @@ $seenProjectNames = [Collections.Generic.HashSet[string]]::new([StringComparer]:
 $analyzerRecords = [Collections.Generic.List[object]]::new()
 $additionalFileRecords = [Collections.Generic.List[object]]::new()
 
-foreach ($projectRelativePath in Get-SolutionProjectPaths) {
-    $projectPath = Join-Path $resolvedRepositoryRoot ($projectRelativePath.Replace('/', $pathSeparator))
-    $query = Get-MsBuildQuery -ProjectPath $projectPath
+foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProjectPaths)) {
+    $projectRelativePath = [string]$result.projectRelativePath
+    $projectPath = [string]$result.projectPath
+    if ([int]$result.exitCode -ne 0) {
+        throw ('Production inventory MSBuild query failed: ' + [string]$result.output)
+    }
+    try {
+        $query = [string]$result.output | ConvertFrom-Json
+    }
+    catch {
+        throw "Production inventory received malformed MSBuild JSON for '$projectPath': $($_.Exception.Message)"
+    }
     $projectName = Get-PropertyValue -Properties $query.Properties -Name 'MSBuildProjectName'
     $production = Get-PropertyValue -Properties $query.Properties -Name 'SharpProofProductionProject'
     if ($production -ne 'true' -and $projectName -notin $extraCoverageProjects) { continue }
@@ -349,11 +401,21 @@ foreach ($projectRelativePath in Get-SolutionProjectPaths) {
         $relative = ''
         $sha = ''
         if (-not [string]::IsNullOrWhiteSpace($fullPath)) {
-            try {
-                $relative = Resolve-RepositoryPath -Candidate $fullPath -Description ("analyzer '" + $identity + "'")
-                $sha = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($relative.Replace('/', $pathSeparator)))
+            $normalizedAnalyzerPath = $fullPath.Replace('\', '/')
+            $resolvedAnalyzerPath = if (
+                [IO.Path]::IsPathRooted($normalizedAnalyzerPath)) {
+                [IO.Path]::GetFullPath($normalizedAnalyzerPath)
             }
-            catch { $relative = '' }
+            else {
+                [IO.Path]::GetFullPath((Join-Path `
+                    $resolvedRepositoryRoot $normalizedAnalyzerPath))
+            }
+            if ($resolvedAnalyzerPath.StartsWith(
+                    $repositoryPrefix,
+                    [StringComparison]::Ordinal)) {
+                $relative = Resolve-RepositoryPath -Candidate $fullPath -Description ("analyzer '" + $identity + "'")
+                $sha = Get-Sha256Hex -Path $resolvedAnalyzerPath
+            }
         }
         if ([IO.Path]::IsPathRooted($identity)) { $identity = [IO.Path]::GetFileName($identity) }
         [void]$analyzerRecords.Add([pscustomobject][ordered]@{ project = $projectName; identity = $identity; path = $relative; sha256 = $sha })

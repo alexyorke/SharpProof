@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace SharpProof.Dataflow.Test;
 
 [TestFixture]
@@ -30,6 +32,33 @@ public sealed class ForwardDataflowAnalysisTests
         Assert.That(result.GetOutputState(2), Is.EqualTo(NullnessValue.NonNull));
         Assert.That(result.GetInputState(3), Is.EqualTo(NullnessValue.MaybeNull));
         Assert.That(result.GetOutputState(3), Is.EqualTo(NullnessValue.MaybeNull));
+    }
+
+    [Test]
+    public void ReachableNonBottomStrictTransferRunsAtBottomInput()
+    {
+        var domain = NullnessDomain.Instance;
+        var graph = new DataflowGraph<NullnessValue>(
+            [
+                new(0, domain.AssumeNonNull),
+                new(1, _ => NullnessValue.Null)
+            ],
+            [new(0, 1)]);
+
+        var result = ForwardDataflowAnalysis.Analyze(
+            graph,
+            domain,
+            NullnessValue.Null);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.GetInputState(1),
+                Is.EqualTo(NullnessValue.Bottom));
+            Assert.That(
+                result.GetOutputState(1),
+                Is.EqualTo(NullnessValue.Null));
+        }
     }
 
     [Test]
@@ -81,6 +110,35 @@ public sealed class ForwardDataflowAnalysisTests
     }
 
     [Test]
+    public void SparseAcyclicCycleClassificationCompletesWithinLinearBudget()
+    {
+        const int blockCount = 30_000;
+        var blocks = Enumerable.Range(0, blockCount)
+            .Select(static id => new DataflowBlock<int>(id, value => value));
+        var edges = Enumerable.Range(0, blockCount - 1)
+            .Select(static id => new DataflowEdge(id, id + 1));
+
+        var stopwatch = Stopwatch.StartNew();
+        var graph = new DataflowGraph<int>(blocks, edges);
+        stopwatch.Stop();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(graph.IsCyclicBlock(0), Is.False);
+            Assert.That(
+                graph.IsCyclicBlock(blockCount / 2),
+                Is.False);
+            Assert.That(
+                graph.IsCyclicBlock(blockCount - 1),
+                Is.False);
+            Assert.That(
+                stopwatch.Elapsed,
+                Is.LessThan(TimeSpan.FromSeconds(5)),
+                $"Sparse DAG construction took {stopwatch.Elapsed}.");
+        }
+    }
+
+    [Test]
     public void RandomizedBatchOrderDoesNotChangeFixpoint()
     {
         var domain = IntervalDomain.Instance;
@@ -119,6 +177,44 @@ public sealed class ForwardDataflowAnalysisTests
                     $"Output state differs at block {blockId} for seed {seed}.");
             }
         }
+    }
+
+    [Test]
+    public void NonmonotoneTransferIsRejectedBeforeStaleOutputPropagates()
+    {
+        var domain = NullnessDomain.Instance;
+        var graph = new DataflowGraph<NullnessValue>(
+            [
+                new(0, value => value),
+                new(1, value => value == NullnessValue.Bottom
+                    ? NullnessValue.Bottom
+                    : NullnessValue.NonNull),
+                new(2, value => value),
+                new(3, value => value switch
+                {
+                    NullnessValue.Bottom => NullnessValue.Bottom,
+                    NullnessValue.Null => NullnessValue.NonNull,
+                    _ => NullnessValue.Null
+                }),
+                new(4, value => value)
+            ],
+            [
+                new(0, 1),
+                new(0, 3),
+                new(1, 2),
+                new(2, 3),
+                new(3, 4)
+            ]);
+
+        var failure = Assert.Throws<InvalidOperationException>((Action)(() =>
+            ForwardDataflowAnalysis.Analyze(
+                graph,
+                domain,
+                NullnessValue.Null)));
+
+        Assert.That(
+            failure!.Message,
+            Does.Contain("Block 3").And.Contain("monotone"));
     }
 
     [Test]

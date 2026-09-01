@@ -4,7 +4,11 @@ public readonly record struct EffectCapabilitySet
 {
     public EffectCapabilitySet(EffectCapabilityKind kinds)
     {
-        if ((kinds & ~EffectCapabilityKind.Unknown) != 0)
+        var unknownMarker =
+            EffectCapabilityKind.Unknown & ~EffectCapabilityKind.AllKnown;
+        if ((kinds & ~EffectCapabilityKind.Unknown) != 0 ||
+            ((kinds & unknownMarker) != 0 &&
+             kinds != EffectCapabilityKind.Unknown))
         {
             throw new ArgumentOutOfRangeException(nameof(kinds));
         }

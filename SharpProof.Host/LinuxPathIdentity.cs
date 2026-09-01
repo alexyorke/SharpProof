@@ -41,10 +41,12 @@ public static partial class LinuxPathIdentity
         Encoding.ASCII.GetBytes("SharpProof.PublicationSetIdentity/1\0");
     private static readonly byte[] PublicationPathIdentityDomain =
         Encoding.ASCII.GetBytes("SharpProof.PublicationPathIdentity/1\0");
-    private static readonly HashSet<string> UnsupportedRemoteFileSystems =
+    // Publication requires local flock, atomic rename, and directory fsync
+    // semantics. Unknown mount types must fail closed.
+    private static readonly HashSet<string> SupportedLocalFileSystems =
         new(StringComparer.Ordinal)
         {
-            "cifs", "nfs", "nfs4", "smb3", "sshfs", "fuse.sshfs"
+            "btrfs", "ext2", "ext3", "ext4", "overlay", "tmpfs", "xfs"
         };
 
     public static string Canonicalize(string path)
@@ -112,10 +114,10 @@ public static partial class LinuxPathIdentity
     {
         var canonical = Canonicalize(path);
         var fileSystem = FindFileSystemType(canonical);
-        if (UnsupportedRemoteFileSystems.Contains(fileSystem))
+        if (!SupportedLocalFileSystems.Contains(fileSystem))
         {
             throw new ArgumentException(
-                $"SharpProof preview publication does not support the '{fileSystem}' filesystem.",
+                $"SharpProof preview publication requires a supported local filesystem; '{fileSystem}' is not supported.",
                 nameof(path));
         }
         return canonical;
@@ -186,17 +188,11 @@ public static partial class LinuxPathIdentity
         var markerPaths = canonicalPaths
             .Select(PublicationMarkerPath)
             .ToArray();
-        var markerCount = markerPaths.Count(File.Exists);
-        if (markerCount == 0 &&
+        if (markerPaths.All(static path => !File.Exists(path)) &&
             canonicalPaths.All(static path =>
                 !File.Exists(path) && !Directory.Exists(path)))
         {
             return;
-        }
-        if (markerCount != markerPaths.Length)
-        {
-            throw new IOException(
-                "SharpProof cannot reset an incomplete publication set.");
         }
 
         using var lease = AcquirePublicationSet(
@@ -222,6 +218,14 @@ public static partial class LinuxPathIdentity
         {
             cancellationToken.ThrowIfCancellationRequested();
             File.Delete(markerPath);
+        }
+        foreach (var directory in canonicalPaths
+                     .Concat(markerPaths)
+                     .Select(static path => Path.GetDirectoryName(path)!)
+                     .Distinct(StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            SyncDirectory(directory);
         }
     }
 
@@ -249,6 +253,7 @@ public static partial class LinuxPathIdentity
         var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
         ValidatePublicationTopology(canonicalPaths);
         ValidatePublicationMetadataAliases(canonicalPaths);
+        var ancestorIdentity = CaptureAncestorIdentity(canonicalPaths);
         var lockPaths = canonicalPaths
             .Select(PublicationLockNameForCanonicalPath)
             .OrderBy(static path => path, StringComparer.Ordinal)
@@ -282,6 +287,7 @@ public static partial class LinuxPathIdentity
                 throw new IOException(
                     "SharpProof publication path identity changed while acquiring locks.");
             }
+            ConfirmAncestorIdentity(ancestorIdentity);
             BindPublicationSet(canonicalPaths);
             var lease = new PublicationLease([.. locks]);
             ownershipTransferred = true;
@@ -406,6 +412,58 @@ public static partial class LinuxPathIdentity
                 StringComparison.Ordinal) &&
             possibleDescendant[possibleAncestor.Length] ==
                 Path.DirectorySeparatorChar;
+    }
+
+    private static Dictionary<string, LinuxStat> CaptureAncestorIdentity(
+        string[] canonicalPaths)
+    {
+        var identities = new Dictionary<string, LinuxStat>(StringComparer.Ordinal);
+        foreach (var path in canonicalPaths)
+        {
+            var current = Path.GetDirectoryName(path) ?? "/";
+            while (true)
+            {
+                if (NativeMethods.LStat(current, out var information) != 0)
+                {
+                    var error = Marshal.GetLastPInvokeError();
+                    if (error != ErrorNoEntry)
+                    {
+                        throw new IOException(
+                            "SharpProof publication path ancestors changed during identity capture.");
+                    }
+                }
+                else
+                {
+                    if ((information.Mode & FileTypeMask) != FileTypeDirectory)
+                    {
+                        throw new IOException(
+                            "SharpProof publication path ancestors changed during identity capture.");
+                    }
+                    identities[current] = information;
+                }
+                if (current == "/")
+                {
+                    break;
+                }
+                current = Path.GetDirectoryName(current) ?? "/";
+            }
+        }
+        return identities;
+    }
+
+    private static void ConfirmAncestorIdentity(
+        Dictionary<string, LinuxStat> expected)
+    {
+        foreach (var pair in expected)
+        {
+            if (NativeMethods.LStat(pair.Key, out var actual) != 0 ||
+                (actual.Mode & FileTypeMask) != FileTypeDirectory ||
+                !SameFile(pair.Value, actual))
+            {
+                throw new IOException(
+                    "SharpProof publication path ancestor identity changed while acquiring locks.");
+            }
+        }
     }
 
     private static string PublicationLockNameForCanonicalPath(
@@ -642,6 +700,17 @@ public static partial class LinuxPathIdentity
             handle.Dispose();
             throw new IOException(
                 $"SharpProof could not inspect a {description} (errno {error}).");
+        }
+        // The pathname may have been replaced between open(2) and fstat(2).
+        // Never claim the lock protects the current pathname unless its inode
+        // still matches the descriptor we actually locked.
+        if (NativeMethods.LStat(path, out var pathnameInformation) != 0 ||
+            (pathnameInformation.Mode & FileTypeMask) == FileTypeSymbolicLink ||
+            !SameFile(information, pathnameInformation))
+        {
+            handle.Dispose();
+            throw new IOException(
+                $"SharpProof {description} pathname changed during open.");
         }
         if ((information.Mode & FileTypeMask) != FileTypeRegular)
         {

@@ -17,14 +17,27 @@ internal sealed partial class OperationEffectScanner
                     EffectAccess.Write,
                     valueIsStoredDirectly ? value : null),
             IPropertyReferenceOperation property =>
-                ScanProperty(
-                    property,
-                    EffectAccess.Write,
-                    valueIsStoredDirectly ? value : null),
+                valueIsStoredDirectly
+                    ? ScanProperty(
+                        property,
+                        EffectAccess.Write,
+                        assignedValue: value)
+                    : ScanProperty(
+                        property,
+                        EffectAccess.Write,
+                        assignedValueRegion: EffectRegionSet.Unknown),
             IParameterReferenceOperation parameter
-                when parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out =>
+                when parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out ||
+                     PrimaryConstructorParameterOwnership.IsReceiverBacked(
+                         parameter.Parameter,
+                         _method) =>
                 EffectSummaryOperations.Write(
                     _conversionOwnership.ClassifyParameter(parameter.Parameter)),
+            ILocalReferenceOperation local
+                when local.Local.RefKind == RefKind.Ref =>
+                EffectSummaryOperations.Write(
+                    _conversionOwnership.ClassifyRefLocalStorage(
+                        local.Local)),
             ILocalReferenceOperation or IParameterReferenceOperation or IDiscardOperation =>
                 EffectSummary.Empty,
             _ => EffectSummaryOperations.Join(
@@ -43,7 +56,12 @@ internal sealed partial class OperationEffectScanner
         }
 
         result = result.Then(ScanStep(assignment.Value));
-        return !result.CompletesNormally
+        return !result.CompletesNormally ||
+            assignment is
+            {
+                IsRef: true,
+                Target: ILocalReferenceOperation
+            }
             ? result.Summary
             : result.Then(new EffectStep(
                 ScanWriteTarget(assignment.Target, assignment.Value),
@@ -79,14 +97,43 @@ internal sealed partial class OperationEffectScanner
     private EffectSummary ScanCompoundAssignment(
         ICompoundAssignmentOperation assignment)
     {
-        return ScanReadModifyWrite(
-            assignment.Target,
-            () => ScanStep(assignment.Value),
-            () => EffectSummaryOperations.Join(
-                ResolveOperatorEffects(
-                    assignment.OperatorMethod,
-                    [assignment.Target, assignment.Value],
-                    assignment),
+        var result = new EffectStep(
+            Scan(assignment.Target, EffectAccess.Read),
+            _completionEvaluator.CanCompleteNormally(assignment.Target));
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
+        result = result.Then(new EffectStep(
+            ResolveOperatorEffects(
+                assignment.InConversion.MethodSymbol,
+                [assignment.Target],
+                assignment),
+            _completionEvaluator.CanCompleteCompoundInConversion(
+                assignment)));
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
+        result = result.Then(ScanStep(assignment.Value));
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
+        result = result.Then(new EffectStep(
+            EffectSummaryOperations.Join(
+                _conversionEffects.SkipsLiftedOperator(assignment)
+                    ? EffectSummary.Empty
+                    : ResolveCompoundOperatorEffects(assignment),
+                StringConcatenationEffectResolver.Resolve(
+                    assignment,
+                    _session.Compilation,
+                    _callResolver,
+                    _abstractFlow,
+                    _conversionOwnership.ClassifyRegion),
                 IntegralDivisionExceptions(
                     assignment.OperatorKind,
                     assignment.Type,
@@ -96,8 +143,56 @@ internal sealed partial class OperationEffectScanner
                 _conversionEffects.CheckedOverflow(
                     assignment.IsChecked,
                     assignment)),
-            () => _completionEvaluator.CanCompleteCompoundValue(assignment),
-            assignment.Value);
+            _completionEvaluator.CanCompleteCompoundOperator(assignment)));
+        if (!result.CompletesNormally)
+        {
+            return result.Summary;
+        }
+
+        // The operator result has no standalone IOperation. Passing a null
+        // actual keeps call-precondition projection fail-closed. Its ownership
+        // is unknown because a user-defined operator may return any region.
+        result = result.Then(new EffectStep(
+            ResolveOperatorEffects(
+                assignment.OutConversion.MethodSymbol,
+                [EffectRegionSet.Unknown],
+                [null],
+                assignment),
+            _completionEvaluator.CanCompleteCompoundOutConversion(
+                assignment)));
+        return !result.CompletesNormally
+            ? result.Summary
+            : result.Then(new EffectStep(
+                ScanWriteTarget(
+                    assignment.Target,
+                    assignment.Value,
+                    valueIsStoredDirectly: false),
+                true)).Summary;
+    }
+
+    private EffectSummary ResolveCompoundOperatorEffects(
+        ICompoundAssignmentOperation assignment)
+    {
+        if (assignment.InConversion.MethodSymbol == null)
+        {
+            return ResolveOperatorEffects(
+                assignment.OperatorMethod,
+                [assignment.Target, assignment.Value],
+                assignment);
+        }
+
+        // A user-defined in-conversion can return a value from any region.
+        // Roslyn has no IOperation for that synthetic result, so neither its
+        // ownership nor call preconditions may be projected from the target.
+        return ResolveOperatorEffects(
+            assignment.OperatorMethod,
+            [
+                EffectRegionSet.Unknown,
+                _conversionOwnership.ClassifyCallArgumentRegion(
+                    assignment.Value)
+            ],
+            [null, assignment.Value],
+            assignment);
     }
 
     private EffectSummary ScanReadModifyWrite(

@@ -21,12 +21,12 @@ public sealed partial class IrPrinter
             IrNullTerm => "((" + TypeName(term.Type) + ")null)",
             IrVariableTerm value => "v" + value.Variable.Value.ToString(CultureInfo.InvariantCulture),
             IrOpaqueTerm value => FormatOpaque(value),
-            IrUnaryTerm value => "(" + IrOperatorCatalog.Get(value.Operator).Token + Format(value.Operand) + ")",
-            IrBinaryTerm value => "(" + Format(value.Left) + " " + IrOperatorCatalog.Get(value.Operator).Token + " " + Format(value.Right) + ")",
-            IrConditionalTerm value => "(" + Format(value.Condition) + " ? " + Format(value.WhenTrue) + " : " + Format(value.WhenFalse) + ")",
-            IrCastTerm value => "((" + TypeName(value.Type) + ")" + Format(value.Operand) + ")",
-            IrLengthTerm value => "len(" + Format(value.Value) + ")",
-            IrSequenceAccessTerm value => Format(value.Sequence) + "[" + Format(value.Index) + "]",
+            IrUnaryTerm value => "(" + IrOperatorCatalog.Get(value.Operator).Token + FormatChild(value.Operand) + ")",
+            IrBinaryTerm value => "(" + FormatChild(value.Left) + " " + IrOperatorCatalog.Get(value.Operator).Token + " " + FormatChild(value.Right) + ")",
+            IrConditionalTerm value => "(" + FormatChild(value.Condition) + " ? " + FormatChild(value.WhenTrue) + " : " + FormatChild(value.WhenFalse) + ")",
+            IrCastTerm value => "((" + TypeName(value.Type) + ")" + FormatChild(value.Operand) + ")",
+            IrLengthTerm value => "len(" + FormatChild(value.Value) + ")",
+            IrSequenceAccessTerm value => FormatChild(value.Sequence) + "[" + FormatChild(value.Index) + "]",
             _ => throw new InvalidOperationException("Unknown IR term kind: " + term.Kind + ".")
         };
     }

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
@@ -18,6 +19,31 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class FinalCompilationCollectorTests
 {
+    [Test]
+    public async Task PrimaryConstructorSameNamedOverloadIsInventoried()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("primary-constructor-overload");
+        var compilation = CreateCompilation(
+            """
+            using SharpProof.Attributes;
+            [method: DoesNotThrow]
+            public sealed class Subject(int value) {
+                public Subject(string value) : this(0) { }
+            }
+            """);
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            compilation,
+            Options(path));
+        Assert.That(diagnostics, Is.Empty);
+        var artifact = CompilerManifestArtifactJson.Deserialize(
+            await File.ReadAllTextAsync(path));
+
+        Assert.That(artifact.Manifest.Callables, Has.Length.EqualTo(1));
+        Assert.That(artifact.Manifest.Claims, Has.Length.EqualTo(1));
+    }
+
     [TestCase('\uD800')]
     [TestCase('\uDC00')]
     public void TextHashRejectsLoneSurrogatesBeforeEncoding(char value)
@@ -69,6 +95,37 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(
                 diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
                 Does.Contain("ill-formed UTF-16"));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task StatefulAdditionalTextCannotAuthenticateALaterValue()
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("stateful-additional-text");
+        var additional = new StatefulAdditionalText(
+            "proof.inputs",
+            "generator-value",
+            "later-value");
+
+        Assert.That(
+            additional.GetText().ToString(),
+            Is.EqualTo("generator-value"));
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            Options(path),
+            [additional]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(
+                diagnostics.FirstOrDefault()?.GetMessage(
+                    CultureInfo.InvariantCulture) ?? string.Empty,
+                Does.Contain("stable compiler input"));
             Assert.That(File.Exists(path), Is.False);
         }
     }
@@ -229,6 +286,8 @@ public sealed class FinalCompilationCollectorTests
         ProjectDirectoryKey = "build_property._SharpProofProjectDirectory";
     private const string MaximumExpressionDepthKey =
         "build_property.SharpProofVerifyMaximumExpressionDepth";
+    private const string SpecificationPacksKey =
+        "build_property.SharpProofSpecificationPacks";
 
     [Test]
     public async Task CollectorIsInactiveWithoutAPathAndForTheOffProfile()
@@ -334,7 +393,9 @@ public sealed class FinalCompilationCollectorTests
             Assert.That(first.Take(3), Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
             Assert.That(first, Does.Not.Contain((byte)'\r'));
             Assert.That(artifact.Schema, Is.EqualTo("SharpProof.CompilerManifest"));
-            Assert.That(artifact.SchemaVersion, Is.EqualTo(15));
+            Assert.That(
+                artifact.SchemaVersion,
+                Is.EqualTo(CompilerManifestArtifactVersions.Current));
             Assert.That(artifact.ProtocolVersion, Is.EqualTo("11"));
             Assert.That(artifact.Compilation.TargetFramework, Is.EqualTo("net9.0"));
             Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.All));
@@ -424,6 +485,35 @@ public sealed class FinalCompilationCollectorTests
     }
 
     [Test]
+    public async Task ExecutableEntryPointSelectionChangesAuthenticatedSnapshot()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            internal static class FirstEntryPoint {
+                public static void Main() { }
+            }
+            internal static class SecondEntryPoint {
+                public static void Main() { }
+            }
+            """);
+        var executable = compilation.Options.WithOutputKind(
+            OutputKind.ConsoleApplication);
+        var firstHash = await EmitHash(
+            compilation.WithOptions(executable.WithMainTypeName(
+                "FirstEntryPoint")),
+            workspace.SealPath("first-entry-point"),
+            additional: "value=1");
+        var secondHash = await EmitHash(
+            compilation.WithOptions(executable.WithMainTypeName(
+                "SecondEntryPoint")),
+            workspace.SealPath("second-entry-point"),
+            additional: "value=1");
+
+        Assert.That(secondHash, Is.Not.EqualTo(firstHash));
+    }
+
+    [Test]
     public async Task DiagnosticPolicyAndRealizedErrorsInvalidateTheSeal()
     {
         using var workspace = new CollectorWorkspace();
@@ -446,19 +536,22 @@ public sealed class FinalCompilationCollectorTests
         var generalError = await EmitArtifact(
             compilation.WithOptions(compilation.Options
                 .WithGeneralDiagnosticOption(ReportDiagnostic.Error)),
-            workspace.SealPath("diagnostic-general"));
+            workspace.SealPath("diagnostic-general"),
+            allowCompilationErrors: true);
         var specificError = await EmitArtifact(
             compilation.WithOptions(compilation.Options
                 .WithSpecificDiagnosticOptions(
                     compilation.Options.SpecificDiagnosticOptions.SetItem(
                         "CS0168", ReportDiagnostic.Error))),
-            workspace.SealPath("diagnostic-specific"));
+            workspace.SealPath("diagnostic-specific"),
+            allowCompilationErrors: true);
         var providerError = await EmitArtifact(
             compilation.WithOptions(compilation.Options
                 .WithSyntaxTreeOptionsProvider(
                     new FixedDiagnosticProvider(
                         "CS0168", ReportDiagnostic.Error))),
-            workspace.SealPath("diagnostic-provider"));
+            workspace.SealPath("diagnostic-provider"),
+            allowCompilationErrors: true);
 
         using (Assert.EnterMultipleScope())
         {
@@ -482,6 +575,36 @@ public sealed class FinalCompilationCollectorTests
                 providerError.Callables.Single().FailureReason,
                 Is.EqualTo(WorkerClaimReason.UnsupportedCallable));
         }
+    }
+
+    [Test]
+    public async Task SuppressedWarningAsErrorDoesNotInvalidateTheSeal()
+    {
+        using var workspace = new CollectorWorkspace();
+        var compilation = CreateCompilation(
+            """
+            #pragma warning disable CS0168
+            using SharpProof.Attributes;
+            internal static class Fixture {
+                [DoesNotThrow]
+                internal static int Method() {
+                    int unused;
+                    return 1;
+                }
+            }
+            #pragma warning restore CS0168
+            """).WithOptions(
+                CreateCompilation().Options.WithGeneralDiagnosticOption(
+                    ReportDiagnostic.Error));
+
+        var artifact = await EmitArtifact(
+            compilation,
+            workspace.SealPath("suppressed-warning-as-error"));
+
+        Assert.That(artifact.CompilerDiagnostics, Is.Empty);
+        Assert.That(
+            artifact.Callables.Single().FailureReason,
+            Is.Not.EqualTo(CompilerCallableProducerReasonCatalog.DiagnosticFailureReason));
     }
 
     [TestCase("?", "first.cs")]
@@ -524,7 +647,8 @@ public sealed class FinalCompilationCollectorTests
 
         var artifact = await EmitArtifact(
             compilation,
-            workspace.SealPath("diagnostic-location"));
+            workspace.SealPath("diagnostic-location"),
+            allowCompilationErrors: true);
         var actual = artifact.CompilerDiagnostics.Select(static diagnostic =>
             new
             {
@@ -573,6 +697,61 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(["SP0049"]));
+    }
+
+    [TestCase(";dotnet.scalar")]
+    [TestCase("dotnet.scalar;")]
+    [TestCase(";;dotnet.scalar")]
+    [TestCase(" ;dotnet.scalar")]
+    public async Task BlankSpecificationPackSegmentFailsArtifactEmission(
+        string value)
+    {
+        using var workspace = new CollectorWorkspace();
+        var path = workspace.SealPath("blank-specification-pack");
+        var options = Options(path);
+        options[SpecificationPacksKey] = value;
+
+        var diagnostics = await AnalyzeCollectorAsync(
+            CreateCompilation(),
+            options);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0049"]));
+            Assert.That(File.Exists(path), Is.False);
+        }
+    }
+
+    [Test]
+    public async Task EmptyOrUnsetSpecificationPacksRemainNoPacksDefault()
+    {
+        using var workspace = new CollectorWorkspace();
+        string?[] values = [null, string.Empty, "   "];
+
+        for (var index = 0; index < values.Length; index++)
+        {
+            var path = workspace.SealPath("no-specification-packs-" + index);
+            var options = Options(path);
+            if (values[index] != null)
+            {
+                options[SpecificationPacksKey] = values[index]!;
+            }
+
+            var diagnostics = await AnalyzeCollectorAsync(
+                CreateCompilation(),
+                options);
+
+            Assert.That(diagnostics, Is.Empty);
+            var artifact = CompilerManifestArtifactJson.Deserialize(
+                await File.ReadAllTextAsync(path));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(artifact.SpecificationPackIds, Is.Empty);
+                Assert.That(artifact.Compilation.SpecificationPackIds, Is.Empty);
+            }
+        }
     }
 
     [Test]
@@ -726,6 +905,40 @@ public sealed class FinalCompilationCollectorTests
                 Is.EqualTo(new[] { manifestPath, firstPath, secondPath }
                     .Select(static path => new FileInfo(path).Length)));
         }
+    }
+
+    [Test]
+    public async Task ReferenceCapturePreservesRecursiveAliases()
+    {
+        using var workspace = new CollectorWorkspace();
+        var referencePath = Path.Combine(
+            workspace.Path,
+            "RecursiveAlias.dll");
+        var image = EmitImage(
+            "internal static class RecursiveAlias {}",
+            "RecursiveAlias");
+        await File.WriteAllBytesAsync(referencePath, image);
+        var withRecursiveAliases = typeof(MetadataReferenceProperties)
+            .GetMethod(
+                "WithRecursiveAliases",
+                BindingFlags.Instance | BindingFlags.NonPublic) ??
+            throw new InvalidOperationException(
+                "Recursive reference aliases are unavailable.");
+        var properties = (MetadataReferenceProperties)withRecursiveAliases.Invoke(
+            new MetadataReferenceProperties(
+                MetadataImageKind.Assembly,
+                aliases: ["recursive"]),
+            [true])!;
+        var reference = MetadataReference.CreateFromFile(
+            referencePath,
+            properties);
+
+        var captured = CompilerCompilationCapture.CaptureReferences(
+            [reference],
+            CompilerCompilationCapture.ReferenceCaptureLimits.Default,
+            CancellationToken.None);
+
+        Assert.That(captured.Single().HasRecursiveAliases, Is.True);
     }
 
     [Test]
@@ -1002,11 +1215,13 @@ public sealed class FinalCompilationCollectorTests
 
     private static async Task<CompilerManifestArtifact> EmitArtifact(
         CSharpCompilation compilation,
-        string path)
+        string path,
+        bool allowCompilationErrors = false)
     {
         var diagnostics = await AnalyzeCollectorAsync(
             compilation,
-            Options(path));
+            Options(path),
+            allowCompilationErrors: allowCompilationErrors);
         Assert.That(diagnostics, Is.Empty);
         return CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(path));
@@ -1015,13 +1230,15 @@ public sealed class FinalCompilationCollectorTests
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string> values,
-        ImmutableArray<AdditionalText> additionalFiles = default)
+        ImmutableArray<AdditionalText> additionalFiles = default,
+        bool allowCompilationErrors = false)
     {
         return AnalyzerTestHost.AnalyzeAsync(
             compilation,
             values,
             additionalFiles,
-            new FinalCompilationCollectorAnalyzer());
+            new FinalCompilationCollectorAnalyzer(),
+            allowCompilationErrors);
     }
 
     private static Task<ImmutableArray<Diagnostic>> AnalyzeCollectorAsync(
@@ -1136,13 +1353,40 @@ public sealed class FinalCompilationCollectorTests
 
     private sealed class MemoryAdditionalText(
         string path,
-        string content) : AdditionalText
+        string content) : AdditionalText, ICompilerAdditionalTextSnapshot
     {
+        private readonly SourceText _text = SourceText.From(
+            content,
+            Encoding.UTF8);
+
         public override string Path { get; } = path;
+
+        SourceText ICompilerAdditionalTextSnapshot.CapturedText => _text;
+
         public override SourceText GetText(
             CancellationToken cancellationToken = default)
         {
-            return SourceText.From(content, Encoding.UTF8);
+            cancellationToken.ThrowIfCancellationRequested();
+            return _text;
+        }
+    }
+
+    private sealed class StatefulAdditionalText(
+        string path,
+        string first,
+        string later) : AdditionalText
+    {
+        private int _readCount;
+
+        public override string Path { get; } = path;
+
+        public override SourceText GetText(
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return SourceText.From(
+                Interlocked.Increment(ref _readCount) == 1 ? first : later,
+                Encoding.UTF8);
         }
     }
 

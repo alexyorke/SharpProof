@@ -80,6 +80,19 @@ public sealed class RoslynProgramLowerer(
         internal SelectedProgramLoweringResult Lower()
         {
             var selected = SelectBlocks();
+            var omittedHandler = _graph.Blocks.FirstOrDefault(block =>
+                block.IsReachable &&
+                !selected.Contains(block) &&
+                IsInsideCatchHandler(block));
+            if (omittedHandler != null)
+            {
+                Abstain(
+                    CreateOperation(
+                        omittedHandler,
+                        ordinal: -1,
+                        kind: OperationKind.None),
+                    FrontendAbstention.UnsupportedControlFlow);
+            }
             foreach (var block in selected)
             {
                 _blocks.Add(block, _builder.CreateBlock(
@@ -185,6 +198,19 @@ public sealed class RoslynProgramLowerer(
             IrBlockId block, OperationId operation, IVariableDeclaratorOperation declarator)
         {
             var target = _expressions.GetVariable(declarator.Symbol, declarator.Symbol.Type);
+            if (declarator.Symbol.RefKind != RefKind.None)
+            {
+                if (declarator.Initializer != null)
+                {
+                    _ = LowerValue(
+                        block,
+                        operation,
+                        declarator.Initializer.Value);
+                }
+                Abstain(operation, FrontendAbstention.UnsupportedMutation);
+                HavocKnownState(block, operation);
+                return;
+            }
             if (declarator.Initializer == null)
             {
                 Havoc(block, operation, IrHavocKind.Variables, target.Variable);
@@ -205,6 +231,28 @@ public sealed class RoslynProgramLowerer(
         private void LowerAssignment(
             IrBlockId block, OperationId operation, ISimpleAssignmentOperation assignment)
         {
+            if (assignment.Target is IFlowCaptureReferenceOperation)
+            {
+                _ = LowerValue(block, operation, assignment.Value);
+                Abstain(operation, FrontendAbstention.UnsupportedMutation);
+                HavocKnownState(block, operation);
+                return;
+            }
+
+            if (assignment.IsRef ||
+                assignment.Target is ILocalReferenceOperation
+                {
+                    Local.RefKind: not RefKind.None
+                })
+            {
+                LowerUnsupportedMutation(
+                    block,
+                    operation,
+                    assignment.Target,
+                    assignment.Value);
+                return;
+            }
+
             var variable = _expressions.GetReferencedVariable(assignment.Target, unwrapConversions: false);
             if (variable.HasValue)
             {
@@ -244,6 +292,14 @@ public sealed class RoslynProgramLowerer(
             {
                 case IInvocationOperation invocation:
                     return LowerInvocation(block, operation, invocation, wantsResult: true)!;
+                case IIncrementOrDecrementOperation mutation:
+                    LowerUnsupportedMutation(block, operation, mutation.Target);
+                    return CreateHavocTemporary(
+                        block, operation, "mutation-result", _expressions.GetTypeId(mutation.Type));
+                case ICompoundAssignmentOperation mutation:
+                    LowerUnsupportedMutation(block, operation, mutation.Target, mutation.Value);
+                    return CreateHavocTemporary(
+                        block, operation, "mutation-result", _expressions.GetTypeId(mutation.Type));
                 case IFieldReferenceOperation:
                 case IArrayElementReferenceOperation:
                     var location = LowerLocation(block, operation, value);
@@ -255,11 +311,74 @@ public sealed class RoslynProgramLowerer(
                     }
                     Abstain(operation, location.Abstention);
                     break;
+                default:
+                    var nestedValues = new Dictionary<IOperation, IrTerm>();
+                    LowerNestedOperations(
+                        block,
+                        operation,
+                        value,
+                        nestedValues);
+                    if (nestedValues.Count == 0)
+                    {
+                        break;
+                    }
+
+                    var priorCustomLowering =
+                        _expressions.CustomLowering;
+                    _expressions.CustomLowering = candidate =>
+                        nestedValues.TryGetValue(
+                            candidate,
+                            out var replacement)
+                            ? (true, replacement)
+                            : priorCustomLowering(candidate);
+                    try
+                    {
+                        var nestedLowered = _expressions.Lower(value);
+                        Observe(operation, nestedLowered.Classification);
+                        return nestedLowered.Term;
+                    }
+                    finally
+                    {
+                        _expressions.CustomLowering =
+                            priorCustomLowering;
+                    }
             }
 
             var lowered = _expressions.Lower(value);
             Observe(operation, lowered.Classification);
             return lowered.Term;
+        }
+
+        private void LowerNestedOperations(
+            IrBlockId block,
+            OperationId operation,
+            IOperation value,
+            Dictionary<IOperation, IrTerm> nestedValues)
+        {
+            switch (value)
+            {
+                case IInvocationOperation invocation:
+                    LowerInvocation(block, operation, invocation, wantsResult: false);
+                    return;
+                case IArrayElementReferenceOperation:
+                    nestedValues.Add(
+                        value,
+                        LowerValue(block, operation, value));
+                    return;
+                case IAnonymousFunctionOperation:
+                case ILocalFunctionOperation:
+                case INameOfOperation:
+                    return;
+            }
+
+            foreach (var child in value.ChildOperations)
+            {
+                LowerNestedOperations(
+                    block,
+                    operation,
+                    child,
+                    nestedValues);
+            }
         }
 
         private IrVariableTerm? LowerInvocation(
@@ -271,7 +390,7 @@ public sealed class RoslynProgramLowerer(
             var resultType = _expressions.GetTypeId(invocation.Type);
             var hasSupportedResult = invocation.TargetMethod.ReturnsVoid ||
                 CompilerIdentityBridge.IsSupportedValueDomain(invocation.Type);
-            var member = _expressions.GetMember(invocation.TargetMethod, receiver, "call:", invocation.Type, arguments);
+            var member = _expressions.GetMember(invocation.TargetMethod, ref receiver, "call:", invocation.Type, arguments);
             var isDirect = IsDirectInvocation(invocation);
             if (!isDirect)
             {
@@ -297,8 +416,17 @@ public sealed class RoslynProgramLowerer(
                 .Distinct()
                 .OrderBy(static variable => variable.Value)
                 .ToArray();
-            if (mutated.Length != 0 || !isDirect || !IsStaticallyBound(invocation.TargetMethod) || !_isKnownPure(invocation.TargetMethod))
+            if (mutated.Length != 0 || !isDirect ||
+                !IsStaticallyBound(invocation.TargetMethod) ||
+                !_isKnownPure(invocation.TargetMethod))
             {
+                if (IsClosureInvocation(invocation.TargetMethod))
+                {
+                    mutated = [.. mutated
+                        .Concat(CreateKnownStateVariables())
+                        .Distinct()
+                        .OrderBy(static variable => variable.Value)];
+                }
                 Havoc(block, operation, mutated.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory, mutated);
             }
 
@@ -339,8 +467,21 @@ public sealed class RoslynProgramLowerer(
                 {
                     case IFieldReferenceOperation field:
                         var fieldReceiver = LowerOptionalValue(block, operation, field.Instance);
-                        var fieldMember = _expressions.GetMember(field.Field, fieldReceiver, "field:", field.Type);
+                        if (!CompilerIdentityBridge.IsSupportedValueDomain(field.Type))
+                        {
+                            return LocationLowering.Abstain(
+                                FrontendAbstention.UnsupportedType);
+                        }
+                        var fieldMember = _expressions.GetMember(field.Field, ref fieldReceiver, "field:", field.Type);
                         return LocationLowering.FromLocation(_builder.MemberLocation(fieldMember, fieldReceiver));
+                    case IInvocationOperation invocation:
+                        _ = LowerInvocation(
+                            block,
+                            operation,
+                            invocation,
+                            wantsResult: false);
+                        return LocationLowering.Abstain(
+                            FrontendAbstention.UnsupportedMutation);
                     case IPropertyReferenceOperation property:
                         _ = LowerOptionalValue(block, operation, property.Instance);
                         foreach (var argument in property.Arguments)
@@ -382,6 +523,14 @@ public sealed class RoslynProgramLowerer(
 
             var fallThrough = source.FallThroughSuccessor;
             var conditional = source.ConditionalSuccessor;
+            if (HasMandatoryFinally(fallThrough) ||
+                HasMandatoryFinally(conditional))
+            {
+                Abstain(operation, FrontendAbstention.UnsupportedControlFlow);
+                HavocKnownState(block, operation);
+                _builder.Return(block, operation);
+                return;
+            }
             if (fallThrough?.Semantics == ControlFlowBranchSemantics.Return)
             {
                 LowerReturn(block, operation, source.BranchValue);
@@ -389,6 +538,14 @@ public sealed class RoslynProgramLowerer(
             }
             if (IsExceptional(fallThrough?.Semantics) || IsExceptional(conditional?.Semantics))
             {
+                // The branch value is the throw operand for exceptional
+                // terminators. Lower it before abandoning control-flow
+                // modeling so calls, reads, and other observable evaluation
+                // effects are not silently omitted from the trace.
+                if (source.BranchValue != null)
+                {
+                    _ = LowerValue(block, operation, source.BranchValue);
+                }
                 Abstain(operation, FrontendAbstention.UnsupportedControlFlow);
                 Havoc(block, operation, IrHavocKind.Memory);
                 _builder.Return(block, operation);
@@ -463,14 +620,18 @@ public sealed class RoslynProgramLowerer(
 
         private void HavocKnownState(IrBlockId block, OperationId operation)
         {
-            var variables = _expressions.CreateVariableBindings()
+            var variables = CreateKnownStateVariables();
+            Havoc(block, operation,
+                variables.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory, variables);
+        }
+
+        private IrVarId[] CreateKnownStateVariables()
+        {
+            return [.. _expressions.CreateVariableBindings()
                 .Select(static binding => binding.Variable)
                 .Concat(_expressions.CreateCaptureBindings())
                 .Distinct()
-                .OrderBy(static variable => variable.Value)
-                .ToArray();
-            Havoc(block, operation,
-                variables.Length == 0 ? IrHavocKind.Memory : IrHavocKind.VariablesAndMemory, variables);
+                .OrderBy(static variable => variable.Value)];
         }
 
         private void LowerReturn(
@@ -540,6 +701,12 @@ public sealed class RoslynProgramLowerer(
             !method.IsOverride;
         }
 
+        private static bool IsClosureInvocation(IMethodSymbol method)
+        {
+            return method.MethodKind == MethodKind.LocalFunction ||
+                method.ContainingType.TypeKind == TypeKind.Delegate;
+        }
+
         private static bool IsExceptional(ControlFlowBranchSemantics? semantics)
         {
             return semantics is
@@ -547,6 +714,28 @@ public sealed class RoslynProgramLowerer(
                 ControlFlowBranchSemantics.ProgramTermination or
                 ControlFlowBranchSemantics.StructuredExceptionHandling or
                 ControlFlowBranchSemantics.Error;
+        }
+
+        private static bool HasMandatoryFinally(ControlFlowBranch? branch)
+        {
+            return branch != null && !branch.FinallyRegions.IsDefaultOrEmpty;
+        }
+
+        private static bool IsInsideCatchHandler(BasicBlock block)
+        {
+            for (var region = block.EnclosingRegion;
+                 region != null;
+                 region = region.EnclosingRegion)
+            {
+                if (region.Kind is
+                    ControlFlowRegionKind.Catch or
+                    ControlFlowRegionKind.Filter or
+                    ControlFlowRegionKind.FilterAndHandler)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private BasicBlock[] SelectBlocks()

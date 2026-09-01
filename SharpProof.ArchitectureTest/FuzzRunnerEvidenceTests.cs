@@ -6,8 +6,10 @@ namespace SharpProof.ArchitectureTest;
 [TestFixture]
 public sealed class FuzzRunnerEvidenceTests
 {
+    private static readonly TimeSpan ScriptTimeout = TimeSpan.FromMinutes(2);
+
     [Test]
-    public void FuzzRunnerEvidenceUsesStrictSchemaFourDecoder()
+    public async Task FuzzRunnerEvidenceUsesStrictSchemaFourDecoder()
     {
         var root = RepositoryRoot();
         var start = new ProcessStartInfo
@@ -25,16 +27,13 @@ public sealed class FuzzRunnerEvidenceTests
             root,
             "scripts",
             "Test-SharpProofFuzzRunnerResult.ps1"));
-        using var process = Process.Start(start)!;
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        var result = await RunAsync(start);
         Assert.That(
-            process.ExitCode,
+            result.ExitCode,
             Is.Zero,
-            output + Environment.NewLine + error);
+            result.Output + Environment.NewLine + result.Error);
 
-        var campaign = File.ReadAllText(Path.Combine(
+        var campaign = await File.ReadAllTextAsync(Path.Combine(
             root,
             "scripts",
             "Invoke-SharpProofFuzzCampaign.ps1"));
@@ -43,12 +42,12 @@ public sealed class FuzzRunnerEvidenceTests
             Assert.That(
                 campaign,
                 Does.Contain("Assert-SharpProofFuzzRunnerResult"));
-            Assert.That(campaign, Does.Contain("schemaVersion = 3"));
+            Assert.That(campaign, Does.Contain("schemaVersion = 4"));
         }
     }
 
     [Test]
-    public void FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic()
+    public async Task FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic()
     {
         var root = RepositoryRoot();
         var start = new ProcessStartInfo
@@ -66,19 +65,20 @@ public sealed class FuzzRunnerEvidenceTests
             root,
             "scripts",
             "Test-SharpProofFuzzEvidenceLifecycle.ps1"));
-        using var process = Process.Start(start)!;
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        var result = await RunAsync(start);
         Assert.That(
-            process.ExitCode,
+            result.ExitCode,
             Is.Zero,
-            output + Environment.NewLine + error);
+            result.Output + Environment.NewLine + result.Error);
 
-        var campaign = File.ReadAllText(Path.Combine(
+        var campaign = await File.ReadAllTextAsync(Path.Combine(
             root,
             "scripts",
             "Invoke-SharpProofFuzzCampaign.ps1"));
+        var lifecycle = await File.ReadAllTextAsync(Path.Combine(
+            root,
+            "scripts",
+            "SharpProof.FuzzEvidenceLifecycle.ps1"));
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -86,6 +86,9 @@ public sealed class FuzzRunnerEvidenceTests
                 Does.Contain("Initialize-SharpProofFuzzEvidence"));
             Assert.That(
                 campaign,
+                Does.Contain("Complete-SharpProofFuzzEvidence"));
+            Assert.That(
+                lifecycle,
                 Does.Contain("Publish-SharpProofFuzzEvidence"));
             Assert.That(
                 campaign.IndexOf(
@@ -94,6 +97,41 @@ public sealed class FuzzRunnerEvidenceTests
                 Is.LessThan(campaign.IndexOf(
                     "retained-seeds.json",
                     StringComparison.Ordinal)));
+        }
+    }
+
+    private static async Task<ProcessResult> RunAsync(
+        ProcessStartInfo start)
+    {
+        using var process = Process.Start(start) ??
+            throw new InvalidOperationException(
+                $"Could not start '{start.FileName}'.");
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.CancelAfter(ScriptTimeout);
+        try
+        {
+            await process.WaitForExitAsync(cancellation.Token);
+            return new ProcessResult(
+                process.ExitCode,
+                await output.WaitAsync(cancellation.Token),
+                await error.WaitAsync(cancellation.Token));
+        }
+        catch (OperationCanceledException)
+            when (cancellation.IsCancellationRequested)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException) when (process.HasExited)
+            {
+            }
+
+            throw new TimeoutException(
+                $"'{start.FileName}' did not exit within " +
+                $"{ScriptTimeout.TotalSeconds:N0} seconds.");
         }
     }
 
@@ -110,4 +148,9 @@ public sealed class FuzzRunnerEvidenceTests
         }
         throw new DirectoryNotFoundException("Could not find repository root.");
     }
+
+    private sealed record ProcessResult(
+        int ExitCode,
+        string Output,
+        string Error);
 }

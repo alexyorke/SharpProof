@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
@@ -10,7 +11,7 @@ using SharpProof.Worker.Protocol;
 namespace SharpProof.Package.Test;
 
 [TestFixture]
-[NonParallelizable]
+[Parallelizable(ParallelScope.Children)]
 public sealed class FinalCompilationProbeTests
 {
     private const string NetStandardTargetFramework = "netstandard2.0";
@@ -125,6 +126,7 @@ public sealed class FinalCompilationProbeTests
             workspace.PackedProbeArtifactPath);
         var firstManifest = await CompilerManifestArtifact.ReadAsync(
             workspace.CompilerManifestPath);
+        AssertManifestBindsProbeInputs(firstOracle, firstManifest);
         Assert.That(
             firstOracle.SyntaxTreePaths,
             Has.Some.EndsWith(CompilerProbeContract.GlobalUsingsHintName));
@@ -212,7 +214,7 @@ public sealed class FinalCompilationProbeTests
                 "canonical Linux amd64 container"));
         _ = await ProbeArtifact.ReadAsync(workspace.PackedProbeArtifactPath);
         _ = await CompilerManifestArtifact.ReadAsync(
-            workspace.CompilerManifestPath);
+            workspace.InvocationCompilerManifestPath);
     }
 
     [Test]
@@ -302,6 +304,47 @@ public sealed class FinalCompilationProbeTests
             result.Output,
             Does.Contain(
                 "canonical Linux amd64 container"));
+    }
+
+    private static void AssertManifestBindsProbeInputs(
+        ProbeArtifact probe,
+        CompilerManifestArtifact manifest)
+    {
+        using var document = JsonDocument.Parse(manifest.Bytes);
+        var compilation = document.RootElement.GetProperty("compilation");
+        var trees = compilation.GetProperty("syntaxTrees")
+            .EnumerateArray()
+            .Select(tree => (
+                Path: tree.GetProperty("path").GetString() ?? string.Empty,
+                Sha256: tree.GetProperty("sha256").GetString() ?? string.Empty))
+            .ToArray();
+        foreach (var expectedSuffix in new[] { "Subject.cs", CompilerProbeContract.ContractHintName })
+        {
+            var probeTree = probe.SyntaxTrees
+                .Select(static text => JsonDocument.Parse(text))
+                .Single(tree => (tree.RootElement.GetProperty("path").GetString() ?? string.Empty)
+                    .EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase));
+            var probeHash = probeTree.RootElement.GetProperty("textSha256").GetString();
+            var manifestHash = trees.Single(tree => tree.Path.EndsWith(
+                expectedSuffix, StringComparison.OrdinalIgnoreCase)).Sha256;
+            Assert.That(manifestHash, Is.EqualTo(probeHash),
+                "compiler manifest syntax-tree provenance: " + expectedSuffix);
+            probeTree.Dispose();
+        }
+
+        var additionalPath = compilation.GetProperty("additionalFiles")
+            .EnumerateArray()
+            .Single(file => (file.GetProperty("path").GetString() ?? string.Empty)
+                .EndsWith(CompilerProbeContract.AdditionalFileName, StringComparison.OrdinalIgnoreCase));
+        var expectedAdditionalHash = Convert.ToHexString(SHA256.HashData(
+            Encoding.UTF8.GetBytes("initial-generator-input\n")));
+        Assert.That(
+            string.Equals(
+                additionalPath.GetProperty("sha256").GetString(),
+                expectedAdditionalHash,
+                StringComparison.OrdinalIgnoreCase),
+            Is.True,
+            "compiler manifest additional-file provenance");
     }
 
     public enum ProbeSuppression
@@ -557,16 +600,24 @@ public sealed class FinalCompilationProbeTests
             Path.GetTempPath(),
             "SharpProof.FinalProbe");
         private readonly string _root;
+        private string _sharedCompilationServerId;
 
         private ProbeWorkspace(string root)
         {
             _root = root;
+            _sharedCompilationServerId = CreateSharedCompilationServerId(
+                "direct",
+                root);
             ProjectPath = Path.Combine(root, "Consumer.csproj");
             ArtifactDirectory = Path.Combine(root, "probe");
             PackageCache = Path.Combine(root, "package-cache");
             CompilerManifestPath = Path.Combine(
                 root,
                 "published",
+                "compiler-manifest.json");
+            InvocationCompilerManifestPath = Path.Combine(
+                root,
+                "invocation",
                 "compiler-manifest.json");
             PackedProbeArtifactPath = Path.Combine(
                 root,
@@ -593,6 +644,10 @@ public sealed class FinalCompilationProbeTests
             get;
         }
         internal string CompilerManifestPath
+        {
+            get;
+        }
+        internal string InvocationCompilerManifestPath
         {
             get;
         }
@@ -627,6 +682,9 @@ public sealed class FinalCompilationProbeTests
             string profile = "advisory",
             bool designTimeBuild = false)
         {
+            _sharedCompilationServerId = CreateSharedCompilationServerId(
+                "direct",
+                _root);
             File.WriteAllText(
                 SubjectPath,
                 """
@@ -654,6 +712,9 @@ public sealed class FinalCompilationProbeTests
 
         internal void WritePackedConsumer(string packageVersion)
         {
+            _sharedCompilationServerId = CreateSharedCompilationServerId(
+                "packed",
+                _root);
             File.WriteAllText(
                 SubjectPath,
                 """
@@ -688,8 +749,7 @@ public sealed class FinalCompilationProbeTests
                 "-c",
                 "Release",
                 "--nologo",
-                "/nodeReuse:false",
-                "-p:UseSharedCompilation=false"
+                "/nodeReuse:false"
             ]);
         }
 
@@ -704,8 +764,7 @@ public sealed class FinalCompilationProbeTests
                 "Release",
                 "--no-restore",
                 "--nologo",
-                "/nodeReuse:false",
-                "-p:UseSharedCompilation=false"
+                "/nodeReuse:false"
             };
             if (forceUnsupportedWorkerHost)
             {
@@ -785,6 +844,8 @@ public sealed class FinalCompilationProbeTests
             {
                 startInfo.ArgumentList.Add(argument);
             }
+            startInfo.Environment["SharedCompilationId"] =
+                _sharedCompilationServerId;
 
             using var process = Process.Start(startInfo) ??
                 throw new InvalidOperationException("Failed to start dotnet.");
@@ -795,6 +856,19 @@ public sealed class FinalCompilationProbeTests
                 process.ExitCode,
                 (await standardOutput) + Environment.NewLine +
                 (await standardError));
+        }
+
+        private static string CreateSharedCompilationServerId(
+            string role,
+            string root)
+        {
+            var identity =
+                typeof(FinalCompilationProbeTests).Assembly.ManifestModule
+                    .ModuleVersionId.ToString("N") + "\n" +
+                Path.GetFullPath(root);
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
+            return "sharpproof-final-probe-" + role + "-" +
+                Convert.ToHexString(hash.AsSpan(0, 16));
         }
 
         internal string[] GetArtifactPaths()
@@ -913,7 +987,7 @@ public sealed class FinalCompilationProbeTests
                     <SharpProofVerifyRequestFile>{Escape(Path.Combine(_root, "published", "request.json"))}</SharpProofVerifyRequestFile>
                     <SharpProofVerifyResultFile>{Escape(VerifyResultPath)}</SharpProofVerifyResultFile>
                     <SharpProofCompilerManifestFile>{Escape(Path.Combine(_root, "published", "compiler-manifest.json"))}</SharpProofCompilerManifestFile>
-                    <_SharpProofCompilerManifestPath>{Escape(CompilerManifestPath)}</_SharpProofCompilerManifestPath>
+                    <_SharpProofCompilerManifestPath>{Escape(InvocationCompilerManifestPath)}</_SharpProofCompilerManifestPath>
                     <SharpProofVerifyCacheDirectory>{Escape(Path.Combine(_root, "published", "cache"))}</SharpProofVerifyCacheDirectory>
                     <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
                     <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>

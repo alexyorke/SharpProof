@@ -183,6 +183,7 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
                  resolvedCachePath,
                  workerDirectory));
         var aliasesCompilerOutput = publicationPaths
+            .Concat(inputPaths)
             .Concat(publicationMarkerPaths)
             .Any(publication => compilerOutputPaths.Any(compilerOutput =>
                 string.Equals(
@@ -246,13 +247,14 @@ public sealed class InvalidatePublishedResult : Microsoft.Build.Utilities.Task, 
 
     public void Cancel()
     {
-        Action? cancel;
         lock (_synchronization)
         {
             _canceled = true;
-            cancel = _cancelExecution;
+            // Invoke while Execute still owns the linked source. Copying the
+            // delegate and invoking after releasing the lock races the
+            // Execute finally block and can call Cancel on a disposed source.
+            _cancelExecution?.Invoke();
         }
-        cancel?.Invoke();
     }
 
     private static IEnumerable<string> Present(params string?[] paths)

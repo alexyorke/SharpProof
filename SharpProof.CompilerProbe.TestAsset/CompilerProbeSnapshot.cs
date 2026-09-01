@@ -4,6 +4,9 @@ namespace SharpProof.CompilerProbe.TestAsset;
 
 internal static class CompilerProbeSnapshot
 {
+    private const string CommandLineAdditionalTextTypeName =
+        "Microsoft.CodeAnalysis.AdditionalTextFile";
+
     internal static string Create(CompilationAnalysisContext context)
     {
         var compilation = (CSharpCompilation)context.Compilation;
@@ -38,7 +41,7 @@ internal static class CompilerProbeSnapshot
             builder,
             ref first,
             "portableReferences",
-            CreateReferenceRows(compilation));
+            CreateReferenceRows(compilation, context.CancellationToken));
         ProbeJson.RawArrayProperty(
             builder,
             ref first,
@@ -101,6 +104,11 @@ internal static class CompilerProbeSnapshot
                 .Select(static option => option.LanguageVersion.ToString())
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(static value => value, StringComparer.Ordinal));
+        ProbeJson.StringProperty(
+            builder,
+            ref first,
+            "mainTypeName",
+            options.MainTypeName ?? string.Empty);
         ProbeJson.StringProperty(
             builder,
             ref first,
@@ -228,9 +236,11 @@ internal static class CompilerProbeSnapshot
             builder,
             ref first,
             "generatedKind",
-            IsGenerated(tree.FilePath, text)
-                ? "Generated"
-                : "NotGenerated");
+            // A Compilation exposes no trustworthy pipeline-origin metadata for
+            // a SyntaxTree. File names and comments are conventions that
+            // handwritten source can freely imitate, so do not assert source
+            // provenance from those heuristics.
+            "Unknown");
         ProbeJson.IntegerProperty(
             builder,
             ref first,
@@ -331,16 +341,38 @@ internal static class CompilerProbeSnapshot
     }
 
     private static IEnumerable<string> CreateReferenceRows(
-        CSharpCompilation compilation)
+        CSharpCompilation compilation,
+        CancellationToken cancellationToken)
     {
         return compilation.References
-            .OfType<PortableExecutableReference>()
             .Select(reference =>
-                CreateReferenceRow(compilation, reference))
+                CreateReferenceRow(
+                    compilation,
+                    reference,
+                    cancellationToken))
             .OrderBy(static row => row, StringComparer.Ordinal);
     }
 
     private static string CreateReferenceRow(
+        CSharpCompilation compilation,
+        MetadataReference reference,
+        CancellationToken cancellationToken)
+    {
+        return reference switch
+        {
+            PortableExecutableReference portable =>
+                CreatePortableReferenceRow(compilation, portable),
+            CompilationReference source =>
+                CreateCompilationReferenceRow(
+                    compilation,
+                    source,
+                    cancellationToken),
+            _ => throw new InvalidOperationException(
+                "The C# compiler probe encountered an unsupported reference.")
+        };
+    }
+
+    private static string CreatePortableReferenceRow(
         CSharpCompilation compilation,
         PortableExecutableReference reference)
     {
@@ -379,7 +411,7 @@ internal static class CompilerProbeSnapshot
             builder,
             ref first,
             "fileSha256",
-            File.Exists(path) ? ProbeHash.File(path) : string.Empty);
+            GetPortableReferenceSha256(reference, path));
         ProbeJson.StringProperty(
             builder,
             ref first,
@@ -389,9 +421,204 @@ internal static class CompilerProbeSnapshot
         return builder.ToString();
     }
 
+    private static string CreateCompilationReferenceRow(
+        CSharpCompilation compilation,
+        CompilationReference reference,
+        CancellationToken cancellationToken)
+    {
+        var builder = new StringBuilder();
+        var first = true;
+        builder.Append('{');
+        ProbeJson.StringArrayProperty(
+            builder,
+            ref first,
+            "aliases",
+            reference.Properties.Aliases.OrderBy(
+                static alias => alias,
+                StringComparer.Ordinal));
+        ProbeJson.StringProperty(
+            builder,
+            ref first,
+            "assemblyOrModuleIdentity",
+            GetReferenceIdentity(compilation, reference));
+        ProbeJson.StringProperty(
+            builder,
+            ref first,
+            "compilationSha256",
+            CreateCompilationReferenceSha256(
+                GetReferencedCompilation(reference),
+                cancellationToken));
+        ProbeJson.StringProperty(
+            builder,
+            ref first,
+            "display",
+            NormalizePath(reference.Display ?? string.Empty));
+        ProbeJson.BooleanProperty(
+            builder,
+            ref first,
+            "embedInteropTypes",
+            reference.Properties.EmbedInteropTypes);
+        ProbeJson.StringProperty(
+            builder,
+            ref first,
+            "kind",
+            reference.Properties.Kind.ToString());
+        builder.Append('}');
+        return builder.ToString();
+    }
+
+    private static string GetPortableReferenceSha256(
+        PortableExecutableReference reference,
+        string path)
+    {
+        if (File.Exists(path))
+        {
+            return ProbeHash.File(path);
+        }
+
+        var metadata = reference.GetMetadata();
+        var method = metadata.GetType().GetMethod(
+            "GetEntireImage",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic,
+            binder: null,
+            Type.EmptyTypes,
+            modifiers: null);
+        var image = method?.Invoke(metadata, null);
+        if (image is null)
+        {
+            image = FindRetainedPortableImage(
+                metadata,
+                depth: 4,
+                []);
+        }
+        if (image is System.Collections.Immutable.ImmutableArray<byte> bytes &&
+            !bytes.IsDefault)
+        {
+            return ProbeHash.Bytes(bytes.ToArray());
+        }
+        if (image is System.Reflection.PortableExecutable.PEMemoryBlock block)
+        {
+            return ProbeHash.Bytes(block.GetContent().ToArray());
+        }
+
+        return string.Empty;
+    }
+
+    private static System.Collections.Immutable.ImmutableArray<byte>
+        FindRetainedPortableImage(
+            object? value,
+            int depth,
+            List<object> visited)
+    {
+        if (value is null || depth < 0)
+        {
+            return default;
+        }
+        if (value is System.Reflection.PortableExecutable.PEReader reader)
+        {
+            return reader.GetEntireImage().GetContent();
+        }
+        if (value is System.Collections.Immutable.ImmutableArray<byte> bytes &&
+            !bytes.IsDefault)
+        {
+            return bytes;
+        }
+        var type = value.GetType();
+        if (type.IsPrimitive || type.IsEnum || value is string or Delegate ||
+            visited.Any(item => ReferenceEquals(item, value)))
+        {
+            return default;
+        }
+        visited.Add(value);
+
+        if (value is System.Collections.IEnumerable sequence)
+        {
+            var count = 0;
+            foreach (var item in sequence)
+            {
+                var found = FindRetainedPortableImage(
+                    item,
+                    depth - 1,
+                    visited);
+                if (!found.IsDefault || ++count >= 32)
+                {
+                    return found;
+                }
+            }
+        }
+
+        const System.Reflection.BindingFlags flags =
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic |
+            System.Reflection.BindingFlags.DeclaredOnly;
+        for (var current = type;
+             current != null;
+             current = current.BaseType)
+        {
+            foreach (var field in current.GetFields(flags))
+            {
+                var found = FindRetainedPortableImage(
+                    field.GetValue(value),
+                    depth - 1,
+                    visited);
+                if (!found.IsDefault)
+                {
+                    return found;
+                }
+            }
+        }
+        return default;
+    }
+
+    private static CSharpCompilation GetReferencedCompilation(
+        CompilationReference reference)
+    {
+        const System.Reflection.BindingFlags flags =
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic;
+        var property = reference.GetType()
+            .GetProperties(flags)
+            .SingleOrDefault(static candidate =>
+                candidate.Name == "Compilation" &&
+                typeof(CSharpCompilation).IsAssignableFrom(
+                    candidate.PropertyType));
+        return property?.GetValue(reference) as CSharpCompilation ??
+            throw new InvalidOperationException(
+                "The C# compiler probe encountered a non-C# compilation reference.");
+    }
+
+    private static string CreateCompilationReferenceSha256(
+        CSharpCompilation compilation,
+        CancellationToken cancellationToken)
+    {
+        var builder = new StringBuilder();
+        var first = true;
+        builder.Append('{');
+        ProbeJson.PropertyName(builder, ref first, "assembly");
+        AppendAssembly(builder, compilation);
+        ProbeJson.PropertyName(builder, ref first, "options");
+        AppendOptions(builder, compilation);
+        ProbeJson.RawArrayProperty(
+            builder,
+            ref first,
+            "syntaxTrees",
+            CreateSyntaxTreeRows(compilation, cancellationToken));
+        ProbeJson.RawArrayProperty(
+            builder,
+            ref first,
+            "references",
+            CreateReferenceRows(compilation, cancellationToken));
+        builder.Append('}');
+        return ProbeHash.Text(builder.ToString());
+    }
+
     private static string GetReferenceIdentity(
         CSharpCompilation compilation,
-        PortableExecutableReference reference)
+        MetadataReference reference)
     {
         return compilation.GetAssemblyOrModuleSymbol(reference) switch
         {
@@ -408,8 +635,9 @@ internal static class CompilerProbeSnapshot
         return context.Options.AdditionalFiles
             .Select(file =>
             {
-                var text = file.GetText(context.CancellationToken)?
-                    .ToString() ?? string.Empty;
+                var text = GetStableAdditionalText(
+                    file,
+                    context.CancellationToken).ToString();
                 var builder = new StringBuilder();
                 var first = true;
                 builder.Append('{');
@@ -437,22 +665,35 @@ internal static class CompilerProbeSnapshot
             .OrderBy(static row => row, StringComparer.Ordinal);
     }
 
+    private static SourceText GetStableAdditionalText(
+        AdditionalText file,
+        CancellationToken cancellationToken)
+    {
+        // The command-line compiler's AdditionalTextFile caches one
+        // Lazy<SourceText> for both generators and analyzers. A custom provider
+        // has no equivalent consistency guarantee, so it cannot back this
+        // final-compilation authority.
+        var providerType = file.GetType();
+        if (providerType.Assembly != typeof(AdditionalText).Assembly ||
+            !string.Equals(
+                providerType.FullName,
+                CommandLineAdditionalTextTypeName,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "An additional file does not expose a stable compiler input snapshot.");
+        }
+
+        return file.GetText(cancellationToken) ??
+            throw new InvalidOperationException(
+                "An additional file has no compiler text.");
+    }
+
     private static string GetOption(
         AnalyzerConfigOptions options,
         string key)
     {
         return options.TryGetValue(key, out var value) ? value : string.Empty;
-    }
-
-    private static bool IsGenerated(string path, string text)
-    {
-        return path.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase) ||
-        path.EndsWith(
-            ".generated.cs",
-            StringComparison.OrdinalIgnoreCase) ||
-        text.TrimStart().StartsWith(
-            "// <auto-generated",
-            StringComparison.Ordinal);
     }
 
     private static string NormalizePath(string path)

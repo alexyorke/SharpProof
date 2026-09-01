@@ -21,12 +21,44 @@ internal static class PrimaryConstructorCallableInventory
         var matches = type.InstanceConstructors
             .Where(candidate =>
                 candidate.MethodKind == MethodKind.Constructor &&
-                candidate.Parameters.Length == parameters.Value.Count &&
-                candidate.Parameters.Select(static parameter => parameter.Name)
-                    .SequenceEqual(
-                        parameters.Value.Select(static parameter =>
-                            parameter.Identifier.ValueText),
-                        StringComparer.Ordinal))
+                candidate.DeclaringSyntaxReferences.Any(reference =>
+                    reference.SyntaxTree == declaration.SyntaxTree &&
+                    reference.GetSyntax(cancellationToken) is
+                        TypeDeclarationSyntax owner &&
+                    owner.Span == declaration.Span))
+            .ToArray();
+        if (matches.Length != 1)
+        {
+            return false;
+        }
+
+        constructor = ContractClauseInventoryBuilder.NormalizeCallable(
+            matches[0]);
+        return true;
+    }
+
+    internal static bool TryGetSynthesizedDefault(
+        TypeDeclarationSyntax declaration,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out IMethodSymbol constructor)
+    {
+        constructor = null!;
+        if (declaration.ParameterList != null ||
+            semanticModel.GetDeclaredSymbol(
+                declaration,
+                cancellationToken) is not INamedTypeSymbol
+                {
+                    TypeKind: TypeKind.Class
+                } type)
+        {
+            return false;
+        }
+
+        var matches = type.InstanceConstructors
+            .Where(static candidate =>
+                candidate.IsImplicitlyDeclared &&
+                candidate.Parameters.IsEmpty)
             .ToArray();
         if (matches.Length != 1)
         {

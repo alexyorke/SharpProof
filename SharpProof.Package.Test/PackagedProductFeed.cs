@@ -32,6 +32,10 @@ internal sealed class PackagedProductFeed : IDisposable
     ];
     private static readonly Lazy<Task<PackagedProductFeed>> s_shared =
         new(CreateAsync, LazyThreadSafetyMode.ExecutionAndPublication);
+    private static readonly string s_sharedCompilationServerId =
+        "sharpproof-package-feed-" +
+        typeof(PackagedProductFeed).Assembly.ManifestModule.ModuleVersionId
+            .ToString("N");
 
     private readonly bool _ownsRoot;
     private readonly string? _ownedRoot;
@@ -165,7 +169,6 @@ internal sealed class PackagedProductFeed : IDisposable
                     "Release",
                     "--nologo",
                     "/nodeReuse:false",
-                    "-p:UseSharedCompilation=false",
                     "-p:GeneratePackageOnBuild=false",
                     "--output",
                     sourceDirectory);
@@ -340,6 +343,8 @@ internal sealed class PackagedProductFeed : IDisposable
         {
             startInfo.ArgumentList.Add(argument);
         }
+        startInfo.Environment["SharedCompilationId"] =
+            s_sharedCompilationServerId;
 
         using var process = Process.Start(startInfo) ??
             throw new InvalidOperationException("Failed to start dotnet.");

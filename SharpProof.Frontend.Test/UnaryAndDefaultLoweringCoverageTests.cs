@@ -184,6 +184,17 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
     }
 
     [Test]
+    public void DirectLongMinValueLiteralNegationLowersToExactConstant()
+    {
+        var result = Lower(
+            "private static long Target() => -9223372036854775808L;",
+            concreteReplay: true);
+
+        Assert.That(result.IsExact, Is.True);
+        Assert.That(((IrIntegerTerm)result.Term).Value, Is.EqualTo(long.MinValue));
+    }
+
+    [Test]
     public void UnaryPlusOnUnsupportedScalarTypesFailsClosed()
     {
         var decimalValue = Lower(
@@ -275,7 +286,8 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
 
     private static FrontendLoweringResult Lower(
         string members,
-        SpecialType? specializedType = null)
+        SpecialType? specializedType = null,
+        bool concreteReplay = false)
     {
         var tree = CSharpSyntaxTree.ParseText(
             "public static class Subject {" +
@@ -313,7 +325,9 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         var operation = GetExpressionOperation(
             compilation.GetSemanticModel(tree),
             expression);
-        var lowerer = new RoslynOperationLowerer(new IrFactory());
+        var lowerer = concreteReplay
+            ? RoslynOperationLowerer.CreateForConcreteReplay(new IrFactory())
+            : new RoslynOperationLowerer(new IrFactory());
         if (specializedType.HasValue)
         {
             var replacement = compilation.GetSpecialType(

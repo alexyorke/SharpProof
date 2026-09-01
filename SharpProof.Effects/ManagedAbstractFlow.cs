@@ -229,6 +229,11 @@ internal sealed class ManagedAbstractFlow
             case IAnonymousFunctionOperation or ILocalFunctionOperation:
                 break;
             case IVariableDeclaratorOperation declarator:
+                if (IsUntrackedManagedReference(declarator.Symbol.RefKind))
+                {
+                    state = state.WithUntrackedAlias();
+                }
+
                 if (declarator.Initializer == null)
                 {
                     state = state.Set(declarator.Symbol, ManagedAbstractValue.TopForType(declarator.Symbol.Type));
@@ -246,6 +251,7 @@ internal sealed class ManagedAbstractFlow
                 }
                 break;
             case IFlowCaptureOperation capture:
+                result.RecordCoalesceAssignmentCapture(capture);
                 var captureHasMutation = ManagedMutationFacts.HasMutation(
                     capture.Value);
                 state = Transfer(state, capture.Value, result, cancellationToken);
@@ -256,23 +262,59 @@ internal sealed class ManagedAbstractFlow
                         : EvaluateCore(capture.Value, state));
                 break;
             case ISimpleAssignmentOperation assignment:
+                var aliasesUntrackedStorage = IsUntrackedRefLocal(assignment.Target);
+                if (aliasesUntrackedStorage)
+                {
+                    // Roslyn lowers ref-local declarations and writes through
+                    // ref locals to assignments. The target aliases storage
+                    // that this domain cannot identify, so facts must remain
+                    // forgotten after the alias enters the flow.
+                    state = state.WithUntrackedAlias();
+                }
+
                 var valueHasMutation = ManagedMutationFacts.HasMutation(
                     assignment.Value);
                 state = TransferMany(state, assignment.ChildOperations, result, cancellationToken);
-                state = SetStorage(
-                    state,
-                    assignment.Target,
-                    valueHasMutation
-                        ? TopForType(assignment.Type)
-                        : EvaluateCore(assignment.Value, state));
+                var assignedValue = valueHasMutation
+                    ? TopForType(assignment.Type)
+                    : EvaluateCore(assignment.Value, state);
+                if (!aliasesUntrackedStorage)
+                {
+                    state = SetStorage(
+                        state,
+                        assignment.Target,
+                        assignedValue);
+                    state = SetStorage(
+                        state,
+                        result.ResolveCoalesceAssignmentTarget(assignment.Target),
+                        assignedValue);
+                }
                 break;
             case ICompoundAssignmentOperation compound:
+                var compoundAliasesUntrackedStorage = IsUntrackedRefLocal(compound.Target);
+                if (compoundAliasesUntrackedStorage)
+                {
+                    state = state.WithUntrackedAlias();
+                }
+
                 state = TransferMany(state, compound.ChildOperations, result, cancellationToken);
-                state = SetStorage(state, compound.Target, TopForType(compound.Type));
+                if (!compoundAliasesUntrackedStorage)
+                {
+                    state = SetStorage(state, compound.Target, TopForType(compound.Type));
+                }
                 break;
             case IIncrementOrDecrementOperation increment:
+                var incrementAliasesUntrackedStorage = IsUntrackedRefLocal(increment.Target);
+                if (incrementAliasesUntrackedStorage)
+                {
+                    state = state.WithUntrackedAlias();
+                }
+
                 state = Transfer(state, increment.Target, result, cancellationToken);
-                state = SetStorage(state, increment.Target, Increment(increment, state));
+                if (!incrementAliasesUntrackedStorage)
+                {
+                    state = SetStorage(state, increment.Target, Increment(increment, state));
+                }
                 break;
             case IInvocationOperation invocation:
                 state = TransferMany(state, invocation.ChildOperations, result, cancellationToken);
@@ -732,7 +774,14 @@ internal sealed class ManagedAbstractFlow
             return EvaluateCore(operation.WhenNull, state);
         }
 
-        return Join(value, EvaluateCore(operation.WhenNull, state));
+        var whenNull = EvaluateCore(operation.WhenNull, state);
+        var joined = Join(value, whenNull);
+
+        // A coalesce cannot produce null when its fallback is definitely non-null.
+        // Keep the joined reference cardinality while refining its nullness.
+        return whenNull.IsDefinitelyNonNull && !joined.IsUnknown && !joined.IsBottom
+            ? Reference(NullnessValue.NonNull, joined.Cardinality)
+            : joined;
     }
 
     internal bool ProvesNoOverflow(IOperation operation, ManagedFlowState state)
@@ -834,9 +883,22 @@ internal sealed class ManagedAbstractFlow
     private static ManagedFlowState HavocCall(
         ManagedFlowState state, IMethodSymbol method, ImmutableArray<IArgumentOperation> arguments)
     {
-        return method.MethodKind == MethodKind.LocalFunction || method.ContainingType.TypeKind == TypeKind.Delegate
+        return method.MethodKind == MethodKind.LocalFunction ||
+            method.ContainingType.TypeKind == TypeKind.Delegate ||
+            arguments.Any(static argument =>
+                CanCarryDelegate(argument.Value))
             ? state.Forget()
             : HavocArguments(state, arguments);
+    }
+
+    private static bool CanCarryDelegate(IOperation value)
+    {
+        value = Unwrap(value);
+        return value is IDelegateCreationOperation ||
+            value.Type is { } type &&
+            (type.TypeKind == TypeKind.Delegate ||
+             type.SpecialType is SpecialType.System_Delegate or
+                 SpecialType.System_MulticastDelegate);
     }
 
     private static ManagedFlowState HavocArguments(
@@ -844,20 +906,57 @@ internal sealed class ManagedAbstractFlow
     {
         foreach (var argument in arguments)
         {
-            if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out &&
-                TryStorage(argument.Value, out var storage))
+            if (argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out)
             {
-                state = state.Set(storage, TopForType(argument.Value.Type));
+                state = HavocArgumentStorage(state, argument.Value);
             }
         }
 
         return state;
     }
 
+    private static ManagedFlowState HavocArgumentStorage(
+        ManagedFlowState state,
+        IOperation value)
+    {
+        value = Unwrap(value);
+        if (value is IConditionalOperation conditional)
+        {
+            state = HavocArgumentStorage(state, conditional.WhenTrue);
+            return conditional.WhenFalse == null
+                ? state.Forget()
+                : HavocArgumentStorage(state, conditional.WhenFalse);
+        }
+
+        if (value is IFlowCaptureReferenceOperation)
+        {
+            // A ref conditional is represented in the CFG by one capture that
+            // can alias either source storage. This value domain does not
+            // retain capture-to-storage aliases, so all scalar facts must be
+            // forgotten rather than updating only the synthetic capture.
+            return state.Forget();
+        }
+
+        return TryStorage(value, out var storage)
+            ? state.Set(storage, TopForType(value.Type))
+            : state;
+    }
+
     private static ManagedFlowState SetStorage(
         ManagedFlowState state, IOperation operation, ManagedAbstractValue value)
     {
         return TryStorage(operation, out var storage) ? state.Set(storage, value) : state;
+    }
+
+    private static bool IsUntrackedRefLocal(IOperation operation)
+    {
+        return DefiniteOperationFacts.UnwrapHarmlessValue(operation) is ILocalReferenceOperation local &&
+            IsUntrackedManagedReference(local.Local.RefKind);
+    }
+
+    private static bool IsUntrackedManagedReference(RefKind refKind)
+    {
+        return refKind is RefKind.Ref or RefKind.RefReadOnly or RefKind.RefReadOnlyParameter;
     }
 
     private static bool TryStorage(IOperation operation, out object storage)
@@ -914,9 +1013,20 @@ internal sealed class ManagedAbstractFlow
 
     internal static bool IsAcyclic(ControlFlowGraph graph)
     {
+        return IsAcyclic(graph, included: null);
+    }
+
+    internal static bool IsAcyclic(
+        ControlFlowGraph graph,
+        ISet<int>? included)
+    {
         var marks = new byte[graph.Blocks.Length];
         bool Visit(BasicBlock block)
         {
+            if (included != null && !included.Contains(block.Ordinal))
+            {
+                return true;
+            }
             if (marks[block.Ordinal] != 0)
             {
                 return marks[block.Ordinal] == 2;
@@ -925,7 +1035,7 @@ internal sealed class ManagedAbstractFlow
             marks[block.Ordinal] = 1;
             foreach (var (branch, _) in Successors(block))
             {
-                if (!Visit(branch.Destination!))
+                if (branch.Destination != null && !Visit(branch.Destination))
                 {
                     return false;
                 }
@@ -935,7 +1045,8 @@ internal sealed class ManagedAbstractFlow
             return true;
         }
         return graph.Blocks
-            .Where(static block => block.IsReachable)
+            .Where(block => block.IsReachable &&
+                (included == null || included.Contains(block.Ordinal)))
             .All(Visit);
     }
 
@@ -976,6 +1087,27 @@ internal sealed class ManagedAbstractFlow
         Compilation compilation,
         IOperation operation)
     {
+        var statement = operation.Syntax.AncestorsAndSelf()
+            .OfType<StatementSyntax>()
+            .FirstOrDefault();
+        if (statement != null)
+        {
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, statement.SyntaxTree);
+            try
+            {
+                if (model.AnalyzeControlFlow(statement) is
+                    { Succeeded: true, StartPointIsReachable: false })
+                {
+                    return true;
+                }
+            }
+            catch (ArgumentException)
+            {
+                // Unsupported statement shapes retain the permissive fallback.
+            }
+        }
+
         foreach (var syntax in operation.Syntax.Ancestors())
         {
             SyntaxNode? condition = syntax switch
@@ -1052,7 +1184,7 @@ internal sealed class ManagedAbstractFlow
     {
         internal static FlowDomain Instance { get; } = new();
         public override ManagedFlowState Bottom => ManagedFlowState.Bottom;
-        public override ManagedFlowState Top => ManagedFlowState.Empty;
+        public override ManagedFlowState Top => ManagedFlowState.Top;
         public override ManagedFlowState Join(ManagedFlowState left, ManagedFlowState right)
         {
             return ManagedFlowState.Join(left, right);
@@ -1080,6 +1212,13 @@ internal sealed class ManagedAbstractFlow
             .OfType<StatementSyntax>()
             .FirstOrDefault();
         if (statement?.Parent is not BlockSyntax block)
+        {
+            return false;
+        }
+        if (statement is LocalFunctionStatementSyntax ||
+            operation.Syntax.Ancestors().TakeWhile(candidate =>
+                candidate != statement).Any(static candidate =>
+                    candidate is AnonymousFunctionExpressionSyntax))
         {
             return false;
         }
@@ -1169,7 +1308,19 @@ internal sealed class ManagedFlowAnalysis
 
 internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 {
+    private readonly CoalesceAssignmentFlowCaptures _coalesceCaptures = new();
     private readonly Dictionary<object, ManagedFlowState> _states = new(ManagedKeyComparer.Instance);
+
+    internal void RecordCoalesceAssignmentCapture(
+        IFlowCaptureOperation capture)
+    {
+        _coalesceCaptures.Record(capture);
+    }
+
+    internal IOperation ResolveCoalesceAssignmentTarget(IOperation target)
+    {
+        return _coalesceCaptures.Resolve(target);
+    }
 
     internal void Record(IOperation operation, ManagedFlowState state)
     {
@@ -1344,14 +1495,19 @@ internal sealed class ManagedFlowState
     private static readonly ImmutableDictionary<object, ManagedAbstractValue> NoValues =
         ImmutableDictionary.Create<object, ManagedAbstractValue>(Comparer);
     private readonly ImmutableDictionary<object, ManagedAbstractValue>? _values;
+    private readonly bool _hasUntrackedAlias;
 
-    private ManagedFlowState(ImmutableDictionary<object, ManagedAbstractValue>? values)
+    private ManagedFlowState(
+        ImmutableDictionary<object, ManagedAbstractValue>? values,
+        bool hasUntrackedAlias = false)
     {
         _values = values;
+        _hasUntrackedAlias = hasUntrackedAlias;
     }
 
     internal static ManagedFlowState Bottom { get; } = new(null);
     internal static ManagedFlowState Empty { get; } = new(NoValues);
+    internal static ManagedFlowState Top { get; } = new(NoValues, hasUntrackedAlias: true);
     internal bool IsBottom => _values == null;
     internal ManagedAbstractValue Get(object storage)
     {
@@ -1373,12 +1529,22 @@ internal sealed class ManagedFlowState
 
     internal ManagedFlowState Set(object storage, ManagedAbstractValue value)
     {
-        return _values == null || value.IsBottom ? Bottom : new(_values.SetItem(storage, value));
+        if (_values == null || value.IsBottom)
+        {
+            return Bottom;
+        }
+
+        return _hasUntrackedAlias ? this : new(_values.SetItem(storage, value));
+    }
+
+    internal ManagedFlowState WithUntrackedAlias()
+    {
+        return IsBottom ? this : Top;
     }
 
     internal ManagedFlowState Forget()
     {
-        return IsBottom ? this : Empty;
+        return IsBottom || _hasUntrackedAlias ? this : Empty;
     }
 
     internal static ManagedFlowState Join(ManagedFlowState left, ManagedFlowState right)
@@ -1391,6 +1557,11 @@ internal sealed class ManagedFlowState
         if (right._values == null)
         {
             return left;
+        }
+
+        if (left._hasUntrackedAlias || right._hasUntrackedAlias)
+        {
+            return Top;
         }
 
         var result = NoValues.ToBuilder();
@@ -1410,6 +1581,16 @@ internal sealed class ManagedFlowState
         }
 
         if (right._values == null)
+        {
+            return false;
+        }
+
+        if (right._hasUntrackedAlias)
+        {
+            return true;
+        }
+
+        if (left._hasUntrackedAlias)
         {
             return false;
         }
@@ -1605,7 +1786,15 @@ internal readonly record struct ManagedAbstractValue(
 
     internal static ManagedAbstractValue NegateBoolean(ManagedAbstractValue value)
     {
-        return value.TryGetBoolean(out var boolean) ? Boolean(!boolean) : Unknown;
+        // Negation preserves the Boolean domain even when the value is not a
+        // singleton. Keeping BooleanUnknown allows subsequent Boolean
+        // equality/refinement instead of widening the result to an untyped
+        // value.
+        return value.TryGetBoolean(out var boolean)
+            ? Boolean(!boolean)
+            : value.IsBoolean
+                ? BooleanUnknown
+                : Unknown;
     }
 
     internal static bool TryArithmetic(
@@ -1913,33 +2102,63 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     /// Returns whether a source method has a reachable normal exit.  This is
     /// intentionally a control-flow fact rather than a may-throw fact: a
     /// method with both a throwing and a returning branch can still permit the
-    /// caller's next source-order step.
+    /// caller's next source-order step. Async and iterator bodies execute
+    /// behind a deferred call boundary, so their body termination cannot make
+    /// the invocation itself noncompleting.
     /// </summary>
     internal bool MethodCanCompleteNormally(IMethodSymbol method)
     {
         method = ArgumentNullGuard.NotNull(method, nameof(method));
         cancellationToken.ThrowIfCancellationRequested();
         var normalized = method.OriginalDefinition;
-        if (normalized.DeclaringSyntaxReferences.Length != 1)
+        var isImplicitConstructor = EffectMethodNodeBuilder
+            .IsSourceImplicitParameterlessConstructor(normalized);
+        if (!isImplicitConstructor &&
+            normalized.DeclaringSyntaxReferences.Length != 1)
         {
             return true;
         }
-        if (!_activeMethods.Add(normalized))
+        if (!isImplicitConstructor &&
+            HasUnconditionalSelfInvocation(normalized))
         {
             return false;
+        }
+        if (!_activeMethods.Add(normalized))
+        {
+            // This is a may-complete query. Recursive re-entry is uncertainty,
+            // not evidence that every invocation is nonreturning.
+            return true;
         }
 
         try
         {
+            if (isImplicitConstructor)
+            {
+                return ImplicitConstructorMayCompleteNormally(normalized);
+            }
+
             var declaration = normalized.DeclaringSyntaxReferences[0]
                 .GetSyntax(cancellationToken);
+            if (DefersBodyCompletion(normalized, declaration))
+            {
+                return true;
+            }
             var model = SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(compilation, declaration.SyntaxTree);
             var operation = model.GetOperation(declaration, cancellationToken) ??
                 (GetBody(declaration) is { } methodBody
                     ? model.GetOperation(methodBody, cancellationToken)
                     : null);
-            return operation == null || MayCompleteNormally(operation);
+            if (operation == null)
+            {
+                return true;
+            }
+            return normalized.MethodKind == MethodKind.Constructor &&
+                operation is IConstructorBodyOperation constructorBody
+                ? ConstructorMayCompleteNormally(
+                    normalized,
+                    constructorBody)
+                : MayCompleteNormally(operation);
         }
         catch (ArgumentException)
         {
@@ -1949,6 +2168,126 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         {
             _activeMethods.Remove(normalized);
         }
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1508:Avoid dead conditional code",
+        Justification = "The analyzer does not track the nullable expression " +
+            "selected from the declaration syntax.")]
+    private bool HasUnconditionalSelfInvocation(IMethodSymbol method)
+    {
+        try
+        {
+            var declaration = method.DeclaringSyntaxReferences[0]
+                .GetSyntax(cancellationToken);
+            ExpressionSyntax? expression = declaration switch
+            {
+                MethodDeclarationSyntax
+                { ExpressionBody.Expression: { } body } => body,
+                MethodDeclarationSyntax
+                { Body.Statements.Count: 1 } body when
+                    body.Body!.Statements[0] is ExpressionStatementSyntax
+                    { Expression: { } statement } => statement,
+                _ => null
+            };
+            if (expression == null)
+            {
+                return false;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, expression.SyntaxTree);
+            return model.GetOperation(expression, cancellationToken) is
+                IInvocationOperation invocation &&
+                SymbolEqualityComparer.Default.Equals(
+                    invocation.TargetMethod.OriginalDefinition,
+                    method.OriginalDefinition);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private bool ImplicitConstructorMayCompleteNormally(
+        IMethodSymbol constructor)
+    {
+        if (constructor.ContainingType.IsValueType)
+        {
+            return true;
+        }
+
+        var baseConstructor = EffectMethodNodeBuilder
+            .GetUniqueParameterlessBaseConstructor(constructor);
+        return baseConstructor != null &&
+            MethodCanCompleteNormally(baseConstructor);
+    }
+
+    private bool ConstructorMayCompleteNormally(
+        IMethodSymbol constructor,
+        IConstructorBodyOperation body)
+    {
+        if (!MayCompleteNormally(body.Initializer))
+        {
+            return false;
+        }
+
+        var initializer = EffectMethodNodeBuilder
+            .GetConstructorInitializerInvocation(body);
+        var delegatesToThis = initializer != null &&
+            SymbolEqualityComparer.Default.Equals(
+                initializer.TargetMethod.ContainingType.OriginalDefinition,
+                constructor.ContainingType.OriginalDefinition);
+        if (!delegatesToThis)
+        {
+            foreach (var reference in EffectMethodNodeBuilder
+                         .GetMemberInitializerReferences(
+                             compilation,
+                             constructor.ContainingType,
+                             staticInitializers: false))
+            {
+                var declaration = reference.GetSyntax(cancellationToken);
+                var expression = EffectProjections.GetInitializerExpression(
+                    declaration);
+                if (expression == null)
+                {
+                    continue;
+                }
+
+                var model = SharpProof.Frontend.Host
+                    .CompilationModelProvider.GetSemanticModel(
+                        compilation,
+                        expression.SyntaxTree);
+                var operation = model.GetOperation(
+                    expression,
+                    cancellationToken);
+                if (operation != null && !MayCompleteNormally(operation))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return MayCompleteNormally(body.BlockBody) &&
+            MayCompleteNormally(body.ExpressionBody);
+    }
+
+    private static bool DefersBodyCompletion(
+        IMethodSymbol method,
+        SyntaxNode declaration)
+    {
+        if (method.IsAsync)
+        {
+            return true;
+        }
+
+        var body = GetBody(declaration);
+        return body != null && body.DescendantNodesAndSelf(
+                descendIntoChildren: static node =>
+                    node is not AnonymousFunctionExpressionSyntax and
+                    not LocalFunctionStatementSyntax)
+            .Any(static node => node is YieldStatementSyntax);
     }
 
     /// <summary>
@@ -1994,6 +2333,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             IPropertySubpatternOperation propertySubpattern =>
                 MayCompleteNormally(propertySubpattern.Member) &&
                 MayCompleteNormally(propertySubpattern.Pattern),
+            IBinaryPatternOperation binaryPattern =>
+                MayCompleteBinaryPattern(binaryPattern),
             IListPatternOperation listPattern =>
                 MayCompleteListPattern(listPattern),
             IRecursivePatternOperation recursivePattern =>
@@ -2022,8 +2363,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 MayCompleteNormally(@lock.LockedValue) &&
                 MayCompleteNormally(@lock.Body),
             IBinaryOperation binary =>
-                ChildrenMayCompleteNormally(binary) &&
-                !IsDefinitelyZeroDivision(binary),
+                BinaryMayCompleteNormally(binary),
             IUnaryOperation or IConversionOperation or
                 IIncrementOrDecrementOperation or ICompoundAssignmentOperation or
                 ISimpleAssignmentOperation or IArrayElementReferenceOperation or
@@ -2051,28 +2391,40 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             ILoopOperation loop when
                 LoopConditionIsAlwaysTrue(loop) &&
                 loop.Body != null &&
-                !LoopHasReachableBreak(loop.Body) => false,
-            ITryOperation @try =>
-                (@try.Finally == null || MayCompleteNormally(@try.Finally)) &&
-                @try.Catches.All(catchClause =>
-                    MayCompleteNormally(catchClause.Handler)),
+                !LoopHasReachableExit(loop) => false,
+            ITryOperation @try => TryMayCompleteNormally(@try),
             ILoopOperation or ISwitchOperation => true,
             _ => true
         };
+    }
+
+    private bool MayCompleteBinaryPattern(
+        IBinaryPatternOperation pattern)
+    {
+        if (!MayCompleteNormally(pattern.LeftPattern))
+        {
+            return false;
+        }
+
+        var input = SwitchExpressionFacts.GetGoverningValue(pattern);
+        var leftSelection =
+            SwitchExpressionFacts.GetPatternSelectionForUnknownValue(
+                pattern.LeftPattern,
+                pattern.LeftPattern.InputType,
+                input != null && IsDefinitelyNonNull(input));
+        var rightIsRequired =
+            pattern.OperatorKind == BinaryOperatorKind.And &&
+            leftSelection == SwitchExpressionSelection.Always ||
+            pattern.OperatorKind == BinaryOperatorKind.Or &&
+            leftSelection == SwitchExpressionSelection.Never;
+        return !rightIsRequired ||
+            MayCompleteNormally(pattern.RightPattern);
     }
 
     private bool MayCompleteSwitchExpression(
         ISwitchExpressionOperation switchExpression)
     {
         if (!MayCompleteNormally(switchExpression.Value))
-        {
-            return false;
-        }
-
-        if (SwitchExpressionFacts.HasReachableUnmatchedPath(
-                switchExpression,
-                MayCompleteNormally,
-                IsDefinitelyNonNull(switchExpression.Value)))
         {
             return false;
         }
@@ -2084,9 +2436,27 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             .Any(MayCompleteNormally);
     }
 
+    private bool TryMayCompleteNormally(ITryOperation @try)
+    {
+        if (@try.Finally != null && !MayCompleteNormally(@try.Finally))
+        {
+            return false;
+        }
+
+        return MayCompleteNormally(@try.Body) ||
+            @try.Catches.Any(catchClause =>
+                (catchClause.Filter == null ||
+                 MayCompleteNormally(catchClause.Filter)) &&
+                MayCompleteNormally(catchClause.Handler));
+    }
+
     private bool MayCompleteRecursivePattern(
         IRecursivePatternOperation pattern)
     {
+        if (HasNullableNullMismatchPath(pattern))
+        {
+            return true;
+        }
         if (pattern.DeconstructSymbol is IMethodSymbol deconstruct &&
             !MethodCanCompleteNormally(deconstruct))
         {
@@ -2099,6 +2469,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     private bool MayCompleteListPattern(IListPatternOperation pattern)
     {
         var value = SwitchExpressionFacts.GetGoverningValue(pattern);
+        if (HasNullableNullMismatchPath(pattern, value))
+        {
+            return true;
+        }
         if (pattern.InputType?.IsValueType != true &&
             value?.Syntax.ToString().IndexOf(
                 "null",
@@ -2150,6 +2524,16 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             }
         }
         return true;
+    }
+
+    private static bool HasNullableNullMismatchPath(
+        IPatternOperation pattern,
+        IOperation? value = null)
+    {
+        value ??= SwitchExpressionFacts.GetGoverningValue(pattern);
+        return (ManagedAbstractValue.IsNullableType(pattern.InputType) ||
+                ManagedAbstractValue.IsNullableType(value?.Type)) &&
+            (value == null || !IsDefinitelyNonNull(value));
     }
 
     private bool TryGetListPatternLength(
@@ -2205,33 +2589,69 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         {
             IWhileLoopOperation
             {
-                ConditionIsTop: true,
                 ConditionIsUntil: false,
                 Condition.ConstantValue: { HasValue: true, Value: true }
             } => true,
             IForLoopOperation { Condition: null } => true,
+            IForLoopOperation
+            {
+                Condition.ConstantValue: { HasValue: true, Value: true }
+            } => true,
             _ => false
         };
     }
 
-    private static bool LoopHasReachableBreak(IOperation body)
+    private bool LoopHasReachableExit(ILoopOperation loop)
     {
-        foreach (var child in body.ChildOperations)
+        return HasReachableExit(loop.Body);
+
+        bool HasReachableExit(IOperation operation)
         {
-            if (child is IBranchOperation { BranchKind: BranchKind.Break })
+            if (operation is IAnonymousFunctionOperation or
+                ILocalFunctionOperation)
             {
-                return true;
+                return false;
             }
-            if (child is ILoopOperation or ISwitchOperation)
+
+            if (operation is IReturnOperation)
             {
-                continue;
+                return MandatoryFinallysMayComplete(operation);
             }
-            if (LoopHasReachableBreak(child))
+
+            if (operation is IBranchOperation branch &&
+                (SymbolEqualityComparer.Default.Equals(
+                     branch.Target,
+                     loop.ExitLabel) ||
+                 IsOutwardGoto(branch)))
             {
-                return true;
+                return MandatoryFinallysMayComplete(branch);
             }
+
+            return operation.ChildOperations.Any(HasReachableExit);
         }
-        return false;
+
+        bool IsOutwardGoto(IBranchOperation branch)
+        {
+            return branch.BranchKind == BranchKind.GoTo &&
+                branch.Target.DeclaringSyntaxReferences.Any(reference =>
+                    reference.SyntaxTree == loop.Syntax.SyntaxTree &&
+                    !loop.Syntax.Span.Contains(reference.Span));
+        }
+
+        bool MandatoryFinallysMayComplete(IOperation exit)
+        {
+            for (var parent = exit.Parent;
+                 parent != null && !ReferenceEquals(parent, loop);
+                 parent = parent.Parent)
+            {
+                if (parent is ITryOperation { Finally: { } @finally } &&
+                    !MayCompleteNormally(@finally))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     private bool InvocationMayCompleteNormally(IInvocationOperation invocation)
@@ -2244,6 +2664,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         if (!invocation.TargetMethod.IsStatic &&
+            invocation.TargetMethod.ReducedFrom == null &&
             invocation.Instance != null &&
             IsDefinitelyNull(invocation.Instance))
         {
@@ -2251,7 +2672,10 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         var target = invocation.TargetMethod.OriginalDefinition;
-        return target.DeclaringSyntaxReferences.Length == 0 ||
+        return invocation.IsVirtual &&
+            target.ContainingType?.IsSealed != true &&
+            !target.IsSealed ||
+            !HasSourceCompletionFlow(target) ||
             MethodCanCompleteNormally(target);
     }
 
@@ -2264,7 +2688,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         }
 
         if (creation.Constructor is { } constructor &&
-            constructor.DeclaringSyntaxReferences.Length != 0 &&
+            HasSourceCompletionFlow(constructor) &&
             !MethodCanCompleteNormally(constructor))
         {
             return false;
@@ -2274,10 +2698,25 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             MayCompleteNormally(creation.Initializer);
     }
 
+    internal static bool HasSourceCompletionFlow(IMethodSymbol method)
+    {
+        method = method.OriginalDefinition;
+        return method.DeclaringSyntaxReferences.Length != 0 ||
+            EffectMethodNodeBuilder
+                .IsSourceImplicitParameterlessConstructor(method);
+    }
+
     private bool SequenceMayCompleteNormally(IEnumerable<IOperation> operations)
     {
         foreach (var operation in operations)
         {
+            if (ManagedAbstractFlow.IsCompileTimeUnreachable(
+                    compilation,
+                    operation))
+            {
+                continue;
+            }
+
             if (!MayCompleteNormally(operation))
             {
                 return false;
@@ -2290,6 +2729,52 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
     private bool ChildrenMayCompleteNormally(IOperation operation)
     {
         return operation.ChildOperations.All(MayCompleteNormally);
+    }
+
+    private bool BinaryMayCompleteNormally(IBinaryOperation binary)
+    {
+        if (!MayCompleteNormally(binary.LeftOperand) ||
+            IsDefinitelyZeroDivision(binary))
+        {
+            return false;
+        }
+
+        if (ConversionEffectClassifier.SkipsLiftedOperator(
+                binary,
+                flow: null))
+        {
+            return ChildrenMayCompleteNormally(binary);
+        }
+
+        if (binary.OperatorKind is BinaryOperatorKind.ConditionalAnd or
+                BinaryOperatorKind.ConditionalOr &&
+            binary.OperatorMethod != null)
+        {
+            var truthOperator = ConditionalTruthOperatorFacts.Resolve(binary);
+            if (truthOperator != null &&
+                !MethodCanCompleteNormally(truthOperator))
+            {
+                return false;
+            }
+
+            if (truthOperator == null ||
+                !ConditionalTruthOperatorFacts.ReturnsConstant(
+                    compilation,
+                    truthOperator,
+                    out var truthResult))
+            {
+                // An unknown truth result retains the short-circuit path.
+                return true;
+            }
+
+            return truthResult ||
+                MayCompleteNormally(binary.RightOperand) &&
+                MethodCanCompleteNormally(binary.OperatorMethod);
+        }
+
+        return MayCompleteNormally(binary.RightOperand) &&
+            (binary.OperatorMethod == null ||
+             MethodCanCompleteNormally(binary.OperatorMethod));
     }
 
     private static bool IsDefinitelyZeroDivision(IBinaryOperation binary)

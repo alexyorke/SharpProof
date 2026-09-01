@@ -11,7 +11,7 @@ public sealed class DevCheckCommandPlanTests
     private static readonly string[] DebugCommandIds =
     [
         "restore", "solution-build", "semantic-tests",
-        "package-restore", "package-test-build",
+        "package-product-build",
         "package-pack:SharpProof.Attributes",
         "package-pack:SharpProof.Package",
         "package-pack:SharpProof.Verifier",
@@ -27,7 +27,7 @@ public sealed class DevCheckCommandPlanTests
         "performance-smoke"
     ];
 
-    [TestCase("Debug", 9, false)]
+    [TestCase("Debug", 8, true)]
     [TestCase("Release", 7, true)]
     public async Task CommandPlanOwnsConfigurationSpecificBuildGraph(
         string configuration,
@@ -73,8 +73,10 @@ public sealed class DevCheckCommandPlanTests
 
         Assert.That(script, Does.Contain("Get-SharpProofDevCheckPlan.ps1"));
         Assert.That(script, Does.Contain("[switch]$PlanOnly"));
-        Assert.That(script, Does.Contain("package-test-build"));
-        Assert.That(script, Does.Contain("NoBuild = $packagePlanReuse"));
+        Assert.That(script, Does.Contain("package-product-build"));
+        Assert.That(script,
+            Does.Contain("Invoke-SharpProofParallelDotnetBuilds"));
+        Assert.That(script, Does.Contain("NoBuild = $true"));
     }
 
     private static async Task<JsonDocument> ReadPlan(string configuration)

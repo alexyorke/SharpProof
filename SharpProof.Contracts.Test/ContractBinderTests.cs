@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -168,7 +167,60 @@ public sealed class ContractBinderTests
     }
 
     [Test]
-    public void InvalidTargetPlacementDoesNotPoisonAValidCompanion()
+    public void RequiresBindingIgnoresUnrelatedClausePlacementFailures()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static void InvalidEnsures(int value) {
+                    Contract.Requires(value > 0);
+                    if (value > 0) Contract.Ensures(true);
+                }
+
+                public static void InvalidAssume(int value) {
+                    Contract.Requires(value > 0);
+                    value++;
+                    Contract.Assume(true);
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var methodName in new[]
+                     {
+                         "InvalidEnsures",
+                         "InvalidAssume"
+                     })
+            {
+                var full = subject.Bind("Target", methodName);
+                var requires = subject.BindRequires("Target", methodName);
+
+                Assert.That(
+                    full.Failure,
+                    Is.EqualTo(
+                        ContractBindingFailure.InvalidClausePlacement),
+                    methodName);
+                Assert.That(
+                    requires.IsSuccess,
+                    Is.True,
+                    $"{methodName}: {requires.Failure}");
+                if (requires.IsSuccess)
+                {
+                    Assert.That(
+                        requires.Contracts!.Clauses.Select(
+                            static clause => clause.Kind),
+                        Is.EqualTo([BoundContractKind.Requires]),
+                        methodName);
+                }
+            }
+        }
+    }
+
+    [Test]
+    public void InvalidTargetPlacementCannotBeHiddenByAValidCompanion()
     {
         const string source =
             """
@@ -195,14 +247,9 @@ public sealed class ContractBinderTests
 
         var result = subject.Bind("Target", "Read");
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
-            Assert.That(result.Contracts!.UsesCompanion, Is.True);
-            Assert.That(result.Contracts.Clauses, Has.Length.EqualTo(1));
-            Assert.That(result.Contracts.Clauses[0].Evidence,
-                Is.EqualTo(BoundContractEvidence.Companion));
-        }
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.InvalidClausePlacement));
     }
 
     [Test]
@@ -410,6 +457,27 @@ public sealed class ContractBinderTests
             Is.EqualTo(contracts.Variables.Single(
                 static variable =>
                     variable.Role == BoundContractVariableRole.Parameter).Variable));
+    }
+
+    [Test]
+    public void ResultWithUnsupportedNullableValueDomainFailsClosed()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                public static int? Read() {
+                    Contract.Ensures(
+                        Contract.Result<int?>() == null);
+                    return null;
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        Assert.That(
+            subject.Bind("Target", "Read").Failure,
+            Is.EqualTo(ContractBindingFailure.UnsupportedExpression));
     }
 
     [Test]
@@ -888,6 +956,33 @@ public sealed class ContractBinderTests
         Assert.That(
             subject.Bind("Target", "Read").Failure,
             Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+    }
+
+    [Test]
+    public void VoidReturnClosedContractFailsAtReturnBinding()
+    {
+        const string source =
+            """
+            using SharpProof.Attributes;
+            public static class Target {
+                [return: NotNull]
+                public static void Read() {
+                }
+            }
+            """;
+        using var subject = ContractSubject.Create(source);
+
+        var full = subject.Bind("Target", "Read");
+        var requires = subject.BindRequires("Target", "Read");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                full.Failure,
+                Is.EqualTo(ContractBindingFailure.InvalidClosedAttribute));
+            Assert.That(requires.IsSuccess, Is.True, requires.Failure.ToString());
+            Assert.That(requires.Contracts!.Clauses, Is.Empty);
+        }
     }
 
     [Test]
@@ -1437,6 +1532,39 @@ public sealed class ContractBinderTests
             Is.EqualTo(ContractBindingFailure.ContractApiUnavailable));
     }
 
+    [Test]
+    public void ForeignCallableFailsClosedInsteadOfBindingEmptyContracts()
+    {
+        using var owner = ContractSubject.Create(
+            """
+            public static class Owner {
+                public static void Analyze() {
+                }
+            }
+            """);
+        using var foreign = ContractSubject.Create(
+            """
+            using SharpProof.Attributes;
+            public static class Foreign {
+                public static void Analyze(bool condition) {
+                    Contract.Requires(condition);
+                }
+            }
+            """);
+
+        var result = owner.Bind(
+            foreign.GetMethodSymbol("Foreign", "Analyze"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(
+                result.Failure,
+                Is.EqualTo(ContractBindingFailure.UnsupportedTarget));
+            Assert.That(result.Contracts, Is.Null);
+        }
+    }
+
     [TestCase(
         """
         [ContractFor(typeof(Target))]
@@ -1548,7 +1676,7 @@ public sealed class ContractBinderTests
             var compilation = CSharpCompilation.Create(
                 "Contracts_" + Guid.NewGuid().ToString("N"),
                 [syntaxTree],
-                GetReferences(),
+                ContractTestMetadataReferences.WithSharpProof,
                 new CSharpCompilationOptions(
                     OutputKind.DynamicallyLinkedLibrary,
                     nullableContextOptions: NullableContextOptions.Enable,
@@ -1571,6 +1699,18 @@ public sealed class ContractBinderTests
         {
             var method = GetMethod(typeName, methodName);
             return _binder.Bind(method);
+        }
+
+        internal ContractBindingResult Bind(IMethodSymbol method)
+        {
+            return _binder.Bind(method);
+        }
+
+        internal IMethodSymbol GetMethodSymbol(
+            string typeName,
+            string methodName)
+        {
+            return GetMethod(typeName, methodName);
         }
 
         internal ContractBindingResult Bind(
@@ -1675,15 +1815,5 @@ public sealed class ContractBinderTests
         {
         }
 
-        private static ImmutableArray<MetadataReference> GetReferences()
-        {
-            var paths = ((string)AppContext.GetData(
-                    "TRUSTED_PLATFORM_ASSEMBLIES")!)
-                .Split(Path.PathSeparator)
-                .Append(typeof(Contract).Assembly.Location)
-                .Distinct(StringComparer.OrdinalIgnoreCase);
-            return [.. paths.Select(static path =>
-                MetadataReference.CreateFromFile(path))];
-        }
     }
 }

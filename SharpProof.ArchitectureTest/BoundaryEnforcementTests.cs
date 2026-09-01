@@ -6,6 +6,7 @@ using NUnit.Framework;
 namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class BoundaryEnforcementTests
 {
     private static readonly string[] BannedApiProjects = [

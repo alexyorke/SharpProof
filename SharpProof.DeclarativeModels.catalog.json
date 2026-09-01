@@ -53,11 +53,13 @@
           "modifiers": ["readonly"],
           "name": "RequiresCallSiteCandidate",
           "parameters": [
-            {"type": "IOperation", "name": "Operation"},
+            {"type": "IOperation?", "name": "Operation"},
+            {"type": "SyntaxNode", "name": "Syntax"},
             {"type": "IMethodSymbol", "name": "TargetMethod"},
             {"type": "IOperation?", "name": "Instance"},
             {"type": "ImmutableArray<IArgumentOperation>", "name": "Arguments"},
             {"type": "ImmutableDictionary<int, IOperation>", "name": "ExplicitArguments"},
+            {"type": "ImmutableDictionary<int, long>", "name": "ImplicitIntegerArguments"},
             {"type": "bool", "name": "CanReplay"},
             {"type": "ManagedFlowResult?", "name": "Flow"},
             {"type": "ManagedFlowStatus", "name": "FlowStatus"}
@@ -132,6 +134,7 @@
                 {"type": "IOperation?", "name": "Instance"},
                 {"type": "ImmutableArray<IArgumentOperation>", "name": "Arguments"},
                 {"type": "ImmutableDictionary<int, IOperation>", "name": "ExplicitArguments"},
+                {"type": "ImmutableDictionary<int, long>", "name": "ImplicitIntegerArguments"},
                 {"type": "bool", "name": "CanReplay"}
               ]
             }

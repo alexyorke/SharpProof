@@ -18,6 +18,10 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
 }
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 $planScript = Join-Path $PSScriptRoot 'Get-SharpProofDevCheckPlan.ps1'
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+$buildParallelism = Get-SharpProofBuildParallelism `
+    -RepositoryRoot $repositoryRoot
 $commandPlanJson = & $planScript -Configuration $Configuration
 if ($PlanOnly) {
     $commandPlanJson
@@ -28,10 +32,9 @@ if ([int]$commandPlan.schemaVersion -ne 1 -or
     [string]$commandPlan.configuration -cne $Configuration) {
     throw 'Developer-check command plan is invalid.'
 }
-$packagePlanBuild = @($commandPlan.commands | Where-Object {
-        [string]$_.id -ceq 'package-test-build'
+$packageProductBuild = @($commandPlan.commands | Where-Object {
+        [string]$_.id -ceq 'package-product-build'
     }).Count -eq 1
-$packagePlanReuse = -not $packagePlanBuild
 $timings = [Collections.Generic.List[object]]::new()
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 
@@ -52,17 +55,34 @@ function Invoke-TimedPhase {
 
 Invoke-TimedPhase -Name 'restore' -Action {
     & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
-        restore SharpProof.sln --locked-mode
+        restore SharpProof.sln --locked-mode /nodeReuse:false
     if ($LASTEXITCODE -ne 0) {
         throw 'Developer-check restore failed.'
     }
 }
 Invoke-TimedPhase -Name 'build' -Action {
-    & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
-        build SharpProof.sln -c $Configuration --no-restore
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Developer-check build failed.'
+    $builds = [Collections.Generic.List[object]]::new()
+    $builds.Add([pscustomobject]@{
+        Name = 'solution-' + $Configuration.ToLowerInvariant()
+        Arguments = @(
+            'build', 'SharpProof.sln', '-c', $Configuration,
+            '--no-restore')
+    })
+    if ($packageProductBuild) {
+        $builds.Add([pscustomobject]@{
+            Name = 'package-products-release'
+            Arguments = @(
+                'build',
+                'SharpProof.Verifier/SharpProof.Verifier.csproj',
+                '-c', 'Release', '--no-restore',
+                '-p:GeneratePackageOnBuild=false')
+        })
     }
+    Invoke-SharpProofParallelDotnetBuilds `
+        -Builds @($builds) `
+        -RepositoryRoot $repositoryRoot `
+        -Parallelism $buildParallelism `
+        -TimeoutSeconds $TimeoutSeconds
 }
 Invoke-TimedPhase -Name 'semantic-tests' -Action {
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofSemanticTests.ps1') `
@@ -75,7 +95,7 @@ Invoke-TimedPhase -Name 'package-tests' -Action {
         Configuration = $Configuration
         TimeoutSeconds = $TimeoutSeconds
     }
-    $packageArguments.NoBuild = $packagePlanReuse
+    $packageArguments.NoBuild = $true
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
         @packageArguments
 }

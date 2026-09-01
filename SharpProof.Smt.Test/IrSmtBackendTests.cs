@@ -1,6 +1,6 @@
-using Z3Ast = Microsoft.Z3.AST;
 using Z3Context = Microsoft.Z3.Context;
 using Z3Expr = Microsoft.Z3.Expr;
+using Z3Object = Microsoft.Z3.Z3Object;
 using Z3Status = Microsoft.Z3.Status;
 
 namespace SharpProof.Smt.Test;
@@ -333,6 +333,29 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
+    public async Task EmbeddedNullStringFailsClosedWithoutTruncation()
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("text", factory.StringType);
+        var goal = factory.Binary(
+            IrBinaryOperator.Equal,
+            factory.String("left\0right"),
+            factory.Variable(variable));
+        var query = new VerificationQuery(
+            factory,
+            [],
+            new Goal(factory, goal, ProofDiagnosticKind.Precondition,
+                new SourceLocationId(0)));
+
+        using var backend = new IrSmtBackend();
+        var outcome = await new ProofKernel(backend).VerifyAsync(query);
+
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+        Assert.That(((UnknownOutcome)outcome).Reason,
+            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+    }
+
+    [Test]
     public async Task NullableStringConcatCannotProduceAFalseProof()
     {
         var factory = new IrFactory();
@@ -427,6 +450,103 @@ public sealed class IrSmtBackendTests
         Assert.That(
             classify.Invoke(null, ["opaque backend failure"]),
             Is.EqualTo(BackendFailureReason.InfrastructureFailure));
+    }
+
+    [Test]
+    public void NullOptionsAreRejectedBeforeContextCreation()
+    {
+        using var context = new Z3Context();
+        var contextFactoryCalls = 0;
+        Action action = () => _ = new IrSmtBackend(
+            null!,
+            () =>
+            {
+                contextFactoryCalls++;
+                return context;
+            });
+
+        var exception = Assert.Throws<ArgumentNullException>(action);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exception!.ParamName, Is.EqualTo("options"));
+            Assert.That(contextFactoryCalls, Is.Zero);
+        }
+    }
+
+    [Test]
+    public void ResourceLimitSymbolIsDisposedAfterConfiguration()
+    {
+        using var context = new Z3Context();
+        using var parameters = context.MkParams();
+        var symbol = context.MkSymbol("rlimit");
+        Assert.That(NativeObject(symbol), Is.Not.EqualTo(IntPtr.Zero));
+
+        IrSmtBackend.AddOwnedParameter(parameters, symbol, 100);
+
+        Assert.That(NativeObject(symbol), Is.EqualTo(IntPtr.Zero));
+    }
+
+    [Test]
+    public async Task ResourceAccountingTreatsEachSolverSnapshotAsFresh()
+    {
+        const uint queryLimit = 1_000_000;
+        var factory = new IrFactory();
+        var operation = factory.CreateOperation("tracked");
+        var assumptions = Enumerable.Range(0, 256)
+            .Select(index => new Assumption(
+                factory,
+                factory.Variable(factory.CreateVariable(
+                    "tracked-" + index,
+                    factory.BooleanType)),
+                new LoweredJustification(operation)))
+            .ToArray();
+        var expensive = new VerificationQuery(
+            factory,
+            assumptions,
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        var inexpensive = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var backend = new IrSmtBackend(
+            new IrSmtBackendOptions(queryLimit));
+
+        _ = await backend.CheckAsync(expensive, CancellationToken.None);
+        var afterExpensive = backend.ConsumedResourceCount;
+        _ = await backend.CheckAsync(inexpensive, CancellationToken.None);
+        var inexpensiveCost = backend.ConsumedResourceCount - afterExpensive;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(afterExpensive, Is.GreaterThan(0));
+            Assert.That(inexpensiveCost, Is.GreaterThanOrEqualTo(0));
+            Assert.That(inexpensiveCost, Is.LessThanOrEqualTo(queryLimit));
+        }
+    }
+
+    [Test]
+    public void ResourceAccountingAddsLowerFreshSnapshotsWithoutWrap()
+    {
+        using var backend = new IrSmtBackend();
+        var addResourceCount = typeof(IrSmtBackend).GetMethod(
+            "AddResourceCount",
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.NonPublic);
+
+        Assert.That(addResourceCount, Is.Not.Null);
+        _ = addResourceCount!.Invoke(backend, [500L]);
+        _ = addResourceCount.Invoke(backend, [7L]);
+
+        Assert.That(backend.ConsumedResourceCount, Is.EqualTo(507));
     }
 
     [Test]
@@ -539,7 +659,7 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
-    public void ActiveCancellationInterruptsTheNativeContext()
+    public void ActiveCancellationDoesNotPoisonTheBackend()
     {
         var factory = new IrFactory();
         var operation = factory.CreateOperation("repeated");
@@ -574,9 +694,19 @@ public sealed class IrSmtBackendTests
 
         Func<Task> action = async () => await check;
         Assert.ThrowsAsync<OperationCanceledException>(action);
-        var retired = backend.CheckAsync(query, CancellationToken.None)
+        var healthyQuery = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        var healthy = backend.CheckAsync(healthyQuery, CancellationToken.None)
             .GetAwaiter().GetResult();
-        Assert.That(retired.FailureReason, Is.EqualTo(BackendFailureReason.Unavailable));
+        Assert.That(
+            healthy.Status,
+            Is.EqualTo(BackendCheckStatus.Unsatisfiable));
     }
 
     [Test]
@@ -597,6 +727,14 @@ public sealed class IrSmtBackendTests
                 factory.PureOpaque(member, receiver: null),
                 ProofDiagnosticKind.InternalConsistency,
                 new SourceLocationId(0)));
+        var healthyQuery = new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
         using var backend = new IrSmtBackend();
         using var cancellation = new CancellationTokenSource();
         var gate = typeof(IrSmtBackend).GetField(
@@ -611,31 +749,42 @@ public sealed class IrSmtBackendTests
             System.Reflection.BindingFlags.NonPublic);
         Assert.That(activeChecks, Is.Not.Null);
 
-        Task<BackendCheckResult> check;
+        Task<BackendCheckResult> active;
+        Task<BackendCheckResult> queued;
         lock (gate!)
         {
-            check = backend.CheckAsync(query, cancellation.Token);
+            active = backend.CheckAsync(
+                healthyQuery,
+                CancellationToken.None);
             Assert.That(
                 SpinWait.SpinUntil(
                     () => (int)activeChecks!.GetValue(backend)! == 1,
                     TimeSpan.FromSeconds(5)),
                 Is.True);
+            queued = backend.CheckAsync(query, cancellation.Token);
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => (int)activeChecks!.GetValue(backend)! > 1,
+                    TimeSpan.FromSeconds(1)),
+                Is.False,
+                "A queued check must not occupy another worker thread.");
             cancellation.Cancel();
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => queued.IsCompleted,
+                    TimeSpan.FromSeconds(1)),
+                Is.True,
+                "A canceled queued check must not wait for the active solver.");
         }
 
-        Func<Task> action = async () => await check;
+        Assert.That(
+            active.GetAwaiter().GetResult().Status,
+            Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+        Func<Task> action = async () => await queued;
         Assert.That(
             Assert.CatchAsync(action),
             Is.InstanceOf<OperationCanceledException>());
 
-        var healthyQuery = new VerificationQuery(
-            factory,
-            [],
-            new Goal(
-                factory,
-                factory.Boolean(true),
-                ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)));
         var healthy = backend.CheckAsync(healthyQuery, CancellationToken.None)
             .GetAwaiter().GetResult();
         Assert.That(healthy.Status, Is.EqualTo(BackendCheckStatus.Unsatisfiable));
@@ -664,6 +813,82 @@ public sealed class IrSmtBackendTests
         Assert.That(
             result.FailureReason,
             Is.EqualTo(BackendFailureReason.UnsupportedEncoding));
+    }
+
+    [Test]
+    public async Task ManagedModelVariableWorkIsResourceAccounted()
+    {
+        const int variableCount = 512;
+        var query = CreateUnusedBooleanModelQuery(variableCount);
+        using var backend = new IrSmtBackend();
+
+        var result = await backend.CheckAsync(query, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Status,
+                Is.EqualTo(BackendCheckStatus.Satisfiable));
+            Assert.That(
+                backend.ConsumedResourceCount,
+                Is.GreaterThanOrEqualTo(variableCount));
+        }
+    }
+
+    [Test]
+    public async Task ManagedModelVariableWorkHonorsTheQueryResourceLimit()
+    {
+        const uint queryLimit = 100;
+        var query = CreateUnusedBooleanModelQuery(512);
+        using var backend = new IrSmtBackend(new IrSmtBackendOptions(queryLimit));
+
+        var result = await backend.CheckAsync(query, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Status, Is.EqualTo(BackendCheckStatus.Unknown));
+            Assert.That(
+                result.FailureReason,
+                Is.EqualTo(BackendFailureReason.ResourceLimit));
+            Assert.That(backend.ConsumedResourceCount, Is.LessThanOrEqualTo(queryLimit));
+        }
+    }
+
+    [Test]
+    public async Task SharedAssumptionDagIsDepthValidatedOnce()
+    {
+        const uint queryLimit = 10_000;
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("shared-depth", factory.BooleanType);
+        IrTerm sharedPredicate = factory.Variable(variable);
+        for (var index = 0; index < 127; index++)
+        {
+            sharedPredicate = factory.Unary(IrUnaryOperator.Not, sharedPredicate);
+        }
+        var operation = factory.CreateOperation("shared-depth");
+        var assumption = new Assumption(
+            factory,
+            sharedPredicate,
+            new LoweredJustification(operation));
+        var query = new VerificationQuery(
+            factory,
+            Enumerable.Repeat(assumption, 100),
+            new Goal(
+                factory,
+                factory.Boolean(true),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)));
+        using var backend = new IrSmtBackend(new IrSmtBackendOptions(queryLimit));
+
+        var result = await backend.CheckAsync(query, CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Status,
+                Is.EqualTo(BackendCheckStatus.Unsatisfiable));
+            Assert.That(backend.ConsumedResourceCount, Is.LessThan(queryLimit));
+        }
     }
 
     [Test]
@@ -723,14 +948,33 @@ public sealed class IrSmtBackendTests
         return false;
     }
 
+    private static VerificationQuery CreateUnusedBooleanModelQuery(int variableCount)
+    {
+        var factory = new IrFactory();
+        var variables = System.Collections.Immutable.ImmutableArray.CreateRange(
+            Enumerable.Range(0, variableCount)
+                .Select(index => factory.CreateVariable(
+                    "unused-model-" + index,
+                    factory.BooleanType)));
+        return new VerificationQuery(
+            factory,
+            [],
+            new Goal(
+                factory,
+                factory.Boolean(false),
+                ProofDiagnosticKind.InternalConsistency,
+                new SourceLocationId(0)),
+            variables);
+    }
+
     private static bool IsLiveNativeObject(Z3Expr expression)
     {
         return NativeObject(expression) != IntPtr.Zero;
     }
 
-    private static IntPtr NativeObject(Z3Expr expression)
+    private static IntPtr NativeObject(Z3Object expression)
     {
-        var property = typeof(Z3Ast).GetProperty(
+        var property = typeof(Z3Object).GetProperty(
             "NativeObject",
             System.Reflection.BindingFlags.Instance |
             System.Reflection.BindingFlags.NonPublic |

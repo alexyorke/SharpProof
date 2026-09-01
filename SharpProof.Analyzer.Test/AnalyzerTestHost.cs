@@ -22,7 +22,8 @@ internal static class AnalyzerTestHost
         IEnumerable<MetadataReference>? additionalReferences = null,
         string? profile = null,
         string? features = null,
-        string filePath = "input.cs")
+        string filePath = "input.cs",
+        bool allowCompilationErrors = false)
     {
         var compilation = CreateCompilation(
             source,
@@ -34,7 +35,8 @@ internal static class AnalyzerTestHost
                 mode,
                 analyzer,
                 profile,
-                features)
+                features,
+                allowCompilationErrors)
             .ConfigureAwait(false);
     }
 
@@ -75,7 +77,9 @@ internal static class AnalyzerTestHost
         string? mode,
         DiagnosticAnalyzer? analyzer = null,
         string? profile = null,
-        string? features = null)
+        string? features = null,
+        bool allowCompilationErrors = false,
+        CancellationToken cancellationToken = default)
     {
         var values = new Dictionary<string, string>(
             StringComparer.OrdinalIgnoreCase);
@@ -112,7 +116,9 @@ internal static class AnalyzerTestHost
         return await AnalyzeAsync(
                 compilation,
                 values,
-                analyzer: analyzer)
+                analyzer: analyzer,
+                allowCompilationErrors: allowCompilationErrors,
+                cancellationToken: cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -120,8 +126,14 @@ internal static class AnalyzerTestHost
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string> values,
         ImmutableArray<AdditionalText> additionalFiles = default,
-        DiagnosticAnalyzer? analyzer = null)
+        DiagnosticAnalyzer? analyzer = null,
+        bool allowCompilationErrors = false,
+        CancellationToken cancellationToken = default)
     {
+        if (!allowCompilationErrors)
+        {
+            EnsureCompilationHasNoErrors(compilation);
+        }
         var analyzerOptions = new AnalyzerOptions(
             additionalFiles.IsDefault ? [] : additionalFiles,
             new TestOptionsProvider(values));
@@ -133,7 +145,8 @@ internal static class AnalyzerTestHost
                 concurrentAnalysis: true,
                 logAnalyzerExecutionTime: false,
                 reportSuppressedDiagnostics: false));
-        return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync())
+        return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync(
+                cancellationToken))
             .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
             .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
     }
@@ -141,8 +154,13 @@ internal static class AnalyzerTestHost
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
         AnalyzerConfigOptionsProvider optionsProvider,
-        DiagnosticAnalyzer? analyzer = null)
+        DiagnosticAnalyzer? analyzer = null,
+        bool allowCompilationErrors = false)
     {
+        if (!allowCompilationErrors)
+        {
+            EnsureCompilationHasNoErrors(compilation);
+        }
         var analyzerOptions = new AnalyzerOptions([], optionsProvider);
         var withAnalyzers = compilation.WithAnalyzers(
             [analyzer ?? new SharpProofAnalyzer()],
@@ -155,6 +173,22 @@ internal static class AnalyzerTestHost
         return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync())
             .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
             .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
+    }
+
+    private static void EnsureCompilationHasNoErrors(CSharpCompilation compilation)
+    {
+        var errors = compilation.GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToImmutableArray();
+        if (errors.IsEmpty)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "Analyzer fixture compilation failed:" +
+            Environment.NewLine +
+            string.Join(Environment.NewLine, errors.Select(static error => error.ToString())));
     }
 
     internal static byte[] EmitImage(CSharpCompilation compilation)

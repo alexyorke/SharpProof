@@ -7,6 +7,10 @@ param(
 
     [switch]$PlanOnly,
 
+    [switch]$NoBuild,
+
+    [switch]$Fast,
+
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 1800
 )
@@ -18,9 +22,12 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
     throw 'Changed-project testing requires the canonical Linux container.'
 }
+if ($Fast -and $NoBuild) {
+    throw '-Fast and -NoBuild cannot be combined.'
+}
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
-$parallelism = Get-SharpProofTestProjectParallelism `
+$parallelism = Get-SharpProofSemanticTestParallelism `
     -RepositoryRoot $repositoryRoot
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 
@@ -120,6 +127,7 @@ foreach ($changedPath in $changedPaths) {
     $fullChangedPath = [IO.Path]::GetFullPath(
         (Join-Path $repositoryRoot $changedPath))
     if ($changedPath -match '^Directory\.' -or
+        $changedPath -match '^[^/]+\.(props|targets)$' -or
         $changedPath -in @('global.json', 'NuGet.Config', 'SharpProof.sln')) {
         $globalImpact = $true
         continue
@@ -222,14 +230,70 @@ if ($selectedRelative.Count -gt 0) {
             }
         } | ConvertTo-Json -Depth 4 |
             Set-Content -LiteralPath $filterPath -Encoding utf8NoBOM
-        Invoke-RequiredDotnet @('restore', $filterPath, '--locked-mode')
-        Invoke-RequiredDotnet @(
-            'test', $filterPath,
-            '-c', $Configuration,
-            '--no-restore',
-            "/m:$parallelism",
-            '--filter',
-            'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus')
+        $directChangedProject = $selectedRelative.Count -eq 1
+        if (-not $NoBuild) {
+            $restoreTarget = if ($directChangedProject) {
+                $selectedRelative[0]
+            }
+            else {
+                $filterPath
+            }
+            Invoke-RequiredDotnet @(
+                'restore', $restoreTarget, '--locked-mode')
+        }
+        $semanticFilter =
+            'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
+        if ($directChangedProject) {
+            $directChangedProjectIsArchitecture =
+                [IO.Path]::GetFileName($selectedRelative[0]) -ceq
+                    'SharpProof.ArchitectureTest.csproj'
+            if (-not $NoBuild) {
+                $changedProjectBuildArguments = @(
+                    'build', $selectedRelative[0],
+                    '-c', $Configuration, '--no-restore')
+                if ($Fast) {
+                    $changedProjectBuildArguments +=
+                        '-p:RunAnalyzersDuringBuild=false'
+                }
+                Invoke-RequiredDotnet $changedProjectBuildArguments
+            }
+            if ($directChangedProjectIsArchitecture) {
+                & (Join-Path $PSScriptRoot `
+                    'Invoke-SharpProofSemanticTests.ps1') `
+                    -Configuration $Configuration `
+                    -NoBuild `
+                    -ArchitectureOnly `
+                    -TimeoutSeconds $TimeoutSeconds
+                if ($LASTEXITCODE -ne 0) {
+                    throw 'Changed architecture tests failed.'
+                }
+                $testArguments = @()
+            }
+            else {
+                $assembly = Get-SharpProofTestAssemblyPath `
+                    -ProjectPath $selectedRelative[0] `
+                    -Configuration $Configuration
+                $testArguments = @('vstest', $assembly)
+                $testArguments += '/TestCaseFilter:' + $semanticFilter
+            }
+        }
+        else {
+            $testArguments = @(
+                'test', $filterPath,
+                '-c', $Configuration,
+                '--no-restore',
+                "/m:$parallelism",
+                '--filter', $semanticFilter)
+            if ($Fast) {
+                $testArguments += '-p:RunAnalyzersDuringBuild=false'
+            }
+            if ($NoBuild) {
+                $testArguments += '--no-build'
+            }
+        }
+        if ($testArguments.Count -gt 0) {
+            Invoke-RequiredDotnet $testArguments
+        }
     }
     finally {
         Remove-Item -LiteralPath $filterPath -Force -ErrorAction SilentlyContinue
@@ -237,9 +301,18 @@ if ($selectedRelative.Count -gt 0) {
 }
 
 if ($runPackageTests) {
+    $packageArguments = @{
+        Configuration = $Configuration
+        TimeoutSeconds = $TimeoutSeconds
+    }
+    if ($NoBuild) {
+        $packageArguments.NoBuild = $true
+    }
+    if ($Fast) {
+        $packageArguments.Fast = $true
+    }
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
-        -Configuration $Configuration `
-        -TimeoutSeconds $TimeoutSeconds
+        @packageArguments
     if ($LASTEXITCODE -ne 0) {
         throw 'Changed package tests failed.'
     }

@@ -266,7 +266,7 @@ internal sealed class CompilerCallableLowerer
 
     private static CompilerIntegerInterval? IntegerInterval(SpecialType? type)
     {
-        return type.HasValue && CSharpScalarSemantics.TryGetInteger(type.Value, out var semantics) && semantics.BitWidth < 64
+        return type.HasValue && CSharpScalarSemantics.TryGetInteger(type.Value, out var semantics) && semantics.BitWidth <= 64
             ? new(semantics.Minimum, semantics.Maximum) : null;
     }
 
@@ -278,6 +278,7 @@ internal sealed class CompilerCallableLowerer
             !RoslynProgramLowerer.IsDirectInvocation(invocation) ||
             invocation.TargetMethod.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
             !_apiSpecs.TryGet(invocation.TargetMethod, out var resolved) ||
+            resolved.Template.Facets.Throws.Behavior != SpecThrowBehavior.DoesNotThrow ||
             !TryAdmitSpecCallEffects(invocation, call, resolved.Template, out var consumesMemoryHavoc) ||
             !resolved.Template.Result.HasValue ||
             !TryGetSpecResultType(invocation.Type, resolved.Template.Target.ResultType,
@@ -377,7 +378,12 @@ internal sealed class CompilerCallableLowerer
     {
         var symbol = ResolvedApiSpecTable.NormalizeSymbol(method);
         identity = symbol?.GetDocumentationCommentId() ?? string.Empty;
-        return identity.Length != 0;
+        // Compiler artifacts bound identity fields to 512 characters. Reject
+        // an otherwise legal Roslyn documentation ID here so a long symbol
+        // becomes a scoped unsupported call instead of failing artifact
+        // construction after partially lowering the body.
+        return identity is { Length: > 0 and <= 512 } &&
+            identity.All(static character => !char.IsControl(character));
     }
 
     private static bool TryAdmitSpecCallEffects(IInvocationOperation invocation, IrCallInstruction call,
@@ -471,6 +477,11 @@ internal sealed class CompilerCallableLowerer
     {
         foreach (var block in graph.Blocks.OrderBy(static block => block.Ordinal))
         {
+            if (!block.IsReachable)
+            {
+                continue;
+            }
+
             for (var index = 0; index < block.Operations.Length; index++)
             {
                 if (block.Operations[index] is not IEmptyOperation &&
@@ -560,6 +571,20 @@ internal sealed class CompilerCallableLowerer
                 continue;
             }
 
+            if (binding.Symbol is ITypeSymbol instanceType &&
+                !target.Method.IsStatic &&
+                SymbolEqualityComparer.Default.Equals(
+                    instanceType, target.Method.ContainingType))
+            {
+                var receiver = contracts.Variables.FirstOrDefault(
+                    static variable => variable.Role == BoundContractVariableRole.Receiver);
+                if (receiver != null)
+                {
+                    bindings.Add(binding.Variable, receiver.Variable);
+                    continue;
+                }
+            }
+
             if (binding.Symbol is not IParameterSymbol parameter ||
                 !SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, target.Method) ||
                 !canonicalParameters.TryGetValue(parameter.Ordinal, out var canonical))
@@ -575,8 +600,12 @@ internal sealed class CompilerCallableLowerer
 
     private bool ContainsOnlyContractStatements(ManifestCallableTarget target)
     {
-        return target.VerifierDeclaration.Body is { } body &&
-            body.Statements.All(statement => IsContractStatement(target, statement));
+        var declaration = target.VerifierDeclaration;
+        return declaration.Body is { } body
+            ? body.Statements.All(statement =>
+                IsContractStatement(target, statement))
+            : declaration.ExpressionBody is { Expression: { } expression } &&
+                IsContractExpression(target, expression);
     }
 
     private bool IsContractStatement(ManifestCallableTarget target, StatementSyntax statement)
@@ -586,8 +615,19 @@ internal sealed class CompilerCallableLowerer
             return true;
         }
 
-        return statement is ExpressionStatementSyntax expression && _contracts.GetClauseInventory(target.Method).Clauses.Any(clause =>
-            clause.Invocation.Syntax.SyntaxTree == expression.SyntaxTree && clause.Invocation.Syntax.Span == expression.Expression.Span);
+        return statement is ExpressionStatementSyntax expression &&
+            IsContractExpression(target, expression.Expression);
+    }
+
+    private bool IsContractExpression(
+        ManifestCallableTarget target,
+        ExpressionSyntax expression)
+    {
+        return _contracts.GetClauseInventory(target.Method).Clauses.Any(
+            clause =>
+                clause.Invocation.Syntax.SyntaxTree ==
+                    expression.SyntaxTree &&
+                clause.Invocation.Syntax.Span == expression.Span);
     }
 
     private static WorkerClaimReason MapBindingFailure(ContractBindingFailure failure)

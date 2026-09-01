@@ -6,8 +6,58 @@ using System.Reflection.PortableExecutable;
 namespace SharpProof.CompilerArtifact;
 #pragma warning disable RS1035 // Build-only compiler evidence must hash final reference images.
 
+internal interface ICompilerAdditionalTextSnapshot
+{
+    SourceText CapturedText { get; }
+}
+
 internal static class CompilerCompilationCapture
 {
+    private sealed class SyntaxTreeCache
+    {
+        internal SyntaxTreeCache(
+            CSharpCompilation compilation,
+            CancellationToken cancellationToken)
+        {
+            Trees = [.. compilation.SyntaxTrees.Select((tree, index) =>
+            {
+                var snapshot = CaptureTree(tree, cancellationToken);
+                // Roslyn permits generated/in-memory trees without a path and
+                // multiple trees sharing one path. Give each tree a stable
+                // compilation-local identity instead of rejecting the input.
+                if (string.IsNullOrEmpty(tree.FilePath))
+                {
+                    snapshot.Path = $"<compiler-generated:{index}>";
+                }
+                else if (compilation.SyntaxTrees.Take(index).Any(
+                             prior => string.Equals(prior.FilePath, tree.FilePath, StringComparison.Ordinal)))
+                {
+                    snapshot.Path = $"{snapshot.Path}#{index}";
+                }
+
+                return snapshot;
+            })];
+        }
+
+        internal CompilerSyntaxTreeSnapshot[] Trees { get; }
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CSharpCompilation, SyntaxTreeCache>
+        SyntaxTreeCaches = new();
+
+    internal static CompilerSyntaxTreeSnapshot[] CaptureTrees(
+        CSharpCompilation compilation,
+        CancellationToken cancellationToken)
+    {
+        compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        return SyntaxTreeCaches.GetValue(
+            compilation,
+            value => new SyntaxTreeCache(value, cancellationToken)).Trees;
+    }
+
+    private const string CommandLineAdditionalTextTypeName =
+        "Microsoft.CodeAnalysis.AdditionalTextFile";
+
     internal readonly struct ReferenceCaptureLimits
     {
         internal ReferenceCaptureLimits(
@@ -83,6 +133,7 @@ internal static class CompilerCompilationCapture
             Options = new CompilerCompilationOptionsSnapshot
             {
                 OutputKind = CompilerOptionWireMappings.Map(options.OutputKind),
+                MainTypeName = options.MainTypeName ?? string.Empty,
                 OptimizationLevel = CompilerOptionWireMappings.Map(options.OptimizationLevel),
                 Platform = CompilerOptionWireMappings.Map(options.Platform),
                 NullableContext = CompilerOptionWireMappings.Map(options.NullableContextOptions),
@@ -97,6 +148,7 @@ internal static class CompilerCompilationCapture
                         Id = option.Key,
                         ReportDiagnostic = CompilerOptionWireMappings.Map(option.Value)
                     })],
+                ReportSuppressedDiagnostics = options.ReportSuppressedDiagnostics,
                 CheckOverflow = options.CheckOverflow,
                 AllowUnsafe = options.AllowUnsafe,
                 Deterministic = options.Deterministic,
@@ -105,7 +157,7 @@ internal static class CompilerCompilationCapture
                 Usings = options.Usings.ToArray(),
                 ResolverPolicy = CompilerResolverPolicy.EvidenceOnly
             },
-            SyntaxTrees = [.. compilation.SyntaxTrees.Select(tree => CaptureTree(tree, cancellationToken))],
+            SyntaxTrees = CaptureTrees(compilation, cancellationToken),
             References = CaptureReferences(
                 compilation.References,
                 ReferenceCaptureLimits.Default,
@@ -122,7 +174,16 @@ internal static class CompilerCompilationCapture
         cancellationToken.ThrowIfCancellationRequested();
         var parse = (CSharpParseOptions)tree.Options;
         var text = tree.GetText(cancellationToken);
-        CompilerSourceLineMapEntry[] lineMap = [.. text.Lines.Select(line =>
+        var characterOffsets = new Dictionary<int, int>();
+        foreach (var mapping in tree.GetLineMappings(cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (mapping.CharacterOffset is { } characterOffset)
+            {
+                characterOffsets[mapping.Span.Start.Line] = characterOffset;
+            }
+        }
+        CompilerSourceLineMapEntry[] lineMap = [.. text.Lines.Select((line, lineIndex) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var mapped = tree.GetMappedLineSpan(
@@ -133,15 +194,24 @@ internal static class CompilerCompilationCapture
                 SourceLength = line.Span.Length,
                 MappedPath = MappedPath(tree, mapped),
                 MappedLine = mapped.StartLinePosition.Line,
-                MappedColumn = mapped.StartLinePosition.Character
+                MappedColumn = mapped.StartLinePosition.Character,
+                CharacterOffset = characterOffsets.TryGetValue(
+                    lineIndex, out var characterOffset)
+                    ? characterOffset
+                    : 0
             };
         })];
         return new CompilerSyntaxTreeSnapshot
         {
-            Path = CompilerCaptureAuthority.NormalizePath(tree.FilePath ??
-                throw new InvalidOperationException(
-                    "A compiler syntax tree has no path.")),
+            Path = CompilerCaptureAuthority.NormalizePath(
+                string.IsNullOrEmpty(tree.FilePath)
+                    ? "<compiler-generated>"
+                    : tree.FilePath),
             Sha256 = ComputeTextSha256(text),
+            Encoding = text.Encoding?.WebName ?? string.Empty,
+            ChecksumAlgorithm = text.ChecksumAlgorithm.ToString(),
+            RoslynChecksum = LowerHex(BitConverter.ToString(text.GetChecksum().ToArray())
+                .Replace("-", string.Empty)),
             LineMapSha256 = CompilationFingerprint.ComputeLineMapSha256(lineMap),
             TextLength = text.Length,
             LineMap = lineMap,
@@ -156,6 +226,19 @@ internal static class CompilerCompilationCapture
             Features = [.. parse.Features.OrderBy(static value => value.Key, StringComparer.Ordinal)
                 .Select(static value => new CompilerFeatureSnapshot { Key = value.Key, Value = value.Value })]
         };
+
+        static string LowerHex(string value)
+        {
+            var chars = value.ToCharArray();
+            for (var index = 0; index < chars.Length; index++)
+            {
+                if (chars[index] is >= 'A' and <= 'F')
+                {
+                    chars[index] = (char)(chars[index] + ('a' - 'A'));
+                }
+            }
+            return new string(chars);
+        }
     }
 
     private static string MappedPath(
@@ -212,6 +295,11 @@ internal static class CompilerCompilationCapture
             _ => throw new InvalidDataException(
                 "A compiler reference identity is unavailable.")
         };
+        if (backingModules.Length > budget.MaximumModuleCount)
+        {
+            throw new InvalidDataException(
+                "A compiler reference exceeds the module count limit.");
+        }
         if (backingModules.Length > 1)
         {
             backingModules = [
@@ -279,6 +367,9 @@ internal static class CompilerCompilationCapture
         {
             Kind = reference.Properties.Kind.ToString(),
             EmbedInteropTypes = reference.Properties.EmbedInteropTypes,
+            HasRecursiveAliases = CompilerOptionWireMappings.ReadInternalBoolean(
+                reference.Properties,
+                "HasRecursiveAliases"),
             Aliases = [.. reference.Properties.Aliases.OrderBy(static value => value, StringComparer.Ordinal)],
             Identity = identity ?? throw new InvalidDataException(
                 "A compiler reference contains no modules."),
@@ -296,6 +387,8 @@ internal static class CompilerCompilationCapture
         {
             _limits = limits;
         }
+
+        internal int MaximumModuleCount => _limits.MaximumModuleCount;
 
         internal void Consume(long sizeBytes)
         {
@@ -319,13 +412,42 @@ internal static class CompilerCompilationCapture
     {
         cancellationToken.ThrowIfCancellationRequested();
         var path = Path.IsPathRooted(file.Path) ? file.Path : Path.Combine(projectDirectory, file.Path);
-        var text = file.GetText(cancellationToken) ??
-            throw new InvalidOperationException("An additional file has no compiler text.");
+        var text = GetStableAdditionalText(file, cancellationToken);
         return new CompilerAdditionalFileSnapshot
         {
             Path = CompilerCaptureAuthority.NormalizePath(path),
             Sha256 = ComputeTextSha256(text)
         };
+    }
+
+    private static SourceText GetStableAdditionalText(
+        AdditionalText file,
+        CancellationToken cancellationToken)
+    {
+        // Analyzer tests provide an already captured immutable value. The
+        // supported command-line compiler uses AdditionalTextFile, whose
+        // Lazy<SourceText> is shared by generators and analyzers. Do not
+        // authenticate arbitrary providers after generation has completed:
+        // a later GetText call need not return the value a generator consumed.
+        if (file is ICompilerAdditionalTextSnapshot snapshot)
+        {
+            return snapshot.CapturedText;
+        }
+
+        var providerType = file.GetType();
+        if (providerType.Assembly != typeof(AdditionalText).Assembly ||
+            !string.Equals(
+                providerType.FullName,
+                CommandLineAdditionalTextTypeName,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "An additional file does not expose a stable compiler input snapshot.");
+        }
+
+        return file.GetText(cancellationToken) ??
+            throw new InvalidOperationException(
+                "An additional file has no compiler text.");
     }
 
     internal static string ComputeTextSha256(SourceText text)

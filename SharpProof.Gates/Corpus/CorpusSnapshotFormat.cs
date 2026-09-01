@@ -1,4 +1,7 @@
+using System.Collections.Immutable;
 using System.Text;
+using SharpProof.Analyzer;
+using SharpProof.Gates.Corpus;
 
 namespace SharpProof.Gates;
 
@@ -14,7 +17,8 @@ internal static class CorpusSnapshotFormat
     internal static string Render(IEnumerable<string> dataLines)
     {
         var lines = dataLines.ToArray();
-        if (lines.Any(static line => !IsData(line)))
+        if (lines.Any(static line => !IsCanonicalData(line)) ||
+            !IsCanonicalOrder(lines))
         {
             throw Invalid();
         }
@@ -67,16 +71,64 @@ internal static class CorpusSnapshotFormat
             }
         }
         var data = lines.Skip(Header.Length).ToArray();
-        if (data.Any(static line => !IsData(line)))
+        if (data.Any(static line => !IsCanonicalData(line)) ||
+            !IsCanonicalOrder(data))
         {
             throw Invalid();
         }
         return data;
     }
 
+    private static bool IsCanonicalData(string? line)
+    {
+        if (!IsData(line))
+        {
+            return false;
+        }
+
+        var parts = line!.Split('|');
+        if (parts.Length != 4 ||
+            !Enum.TryParse<CorpusVerdict>(
+                parts[1],
+                ignoreCase: false,
+                out var verdict) ||
+            !Enum.IsDefined(verdict) ||
+            !Enum.TryParse<AnalyzerSemanticOutcome>(
+                parts[2],
+                ignoreCase: false,
+                out var semanticOutcome) ||
+            !Enum.IsDefined(semanticOutcome))
+        {
+            return false;
+        }
+
+        ImmutableArray<string> diagnostics = parts[3].Length == 0
+            ? []
+            : [.. parts[3].Split(',')
+                .OrderBy(static diagnostic =>
+                    diagnostic,
+                    StringComparer.Ordinal)
+            ];
+        var expectation = new SnapshotExpectation(
+            parts[0],
+            verdict,
+            semanticOutcome,
+            diagnostics);
+        return string.Equals(
+            line,
+            expectation.ToCanonicalLine(),
+            StringComparison.Ordinal);
+    }
+
     private static bool IsData(string? line)
     {
         return !string.IsNullOrEmpty(line) && line[0] != '#';
+    }
+
+    private static bool IsCanonicalOrder(string[] lines)
+    {
+        return lines.SequenceEqual(
+            lines.OrderBy(static line => line, StringComparer.Ordinal));
     }
 
     private static InvalidDataException Invalid()

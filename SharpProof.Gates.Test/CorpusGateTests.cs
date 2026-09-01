@@ -1,5 +1,9 @@
 using System.Text;
+using System.Text.Json;
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
+using SharpProof.Analyzer;
 using SharpProof.Gates.Corpus;
 
 namespace SharpProof.Gates.Test;
@@ -7,6 +11,360 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusGateTests
 {
+    [Test]
+    public void OssImporterRejectsMitLicenseWithAppendedRestrictions()
+    {
+        var license = File.ReadAllText(Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            "..", "..", "..", "..", "SharpProof.Gates", "Corpus",
+            "third-party", "aalhour-C-Sharp-Algorithms-LICENSE.txt"));
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            OpenSourceCorpusImporter.ValidateReviewedMitLicense(
+                license + "\nAdditional restriction: no commercial use.\n")));
+    }
+
+    [TestCase("https://github.com/aalhour/C-Sharp-Algorithms.git", "https://github.com/aalhour/C-Sharp-Algorithms")]
+    [TestCase("git@github.com:aalhour/C-Sharp-Algorithms.git", "https://github.com/aalhour/C-Sharp-Algorithms")]
+    [TestCase("https://github.com/aalhour/C-Sharp-Algorithms.git-mirror", "https://github.com/aalhour/C-Sharp-Algorithms.git-mirror")]
+    public void OssImporterRepositoryUrlNormalizationOnlyRemovesTerminalGitSuffix(
+        string input,
+        string expected)
+    {
+        Assert.That(
+            OpenSourceCorpusImporter.NormalizeRepositoryUrl(input),
+            Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void UnknownReasonRatchetRejectsStaleCeilings()
+    {
+        var ratchet = new CorpusUnknownReasonRatchet(
+            0,
+            0,
+            1,
+            new Dictionary<string, int>(StringComparer.Ordinal)
+            {
+                ["SP0002"] = 1,
+                ["SP0047"] = 1
+            }.ToImmutableDictionary(StringComparer.Ordinal));
+        var actual = ImmutableArray.Create(
+            new CorpusUnknownReasonCount("SP0002", 1));
+        var failures = ImmutableArray.CreateBuilder<string>();
+
+        CorpusGate.ValidateUnknownReasonRatchet(
+            ratchet, actual, 1, 0, 0, failures);
+
+        Assert.That(
+            failures,
+            Has.Some.Contains("SP0047"));
+        Assert.That(failures, Has.Some.Contains("stale ratchet ceiling"));
+    }
+
+    [Test]
+    public void CorpusFileCountIncludesSourceIdentity()
+    {
+        var methods = new[]
+        {
+            new OpenSourceCorpusMethod("OSS0001", "one", "shared.cs", 1, 1,
+                "hash-one", "A", "effects", CorpusVerdict.Proven, CorpusSupport.Supported),
+            new OpenSourceCorpusMethod("OSS0002", "two", "shared.cs", 1, 1,
+                "hash-two", "B", "effects", CorpusVerdict.Proven, CorpusSupport.Supported)
+        };
+
+        Assert.That(OpenSourceCorpusCatalog.CountSourceFiles(methods), Is.EqualTo(2));
+    }
+
+    [Test]
+    public void CorpusSourceIdsRejectDuplicatesDeterministically()
+    {
+        var source = new OpenSourceCorpusSource(
+            "shared", "https://example.invalid", new string('a', 40),
+            "MIT", "LICENSE", new string('b', 64));
+
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+            OpenSourceCorpusCatalog.ValidateSourceIds([source, source])));
+
+        Assert.That(exception!.Message, Is.EqualTo(
+            "Duplicate OSS corpus source ID: shared."));
+    }
+
+    [Test]
+    public void CorpusSourceIdsRejectEmptyValuesDeterministically()
+    {
+        var source = new OpenSourceCorpusSource(
+            " ", "https://example.invalid", new string('a', 40),
+            "MIT", "LICENSE", new string('b', 64));
+
+        var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+            OpenSourceCorpusCatalog.ValidateSourceIds([source])));
+
+        Assert.That(exception!.Message, Is.EqualTo(
+            "OSS corpus source IDs must not be empty."));
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public void CorpusContainmentRejectsSymlinkTargetsOutsideRoot()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        var outside = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        Directory.CreateDirectory(outside);
+        var target = Path.Combine(outside, "license.txt");
+        var link = Path.Combine(root, "license.txt");
+        try
+        {
+            File.WriteAllText(target, "outside\n");
+            File.CreateSymbolicLink(link, target);
+
+            var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+                OpenSourceCorpusCatalog.EnsureContained(root, link)));
+
+            Assert.That(
+                exception!.Message,
+                Does.Contain("follows a link outside its directory"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
+    [Test]
+    public void UnassignedCorpusDiagnosticFailsTheGate()
+    {
+        var descriptor = new DiagnosticDescriptor(
+            "SPTEST",
+            "Test diagnostic",
+            "Test diagnostic",
+            "Test",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true);
+        var diagnostic = Diagnostic.Create(descriptor, Location.None);
+
+        Assert.That(
+            (Action)(() =>
+                OpenSourceCorpusRunner.RequireCompleteDiagnosticAssignment(
+                    [diagnostic],
+                    [0])),
+            Throws.TypeOf<InvalidDataException>());
+        Assert.DoesNotThrow((Action)(() =>
+            OpenSourceCorpusRunner.RequireCompleteDiagnosticAssignment(
+                [diagnostic],
+                [1])));
+        Assert.That(
+            (Action)(() =>
+                OpenSourceCorpusRunner.RequireCompleteDiagnosticAssignment(
+                    [diagnostic],
+                    [2])),
+            Throws.TypeOf<InvalidDataException>());
+    }
+
+    [Test]
+    public async Task CorpusBatchRollsBackACommitFailure()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var first = Path.Combine(root, "first.txt");
+        var second = Path.Combine(root, "second.txt");
+        await File.WriteAllTextAsync(first, "old-first\n");
+        await File.WriteAllTextAsync(second, "old-second\n");
+        try
+        {
+            Func<Task> write = () => CorpusFileTransaction.WriteAllAsync(
+                root,
+                [
+                    new CorpusFileUpdate(first, "new-first\n"),
+                    new CorpusFileUpdate(second, "new-second\n")
+                ],
+                CancellationToken.None,
+                index =>
+                {
+                    if (index == 1)
+                    {
+                        throw new IOException("injected failure");
+                    }
+                });
+            Assert.ThrowsAsync<IOException>(write);
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    await File.ReadAllTextAsync(first),
+                    Is.EqualTo("old-first\n"));
+                Assert.That(
+                    await File.ReadAllTextAsync(second),
+                    Is.EqualTo("old-second\n"));
+                Assert.That(
+                    File.Exists(Path.Combine(
+                        root,
+                        ".sharpproof-corpus-transaction.json")),
+                    Is.False);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CorpusCatalogRecoveryRollsBackAnInterruptedBatch()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var first = Path.Combine(root, "first.txt");
+        var second = Path.Combine(root, "second.txt");
+        var firstStage = Path.Combine(root, "first.new");
+        var secondStage = Path.Combine(root, "second.new");
+        var firstBackup = Path.Combine(root, "first.old");
+        var secondBackup = Path.Combine(root, "second.old");
+        var marker = Path.Combine(
+            root,
+            ".sharpproof-corpus-transaction.json");
+        await File.WriteAllTextAsync(first, "new-first\n");
+        await File.WriteAllTextAsync(second, "old-second\n");
+        await File.WriteAllTextAsync(secondStage, "new-second\n");
+        await File.WriteAllTextAsync(firstBackup, "old-first\n");
+        await File.WriteAllTextAsync(secondBackup, "old-second\n");
+        await File.WriteAllTextAsync(
+            marker,
+            JsonSerializer.Serialize(new
+            {
+                SchemaVersion = 1,
+                Entries = new[]
+                {
+                    new
+                    {
+                        DestinationPath = first,
+                        StagedPath = firstStage,
+                        BackupPath = firstBackup,
+                        DestinationExisted = true
+                    },
+                    new
+                    {
+                        DestinationPath = second,
+                        StagedPath = secondStage,
+                        BackupPath = secondBackup,
+                        DestinationExisted = true
+                    }
+                }
+            }));
+        try
+        {
+            CorpusFileTransaction.Recover(root);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(
+                    await File.ReadAllTextAsync(first),
+                    Is.EqualTo("old-first\n"));
+                Assert.That(
+                    await File.ReadAllTextAsync(second),
+                    Is.EqualTo("old-second\n"));
+                Assert.That(File.Exists(marker), Is.False);
+                Assert.That(File.Exists(secondStage), Is.False);
+                Assert.That(File.Exists(firstBackup), Is.False);
+                Assert.That(File.Exists(secondBackup), Is.False);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Test]
+    [Platform("Linux")]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public async Task CanceledGitReadTerminatesTheChildProcess()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var executable = Path.Combine(root, "git-probe.sh");
+        var pidPath = Path.Combine(root, "child.pid");
+        await File.WriteAllTextAsync(
+            executable,
+            "#!/bin/sh\nprintf '%s\\n' \"$$\" > child.pid\n" +
+            "while :; do sleep 1; done\n");
+        File.SetUnixFileMode(
+            executable,
+            UnixFileMode.UserRead |
+            UnixFileMode.UserWrite |
+            UnixFileMode.UserExecute);
+        var processId = -1;
+        try
+        {
+            using var cancellation = new CancellationTokenSource();
+            var read = OpenSourceCorpusImporter.ReadGitAsync(
+                root,
+                ["status", "--porcelain"],
+                cancellation.Token,
+                executable);
+            for (var attempt = 0;
+                 attempt < 100 && !File.Exists(pidPath);
+                 attempt++)
+            {
+                await Task.Delay(10);
+            }
+            Assert.That(File.Exists(pidPath), Is.True);
+            processId = int.Parse(
+                await File.ReadAllTextAsync(pidPath),
+                System.Globalization.CultureInfo.InvariantCulture);
+
+            await cancellation.CancelAsync();
+            var canceled = false;
+            try
+            {
+                _ = await read;
+            }
+            catch (OperationCanceledException)
+            {
+                canceled = true;
+            }
+
+            for (var attempt = 0;
+                 attempt < 100 && ProcessExists(processId);
+                 attempt++)
+            {
+                await Task.Delay(10);
+            }
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(canceled, Is.True);
+                Assert.That(ProcessExists(processId), Is.False);
+            }
+        }
+        finally
+        {
+            if (processId > 0 && ProcessExists(processId))
+            {
+                using var process = System.Diagnostics.Process.GetProcessById(
+                    processId);
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
+            }
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Test]
     public void CorpusSnapshotFormatRequiresExactSchemaThreeBytes()
     {
@@ -40,6 +398,89 @@ public sealed class CorpusGateTests
     }
 
     [Test]
+    public void CorpusSnapshotFormatRequiresCanonicalRowOrdering()
+    {
+        const string header = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
+        const string first = "a|Proven|Proven|";
+        const string second = "b|Proven|Proven|";
+
+        Assert.That(
+            CorpusSnapshotFormat.Parse(Encoding.UTF8.GetBytes(
+                header + first + "\n" + second + "\n")),
+            Is.EqualTo(new[] { first, second }));
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CorpusSnapshotFormat.Parse(Encoding.UTF8.GetBytes(
+                header + second + "\n" + first + "\n"))));
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            CorpusSnapshotFormat.Render([second, first])));
+    }
+
+    [Test]
+    public void CorpusSnapshotFormatRequiresCanonicalEnumNames()
+    {
+        const string header = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
+        static byte[] Snapshot(string header, string data)
+        {
+            return Encoding.UTF8.GetBytes(header + data + "\n");
+        }
+        static void AssertAccepted(string header, string data)
+        {
+            Assert.That(
+                CorpusSnapshotFormat.Render([data]),
+                Is.EqualTo(header + data + "\n"));
+            Assert.That(
+                CorpusSnapshotFormat.Parse(Snapshot(header, data)),
+                Is.EqualTo(new[] { data }));
+        }
+
+        foreach (var verdict in new[]
+                 {
+                     "Proven", "Refuted", "Unknown", "SilentUnknown"
+                 })
+        {
+            AssertAccepted(header, $"case|{verdict}|Proven|");
+        }
+        foreach (var semanticOutcome in new[]
+                 {
+                     "NotApplicable", "Proven", "Suppressed", "Abstained",
+                     "Unknown", "Refuted"
+                 })
+        {
+            AssertAccepted(header, $"case|Proven|{semanticOutcome}|");
+        }
+
+        foreach (var noncanonical in new[]
+                 {
+                     "case|0|Proven|",
+                     "case| Proven|Proven|",
+                     "case|Proven |Proven|",
+                     "case|Proven|1|",
+                     "case|Proven| Proven|",
+                     "case|Proven|Proven |"
+                 })
+        {
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CorpusSnapshotFormat.Parse(Snapshot(header, noncanonical))));
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                CorpusSnapshotFormat.Render([noncanonical])));
+        }
+    }
+
+    private static bool ProcessExists(int processId)
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(
+                processId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    [Test]
     public void GeneratorHasDocumentedMetamorphicCoverage()
     {
         var cases = CorpusCatalog.CreateCases();
@@ -50,7 +491,7 @@ public sealed class CorpusGateTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(synthetic, Has.Length.EqualTo(280));
+            Assert.That(synthetic, Has.Length.EqualTo(262));
             Assert.That(
                 synthetic.Select(static item => item.SeedId).Distinct().Count(),
                 Is.EqualTo(28));
@@ -128,20 +569,20 @@ public sealed class CorpusGateTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Passed, Is.True);
-            Assert.That(result.CaseCount, Is.EqualTo(480));
+            Assert.That(result.CaseCount, Is.EqualTo(462));
             Assert.That(result.BaseCaseCount, Is.EqualTo(228));
             Assert.That(result.OpenSourceMethodCount, Is.EqualTo(200));
             Assert.That(result.SupportedOpenSourceMethodCount, Is.EqualTo(1));
             Assert.That(result.OpenSourceFileCount, Is.EqualTo(87));
             Assert.That(result.SyntheticSeedCount, Is.EqualTo(28));
-            Assert.That(result.SupportedCaseCount, Is.EqualTo(171));
+            Assert.That(result.SupportedCaseCount, Is.EqualTo(163));
             Assert.That(
                 result.IntentionallyUnsupportedCaseCount,
-                Is.EqualTo(309));
+                Is.EqualTo(299));
             Assert.That(result.SupportedUnknownCount, Is.Zero);
-            Assert.That(result.UnknownCount, Is.EqualTo(299));
+            Assert.That(result.UnknownCount, Is.EqualTo(289));
             Assert.That(result.SilentUnknownCount, Is.EqualTo(10));
-            Assert.That(result.TotalUnknownCount, Is.EqualTo(309));
+            Assert.That(result.TotalUnknownCount, Is.EqualTo(299));
             Assert.That(
                 result.UnknownReasons
                     .ToDictionary(
@@ -150,11 +591,11 @@ public sealed class CorpusGateTests
                 Is.EquivalentTo(
                     new Dictionary<string, int>(StringComparer.Ordinal)
                     {
-                        ["SP0002"] = 28,
-                        ["SP0016"] = 20,
-                        ["SP0045"] = 30,
-                        ["SP0045+SP0046"] = 10,
-                        ["SP0046"] = 30,
+                        ["SP0002"] = 27,
+                        ["SP0016"] = 18,
+                        ["SP0045"] = 27,
+                        ["SP0045+SP0046"] = 9,
+                        ["SP0046"] = 27,
                         ["SP0047"] = 181,
                         ["silent-unclassified"] = 10
                     }));
@@ -194,6 +635,70 @@ public sealed class CorpusGateTests
             Is.EqualTo([
                 "1 supported corpus cases produced Unknown; supported cases " +
                 "must have an accountable Proven or Refuted result."
+            ]));
+    }
+
+    [Test]
+    public void AlphaRenameDoesNotEmitDuplicateEffectSources()
+    {
+        var cases = CorpusCatalog.CreateSyntheticCases();
+        Assert.That(
+            cases.Any(item => item.SeedId.StartsWith('E') &&
+                item.Variant == CorpusVariant.AlphaRenameContractFormals),
+            Is.False);
+        Assert.That(
+            cases.Any(item => item.SeedId == "C07" &&
+                item.Variant == CorpusVariant.AlphaRenameContractFormals),
+            Is.True);
+    }
+
+    [Test]
+    public async Task MetamorphicVariantsMustRetainSeedOutcomeAndDiagnosticClasses()
+    {
+        var catalog = CorpusCatalog.CreateSyntheticCases();
+        var baseline = catalog.Single(static item =>
+            item.Id == "C02.baseline") with
+        {
+            Id = "seed.baseline",
+            SeedId = "seed"
+        };
+        var renamed = catalog.Single(static item =>
+            item.Id == "C02.rename") with
+        {
+            Id = "seed.rename",
+            SeedId = "seed"
+        };
+        var temporary = catalog.Single(static item =>
+            item.Id == "C01.temporary") with
+        {
+            Id = "seed.temporary",
+            SeedId = "seed"
+        };
+        var trivia = catalog.Single(static item =>
+            item.Id == "E02.trivia") with
+        {
+            Id = "seed.trivia",
+            SeedId = "seed"
+        };
+        var cases = new[] { baseline, renamed, temporary, trivia };
+        var observations = await Task.WhenAll(cases.Select(item =>
+            CorpusGate.ObserveCaseAsync(item, CancellationToken.None)));
+        var failures = CorpusGate.ValidateMetamorphicConsistency(
+            [.. cases],
+            [.. observations]);
+
+        Assert.That(
+            failures.ToArray(),
+            Is.EqualTo([
+                "Metamorphic variant seed.trivia changed semantic outcome " +
+                "from Refuted to Unknown relative to seed.baseline.",
+                "Metamorphic variant seed.trivia changed diagnostic classes " +
+                "from [SP0027@Warning] to [SP0002@Warning] relative to " +
+                "seed.baseline.",
+                "Metamorphic variant seed.temporary changed semantic outcome " +
+                "from Refuted to Proven relative to seed.baseline.",
+                "Metamorphic variant seed.temporary changed diagnostic classes " +
+                "from [SP0027@Warning] to [] relative to seed.baseline."
             ]));
     }
 

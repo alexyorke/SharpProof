@@ -117,7 +117,7 @@ public static class ForwardDataflowAnalysis
         var updateCounts = new int[graph.Blocks.Length];
         inputs[graph.EntryBlockId] = initialState;
 
-        var pending = new SortedSet<int> { graph.EntryBlockId };
+        var pending = FindReachableBlocks(graph);
         var iterations = 0;
         while (pending.Count != 0)
         {
@@ -139,6 +139,12 @@ public static class ForwardDataflowAnalysis
             foreach (var blockId in batch)
             {
                 var transferred = graph.GetBlock(blockId).Transfer(inputs[blockId]);
+                if (!domain.LessThanOrEqual(outputs[blockId], transferred))
+                {
+                    throw new InvalidOperationException(
+                        $"Block {blockId} transfer must be monotone as its input grows.");
+                }
+
                 var monotoneOutput = domain.Join(outputs[blockId], transferred);
                 if (!domain.AreEquivalent(outputs[blockId], monotoneOutput))
                 {
@@ -198,6 +204,27 @@ public static class ForwardDataflowAnalysis
         }
 
         return new DataflowAnalysisResult<T>([.. inputs], [.. outputs], iterations);
+    }
+
+    private static SortedSet<int> FindReachableBlocks<T>(
+        DataflowGraph<T> graph)
+    {
+        var reachable = new SortedSet<int> { graph.EntryBlockId };
+        var pending = new Stack<int>();
+        pending.Push(graph.EntryBlockId);
+        while (pending.Count != 0)
+        {
+            var blockId = pending.Pop();
+            foreach (var successor in graph.GetSuccessors(blockId))
+            {
+                if (reachable.Add(successor))
+                {
+                    pending.Push(successor);
+                }
+            }
+        }
+
+        return reachable;
     }
 
     private static ImmutableArray<int> ValidatePermutation(

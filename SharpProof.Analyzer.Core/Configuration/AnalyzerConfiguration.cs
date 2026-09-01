@@ -90,11 +90,6 @@ internal sealed class AnalyzerConfiguration
             builder.Add(new(option.Key, value.Trim(),
                 "expected one of: " + string.Join(", ", option.AllowedValues)));
         }
-        if (builder.Count != 0)
-        {
-            return builder.ToImmutable();
-        }
-
         if (TryGetRetiredMode(options, out var retiredMode))
         {
             builder.Add(new(
@@ -184,11 +179,22 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigOptions options,
         out string value)
     {
-        return (options.TryGetValue("sharpproof_mode", out value!) ||
-                options.TryGetValue(
-                    "build_property.SharpProofMode",
-                    out value!)) &&
-            !string.IsNullOrWhiteSpace(value);
+        foreach (var key in new[] {
+                     "sharpproof_mode",
+                     "build_property.sharpproof_mode",
+                     "build_property.SharpProofMode"
+                 })
+        {
+            if (options.TryGetValue(key, out var candidate) &&
+                !string.IsNullOrWhiteSpace(candidate))
+            {
+                value = candidate;
+                return true;
+            }
+        }
+
+        value = string.Empty;
+        return false;
     }
 
     private static bool TryGet(
@@ -203,8 +209,7 @@ internal sealed class AnalyzerConfiguration
         };
         foreach (var key in keys)
         {
-            if (options.TryGetValue(key, out var found) &&
-                !string.IsNullOrWhiteSpace(found))
+            if (options.TryGetValue(key, out var found))
             {
                 value = found;
                 return true;

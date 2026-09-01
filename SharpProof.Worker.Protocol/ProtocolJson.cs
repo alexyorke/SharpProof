@@ -38,6 +38,34 @@ public static partial class WorkerProtocolJson
         return reader.ReadToEnd().TrimStart('\uFEFF');
     }
 
+    internal static string ComputeFileSha256(string path)
+    {
+        var expectedLength = new FileInfo(path).Length;
+        if (expectedLength <= 0 || expectedLength > MaximumJsonBytes)
+        {
+            throw new InvalidDataException(
+                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
+        using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            bufferSize: 81920, options: FileOptions.SequentialScan);
+        if (file.Length != expectedLength)
+        {
+            throw new InvalidDataException("The JSON file changed while it was opened.");
+        }
+
+        using var bounded = new BoundedReadStream(file, MaximumJsonBytes,
+            $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+        using var buffer = new MemoryStream();
+        bounded.CopyTo(buffer);
+        if (bounded.ReadByte() != -1)
+        {
+            throw new InvalidDataException("The JSON file changed while it was read.");
+        }
+
+        return ComputeSha256(buffer.ToArray());
+    }
+
     internal static async Task<string> ReadUtf8FileAsync(
         string path, CancellationToken cancellationToken = default)
     {
@@ -60,7 +88,8 @@ public static partial class WorkerProtocolJson
 
     public static string SerializeRequest(WorkerVerifyRequest request)
     {
-        return JsonSerializer.Serialize(request ?? throw new ArgumentNullException(nameof(request)), s_options);
+        return SerializeBounded(
+            request ?? throw new ArgumentNullException(nameof(request)));
     }
 
     public static string ComputeRequestHash(WorkerVerifyRequest request)
@@ -70,6 +99,21 @@ public static partial class WorkerProtocolJson
 
     private static StreamReader OpenJsonReader(string path)
     {
+        // Inspect the directory entry before FileStream opens it. On Unix,
+        // opening a FIFO for reading waits for a writer, so a zero-length
+        // non-file must fail before the potentially blocking open.
+        var fileLength = new FileInfo(path).Length;
+        if (fileLength <= 0)
+        {
+            throw new InvalidDataException(
+                "The JSON file must be a nonempty regular file.");
+        }
+        if (fileLength > MaximumJsonBytes)
+        {
+            throw new InvalidDataException(
+                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
         var stream = new FileStream(
             path,
             FileMode.Open,
@@ -77,20 +121,38 @@ public static partial class WorkerProtocolJson
             FileShare.Read,
             bufferSize: 81920,
             options: FileOptions.SequentialScan);
-        if (stream.Length > MaximumJsonBytes)
+        if (stream.Length != fileLength)
         {
             stream.Dispose();
             throw new InvalidDataException(
-                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
+                "The JSON file changed while it was opened.");
         }
 
-        return new StreamReader(stream, s_strictUtf8, detectEncodingFromByteOrderMarks: false);
+        return new StreamReader(
+            new BoundedReadStream(
+                stream,
+                MaximumJsonBytes,
+                $"The JSON file exceeds the {MaximumJsonBytes} byte limit."),
+            s_strictUtf8,
+            detectEncodingFromByteOrderMarks: false);
     }
 
     public static string SerializeResponse(WorkerVerifyResponse response)
     {
         Canonicalize(response ?? throw new ArgumentNullException(nameof(response)));
-        return JsonSerializer.Serialize(response, s_options);
+        return SerializeBounded(response);
+    }
+
+    private static string SerializeBounded<T>(T value)
+    {
+        var json = JsonSerializer.Serialize(value, s_options);
+        if (Encoding.UTF8.GetByteCount(json) > MaximumJsonBytes)
+        {
+            throw new InvalidDataException(
+                $"The JSON document exceeds the {MaximumJsonBytes} byte limit.");
+        }
+
+        return json;
     }
 
     public static WorkerProtocolValidationResult Validate(WorkerVerifyRequest? request)
@@ -121,14 +183,16 @@ public static partial class WorkerProtocolJson
     internal static WorkerProtocolValidationResult Validate(
         WorkerVerifyResponse? response, string expectedInputHash,
         WorkerClaimManifest? expectedManifest,
-        IWorkerResponseEvidenceAuthority evidenceAuthority)
+        IWorkerResponseEvidenceAuthority evidenceAuthority,
+        CancellationToken cancellationToken = default)
     {
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
         _ = evidenceAuthority ??
             throw new ArgumentNullException(nameof(evidenceAuthority));
         return ValidateResponse(
             response, expectedInputHash, expectedManifest, null, null, null,
-            evidenceAuthority: evidenceAuthority);
+            evidenceAuthority: evidenceAuthority,
+            cancellationToken: cancellationToken);
     }
     public static WorkerProtocolValidationResult ValidateForRequest(
         WorkerVerifyResponse? response, string expectedRequestHash, string expectedInputHash,
@@ -167,7 +231,8 @@ public static partial class WorkerProtocolJson
         WorkerClaimManifest expectedManifest, WorkerVerifyRequest expectedRequest,
         WorkerVersionSummary expectedVersions,
         IWorkerResponseEvidenceAuthority evidenceAuthority,
-        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds)
+        int terminationGraceMilliseconds = WorkerLauncherDefaults.TerminationGraceMilliseconds,
+        CancellationToken cancellationToken = default)
     {
         RequireSha256(expectedRequestHash, nameof(expectedRequestHash), "request");
         RequireSha256(expectedInputHash, nameof(expectedInputHash), "input");
@@ -197,7 +262,7 @@ public static partial class WorkerProtocolJson
         return ValidateResponse(
             response, expectedInputHash, expectedManifest,
             expectedRequestHash, expectedRequest, expectedVersions,
-            maximumElapsedMilliseconds, evidenceAuthority);
+            maximumElapsedMilliseconds, evidenceAuthority, cancellationToken);
     }
 
     public static void Canonicalize(WorkerVerifyResponse response)
@@ -214,9 +279,10 @@ public static partial class WorkerProtocolJson
             result.Assumptions = CanonicalizeAssumptions(result.Assumptions);
         }
 
+        var claimsById = CreateClaimIndex(response.Manifest);
         response.ClaimResults = [.. (response.ClaimResults ?? [])
-            .OrderBy(value => FindClaimCallableId(response.Manifest, value?.ClaimId), s_ordinal)
-            .ThenBy(value => FindClaimOrdinal(response.Manifest, value?.ClaimId))
+            .OrderBy(value => FindClaimCallableId(claimsById, value?.ClaimId), s_ordinal)
+            .ThenBy(value => FindClaimOrdinal(claimsById, value?.ClaimId))
             .ThenBy(static value => value?.ClaimId, s_ordinal)];
         foreach (var result in response.ClaimResults.OfType<WorkerClaimResult>())
         {
@@ -254,7 +320,8 @@ public static partial class WorkerProtocolJson
         string? expectedRequestHash, WorkerVerifyRequest? expectedRequest,
         WorkerVersionSummary? expectedVersions,
         long? maximumElapsedMilliseconds = null,
-        IWorkerResponseEvidenceAuthority? evidenceAuthority = null)
+        IWorkerResponseEvidenceAuthority? evidenceAuthority = null,
+        CancellationToken cancellationToken = default)
     {
         var errors = new Validator();
         if (response == null)
@@ -320,7 +387,7 @@ public static partial class WorkerProtocolJson
         {
             try
             {
-                foreach (var code in evidenceAuthority.Validate(response)
+                foreach (var code in evidenceAuthority.Validate(response, cancellationToken)
                              .Where(static code => !string.IsNullOrWhiteSpace(code))
                              .Distinct(s_ordinal))
                 {
@@ -441,13 +508,20 @@ public static partial class WorkerProtocolJson
             callables.Where(static value => !string.IsNullOrWhiteSpace(value.CallableId))
                 .Select(static value => value.CallableId),
             s_ordinal);
+        var claimsByCallable = claims.ToLookup(
+            static value => (string?)value.CallableId,
+            s_ordinal);
         foreach (var callable in callables)
         {
             errors.Check(HasValidLocation(callable.Location), prefix + ".callable_location")
                 .Rules(callable, WorkerProtocolMetadata.ManifestCallableRules, prefix + ".")
                 .Check(HasProducerAssumptionKinds(callable.Assumptions),
                     prefix + ".assumption_kind");
-            ValidateClaimMembership(callable, claims, prefix, errors);
+            ValidateClaimMembership(
+                callable,
+                claimsByCallable[callable.CallableId],
+                prefix,
+                errors);
         }
         ValidateManifestAssumptionIdentity(callables, prefix, errors);
         foreach (var claim in claims)
@@ -462,16 +536,37 @@ public static partial class WorkerProtocolJson
         }
     }
     private static void ValidateClaimMembership(
-        WorkerCallableManifestEntry callable, WorkerClaimManifestEntry[] claims, string prefix, Validator errors)
+        WorkerCallableManifestEntry callable,
+        IEnumerable<WorkerClaimManifestEntry> claims,
+        string prefix,
+        Validator errors)
     {
-        var expected = claims.Where(value => value.CallableId == callable.CallableId)
+        var expected = claims
             .OrderBy(static value => value.Ordinal)
             .ThenBy(static value => value.ClaimId, s_ordinal).ToArray();
         errors.Check(expected.Select(static value => value.Ordinal)
                 .SequenceEqual(Enumerable.Range(0, expected.Length)), prefix + ".dense_ordinals")
             .Check(callable.ClaimIds != null && callable.ClaimIds.SequenceEqual(
                 expected.Select(static value => value.ClaimId), s_ordinal),
-                prefix + ".claim_membership");
+                prefix + ".claim_membership")
+            .Check(HasVerifierCompatibleClaimOrder(expected), prefix + ".claim_order");
+    }
+    private static bool HasVerifierCompatibleClaimOrder(WorkerClaimManifestEntry[] claims)
+    {
+        var effectSeen = false;
+        foreach (var claim in claims)
+        {
+            if (claim.Kind == WorkerClaimKind.Effect)
+            {
+                effectSeen = true;
+            }
+            else if (effectSeen && claim.Kind == WorkerClaimKind.Postcondition)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
     private static WorkerCallableResult[] ValidateCallableResults(WorkerCallableResult[]? values,
         WorkerClaimManifest? manifest, Validator errors)
@@ -481,11 +576,14 @@ public static partial class WorkerProtocolJson
                 .Select(static value => value.CallableId) ?? [],
             static value => value.CallableId, "response.callable_results",
             "response.callable_id", "response.callable_set", errors);
+        var declaredById = new OrdinalIdentityIndex<
+            WorkerCallableManifestEntry>(
+                manifest?.Callables?.OfType<WorkerCallableManifestEntry>() ?? [],
+                static item => item.CallableId);
         foreach (var value in valid)
         {
             errors.Rules(value, WorkerProtocolMetadata.CallableResultRules);
-            var declared = manifest?.Callables?.FirstOrDefault(
-                item => item != null && item.CallableId == value.CallableId);
+            var declared = declaredById.Find(value.CallableId);
             errors.Check(declared != null &&
                 SameAssumptionDeclarations(value.Assumptions, declared.Assumptions),
                 "response.callable_assumption_set");
@@ -499,18 +597,28 @@ public static partial class WorkerProtocolJson
                 .Select(static value => value.ClaimId) ?? [],
             static value => value.ClaimId, "response.claim_results",
             "response.result_claim_id", "response.claim_set", errors);
+        var claimsById = new OrdinalIdentityIndex<WorkerClaimManifestEntry>(
+            manifest?.Claims?.OfType<WorkerClaimManifestEntry>() ?? [],
+            static item => item.ClaimId);
+        var callablesById = new OrdinalIdentityIndex<
+            WorkerCallableManifestEntry>(
+                manifest?.Callables?.OfType<WorkerCallableManifestEntry>() ?? [],
+                static item => item.CallableId);
         foreach (var value in valid)
         {
-            ValidateClaimResult(value, manifest, errors);
+            ValidateClaimResult(value, claimsById, callablesById, errors);
         }
 
         return valid;
     }
-    private static void ValidateClaimResult(WorkerClaimResult value, WorkerClaimManifest? manifest, Validator errors)
+    private static void ValidateClaimResult(
+        WorkerClaimResult value,
+        OrdinalIdentityIndex<WorkerClaimManifestEntry> claimsById,
+        OrdinalIdentityIndex<WorkerCallableManifestEntry> callablesById,
+        Validator errors)
     {
         errors.Rules(value, WorkerProtocolMetadata.ClaimResultRules);
-        var claim = manifest?.Claims?.FirstOrDefault(
-            item => item != null && item.ClaimId == value.ClaimId);
+        var claim = claimsById.Find(value.ClaimId);
         var effectClaim = claim?.Kind == WorkerClaimKind.Effect;
         errors.Check(claim != null &&
                 WorkerProtocolMetadata.MatchesClaimKindOutcome(
@@ -545,8 +653,7 @@ public static partial class WorkerProtocolJson
         errors.Check(WorkerProtocolMetadata.MatchesVacuity(
             claim?.Kind ?? WorkerClaimKind.Unspecified, value.Outcome, value.Vacuity),
             "response.vacuity");
-        var owner = manifest?.Callables?.FirstOrDefault(
-            item => item != null && item.CallableId == claim?.CallableId);
+        var owner = callablesById.Find(claim?.CallableId);
         errors.Check(owner != null && SameAssumptionDeclarations(value.Assumptions, owner.Assumptions),
             "response.claim_assumption_set");
     }
@@ -605,18 +712,48 @@ public static partial class WorkerProtocolJson
             "response.run_projection");
         if (response.Manifest != null && projected)
         {
+            var callablesById = new OrdinalIdentityIndex<
+                WorkerCallableManifestEntry>(
+                    response.Manifest.Callables
+                        .OfType<WorkerCallableManifestEntry>(),
+                    static item => item.CallableId);
+            var claimsById = claims.ToLookup(
+                static claim => (string?)claim.ClaimId,
+                s_ordinal);
             foreach (var callable in callables)
             {
+                var declared = callablesById.Find(callable.CallableId);
+                var owned = GetOwnedClaimResults(declared, claimsById);
                 errors.Check(WorkerResultAssembler.MatchesCallableProjection(
                         callable,
-                        response.Manifest,
-                        claims,
+                        owned,
                         expectedStatus,
                         expectedFailure,
                         protocolErrors.Length != 0),
                     "response.callable_projection");
             }
         }
+    }
+
+    private static WorkerClaimResult[] GetOwnedClaimResults(
+        WorkerCallableManifestEntry? callable,
+        ILookup<string?, WorkerClaimResult> claimsById)
+    {
+        if (callable?.ClaimIds == null)
+        {
+            return [];
+        }
+
+        var ownedIds = new HashSet<string?>(s_ordinal);
+        var owned = new List<WorkerClaimResult>();
+        foreach (var claimId in callable.ClaimIds)
+        {
+            if (ownedIds.Add(claimId))
+            {
+                owned.AddRange(claimsById[claimId]);
+            }
+        }
+        return [.. owned];
     }
 
     private static void ValidateSummary(WorkerVerificationSummary? summary,
@@ -713,6 +850,13 @@ public static partial class WorkerProtocolJson
     internal static bool AreDistinctNonblank(string[]? values)
     {
         return CompleteUnique(values, static value => !string.IsNullOrWhiteSpace(value), static value => value);
+    }
+
+    internal static bool IsSingleLineText(string? value)
+    {
+        return value != null && value.All(static character =>
+            !char.IsControl(character) &&
+            character is not '\u2028' and not '\u2029');
     }
 
     internal static bool AreDefinedUnique<T>(T[]? values, T unspecified, bool nonEmpty)
@@ -830,6 +974,47 @@ public static partial class WorkerProtocolJson
         return Normalize(actual).SequenceEqual(Normalize(expected));
     }
 
+    private sealed class OrdinalIdentityIndex<T>
+        where T : class
+    {
+        private readonly Dictionary<string, T> _byId = new(s_ordinal);
+        private bool _hasNull;
+        private T? _nullValue;
+
+        internal OrdinalIdentityIndex(
+            IEnumerable<T> values,
+            Func<T, string?> identity)
+        {
+            foreach (var value in values)
+            {
+                var id = identity(value);
+                if (id == null)
+                {
+                    if (!_hasNull)
+                    {
+                        _nullValue = value;
+                        _hasNull = true;
+                    }
+                }
+                else if (!_byId.ContainsKey(id))
+                {
+                    _byId.Add(id, value);
+                }
+            }
+        }
+
+        internal T? Find(string? id)
+        {
+            if (id == null)
+            {
+                return _hasNull ? _nullValue : null;
+            }
+            return _byId.TryGetValue(id, out var value)
+                ? value
+                : null;
+        }
+    }
+
     private static string ManifestName<T>(T value) where T : struct, Enum
     {
         return WorkerProtocolMetadata.GetManifestName((Enum)(object)value) ??
@@ -847,16 +1032,26 @@ public static partial class WorkerProtocolJson
         EnsureJsonShape(json, typeof(T).Name);
         return JsonSerializer.Deserialize<T>(json, s_options);
     }
-    private static int FindClaimOrdinal(WorkerClaimManifest? manifest, string? id)
+    private static OrdinalIdentityIndex<WorkerClaimManifestEntry>
+        CreateClaimIndex(WorkerClaimManifest? manifest)
     {
-        return manifest?.Claims?.FirstOrDefault(value => value != null && value.ClaimId == id)?.Ordinal ??
-        int.MaxValue;
+        return new(
+            (manifest?.Claims ?? []).OfType<WorkerClaimManifestEntry>(),
+            static value => value.ClaimId);
     }
 
-    private static string FindClaimCallableId(WorkerClaimManifest? manifest, string? id)
+    private static int FindClaimOrdinal(
+        OrdinalIdentityIndex<WorkerClaimManifestEntry> claimsById,
+        string? id)
     {
-        return manifest?.Claims?.FirstOrDefault(value => value != null && value.ClaimId == id)?.CallableId ??
-            string.Empty;
+        return claimsById.Find(id)?.Ordinal ?? int.MaxValue;
+    }
+
+    private static string FindClaimCallableId(
+        OrdinalIdentityIndex<WorkerClaimManifestEntry> claimsById,
+        string? id)
+    {
+        return claimsById.Find(id)?.CallableId ?? string.Empty;
     }
 
     internal static bool IsSha256(string? value)

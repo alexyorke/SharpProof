@@ -99,6 +99,48 @@ public sealed class ProductionInventoryAuthorityTests
     }
 
     [Test]
+    public async Task InventoryRejectsMissingRepositoryAnalyzer()
+    {
+        var repository = Path.Combine(
+            Path.GetTempPath(),
+            "sharpproof-production-inventory-analyzer-" +
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(repository);
+        try
+        {
+            await InitializeRepositoryAsync(repository);
+            await WriteFixtureAsync(repository);
+            var projectPath = Path.Combine(
+                repository,
+                "Project",
+                "Project.csproj");
+            var project = await File.ReadAllTextAsync(projectPath);
+            await File.WriteAllTextAsync(
+                projectPath,
+                project.Replace(
+                    "    <Compile Include=\"**/*.cs\" Exclude=\"bin/**/*.cs;obj/**/*.cs\" />",
+                    "    <Compile Include=\"**/*.cs\" Exclude=\"bin/**/*.cs;obj/**/*.cs\" />\n" +
+                    "    <Analyzer Include=\"../tools/MissingAnalyzer.dll\" />",
+                    StringComparison.Ordinal));
+            await CommitAllAsync(repository, "missing analyzer fixture");
+
+            var result = await RunInventoryProcessAsync(repository);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Not.Zero);
+                Assert.That(
+                    result.Error + result.Output,
+                    Does.Contain("MissingAnalyzer.dll"));
+            }
+        }
+        finally
+        {
+            DeleteTemporaryRepository(repository);
+        }
+    }
+
+    [Test]
     public void ProductionConsumersUseOneInventoryAuthority()
     {
         var root = RepositoryRoot();
@@ -128,6 +170,35 @@ public sealed class ProductionInventoryAuthorityTests
             Assert.That(complexity, Does.Contain("New-SharpProofCSharpParseOptions"));
             Assert.That(complexity, Does.Contain("generatedFiles"));
         }
+    }
+
+    [Test]
+    public async Task ProductionComplexityGatePassesAgainstCanonicalInventory()
+    {
+        var root = RepositoryRoot();
+        var result = await RunAsync(
+            root,
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            Path.Combine(root, "scripts", "Test-ProductionCSharpComplexity.ps1"),
+            "-Json");
+
+        Assert.That(result.ExitCode, Is.Zero, result.Error + result.Output);
+        using var document = JsonDocument.Parse(result.Output);
+        Assert.That(
+            document.RootElement.GetProperty("schemaVersion").GetInt32(),
+            Is.EqualTo(1));
+        Assert.That(
+            document.RootElement.GetProperty("passed").GetBoolean(),
+            Is.True);
+        Assert.That(
+            document.RootElement.GetProperty("exclusions")
+                .GetProperty("generatedFiles")
+                .GetRawText(),
+            Does.Contain("SharpProof.Ir/IrIdentifierAliases.cs"));
     }
 
     private static async Task WriteFixtureAsync(string repository)
@@ -283,4 +354,3 @@ public sealed class ProductionInventoryAuthorityTests
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }
-

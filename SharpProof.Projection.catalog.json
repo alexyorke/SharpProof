@@ -282,12 +282,12 @@
             {"pattern": "IrNullTerm", "expression": "\"((\" + TypeName(term.Type) + \")null)\""},
             {"pattern": "IrVariableTerm value", "expression": "\"v\" + value.Variable.Value.ToString(CultureInfo.InvariantCulture)"},
             {"pattern": "IrOpaqueTerm value", "expression": "FormatOpaque(value)"},
-            {"pattern": "IrUnaryTerm value", "expression": "\"(\" + IrOperatorCatalog.Get(value.Operator).Token + Format(value.Operand) + \")\""},
-            {"pattern": "IrBinaryTerm value", "expression": "\"(\" + Format(value.Left) + \" \" + IrOperatorCatalog.Get(value.Operator).Token + \" \" + Format(value.Right) + \")\""},
-            {"pattern": "IrConditionalTerm value", "expression": "\"(\" + Format(value.Condition) + \" ? \" + Format(value.WhenTrue) + \" : \" + Format(value.WhenFalse) + \")\""},
-            {"pattern": "IrCastTerm value", "expression": "\"((\" + TypeName(value.Type) + \")\" + Format(value.Operand) + \")\""},
-            {"pattern": "IrLengthTerm value", "expression": "\"len(\" + Format(value.Value) + \")\""},
-            {"pattern": "IrSequenceAccessTerm value", "expression": "Format(value.Sequence) + \"[\" + Format(value.Index) + \"]\""}
+            {"pattern": "IrUnaryTerm value", "expression": "\"(\" + IrOperatorCatalog.Get(value.Operator).Token + FormatChild(value.Operand) + \")\""},
+            {"pattern": "IrBinaryTerm value", "expression": "\"(\" + FormatChild(value.Left) + \" \" + IrOperatorCatalog.Get(value.Operator).Token + \" \" + FormatChild(value.Right) + \")\""},
+            {"pattern": "IrConditionalTerm value", "expression": "\"(\" + FormatChild(value.Condition) + \" ? \" + FormatChild(value.WhenTrue) + \" : \" + FormatChild(value.WhenFalse) + \")\""},
+            {"pattern": "IrCastTerm value", "expression": "\"((\" + TypeName(value.Type) + \")\" + FormatChild(value.Operand) + \")\""},
+            {"pattern": "IrLengthTerm value", "expression": "\"len(\" + FormatChild(value.Value) + \")\""},
+            {"pattern": "IrSequenceAccessTerm value", "expression": "FormatChild(value.Sequence) + \"[\" + FormatChild(value.Index) + \"]\""}
           ],
           "fallback": "throw new InvalidOperationException(\"Unknown IR term kind: \" + term.Kind + \".\")"
         }
@@ -509,6 +509,19 @@
           "cases": [
             {"pattern": "IBinaryOperation binary", "expression": "binary.IsLifted"},
             {"pattern": "IUnaryOperation unary", "expression": "unary.IsLifted"}
+          ],
+          "fallback": "false"
+        },
+        {
+          "accessibility": "internal",
+          "static": true,
+          "returnType": "bool",
+          "name": "IsTryCast",
+          "parameters": [{"type": "IOperation", "name": "operation"}],
+          "switchMode": "type",
+          "target": "operation",
+          "cases": [
+            {"pattern": "IConversionOperation conversion", "expression": "conversion.IsTryCast"}
           ],
           "fallback": "false"
         }

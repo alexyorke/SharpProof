@@ -62,6 +62,29 @@ public sealed class CallableCounterexampleReplayerTests
     }
 
     [Test]
+    public void ReplayRejectsAnArbitraryReturnValueFromAVoidCallable()
+    {
+        var factory = new IrFactory();
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(entry, factory.CreateOperation(), factory.Integer(42));
+        var target = new CompilerCallablePreparation(factory,
+            new WorkerCallableManifestEntry { CallableId = "void", ClaimIds = ["claim"] },
+            [new CompilerPreparedClause(CompilerContractKind.Ensures, factory.Boolean(false),
+                CompilerContractEvidence.CompilerBoundInvocation, "claim", null)],
+            [], WorkerClaimReason.None,
+            CompilerPreparedBody.ProgramBody(
+                builder.Build(),
+                ImmutableDictionary<IrVarId, IrVarId>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty));
+
+        Assert.That(CallableCounterexampleReplayer.Replay(
+            target, 0, ImmutableDictionary<IrVarId, IrValue>.Empty),
+            Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
+    }
+
+    [Test]
     public void ReplayAllowsACallOutsideTheConcretePath()
     {
         var fixture = Create(static (factory, _, _, _) => factory.Boolean(false),
@@ -222,6 +245,94 @@ public sealed class CallableCounterexampleReplayerTests
                 0,
                 ImmutableDictionary<IrVarId, IrValue>.Empty),
             Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
+    }
+
+    [Test]
+    public void ReplayAndAuthorityRejectResultOutsideSourceIntegerInterval()
+    {
+        var factory = new IrFactory();
+        var result = factory.CreateVariable("result", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.Return(
+            entry,
+            factory.CreateOperation(),
+            factory.Integer(byte.MaxValue + 1));
+        var target = new CompilerCallablePreparation(
+            factory,
+            new WorkerCallableManifestEntry
+            {
+                CallableId = "byte-result",
+                ClaimIds = ["claim"]
+            },
+            [new CompilerPreparedClause(
+                CompilerContractKind.Ensures,
+                factory.Binary(
+                    IrBinaryOperator.LessThanOrEqual,
+                    factory.Variable(result),
+                    factory.Integer(byte.MaxValue)),
+                CompilerContractEvidence.CompilerBoundInvocation,
+                "claim",
+                null)],
+            [new CompilerCanonicalVariable(
+                CompilerVariableRole.Result,
+                -1,
+                result,
+                null,
+                new CompilerIntegerInterval(byte.MinValue, byte.MaxValue),
+                "result")],
+            WorkerClaimReason.None,
+            CompilerPreparedBody.ProgramBody(
+                builder.Build(),
+                ImmutableDictionary<IrVarId, IrVarId>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<
+                    IrInstructionId,
+                    CompilerPreparedSummaryCall>.Empty));
+        var response = new WorkerVerifyResponse
+        {
+            CallableResults =
+            [
+                new WorkerCallableResult
+                {
+                    CallableId = "byte-result",
+                    Assumptions = []
+                }
+            ],
+            ClaimResults =
+            [
+                new WorkerClaimResult
+                {
+                    ClaimId = "claim",
+                    Outcome = WorkerClaimOutcome.Refuted,
+                    Reason = WorkerClaimReason.None,
+                    Vacuity = WorkerVacuityKind.None,
+                    ProofCore = [],
+                    Model = [],
+                    Assumptions = []
+                }
+            ]
+        };
+
+        var replayReason = CallableCounterexampleReplayer.Replay(
+            target,
+            0,
+            ImmutableDictionary<IrVarId, IrValue>.Empty);
+        var authorityErrors = new CompilerResponseEvidenceAuthority([target])
+            .Validate(response)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                replayReason,
+                Is.EqualTo(WorkerClaimReason.CounterexampleReplayFailed));
+            Assert.That(
+                authorityErrors,
+                Does.Contain("response.model_authority"));
+        }
     }
 
     private static ReplayFixture CreateIncrementingBranch(

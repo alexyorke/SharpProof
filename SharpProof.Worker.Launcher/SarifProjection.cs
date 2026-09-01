@@ -5,11 +5,15 @@ namespace SharpProof.Worker.Launcher;
 
 internal static class SarifProjection
 {
+    private const string SourceRootUriBaseId = "%SRCROOT%";
+
     internal static string Serialize(
-        WorkerVerifyRequest request, WorkerVerifyResponse response)
+        WorkerVerifyRequest request, WorkerVerifyResponse response,
+        string projectDirectory)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(response);
+        var projectDirectoryUri = DirectoryUri(projectDirectory);
         WorkerProtocolJson.Canonicalize(response);
         var manifest = response.Manifest;
         var summary = response.Summary;
@@ -64,6 +68,10 @@ internal static class SarifProjection
             automationDetails = new
             {
                 id = manifest.Hash
+            },
+            originalUriBaseIds = new Dictionary<string, object>
+            {
+                [SourceRootUriBaseId] = new { uri = projectDirectoryUri }
             },
             invocations = new[] { new {
                 executionSuccessful = runStatus == WorkerRunStatus.Complete && errors.Length == 0,
@@ -146,7 +154,7 @@ internal static class SarifProjection
                 text = message
             },
             locations = new[] { new { physicalLocation = new {
-                artifactLocation = new { uri = LocationUri(location.Path) },
+                artifactLocation = ArtifactLocation(location.Path),
                 region = new {
                     startLine = location.Line, startColumn = location.Column
                 }
@@ -176,9 +184,66 @@ internal static class SarifProjection
         };
     }
 
-    private static string LocationUri(string path)
+    private static object ArtifactLocation(string path)
     {
-        return Uri.TryCreate(path, UriKind.Absolute, out var uri)
-            ? uri.AbsoluteUri : path.Replace('\\', '/');
+        return TryAbsolutePathUri(path, out var uri)
+            ? new { uri }
+            : new
+            {
+                uri = EscapePath(path),
+                uriBaseId = SourceRootUriBaseId
+            };
+    }
+
+    private static string DirectoryUri(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var windowsPath = IsWindowsDriveAbsolute(path);
+        var directory = windowsPath
+            ? path.TrimEnd('/', '\\') + '\\'
+            : path.TrimEnd('/') + '/';
+        if (!TryAbsolutePathUri(directory, out var uri))
+        {
+            throw new ArgumentException(
+                "The SARIF project directory must be an absolute path.",
+                nameof(path));
+        }
+
+        return uri;
+    }
+
+    private static bool TryAbsolutePathUri(
+        string path, out string uri)
+    {
+        if (path.Length != 0 && path[0] == '/')
+        {
+            uri = "file://" + EscapePath(path);
+            return true;
+        }
+        if (IsWindowsDriveAbsolute(path))
+        {
+            uri = "file:///" + path[..2] +
+                EscapePath(path[2..].Replace('\\', '/'));
+            return true;
+        }
+
+        uri = string.Empty;
+        return false;
+    }
+
+    private static bool IsWindowsDriveAbsolute(string path)
+    {
+        return path.Length >= 3 &&
+            char.IsAsciiLetter(path[0]) &&
+            path[1] == ':' &&
+            path[2] is '/' or '\\';
+    }
+
+    private static string EscapePath(string path)
+    {
+        return string.Join(
+            "/",
+            path.Split('/').Select(
+                static segment => Uri.EscapeDataString(segment)));
     }
 }

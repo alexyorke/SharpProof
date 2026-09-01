@@ -7,6 +7,7 @@ using NUnit.Framework;
 namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class PackageDependencyAuthorityTests
 {
     private const string Version = "1.0.0-preview.1";

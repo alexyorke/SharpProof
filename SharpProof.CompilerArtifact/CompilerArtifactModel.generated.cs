@@ -11,7 +11,7 @@ namespace SharpProof.CompilerArtifact;
 internal static class CompilerManifestArtifactVersions
 {
     internal const string Schema = "SharpProof.CompilerManifest";
-    internal const int Current = 15;
+    internal const int Current = 18;
 }
 
 internal static class CompilerRelationalSummaryVersions
@@ -62,7 +62,8 @@ internal enum CompilerScalarDomain
     Short = 3,
     UShort = 4,
     Int = 5,
-    UInt = 6
+    UInt = 6,
+    Long = 7
 }
 
 internal enum CompilerPreparedBodyKind
@@ -496,7 +497,7 @@ internal static class CompilerEffectEvidenceCatalog
     internal const string OperationDomain = "SharpProof.CompilerEffectReplayOperation";
     internal const int OperationVersion = 1;
     internal const string EvidenceDomain = "SharpProof.CompilerEffectClaimEvidence";
-    internal const int EvidenceVersion = 8;
+    internal const int EvidenceVersion = 9;
     internal const int MaximumReplayEvents = 256;
     internal const CompilerEffectReplayPathKind ReplayPathKind =
         CompilerEffectReplayPathKind.Unconditional;
@@ -552,6 +553,9 @@ internal static class CompilerEffectEvidenceCatalog
     internal static readonly CompilerEffectReplayEventKind[] SupportedReplayEventKinds = [
         CompilerEffectReplayEventKind.ManagedObjectAllocation,
         CompilerEffectReplayEventKind.ManagedArrayAllocation,
+        CompilerEffectReplayEventKind.ExplicitThrow,
+        CompilerEffectReplayEventKind.MonitorCall,
+        CompilerEffectReplayEventKind.EmptyLock,
     ];
 }
 

@@ -10,6 +10,10 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Gates.Corpus;
 
+internal sealed record OpenSourceCorpusImportPlan(
+    OpenSourceCorpusDocument Document,
+    CorpusFileUpdate[] Updates);
+
 internal static class OpenSourceCorpusImporter
 {
     internal const string SourceEnvironmentVariable =
@@ -21,6 +25,29 @@ internal static class OpenSourceCorpusImporter
     private const string LicenseRelativePath =
         "third-party/aalhour-C-Sharp-Algorithms-LICENSE.txt";
     private const int TargetMethodCount = 200;
+    private const string ReviewedMitLicense = """
+The MIT License (MIT)
+
+Copyright (c) 2015 Ahmad Alhour
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+""";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -29,7 +56,8 @@ internal static class OpenSourceCorpusImporter
         Converters = { new JsonStringEnumConverter() }
     };
 
-    internal static async Task ImportIfRequestedAsync(
+    internal static async Task<OpenSourceCorpusImportPlan?>
+        PrepareIfRequestedAsync(
         string repositoryRoot,
         CancellationToken cancellationToken)
     {
@@ -37,10 +65,10 @@ internal static class OpenSourceCorpusImporter
             SourceEnvironmentVariable);
         if (string.IsNullOrWhiteSpace(upstreamRoot))
         {
-            return;
+            return null;
         }
 
-        await ImportAsync(
+        return await PrepareAsync(
                 repositoryRoot,
                 upstreamRoot,
                 cancellationToken)
@@ -51,7 +79,7 @@ internal static class OpenSourceCorpusImporter
         "Globalization",
         "CA1308:Normalize strings to uppercase",
         Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
-    internal static async Task ImportAsync(
+    internal static async Task<OpenSourceCorpusImportPlan> PrepareAsync(
         string repositoryRoot,
         string upstreamRoot,
         CancellationToken cancellationToken)
@@ -96,27 +124,26 @@ internal static class OpenSourceCorpusImporter
                 $"expected {RepositoryUrl}.");
         }
 
-        var licenseSourcePath = Path.Combine(resolvedUpstreamRoot, "LICENSE");
-        if (!File.Exists(licenseSourcePath))
-        {
-            throw new InvalidDataException(
-                $"The upstream MIT license is missing: {licenseSourcePath}");
-        }
+        await VerifyCommitBelongsToApprovedRemoteAsync(
+                commit,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         var licenseText = OpenSourceCorpusCatalog.NormalizeLineEndings(
-            await File.ReadAllTextAsync(
-                    licenseSourcePath,
-                    cancellationToken)
-                .ConfigureAwait(false));
-        if (!licenseText.StartsWith(
-                "The MIT License (MIT)",
-                StringComparison.Ordinal))
-        {
-            throw new InvalidDataException(
-                "The upstream license no longer has the reviewed MIT form.");
-        }
+            Encoding.UTF8.GetString(
+                await ReadGitBlobAsync(
+                        resolvedUpstreamRoot,
+                        commit,
+                        "LICENSE",
+                        cancellationToken)
+                    .ConfigureAwait(false)));
+        ValidateReviewedMitLicense(licenseText);
 
-        var (files, candidates) = DiscoverSources(resolvedUpstreamRoot);
+        var (files, candidates) = await DiscoverSourcesAsync(
+                resolvedUpstreamRoot,
+                commit,
+                cancellationToken)
+            .ConfigureAwait(false);
         var selected = SelectDiverseCandidates(candidates, TargetMethodCount);
 
         var corpusDirectory =
@@ -124,23 +151,15 @@ internal static class OpenSourceCorpusImporter
         var existingSupport = LoadExistingSupport(corpusDirectory);
         var licenseTargetPath = Path.GetFullPath(
             Path.Combine(corpusDirectory, LicenseRelativePath));
-        EnsureContained(corpusDirectory, licenseTargetPath);
-        Directory.CreateDirectory(
-            Path.GetDirectoryName(licenseTargetPath) ??
-            throw new InvalidDataException(
-                "Could not resolve the imported license directory."));
-        await File.WriteAllTextAsync(
-                licenseTargetPath,
-                licenseText.EndsWith('\n') ? licenseText : licenseText + "\n",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-                cancellationToken)
-            .ConfigureAwait(false);
+        OpenSourceCorpusCatalog.EnsureContained(
+            corpusDirectory,
+            licenseTargetPath);
+        var licenseContent = licenseText.EndsWith('\n')
+            ? licenseText
+            : licenseText + "\n";
         var licenseHash = Convert.ToHexString(
                 System.Security.Cryptography.SHA256.HashData(
-                    await File.ReadAllBytesAsync(
-                            licenseTargetPath,
-                            cancellationToken)
-                        .ConfigureAwait(false)))
+                    Encoding.UTF8.GetBytes(licenseContent)))
             .ToLowerInvariant();
         var source = new OpenSourceCorpusSource(
             SourceId,
@@ -187,12 +206,6 @@ internal static class OpenSourceCorpusImporter
         var manifest = JsonSerializer.Serialize(document, JsonOptions)
             .Replace("\r\n", "\n", StringComparison.Ordinal) + "\n";
         var manifestPath = Path.Combine(corpusDirectory, "oss-methods.json");
-        await File.WriteAllTextAsync(
-                manifestPath,
-                manifest,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-                cancellationToken)
-            .ConfigureAwait(false);
         var unreviewedMethods = methods
             .Where(static method =>
                 method.Support == CorpusSupport.Unspecified)
@@ -205,7 +218,24 @@ internal static class OpenSourceCorpusImporter
                 "support classification. Set each generated support field " +
                 $"before updating the snapshot: {string.Join(", ", unreviewedMethods)}");
         }
-        _ = OpenSourceCorpusCatalog.Load(repositoryRoot);
+        return new OpenSourceCorpusImportPlan(
+            document,
+            [
+                new CorpusFileUpdate(licenseTargetPath, licenseContent),
+                new CorpusFileUpdate(manifestPath, manifest)
+            ]);
+    }
+
+    internal static void ValidateReviewedMitLicense(string licenseText)
+    {
+        if (!string.Equals(
+                OpenSourceCorpusCatalog.NormalizeLineEndings(licenseText).TrimEnd('\n'),
+                ReviewedMitLicense.TrimEnd('\n'),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "The upstream license no longer has the reviewed MIT form.");
+        }
     }
 
     private static ImmutableDictionary<string, CorpusSupport>
@@ -227,10 +257,12 @@ internal static class OpenSourceCorpusImporter
             StringComparer.Ordinal);
     }
 
-    private static (
+    private static async Task<(
         ImmutableArray<OpenSourceCorpusFile> Files,
-        ImmutableArray<ImportCandidate> Candidates)
-        DiscoverSources(string upstreamRoot)
+        ImmutableArray<ImportCandidate> Candidates)> DiscoverSourcesAsync(
+        string upstreamRoot,
+        string commit,
+        CancellationToken cancellationToken)
     {
         var sourceRoots = new[] {
             Path.Combine(upstreamRoot, "Algorithms"),
@@ -248,27 +280,24 @@ internal static class OpenSourceCorpusImporter
         var files = ImmutableArray.CreateBuilder<OpenSourceCorpusFile>();
         var candidates = ImmutableArray.CreateBuilder<ImportCandidate>();
         var declarationHashes = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var path in sourceRoots
-                     .SelectMany(static root =>
-                         Directory.EnumerateFiles(
-                             root,
-                             "*.cs",
-                             SearchOption.AllDirectories))
-                     .Where(static path =>
-                         !path.Contains(
-                             $"{Path.DirectorySeparatorChar}bin" +
-                             Path.DirectorySeparatorChar,
-                             StringComparison.OrdinalIgnoreCase) &&
-                         !path.Contains(
-                             $"{Path.DirectorySeparatorChar}obj" +
-                             Path.DirectorySeparatorChar,
-                             StringComparison.OrdinalIgnoreCase))
+        var trackedPaths = await ReadGitAsync(
+                upstreamRoot,
+                ["ls-tree", "-r", "--name-only", commit, "--", "Algorithms", "DataStructures"],
+                cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var relativePath in trackedPaths
+                     .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                     .Where(static path => path.EndsWith(".cs", StringComparison.Ordinal))
                      .OrderBy(static path => path, StringComparer.Ordinal))
         {
             var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
-                File.ReadAllText(path));
-            var relativePath = Path.GetRelativePath(upstreamRoot, path)
-                .Replace('\\', '/');
+                Encoding.UTF8.GetString(
+                    await ReadGitBlobAsync(
+                            upstreamRoot,
+                            commit,
+                            relativePath,
+                            cancellationToken)
+                        .ConfigureAwait(false)));
             files.Add(
                 new OpenSourceCorpusFile(
                     SourceId,
@@ -278,8 +307,9 @@ internal static class OpenSourceCorpusImporter
             var tree = CSharpSyntaxTree.ParseText(
                 content,
                 AnalyzerGateHost.ParseOptions,
-                relativePath);
-            foreach (var method in tree.GetCompilationUnitRoot()
+                relativePath,
+                cancellationToken: cancellationToken);
+            foreach (var method in tree.GetCompilationUnitRoot(cancellationToken)
                          .DescendantNodes()
                          .OfType<MethodDeclarationSyntax>()
                          .OrderBy(static method => method.SpanStart))
@@ -298,7 +328,7 @@ internal static class OpenSourceCorpusImporter
                     continue;
                 }
 
-                var lineSpan = tree.GetLineSpan(method.Span);
+                var lineSpan = tree.GetLineSpan(method.Span, cancellationToken);
                 candidates.Add(
                     new ImportCandidate(
                         relativePath,
@@ -376,12 +406,13 @@ internal static class OpenSourceCorpusImporter
         return selected.ToImmutable();
     }
 
-    private static async Task<string> ReadGitAsync(
+    internal static async Task<string> ReadGitAsync(
         string workingDirectory,
         IReadOnlyList<string> arguments,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string gitExecutable = "git")
     {
-        var startInfo = new ProcessStartInfo("git")
+        var startInfo = new ProcessStartInfo(gitExecutable)
         {
             WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
@@ -398,7 +429,28 @@ internal static class OpenSourceCorpusImporter
             throw new InvalidOperationException("Could not start Git.");
         var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            if (!process.HasExited)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+
+            await process.WaitForExitAsync(CancellationToken.None)
+                .ConfigureAwait(false);
+            throw;
+        }
         var output = (await outputTask.ConfigureAwait(false)).Trim();
         var error = (await errorTask.ConfigureAwait(false)).Trim();
         if (process.ExitCode != 0)
@@ -410,32 +462,127 @@ internal static class OpenSourceCorpusImporter
         return output;
     }
 
-    private static void EnsureContained(string root, string path)
+    private static async Task<byte[]> ReadGitBlobAsync(
+        string workingDirectory,
+        string commit,
+        string relativePath,
+        CancellationToken cancellationToken,
+        string gitExecutable = "git")
     {
-        var relative = Path.GetRelativePath(Path.GetFullPath(root), path);
-        if (Path.IsPathRooted(relative) ||
-            relative.Split(
-                    Path.DirectorySeparatorChar,
-                    Path.AltDirectorySeparatorChar)
-                .Any(static part => part == ".."))
+        var startInfo = new ProcessStartInfo(gitExecutable)
         {
-            throw new InvalidDataException(
-                $"Generated OSS corpus path escaped its directory: {path}");
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("cat-file");
+        startInfo.ArgumentList.Add("blob");
+        startInfo.ArgumentList.Add($"{commit}:{relativePath}");
+
+        using var process = Process.Start(startInfo) ??
+            throw new InvalidOperationException("Could not start Git.");
+        using var output = new MemoryStream();
+        var outputTask = process.StandardOutput.BaseStream.CopyToAsync(
+            output,
+            cancellationToken);
+        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
+        catch
+        {
+            if (!process.HasExited)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+
+            await process.WaitForExitAsync(CancellationToken.None)
+                .ConfigureAwait(false);
+            throw;
+        }
+
+        await outputTask.ConfigureAwait(false);
+        var error = (await errorTask.ConfigureAwait(false)).Trim();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"git cat-file blob {commit}:{relativePath} failed: {error}");
+        }
+
+        return output.ToArray();
     }
 
-    private static string NormalizeRepositoryUrl(string value)
+    internal static string NormalizeRepositoryUrl(string value)
     {
-        return value.Trim()
+        var normalized = value.Trim()
             .TrimEnd('/')
             .Replace(
                 "git@github.com:",
                 "https://github.com/",
                 StringComparison.OrdinalIgnoreCase)
-            .Replace(
+            .TrimEnd('/');
+        return normalized.EndsWith(
                 ".git",
-                string.Empty,
-                StringComparison.OrdinalIgnoreCase);
+                StringComparison.OrdinalIgnoreCase)
+            ? normalized[..^4]
+            : normalized;
+    }
+
+    private static async Task VerifyCommitBelongsToApprovedRemoteAsync(
+        string commit,
+        CancellationToken cancellationToken)
+    {
+        var verificationRoot = Directory.CreateTempSubdirectory(
+            "SharpProof-OSS-origin-");
+        try
+        {
+            await ReadGitAsync(
+                    verificationRoot.FullName,
+                    ["init", "--bare", "--quiet"],
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await ReadGitAsync(
+                    verificationRoot.FullName,
+                    [
+                        "fetch",
+                        "--no-tags",
+                        "--quiet",
+                        RepositoryUrl,
+                        "+refs/heads/*:refs/sharpproof-approved/*"
+                    ],
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            try
+            {
+                await ReadGitAsync(
+                        verificationRoot.FullName,
+                        ["cat-file", "-e", $"{commit}^{{commit}}"],
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw new InvalidDataException(
+                    $"Upstream HEAD {commit} is not a commit from the " +
+                    $"approved repository {RepositoryUrl}.",
+                    exception);
+            }
+        }
+        finally
+        {
+            verificationRoot.Delete(recursive: true);
+        }
     }
 
     private sealed record ImportCandidate(

@@ -116,6 +116,31 @@ public sealed class ManagedAbstractFlowTests
     }
 
     [Test]
+    public void UnaryBooleanNegationPreservesUnknownBooleanDomain()
+    {
+        var compilation = EffectTestHost.CreateCompilation(
+            """
+            public static class Sample {
+                public static bool Calls(bool value) => !value;
+            }
+            """);
+        var syntax = compilation.SyntaxTrees.Single().GetRoot()
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
+        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var unary = (IUnaryOperation)model.GetOperation(
+            syntax.ExpressionBody!.Expression)!;
+        var value = ManagedAbstractFlow.ForCompilation(compilation)
+            .Evaluate(
+                unary,
+                ManagedFlowState.Empty.Set(
+                    ((IMethodSymbol)model.GetDeclaredSymbol(syntax)!).Parameters.Single(),
+                    ManagedAbstractValue.BooleanUnknown));
+
+        Assert.That(value.IsBoolean, Is.True);
+        Assert.That(value.TryGetBoolean(out _), Is.False);
+    }
+
+    [Test]
     public void UnaryIntegerNegationOfUnknownUsesTheTypeTopValue()
     {
         var compilation = EffectTestHost.CreateCompilation(
@@ -234,7 +259,7 @@ public sealed class ManagedAbstractFlowTests
         {
             Assert.That(conditionalValue.IsUnknown, Is.True);
             Assert.That(coalesceValue.IsDefinitelyNull, Is.False);
-            Assert.That(coalesceValue.IsDefinitelyNonNull, Is.False);
+            Assert.That(coalesceValue.IsDefinitelyNonNull, Is.True);
         }
     }
 

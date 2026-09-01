@@ -9,6 +9,8 @@ param(
 
     [switch]$NoBuild,
 
+    [switch]$Fast,
+
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 1800,
 
@@ -24,12 +26,33 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
     throw 'Package tests require the canonical Linux container.'
 }
+if ($Fast -and $NoBuild) {
+    throw '-Fast and -NoBuild cannot be combined.'
+}
 
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
-$parallelism = Get-SharpProofTestProjectParallelism `
+$parallelism = Get-SharpProofPackageTestParallelism `
+    -RepositoryRoot $repositoryRoot
+$buildParallelism = Get-SharpProofBuildParallelism `
     -RepositoryRoot $repositoryRoot
 $dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+$dotnetCommand = Get-Command `
+    dotnet `
+    -CommandType Application `
+    -ErrorAction Stop | Select-Object -First 1
+$dotnetItem = Get-Item -LiteralPath $dotnetCommand.Source
+$dotnetTarget = $dotnetItem.ResolveLinkTarget($true)
+$resolvedDotnetHost = if ($null -eq $dotnetTarget) {
+    $dotnetItem.FullName
+}
+else {
+    $dotnetTarget.FullName
+}
+if (-not [IO.Path]::IsPathRooted($resolvedDotnetHost) -or
+    -not (Test-Path -LiteralPath $resolvedDotnetHost -PathType Leaf)) {
+    throw "Could not resolve the canonical dotnet host: $resolvedDotnetHost"
+}
 $testProject = Join-Path `
     $repositoryRoot 'SharpProof.Package.Test/SharpProof.Package.Test.csproj'
 $coverageEnabled =
@@ -54,6 +77,14 @@ $resolvedCoverageResults = if ($coverageEnabled) {
 else {
     ''
 }
+$testAssembly = if ($NoBuild -and -not $coverageEnabled) {
+    Get-SharpProofTestAssemblyPath `
+        -ProjectPath $testProject `
+        -Configuration $Configuration
+}
+else {
+    ''
+}
 $isolatedOutputRoot = if ($coverageEnabled) {
     Join-Path $repositoryRoot (
         '.sharpproof-coverage-output-' + [Guid]::NewGuid().ToString('N'))
@@ -71,10 +102,20 @@ function Invoke-RequiredDotnet {
     }
 }
 
-function Get-WorkerMethodTimings {
+function Invoke-RequiredBuilds {
+    param([Parameter(Mandatory = $true)][object[]]$Builds)
+
+    Invoke-SharpProofParallelDotnetBuilds `
+        -Builds $Builds `
+        -RepositoryRoot $repositoryRoot `
+        -Parallelism $buildParallelism `
+        -TimeoutSeconds $TimeoutSeconds
+}
+
+function Get-TestMethodTimings {
     param(
         [Parameter(Mandatory = $true)][string]$ResultsRoot,
-        [Parameter(Mandatory = $true)][string]$WorkerClass
+        [Parameter(Mandatory = $true)][string]$ClassName
     )
 
     $milliseconds = @{}
@@ -104,7 +145,7 @@ function Get-WorkerMethodTimings {
                 continue
             }
             $definition = $definitions[$testId]
-            if ($definition.ClassName -cne $WorkerClass) {
+            if ($definition.ClassName -cne $ClassName) {
                 continue
             }
             $match = [regex]::Match(
@@ -132,6 +173,35 @@ function Get-WorkerMethodTimings {
         } | Sort-Object name)
 }
 
+function Get-DiscoveredTestMethods {
+    param(
+        [Parameter(Mandatory = $true)][string]$Assembly,
+        [Parameter(Mandatory = $true)][string]$ClassName,
+        [Parameter(Mandatory = $true)][int]$MinimumCount,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    $list = & dotnet vstest $Assembly `
+        /ListTests `
+        "/TestCaseFilter:FullyQualifiedName~$ClassName" 2>&1 |
+        Out-String
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not discover $Description tests."
+    }
+    $methods = @(
+        [regex]::Matches(
+            $list,
+            '(?m)^\s{4}(?<method>[A-Za-z_][A-Za-z0-9_]*)(?:\(|\s*$)') |
+            ForEach-Object { $_.Groups['method'].Value } |
+            Sort-Object -Unique)
+    if ($methods.Count -lt $MinimumCount) {
+        throw (
+            "$Description discovery returned only " +
+            "$($methods.Count) test methods.")
+    }
+    return $methods
+}
+
 $root = Join-Path ([IO.Path]::GetTempPath()) (
     'sharpproof-package-tests-' + [Guid]::NewGuid().ToString('N'))
 $feed = if ([string]::IsNullOrWhiteSpace($PackageSource)) {
@@ -151,16 +221,48 @@ if ([string]::IsNullOrWhiteSpace($PackageSource)) {
 }
 [IO.Directory]::CreateDirectory($results) | Out-Null
 $campaign = [Diagnostics.Stopwatch]::StartNew()
+$phaseTimings = [Collections.Generic.List[object]]::new()
+function Invoke-TimedPhase {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][scriptblock]$Action
+    )
+
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        & $Action
+    }
+    finally {
+        $timer.Stop()
+        $phaseTimings.Add([pscustomobject]@{
+            name = $Name
+            elapsedMilliseconds = [long]$timer.Elapsed.TotalMilliseconds
+        })
+    }
+}
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
+$timingStem = 'package-tests-' + $Configuration.ToLowerInvariant()
+$timingSuffix = if ($coverageEnabled) { '-coverage' } else { '' }
+$canonicalTimingOutput = Join-Path $timingDirectory (
+    $timingStem + $timingSuffix + '.json')
 $timingOutput = Join-Path $timingDirectory (
-    'package-tests-' + $Configuration.ToLowerInvariant() +
-    $(if ($coverageEnabled) { '-coverage' } else { '' }) + '.json')
+    $timingStem + $(if ($Fast) { '-fast' } else { '' }) +
+    $timingSuffix + '.json')
 $priorMethodMilliseconds = @{}
+$priorPackageLayoutMethodMilliseconds = @{}
 $priorFilterMilliseconds = @{}
-if (Test-Path -LiteralPath $timingOutput -PathType Leaf) {
+foreach ($priorTimingPath in $(if ($Fast) {
+            @($canonicalTimingOutput, $timingOutput)
+        }
+        else {
+            @($timingOutput)
+        })) {
+    if (-not (Test-Path -LiteralPath $priorTimingPath -PathType Leaf)) {
+        continue
+    }
     try {
-        $priorTiming = Get-Content -LiteralPath $timingOutput -Raw |
+        $priorTiming = Get-Content -LiteralPath $priorTimingPath -Raw |
             ConvertFrom-Json
         $hasScheduler =
             $priorTiming.PSObject.Properties.Name -contains 'scheduler'
@@ -174,6 +276,21 @@ if (Test-Path -LiteralPath $timingOutput -PathType Leaf) {
             $elapsed = [long]$method.elapsedMilliseconds
             if ($elapsed -gt 0) {
                 $priorMethodMilliseconds[[string]$method.name] = $elapsed
+            }
+        }
+        $packageLayoutMethodHistory = if ($hasScheduler -and
+            $priorTiming.scheduler.PSObject.Properties.Name -contains
+                'packageLayoutMethods') {
+            @($priorTiming.scheduler.packageLayoutMethods)
+        }
+        else {
+            @()
+        }
+        foreach ($method in $packageLayoutMethodHistory) {
+            $elapsed = [long]$method.elapsedMilliseconds
+            if ($elapsed -gt 0) {
+                $priorPackageLayoutMethodMilliseconds[
+                    [string]$method.name] = $elapsed
             }
         }
         $filterHistory = if ($hasScheduler) {
@@ -191,53 +308,82 @@ if (Test-Path -LiteralPath $timingOutput -PathType Leaf) {
     }
     catch {
         Write-Warning (
-            'Ignoring malformed prior package timing evidence: ' +
+            "Ignoring malformed package timing '$priorTimingPath': " +
             $_.Exception.Message)
     }
 }
 
 try {
     if (-not $NoBuild) {
-        Invoke-RequiredDotnet @(
-            'restore', 'SharpProof.sln', '--locked-mode')
-        Invoke-RequiredDotnet @(
-            'build', $testProject, '-c', $Configuration, '--no-restore')
+        Invoke-TimedPhase -Name 'restore' -Action {
+            Invoke-RequiredDotnet @(
+                'restore', 'SharpProof.sln', '--locked-mode',
+                '/nodeReuse:false')
+        }
+    }
+
+    $builds = [Collections.Generic.List[object]]::new()
+    if (-not $NoBuild) {
+        $testHarnessBuildArguments = @(
+            'build', $testProject, '-c', $Configuration,
+            '--no-restore')
+        if ($Fast) {
+            $testHarnessBuildArguments +=
+                '-p:RunAnalyzersDuringBuild=false'
+        }
+        $builds.Add([pscustomobject]@{
+            Name = 'test-harness-' + $Configuration.ToLowerInvariant()
+            Arguments = $testHarnessBuildArguments
+        })
+    }
+    if ([string]::IsNullOrWhiteSpace($PackageSource) -and -not $NoBuild) {
+        $packageProductBuildArguments = @(
+            'build',
+            'SharpProof.Verifier/SharpProof.Verifier.csproj',
+            '-c', 'Release', '--no-restore',
+            '-p:GeneratePackageOnBuild=false')
+        if ($Fast) {
+            $packageProductBuildArguments +=
+                '-p:RunAnalyzersDuringBuild=false'
+        }
+        $builds.Add([pscustomobject]@{
+            Name = 'package-products-release'
+            Arguments = $packageProductBuildArguments
+        })
+    }
+    if ($builds.Count -gt 0) {
+        Invoke-TimedPhase -Name 'build-prerequisites' -Action {
+            Invoke-RequiredBuilds -Builds @($builds)
+        }
     }
 
     if ([string]::IsNullOrWhiteSpace($PackageSource)) {
         $packageManifest = Get-Content -LiteralPath (Join-Path `
             $repositoryRoot 'scripts/package-projects.json') -Raw |
             ConvertFrom-Json
-        foreach ($project in @($packageManifest.projects)) {
-            Invoke-RequiredDotnet @(
-                'pack', [string]$project, '-c', 'Release', '--no-restore',
-                $(if ($NoBuild) { '--no-build' } else { '--nologo' }),
-                '--output', $feed, '/p:GeneratePackageOnBuild=false')
+        Invoke-TimedPhase -Name 'pack' -Action {
+            foreach ($project in @($packageManifest.projects)) {
+                Invoke-RequiredDotnet @(
+                    'pack', [string]$project, '-c', 'Release',
+                    '--no-restore', '--no-build', '--nologo',
+                    '/nodeReuse:false', '--output', $feed,
+                    '/p:GeneratePackageOnBuild=false')
+            }
         }
     }
 
     $workerClass =
         'SharpProof.Package.Test.WorkerMsBuildIntegrationTests'
-    $workerList = & dotnet test $testProject `
-        -c $Configuration `
-        --no-build `
-        --no-restore `
-        --list-tests `
-        --filter "FullyQualifiedName~$workerClass" 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Could not discover Worker MSBuild integration tests.'
+    if ([string]::IsNullOrWhiteSpace($testAssembly)) {
+        $testAssembly = Get-SharpProofTestAssemblyPath `
+            -ProjectPath $testProject `
+            -Configuration $Configuration
     }
-    $workerMethods = @(
-        [regex]::Matches(
-            $workerList,
-            '(?m)^\s{4}(?<method>[A-Za-z_][A-Za-z0-9_]*)(?:\(|\s*$)') |
-            ForEach-Object { $_.Groups['method'].Value } |
-            Sort-Object -Unique)
-    if ($workerMethods.Count -lt 40) {
-        throw (
-            'Worker MSBuild integration discovery returned only ' +
-            "$($workerMethods.Count) test methods.")
-    }
+    $workerMethods = @(Get-DiscoveredTestMethods `
+        -Assembly $testAssembly `
+        -ClassName $workerClass `
+        -MinimumCount 40 `
+        -Description 'Worker MSBuild integration')
     $workerBuckets = @(
         for ($index = 0; $index -lt $parallelism; $index++) {
             [pscustomobject]@{
@@ -270,6 +416,58 @@ try {
                 1L
             })
     }
+    $packageLayoutClass =
+        'SharpProof.Package.Test.PackageLayoutSmokeTests'
+    $packageLayoutMethods = @(Get-DiscoveredTestMethods `
+        -Assembly $testAssembly `
+        -ClassName $packageLayoutClass `
+        -MinimumCount 15 `
+        -Description 'package-layout')
+    $packageLayoutFilter =
+        "FullyQualifiedName~$packageLayoutClass"
+    $defaultPackageLayoutMethodMilliseconds =
+        if ($priorFilterMilliseconds.ContainsKey($packageLayoutFilter)) {
+            [long][Math]::Max(
+                1,
+                [Math]::Ceiling(
+                    [long]$priorFilterMilliseconds[$packageLayoutFilter] /
+                        [double]$packageLayoutMethods.Count))
+        }
+        else {
+            1L
+        }
+    $packageLayoutBuckets = @(
+        for ($index = 0; $index -lt [Math]::Min(4, $parallelism); $index++) {
+            [pscustomobject]@{
+                Index = $index
+                Methods = [Collections.Generic.List[string]]::new()
+                EstimatedMilliseconds = 0L
+            }
+        })
+    $orderedPackageLayoutMethods = @($packageLayoutMethods | Sort-Object `
+        @{ Expression = {
+                if ($priorPackageLayoutMethodMilliseconds.ContainsKey($_)) {
+                    [long]$priorPackageLayoutMethodMilliseconds[$_]
+                }
+                else {
+                    $defaultPackageLayoutMethodMilliseconds
+                }
+            }; Descending = $true }, `
+        @{ Expression = { $_ }; Descending = $false })
+    foreach ($method in $orderedPackageLayoutMethods) {
+        $bucket = $packageLayoutBuckets | Sort-Object `
+            EstimatedMilliseconds, `
+            @{ Expression = { $_.Methods.Count } }, `
+            Index | Select-Object -First 1
+        $bucket.Methods.Add($method)
+        $bucket.EstimatedMilliseconds +=
+            $(if ($priorPackageLayoutMethodMilliseconds.ContainsKey($method)) {
+                [long]$priorPackageLayoutMethodMilliseconds[$method]
+            }
+            else {
+                $defaultPackageLayoutMethodMilliseconds
+            })
+    }
 
     $shards = [Collections.Generic.List[object]]::new()
     if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
@@ -287,11 +485,9 @@ try {
     }
     else {
         $fixtureClasses = @(
-            'BuildTaskTests',
             'DependencyAuditScriptTests',
             'FinalCompilationProbeTests',
             'LauncherArgumentTests',
-            'PackageLayoutSmokeTests',
             'ReleasePublicationScriptTests')
         foreach ($fixtureClass in $fixtureClasses) {
             $filter =
@@ -306,6 +502,47 @@ try {
                     else {
                         1L
                     })
+                })
+        }
+        $buildTaskClass = 'SharpProof.Package.Test.BuildTaskTests'
+        $isolatedBuildTaskMethods = @(
+            'OversizedVerifierOutputTriggersPromptBoundedContainment',
+            'VerifierExecutionRetainsLiveIncompleteCleanupAnchor',
+            'VerifierTaskBoundsTheWholeLauncherProcess')
+        $remainingBuildTaskFilter = "FullyQualifiedName~$buildTaskClass"
+        foreach ($method in $isolatedBuildTaskMethods) {
+            $remainingBuildTaskFilter +=
+                "&FullyQualifiedName!~$buildTaskClass.$method"
+        }
+        $shards.Add([pscustomobject]@{
+            Name = 'postflight-buildtask-main'
+            Filter = $remainingBuildTaskFilter
+            EstimatedMilliseconds = -1L
+            Exclusive = $true
+        })
+        foreach ($method in $isolatedBuildTaskMethods) {
+            $shards.Add([pscustomobject]@{
+                Name = 'postflight-buildtask-' + $method.ToLowerInvariant()
+                Filter = "FullyQualifiedName~$buildTaskClass.$method"
+                EstimatedMilliseconds = -1L
+                Exclusive = $true
+            })
+        }
+        foreach ($bucket in $packageLayoutBuckets) {
+            $filter = @($bucket.Methods | ForEach-Object {
+                    "FullyQualifiedName~$packageLayoutClass.$_"
+                }) -join '|'
+            $shards.Add([pscustomobject]@{
+                Name = 'package-layout-' + ($bucket.Index + 1).ToString(
+                    'D2', [Globalization.CultureInfo]::InvariantCulture)
+                Filter = $filter
+                EstimatedMilliseconds =
+                    $(if ($priorFilterMilliseconds.ContainsKey($filter)) {
+                        [long]$priorFilterMilliseconds[$filter]
+                    }
+                    else {
+                        $bucket.EstimatedMilliseconds
+                    })
             })
         }
         foreach ($bucket in @($workerBuckets | Where-Object {
@@ -315,8 +552,8 @@ try {
                 Name = 'worker-' + ($bucket.Index + 1).ToString(
                     'D2', [Globalization.CultureInfo]::InvariantCulture)
                 Filter = @($bucket.Methods | ForEach-Object {
-                        "FullyQualifiedName~$workerClass.$_"
-                    }) -join '|'
+                    "FullyQualifiedName~$workerClass.$_"
+                }) -join '|'
                 EstimatedMilliseconds = $bucket.EstimatedMilliseconds
             })
         }
@@ -332,9 +569,17 @@ try {
     $shardTimings = [Collections.Generic.List[object]]::new()
     $failures = [Collections.Generic.List[string]]::new()
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $testPhase = [Diagnostics.Stopwatch]::StartNew()
 
     while ($pending.Count -gt 0 -or $running.Count -gt 0) {
         while ($pending.Count -gt 0 -and $running.Count -lt $parallelism) {
+            $next = $pending.Peek()
+            $nextIsExclusive =
+                $next.PSObject.Properties.Name -contains 'Exclusive' -and
+                [bool]$next.Exclusive
+            if ($nextIsExclusive -and $running.Count -gt 0) {
+                break
+            }
             $shard = $pending.Dequeue()
             $startInfo = [Diagnostics.ProcessStartInfo]::new()
             $startInfo.FileName = 'dotnet'
@@ -353,17 +598,38 @@ try {
                         $isolatedOutputRoot (
                             $shard.Name + '/' + $Configuration + '/net9.0'))
             }
-            $arguments = @(
-                'test', $testProject, '-c', $Configuration,
-                '--no-build', '--no-restore')
-            if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
+            $directVstest = -not $coverageEnabled -and
+                -not $nextIsExclusive
+            if ($directVstest) {
+                $startInfo.Environment['DOTNET_HOST_PATH'] =
+                    $resolvedDotnetHost
+            }
+            $arguments = if ($directVstest) {
+                @('vstest', $testAssembly)
+            }
+            else {
+                @(
+                    'test', $testProject, '-c', $Configuration,
+                    '--no-build', '--no-restore')
+            }
+            if (-not $directVstest -and
+                -not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
                 $arguments += '-p:OutDir=' + $isolatedOutput + '/'
             }
-            $arguments += @(
+            if ($directVstest) {
+                $arguments += '/TestCaseFilter:' + $shard.Filter
+                $arguments += '/logger:console;verbosity=minimal'
+                $arguments += "/logger:trx;LogFileName=$($shard.Name).trx"
+                $arguments += '/ResultsDirectory:' + (
+                    Join-Path $results $shard.Name)
+            }
+            else {
+                $arguments += @(
                     '--filter', $shard.Filter,
                     '--logger', 'console;verbosity=minimal',
                     '--logger', "trx;LogFileName=$($shard.Name).trx",
                     '--results-directory', (Join-Path $results $shard.Name))
+            }
             if ($coverageEnabled) {
                 $arguments += @(
                     '--settings', $resolvedCoverageSettings,
@@ -385,6 +651,9 @@ try {
                 StandardOutput = $process.StandardOutput.ReadToEndAsync()
                 StandardError = $process.StandardError.ReadToEndAsync()
             })
+            if ($nextIsExclusive) {
+                break
+            }
         }
 
         if ([DateTime]::UtcNow -ge $deadline) {
@@ -429,17 +698,35 @@ try {
             $active.Process.Dispose()
         }
     }
+    $testPhase.Stop()
+    $phaseTimings.Add([pscustomobject]@{
+        name = 'test-shards'
+        elapsedMilliseconds = [long]$testPhase.Elapsed.TotalMilliseconds
+    })
 
     $campaign.Stop()
-    $workerMethodTimings = Get-WorkerMethodTimings `
+    $workerMethodTimings = Get-TestMethodTimings `
         -ResultsRoot $results `
-        -WorkerClass $workerClass
+        -ClassName $workerClass
+    $packageLayoutMethodTimings = Get-TestMethodTimings `
+        -ResultsRoot $results `
+        -ClassName $packageLayoutClass
     $schedulerMethodMilliseconds = @{}
     foreach ($entry in $priorMethodMilliseconds.GetEnumerator()) {
         $schedulerMethodMilliseconds[[string]$entry.Key] = [long]$entry.Value
     }
     foreach ($entry in $workerMethodTimings) {
         $schedulerMethodMilliseconds[[string]$entry.name] =
+            [long]$entry.elapsedMilliseconds
+    }
+    $schedulerPackageLayoutMethodMilliseconds = @{}
+    foreach ($entry in
+        $priorPackageLayoutMethodMilliseconds.GetEnumerator()) {
+        $schedulerPackageLayoutMethodMilliseconds[[string]$entry.Key] =
+            [long]$entry.Value
+    }
+    foreach ($entry in $packageLayoutMethodTimings) {
+        $schedulerPackageLayoutMethodMilliseconds[[string]$entry.name] =
             [long]$entry.elapsedMilliseconds
     }
     $schedulerFilterMilliseconds = @{}
@@ -456,13 +743,24 @@ try {
         schemaVersion = 1
         command = 'package-tests'
         configuration = $Configuration
+        fast = [bool]$Fast
         parallelism = $parallelism
         totalElapsedMilliseconds = [long]$campaign.Elapsed.TotalMilliseconds
+        phases = @($phaseTimings)
         shards = @($shardTimings | Sort-Object name)
         workerMethods = $workerMethodTimings
+        packageLayoutMethods = $packageLayoutMethodTimings
         scheduler = [ordered]@{
             workerMethods = @(
                 $schedulerMethodMilliseconds.GetEnumerator() |
+                    ForEach-Object {
+                        [pscustomobject]@{
+                            name = [string]$_.Key
+                            elapsedMilliseconds = [long]$_.Value
+                        }
+                    } | Sort-Object name)
+            packageLayoutMethods = @(
+                $schedulerPackageLayoutMethodMilliseconds.GetEnumerator() |
                     ForEach-Object {
                         [pscustomobject]@{
                             name = [string]$_.Key

@@ -566,6 +566,44 @@ public sealed class IrKernelTests
         Assert.That(secondText, Is.EqualTo(firstText));
     }
 
+    [Test]
+    public void PrinterEscapesTypeNamesAndIncludesTypeIdentity()
+    {
+        var factory = new IrFactory();
+        var first = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(), "Widget\n\"One\"");
+        var second = factory.GetOrCreateReferenceType(
+            factory.CreateIdentity(), "Widget\n\"One\"");
+
+        var firstText = new IrPrinter(factory).Print(factory.Null(first));
+        var secondText = new IrPrinter(factory).Print(factory.Null(second));
+
+        Assert.That(firstText, Does.Not.Contain("\n"));
+        Assert.That(firstText, Does.Contain("\\n"));
+        Assert.That(firstText, Does.Contain("\\\"One\\\""));
+        Assert.That(secondText, Is.Not.EqualTo(firstText));
+    }
+
+    [Test]
+    public void PrinterRejectsTermsBeyondItsFormattingDepthLimit()
+    {
+        var factory = new IrFactory();
+        var variable = factory.Variable(
+            factory.CreateVariable("value", factory.IntegerType));
+        IrTerm term = variable;
+        for (var index = 0; index < 2048; index++)
+        {
+            term = factory.Binary(IrBinaryOperator.Add, term, variable);
+        }
+
+        var printer = new IrPrinter(factory);
+        var exception = Assert.Throws<InvalidOperationException>(
+            (Action)(() => printer.Print(term)));
+
+        Assert.That(exception!.Message, Does.Contain("formatting depth"));
+        Assert.That(printer.Print(factory.Integer(1)), Is.EqualTo("1"));
+    }
+
     [TestCase(IrUnaryOperator.Not, IrTypeKind.Boolean, "(!v0)")]
     [TestCase(IrUnaryOperator.Negate, IrTypeKind.Integer, "(-v0)")]
     public void UnaryOperatorMetadataPreservesTypesKeysAndTokens(
@@ -1044,6 +1082,58 @@ public sealed class IrKernelTests
                 factory.String("line\n\"x\""),
                 factory.Variable(text)),
             factory.String("fallback"));
+    }
+
+    [Test]
+    public void MemoizedSubtermsCannotBypassTheEvaluationDepthLimit()
+    {
+        const int maximumDepth = 256;
+        var factory = new IrFactory();
+        var sharedVariable = factory.CreateVariable(
+            "shared",
+            factory.IntegerType);
+        var uncachedVariable = factory.CreateVariable(
+            "uncached",
+            factory.IntegerType);
+        var shared = (IrTerm)factory.Variable(sharedVariable);
+        var uncached = (IrTerm)factory.Variable(uncachedVariable);
+
+        var cachedLeafTerm = Nest(shared);
+        var uncachedLeafTerm = Nest(uncached);
+        var environment = new Dictionary<IrVarId, IrValue>
+        {
+            [sharedVariable] = factory.CreateIntegerValue(1),
+            [uncachedVariable] = factory.CreateIntegerValue(1)
+        };
+        var interpreter = new IrInterpreter(factory);
+
+        var cachedLeaf = interpreter.Evaluate(cachedLeafTerm, environment);
+        var uncachedLeaf = interpreter.Evaluate(uncachedLeafTerm, environment);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                cachedLeaf.Status,
+                Is.EqualTo(IrEvaluationStatus.Unsupported),
+                "a cached leaf cannot bypass the structural depth limit");
+            Assert.That(
+                uncachedLeaf.Status,
+                Is.EqualTo(IrEvaluationStatus.Unsupported),
+                "the equivalent uncached leaf is rejected at the same depth");
+        }
+
+        IrTerm Nest(IrTerm leaf)
+        {
+            var term = leaf;
+            for (var index = 0; index < maximumDepth; index++)
+            {
+                term = factory.Binary(
+                    IrBinaryOperator.Add,
+                    shared,
+                    term);
+            }
+            return term;
+        }
     }
 
     [Test]

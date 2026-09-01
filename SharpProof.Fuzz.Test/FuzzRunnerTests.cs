@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using SharpProof.Ir;
 using SharpProof.Fuzz;
+using SharpProof.Verify;
 
 namespace SharpProof.Fuzz.Test;
 
@@ -41,7 +42,7 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
-    public void PartialAbstentionIsNotClassifiedAsMismatchEvidence()
+    public void PartialAbstentionIsRetainedAsFailureEvidence()
     {
         var classification = FuzzRunner.ClassifyCase(
             FuzzOracleStatus.Agreement,
@@ -56,8 +57,25 @@ public sealed class FuzzRunnerTests
         {
             Assert.That(classification.HasMismatch, Is.False);
             Assert.That(classification.HasAbstention, Is.True);
-            Assert.That(keys, Is.Empty);
+            Assert.That(
+                keys,
+                Is.EqualTo(new[] { new FuzzFailureKey(0, "partial-term-smt") }));
         }
+    }
+
+    [Test]
+    public void FrontendMinimizationDoesNotTreatCompileErrorsAsSemanticMismatches()
+    {
+        var compileFailure = new FrontendDifferentialResult(
+            FuzzOracleStatus.Mismatch,
+            "Generated C# did not compile: CS1002");
+        var semanticFailure = new FrontendDifferentialResult(
+            FuzzOracleStatus.Mismatch,
+            "Compiled C# and lowered IR produced different values.");
+
+        Assert.That(FuzzRunner.IsCompilationFailure(compileFailure), Is.True);
+        Assert.That(FuzzRunner.IsSemanticMismatch(compileFailure), Is.False);
+        Assert.That(FuzzRunner.IsSemanticMismatch(semanticFailure), Is.True);
     }
 
     [Test]
@@ -85,6 +103,47 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
+    public void GeneratorCorpusCoversEverySupportedOperatorFamily()
+    {
+        var observed = new HashSet<GeneratedExpressionKind>();
+        for (var seed = 0; seed < 256; seed++)
+        {
+            var expression = new SmallCSharpCaseGenerator(seed).Next(
+                maximumDepth: 5).Expression;
+            Collect(expression, observed);
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Add));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Subtract));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Multiply));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Divide));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Remainder));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Conditional));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.AndAlso));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.OrElse));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.Equal));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.NotEqual));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.LessThan));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.LessThanOrEqual));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.GreaterThan));
+            Assert.That(observed, Does.Contain(GeneratedExpressionKind.GreaterThanOrEqual));
+        }
+
+        static void Collect(
+            GeneratedCSharpExpression expression,
+            ISet<GeneratedExpressionKind> observed)
+        {
+            observed.Add(expression.Kind);
+            foreach (var child in expression.Children)
+            {
+                Collect(child, observed);
+            }
+        }
+    }
+
+    [Test]
     public async Task ParallelismDoesNotChangeDeterministicOutcomes()
     {
         var serial = await FuzzRunner.RunAsync(
@@ -92,7 +151,11 @@ public sealed class FuzzRunnerTests
         var parallel = await FuzzRunner.RunAsync(
             new FuzzOptions(Cases: 16, Seed: -9876, MaximumParallelism: 4));
 
-        Assert.That(serial.Passed, Is.True);
+        Assert.That(
+            serial.Passed,
+            Is.True,
+            string.Join(Environment.NewLine, serial.Failures.Select(
+                static failure => failure.ToString())));
         Assert.That(parallel.Passed, Is.True);
         Assert.That(parallel.Agreements, Is.EqualTo(serial.Agreements));
         Assert.That(parallel.Abstentions, Is.EqualTo(serial.Abstentions));
@@ -290,7 +353,9 @@ public sealed class FuzzRunnerTests
 
         Assert.That(
             results.Select(static result => result.Status),
-            Is.All.EqualTo(FuzzOracleStatus.Agreement));
+            Is.All.EqualTo(FuzzOracleStatus.Agreement),
+            string.Join(Environment.NewLine, results.Select(
+                static result => result.Detail)));
         Assert.That(
             results[0].ExceptionKind,
             Is.EqualTo(IrExceptionKind.NullReference));
@@ -376,6 +441,55 @@ public sealed class FuzzRunnerTests
         Assert.That(unsat.FiniteDomainAssumptions, Is.EqualTo(1));
     }
 
+    [Test]
+    public async Task OversizedFiniteDomainAbstainsBeforeEnumeration()
+    {
+        var factory = new IrFactory();
+        IrTerm any = factory.Boolean(false);
+        for (var index = 0; index < 32; index++)
+        {
+            var variable = factory.CreateVariable(
+                "value" + index,
+                factory.BooleanType);
+            any = factory.Binary(
+                IrBinaryOperator.OrElse,
+                any,
+                factory.Variable(variable));
+        }
+        var contradiction = factory.Binary(
+            IrBinaryOperator.AndAlso,
+            any,
+            factory.Unary(IrUnaryOperator.Not, any));
+        using var safety = new CancellationTokenSource(
+            TimeSpan.FromSeconds(1));
+
+        var defined = FiniteDomainSmtDifferentialOracle
+            .IsDefinedForAllAssignments(
+                factory,
+                contradiction,
+                safety.Token);
+        var comparison = await new FiniteDomainSmtDifferentialOracle()
+            .CompareAsync(
+                factory,
+                contradiction,
+                safety.Token);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(defined, Is.False);
+            Assert.That(
+                comparison.Status,
+                Is.EqualTo(FuzzOracleStatus.Abstained));
+            Assert.That(
+                comparison.Detail,
+                Does.Contain("assignment limit"));
+            Assert.That(
+                safety.IsCancellationRequested,
+                Is.False,
+                "The safety timeout fired before the oracle budget.");
+        }
+    }
+
     [TestCase(0, 0, 1, 1)]
     [TestCase(7, 1, 0, 1)]
     public async Task PartialTermOracleChecksShortCircuitAndUndefinedArithmetic(
@@ -400,6 +514,54 @@ public sealed class FuzzRunnerTests
             Assert.That(result.DefinedTrueCount, Is.EqualTo(expectedTrue));
             Assert.That(result.DefinedFalseCount, Is.EqualTo(expectedFalse));
             Assert.That(result.UndefinedCount, Is.EqualTo(expectedUndefined));
+        }
+    }
+
+    [Test]
+    public void PartialTermGeneratorUsesHigherSeedBitsForDistinctCases()
+    {
+        var factory = new IrFactory();
+        var first = PartialTermSmtCaseGenerator.Create(factory, 0);
+        var second = PartialTermSmtCaseGenerator.Create(factory, 8);
+        var printer = new IrPrinter(factory);
+
+        Assert.That(printer.Print(first.Formula), Is.Not.EqualTo(printer.Print(second.Formula)));
+    }
+
+    [Test]
+    public async Task PartialTermOracleAbstainsOnGenericCounterexampleReplayFailure()
+    {
+        var factory = new IrFactory();
+        var variable = factory.CreateVariable("value", factory.IntegerType);
+        var goal = new Goal(
+            factory,
+            factory.Boolean(true),
+            ProofDiagnosticKind.Postcondition,
+            new SourceLocationId(0));
+        var query = new VerificationQuery(factory, [], goal, [variable]);
+        var outcome = await new ProofKernel(
+                new StubBackend(BackendCheckResult.Satisfiable(new BackendModel([]))))
+            .VerifyAsync(query);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
+            Assert.That(
+                ((UnknownOutcome)outcome).Reason,
+                Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
+            Assert.That(
+                PartialTermSmtDifferentialOracle.Classify(outcome),
+                Is.Null);
+        }
+    }
+
+    private sealed class StubBackend(BackendCheckResult result) : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(result);
         }
     }
 

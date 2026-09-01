@@ -25,13 +25,18 @@ public sealed class EffectAnalysisSession
     private readonly Compilation _compilation;
     private readonly InvocationEmissionPolicy _invocationEmission;
     private readonly ExternalEffectResolver _external;
+    private readonly EffectKnownSymbols _knownSymbols;
+    private readonly CSharpCompilation? _metadataImportCompilation;
     private readonly IEffectCallPreconditionPolicy
         _callPreconditions;
     private readonly EffectModuleInitialization _moduleInitialization;
     private readonly EffectMethodNodeBuilder _nodeBuilder;
     private readonly object _gate = new();
-    private ImmutableArray<IMethodSymbol> _moduleInitializers;
+    private ImmutableArray<EffectModuleInitializer> _moduleInitializers;
     private readonly Dictionary<IMethodSymbol, EffectMethodNode> _nodes = new(SymbolEqualityComparer.Default);
+    private ImmutableDictionary<IMethodSymbol, EffectSummary> _bodySummaries =
+        ImmutableDictionary.Create<IMethodSymbol, EffectSummary>(
+            SymbolEqualityComparer.Default);
     private volatile ImmutableDictionary<IMethodSymbol, EffectSummary> _summaries =
         ImmutableDictionary.Create<IMethodSymbol, EffectSummary>(SymbolEqualityComparer.Default);
 
@@ -50,9 +55,15 @@ public sealed class EffectAnalysisSession
         IEffectCallPreconditionPolicy? callPreconditions = null)
     {
         _compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
+        _metadataImportCompilation = compilation is CSharpCompilation csharp
+            ? csharp.WithOptions(
+                csharp.Options.WithMetadataImportOptions(
+                    MetadataImportOptions.All))
+            : null;
         _invocationEmission = new InvocationEmissionPolicy(compilation);
         _external = new ExternalEffectResolver(compilation,
             ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs)));
+        _knownSymbols = new EffectKnownSymbols(compilation);
         _callPreconditions =
             callPreconditions ??
             new ConservativeEffectCallPreconditionPolicy(
@@ -66,6 +77,7 @@ public sealed class EffectAnalysisSession
 
     public Compilation Compilation => _compilation;
     internal ResolvedApiSpecTable ApiSpecs => _external.ApiSpecs;
+    internal EffectKnownSymbols KnownSymbols => _knownSymbols;
 
     internal EffectContractResolution ResolveExternalContract(IMethodSymbol method)
     {
@@ -78,18 +90,22 @@ public sealed class EffectAnalysisSession
         method = ArgumentNullGuard.NotNull(method, nameof(method));
 
         cancellationToken.ThrowIfCancellationRequested();
-        var normalized = NormalizeMethod(method);
+        var preconditionTarget = NormalizeMethodConstruction(method);
+        var normalized = preconditionTarget.OriginalDefinition;
         if (!IsSourceMethod(normalized))
         {
             return new EffectMethodResult(
                 normalized,
                 EffectSummaryOperations.Join(
                     _external.Resolve(normalized),
-                    ResolveEntryPreconditions(normalized)));
+                    ResolveEntryPreconditions(preconditionTarget)));
         }
 
         var moduleInitializers = GetModuleInitializers(cancellationToken);
-        EnsureAnalyzed(moduleInitializers.Add(normalized), cancellationToken);
+        EnsureAnalyzed(
+            moduleInitializers.Select(static initializer => initializer.Method)
+                .Append(normalized),
+            cancellationToken);
         var summaries = _summaries;
         var summary = summaries.TryGetValue(normalized, out var analyzed)
             ? analyzed
@@ -98,12 +114,13 @@ public sealed class EffectAnalysisSession
             normalized,
             moduleInitializers,
             summaries);
-        summary = EffectSummaryDomain.Instance.Join(initialization, summary);
+        summary = initialization.Then(new EffectStep(summary, true)).Summary;
         ImmutableArray<EffectDirectWitness> directWitnesses;
         lock (_gate)
         {
             directWitnesses =
-                !EffectModuleInitialization.CanPreventBodyEntry(initialization) &&
+                !EffectModuleInitialization.CanPreventBodyEntry(
+                    initialization.Summary) &&
                 _nodes.TryGetValue(normalized, out var node)
                 ? node.DirectWitnesses
                 : [];
@@ -130,11 +147,11 @@ public sealed class EffectAnalysisSession
                         summaries);
                 return new EffectMethodResult(
                     method,
-                    EffectSummaryDomain.Instance.Join(
-                        initialization,
-                        summaries[method]),
+                    initialization.Then(new EffectStep(
+                        summaries[method],
+                        true)).Summary,
                     EffectModuleInitialization.CanPreventBodyEntry(
-                        initialization)
+                        initialization.Summary)
                         ? []
                         : _nodes[method].DirectWitnesses);
             })];
@@ -161,11 +178,12 @@ public sealed class EffectAnalysisSession
             receiver = EffectRegionSet.Empty;
             writeReceiver = EffectRegionSet.Empty;
         }
-        var normalized = NormalizeMethod(target);
+        var preconditionTarget = NormalizeMethodConstruction(target);
+        var normalized = preconditionTarget.OriginalDefinition;
         var preconditions = _callPreconditions.Assess(
             new EffectCallPreconditionContext(
                 caller,
-                normalized,
+                preconditionTarget,
                 instance,
                 actualArguments,
                 flow,
@@ -201,6 +219,7 @@ public sealed class EffectAnalysisSession
         return EffectSummaryOperations.Join(
             preconditionEvidence,
             EffectSummaryOperations.DirectCall(),
+            ResolveExactMetadataTypeInitialization(normalized),
             EffectSummaryOperations.Remap(
                 _external.Resolve(normalized),
                 receiver,
@@ -208,11 +227,76 @@ public sealed class EffectAnalysisSession
                 arguments));
     }
 
+    private EffectSummary ResolveExactMetadataTypeInitialization(
+        IMethodSymbol target)
+    {
+        if (!ApiSpecs.TryGet(target, out var spec) ||
+            !EffectMethodNodeBuilder.CanTriggerOwnTypeInitialization(
+                target))
+        {
+            return EffectSummary.Empty;
+        }
+
+        var importedType = ResolveImportedMetadataType(
+            target,
+            spec.Template.Target.ContainingTypeMetadataName);
+        if (importedType == null)
+        {
+            return EffectSummaryOperations.UnknownBoundary(
+                EffectUncertainty.UnmodeledCall);
+        }
+
+        var initializers = importedType.StaticConstructors;
+        if (initializers.IsDefaultOrEmpty)
+        {
+            return EffectSummary.Empty;
+        }
+
+        if (initializers.Length != 1)
+        {
+            return EffectSummaryOperations.UnknownBoundary(
+                EffectUncertainty.UnmodeledCall);
+        }
+
+        return WrapTypeInitializationFailures(
+            new ExternalEffectResolver(
+                _metadataImportCompilation!,
+                ApiSpecs).Resolve(initializers[0]));
+    }
+
+    private INamedTypeSymbol? ResolveImportedMetadataType(
+        IMethodSymbol target,
+        string metadataName)
+    {
+        if (_metadataImportCompilation == null)
+        {
+            return null;
+        }
+
+        foreach (var reference in _compilation.References)
+        {
+            if (_compilation.GetAssemblyOrModuleSymbol(reference)
+                    is not IAssemblySymbol assembly ||
+                !SymbolEqualityComparer.Default.Equals(
+                    assembly,
+                    target.ContainingAssembly) ||
+                _metadataImportCompilation.GetAssemblyOrModuleSymbol(
+                    reference) is not IAssemblySymbol importedAssembly)
+            {
+                continue;
+            }
+
+            return importedAssembly.GetTypeByMetadataName(metadataName);
+        }
+
+        return null;
+    }
+
     internal EffectSummary ResolveEntryPreconditions(
         IMethodSymbol method)
     {
         return _callPreconditions.AssessEntry(
-                NormalizeMethod(method)) ==
+                NormalizeMethodConstruction(method)) ==
             EffectCallPreconditionStatus.NotProven
                 ? EffectSummaryOperations.IncompleteAnalysis(
                     EffectAnalysisIncompleteReason
@@ -223,6 +307,17 @@ public sealed class EffectAnalysisSession
     internal EffectThrowSet ResolveExceptionSet(params string[] metadataNames)
     {
         return _external.ResolveExceptionSet(metadataNames);
+    }
+
+    internal EffectSummary WrapTypeInitializationFailures(
+        EffectSummary summary)
+    {
+        return summary.Throws.IsEmpty
+            ? summary
+            : EffectSummaryOperations.WithThrows(
+                summary,
+                ResolveExceptionSet(
+                    FrameworkTypeMetadataNames.TypeInitializationException));
     }
 
     internal bool IsConditionallyElided(IInvocationOperation invocation)
@@ -275,18 +370,22 @@ public sealed class EffectAnalysisSession
             normalizedTarget.StaticConstructors.Any(
                 static constructor => !constructor.IsImplicitlyDeclared))
         {
-            return EffectSummaryOperations.Throw(
-                ResolveExceptionSet(
-                    FrameworkTypeMetadataNames.TypeInitializationException));
+            return EffectSummaryOperations.UnknownBoundary(
+                EffectUncertainty.UnmodeledCall);
         }
         var mayInitialize = !isSourceType ||
             EffectMethodNodeBuilder.HasPotentialStaticInitialization(
                 normalizedTarget,
                 ApiSpecs);
-        if (!mayInitialize ||
-            isSourceType && StaticInitializationCannotComplete(normalizedTarget))
+        if (!mayInitialize)
         {
             return EffectSummary.Empty;
+        }
+        if (isSourceType && StaticInitializationCannotComplete(normalizedTarget))
+        {
+            return EffectSummaryOperations.Throw(
+                ResolveExceptionSet(
+                    FrameworkTypeMetadataNames.TypeInitializationException));
         }
         return EffectSummaryOperations.UnknownBoundary(
             EffectUncertainty.UnmodeledCall);
@@ -367,21 +466,75 @@ public sealed class EffectAnalysisSession
         CancellationToken cancellationToken)
     {
         var summaries = existing.ToBuilder();
+        var bodySummaries = _bodySummaries.ToBuilder();
         foreach (var method in EffectCallGraph.FindRecursiveMethods(
                      nodes,
                      cancellationToken))
         {
-            summaries[method] = EffectSummaryDomain.Instance.Join(nodes[method].LocalSummary,
+            var recursive = EffectSummaryDomain.Instance.Join(
+                nodes[method].LocalSummary,
                 EffectSummaryOperations.UnknownBoundary(
-                    EffectUncertainty.DirectCall | EffectUncertainty.Recursion));
+                    EffectUncertainty.DirectCall |
+                    EffectUncertainty.Recursion));
+            summaries[method] = recursive;
+            bodySummaries[method] = recursive;
         }
 
         var computeDepth = 0;
+        var activeEntries = new HashSet<IMethodSymbol>(
+            SymbolEqualityComparer.Default);
 
         EffectSummary Compute(IMethodSymbol method)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (summaries.TryGetValue(method, out var cached))
+            {
+                return cached;
+            }
+
+            if (!nodes.ContainsKey(method) || !activeEntries.Add(method))
+            {
+                return EffectSummaryOperations.UnknownBoundary(
+                    EffectUncertainty.UnmodeledCall);
+            }
+
+            var summary = ComputeBody(method);
+            if (_nodeBuilder.TryGetBeforeFieldInitNode(
+                    method,
+                    out var initialization))
+            {
+                var initializationSummary = initialization.LocalSummary;
+                foreach (var call in OrderCalls(initialization.Calls))
+                {
+                    var target = HasSameContainingType(method, call.Target)
+                        ? ComputeBody(call.Target)
+                        : Compute(call.Target);
+                    initializationSummary = EffectSummaryDomain.Instance.Join(
+                        initializationSummary,
+                        EffectExceptionFlow.KeepEscaping(
+                            WrapTypeInitializationFailures(
+                                EffectSummaryOperations.Remap(
+                                    target,
+                                    call.Receiver,
+                                    call.WriteReceiver,
+                                    call.Arguments)),
+                            call.Origin,
+                            _compilation));
+                }
+                summary = EffectSummaryDomain.Instance.Join(
+                    summary,
+                    initializationSummary);
+            }
+
+            activeEntries.Remove(method);
+            summaries[method] = summary;
+            return summary;
+        }
+
+        EffectSummary ComputeBody(IMethodSymbol method)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (bodySummaries.TryGetValue(method, out var cached))
             {
                 return cached;
             }
@@ -392,26 +545,34 @@ public sealed class EffectAnalysisSession
             if (!nodes.TryGetValue(method, out var node) ||
                 computeDepth >= EffectCallGraph.MaximumCallGraphDepth)
             {
-                return EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall);
+                return EffectSummaryOperations.UnknownBoundary(
+                    EffectUncertainty.UnmodeledCall);
             }
 
             computeDepth++;
             var summary = node.LocalSummary;
-            foreach (var call in node.Calls
-                         .OrderBy(static call => call.Target, EffectSymbolComparer<IMethodSymbol>.Instance)
-                         .ThenBy(static call => call.Receiver.GetHashCode()))
+            foreach (var call in OrderCalls(node.Calls))
             {
-                summary = EffectSummaryDomain.Instance.Join(summary,
-                    EffectExceptionFlow.KeepEscaping(EffectSummaryOperations.Remap(
-                        Compute(call.Target),
-                        call.Receiver,
-                        call.WriteReceiver,
-                        call.Arguments),
-                        call.Origin, _compilation));
+                var target =
+                    EffectMethodNodeBuilder
+                        .CanTriggerBeforeFieldInitInitialization(method) &&
+                    HasSameContainingType(method, call.Target)
+                        ? ComputeBody(call.Target)
+                        : Compute(call.Target);
+                summary = EffectSummaryDomain.Instance.Join(
+                    summary,
+                    EffectExceptionFlow.KeepEscaping(
+                        EffectSummaryOperations.Remap(
+                            target,
+                            call.Receiver,
+                            call.WriteReceiver,
+                            call.Arguments),
+                        call.Origin,
+                        _compilation));
             }
 
             computeDepth--;
-            summaries[method] = summary;
+            bodySummaries[method] = summary;
             return summary;
         }
 
@@ -421,7 +582,27 @@ public sealed class EffectAnalysisSession
             Compute(method);
         }
 
+        _bodySummaries = bodySummaries.ToImmutable();
         return summaries.ToImmutable();
+
+        static IOrderedEnumerable<EffectCallSite> OrderCalls(
+            IEnumerable<EffectCallSite> calls)
+        {
+            return calls
+                .OrderBy(
+                    static call => call.Target,
+                    EffectSymbolComparer<IMethodSymbol>.Instance)
+                .ThenBy(static call => call.Receiver.GetHashCode());
+        }
+
+        static bool HasSameContainingType(
+            IMethodSymbol left,
+            IMethodSymbol right)
+        {
+            return SymbolEqualityComparer.Default.Equals(
+                left.ContainingType.OriginalDefinition,
+                right.ContainingType.OriginalDefinition);
+        }
     }
 
     private Dictionary<IMethodSymbol, EffectMethodNode> BuildNodes(
@@ -446,7 +627,12 @@ public sealed class EffectAnalysisSession
                 _nodes.Add(method, node);
             }
             nodes.Add(method, node);
-            foreach (var call in node.Calls)
+            var calls = _nodeBuilder.TryGetBeforeFieldInitNode(
+                    method,
+                    out var initialization)
+                ? node.Calls.Concat(initialization.Calls)
+                : node.Calls;
+            foreach (var call in calls)
             {
                 if (!knownSummaries.ContainsKey(call.Target) && !nodes.ContainsKey(call.Target))
                 {
@@ -473,6 +659,14 @@ public sealed class EffectAnalysisSession
                     case IMethodSymbol method when IsSourceMethod(method):
                         methods.Add(NormalizeMethod(method));
                         break;
+                    case INamedTypeSymbol type
+                        when syntax is TypeDeclarationSyntax declaration:
+                        AddPrimaryConstructor(
+                            methods,
+                            type,
+                            declaration,
+                            cancellationToken);
+                        break;
                     case IPropertySymbol property:
                         if (property.GetMethod is { } getter && IsSourceMethod(getter))
                         {
@@ -492,7 +686,34 @@ public sealed class EffectAnalysisSession
             static method => method, EffectSymbolComparer<IMethodSymbol>.Instance)];
     }
 
-    private ImmutableArray<IMethodSymbol> GetModuleInitializers(
+    private void AddPrimaryConstructor(
+        HashSet<IMethodSymbol> methods,
+        INamedTypeSymbol type,
+        TypeDeclarationSyntax declaration,
+        CancellationToken cancellationToken)
+    {
+        if (declaration.ParameterList == null)
+        {
+            return;
+        }
+
+        foreach (var constructor in type.InstanceConstructors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (constructor.MethodKind == MethodKind.Constructor &&
+                IsSourceMethod(constructor) &&
+                constructor.DeclaringSyntaxReferences.Any(reference =>
+                    reference.SyntaxTree == declaration.SyntaxTree &&
+                    reference.GetSyntax(cancellationToken) is
+                        TypeDeclarationSyntax owner &&
+                    owner.Span == declaration.Span))
+            {
+                methods.Add(NormalizeMethod(constructor));
+            }
+        }
+    }
+
+    private ImmutableArray<EffectModuleInitializer> GetModuleInitializers(
         CancellationToken cancellationToken)
     {
         lock (_gate)
@@ -517,8 +738,14 @@ public sealed class EffectAnalysisSession
 
     internal static IMethodSymbol NormalizeMethod(IMethodSymbol method)
     {
+        return NormalizeMethodConstruction(method).OriginalDefinition;
+    }
+
+    internal static IMethodSymbol NormalizeMethodConstruction(
+        IMethodSymbol method)
+    {
         var normalized = method.ReducedFrom ?? method;
         normalized = normalized.PartialImplementationPart ?? normalized;
-        return normalized.OriginalDefinition;
+        return normalized;
     }
 }

@@ -11,7 +11,14 @@ internal static class PostconditionObligationBuilder
         ImmutableArray<Assumption>.Builder entryDomainAssumptions,
         Dictionary<ProofJustification, string> assumptionLabels)
     {
-        var seenPredicates = assumptions.Select(static assumption => assumption.Predicate.Id).ToHashSet();
+        // User assumptions and compiler-domain assumptions may intentionally
+        // share a predicate. Keep both: deduplicating by predicate alone can
+        // erase the trusted domain row and its provenance.
+        var seenPredicates = assumptions
+            .Where(static assumption =>
+                assumption.Justification is not UserAssumedJustification)
+            .Select(static assumption => assumption.Predicate.Id)
+            .ToHashSet();
         foreach (var variable in variables
                      .Where(static variable => variable.Role is CompilerVariableRole.Receiver
                          or CompilerVariableRole.Parameter or CompilerVariableRole.Result)
@@ -23,27 +30,40 @@ internal static class PostconditionObligationBuilder
                 continue;
             }
 
-            var interval = IntervalDomain.Instance.Range(sourceInterval.Minimum, sourceInterval.Maximum);
-            if (interval.IsBottom)
-            {
-                return false;
-            }
-
             IEnumerable<(IrTerm? Term, IrTerm? Guard)> values =
                 variable.Role == CompilerVariableRole.Result
                 ? returns.Select(static path => (path.ReturnTerm, Guard: (IrTerm?)path.Predicate))
                 : [(factory.Variable(variable.Variable), Guard: (IrTerm?)null)];
             foreach (var (term, guard) in values)
             {
-                if (term == null || term.Type != factory.IntegerType ||
-                    !SpecResultDomainProjection.TryCreateIntervalPredicate(
-                        factory, term, interval, out var predicate) || predicate == null)
+                var projectedTerm = term == null ? null :
+                    SpecResultDomainProjection.Rewrite(
+                        factory,
+                        term,
+                        projections);
+                if (!TryCreateSourceDomainPredicate(
+                        factory,
+                        projectedTerm,
+                        sourceInterval,
+                        out var predicate))
                 {
                     return false;
                 }
+                if (predicate == null)
+                {
+                    continue;
+                }
 
-                AddDomainAssumption(guard == null ? predicate : Guard(factory,
-                    SpecResultDomainProjection.Rewrite(factory, guard, projections), predicate), variable);
+                var projectedGuard = guard == null ? null :
+                    SpecResultDomainProjection.Rewrite(
+                        factory,
+                        guard,
+                        projections);
+                AddDomainAssumption(
+                    projectedGuard == null
+                        ? predicate
+                        : Guard(factory, projectedGuard, predicate),
+                    variable);
             }
         }
         return true;
@@ -70,6 +90,38 @@ internal static class PostconditionObligationBuilder
         }
     }
 
+    internal static bool TryCreateSourceDomainPredicate(
+        IrFactory factory,
+        IrTerm? term,
+        CompilerIntegerInterval sourceInterval,
+        out IrTerm? predicate)
+    {
+        var interval = IntervalDomain.Instance.Range(
+            sourceInterval.Minimum,
+            sourceInterval.Maximum);
+        if (interval.IsBottom)
+        {
+            predicate = null;
+            return false;
+        }
+        if (interval.Equals(IntervalValue.Top))
+        {
+            predicate = null;
+            return true;
+        }
+        if (term == null || term.Type != factory.IntegerType)
+        {
+            predicate = null;
+            return false;
+        }
+
+        return SpecResultDomainProjection.TryCreateIntervalPredicate(
+            factory,
+            term,
+            interval,
+            out predicate);
+    }
+
     internal static IrTerm AddNormalCompletionAssumption(
         IrFactory factory, ImmutableArray<SymbolicReturn> returns,
         ImmutableDictionary<IrVarId, SpecResultProjection> projections, ImmutableArray<Assumption>.Builder assumptions,
@@ -85,8 +137,36 @@ internal static class PostconditionObligationBuilder
             completions.Add(SpecResultDomainProjection.Rewrite(factory, completion, projections));
         }
         var predicate = Disjoin(factory, completions);
-        if (predicate is IrBooleanTerm { Value: true } || assumptions.Any(assumption =>
-                assumption.Predicate.Id == predicate.Id && assumption.Justification is not UserAssumedJustification))
+        if (predicate is IrBooleanTerm { Value: true })
+        {
+            return predicate;
+        }
+
+        var hasNonUserDuplicate = false;
+        var promotedResultDomain = false;
+        for (var index = assumptions.Count - 1; index >= 0; index--)
+        {
+            var existing = assumptions[index];
+            if (existing.Predicate.Id != predicate.Id ||
+                existing.Justification is UserAssumedJustification)
+            {
+                continue;
+            }
+
+            hasNonUserDuplicate = true;
+            if (!assumptionLabels.TryGetValue(
+                    existing.Justification,
+                    out var label) ||
+                label != "domain:result")
+            {
+                continue;
+            }
+
+            assumptions.RemoveAt(index);
+            assumptionLabels.Remove(existing.Justification);
+            promotedResultDomain = true;
+        }
+        if (hasNonUserDuplicate && !promotedResultDomain)
         {
             return predicate;
         }

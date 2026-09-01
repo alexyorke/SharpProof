@@ -6,6 +6,7 @@ namespace SharpProof.Specs;
 /// </summary>
 public static class FrameworkTypeMetadataNames
 {
+    public const string ArgumentException = "System.ArgumentException";
     public const string ArgumentNullException = "System.ArgumentNullException";
     public const string ArrayTypeMismatchException =
         "System.ArrayTypeMismatchException";
@@ -14,6 +15,7 @@ public static class FrameworkTypeMetadataNames
     public const string DivideByZeroException =
         "System.DivideByZeroException";
     public const string Exception = "System.Exception";
+    public const string FormattableString = "System.FormattableString";
     public const string ExpressionOfT =
         "System.Linq.Expressions.Expression`1";
     public const string GeneratedCodeAttribute =
@@ -24,6 +26,14 @@ public static class FrameworkTypeMetadataNames
     public const string InvalidOperationException =
         "System.InvalidOperationException";
     public const string IDisposable = "System.IDisposable";
+    public const string IFormattable = "System.IFormattable";
+    public const string IFormatProvider = "System.IFormatProvider";
+    public const string Span = "System.Span`1";
+    public const string ReadOnlySpan = "System.ReadOnlySpan`1";
+    public const string ICriticalNotifyCompletion =
+        "System.Runtime.CompilerServices.ICriticalNotifyCompletion";
+    public const string INotifyCompletion =
+        "System.Runtime.CompilerServices.INotifyCompletion";
     public const string ModuleInitializerAttribute =
         "System.Runtime.CompilerServices.ModuleInitializerAttribute";
     public static readonly string Monitor = "System.Threading.Monitor";

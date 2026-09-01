@@ -6,6 +6,7 @@ using NUnit.Framework;
 namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class CoverageScriptTests
 {
     private static readonly string[] s_trustedPaths =
@@ -44,7 +45,7 @@ public sealed class CoverageScriptTests
         var repository = await CreateMultiCommitFixtureAsync();
         try
         {
-            var result = await RunCoverageAsync(
+            var result = await RunCoverageScriptOnlyAsync(
                 repository,
                 comparisonRef: "HEAD^",
                 reportOnly: true);
@@ -92,16 +93,17 @@ public sealed class CoverageScriptTests
         var repository = await CreateSingleCommitFixtureAsync();
         try
         {
-            var missing = await RunCoverageAsync(
+            var missing = await RunCoverageScriptOnlyAsync(
                 repository,
                 comparisonRef: null,
                 reportOnly: false);
-            var unusable = await RunCoverageAsync(
+            var unusable = await RunCoverageScriptOnlyAsync(
                 repository,
                 comparisonRef: "missing-comparison-ref",
                 reportOnly: false,
                 includeWorkingTree: true);
-            var localReport = await RunCoverageAsync(
+            await PrepareCoverageFixtureAsync(repository);
+            var localReport = await RunCoverageScriptOnlyAsync(
                 repository,
                 comparisonRef: null,
                 reportOnly: true);
@@ -128,7 +130,7 @@ public sealed class CoverageScriptTests
         var repository = await CreateSingleCommitFixtureAsync();
         try
         {
-            var result = await RunCoverageAsync(
+            var result = await RunCoverageScriptOnlyAsync(
                 repository,
                 comparisonRef: "HEAD^",
                 reportOnly: true);
@@ -1346,17 +1348,14 @@ public sealed class CoverageScriptTests
         await AssertSuccessAsync(RunAsync(
             repository,
             "dotnet",
-            "restore",
-            "Project/Project.csproj",
-            "--ignore-failed-sources"));
-        await AssertSuccessAsync(RunAsync(
-            repository,
-            "dotnet",
             "build",
             "Project/Project.csproj",
             "--configuration",
             "Release",
-            "--no-restore"));
+            "--nologo",
+            "--verbosity",
+            "quiet",
+            "-p:RestoreIgnoreFailedSources=true"));
         var coverage = Path.Combine(repository, "coverage");
         var authorityPath = Path.Combine(coverage, "coverage-authority.json");
         await AssertSuccessAsync(RunAsync(

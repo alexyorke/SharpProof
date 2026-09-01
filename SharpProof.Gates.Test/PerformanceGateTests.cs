@@ -1,5 +1,8 @@
 using NUnit.Framework;
 using SharpProof.Gates.Performance;
+using SharpProof.Worker.Protocol;
+using System.Diagnostics;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Xml.Linq;
 
@@ -34,6 +37,144 @@ public sealed class PerformanceGateTests
             Assert.That(contract.IdeEditMaximumMilliseconds, Is.EqualTo(250));
             Assert.That(contract.CancellationP95Milliseconds, Is.EqualTo(250));
             Assert.That(contract.ForcedTerminationMilliseconds, Is.EqualTo(1000));
+        }
+    }
+
+    [Test]
+    public void CooperativeTimeoutProbeRejectsPartialProtocolEvidence()
+    {
+        var location = new WorkerSourceLocation
+        {
+            Path = "Subject.cs",
+            Start = 0,
+            Length = 1,
+            Line = 1,
+            Column = 1
+        };
+        var manifest = new WorkerClaimManifest
+        {
+            Callables = [
+                new WorkerCallableManifestEntry {
+                    CallableId = "M:Subject.Verify()",
+                    SelectedFeatures = [WorkerSelectedFeature.Contracts],
+                    SelectionReasons = [
+                        WorkerSelectionReason.DiscoveredPostcondition
+                    ],
+                    Location = location,
+                    ClaimIds = ["claim.verify.0"]
+                }
+            ],
+            Claims = [
+                new WorkerClaimManifestEntry {
+                    ClaimId = "claim.verify.0",
+                    CallableId = "M:Subject.Verify()",
+                    Kind = WorkerClaimKind.Postcondition,
+                    Evidence = WorkerClaimEvidence.DirectClause,
+                    Location = location
+                }
+            ]
+        };
+        WorkerProtocolJson.SealManifest(manifest);
+        var response = new WorkerVerifyResponse
+        {
+            RequestHash = WorkerProtocolVersions.EmptySha256,
+            InputHash = WorkerProtocolVersions.EmptySha256,
+            Manifest = manifest,
+            RunStatus = WorkerRunStatus.TimedOut,
+            FailureReason = WorkerRunFailureReason.None,
+            CallableResults = [
+                new WorkerCallableResult {
+                    CallableId = "M:Subject.Verify()",
+                    Coverage = WorkerCallableCoverage.Incomplete,
+                    Reason = WorkerCallableCoverageReason.ProjectTimeout
+                }
+            ],
+            ClaimResults = [
+                new WorkerClaimResult {
+                    ClaimId = "claim.verify.0",
+                    Outcome = WorkerClaimOutcome.Unknown,
+                    Reason = WorkerClaimReason.ProjectTimeout
+                }
+            ],
+            Summary = new WorkerVerificationSummary
+            {
+                CallableCount = 1,
+                ClaimCount = 1,
+                OutcomeCounts = [
+                    new WorkerClaimOutcomeCount {
+                        Outcome = WorkerClaimOutcome.Unknown,
+                        Count = 1
+                    }
+                ],
+                ReasonCounts = [
+                    new WorkerClaimReasonCount {
+                        Reason = WorkerClaimReason.ProjectTimeout,
+                        Count = 1
+                    }
+                ],
+                CacheStatus = WorkerCacheStatus.Disabled,
+                Versions = new WorkerVersionSummary
+                {
+                    WorkerVersion = "test-worker",
+                    ApiSpecVersion = "test-spec"
+                },
+                Budgets = new WorkerBudgets()
+            }
+        };
+        Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
+        Assert.That(
+            WorkerPerformanceProbe.IsCompleteProjectTimeout(response),
+            Is.True);
+
+        response.CallableResults = [];
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                WorkerProtocolJson.Validate(response).IsValid,
+                Is.False);
+            Assert.That(
+                WorkerPerformanceProbe.IsCompleteProjectTimeout(response),
+                Is.False);
+        }
+    }
+
+    [Test]
+    public async Task WorkerCancellationWaitObservesTheOuterBoundary()
+    {
+        var releaseCallback = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var verification = new TaskCompletionSource<WorkerVerifyResponse>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellation = new CancellationTokenSource();
+        using var registration = cancellation.Token.Register(() =>
+            releaseCallback.Task.GetAwaiter().GetResult());
+        using var boundary = new CancellationTokenSource(50);
+
+        var wait = WorkerPerformanceProbe.CancelAndAwaitWorkerAsync(
+            verification.Task,
+            cancellation,
+            boundary.Token);
+        var completed = await Task.WhenAny(wait, Task.Delay(500));
+        releaseCallback.SetResult();
+        verification.SetResult(new WorkerVerifyResponse());
+        var canceled = false;
+        try
+        {
+            _ = await wait;
+        }
+        catch (OperationCanceledException)
+        {
+            canceled = true;
+        }
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                completed,
+                Is.SameAs(wait),
+                "The outer boundary must release a blocked cancellation wait.");
+            Assert.That(canceled, Is.True);
         }
     }
 
@@ -321,6 +462,21 @@ public sealed class PerformanceGateTests
     }
 
     [Test]
+    public void EnabledRetentionAnalysisAcceptsAReusableAnalyzer()
+    {
+        var method = typeof(PerformanceGate).GetMethod(
+            "AnalyzeEnabledCompilation",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.That(method, Is.Not.Null);
+        Assert.That(
+            method!.GetParameters().Count(static parameter =>
+                typeof(Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer)
+                    .IsAssignableFrom(parameter.ParameterType)),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public void RetainedMemoryLimitsAreEnforcedIndependently()
     {
         var contract = AcceptancePerformanceContract.Load(
@@ -405,6 +561,198 @@ public sealed class PerformanceGateTests
     {
         PerformanceGate.ValidateAdvisoryPackagePolicy(
             RepositoryLayout.FindRoot());
+    }
+
+    [TestCase("conditional-override")]
+    [TestCase("import")]
+    [TestCase("executable-props-target")]
+    public void AdvisoryPolicyRejectsUnevaluatedMsBuildBehavior(
+        string mutation)
+    {
+        var sourceRoot = RepositoryLayout.FindRoot();
+        var temporary = Directory.CreateTempSubdirectory(
+            "sharpproof-package-policy-");
+        try
+        {
+            foreach (var (package, file) in new[]
+                     {
+                         ("SharpProof.Package", "SharpProof.props"),
+                         ("SharpProof.Package", "SharpProof.targets"),
+                         ("SharpProof.Verifier", "SharpProof.Verifier.props"),
+                         ("SharpProof.Verifier", "SharpProof.Verifier.targets")
+                     })
+            {
+                var destination = Path.Combine(
+                    temporary.FullName,
+                    package,
+                    "buildTransitive");
+                Directory.CreateDirectory(destination);
+                File.Copy(
+                    Path.Combine(
+                        sourceRoot,
+                        package,
+                        "buildTransitive",
+                        file),
+                    Path.Combine(destination, file));
+            }
+
+            var portableRoot = Path.Combine(
+                temporary.FullName,
+                "SharpProof.Package",
+                "buildTransitive");
+            var path = mutation == "executable-props-target"
+                ? Path.Combine(portableRoot, "SharpProof.props")
+                : Path.Combine(portableRoot, "SharpProof.targets");
+            var document = XDocument.Load(path);
+            switch (mutation)
+            {
+                case "conditional-override":
+                    document.Root!.Add(new XElement(
+                        "PropertyGroup",
+                        new XAttribute(
+                            "Condition",
+                            "'$(SharpProofProfile)' == 'advisory'"),
+                        new XElement("SharpProofProfile", "off")));
+                    break;
+                case "import":
+                    new XDocument(
+                        new XElement(
+                            "Project",
+                            new XElement(
+                                "PropertyGroup",
+                                new XElement(
+                                    "SharpProofProfile",
+                                    "off"))))
+                        .Save(Path.Combine(portableRoot, "override.targets"));
+                    document.Root!.Add(new XElement(
+                        "Import",
+                        new XAttribute("Project", "override.targets")));
+                    break;
+                case "executable-props-target":
+                    document.Root!.Add(new XElement(
+                        "Target",
+                        new XAttribute(
+                            "Name",
+                            "UnexpectedPackageWork"),
+                        new XAttribute("BeforeTargets", "CoreCompile"),
+                        new XElement(
+                            "Error",
+                            new XAttribute(
+                                "Text",
+                                "unexpected package work"))));
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unknown mutation '{mutation}'.");
+            }
+            document.Save(path);
+
+            Assert.Throws<InvalidDataException>((Action)(() =>
+                PerformanceGate.ValidateAdvisoryPackagePolicy(
+                temporary.FullName)));
+        }
+        finally
+        {
+            temporary.Delete(recursive: true);
+        }
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task PackagePerformanceProbeRejectsUnusableAnalyzerEntryPoint(
+        bool writeInvalidAnalyzer)
+    {
+        var temporaryRoot = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            var project = CreatePerformanceProbeProject(
+                temporaryRoot,
+                "public static class Subject { }",
+                RepositoryLayout.FindRoot(),
+                importSharpProof: true);
+            var projectDocument = XDocument.Load(project);
+            var analyzerDirectory = Path.Combine(
+                temporaryRoot,
+                "unusable-analyzers");
+            projectDocument.Descendants("SharpProofAnalyzerDirectory")
+                .Single()
+                .Value = analyzerDirectory;
+            projectDocument.Save(project);
+            if (writeInvalidAnalyzer)
+            {
+                Directory.CreateDirectory(analyzerDirectory);
+                await File.WriteAllTextAsync(
+                        Path.Combine(
+                            analyzerDirectory,
+                            "SharpProof.Analyzer.dll"),
+                        "not an analyzer assembly")
+                    .ConfigureAwait(false);
+            }
+
+            _ = await RunPerformanceProbeDotnetAsync(
+                project,
+                restore: true,
+                symbol: null);
+
+            Assert.ThrowsAsync<InvalidOperationException>((Func<Task>)(async () =>
+                _ = await RunPerformanceProbeDotnetAsync(
+                    project,
+                    restore: false,
+                    symbol: "SHARPPROOF_MISSING_ANALYZER")));
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    [Test]
+    public void PackagePerformanceProbeHasAnInternalWallTimeLimit()
+    {
+        var temporaryRoot = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            var project = Path.Combine(temporaryRoot, "Hang.csproj");
+            File.WriteAllText(
+                project,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <Target Name="Hang" BeforeTargets="Restore">
+                    <Exec Command="sleep 30" />
+                  </Target>
+                </Project>
+                """);
+
+            var stopwatch = Stopwatch.StartNew();
+            var exception = Assert.ThrowsAsync<TimeoutException>((Func<Task>)(async () =>
+                _ = await RunPerformanceProbeDotnetAsync(
+                    project,
+                    restore: true,
+                    symbol: null,
+                    timeout: TimeSpan.FromMilliseconds(250))));
+            stopwatch.Stop();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(exception!.Message, Does.Contain("restore"));
+                Assert.That(exception.Message, Does.Contain("exceeded"));
+                Assert.That(
+                    stopwatch.Elapsed,
+                    Is.LessThan(TimeSpan.FromSeconds(5)));
+            }
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
     }
 
     [Test]
@@ -560,9 +908,21 @@ public sealed class PerformanceGateTests
 
     [Test]
     [Category("Performance")]
+    [Explicit(
+        "The release performance contract must run in isolation from a " +
+        "Release build. Use the canonical performance command.")]
     [NonParallelizable]
     public async Task ReleasePerformanceContractPasses()
     {
+        var assemblyConfiguration = typeof(PerformanceGate)
+            .Assembly
+            .GetCustomAttribute<AssemblyConfigurationAttribute>()
+            ?.Configuration;
+        Assume.That(
+            assemblyConfiguration,
+            Is.EqualTo("Release"),
+            "Debug binaries cannot produce release performance evidence.");
+
         var result = await PerformanceGate.RunAsync(
             RepositoryLayout.FindRoot());
 
@@ -652,5 +1012,70 @@ public sealed class PerformanceGateTests
                 result.ForcedTerminationMilliseconds,
                 Is.GreaterThan(0));
         }
+    }
+
+    private static string CreatePerformanceProbeProject(
+        string directory,
+        string source,
+        string repositoryRoot,
+        bool importSharpProof)
+    {
+        var method = typeof(PerformanceGate).GetMethod(
+            "CreatePerformanceProbeProject",
+            BindingFlags.NonPublic | BindingFlags.Static) ??
+            throw new InvalidOperationException(
+                "Could not find the package performance probe factory.");
+        return (string)method.Invoke(
+            null,
+            [directory, source, repositoryRoot, importSharpProof])!;
+    }
+
+    private static Task<double> RunPerformanceProbeDotnetAsync(
+        string project,
+        bool restore,
+        string? symbol)
+    {
+        var method = typeof(PerformanceGate).GetMethod(
+            "RunDotnetAsync",
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            [
+                typeof(string),
+                typeof(bool),
+                typeof(string),
+                typeof(CancellationToken)
+            ],
+            modifiers: null) ??
+            throw new InvalidOperationException(
+                "Could not find the package performance process runner.");
+        return (Task<double>)method.Invoke(
+            null,
+            [project, restore, symbol, CancellationToken.None])!;
+    }
+
+    private static Task<double> RunPerformanceProbeDotnetAsync(
+        string project,
+        bool restore,
+        string? symbol,
+        TimeSpan timeout)
+    {
+        var method = typeof(PerformanceGate).GetMethod(
+            "RunDotnetAsync",
+            BindingFlags.NonPublic | BindingFlags.Static,
+            binder: null,
+            [
+                typeof(string),
+                typeof(bool),
+                typeof(string),
+                typeof(TimeSpan),
+                typeof(CancellationToken)
+            ],
+            modifiers: null) ??
+            throw new InvalidOperationException(
+                "Could not find the timeout-aware package performance " +
+                "process runner.");
+        return (Task<double>)method.Invoke(
+            null,
+            [project, restore, symbol, timeout, CancellationToken.None])!;
     }
 }

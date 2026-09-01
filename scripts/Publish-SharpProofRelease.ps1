@@ -700,6 +700,7 @@ function Invoke-NuGetPush {
         [bool]$NoSymbols
     )
 
+    Assert-ReleaseDotNetIdentity
     $arguments = [Collections.Generic.List[string]]::new()
     foreach ($argument in @(
             'nuget',
@@ -721,6 +722,19 @@ function Invoke-NuGetPush {
         throw (
             "NuGet push failed with exit code $LASTEXITCODE for " +
             "'$([IO.Path]::GetFileName($Path))'.")
+    }
+}
+
+function Assert-ReleaseDotNetIdentity {
+    if ([string]::IsNullOrWhiteSpace($script:ReleaseDotNetSha256)) {
+        throw 'The release dotnet host identity was not initialized.'
+    }
+    if (-not (Test-Path -LiteralPath $script:DotNetPath -PathType Leaf)) {
+        throw 'The release dotnet host was replaced or removed after validation.'
+    }
+    $current = (Get-FileHash -LiteralPath $script:DotNetPath -Algorithm SHA256).Hash
+    if ($current -cne $script:ReleaseDotNetSha256) {
+        throw 'The release dotnet host was replaced after validation.'
     }
 }
 
@@ -861,6 +875,7 @@ if (-not $PlanOnly) {
     $DotNetPath = Resolve-ReleaseDotNet `
         -Candidate $DotNetPath `
         -SdkVersion (Get-RepositorySdkVersion)
+    $ReleaseDotNetSha256 = (Get-FileHash -LiteralPath $DotNetPath -Algorithm SHA256).Hash
 }
 
 $repositoryHead = Get-RepositoryHead
@@ -986,14 +1001,19 @@ try {
         $package = $publicationStage.Release.packages[$index]
         Test-SharpProofPublicationPlanIdentity `
             -Plan $publicationStage.Plan
-        Write-Host (
-            "Publishing $($package.packageId) $($package.version) " +
-            "main package.")
-        Invoke-NuGetPush `
-            -Path $package.mainPath `
-            -Destination $publicationDestination.mainDestination `
-            -Key $ApiKey `
-            -NoSymbols $true
+        if ($publicationStage.Plan.packages[$index].mainAction -ceq 'Push') {
+            Write-Host (
+                "Publishing $($package.packageId) $($package.version) " +
+                "main package.")
+            Invoke-NuGetPush `
+                -Path $package.mainPath `
+                -Destination $publicationDestination.mainDestination `
+                -Key $ApiKey `
+                -NoSymbols $true
+        }
+        else {
+            Write-Host "Resuming existing main package."
+        }
         Test-SharpProofPublicationPlanIdentity `
             -Plan $publicationStage.Plan
         Write-Host (

@@ -40,14 +40,12 @@ Add-Command 'restore' 'restore' $Configuration $false
 Add-Command 'solution-build' 'build' $Configuration $false
 Add-Command 'semantic-tests' 'semantic-tests' $Configuration $true
 if ($Configuration -eq 'Debug') {
-    Add-Command 'package-restore' 'package-tests' $Configuration $false
-    Add-Command 'package-test-build' 'package-tests' $Configuration $false
+    Add-Command 'package-product-build' 'package-tests' 'Release' $false
 }
 foreach ($project in $packageProjects) {
     $packageId = [IO.Path]::GetFileNameWithoutExtension([string]$project)
     Add-Command (
-        'package-pack:' + $packageId) 'package-tests' 'Release' (
-        $Configuration -eq 'Release')
+        'package-pack:' + $packageId) 'package-tests' 'Release' $true
 }
 Add-Command 'performance-smoke' 'performance-smoke' $Configuration $true
 

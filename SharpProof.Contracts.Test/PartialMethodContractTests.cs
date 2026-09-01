@@ -1,6 +1,6 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.Ir;
@@ -75,6 +75,70 @@ public sealed class PartialMethodContractTests
         Assert.That(inventory.ImplementationBody, Is.Not.Null);
         Assert.That(inventory.Clauses, Has.Length.EqualTo(1));
         Assert.That(inventory.Clauses[0].IsValid, Is.True);
+    }
+
+    [Test]
+    public void ParameterClosedAttributesBindFromEitherPartialPart()
+    {
+        var compilation = CreateCompilation(
+            (
+                "Definition.cs",
+                """
+                using SharpProof.Attributes;
+                public static partial class Subject {
+                    public static partial long Identity(
+                        [Positive] long value);
+                }
+                """),
+            (
+                "Implementation.cs",
+                """
+                public static partial class Subject {
+                    public static partial long Identity(long value) => value;
+                }
+                """));
+        var definition = GetMethod(compilation, "Subject", "Identity");
+        var implementation = definition.PartialImplementationPart!;
+
+        var fromDefinition = new ContractBinder(compilation, new IrFactory())
+            .Bind(definition);
+        var fromImplementation = new ContractBinder(compilation, new IrFactory())
+            .Bind(implementation);
+
+        AssertSingleClosedClause(fromDefinition, BoundContractKind.Requires);
+        AssertSingleClosedClause(fromImplementation, BoundContractKind.Requires);
+    }
+
+    [Test]
+    public void ReturnClosedAttributesBindFromEitherPartialPart()
+    {
+        var compilation = CreateCompilation(
+            (
+                "Definition.cs",
+                """
+                public static partial class Subject {
+                    public static partial string Identity(string value);
+                }
+                """),
+            (
+                "Implementation.cs",
+                """
+                using SharpProof.Attributes;
+                public static partial class Subject {
+                    [return: NotNull]
+                    public static partial string Identity(string value) => value;
+                }
+                """));
+        var definition = GetMethod(compilation, "Subject", "Identity");
+        var implementation = definition.PartialImplementationPart!;
+
+        var fromDefinition = new ContractBinder(compilation, new IrFactory())
+            .Bind(definition);
+        var fromImplementation = new ContractBinder(compilation, new IrFactory())
+            .Bind(implementation);
+
+        AssertSingleClosedClause(fromDefinition, BoundContractKind.Ensures);
+        AssertSingleClosedClause(fromImplementation, BoundContractKind.Ensures);
     }
 
     [TestCase(MethodKind.PropertyGet)]
@@ -179,6 +243,122 @@ public sealed class PartialMethodContractTests
         }
     }
 
+    [TestCase(MethodKind.EventAdd)]
+    [TestCase(MethodKind.EventRemove)]
+    public void ReferencedPartialEventAccessorsUseImplementationBodies(
+        MethodKind accessorKind)
+    {
+        var compilation = CreateCompilation(
+            (
+                "Definition.cs",
+                """
+                public partial class Subject {
+                    public partial event System.Action Changed;
+                }
+                """),
+            (
+                "Implementation.cs",
+                """
+                using SharpProof.Attributes;
+                public partial class Subject {
+                    public partial event System.Action Changed {
+                        add {
+                            Contract.Requires(value != null);
+                        }
+                        remove {
+                            Contract.Requires(value != null);
+                            Contract.Requires(true);
+                        }
+                    }
+                }
+                """),
+            (
+                "Consumer.cs",
+                """
+                public static class Consumer {
+                    public static void Subscribe(
+                        Subject subject,
+                        System.Action handler) {
+                        subject.Changed += handler;
+                    }
+
+                    public static void Unsubscribe(
+                        Subject subject,
+                        System.Action handler) {
+                        subject.Changed -= handler;
+                    }
+                }
+                """));
+        var definition = compilation.GetTypeByMetadataName("Subject")!
+            .GetMembers("Changed")
+            .OfType<IEventSymbol>()
+            .Single(static @event =>
+                @event.PartialImplementationPart != null);
+        var implementation = definition.PartialImplementationPart!;
+        var consumerTree = compilation.SyntaxTrees.Single(static tree =>
+            Path.GetFileName(tree.FilePath) == "Consumer.cs");
+        var assignmentKind = accessorKind == MethodKind.EventAdd
+            ? SyntaxKind.AddAssignmentExpression
+            : SyntaxKind.SubtractAssignmentExpression;
+        var eventReference = consumerTree.GetRoot().DescendantNodes()
+            .OfType<AssignmentExpressionSyntax>()
+            .Single(assignment => assignment.IsKind(assignmentKind))
+            .Left;
+        var referencedEvent = (IEventSymbol)compilation
+            .GetSemanticModel(consumerTree)
+            .GetSymbolInfo(eventReference)
+            .Symbol!;
+        var definitionAccessor = accessorKind == MethodKind.EventAdd
+            ? referencedEvent.AddMethod!
+            : referencedEvent.RemoveMethod!;
+        var implementationAccessor = accessorKind == MethodKind.EventAdd
+            ? implementation.AddMethod!
+            : implementation.RemoveMethod!;
+        var builder = new ContractClauseInventoryBuilder(compilation);
+        var expectedClauseCount = accessorKind == MethodKind.EventAdd ? 1 : 2;
+
+        var fromDefinition = builder.Create(definitionAccessor);
+        var fromImplementation = builder.Create(implementationAccessor);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    referencedEvent,
+                    definition),
+                Is.True);
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    definitionAccessor,
+                    implementationAccessor),
+                Is.False);
+            Assert.That(fromDefinition.ImplementationBody, Is.Not.Null);
+            Assert.That(
+                fromDefinition.Clauses,
+                Has.Length.EqualTo(expectedClauseCount));
+            Assert.That(
+                fromDefinition.Clauses.All(static clause => clause.IsValid),
+                Is.True);
+            Assert.That(fromImplementation.ImplementationBody, Is.Not.Null);
+            Assert.That(
+                fromImplementation.Clauses,
+                Has.Length.EqualTo(expectedClauseCount));
+            Assert.That(
+                fromImplementation.Clauses.All(static clause => clause.IsValid),
+                Is.True);
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    fromDefinition.Callable,
+                    implementationAccessor),
+                Is.True);
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    fromImplementation.Callable,
+                    implementationAccessor),
+                Is.True);
+        }
+    }
+
     [Test]
     public void CompanionContractsBindFromTheImplementationAcrossSyntaxTrees()
     {
@@ -252,6 +432,21 @@ public sealed class PartialMethodContractTests
         }
     }
 
+    private static void AssertSingleClosedClause(
+        ContractBindingResult result,
+        BoundContractKind kind)
+    {
+        Assert.That(result.IsSuccess, Is.True, result.Failure.ToString());
+        var clause = result.Contracts!.Clauses.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(clause.Kind, Is.EqualTo(kind));
+            Assert.That(
+                clause.Evidence,
+                Is.EqualTo(BoundContractEvidence.ClosedAttribute));
+        }
+    }
+
     private static IMethodSymbol GetMethod(
         CSharpCompilation compilation,
         string typeName,
@@ -276,7 +471,7 @@ public sealed class PartialMethodContractTests
                 source.Source,
                 parseOptions,
                 source.FileName)),
-            GetReferences(),
+            ContractTestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
@@ -294,14 +489,4 @@ public sealed class PartialMethodContractTests
         return compilation;
     }
 
-    private static ImmutableArray<MetadataReference> GetReferences()
-    {
-        var paths = ((string)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Append(typeof(Contract).Assembly.Location)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-        return [.. paths.Select(static path =>
-            MetadataReference.CreateFromFile(path))];
-    }
 }

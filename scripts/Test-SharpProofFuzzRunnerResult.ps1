@@ -84,8 +84,10 @@ try {
         -ExpectedMaximumParallelism 4 `
         -AfterValidation {
             param($validatedPath)
+            $replacementPath = $validatedPath + '.replacement'
             $replacement | ConvertTo-Json -Depth 8 |
-                Set-Content -LiteralPath $validatedPath
+                Set-Content -LiteralPath $replacementPath
+            [IO.File]::Move($replacementPath, $validatedPath, $true)
         }
     $expectedRaceHash = [Convert]::ToHexString(
         [Security.Cryptography.SHA256]::HashData(
@@ -93,6 +95,12 @@ try {
     if ($raced.Seed -ne 123 -or
         $raced.ResultSha256 -cne $expectedRaceHash) {
         throw 'The fuzz runner result changed after its validated read.'
+    }
+    $resealedHash = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData(
+            [IO.File]::ReadAllBytes($racePath))).ToLowerInvariant()
+    if ($resealedHash -cne $expectedRaceHash) {
+        throw 'The fuzz runner result path was not resealed from validated bytes.'
     }
     $encoding = [Text.UTF8Encoding]::new($false)
     $boundedJson = $canonical | ConvertTo-Json -Depth 8 -Compress

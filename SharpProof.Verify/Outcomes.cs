@@ -12,7 +12,8 @@ public enum AbstentionReason
     InfrastructureFailure,
     MalformedBackendResult,
     CounterexampleReplayFailed,
-    PostconditionMayBeUndefined
+    PostconditionMayBeUndefined,
+    InternalConsistencyMayBeUndefined
 }
 
 public abstract class ProofOutcome

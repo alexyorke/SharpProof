@@ -83,6 +83,8 @@ $projects = @($inventory.projects | Sort-Object name)
 $roots = @($projects | ForEach-Object { [string]$_.name + '/' })
 $fileOptions = [Collections.Generic.Dictionary[string, object]]::new(
     [StringComparer]::Ordinal)
+$fileOptionSignatures = [Collections.Generic.Dictionary[string, object]]::new(
+    [StringComparer]::Ordinal)
 $generatedByPath = [Collections.Generic.Dictionary[string, bool]]::new(
     [StringComparer]::Ordinal)
 foreach ($project in $projects) {
@@ -91,15 +93,15 @@ foreach ($project in $projects) {
         if (-not $path.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)) {
             continue
         }
-        if ($fileOptions.ContainsKey($path)) {
-            $existing = $fileOptions[$path] | ConvertTo-Json -Compress
-            $current = $project.parseOptions | ConvertTo-Json -Compress
-            if ($existing -cne $current) {
-                throw "Shared Compile source has conflicting parse options: '$path'."
-            }
+        if (-not $fileOptions.ContainsKey($path)) {
+            $fileOptions[$path] = [Collections.Generic.List[object]]::new()
+            $fileOptionSignatures[$path] =
+                [Collections.Generic.HashSet[string]]::new(
+                    [StringComparer]::Ordinal)
         }
-        else {
-            $fileOptions[$path] = $project.parseOptions
+        $signature = $project.parseOptions | ConvertTo-Json -Compress
+        if ($fileOptionSignatures[$path].Add($signature)) {
+            $fileOptions[$path].Add($project.parseOptions)
         }
         if ($generatedByPath.ContainsKey($path) -and
             $generatedByPath[$path] -ne [bool]$file.generated) {
@@ -116,9 +118,6 @@ $approvedGeneratedFiles = @(
     $generatedByPath.Keys |
         Where-Object { $generatedByPath[$_] } |
         Sort-Object)
-$generatedCandidates = @($approvedGeneratedFiles)
-$unapprovedGeneratedFiles = @()
-$missingGeneratedFiles = @()
 Push-Location $repositoryRoot
 try {
     $physicalLines = 0
@@ -135,18 +134,36 @@ try {
             continue
         }
 
-        $parseOptions = New-SharpProofCSharpParseOptions -LanguageVersion ([string]$fileOptions[$path].languageVersion) -PreprocessorSymbols @($fileOptions[$path].preprocessorSymbols | ForEach-Object { [string]$_ })
-        $metrics = Measure-CSharpSourceText -Source $source -Path $path -ParseOptions $parseOptions
+        $fileSyntaxTokens = 0
+        $fileSyntaxNodes = 0
+        $fileExpressionNodes = 0
+        $fileDecisionPoints = 0
+        $fileMembers = 0
+        foreach ($options in $fileOptions[$path]) {
+            $parseOptions = New-SharpProofCSharpParseOptions -LanguageVersion ([string]$options.languageVersion) -PreprocessorSymbols @($options.preprocessorSymbols | ForEach-Object { [string]$_ })
+            $metrics = Measure-CSharpSourceText `
+                -Source $source -Path $path -ParseOptions $parseOptions
+            $fileSyntaxTokens = [Math]::Max(
+                $fileSyntaxTokens, [int]$metrics.syntaxTokens)
+            $fileSyntaxNodes = [Math]::Max(
+                $fileSyntaxNodes, [int]$metrics.syntaxNodes)
+            $fileExpressionNodes = [Math]::Max(
+                $fileExpressionNodes, [int]$metrics.expressionNodes)
+            $fileDecisionPoints = [Math]::Max(
+                $fileDecisionPoints, [int]$metrics.decisionPoints)
+            $fileMembers = [Math]::Max(
+                $fileMembers, [int]$metrics.members)
+        }
         $lines = @(Get-Content -LiteralPath $path)
         $physicalLines += $lines.Count
         $nonblankLines += @($lines | Where-Object {
             -not [string]::IsNullOrWhiteSpace($_)
         }).Count
-        $syntaxTokens += $metrics.syntaxTokens
-        $syntaxNodes += $metrics.syntaxNodes
-        $expressionNodes += $metrics.expressionNodes
-        $decisionPoints += $metrics.decisionPoints
-        $members += $metrics.members
+        $syntaxTokens += $fileSyntaxTokens
+        $syntaxNodes += $fileSyntaxNodes
+        $expressionNodes += $fileExpressionNodes
+        $decisionPoints += $fileDecisionPoints
+        $members += $fileMembers
         $handwrittenFiles++
     }
 

@@ -4,6 +4,7 @@ namespace SharpProof.Analyzer;
 
 internal sealed partial class SharpProofAnalyzerEngine
 {
+    private const int ActivationCancellationCheckInterval = 256;
     private readonly IAnalyzerSessionFactory _sessionFactory;
 
     internal SharpProofAnalyzerEngine()
@@ -50,6 +51,12 @@ internal sealed partial class SharpProofAnalyzerEngine
             return;
         }
 
+        // Reconcile companions even when another configuration diagnostic
+        // causes ordinary analysis to stop.  Configuration errors must not
+        // hide independent malformed companion declarations.
+        context.RegisterCompilationEndAction(
+            ValidateContractForCompanions);
+
         // A contract API that is referenced but unreadable disables every
         // contract silently, which is indistinguishable from "nothing to
         // report". Surface it instead.
@@ -84,15 +91,6 @@ internal sealed partial class SharpProofAnalyzerEngine
                     configurationDiagnostics));
             return;
         }
-
-        // ContractFor validation is a final-compilation reconciliation. The
-        // analyzer is the sole owner so every source tree, including output
-        // added by peer generators, is observed exactly once. This is
-        // intentionally independent of feature selection and advisory
-        // activation: every non-off profile must reject malformed companions
-        // rather than silently treating them as absent.
-        context.RegisterCompilationEndAction(
-            ValidateContractForCompanions);
 
         var activation = configuration.Profile == SharpProofProfile.Advisory
             ? GetAdvisoryActivation(
@@ -169,6 +167,13 @@ internal sealed partial class SharpProofAnalyzerEngine
             }
             if (activation.RequiresFullOperationAnalysis)
             {
+                context.RegisterSyntaxNodeAction(
+                    syntaxContext =>
+                        AnalyzerFeaturePipeline.AnalyzeLambdaEffects(
+                            syntaxContext,
+                            session),
+                    SyntaxKind.SimpleLambdaExpression,
+                    SyntaxKind.ParenthesizedLambdaExpression);
                 context.RegisterOperationBlockAction(operationContext =>
                     AnalyzerFeaturePipeline.AnalyzeOperationBlock(
                         operationContext,
@@ -204,11 +209,13 @@ internal sealed partial class SharpProofAnalyzerEngine
         Compilation compilation,
         CancellationToken cancellationToken)
     {
+        var hasContractApiCandidate = false;
         foreach (var tree in compilation.SyntaxTrees)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!MayContainAdvisoryActivationSyntax(
-                    tree.GetText(cancellationToken)))
+                    tree.GetText(cancellationToken),
+                    cancellationToken))
             {
                 continue;
             }
@@ -216,21 +223,27 @@ internal sealed partial class SharpProofAnalyzerEngine
             foreach (var node in tree.GetRoot(cancellationToken)
                          .DescendantNodes())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (node is AttributeSyntax attribute &&
                     !IsAssemblyOrModuleAttribute(attribute))
                 {
                     return AdvisoryActivation.Full;
                 }
 
-                if (node is InvocationExpressionSyntax invocation &&
-                    IsContractApiCandidate(invocation.Expression))
+                if (node is ExpressionSyntax expression &&
+                    IsContractApiCandidate(expression))
                 {
-                    return new(
-                        RequiresSymbolAnalysis: false,
-                        RequiresOperationAnalysis: true,
-                        RequiresFullOperationAnalysis: true);
+                    hasContractApiCandidate = true;
                 }
             }
+        }
+
+        if (hasContractApiCandidate)
+        {
+            return new(
+                RequiresSymbolAnalysis: false,
+                RequiresOperationAnalysis: true,
+                RequiresFullOperationAnalysis: true);
         }
 
         var hasSharpProofAssemblyAttribute =
@@ -247,10 +260,18 @@ internal sealed partial class SharpProofAnalyzerEngine
                 : AdvisoryActivation.None;
     }
 
-    private static bool MayContainAdvisoryActivationSyntax(SourceText text)
+    private static bool MayContainAdvisoryActivationSyntax(
+        SourceText text,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         for (var index = 0; index < text.Length; index++)
         {
+            if (index % ActivationCancellationCheckInterval == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             if (text[index] == '[' ||
                 (text[index] == '\\' &&
                  index + 1 < text.Length &&
@@ -265,7 +286,10 @@ internal sealed partial class SharpProofAnalyzerEngine
         foreach (var candidate in
                  ContractApiMetadata.ContractMethodCandidateNames)
         {
-            if (ContainsOrdinal(text, candidate))
+            if (ContainsOrdinal(
+                    text,
+                    candidate,
+                    cancellationToken))
             {
                 return true;
             }
@@ -274,11 +298,20 @@ internal sealed partial class SharpProofAnalyzerEngine
         return false;
     }
 
-    private static bool ContainsOrdinal(SourceText text, string value)
+    private static bool ContainsOrdinal(
+        SourceText text,
+        string value,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var lastStart = text.Length - value.Length;
         for (var start = 0; start <= lastStart; start++)
         {
+            if (start % ActivationCancellationCheckInterval == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             var matches = true;
             for (var offset = 0; offset < value.Length; offset++)
             {
@@ -323,8 +356,15 @@ internal sealed partial class SharpProofAnalyzerEngine
                 continue;
             }
 
-            if (reference is CompilationReference)
+            if (reference is CompilationReference source)
             {
+                if (CompilationContainsRequiresClause(
+                        source.Compilation,
+                        cancellationToken))
+                {
+                    return true;
+                }
+
                 var symbol = compilation.GetAssemblyOrModuleSymbol(reference);
                 if (symbol == null)
                 {
@@ -355,6 +395,60 @@ internal sealed partial class SharpProofAnalyzerEngine
             }
 
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool CompilationContainsRequiresClause(
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
+        if (compilation.Language != LanguageNames.CSharp)
+        {
+            return true;
+        }
+
+        var contract = SharpProof.Frontend.ContractApiIdentityResolver
+            .ForCompilation(compilation)
+            .Contract;
+        if (contract == null)
+        {
+            return false;
+        }
+
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!MayContainAdvisoryActivationSyntax(
+                    tree.GetText(cancellationToken),
+                    cancellationToken))
+            {
+                continue;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, tree);
+            foreach (var invocation in tree.GetRoot(cancellationToken)
+                         .DescendantNodes()
+                         .OfType<InvocationExpressionSyntax>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!IsContractApiCandidate(invocation.Expression) ||
+                    model.GetSymbolInfo(invocation, cancellationToken)
+                        .Symbol is not IMethodSymbol
+                        {
+                            Name: ContractApiMetadata.RequiresMethodName
+                        } method ||
+                    !SymbolEqualityComparer.Default.Equals(
+                        method.ContainingType.OriginalDefinition,
+                        contract.OriginalDefinition))
+                {
+                    continue;
+                }
+
+                return true;
+            }
         }
 
         return false;

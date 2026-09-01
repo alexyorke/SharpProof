@@ -6,6 +6,37 @@ namespace SharpProof.ContractForValidation;
 /// </summary>
 internal static class ContractForCompanionValidator
 {
+    internal static bool ValidateRelationship(
+        ResolvedCompanion companion,
+        ContractForSymbolMatcher.CompanionRelationshipInventory relationships,
+        List<Diagnostic> diagnostics)
+    {
+        var issue = relationships.GetIssue(companion.Companion);
+        switch (issue)
+        {
+            case ContractForSymbolMatcher.CompanionRelationshipIssue.None:
+                return true;
+            case ContractForSymbolMatcher.CompanionRelationshipIssue.SelfTarget:
+                diagnostics.Add(At(
+                    ContractForDiagnosticDescriptors.SelfTarget,
+                    companion.AttributeLocation,
+                    companion.Companion.Name));
+                return false;
+            case ContractForSymbolMatcher.CompanionRelationshipIssue.Cycle:
+                diagnostics.Add(At(
+                    ContractForDiagnosticDescriptors.CyclicRelationship,
+                    companion.AttributeLocation,
+                    companion.Companion.Name,
+                    companion.Target.Name));
+                return false;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(relationships),
+                    issue,
+                    "Unknown ContractFor relationship issue.");
+        }
+    }
+
     internal static void Validate(
         ResolvedCompanion companion,
         Compilation compilation,
@@ -25,21 +56,41 @@ internal static class ContractForCompanionValidator
             return;
         }
 
-        var targets = ContractForSymbolMatcher.GetOrdinaryMethods(companion.Target);
-        var candidates = ContractForSymbolMatcher.GetOrdinaryMethods(companion.Companion);
+        var targets = GetLogicalMethods(companion.Target);
+        var candidates = GetLogicalMethods(companion.Companion);
+        var intrinsics = new ContractIntrinsicValidator(compilation);
         var comparer = (IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default;
-        var byTarget = targets.ToDictionary(
-            static target => target,
-            target => candidates.Where(candidate =>
-                ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
-                .ToImmutableArray(),
-            comparer);
-        var byCandidate = candidates.ToDictionary(
-            static candidate => candidate,
-            candidate => targets.Where(target =>
-                ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
-                .ToImmutableArray(),
-            comparer);
+        var byTarget = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(comparer);
+        foreach (var target in targets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var matches = ImmutableArray.CreateBuilder<IMethodSymbol>();
+            foreach (var candidate in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
+                {
+                    matches.Add(candidate);
+                }
+            }
+            byTarget.Add(target, matches.ToImmutable());
+        }
+
+        var byCandidate = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>(comparer);
+        foreach (var candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var matches = ImmutableArray.CreateBuilder<IMethodSymbol>();
+            foreach (var target in targets)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate))
+                {
+                    matches.Add(target);
+                }
+            }
+            byCandidate.Add(candidate, matches.ToImmutable());
+        }
         var targetSurfaceIsComplete = targets.All(target =>
             byTarget[target] is { Length: 1 } matches &&
             byCandidate[matches[0]].Length == 1);
@@ -140,6 +191,7 @@ internal static class ContractForCompanionValidator
             ValidateBody(
                 ContractClauseInventoryBuilder.NormalizeCallable(matches[0]),
                 clauses,
+                intrinsics,
                 diagnostics,
                 compilation,
                 companion.AttributeLocation,
@@ -147,15 +199,35 @@ internal static class ContractForCompanionValidator
         }
     }
 
+    private static ImmutableArray<IMethodSymbol> GetLogicalMethods(
+        INamedTypeSymbol type)
+    {
+        return [.. ContractForSymbolMatcher.GetOrdinaryMethods(type)
+            .Select(ContractClauseInventoryBuilder.NormalizeCallable)
+            .Distinct((IEqualityComparer<IMethodSymbol>)SymbolEqualityComparer.Default)];
+    }
+
     private static void ValidateBody(
         IMethodSymbol method,
         ContractClauseInventoryBuilder clauses,
+        ContractIntrinsicValidator intrinsics,
         List<Diagnostic> diagnostics,
         Compilation compilation,
         Location fallback,
         CancellationToken cancellationToken)
     {
-        var inventory = clauses.Create(method);
+        var inventory = clauses.Create(
+            method,
+            implementationBody: null,
+            cancellationToken: cancellationToken);
+        if (inventory.HasRejectedContractApiUsage)
+        {
+            SharpProof.Analyzer.SharpProofControlAttributePolicy.ReportRejectedContractApi(
+                method.Name,
+                GetSourceLocation(method, compilation, fallback),
+                diagnostics.Add);
+        }
+
         if (inventory.ImplementationBody == null)
         {
             diagnostics.Add(At(
@@ -163,6 +235,17 @@ internal static class ContractForCompanionValidator
                 GetSourceLocation(method, compilation, fallback),
                 method.Name));
             return;
+        }
+
+        foreach (var violation in intrinsics.Validate(
+                     method,
+                     inventory.ImplementationBody,
+                     includeNestedCallables: true))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            diagnostics.Add(
+                SharpProof.Analyzer.InvalidContractArgumentDiagnostics.Create(
+                    violation));
         }
 
         foreach (var clause in inventory.Clauses)

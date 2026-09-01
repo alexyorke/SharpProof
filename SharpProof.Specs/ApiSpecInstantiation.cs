@@ -39,6 +39,7 @@ public static partial class ApiSpecInstantiator
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         substitutions = ArgumentNullGuard.NotNull(
             substitutions, nameof(substitutions));
+        substitutions = substitutions.ToImmutableDictionary();
 
         var variables = template.Variables.ToImmutableDictionary(static item => item.Id);
         foreach (var substitution in substitutions)
@@ -253,14 +254,11 @@ public static partial class ApiSpecInstantiator
             }
 
             var peerType = factory.GetTypeInfo(peer.Term!.Type);
-            if (value.Type == IrTypeKind.Sequence)
-            {
-                return Failure(SpecInstantiationFailureKind.UnsupportedValueType, null,
-                    "A factory-independent sequence null needs a concrete sequence type substitution.");
-            }
-
             return peerType.Kind == value.Type &&
-                   value.Type is IrTypeKind.String or IrTypeKind.Reference
+                   value.Type is
+                       IrTypeKind.String or
+                       IrTypeKind.Reference or
+                       IrTypeKind.Sequence
                 ? new(factory.Null(peer.Term.Type), null)
                 : Failure(SpecInstantiationFailureKind.TypeMismatch, null,
                     "The exact instantiated null operand type does not match its peer.");
@@ -274,13 +272,37 @@ public static partial class ApiSpecInstantiator
                 return condition;
             }
 
-            var whenTrue = Term(conditional.WhenTrue);
+            TermResult whenTrue;
+            TermResult whenFalse;
+            if (conditional.WhenTrue is SpecNullDeclaration trueNull &&
+                conditional.WhenFalse is not SpecNullDeclaration)
+            {
+                whenFalse = Term(conditional.WhenFalse);
+                if (whenFalse.Failure != null)
+                {
+                    return whenFalse;
+                }
+
+                whenTrue = Null(trueNull, whenFalse);
+            }
+            else
+            {
+                whenTrue = Term(conditional.WhenTrue);
+                whenFalse = default;
+            }
+
             if (whenTrue.Failure != null)
             {
                 return whenTrue;
             }
 
-            var whenFalse = Term(conditional.WhenFalse);
+            if (whenFalse.Term == null)
+            {
+                whenFalse = conditional.WhenFalse is SpecNullDeclaration falseNull &&
+                            conditional.WhenTrue is not SpecNullDeclaration
+                    ? Null(falseNull, whenTrue)
+                    : Term(conditional.WhenFalse);
+            }
             return whenFalse.Failure != null
                 ? whenFalse
                 : new(factory.Conditional(

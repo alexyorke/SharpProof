@@ -49,6 +49,15 @@ internal sealed partial class ClaimManifestBuilder(
     private ManifestCallableTarget? BuildTarget(CallableSeed seed, string callableId)
     {
         var target = seed.Method;
+        if (SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
+                target,
+                _effectSession,
+                static _ => { },
+                cancellationToken))
+        {
+            return null;
+        }
+
         var resolution = _contractSources.Resolve(target);
         var source = resolution.Source;
         var inventory = resolution.Inventory;
@@ -88,7 +97,8 @@ internal sealed partial class ClaimManifestBuilder(
                 ConstructorDeclarationSyntax &&
             target.MethodKind is
                 MethodKind.Ordinary or
-                MethodKind.Constructor &&
+                MethodKind.Constructor or
+                MethodKind.ExplicitInterfaceImplementation &&
             selectedSubset.IsSupported;
         var location = CallableLocation(target, seed.Declaration);
         var effects = EffectsEnabled
@@ -193,7 +203,12 @@ internal sealed partial class ClaimManifestBuilder(
                 clause.Invocation, null, clause.Placement))
             .Concat(target.GetReturnTypeAttributes()
                 .Where(_attributes.IsClosedContract)
-                .OrderBy(AttributeOrder)
+                .OrderBy(
+                    static attribute =>
+                        attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
+                    StringComparer.Ordinal)
+                .ThenBy(static attribute =>
+                    attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue)
                 .Select(attribute => new ClaimCandidate(
                     SemanticClaimIdentity.CreateAttributeFingerprint(attribute, target),
                     AttributeLocation(attribute, target),
@@ -310,7 +325,13 @@ internal sealed partial class ClaimManifestBuilder(
         var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var evaluation in evaluations.OrderBy(static evaluation => evaluation.Kind))
         {
-            foreach (var attribute in evaluation.Attributes.OrderBy(AttributeOrder))
+            foreach (var attribute in evaluation.Attributes
+                .OrderBy(
+                    static attribute =>
+                        attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
+                    StringComparer.Ordinal)
+                .ThenBy(static attribute =>
+                    attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var fingerprint = "effect:" + evaluation.Kind + ":" +
@@ -412,7 +433,8 @@ internal sealed partial class ClaimManifestBuilder(
             Effects = ToWorkerEffects(witness.Effects),
             Capabilities =
                 ToWorkerCapabilities(witness.Capabilities),
-            ExactExceptionTypeHierarchy = [],
+            ExactExceptionTypeHierarchy =
+                [.. replay!.Events[0].ExactExceptionTypeHierarchy],
             Location = replay!.Events[0].Location
         };
         evidence.Replay = replay;
@@ -545,6 +567,11 @@ internal sealed partial class ClaimManifestBuilder(
         foreach (var group in callables
                      .Where(static seed => seed.Method.MethodKind is
                          MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+                     // Callables without contract clauses do not participate in
+                     // the manifest identity. Excluding them keeps an unrelated
+                     // sibling from renumbering the callables that do.
+                     .Where(static seed => seed.Declaration?.ToString()
+                         .IndexOf("Contract.", StringComparison.Ordinal) >= 0)
                      .GroupBy(static seed => seed.Method.ContainingSymbol!,
                          SymbolEqualityComparer.Default))
         {
@@ -567,29 +594,63 @@ internal sealed partial class ClaimManifestBuilder(
 
         return ids.ToImmutableDictionary(SymbolEqualityComparer.Default);
 
-        string Resolve(IMethodSymbol method)
+        void Resolve(IMethodSymbol method)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             method = ContractClauseInventoryBuilder.NormalizeCallable(method);
-            if (ids.TryGetValue(method, out var id))
+            if (ids.ContainsKey(method))
             {
-                return id;
+                return;
             }
 
-            if (method.MethodKind is MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+            var unresolved = new Stack<IMethodSymbol>();
+            string parentId;
+            while (true)
             {
-                var parent = method.ContainingSymbol;
-                var parentId = parent is IMethodSymbol parentMethod
-                    ? Resolve(parentMethod)
-                    : SemanticClaimIdentity.CreateContainerId(parent);
-                id = SemanticClaimIdentity.CreateNestedCallableId(parentId, method, ordinals[method]);
+                cancellationToken.ThrowIfCancellationRequested();
+                method = ContractClauseInventoryBuilder.NormalizeCallable(
+                    method);
+                if (ids.TryGetValue(method, out parentId))
+                {
+                    break;
+                }
+
+                if (method.MethodKind is
+                    MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+                {
+                    unresolved.Push(method);
+                    if (method.ContainingSymbol is IMethodSymbol parentMethod)
+                    {
+                        method = parentMethod;
+                        continue;
+                    }
+
+                    parentId = SemanticClaimIdentity.CreateContainerId(
+                        method.ContainingSymbol);
+                    break;
+                }
+
+                parentId = SemanticClaimIdentity.CreateCallableId(method);
+                ids.Add(method, parentId);
+                break;
             }
-            else
+
+            while (unresolved.Count > 0)
             {
-                id = SemanticClaimIdentity.CreateCallableId(method);
+                cancellationToken.ThrowIfCancellationRequested();
+                var nested = unresolved.Pop();
+                // Clause-free nested callables are intentionally excluded from
+                // the stable ordinal sequence. They may still be visited while
+                // resolving a containing callable, so use a deterministic
+                // neutral ordinal rather than failing the entire manifest.
+                var ordinal = ordinals.TryGetValue(nested, out var value)
+                    ? value
+                    : 0;
+                parentId = SemanticClaimIdentity.CreateNestedCallableId(
+                    parentId,
+                    nested,
+                    ordinal);
+                ids.Add(nested, parentId);
             }
-            ids.Add(method, id);
-            return id;
         }
     }
 
@@ -610,18 +671,12 @@ internal sealed partial class ClaimManifestBuilder(
         target.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
     }
 
-    private static (string Path, int Start) AttributeOrder(AttributeData attribute)
-    {
-        return (attribute.ApplicationSyntaxReference?.SyntaxTree.FilePath ?? string.Empty,
-                attribute.ApplicationSyntaxReference?.Span.Start ?? int.MaxValue);
-    }
-
     private static Location CallableLocation(IMethodSymbol method, SyntaxNode? declaration)
     {
         return declaration?.GetLocation() ?? method.Locations.FirstOrDefault(static location => location.IsInSource) ?? Location.None;
     }
 
-    private static WorkerSourceLocation ToSourceLocation(Location location)
+    private WorkerSourceLocation ToSourceLocation(Location location)
     {
         if (!location.IsInSource)
         {
@@ -632,7 +687,7 @@ internal sealed partial class ClaimManifestBuilder(
         var path = string.IsNullOrEmpty(mapped.Path)
             ? location.SourceTree?.FilePath ?? string.Empty
             : mapped.Path;
-        return new WorkerSourceLocation
+        var result = new WorkerSourceLocation
         {
             Path = string.IsNullOrEmpty(path) ? "<compiler-generated>" : path,
             Start = location.SourceSpan.Start,
@@ -640,6 +695,15 @@ internal sealed partial class ClaimManifestBuilder(
             Line = mapped.StartLinePosition.Line + 1,
             Column = mapped.StartLinePosition.Character + 1
         };
+        if (location.SourceTree is { } sourceTree)
+        {
+            var ordinal = _compilation.SyntaxTrees.IndexOf(sourceTree);
+            if (ordinal >= 0)
+            {
+                CompilerSourceLocationAuthority.RememberTree(result, ordinal);
+            }
+        }
+        return result;
     }
 
 }

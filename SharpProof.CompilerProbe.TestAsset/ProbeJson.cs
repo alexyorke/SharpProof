@@ -127,7 +127,7 @@ internal static class ProbeJson
                     builder.Append("\\t");
                     break;
                 default:
-                    if (character < ' ')
+                    if (character < ' ' || character > '\u007f')
                     {
                         builder.Append("\\u");
                         builder.Append(

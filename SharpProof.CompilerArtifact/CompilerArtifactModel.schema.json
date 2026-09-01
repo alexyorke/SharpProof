@@ -4,7 +4,7 @@
   "jsonNamingPolicy": "camelCase",
   "artifactEnvelope": {
     "schema": "SharpProof.CompilerManifest",
-    "version": 15
+    "version": 18
   },
   "declarations": [
     {
@@ -21,7 +21,7 @@
           "accessibility": "internal",
           "name": "Current",
           "type": "int",
-          "value": 15
+          "value": 18
         }
       ]
     },
@@ -192,6 +192,10 @@
         {
           "name": "UInt",
           "value": 6
+        },
+        {
+          "name": "Long",
+          "value": 7
         }
       ]
     },
@@ -3072,6 +3076,16 @@
           }
         },
         {
+          "name": "MainTypeName",
+          "jsonName": "mainTypeName",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "stringEmpty"
+          }
+        },
+        {
           "name": "OptimizationLevel",
           "jsonName": "optimizationLevel",
           "type": "CompilerOptimizationLevel",
@@ -3139,6 +3153,16 @@
           "set": "set",
           "default": {
             "kind": "emptyArray"
+          }
+        },
+        {
+          "name": "ReportSuppressedDiagnostics",
+          "jsonName": "reportSuppressedDiagnostics",
+          "type": "bool",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
           }
         },
         {
@@ -3292,6 +3316,16 @@
           "default": {
             "kind": "implicit"
           }
+        },
+        {
+          "name": "CharacterOffset",
+          "jsonName": "characterOffset",
+          "type": "int",
+          "accessibility": "public",
+          "set": "set",
+          "default": {
+            "kind": "implicit"
+          }
         }
       ]
     },
@@ -3318,6 +3352,30 @@
           "default": {
             "kind": "stringEmpty"
           }
+        },
+        {
+          "name": "Encoding",
+          "jsonName": "encoding",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": { "kind": "stringEmpty" }
+        },
+        {
+          "name": "ChecksumAlgorithm",
+          "jsonName": "checksumAlgorithm",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": { "kind": "stringEmpty" }
+        },
+        {
+          "name": "RoslynChecksum",
+          "jsonName": "roslynChecksum",
+          "type": "string",
+          "accessibility": "public",
+          "set": "set",
+          "default": { "kind": "stringEmpty" }
         },
         {
           "name": "LineMapSha256",
@@ -4374,7 +4432,7 @@
   },
   "effectEvidence": {
     "domain": "SharpProof.CompilerEffectClaimEvidence",
-    "version": 8,
+    "version": 9,
     "constraintKinds": {
       "capabilities": "AllowedCapabilities",
       "exceptions": "AllowedExceptions",
@@ -4385,7 +4443,10 @@
       "maximumEvents": 256,
       "supportedEventKinds": [
         "ManagedObjectAllocation",
-        "ManagedArrayAllocation"
+        "ManagedArrayAllocation",
+        "ExplicitThrow",
+        "MonitorCall",
+        "EmptyLock"
       ]
     },
     "sortAllowedExceptionTypes": true,

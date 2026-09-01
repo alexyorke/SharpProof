@@ -96,7 +96,7 @@ public sealed class CompilerArtifactModelSchemaTests
             Assert.That(
                 evidence.GetProperty("domain").GetString(),
                 Is.EqualTo("SharpProof.CompilerEffectClaimEvidence"));
-            Assert.That(evidence.GetProperty("version").GetInt32(), Is.EqualTo(8));
+            Assert.That(evidence.GetProperty("version").GetInt32(), Is.EqualTo(9));
             Assert.That(
                 evidence.GetProperty("replay")
                     .GetProperty("pathKind").GetString(),
@@ -113,7 +113,10 @@ public sealed class CompilerArtifactModelSchemaTests
                 Is.EqualTo(new[]
                 {
                     nameof(CompilerEffectReplayEventKind.ManagedObjectAllocation),
-                    nameof(CompilerEffectReplayEventKind.ManagedArrayAllocation)
+                    nameof(CompilerEffectReplayEventKind.ManagedArrayAllocation),
+                    nameof(CompilerEffectReplayEventKind.ExplicitThrow),
+                    nameof(CompilerEffectReplayEventKind.MonitorCall),
+                    nameof(CompilerEffectReplayEventKind.EmptyLock)
                 }));
         }
 

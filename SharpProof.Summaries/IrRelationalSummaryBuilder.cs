@@ -187,8 +187,11 @@ public static class IrRelationalSummaryBuilder
         private readonly List<IrTerm> _relations = [];
         private readonly List<IrVarId> _existentials = [];
         private readonly HashSet<IrMemberId> _dependencies = [];
-        private readonly Dictionary<string, IrSummaryProvenance>
-            _dependencyProvenance = new(StringComparer.Ordinal);
+        private readonly Dictionary<(
+            IrSummaryOrigin Origin,
+            string EvidenceCallIdentity,
+            string EvidenceIdentity,
+            string EvidenceSha256), IrSummaryProvenance> _dependencyProvenance = [];
         private readonly HashSet<IrId> _visitedTerms = [];
         private int _remainingOperations;
         private bool _mayThrow;
@@ -281,7 +284,13 @@ public static class IrRelationalSummaryBuilder
                 [.. _dependencies.OrderBy(
                     static member => member.Value)],
                 [.. _dependencyProvenance
-                    .OrderBy(static item => item.Key, StringComparer.Ordinal)
+                    .OrderBy(static item => item.Key.Origin)
+                    .ThenBy(static item => item.Key.EvidenceCallIdentity,
+                        StringComparer.Ordinal)
+                    .ThenBy(static item => item.Key.EvidenceIdentity,
+                        StringComparer.Ordinal)
+                    .ThenBy(static item => item.Key.EvidenceSha256,
+                        StringComparer.Ordinal)
                     .Select(static item => item.Value)],
                 _mayThrow ? IrSummaryEffect.MayThrow : IrSummaryEffect.None,
                 IrSummaryTermination.TerminatesOrThrows);
@@ -418,6 +427,14 @@ public static class IrRelationalSummaryBuilder
                 }
 
                 predicate = constrained;
+                if (ConstrainNonNullReceiver(
+                        predicate,
+                        receiver) is not { } nonNullReceiver)
+                {
+                    return null;
+                }
+
+                predicate = nonNullReceiver;
             }
 
             var arguments = new IrTerm[call.Arguments.Length];
@@ -457,10 +474,13 @@ public static class IrRelationalSummaryBuilder
                 return null;
             }
 
-            predicate = Factory.Binary(
-                IrBinaryOperator.AndAlso,
-                predicate,
-                instantiated.NormalRelation);
+            predicate = IrSemanticTerms.Conjoin(
+                Factory,
+                [
+                    predicate,
+                    instantiated.NormalCompletion,
+                    instantiated.NormalRelation
+                ]);
             if (!Supported(predicate))
             {
                 return null;
@@ -477,13 +497,42 @@ public static class IrRelationalSummaryBuilder
             return new CallApplication(instantiated.Result, predicate);
         }
 
+        private IrTerm? ConstrainNonNullReceiver(
+            IrTerm predicate,
+            IrTerm receiver)
+        {
+            if (Factory.GetTypeInfo(receiver.Type).Kind is not (
+                    IrTypeKind.String or
+                    IrTypeKind.Reference or
+                    IrTypeKind.Sequence))
+            {
+                return predicate;
+            }
+
+            if (!Spend(2))
+            {
+                return null;
+            }
+
+            var nonNull = Factory.Binary(
+                IrBinaryOperator.NotEqual,
+                receiver,
+                Factory.Null(receiver.Type));
+            _mayThrow |= nonNull is not IrBooleanTerm { Value: true };
+            var result = Factory.Binary(
+                IrBinaryOperator.AndAlso,
+                predicate,
+                nonNull);
+            return Supported(result) ? result : null;
+        }
+
         private void AddDependencyProvenance(IrSummaryProvenance provenance)
         {
-            var key = ((int)provenance.Origin).ToString(
-                    System.Globalization.CultureInfo.InvariantCulture) +
-                provenance.EvidenceCallIdentity + "|" +
-                provenance.EvidenceIdentity + "|" +
-                provenance.EvidenceSha256;
+            var key = (
+                provenance.Origin,
+                provenance.EvidenceCallIdentity,
+                provenance.EvidenceIdentity,
+                provenance.EvidenceSha256);
             _dependencyProvenance[key] = provenance;
         }
 

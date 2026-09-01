@@ -83,6 +83,16 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
+        var firstDeclaration = method.DeclaringSyntaxReferences[0]
+            .GetSyntax(context.CancellationToken);
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                method,
+                firstDeclaration.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
 
         EffectContractDiagnostics.ValidateArguments(method, session, context.ReportDiagnostic);
         ClosedContractDiagnostics.Validate(method, session, context.ReportDiagnostic);
@@ -327,6 +337,102 @@ internal static partial class AnalyzerFeaturePipeline
         session.RecordSemanticOutcome(method, outcome);
     }
 
+    internal static void AnalyzeLambdaEffects(
+        SyntaxNodeAnalysisContext context,
+        AnalyzerSession session)
+    {
+        context.CancellationToken.ThrowIfCancellationRequested();
+        if (context.SemanticModel.GetOperation(
+                context.Node,
+                context.CancellationToken) is not
+            IAnonymousFunctionOperation anonymousFunction)
+        {
+            return;
+        }
+
+        var method = anonymousFunction.Symbol;
+        if (AnalyzerGeneratedCodePolicy.IsGenerated(
+                method,
+                context.Node.SyntaxTree,
+                context.Compilation,
+                context.CancellationToken))
+        {
+            return;
+        }
+
+        EffectContractDiagnostics.ValidateArguments(
+            method,
+            session,
+            context.ReportDiagnostic);
+        var rejectedContractApi =
+            session.Attributes.GetRejectedSelectionFeatures(method) !=
+            ContractSelectionFeatures.None;
+        if (rejectedContractApi &&
+            session.TryMarkRejectedContractApiReported(method))
+        {
+            ReportRejectedContractApi(
+                method,
+                context.ReportDiagnostic,
+                context.CancellationToken);
+        }
+
+        var selection = GetSelection(
+            method,
+            session,
+            context.ReportDiagnostic,
+            context.CancellationToken);
+        if (!selection.Effects ||
+            !session.TryBeginExecutableAnalysis(method))
+        {
+            return;
+        }
+        if (rejectedContractApi)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
+        if (selection.IsSuppressed)
+        {
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Suppressed);
+            return;
+        }
+
+        var subset = LanguageSubsetGate.ClassifyEffects(
+            method,
+            context.Node,
+            context.SemanticModel,
+            [anonymousFunction.Body],
+            session.HasResolvedApiSpec,
+            context.CancellationToken);
+        if (!subset.IsSupported)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+                method.Name,
+                subset.OperationKind is { } operation
+                    ? subset.Reason + " (" + operation + ")"
+                    : subset.Reason.ToString()));
+            session.RecordSemanticOutcome(
+                method,
+                AnalyzerSemanticOutcome.Abstained);
+            return;
+        }
+
+        session.RecordSemanticOutcome(
+            method,
+            EffectContractDiagnostics.Analyze(
+                method,
+                context.Node,
+                session,
+                context.ReportDiagnostic,
+                context.CancellationToken));
+    }
+
     internal static void ReconcileSelectedSemicolonAccessors(
         CompilationAnalysisContext context,
         AnalyzerSession session)
@@ -383,7 +489,12 @@ internal static partial class AnalyzerFeaturePipeline
                 declaration,
                 context.SemanticModel,
                 context.CancellationToken,
-                out var constructor) ||
+                out var constructor) &&
+            !PrimaryConstructorCallableInventory.TryGetSynthesizedDefault(
+                declaration,
+                context.SemanticModel,
+                context.CancellationToken,
+                out constructor) ||
             AnalyzerGeneratedCodePolicy.IsGenerated(
                 constructor,
                 declaration.SyntaxTree,
@@ -450,6 +561,9 @@ internal static partial class AnalyzerFeaturePipeline
                     candidate.DeclaringSyntaxReferences.FirstOrDefault()?.SyntaxTree ??
                         initializer.SyntaxTree,
                     context.Compilation,
+                    context.CancellationToken) &&
+                !IsThisDelegatingConstructor(
+                    candidate,
                     context.CancellationToken))
             .ToArray();
         var root = context.SemanticModel.GetOperation(
@@ -463,7 +577,7 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        IMethodSymbol? constructor = null;
+        var eligibleConstructors = ImmutableArray.CreateBuilder<IMethodSymbol>();
         foreach (var candidate in constructors)
         {
             if (SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
@@ -477,14 +591,12 @@ internal static partial class AnalyzerFeaturePipeline
                     AnalyzerSemanticOutcome.Suppressed);
                 continue;
             }
-            constructor = candidate;
-            break;
+            eligibleConstructors.Add(candidate);
         }
-        if (constructor == null)
+        if (eligibleConstructors.Count == 0)
         {
             return;
         }
-        var outcome = AnalyzerSemanticOutcome.NotApplicable;
         var operationFacts = new DefiniteOperationFacts(
             context.Compilation,
             context.CancellationToken);
@@ -497,19 +609,48 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        foreach (var operation in RequiresCallSiteDiscovery
-                     .ExecutableUnflowedDescendantsAndSelf(
-                         root,
-                         operationFacts))
+        var reportedDiagnostics = new HashSet<MemberInitializerDiagnosticKey>();
+        foreach (var constructor in eligibleConstructors)
         {
-            outcome = AnalyzerSemanticOutcomes.Combine(
-                outcome,
-                RequiresCallSiteAnalyzer.AnalyzeInitializerCall(
-                    constructor, initializer, operation,
-                    context.SemanticModel, session,
-                    context.ReportDiagnostic, context.CancellationToken));
+            var outcome = RequiresCallSiteAnalyzer.AnalyzeInitializerCall(
+                constructor,
+                initializer,
+                root,
+                context.SemanticModel,
+                session,
+                diagnostic =>
+                {
+                    var key = new MemberInitializerDiagnosticKey(
+                        diagnostic.Id,
+                        diagnostic.Location.SourceTree,
+                        diagnostic.Location.SourceSpan,
+                        diagnostic.GetMessage(CultureInfo.InvariantCulture));
+                    if (reportedDiagnostics.Add(key))
+                    {
+                        context.ReportDiagnostic(diagnostic);
+                    }
+                },
+                context.CancellationToken);
+            session.RecordSemanticOutcome(constructor, outcome);
         }
-        session.RecordSemanticOutcome(constructor, outcome);
+    }
+
+    private readonly record struct MemberInitializerDiagnosticKey(
+        string Id,
+        SyntaxTree? Tree,
+        TextSpan Span,
+        string Message);
+
+    private static bool IsThisDelegatingConstructor(
+        IMethodSymbol constructor,
+        CancellationToken cancellationToken)
+    {
+        return constructor.DeclaringSyntaxReferences
+            .Select(reference => reference.GetSyntax(cancellationToken))
+            .OfType<ConstructorDeclarationSyntax>()
+            .Any(static declaration =>
+                declaration.Initializer?.ThisOrBaseKeyword.IsKind(
+                    SyntaxKind.ThisKeyword) == true);
     }
 
     private static bool CanReachMemberInitializer(
@@ -520,79 +661,61 @@ internal static partial class AnalyzerFeaturePipeline
         CancellationToken cancellationToken)
     {
         var containingType = target.FirstAncestorOrSelf<TypeDeclarationSyntax>();
-        var targetMember = target.FirstAncestorOrSelf<MemberDeclarationSyntax>();
-        if (containingType == null || targetMember == null)
+        var type = containingType == null
+            ? null
+            : semanticModel.GetDeclaredSymbol(
+                containingType,
+                cancellationToken);
+        if (type == null)
         {
             return true;
         }
 
-        foreach (var member in containingType.Members)
+        foreach (var reference in EffectMethodNodeBuilder
+                     .GetMemberInitializerReferences(
+                         semanticModel.Compilation,
+                         type,
+                         isStatic))
         {
-            foreach (var initializer in GetMemberInitializers(member))
+            var initializer = GetMemberInitializer(
+                reference.GetSyntax(cancellationToken));
+            if (initializer == null)
             {
-                if (initializer.SyntaxTree == target.SyntaxTree &&
-                    initializer.Span == target.Span)
-                {
-                    return true;
-                }
-                if (!HasMatchingInitializationKind(
-                        initializer,
-                        isStatic,
-                        semanticModel,
-                        cancellationToken))
-                {
-                    continue;
-                }
-                var operation = semanticModel.GetOperation(
-                    initializer.Value,
-                    cancellationToken);
-                if (operation != null &&
-                    !operationFacts.MayCompleteNormally(operation))
-                {
-                    return false;
-                }
+                continue;
             }
-            if (member.SyntaxTree == targetMember.SyntaxTree &&
-                member.Span == targetMember.Span)
+            if (initializer.SyntaxTree == target.SyntaxTree &&
+                initializer.Span == target.Span)
             {
                 return true;
+            }
+            var model = initializer.SyntaxTree == semanticModel.SyntaxTree
+                ? semanticModel
+                : SharpProof.Frontend.Host.CompilationModelProvider.GetSemanticModel(
+                    semanticModel.Compilation,
+                    initializer.SyntaxTree);
+            var operation = model.GetOperation(
+                initializer.Value,
+                cancellationToken);
+            if (operation != null &&
+                !operationFacts.MayCompleteNormally(operation))
+            {
+                return false;
             }
         }
         return true;
     }
 
-    private static IEnumerable<EqualsValueClauseSyntax> GetMemberInitializers(
-        MemberDeclarationSyntax member)
+    private static EqualsValueClauseSyntax? GetMemberInitializer(
+        SyntaxNode member)
     {
         return member switch
         {
-            BaseFieldDeclarationSyntax field => field.Declaration.Variables
-                .Select(static variable => variable.Initializer)
-                .OfType<EqualsValueClauseSyntax>(),
+            VariableDeclaratorSyntax { Initializer: { } initializer } =>
+                initializer,
             PropertyDeclarationSyntax { Initializer: { } initializer } =>
-                [initializer],
-            _ => []
-        };
-    }
-
-    private static bool HasMatchingInitializationKind(
-        EqualsValueClauseSyntax initializer,
-        bool isStatic,
-        SemanticModel semanticModel,
-        CancellationToken cancellationToken)
-    {
-        var symbol = initializer.Parent switch
-        {
-            VariableDeclaratorSyntax variable => semanticModel.GetDeclaredSymbol(
-                variable,
-                cancellationToken),
-            PropertyDeclarationSyntax property => semanticModel.GetDeclaredSymbol(
-                property,
-                cancellationToken),
+                initializer,
             _ => null
         };
-        return symbol is IFieldSymbol or IPropertySymbol or IEventSymbol &&
-            symbol.IsStatic == isStatic;
     }
 
     private static bool ValidateContractClauses(
@@ -661,23 +784,9 @@ internal static partial class AnalyzerFeaturePipeline
                 continue;
             }
 
-            var isOld = violation.Failure is
-                ContractBindingFailure.OldOutsideEnsures or ContractBindingFailure.NestedOld;
-            var (argument, reason) = DescribeIntrinsicViolation(violation.Failure, isOld);
-            reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
-                isOld ? "Contract.Old" : "Contract.Result",
-                argument,
-                reason,
-                violation.Invocation.Syntax.GetLocation()));
+            reportDiagnostic(
+                InvalidContractArgumentDiagnostics.Create(violation));
         }
-    }
-
-    private static (string Argument, string Reason) DescribeIntrinsicViolation(
-        ContractBindingFailure failure,
-        bool isOld)
-    {
-        return AnalyzerDiagnosticCatalog.DescribeIntrinsicViolation(
-            failure, isOld);
     }
 
     private static void ReportInvalidClauses(

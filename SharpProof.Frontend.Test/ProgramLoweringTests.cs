@@ -115,6 +115,102 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void RefLocalAliasesAbstainInsteadOfBecomingIndependentValues()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long first, long second) {
+                ref long alias = ref first;
+                alias = 10L;
+                alias = ref second;
+                alias = 20L;
+                return checked(first + second);
+            }
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedMutation));
+        }
+    }
+
+    [Test]
+    public void NestedRefInvocationCarriesCallAndMutationHavoc()
+    {
+        var lowered = Lower(
+            """
+            private static long Mutate(ref long value) => ++value;
+            public static long Target(long value) {
+                long result = Mutate(ref value) + 1L;
+                return value;
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+        var parameter = lowered.Result.Variables.Single(
+            static binding =>
+                binding.Symbol is IParameterSymbol
+                {
+                    Name: "value"
+                });
+
+        Assert.That(
+            instructions.OfType<IrCallInstruction>(),
+            Has.Exactly(1).Items);
+        var havoc = instructions
+            .OfType<IrHavocInstruction>()
+            .Single(static instruction =>
+                instruction.HavocKind ==
+                IrHavocKind.VariablesAndMemory);
+        Assert.That(havoc.Variables, Is.EqualTo(new[] { parameter.Variable }));
+    }
+
+    [Test]
+    public void ImpureLocalFunctionCallHavocsCapturedLocals()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long value) {
+                long captured = value;
+                void Mutate() {
+                    captured++;
+                }
+                Mutate();
+                return captured;
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+        var call = instructions
+            .OfType<IrCallInstruction>()
+            .Single();
+        var captured = lowered.Result.Variables.Single(
+            static binding =>
+                binding.Symbol is ILocalSymbol
+                {
+                    Name: "captured"
+                });
+        var havoc = instructions
+            .OfType<IrHavocInstruction>()
+            .Single(instruction => instruction.Operation == call.Operation);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                havoc.HavocKind,
+                Is.EqualTo(IrHavocKind.VariablesAndMemory));
+            Assert.That(
+                havoc.Variables,
+                Does.Contain(captured.Variable));
+        }
+    }
+
+    [Test]
     public void OnlySpecBackedPureCallsAvoidMemoryHavoc()
     {
         const string source =
@@ -170,6 +266,44 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void RefConditionalAssignmentCannotUpdateOnlyTheSyntheticCapture()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(bool choose, long left, long right) {
+                (choose ? ref left : ref right) = 42L;
+                return choose ? left : right;
+            }
+            """);
+        var parameters = lowered.Result.Variables
+            .Where(static binding =>
+                binding.Symbol is IParameterSymbol
+                {
+                    Name: "left" or "right"
+                })
+            .Select(static binding => binding.Variable)
+            .OrderBy(static variable => variable.Value)
+            .ToArray();
+        var havoced = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .OfType<IrHavocInstruction>()
+            .SelectMany(static havoc => havoc.Variables)
+            .Distinct()
+            .OrderBy(static variable => variable.Value)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedMutation));
+            Assert.That(havoced, Does.Contain(parameters[0]));
+            Assert.That(havoced, Does.Contain(parameters[1]));
+        }
+    }
+
+    [Test]
     public void UnsupportedMutationAbstainsAndHavocsWithoutThrowing()
     {
         FrontendProgramLoweringResult? result = null;
@@ -202,6 +336,59 @@ public sealed class ProgramLoweringTests
                 .OfType<IrHavocInstruction>()
                 .SelectMany(static havoc => havoc.Variables),
             Does.Contain(parameter));
+    }
+
+    [Test]
+    public void MandatoryFinallyControlFlowCannotRemainExact()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long value) {
+                try { value = 1L; }
+                finally { value = 2L; }
+                return value;
+            }
+            """);
+        var parameter = lowered.Result.Variables.Single(static binding =>
+            binding.Symbol is IParameterSymbol { Name: "value" }).Variable;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedControlFlow));
+            Assert.That(
+                lowered.Result.Program.Blocks
+                    .SelectMany(static block => block.Instructions)
+                    .OfType<IrHavocInstruction>()
+                    .SelectMany(static havoc => havoc.Variables),
+                Does.Contain(parameter));
+        }
+    }
+
+    [Test]
+    public void ReachableCatchHandlerCannotBeOmittedFromExactLowering()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long value) {
+                try {
+                    return 10L / value;
+                }
+                catch (System.DivideByZeroException) {
+                    return -1L;
+                }
+            }
+            """);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.False);
+            Assert.That(
+                lowered.Result.Abstentions.Select(static value => value.Reason),
+                Does.Contain(FrontendAbstention.UnsupportedControlFlow));
+        }
     }
 
     [Test]
@@ -303,6 +490,72 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void NestedArrayReadsLoadFromProgramMemoryAfterStores()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long[] values) {
+                values[0] = 41L;
+                return checked(values[0] + 1L);
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+        var store = instructions.OfType<IrStoreInstruction>().Single();
+        var load = instructions.OfType<IrLoadInstruction>().Single();
+        var returned = instructions.OfType<IrReturnInstruction>()
+            .Single(static instruction => instruction.Value != null);
+        var sum = (IrBinaryTerm)returned.Value!;
+        var loadedValue = (IrVariableTerm)sum.Left;
+        var storeLocation = (IrSequenceLocation)store.Location;
+        var loadLocation = (IrSequenceLocation)load.Location;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(lowered.Result.IsExact, Is.True);
+            Assert.That(
+                Array.IndexOf(instructions, store),
+                Is.LessThan(Array.IndexOf(instructions, load)));
+            Assert.That(
+                loadLocation.Sequence.Id,
+                Is.EqualTo(storeLocation.Sequence.Id));
+            Assert.That(
+                loadLocation.Index.Id,
+                Is.EqualTo(storeLocation.Index.Id));
+            Assert.That(loadedValue.Variable, Is.EqualTo(load.Target));
+        }
+    }
+
+    [Test]
+    public void RefReturnAssignmentTargetsAreEvaluatedBeforeValues()
+    {
+        var lowered = Lower(
+            """
+            private static long cell;
+            private static ref long Pick() => ref cell;
+            private static long Probe() => 2L;
+            public static long Target() {
+                Pick() = Probe();
+                return cell;
+            }
+            """);
+        var calls = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .OfType<IrCallInstruction>()
+            .Select(call => lowered.Factory.GetString(
+                lowered.Factory.GetMemberInfo(call.Member).Name))
+            .ToArray();
+
+        Assert.That(calls, Has.Length.EqualTo(2));
+        Assert.That(calls[0], Does.Contain("Pick"));
+        Assert.That(calls[1], Does.Contain("Probe"));
+        Assert.That(
+            lowered.Result.Abstentions.Select(static value => value.Reason),
+            Does.Contain(FrontendAbstention.UnsupportedMutation));
+    }
+
+    [Test]
     public void OrdinaryPropertyAccessAbstainsInsteadOfModelingPassiveMemory()
     {
         var lowered = Lower(
@@ -392,6 +645,30 @@ public sealed class ProgramLoweringTests
     }
 
     [Test]
+    public void ValuePositionMutationHavocsStateAndProducesUnknownValue()
+    {
+        var lowered = Lower(
+            """
+            public static long Target(long value) {
+                var result = (value += 1L);
+                return value;
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+
+        Assert.That(lowered.Result.IsExact, Is.False);
+        Assert.That(
+            lowered.Result.Abstentions.Select(static value => value.Reason),
+            Does.Contain(FrontendAbstention.UnsupportedMutation));
+        Assert.That(
+            instructions.OfType<IrHavocInstruction>()
+                .Select(static havoc => havoc.HavocKind),
+            Does.Contain(IrHavocKind.VariablesAndMemory));
+    }
+
+    [Test]
     public void InvocationLoweringOrdersArgumentsByRoslynParameterOrdinal()
     {
         var lowered = Lower(
@@ -428,6 +705,26 @@ public sealed class ProgramLoweringTests
         Assert.That(
             lowered.Result.Abstentions.Select(static value => value.Reason),
             Does.Contain(FrontendAbstention.UnsupportedType));
+    }
+
+    [Test]
+    public void UnsupportedFieldValueDomainsAbstainBeforeMemoryLoads()
+    {
+        var lowered = Lower(
+            """
+            private struct Token { public long Value; }
+            private static Token value;
+            private static Token Target() => value;
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+
+        Assert.That(lowered.Result.IsExact, Is.False);
+        Assert.That(
+            lowered.Result.Abstentions.Select(static value => value.Reason),
+            Does.Contain(FrontendAbstention.UnsupportedType));
+        Assert.That(instructions.OfType<IrLoadInstruction>(), Is.Empty);
     }
 
     [Test]
@@ -508,6 +805,39 @@ public sealed class ProgramLoweringTests
                 lowered.Factory.GetMemberInfo(member).DeclaringType,
                 Is.EqualTo(receiver!.Type));
         }
+    }
+
+    [Test]
+    public void InheritedInstanceMembersShareIdentityAcrossReceiverTypes()
+    {
+        var lowered = Lower(
+            """
+            private class Base {
+                public long Value;
+            }
+            private sealed class Derived : Base {
+            }
+            private static long Target(Base baseValue, Derived derivedValue) {
+                baseValue.Value = 1L;
+                derivedValue.Value = 2L;
+                return baseValue.Value;
+            }
+            """);
+        var instructions = lowered.Result.Program.Blocks
+            .SelectMany(static block => block.Instructions)
+            .ToArray();
+        var members = instructions
+            .OfType<IrStoreInstruction>()
+            .Select(static instruction => (IrMemberLocation)instruction.Location)
+            .Select(static location => location.Member)
+            .Concat(instructions
+                .OfType<IrLoadInstruction>()
+                .Select(static instruction => (IrMemberLocation)instruction.Location)
+                .Select(static location => location.Member))
+            .ToArray();
+
+        Assert.That(members, Has.Length.EqualTo(3));
+        Assert.That(members.Distinct().ToArray(), Has.Length.EqualTo(1));
     }
 
     private static string Shape(IrProgram program)

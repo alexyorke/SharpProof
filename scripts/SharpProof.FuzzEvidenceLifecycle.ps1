@@ -1,5 +1,40 @@
 Set-StrictMode -Version Latest
 
+function Get-SharpProofRotatingSeed {
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][DateTime]$UtcDate)
+
+    $utcDay = [int]$UtcDate.ToUniversalTime().Date.Subtract(
+        [DateTime]::UnixEpoch).TotalDays
+    return [int]($utcDay * 1009 + [int][Math]::Floor($utcDay / 397))
+}
+
+function Get-SharpProofCleanFuzzSourceCommit {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $headOutput = @(& git -C $RepositoryRoot rev-parse HEAD)
+    $headExitCode = $LASTEXITCODE
+    $head = if ($headOutput.Count -eq 1) {
+        ([string]$headOutput[0]).Trim()
+    }
+    else {
+        ''
+    }
+    if ($headExitCode -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
+        throw 'Unable to bind fuzz evidence to the exact source commit.'
+    }
+    $dirty = @(& git -C $RepositoryRoot status `
+        --porcelain=v1 --untracked-files=no)
+    if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) {
+        throw 'Fuzz evidence requires a clean tracked repository tree.'
+    }
+    return $head
+}
+
 function Assert-SharpProofFuzzCaseBudget {
     [CmdletBinding()]
     param(
@@ -170,6 +205,48 @@ function Initialize-SharpProofFuzzEvidence {
     }
 }
 
+function Enter-SharpProofFuzzEvidenceLease {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputDirectory,
+
+        [ValidateRange(0, 3600)]
+        [int]$TimeoutSeconds = 120
+    )
+
+    [IO.Directory]::CreateDirectory($OutputDirectory) | Out-Null
+    $lockPath = Join-Path $OutputDirectory '.campaign.lock'
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ($true) {
+        try {
+            # FileShare.None makes the lock a process-held lease over the
+            # whole namespace, including initialization and publication.
+            return [IO.FileStream]::new(
+                $lockPath,
+                [IO.FileMode]::OpenOrCreate,
+                [IO.FileAccess]::ReadWrite,
+                [IO.FileShare]::None)
+        }
+        catch [IO.IOException] {
+            if ([DateTime]::UtcNow -ge $deadline) {
+                throw "Timed out acquiring fuzz evidence lease: $lockPath"
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+}
+
+function Exit-SharpProofFuzzEvidenceLease {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [IO.FileStream]$Lease
+    )
+
+    $Lease.Dispose()
+}
+
 function Publish-SharpProofFuzzEvidence {
     [CmdletBinding()]
     param(
@@ -193,5 +270,26 @@ function Publish-SharpProofFuzzEvidence {
         if ([IO.File]::Exists($temporary)) {
             [IO.File]::Delete($temporary)
         }
+    }
+}
+
+function Complete-SharpProofFuzzEvidence {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [object]$Summary
+    )
+
+    $json = ($Summary | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
+    Write-Output $json
+    Publish-SharpProofFuzzEvidence `
+        -OutputDirectory $OutputDirectory `
+        -Json ($json + "`n")
+    if (-not [bool]$Summary.passed) {
+        $destination = Join-Path $OutputDirectory 'campaign.json'
+        throw "SharpProof fuzz campaign failed. Evidence: $destination"
     }
 }

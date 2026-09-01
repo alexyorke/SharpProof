@@ -13,7 +13,7 @@ namespace SharpProof.Worker.Test;
 public sealed class ExceptionIdentityReplayTests
 {
     [Test]
-    public void AliasedExceptionIdentitiesRemainDistinctWhenEffectReplayIsUnavailable()
+    public void AliasedExceptionIdentitiesRemainDistinctWhileFrameworkThrowsReplay()
     {
         var allowedReference = CreateExceptionReference(
             "Collision.Exceptions",
@@ -50,7 +50,8 @@ public sealed class ExceptionIdentityReplayTests
                     throw new System.InvalidOperationException();
             }
             """,
-            new CSharpParseOptions(LanguageVersion.CSharp12));
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            path: "ExceptionIdentityReplay.cs");
         var compilation = CSharpCompilation.Create(
             "Collision.Consumer",
             [tree],
@@ -158,13 +159,20 @@ public sealed class ExceptionIdentityReplayTests
             Assert.That(aliasedEvidence.Witness, Is.Null);
             Assert.That(
                 frameworkEvidence.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
                 frameworkEvidence.Reason,
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                frameworkEvidence.Witness?.Kind,
+                Is.EqualTo("explicit-throw"));
+            Assert.That(
+                frameworkEvidence.Witness?.ExactExceptionTypeHierarchy,
+                Is.Not.Empty);
+            Assert.That(
+                frameworkEvidence.Replay?.Events.Single().Kind,
                 Is.EqualTo(
-                    WorkerClaimReason.CounterexampleNotReplayable));
-            Assert.That(frameworkEvidence.Witness, Is.Null);
-            Assert.That(frameworkEvidence.Replay, Is.Null);
+                    CompilerEffectReplayEventKind.ExplicitThrow));
         }
 
         const string claimId = "effect-exception-identity";
@@ -219,6 +227,70 @@ public sealed class ExceptionIdentityReplayTests
                 evidence.Evidence,
                 Does.Contain(thrownIdentity));
             Assert.That(result.Model, Is.Empty);
+        }
+    }
+
+    [Test]
+    public void ConstructedGenericExceptionIdentityIncludesArgumentAssembly()
+    {
+        var firstReference = CreateExceptionReference(
+            "Collision.Exceptions",
+            new Version(1, 0, 0, 0),
+            "first");
+        var secondReference = CreateExceptionReference(
+            "Collision.Exceptions",
+            new Version(2, 0, 0, 0),
+            "second");
+        var tree = CSharpSyntaxTree.ParseText(
+            """
+            extern alias first;
+            extern alias second;
+
+            public static class Subject {
+                public static void Compare(
+                    first::Collision.GenericBoomException<
+                        first::Collision.Marker> firstValue,
+                    first::Collision.GenericBoomException<
+                        second::Collision.Marker> secondValue) {
+                }
+            }
+            """,
+            new CSharpParseOptions(LanguageVersion.CSharp12));
+        var compilation = CSharpCompilation.Create(
+            "Generic.Argument.Consumer",
+            [tree],
+            PlatformReferences.Add(firstReference).Add(secondReference),
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var errors = compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        Assert.That(
+            errors,
+            Is.Empty,
+            string.Join(
+                Environment.NewLine,
+                errors.Select(static diagnostic => diagnostic.ToString())));
+
+        var method = compilation.GetTypeByMetadataName("Subject")!
+            .GetMembers("Compare")
+            .OfType<IMethodSymbol>()
+            .Single();
+        var first = (INamedTypeSymbol)method.Parameters[0].Type;
+        var second = (INamedTypeSymbol)method.Parameters[1].Type;
+        var firstIdentity = CompilerExceptionTypeIdentity.Encode(first);
+        var secondIdentity = CompilerExceptionTypeIdentity.Encode(second);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                DocumentationCommentId.CreateReferenceId(first),
+                Is.EqualTo(
+                    DocumentationCommentId.CreateReferenceId(second)));
+            Assert.That(firstIdentity, Is.Not.EqualTo(secondIdentity));
+            Assert.That(firstIdentity, Does.Not.Contain("Version=2.0.0.0"));
+            Assert.That(secondIdentity, Does.Contain("Version=2.0.0.0"));
         }
     }
 
@@ -348,6 +420,9 @@ public sealed class ExceptionIdentityReplayTests
 
                 public sealed class GenericBoomException<T>
                     : System.Exception {
+                }
+
+                public sealed class Marker {
                 }
             }
             """,

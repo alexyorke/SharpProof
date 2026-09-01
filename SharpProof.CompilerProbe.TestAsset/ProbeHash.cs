@@ -14,7 +14,7 @@ internal static class ProbeHash
         return Hex(algorithm.ComputeHash(stream));
     }
 
-    private static string Bytes(byte[] value)
+    internal static string Bytes(byte[] value)
     {
         using var algorithm = SHA256.Create();
         return Hex(algorithm.ComputeHash(value));

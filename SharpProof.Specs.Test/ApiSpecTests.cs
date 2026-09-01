@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -84,6 +85,25 @@ public sealed class ApiSpecTests
                     RuntimeAssemblyIdentity() with {
                         ReferenceFamily = (ApiSpecReferenceFamily)int.MaxValue
                     }
+                ]
+            }
+        };
+
+        Assert.Throws<ArgumentException>(() => ApiSpecTable.Create([declaration]));
+    }
+
+    [Test]
+    public void ApprovedAssemblyTokensAreUniqueIgnoringHexCase()
+    {
+        var declaration = Declaration("duplicate-token", "M:Missing.Row.Run", "Missing.Row");
+        var identity = RuntimeAssemblyIdentity();
+        declaration = declaration with
+        {
+            Target = declaration.Target with
+            {
+                ApprovedAssemblies = [
+                    identity,
+                    identity with { PublicKeyToken = identity.PublicKeyToken.ToUpperInvariant() }
                 ]
             }
         };
@@ -240,6 +260,66 @@ public sealed class ApiSpecTests
     }
 
     [Test]
+    public void ImpossibleConstructorAndPropertyShapesAreRejectedByTheTable()
+    {
+        var constructor = ApiSpecTable.Default.Templates.Single(
+            static row => row.Target.WitnessIdentifier == "bcl.exception.ctor");
+        var property = ApiSpecTable.Default.Templates.Single(
+            static row => row.Target.WitnessIdentifier == "bcl.string.length");
+        var staticConstructor = DeclarationWithTarget(
+            constructor,
+            constructor.Target with
+            {
+                IsStatic = true,
+                ReceiverType = null
+            });
+        var genericProperty = DeclarationWithTarget(
+            property,
+            property.Target with { GenericArity = 1 });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                () => ApiSpecTable.Create([staticConstructor]),
+                Throws.ArgumentException.With.Message.Contains(
+                    "constructors must be instance members"));
+            Assert.That(
+                () => ApiSpecTable.Create([genericProperty]),
+                Throws.ArgumentException.With.Message.Contains(
+                    "properties cannot declare generic arity"));
+        });
+    }
+
+    [Test]
+    public void ResolverDoesNotMatchImpossibleConstructorAndPropertyShapes()
+    {
+        var compilation = CreatePlatformCompilation();
+        var constructor = compilation.GetTypeByMetadataName("System.Exception")!
+            .InstanceConstructors.Single(static method => method.Parameters.Length == 0);
+        var property = compilation.GetSpecialType(SpecialType.System_String)
+            .GetMembers("Length")
+            .OfType<IPropertySymbol>()
+            .Single();
+        var constructorTarget = ApiSpecTable.Default.Templates.Single(
+            static row => row.Target.WitnessIdentifier == "bcl.exception.ctor")
+            .Target with
+        {
+            IsStatic = true,
+            ReceiverType = null
+        };
+        var propertyTarget = ApiSpecTable.Default.Templates.Single(
+            static row => row.Target.WitnessIdentifier == "bcl.string.length")
+            .Target with
+        { GenericArity = 1 };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ResolverMatchesTarget(constructor, constructorTarget), Is.False);
+            Assert.That(ResolverMatchesTarget(property, propertyTarget), Is.False);
+        });
+    }
+
+    [Test]
     public void SharpProofPackageSpecsResolveAgainstGenuineAttributes()
     {
         var reference = MetadataReference.CreateFromFile(
@@ -254,6 +334,39 @@ public sealed class ApiSpecTests
                 resolved.Specs.Single().Template.Target.WitnessIdentifier,
                 Is.EqualTo("contract.requires.test"));
         });
+    }
+
+    [Test]
+    public void AuthenticatedPackageSpecResolutionChecksConditionalElisionShape()
+    {
+        var reference = MetadataReference.CreateFromFile(
+            typeof(Contract).Assembly.Location);
+        var compilation = CSharpCompilation.Create(
+            "AuthenticatedContractSpecConsumer",
+            references: PlatformReferences().Append(reference),
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary));
+        var resolved = new ApiSpecResolver(ApiSpecTable.Create([
+            ContractRequiresDeclaration(string.Empty)
+        ])).Resolve(compilation);
+        var contract = compilation.GetTypeByMetadataName(
+            "SharpProof.Attributes.Contract");
+        var requires = contract!.GetMembers("Requires")
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(resolved.Failures, Is.Empty);
+            Assert.That(resolved.Specs, Has.Length.EqualTo(1));
+            Assert.That(
+                requires.GetAttributes()
+                    .Where(attribute => attribute.AttributeClass?.ToDisplayString() ==
+                        "System.Diagnostics.ConditionalAttribute")
+                    .SelectMany(attribute => attribute.ConstructorArguments)
+                    .Select(argument => argument.Value),
+                Is.EquivalentTo(new object[] { Contract.ConditionalSymbol }));
+        }
     }
 
     [Test]
@@ -693,9 +806,9 @@ public sealed class ApiSpecTests
             .Where(static constructor =>
                 constructor.Parameters.Length == 0 ||
                 constructor.Parameters is [
-                {
-                    Type.SpecialType: SpecialType.System_String
-                }])
+                    {
+                        Type.SpecialType: SpecialType.System_String
+                    }])
             .ToArray();
         var aggregateEnumerable = aggregate.InstanceConstructors.Single(
             static constructor =>
@@ -872,6 +985,28 @@ public sealed class ApiSpecTests
                 new SpecNullnessFacet(SpecNullness.Unknown, evidence),
                 new SpecCardinalityFacet(SpecCardinality.Unknown, null, evidence)),
             []);
+    }
+
+    private static ApiSpecDeclaration DeclarationWithTarget(
+        ApiSpecTemplate template,
+        ApiSpecTarget target)
+    {
+        return new ApiSpecDeclaration(
+            target,
+            template.Facets,
+            [.. template.Postconditions.Select(static postcondition =>
+                new SpecPostconditionDeclaration(
+                    postcondition.Condition,
+                    postcondition.Evidence))]);
+    }
+
+    private static bool ResolverMatchesTarget(ISymbol symbol, ApiSpecTarget target)
+    {
+        var method = typeof(ApiSpecResolver).GetMethod(
+            "MatchesTarget",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.That(method, Is.Not.Null);
+        return (bool)method!.Invoke(null, [symbol, target])!;
     }
 
     private static ApiSpecAssemblyIdentity RuntimeAssemblyIdentity()

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('contract', 'restore', 'build', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
+    [ValidateSet('contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -11,7 +11,11 @@ param(
 
     [string]$PackageSource = '',
 
-    [string]$TestFilter = ''
+    [string]$TestFilter = '',
+
+    [switch]$NoBuild,
+
+    [switch]$Fast
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,10 +35,37 @@ if ($env:SHARPPROOF_CONTAINER -cne '1' -or
     throw 'SharpProof container commands require the canonical container contract.'
 }
 
+if ($NoBuild -and $Command -notin @(
+        'test', 'test-changed', 'semantic-tests', 'portable-tests',
+        'worker-tests', 'package-tests')) {
+    throw (
+        '-NoBuild is supported only for test commands that can reuse an ' +
+        'existing build in the current container workspace.')
+}
+if ($Fast -and $Command -notin @(
+        'test', 'test-changed', 'semantic-tests', 'portable-tests',
+        'worker-tests', 'package-tests')) {
+    throw '-Fast is supported only for non-qualifying test commands.'
+}
+if ($Fast -and $NoBuild) {
+    throw '-Fast and -NoBuild cannot be combined.'
+}
+$fastBuildArguments = if ($Fast) {
+    @('-p:RunAnalyzersDuringBuild=false')
+}
+else {
+    @()
+}
+
 function Invoke-DotNet([string[]]$Arguments) {
-    & dotnet @Arguments
+    $effectiveArguments = @(
+        Add-SharpProofStaticGraphArgument -Arguments $Arguments
+    )
+    & dotnet @effectiveArguments
     if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+        throw (
+            "dotnet $($effectiveArguments -join ' ') failed with exit " +
+            "code $LASTEXITCODE.")
     }
 }
 
@@ -52,6 +83,94 @@ switch ($Command) {
     'build' {
         Invoke-DotNet @('restore', $Target, '--locked-mode')
         Invoke-DotNet @('build', $Target, '--configuration', $Configuration, '--no-restore')
+    }
+    'self-apply' {
+        $trackedProjects = @(
+            & git -C $repositoryRoot ls-files -- '*.csproj' |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                ForEach-Object {
+                    Join-Path $repositoryRoot $_
+                } |
+                Sort-Object
+        )
+        if ($LASTEXITCODE -ne 0 -or $trackedProjects.Count -eq 0) {
+            throw 'self-apply requires a Git-backed repository with tracked project files.'
+        }
+
+        $sourceProjects = @(
+            $trackedProjects |
+                Where-Object {
+                    $relative = [IO.Path]::GetRelativePath(
+                        $repositoryRoot, $_).Replace('\', '/')
+                    $relative -notlike 'samples/*' -and
+                        $relative -notlike 'eng/pilots/*'
+                }
+        )
+        if ($sourceProjects.Count -eq 0) {
+            throw 'self-apply found no source-tree projects to analyze.'
+        }
+
+        # Build the complete source tree once with the self lane disabled so
+        # every analyzer and generator output is available as a stable input.
+        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
+        Invoke-DotNet @(
+            'build', 'SharpProof.sln', '--configuration', $Configuration,
+            '--no-restore', '--nologo',
+            '-p:SharpProofSelfApplication=false',
+            '-p:SharpProofProfile=off',
+            '-p:SharpProofVerify=false',
+            '-p:GeneratePackageOnBuild=false')
+
+        $ordinal = 0
+        foreach ($project in $sourceProjects) {
+            $ordinal++
+            Write-Host ("Self-applying SharpProof ({0}/{1}): {2}" -f
+                $ordinal, $sourceProjects.Count,
+                [IO.Path]::GetRelativePath($repositoryRoot, $project))
+            Invoke-DotNet @(
+                'build', $project, '--configuration', $Configuration,
+                '--no-restore', '--no-dependencies', '--nologo',
+                '-p:SharpProofSelfApplication=true',
+                '-p:SharpProofProfile=advisory',
+                '-p:SharpProofFeatures=all',
+                '-p:SharpProofVerify=false',
+                '-p:GeneratePackageOnBuild=false')
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($PackageSource)) {
+            # The source self-application builds can leave Roslyn's shared
+            # compiler server holding source-built analyzer load contexts.
+            # Stop it before package pilots so the package lane observes only
+            # the candidate analyzer payload.
+            Invoke-DotNet @('build-server', 'shutdown')
+            $resolvedPackageSource = if ([IO.Path]::IsPathRooted($PackageSource)) {
+                [IO.Path]::GetFullPath($PackageSource)
+            }
+            else {
+                [IO.Path]::GetFullPath(
+                    (Join-Path $repositoryRoot $PackageSource))
+            }
+            if (-not (Test-Path -LiteralPath $resolvedPackageSource -PathType Container)) {
+                throw "self-apply package source is missing: '$resolvedPackageSource'."
+            }
+            & (Join-Path $repositoryRoot 'scripts/Test-SharpProofPilots.ps1') `
+                -PackageSource $resolvedPackageSource
+            if ($LASTEXITCODE -ne 0) {
+                throw 'SharpProof self-application pilot validation failed.'
+            }
+        }
+
+        # Package-backed samples exercise the same analyzer payload through
+        # the supported package-consumer path.  The sample harness creates and
+        # cleans its own isolated local feed and temporary build roots.  Keep
+        # this after pilots because its pack restores may update lock files in
+        # the disposable checkout, which would violate the pilot clean guard.
+        & (Join-Path $repositoryRoot 'scripts/Test-SharpProofSamples.ps1') `
+            -Configuration $Configuration `
+            -ExpectedSmt Required
+        if ($LASTEXITCODE -ne 0) {
+            throw 'SharpProof self-application sample validation failed.'
+        }
     }
     'check' {
         & (Join-Path $repositoryRoot 'scripts/Invoke-SharpProofDevCheck.ps1') `
@@ -86,18 +205,62 @@ switch ($Command) {
             '--no-build', '--no-restore',
             '--filter',
             'FullyQualifiedName~ForcedTerminationDeadlineIsStableAcrossLaunches')
-        Invoke-DotNet @(
-            'test', 'SharpProof.Dev.Tests.slnf',
-            '--configuration', $Configuration,
-            '--no-build', '--no-restore',
-            "/m:$testProjectParallelism",
-            '--filter',
-            'TestCategory!=Performance&TestCategory!=Coverage')
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofSemanticTests.ps1') `
+            -Configuration $Configuration `
+            -NoBuild `
+            -TestFilter (
+                'TestCategory!=Performance&TestCategory!=Coverage&' +
+                'TestCategory!=Corpus')
+        if ($LASTEXITCODE -ne 0) {
+            throw 'PR semantic validation failed.'
+        }
+
+        & (Join-Path $repositoryRoot `
+            'scripts/Invoke-SharpProofPackageTests.ps1') `
+            -Configuration $Configuration `
+            -NoBuild `
+            -TestFilter (
+                'TestCategory!=Performance&TestCategory!=Coverage&' +
+                'TestCategory!=Corpus')
+        if ($LASTEXITCODE -ne 0) {
+            throw 'PR package validation failed.'
+        }
     }
     'test' {
-        Invoke-DotNet @('restore', $Target, '--locked-mode')
+        $directProjectTest =
+            $Target.EndsWith(
+                '.csproj', [StringComparison]::OrdinalIgnoreCase) -and
+            [IO.Path]::GetFileName($Target) -cne
+                'SharpProof.Package.Test.csproj'
+        if ($directProjectTest) {
+            if (-not $NoBuild) {
+                Invoke-DotNet @('restore', $Target, '--locked-mode')
+                $directProjectBuildArguments = @(
+                    'build', $Target, '--configuration', $Configuration,
+                    '--no-restore')
+                $directProjectBuildArguments += $fastBuildArguments
+                Invoke-DotNet $directProjectBuildArguments
+            }
+            $assembly = Get-SharpProofTestAssemblyPath `
+                -ProjectPath $Target `
+                -Configuration $Configuration
+            $arguments = @('vstest', $assembly)
+            if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+                $arguments += '/TestCaseFilter:' + $TestFilter
+            }
+            Invoke-DotNet $arguments
+            break
+        }
+        if (-not $NoBuild) {
+            Invoke-DotNet @('restore', $Target, '--locked-mode')
+        }
         $arguments = @(
             'test', $Target, '--configuration', $Configuration, '--no-restore')
+        $arguments += $fastBuildArguments
+        if ($NoBuild) {
+            $arguments += '--no-build'
+        }
         if ($Target.EndsWith('.sln', [StringComparison]::OrdinalIgnoreCase) -or
             $Target.EndsWith('.slnf', [StringComparison]::OrdinalIgnoreCase)) {
             $arguments += "/m:$testProjectParallelism"
@@ -108,43 +271,91 @@ switch ($Command) {
         Invoke-DotNet $arguments
     }
     'test-changed' {
+        $changedArguments = @{
+            Configuration = $Configuration
+        }
+        if ($NoBuild) {
+            $changedArguments.NoBuild = $true
+        }
+        if ($Fast) {
+            $changedArguments.Fast = $true
+        }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofChangedTests.ps1') `
-            -Configuration $Configuration
+            @changedArguments
     }
     'semantic-tests' {
+        $semanticArguments = @{
+            Configuration = $Configuration
+        }
+        if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+            $semanticArguments.TestFilter = $TestFilter
+        }
+        if ($NoBuild) {
+            $semanticArguments.NoBuild = $true
+        }
+        if ($Fast) {
+            $semanticArguments.Fast = $true
+        }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofSemanticTests.ps1') `
-            -Configuration $Configuration
+            @semanticArguments
     }
     'portable-tests' {
         $target = 'SharpProof.Portable.Tests.slnf'
-        Invoke-DotNet @('restore', $target, '--locked-mode')
+        if (-not $NoBuild) {
+            Invoke-DotNet @('restore', $target, '--locked-mode')
+        }
         $arguments = @(
             'test', $target, '--configuration', $Configuration,
             '--no-restore', "/m:$testProjectParallelism")
+        $arguments += $fastBuildArguments
+        if ($NoBuild) {
+            $arguments += '--no-build'
+        }
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
             $arguments += @('--filter', $TestFilter)
         }
         Invoke-DotNet $arguments
     }
     'worker-tests' {
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
-        $arguments = @(
-            'test',
-            'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj',
-            '--configuration', $Configuration, '--no-restore')
+        $workerTestProject =
+            'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj'
+        if (-not $NoBuild) {
+            Invoke-DotNet @(
+                'restore',
+                $workerTestProject,
+                '--locked-mode')
+            $directWorkerTestArguments = @(
+                'build', $workerTestProject,
+                '--configuration', $Configuration, '--no-restore')
+            $directWorkerTestArguments += $fastBuildArguments
+            Invoke-DotNet $directWorkerTestArguments
+        }
+        $assembly = Get-SharpProofTestAssemblyPath `
+            -ProjectPath $workerTestProject `
+            -Configuration $Configuration
+        $arguments = @('vstest', $assembly)
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $arguments += @('--filter', $TestFilter)
+            $arguments += '/TestCaseFilter:' + $TestFilter
         }
         Invoke-DotNet $arguments
     }
     'package-tests' {
+        $packageArguments = @{
+            Configuration = $Configuration
+            TestFilter = $TestFilter
+            PackageSource = $PackageSource
+        }
+        if ($NoBuild) {
+            $packageArguments.NoBuild = $true
+        }
+        if ($Fast) {
+            $packageArguments.Fast = $true
+        }
         & (Join-Path `
             $repositoryRoot 'scripts/Invoke-SharpProofPackageTests.ps1') `
-            -Configuration $Configuration `
-            -TestFilter $TestFilter `
-            -PackageSource $PackageSource
+            @packageArguments
         if ($LASTEXITCODE -ne 0) { throw 'Package tests failed.' }
     }
     'package-consumers' {

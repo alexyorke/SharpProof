@@ -179,7 +179,8 @@ internal static class CompilerLoweredArtifact
                     call,
                     item.Result,
                     item.ExistentialVariables,
-                    item.NormalRelation)
+                    item.NormalRelation,
+                    item.DependencyEvidence)
             };
         }
     }
@@ -202,6 +203,8 @@ internal static class CompilerLoweredArtifact
                 CompilerScalarDomain.Int,
             { Minimum: uint.MinValue, Maximum: uint.MaxValue } =>
                 CompilerScalarDomain.UInt,
+            { Minimum: long.MinValue, Maximum: long.MaxValue } =>
+                CompilerScalarDomain.Long,
             _ => throw new InvalidDataException(
                 "A compiler integer interval is not a primitive scalar domain.")
         };
@@ -209,8 +212,10 @@ internal static class CompilerLoweredArtifact
     internal static ImmutableArray<CompilerCallablePreparation> Decode(
         CompilerCallableArtifact[] artifacts,
         WorkerClaimManifest manifest,
-        CompilerCompilationSnapshot compilation)
+        CompilerCompilationSnapshot compilation,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (artifacts == null)
         {
             throw new InvalidDataException("The lowered callable payload is missing.");
@@ -221,6 +226,7 @@ internal static class CompilerLoweredArtifact
             throw new InvalidDataException("The compiler compilation evidence is missing.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var callables = manifest.Callables.ToDictionary(static item => item.CallableId, StringComparer.Ordinal);
         var claims = manifest.Claims.GroupBy(static item => item.CallableId)
             .ToDictionary(static group => group.Key,
@@ -236,6 +242,7 @@ internal static class CompilerLoweredArtifact
         var result = ImmutableArray.CreateBuilder<CompilerCallablePreparation>(artifacts.Length);
         foreach (var artifact in artifacts.OrderBy(static item => item.CallableId, StringComparer.Ordinal))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var entry = callables[artifact.CallableId];
             var targetClaims = claims.TryGetValue(artifact.CallableId, out var rows) ? rows : [];
             if (!entry.ClaimIds.SequenceEqual(targetClaims.Select(static item => item.ClaimId), StringComparer.Ordinal))
@@ -243,16 +250,24 @@ internal static class CompilerLoweredArtifact
                 throw new InvalidDataException("A lowered callable claim list does not equal the manifest.");
             }
 
-            result.Add(Decode(artifact, entry, targetClaims, compilation));
+            result.Add(Decode(
+                artifact,
+                entry,
+                targetClaims,
+                compilation,
+                cancellationToken));
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return result.MoveToImmutable();
     }
     private static CompilerCallablePreparation Decode(
         CompilerCallableArtifact artifact,
         WorkerCallableManifestEntry entry,
         ImmutableArray<WorkerClaimManifestEntry> claims,
-        CompilerCompilationSnapshot compilation)
+        CompilerCompilationSnapshot compilation,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (artifact.FailureReason !=
                 CompilerCallableArtifactReasonCatalog.SuccessReason &&
             !CompilerCallableArtifactReasonCatalog.IsFailureReason(
@@ -273,7 +288,11 @@ internal static class CompilerLoweredArtifact
             return new CompilerCallablePreparation(
                 new IrFactory(), entry, [], [], artifact.FailureReason, null)
             {
-                EffectClaims = DecodeEffects(artifact, claims, compilation),
+                EffectClaims = DecodeEffects(
+                    artifact,
+                    claims,
+                    compilation,
+                    cancellationToken),
                 Compilation = compilation
             };
         }
@@ -284,7 +303,9 @@ internal static class CompilerLoweredArtifact
 
         var decoded = PortableIrGraphCodec.Decode(
             artifact.Graph,
-            ExternalVariableIndices(artifact));
+            ExternalVariableIndices(artifact),
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         var summaryRootCount = artifact.Body?.SummaryCalls?.Length ?? 0;
         if (decoded.Roots.Count != artifact.Clauses.Length + summaryRootCount)
         {
@@ -304,6 +325,7 @@ internal static class CompilerLoweredArtifact
 
         var clauses = artifact.Clauses.Select((row, index) =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (row == null ||
                 !Enum.IsDefined(typeof(CompilerContractKind), row.Kind) ||
                 !Enum.IsDefined(typeof(CompilerContractEvidence), row.Evidence) || row.Root != index ||
@@ -315,7 +337,19 @@ internal static class CompilerLoweredArtifact
                 throw new InvalidDataException("A lowered contract clause is invalid.");
             }
 
-            var clause = new CompilerPreparedClause(row.Kind, Root(row.Root), row.Evidence, row.ClaimId, row.AssumptionId);
+            var condition = Root(row.Root);
+            if (condition.Type != decoded.Factory.BooleanType)
+            {
+                throw new InvalidDataException(
+                    "A lowered contract predicate is not Boolean.");
+            }
+
+            var clause = new CompilerPreparedClause(
+                row.Kind,
+                condition,
+                row.Evidence,
+                row.ClaimId,
+                row.AssumptionId);
             if (row.PredicateSha256 != PredicateSha256(decoded.Factory, clause))
             {
                 throw new InvalidDataException("A lowered contract predicate does not equal its compiler inventory.");
@@ -323,6 +357,7 @@ internal static class CompilerLoweredArtifact
 
             return clause;
         }).ToImmutableArray();
+        cancellationToken.ThrowIfCancellationRequested();
         var postconditionClaims = claims.Where(static item => item.Kind == WorkerClaimKind.Postcondition).ToArray();
         var loweredClaims = clauses.Where(static item => item.Kind == CompilerContractKind.Ensures).ToArray();
         if (loweredClaims.Length != postconditionClaims.Length ||
@@ -349,6 +384,7 @@ internal static class CompilerLoweredArtifact
 
         var variables = artifact.Variables.Select(row =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (row == null ||
                 !Enum.IsDefined(typeof(CompilerVariableRole), row.Role) ||
                 row.Minimum.HasValue != row.Maximum.HasValue ||
@@ -363,7 +399,9 @@ internal static class CompilerLoweredArtifact
                 ? new CompilerIntegerInterval(row.Minimum.Value, row.Maximum!.Value) : null;
             return new CompilerCanonicalVariable(row.Role, row.Ordinal, variable, current, interval, row.ModelLabel);
         }).ToImmutableArray();
+        cancellationToken.ThrowIfCancellationRequested();
         ValidateVariables(decoded.Factory, variables, artifact.Variables);
+        cancellationToken.ThrowIfCancellationRequested();
         var body = DecodeBody(
             artifact.Body,
             artifact.Graph,
@@ -371,6 +409,7 @@ internal static class CompilerLoweredArtifact
             variables,
             artifact.Clauses.Length,
             compilation);
+        cancellationToken.ThrowIfCancellationRequested();
         if (postconditionClaims.Length != 0 && body == null)
         {
             throw new InvalidDataException(
@@ -379,7 +418,11 @@ internal static class CompilerLoweredArtifact
         return new CompilerCallablePreparation(
             decoded.Factory, entry, clauses, variables, WorkerClaimReason.None, body)
         {
-            EffectClaims = DecodeEffects(artifact, claims, compilation),
+            EffectClaims = DecodeEffects(
+                artifact,
+                claims,
+                compilation,
+                cancellationToken),
             Compilation = compilation
         };
     }
@@ -429,8 +472,10 @@ internal static class CompilerLoweredArtifact
     private static ImmutableArray<CompilerEffectClaimArtifact> DecodeEffects(
         CompilerCallableArtifact artifact,
         ImmutableArray<WorkerClaimManifestEntry> claims,
-        CompilerCompilationSnapshot compilation)
+        CompilerCompilationSnapshot compilation,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (artifact.EffectClaims == null)
         {
             throw new InvalidDataException("Compiler effect-claim evidence is missing.");
@@ -454,6 +499,7 @@ internal static class CompilerLoweredArtifact
 
         for (var index = 0; index < expected.Length; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var evidence = artifact.EffectClaims[index];
             var authority = artifact.EffectAuthorities[index];
             CompilerEffectClaimArtifactCodec.Validate(evidence, compilation);
@@ -473,6 +519,7 @@ internal static class CompilerLoweredArtifact
                     "Compiler effect evidence does not equal its compiler authority.");
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
         return [.. artifact.EffectClaims];
     }
     private static void ValidateVariables(
@@ -551,7 +598,8 @@ internal static class CompilerLoweredArtifact
     {
         return (value.Minimum, value.Maximum) is
         (sbyte.MinValue, sbyte.MaxValue) or (byte.MinValue, byte.MaxValue) or (short.MinValue, short.MaxValue) or
-        (ushort.MinValue, ushort.MaxValue) or (int.MinValue, int.MaxValue) or (uint.MinValue, uint.MaxValue);
+        (ushort.MinValue, ushort.MaxValue) or (int.MinValue, int.MaxValue) or (uint.MinValue, uint.MaxValue) or
+        (long.MinValue, long.MaxValue);
     }
 
     private static CompilerPreparedBody? DecodeBody(
@@ -763,12 +811,13 @@ internal static class CompilerLoweredArtifact
                     result,
                     existentials,
                     relation) ||
-                summary.InstantiationSha256 != SummaryInstantiationSha256(
+            summary.InstantiationSha256 != SummaryInstantiationSha256(
                     graph.Factory,
                     call,
                     result,
                     existentials,
-                    relation))
+                    relation,
+                    summary.DependencyEvidence))
             {
                 throw new InvalidDataException(
                     "A lowered source-call relation is invalid.");
@@ -843,7 +892,8 @@ internal static class CompilerLoweredArtifact
         IrCallInstruction call,
         IrVarId result,
         IReadOnlyList<IrVarId> existentials,
-        IrTerm relation)
+        IrTerm relation,
+        object dependencyEvidence)
     {
         var roots = new List<IrTerm>(
             (call.Receiver == null ? 0 : 1) +
@@ -868,6 +918,9 @@ internal static class CompilerLoweredArtifact
             .Add(existentials.Count)
             .Add(JsonSerializer.SerializeToUtf8Bytes(
                 graph,
+                WorkerProtocolJson.Options))
+            .Add(JsonSerializer.SerializeToUtf8Bytes(
+                dependencyEvidence,
                 WorkerProtocolJson.Options))
             .Finish();
     }

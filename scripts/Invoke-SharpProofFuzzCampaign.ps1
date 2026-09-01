@@ -25,11 +25,14 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $resolvedOutput = Resolve-SharpProofContainedPath `
     -Root $repositoryRoot -Path $OutputDirectory `
     -ParameterName 'OutputDirectory'
+$logicalOutput = [IO.Path]::GetRelativePath(
+    $repositoryRoot,
+    [IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDirectory))).Replace('\', '/')
+$evidenceLease = Enter-SharpProofFuzzEvidenceLease `
+    -OutputDirectory $resolvedOutput
 Initialize-SharpProofFuzzEvidence -OutputDirectory $resolvedOutput
-$sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
-    throw 'Unable to bind fuzz evidence to the exact source commit.'
-}
+$sourceCommit = Get-SharpProofCleanFuzzSourceCommit `
+    -RepositoryRoot $repositoryRoot
 $contract = Get-Content `
     -LiteralPath (Join-Path $repositoryRoot 'eng\acceptance\contract.json') `
     -Raw |
@@ -43,9 +46,11 @@ $retained = Read-SharpProofRetainedFuzzSeedManifest `
     -Path $retainedManifestPath
 $retainedSeeds = @($retained.Seeds)
 if (-not $PSBoundParameters.ContainsKey('RotatingSeed')) {
-    $RotatingSeed = [int][DateTime]::UtcNow.ToString(
-        'yyyyMMdd',
-        [Globalization.CultureInfo]::InvariantCulture)
+    # FuzzRunner advances each case seed by 397.  A calendar-shaped seed
+    # (yyyyMMdd) therefore causes dates 397 days apart to replay the same
+    # sequence.  Use a monotonic day number with a small quotient term so
+    # those campaign offsets are not congruent modulo the case stride.
+    $RotatingSeed = Get-SharpProofRotatingSeed -UtcDate ([DateTime]::UtcNow)
 }
 $effectiveRotatingCases = if ($RotatingCases -gt 0) {
     $RotatingCases
@@ -63,14 +68,86 @@ $maximumCampaignCases = Assert-SharpProofFuzzCaseBudget `
     -Value $contract.fuzz.maximumCampaignCases `
     -Name 'contract.fuzz.maximumCampaignCases'
 $retainedRunSeeds = @($retainedSeeds | Where-Object {
-        [int]$_ -ne $RotatingSeed -or
-        $effectiveRotatingCases -lt $effectiveRetainedCases
+        # Both runners start at case zero.  Replaying a retained seed that
+        # matches the rotating seed would therefore duplicate its prefix when
+        # the rotating run is shorter than the retained run.
+        [int]$_ -ne $RotatingSeed
     })
 $requestedCampaignCases = Assert-SharpProofFuzzCampaignBudget `
     -RotatingCases $effectiveRotatingCases `
     -RetainedCases $effectiveRetainedCases `
     -RetainedRunCount $retainedRunSeeds.Count `
     -MaximumCases $maximumCampaignCases
+$dotnetWrapper = Join-Path `
+    $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+$fuzzProject = Join-Path `
+    $repositoryRoot 'Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj'
+
+function Invoke-BoundedDotnetProcess {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$DotnetArguments,
+
+        [string]$StandardOutput = '',
+
+        [string]$StandardError = ''
+    )
+
+    $quotedArguments = @(
+        $DotnetArguments |
+            ForEach-Object {
+                "'" + ([string]$_).Replace("'", "''") + "'"
+            }
+    ) -join ','
+    $escapedWrapper = $dotnetWrapper.Replace("'", "''")
+    $command = (
+        "& '$escapedWrapper' -TimeoutSeconds " +
+        [string]$contract.worker.maximumProjectWallSeconds +
+        " @($quotedArguments); exit " + '$LASTEXITCODE')
+    $encodedCommand = [Convert]::ToBase64String(
+        [Text.Encoding]::Unicode.GetBytes($command))
+    $startParameters = @{
+        FilePath = 'pwsh'
+        ArgumentList = @(
+            '-NoLogo', '-NoProfile', '-EncodedCommand', $encodedCommand)
+        WorkingDirectory = $repositoryRoot
+        Wait = $true
+        PassThru = $true
+    }
+    if (-not [string]::IsNullOrWhiteSpace($StandardOutput)) {
+        $startParameters.RedirectStandardOutput = $StandardOutput
+    }
+    if (-not [string]::IsNullOrWhiteSpace($StandardError)) {
+        $startParameters.RedirectStandardError = $StandardError
+    }
+    return Start-Process @startParameters
+}
+
+$buildProcess = Invoke-BoundedDotnetProcess -DotnetArguments @(
+    'build',
+    $fuzzProject,
+    '-c',
+    'Release',
+    '--no-restore',
+    '--no-incremental',
+    '--nologo')
+if ($buildProcess.ExitCode -ne 0) {
+    throw "SharpProof fuzz runner rebuild failed with code $($buildProcess.ExitCode)."
+}
+$builtCommit = Get-SharpProofCleanFuzzSourceCommit `
+    -RepositoryRoot $repositoryRoot
+if ($builtCommit -cne $sourceCommit) {
+    throw 'Fuzz source changed while rebuilding the runner.'
+}
+$runnerAssembly = Join-Path $repositoryRoot `
+    'Tools\SharpProof.Fuzz\bin\Release\net9.0\SharpProof.Fuzz.dll'
+if (-not (Test-Path -LiteralPath $runnerAssembly -PathType Leaf)) {
+    throw 'The rebuilt fuzz runner assembly is missing.'
+}
+$runnerSha256 = (Get-FileHash `
+    -LiteralPath $runnerAssembly `
+    -Algorithm SHA256).Hash.ToLowerInvariant()
+
 function Invoke-FuzzRun {
     param(
         [Parameter(Mandatory = $true)]
@@ -85,11 +162,10 @@ function Invoke-FuzzRun {
 
     $standardOutput = Join-Path $resolvedOutput "$Name.stdout.json"
     $standardError = Join-Path $resolvedOutput "$Name.stderr.txt"
-    $wrapper = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
     $dotnetArguments = @(
         'run',
         '--project',
-        (Join-Path $repositoryRoot 'Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj'),
+        $fuzzProject,
         '-c',
         'Release',
         '--no-build',
@@ -101,33 +177,10 @@ function Invoke-FuzzRun {
         '--max-parallelism',
         [string]$contract.fuzz.maximumParallelism
     )
-    $quotedArguments = @(
-        $dotnetArguments |
-            ForEach-Object {
-                "'" + ([string]$_).Replace("'", "''") + "'"
-            }
-    ) -join ','
-    $escapedWrapper = $wrapper.Replace("'", "''")
-    $command = (
-        "& '$escapedWrapper' -TimeoutSeconds " +
-        [string]$contract.worker.maximumProjectWallSeconds +
-        " @($quotedArguments); exit " + '$LASTEXITCODE')
-    $encodedCommand = [Convert]::ToBase64String(
-        [Text.Encoding]::Unicode.GetBytes($command))
-    $arguments = @(
-        '-NoLogo',
-        '-NoProfile',
-        '-EncodedCommand',
-        $encodedCommand
-    )
-    $process = Start-Process `
-        -FilePath 'pwsh' `
-        -ArgumentList $arguments `
-        -WorkingDirectory $repositoryRoot `
-        -Wait `
-        -PassThru `
-        -RedirectStandardOutput $standardOutput `
-        -RedirectStandardError $standardError
+    $process = Invoke-BoundedDotnetProcess `
+        -DotnetArguments $dotnetArguments `
+        -StandardOutput $standardOutput `
+        -StandardError $standardError
     $validationError = $null
     $observedCases = 0
     $agreements = 0
@@ -170,12 +223,8 @@ function Invoke-FuzzRun {
         validationPassed = $null -eq $validationError
         validationError = $validationError
         resultSha256 = $resultSha256
-        standardOutput = [IO.Path]::GetRelativePath(
-            $repositoryRoot,
-            $standardOutput).Replace('\', '/')
-        standardError = [IO.Path]::GetRelativePath(
-            $repositoryRoot,
-            $standardError).Replace('\', '/')
+        standardOutput = "$logicalOutput/$Name.stdout.json"
+        standardError = "$logicalOutput/$Name.stderr.txt"
     }
 }
 
@@ -190,12 +239,22 @@ foreach ($seed in $retainedRunSeeds) {
         -Cases $effectiveRetainedCases `
         -Seed ([int]$seed)))
 }
+$completedCommit = Get-SharpProofCleanFuzzSourceCommit `
+    -RepositoryRoot $repositoryRoot
+$completedRunnerSha256 = (Get-FileHash `
+    -LiteralPath $runnerAssembly `
+    -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($completedCommit -cne $sourceCommit -or
+    $completedRunnerSha256 -cne $runnerSha256) {
+    throw 'Fuzz source or runner identity changed during the campaign.'
+}
 $summary = [pscustomobject][ordered]@{
-    schemaVersion = 3
+    schemaVersion = 4
     status = if (@($runs | Where-Object {
                 $_.exitCode -ne 0 -or -not $_.validationPassed
             }).Count -eq 0) { 'passed' } else { 'failed' }
     commit = $sourceCommit
+    runnerSha256 = $runnerSha256
     rotatingSeed = $RotatingSeed
     rotatingCases = $effectiveRotatingCases
     retainedCasesPerSeed = $effectiveRetainedCases
@@ -209,12 +268,7 @@ $summary = [pscustomobject][ordered]@{
             $_.exitCode -ne 0 -or -not $_.validationPassed
         }).Count -eq 0
 }
-$summaryPath = Join-Path $resolvedOutput 'campaign.json'
-$json = ($summary | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
-$summary | ConvertTo-Json -Depth 6
-if (-not $summary.passed) {
-    throw "SharpProof fuzz campaign failed. Evidence: $summaryPath"
-}
-Publish-SharpProofFuzzEvidence `
+Complete-SharpProofFuzzEvidence `
     -OutputDirectory $resolvedOutput `
-    -Json ($json + "`n")
+    -Summary $summary
+Exit-SharpProofFuzzEvidenceLease -Lease $evidenceLease

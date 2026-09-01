@@ -42,11 +42,21 @@ Use the short `sp` command inside the container:
 sp test-changed
 sp check
 sp build
+sp self-apply
+sp self-apply -Configuration Release -PackageSource artifacts/container-packages
 sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj
+sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -Fast
+sp test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -NoBuild
+sp test-changed -Fast
+sp test-changed -NoBuild
 sp semantic-tests
+sp semantic-tests -NoBuild
 sp portable-tests
+sp portable-tests -NoBuild
 sp worker-tests
+sp worker-tests -NoBuild
 sp package-tests
+sp package-tests -NoBuild
 sp corpus -Configuration Release
 sp coverage
 sp mutation -Configuration Release
@@ -55,7 +65,16 @@ sp acceptance -Configuration Release
 
 Use `sp test-changed` during an edit loop. It derives the affected test-project
 closure from Git and project references.
-The default Debug check performs one Debug solution build, one additional Debug package-test build, and 3 build-capable Release pack commands.
+Use `-Fast` while iterating on code. It asks Roslyn to skip diagnostic-analyzer
+execution for that build while still compiling and running the selected tests.
+It is non-qualifying: run the same command without `-Fast`, or run `sp check`,
+before delivery. Roslyn records the skipped-analyzer build so a later normal
+build reruns analyzers even when outputs are otherwise up to date. `-Fast` and
+`-NoBuild` are mutually exclusive.
+After a matching build, `sp test-changed -NoBuild` reuses the existing output
+trees and skips both restore and compilation; use the normal command whenever
+source, project, or configuration changes require a rebuild.
+The default Debug check concurrently performs one Debug solution build and one Release package-product build, then runs 3 Release pack commands with `--no-build`.
 The Release check performs one Release solution build and 3 Release pack commands with `--no-build`.
 Both run
 duration-aware semantic, Worker, and package shards plus a short performance
@@ -63,11 +82,76 @@ smoke. The exact release performance protocol remains part of `sp acceptance`;
 trusted mutations remain a separate exact-commit gate.
 
 The permanent `dev` service retains `bin` and `obj`, MSBuild nodes, and
-Roslyn's compiler server. A no-change rebuild is therefore incremental.
+Roslyn's compiler server. It also enables the opt-in MSBuild server, whose
+evaluation cache remains warm between closely spaced commands. A no-change
+rebuild is therefore incremental and avoids repeatedly starting MSBuild.
 Finite `docker compose run --rm tooling ...` commands materialize the current
 source snapshot in a private temporary workspace and pay a cold build; use them
 for qualification, not for every edit. `contract`, `build`, and ordinary test
 commands work when the source directory came from an archive without `.git`.
+
+For a host-edited Git checkout, the separate `loop` service provides the same
+warm-build behavior without writing Linux outputs into the host tree:
+
+```text
+docker compose up -d loop
+docker compose exec loop sharpproof-loop test-changed -Fast
+docker compose exec loop sharpproof-loop test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -Fast
+```
+
+When PowerShell and Git are available on the host, use the optional snapshot
+wrapper for the shortest host-edited cycle:
+
+```powershell
+pwsh -File scripts/Invoke-SharpProofLoop.ps1 test-changed -Fast
+pwsh -File scripts/Invoke-SharpProofLoop.ps1 test -Target SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj -Fast
+```
+
+The wrapper captures the Git patch and untracked files on the host, where Git
+can scan the checkout quickly, and passes that bounded snapshot to the private
+Linux workspace. The regular `sharpproof-loop` command remains the portable
+fallback when host Git is unavailable.
+
+The private clone uses `SHARPPROOF_ORIGIN_URL` (the public SharpProof origin by
+default), so local Release builds retain the same Source Link identity as
+disposable qualification builds. Keep that override credential-free.
+
+Each `sharpproof-loop` command mirrors the current tracked and non-ignored
+untracked source into a private Compose volume, then runs `sp` there. The mirror
+keeps `bin`, `obj`, MSBuild and Roslyn compiler servers, and package caches
+between commands. A
+non-blocking workspace lock rejects overlapping commands, so multiple agents
+cannot corrupt the shared incremental outputs. Use a distinct
+`COMPOSE_PROJECT_NAME` for an independent checkout or independent build lane.
+The loop source must be a Git checkout that is directly visible inside Docker;
+use the ordinary persistent Dev Container for a linked Git worktree whose
+administrative Git directory is outside the mounted checkout. The loop volume
+is a disposable mirror: edit and commit only in the host checkout. Continue to
+use finite `tooling` containers for final qualification.
+
+After a completed build in the permanent workspace, `sp worker-tests -NoBuild`
+reuses those outputs and skips the restore/build phase for fast filtered runs.
+Use the normal `sp worker-tests` command after source, project, or configuration
+changes so the Worker dependency closure is rebuilt.
+The same `-NoBuild` fast path is available on `sp test`, `sp semantic-tests`,
+`sp portable-tests`, and `sp package-tests`; use it only when the matching
+configuration and package outputs already exist in this workspace.
+For a single test project, `sp test` performs the required incremental build
+and then runs the built assembly directly through VSTest, avoiding a second
+MSBuild project-graph evaluation. `-NoBuild` skips that build as well.
+`sp worker-tests` uses the same build-then-VSTest path.
+`sp test-changed` also uses it when the dependency analysis selects exactly
+one test project. When that project is `SharpProof.ArchitectureTest`, it reuses
+the semantic runner's duration-aware architecture-fixture sharding instead of
+running the repository-wide checks serially in one test process.
+Non-coverage semantic shards and ordinary package shards use the same
+direct-assembly path. Package process-containment postflight shards retain the
+project-aware runner and run exclusively after the parallel wave. The generic
+single-project command also retains the project-aware runner for
+`SharpProof.Package.Test` because callers can select those containment tests.
+Coverage keeps the project-aware runner so each shard can receive isolated
+instrumented outputs. Solution commands retain their project-aware runner
+because they coordinate multiple outputs.
 Commands that compare revisions or certify exact-commit evidence (`test-changed`,
 acceptance, mutation, packaging, pilots, fuzz, coverage, and release commands)
 require a Git-backed source workspace. Start the persistent Dev Container to
@@ -76,15 +160,31 @@ obtain that workspace using container Git; Git remains unnecessary on the host.
 `portable-tests`, broad coverage, and acceptance run independent test projects
 through MSBuild's project scheduler.
 
-The default container budget is 16 CPUs and 40960 MiB.
-Test-project concurrency uses 8 lanes (one lane per 2 CPUs).
+Containers use all CPUs available to Docker and up to 40960 MiB by default.
+Semantic-test scheduling uses every container-visible CPU.
+Set `SHARPPROOF_SEMANTIC_TEST_PARALLELISM` to cap it between 1 and the visible CPU count.
+The persistent workspace serializes commands.
+Package integration tests use 75% of container-visible CPU lanes by default.
+Other test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
+Parallel prerequisite builds use 75% of container-visible CPU lanes by default.
+Finite task workspaces use an 8 GiB `/tmp` tmpfs by default, keeping source
+snapshots, compiler scratch, and test outputs off the host filesystem. Set
+`SHARPPROOF_TMPFS_SIZE` higher for unusually large package or coverage runs.
 Trusted mutations use 4 deterministic weighted lanes. Worker fixtures and
 package integration methods run in isolated duration-weighted processes.
 Override the
 Docker budget with
 `SHARPPROOF_CONTAINER_CPU_LIMIT` and `SHARPPROOF_CONTAINER_MEMORY_LIMIT`; the
 lane count follows the CPUs visible to .NET. Use
-`SHARPPROOF_TEST_PROJECT_PARALLELISM` only for profiling or diagnosis.
+`SHARPPROOF_TEST_PROJECT_PARALLELISM` only for profiling or diagnosis. To cap
+semantic-test scheduling without changing other test/build lanes, use
+`SHARPPROOF_SEMANTIC_TEST_PARALLELISM` (an integer from 1 through the
+container-visible CPU count).
+When set, that override caps semantic and other test-project concurrency as
+well as parallel prerequisite-build lanes.
+The lane count is per container: when several agents share one Docker VM, cap
+each heavy container with that override (typically 1-2 lanes) and keep the
+aggregate build-capable containers within the VM memory budget.
 
 NUnit tests within a project are not globally forced parallel. Several package
 tests intentionally mutate process-local environment variables; those fixtures

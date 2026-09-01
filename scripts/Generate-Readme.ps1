@@ -1,18 +1,43 @@
 [CmdletBinding()]
 param(
-    [switch]$Verify
+    [switch]$Verify,
+
+    [string]$TextOverrideRelativePath = '',
+
+    [string]$TextOverridePath = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$hasTextOverrideRelativePath =
+    -not [string]::IsNullOrWhiteSpace($TextOverrideRelativePath)
+$hasTextOverridePath = -not [string]::IsNullOrWhiteSpace($TextOverridePath)
+if ($hasTextOverrideRelativePath -ne $hasTextOverridePath) {
+    throw (
+        'TextOverrideRelativePath and TextOverridePath must be supplied ' +
+        'together.')
+}
+$normalizedTextOverrideRelativePath = if ($hasTextOverrideRelativePath) {
+    $TextOverrideRelativePath.Replace('\', '/')
+}
+else {
+    ''
+}
+$resolvedTextOverridePath = if ($hasTextOverridePath) {
+    (Resolve-Path -LiteralPath $TextOverridePath -ErrorAction Stop).Path
+}
+else {
+    ''
+}
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 $repositoryDefaultBranch = 'master'
 $currentMaintainedDocuments = @(
     'README.md',
     'SEMANTICS.md',
     'docs\README.md',
+    'docs\getting-started.md',
     'docs\architecture.md',
     'docs\coverage-and-limits.md',
     'docs\container-development.md',
@@ -30,6 +55,7 @@ $currentMaintainedDocuments = @(
     'SharpProof.Gates\Corpus\README.md'
 )
 $datedEvidenceDocuments = @(
+    'docs\code-usefulness-audit.md',
     'docs\soundness-notes\2026-08-08-relational-interprocedural-verification.md',
     'docs\soundness-notes\2026-07-25-api-spec-result-domains.md',
     'docs\soundness-notes\2026-07-25-hardening.md',
@@ -54,6 +80,11 @@ function Get-RequiredText {
     $path = Get-RepositoryPath $RelativePath
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Required documentation source is missing: $RelativePath"
+    }
+    if ($hasTextOverrideRelativePath -and
+        $RelativePath.Replace('\', '/') -ceq
+            $normalizedTextOverrideRelativePath) {
+        return Get-Content -LiteralPath $resolvedTextOverridePath -Raw
     }
     return Get-Content -LiteralPath $path -Raw
 }
@@ -828,25 +859,36 @@ if ([regex]::Matches(
         [regex]::Escape($typedResultReadmeClaim)).Count -ne 1) {
     throw 'README.md must contain the exact typed-result documentation claim.'
 }
-$containerCpuCount = [int]$acceptanceContract.container.defaultCpuCount
+$containerCpuLimit = [int]$acceptanceContract.container.defaultCpuLimit
 $containerMemoryMiB = [int]$acceptanceContract.container.defaultMemoryMiB
 $testProjectCpuDivisor =
     [int]$acceptanceContract.automation.testProjectCpuDivisor
+$packageTestCpuPercent =
+    [int]$acceptanceContract.automation.packageTestCpuPercent
+$buildCpuPercent =
+    [int]$acceptanceContract.automation.buildCpuPercent
 $mutationParallelism =
     [int]$acceptanceContract.automation.mutationParallelism
-if ($containerCpuCount -le 0 -or
+if ($containerCpuLimit -ne 0 -or
     $containerMemoryMiB -le 0 -or
     $testProjectCpuDivisor -le 0 -or
-    $containerCpuCount % $testProjectCpuDivisor -ne 0 -or
+    $packageTestCpuPercent -le 0 -or
+    $packageTestCpuPercent -gt 100 -or
+    $buildCpuPercent -le 0 -or
+    $buildCpuPercent -gt 100 -or
     $mutationParallelism -le 0) {
     throw 'Acceptance resource and concurrency authority is invalid.'
 }
-$testProjectLanes = $containerCpuCount / $testProjectCpuDivisor
 $resourceClaims = @(
-    ("The default container budget is $containerCpuCount CPUs and " +
-        "$containerMemoryMiB MiB.")
-    ("Test-project concurrency uses $testProjectLanes lanes " +
-        "(one lane per $testProjectCpuDivisor CPUs).")
+    ("Containers use all CPUs available to Docker and up to " +
+        "$containerMemoryMiB MiB by default.")
+    "Semantic-test scheduling uses every container-visible CPU."
+    ("Package integration tests use $packageTestCpuPercent% of " +
+        "container-visible CPU lanes by default.")
+    ("Other test-project concurrency auto-detects the available CPUs " +
+        "and uses one lane per $testProjectCpuDivisor CPUs.")
+    ("Parallel prerequisite builds use $buildCpuPercent% of " +
+        "container-visible CPU lanes by default.")
     ("Trusted mutations use $mutationParallelism deterministic weighted lanes.")
 )
 foreach ($resourceDocument in @(
@@ -889,18 +931,18 @@ if (@($debugCommands | Where-Object {
             [string]$_.configuration -ceq 'Debug'
         }).Count -ne 1 -or
     @($debugCommands | Where-Object {
-            [string]$_.id -ceq 'package-test-build' -and
-            [string]$_.configuration -ceq 'Debug'
+            [string]$_.id -ceq 'package-product-build' -and
+            [string]$_.configuration -ceq 'Release'
         }).Count -ne 1 -or
     @($debugPacks | Where-Object {
-            [string]$_.configuration -cne 'Release' -or [bool]$_.noBuild
+            [string]$_.configuration -cne 'Release' -or -not [bool]$_.noBuild
         }).Count -ne 0 -or
     @($releaseCommands | Where-Object {
             [string]$_.id -ceq 'solution-build' -and
             [string]$_.configuration -ceq 'Release'
         }).Count -ne 1 -or
     @($releaseCommands | Where-Object {
-            [string]$_.id -ceq 'package-test-build'
+            [string]$_.id -ceq 'package-product-build'
         }).Count -ne 0 -or
     @($releasePacks | Where-Object {
             [string]$_.configuration -cne 'Release' -or -not [bool]$_.noBuild
@@ -908,9 +950,10 @@ if (@($debugCommands | Where-Object {
     throw 'Developer-check command plan has an unsupported build topology.'
 }
 $checkPlanClaims = @(
-    ("The default Debug check performs one Debug solution build, one " +
-        "additional Debug package-test build, and $($debugPacks.Count) " +
-        "build-capable Release pack commands.")
+    ("The default Debug check concurrently performs one Debug solution " +
+        "build and one Release package-product build, then runs " +
+        "$($debugPacks.Count) Release " +
+        "pack commands with ``--no-build``.")
     ("The Release check performs one Release solution build and " +
         "$($releasePacks.Count) Release pack commands with ``--no-build``.")
 )

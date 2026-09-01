@@ -87,7 +87,8 @@ public sealed record EffectSummary
         EffectRegionSet.Unknown, EffectRegionSet.Unknown,
         EffectAllocationKind.Unknown, EffectCapabilitySet.Unknown,
         EffectThrowSet.Unknown, EffectTermination.Unknown,
-        EffectCompleteness.Incomplete, EffectUncertainty.Unknown);
+        EffectCompleteness.Incomplete, EffectUncertainty.Unknown,
+        EffectContractMetadata.AllIncompleteReasons);
 
     public bool IsBottom
     {
@@ -179,7 +180,9 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
                left.Throws.IsSubsetOf(right.Throws) &&
                left.Termination <= right.Termination &&
                left.Completeness <= right.Completeness &&
-               (left.Uncertainty & ~right.Uncertainty) == 0;
+               (left.Uncertainty & ~right.Uncertainty) == 0 &&
+               (left.AnalysisIncompleteReason &
+                ~right.AnalysisIncompleteReason) == 0;
     }
 
     public bool AreEquivalent(EffectSummary left, EffectSummary right)

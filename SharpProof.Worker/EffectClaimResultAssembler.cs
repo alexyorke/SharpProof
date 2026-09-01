@@ -37,6 +37,7 @@ internal static class EffectClaimResultAssembler
             throw new InvalidDataException(
                 "Compiler effect-claim evidence has an unsupported result tuple.");
         }
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (evidence.Outcome == WorkerClaimOutcome.Unknown &&
             evidence.Reason == WorkerClaimReason.UnsupportedContract)

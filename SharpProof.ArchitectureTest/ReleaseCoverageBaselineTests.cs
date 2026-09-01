@@ -5,6 +5,7 @@ using NUnit.Framework;
 namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
+[Parallelizable(ParallelScope.Children)]
 public sealed class ReleaseCoverageBaselineTests
 {
     private const string FirstPreviewBaseline =
@@ -284,6 +285,8 @@ public sealed class ReleaseCoverageBaselineTests
                 (Value: JsonSerializer.Serialize(new
                 {
                     schemaVersion = 1,
+                    command = "acceptance",
+                    configuration = "release",
                     status = "passed",
                     commit = head
                 }), Valid: true)

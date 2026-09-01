@@ -3,7 +3,9 @@ namespace SharpProof.Analyzer;
 internal sealed class AnalyzerEffectCallPreconditionPolicy(
     ContractBinder binder,
     ContractClauseInventoryBuilder clauses,
-    ConservativeEffectCallPreconditionPolicy fallback)
+    IrFactory factory,
+    ConservativeEffectCallPreconditionPolicy fallback,
+    CancellationToken cancellationToken)
     : IEffectCallPreconditionPolicy
 {
     private readonly ContractBinder _binder =
@@ -11,20 +13,26 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
     private readonly ContractClauseInventoryBuilder
         _clauses =
             ArgumentNullGuard.NotNull(clauses, nameof(clauses));
+    private readonly IrFactory _factory =
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly ConservativeEffectCallPreconditionPolicy
         _fallback =
             ArgumentNullGuard.NotNull(fallback, nameof(fallback));
+    private readonly CancellationToken _cancellationToken =
+        cancellationToken;
 
     public EffectCallPreconditionStatus Assess(
         EffectCallPreconditionContext context)
     {
+        _cancellationToken.ThrowIfCancellationRequested();
         if (HasInvalidEntryInventory(context.Target))
         {
             return EffectCallPreconditionStatus.NotProven;
         }
 
         var binding = _binder.BindRequires(
-            context.Target);
+            context.Target,
+            _cancellationToken);
         if (binding is not
             { IsSuccess: true, Contracts: { } contracts })
         {
@@ -114,7 +122,8 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
             ManagedContractFacts.Evaluate(
                     clause.Condition,
                     variables,
-                    definitelyStrings)
+                    definitelyStrings,
+                    _factory.StringType)
                 .TryGetBoolean(out var established) &&
             established)
                 ? EffectCallPreconditionStatus.Proven
@@ -233,12 +242,15 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
     public EffectCallPreconditionStatus AssessEntry(
         IMethodSymbol method)
     {
+        _cancellationToken.ThrowIfCancellationRequested();
         if (HasInvalidEntryInventory(method))
         {
             return EffectCallPreconditionStatus.NotProven;
         }
 
-        var binding = _binder.BindRequires(method);
+        var binding = _binder.BindRequires(
+            method,
+            _cancellationToken);
         if (binding is not
             { IsSuccess: true, Contracts: { } })
         {
@@ -270,7 +282,10 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
     private bool HasInvalidEntryInventory(
         IMethodSymbol method)
     {
-        var inventory = _clauses.Create(method);
+        var inventory = _clauses.Create(
+            method,
+            implementationBody: null,
+            cancellationToken: _cancellationToken);
         return inventory.HasRejectedContractApiUsage ||
             inventory.Clauses.Any(static clause =>
                 clause.Kind ==

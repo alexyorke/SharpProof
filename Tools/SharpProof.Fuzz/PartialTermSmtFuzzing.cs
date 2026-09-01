@@ -42,11 +42,20 @@ public static class PartialTermSmtCaseGenerator
         var divisor = factory.CreateVariable(
             "partial-divisor",
             factory.IntegerType);
+        // Keep the original three control bits for the established scenarios,
+        // but use additional seed bits to vary the arithmetic operand.  The
+        // old generator only consumed bits 0..2, so large campaigns repeated
+        // the same eight semantic cases indefinitely.
+        var arithmeticOperand = (seed & 8) != 0
+            ? factory.Integer(-1)
+            : (seed & 16) != 0
+                ? factory.Integer(1)
+                : factory.Integer(long.MinValue);
         var arithmetic = factory.Binary(
             (seed & 1) == 0
                 ? IrBinaryOperator.Divide
                 : IrBinaryOperator.Remainder,
-            factory.Integer(long.MinValue),
+            arithmeticOperand,
             factory.Variable(divisor));
         var comparison = factory.Binary(
             IrBinaryOperator.Equal,
@@ -277,7 +286,7 @@ public sealed class PartialTermSmtDifferentialOracle
         };
     }
 
-    private static PartialTermSemanticOutcome? Classify(
+    internal static PartialTermSemanticOutcome? Classify(
         ProofOutcome outcome)
     {
         return outcome switch
@@ -286,7 +295,7 @@ public sealed class PartialTermSmtDifferentialOracle
             RefutedOutcome => PartialTermSemanticOutcome.DefinedFalse,
             UnknownOutcome
             {
-                Reason: AbstentionReason.CounterexampleReplayFailed
+                Reason: AbstentionReason.InternalConsistencyMayBeUndefined
             } => PartialTermSemanticOutcome.Undefined,
             _ => null
         };

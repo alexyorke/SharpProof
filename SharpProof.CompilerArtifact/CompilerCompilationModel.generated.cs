@@ -48,6 +48,7 @@ internal enum CompilerReportDiagnostic
 internal sealed class CompilerCompilationOptionsSnapshot
 {
     public CompilerOutputKind OutputKind { get; set; }
+    public string MainTypeName { get; set; } = string.Empty;
     public CompilerOptimizationLevel OptimizationLevel { get; set; }
     public CompilerPlatform Platform { get; set; }
     public CompilerNullableContext NullableContext { get; set; }
@@ -55,6 +56,7 @@ internal sealed class CompilerCompilationOptionsSnapshot
     public int WarningLevel { get; set; }
     public CompilerReportDiagnostic GeneralDiagnosticOption { get; set; }
     public CompilerDiagnosticOptionSnapshot[] SpecificDiagnosticOptions { get; set; } = [];
+    public bool ReportSuppressedDiagnostics { get; set; }
     public bool CheckOverflow { get; set; }
     public bool AllowUnsafe { get; set; }
     public bool Deterministic { get; set; }
@@ -77,12 +79,16 @@ internal sealed class CompilerSourceLineMapEntry
     public string MappedPath { get; set; } = string.Empty;
     public int MappedLine { get; set; }
     public int MappedColumn { get; set; }
+    public int CharacterOffset { get; set; }
 }
 
 internal sealed class CompilerSyntaxTreeSnapshot
 {
     public string Path { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
+    public string Encoding { get; set; } = string.Empty;
+    public string ChecksumAlgorithm { get; set; } = string.Empty;
+    public string RoslynChecksum { get; set; } = string.Empty;
     public string LineMapSha256 { get; set; } = string.Empty;
     public int TextLength { get; set; }
     public CompilerSourceLineMapEntry[] LineMap { get; set; } = [];

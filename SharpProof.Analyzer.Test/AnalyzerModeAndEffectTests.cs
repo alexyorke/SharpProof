@@ -184,6 +184,8 @@ public sealed class AnalyzerModeAndEffectTests
 
     [TestCase(null, "everything", null, "advisory, strict, off")]
     [TestCase(null, null, "everything", "effects, contracts, all")]
+    [TestCase(null, "   ", null, "advisory, strict, off")]
+    [TestCase(null, null, "\t", "effects, contracts, all")]
     [TestCase("everything", null, null, "option was removed")]
     public async Task InvalidConfigurationReportsAllowedValuesAndFailsClosed(
         string? mode,
@@ -256,6 +258,61 @@ public sealed class AnalyzerModeAndEffectTests
             Assert.That(
                 diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
                 Does.Contain("option was removed"));
+        }
+    }
+
+    [Test]
+    public async Task LowercaseRetiredBuildPropertyFailsClosed()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            ModeFixture,
+            ["SP0025"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["build_property.sharpproof_mode"] = "everything"
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0025"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("option was removed"));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("everything"));
+        }
+    }
+
+    [Test]
+    public async Task BlankRetiredEditorConfigAliasDoesNotHideMsBuildAlias()
+    {
+        var compilation = AnalyzerTestHost.CreateCompilation(
+            ModeFixture,
+            ["SP0025"]);
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            compilation,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["sharpproof_mode"] = "  ",
+                ["build_property.SharpProofMode"] = "strict"
+            });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EqualTo(["SP0025"]));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("option was removed"));
+            Assert.That(
+                diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
+                Does.Contain("strict"));
         }
     }
 
@@ -335,6 +392,47 @@ public sealed class AnalyzerModeAndEffectTests
             diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EquivalentTo(
                 ["SP0002", "SP0016", "SP0045", "SP0046", "SP0046"]));
+    }
+
+    [Test]
+    public async Task LambdaOwnedEffectAttributesAreAnalyzed()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int state;
+
+                public static void Configure() {
+                    Action pure = [EnforcePure] () => state++;
+                    Func<object> allocate = [ZeroAllocations] () => new object();
+                    Func<int> divide = [DoesNotThrow] () => 1 / state;
+                    Action declared =
+                        [EffectContract(SharpProofEffect.None, Complete = true)]
+                        () => state++;
+                    _ = pure;
+                    _ = allocate;
+                    _ = divide;
+                    _ = declared;
+                }
+            }
+            """,
+            "effects",
+            ["SP0002", "SP0045", "SP0046", "SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics.Select(static diagnostic => diagnostic.Id),
+                Is.EquivalentTo(["SP0002", "SP0045", "SP0046", "SP0047"]));
+            Assert.That(
+                factory.Outcomes.Values,
+                Has.Some.EqualTo(AnalyzerSemanticOutcome.Unknown));
+        }
     }
 
     [Test]
@@ -439,6 +537,46 @@ public sealed class AnalyzerModeAndEffectTests
                     AnalyzerSemanticOutcome.Proven));
             Assert.That(
                 factory.Outcomes["Unknown"],
+                Is.EqualTo(
+                    AnalyzerSemanticOutcome.Unknown));
+        }
+    }
+
+    [Test]
+    public async Task IncompatibleCastCannotEstablishCalleePrecondition()
+    {
+        var factory = new RecordingSessionFactory();
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static void Need(object value) {
+                    Contract.Requires((IDisposable)value != null);
+                }
+
+                [DoesNotThrow]
+                public static void Call() => Need("text");
+            }
+            """,
+            "effects",
+            ["SP0047"],
+            new SharpProofAnalyzer(factory));
+
+        Assert.That(
+            diagnostics.Select(
+                static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0047"]));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                diagnostics[0].GetMessage(
+                    CultureInfo.InvariantCulture),
+                Does.Contain(
+                    "CallPreconditionNotProven"));
+            Assert.That(
+                factory.Outcomes["Call"],
                 Is.EqualTo(
                     AnalyzerSemanticOutcome.Unknown));
         }
@@ -1098,7 +1236,8 @@ public sealed class AnalyzerModeAndEffectTests
             """,
             "effects",
             ["SP0002"],
-            new SharpProofAnalyzer(factory));
+            new SharpProofAnalyzer(factory),
+            allowCompilationErrors: true);
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
@@ -2192,7 +2331,8 @@ public sealed class AnalyzerModeAndEffectTests
             """,
             "effects",
             ["SP0047"],
-            new SharpProofAnalyzer(factory));
+            new SharpProofAnalyzer(factory),
+            allowCompilationErrors: true);
 
         using (Assert.EnterMultipleScope())
         {
@@ -3303,6 +3443,36 @@ public sealed class AnalyzerModeAndEffectTests
             Assert.That(
                 factory.Outcomes["RequiredNonNull"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Proven));
+        }
+    }
+
+    [Test]
+    public async Task AllowedExceptionDiagnosticsRetainNamespaceIdentity()
+    {
+        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            """
+            using SharpProof.Attributes;
+            namespace First { public sealed class SameException : System.Exception { } }
+            namespace Second { public sealed class SameException : System.Exception { } }
+            public static class Fixture {
+                [DoesNotThrow]
+                public static void Run(bool first) {
+                    if (first) throw new First.SameException();
+                    throw new Second.SameException();
+                }
+            }
+            """,
+            mode: null,
+            ["SP0046"],
+            new SharpProofAnalyzer(new RecordingSessionFactory()),
+            features: "effects");
+
+        var message = diagnostics.Single(static diagnostic => diagnostic.Id == "SP0046")
+            .GetMessage(CultureInfo.InvariantCulture);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(message, Does.Contain("First.SameException"));
+            Assert.That(message, Does.Contain("Second.SameException"));
         }
     }
 

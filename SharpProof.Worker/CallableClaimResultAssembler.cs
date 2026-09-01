@@ -110,7 +110,13 @@ internal static class CallableClaimResultAssembler
             Outcome = outcome,
             Reason = reason,
             EffectCertainty = certainty,
-            Assumptions = [.. target.Entry.Assumptions]
+            Assumptions = [.. target.Entry.Assumptions.Select(static evidence =>
+                new WorkerAssumptionEvidence
+                {
+                    Id = evidence.Id,
+                    Kind = evidence.Kind,
+                    Used = evidence.Used
+                })]
         };
     }
 

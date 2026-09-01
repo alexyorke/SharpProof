@@ -104,6 +104,40 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task LongDelegateAliasChainDoesNotOverflowAnalysis()
+    {
+        const int AliasCount = 8192;
+        var aliases = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(1, AliasCount).Select(index =>
+                $"                    Func<int> alias{index} = " +
+                $"alias{index - 1};"));
+        var source = $$"""
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    Func<int> alias0 = Reachable;
+            {{aliases}}
+                    return alias{{AliasCount}}();
+
+                    int Reachable() => Positive(-1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+    }
+
+    [Test]
     public async Task RootAndNestedOutcomesRemainIndependent()
     {
         var factory = new RecordingSessionFactory();
@@ -380,6 +414,59 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task DiscardedMethodGroupsAndLambdasDoNotReachNestedCallables()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    _ = (Func<int>)Dead;
+                    _ = (Func<int>)(() => Positive(-2));
+                    return 0;
+
+                    int Dead() => Positive(-1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public async Task NameofReferencesDoNotReachLocalFunctions()
+    {
+        var diagnostics = await Analyze(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static string Outer() {
+                    return nameof(Dead);
+
+                    int Dead() => Positive(-1);
+                }
+            }
+            """);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task GenericAndMethodGroupReferencesReachLocalFunctions()
     {
         const string source =
@@ -407,7 +494,9 @@ public sealed class NestedRequiresCallSiteTests
                 }
             }
             """;
-        var diagnostics = await Analyze(source);
+        var diagnostics = await Analyze(
+            source,
+            allowCompilationErrors: true);
 
         AssertRequiresDiagnostics(diagnostics, 2);
         Assert.That(
@@ -459,6 +548,80 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task AssignmentTargetEvaluationConsumesDelegates()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private sealed class Holder {
+                    public int Value;
+                }
+
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                private static Holder Select(int value) => new();
+
+                public static int Outer() {
+                    Func<int> index = Index;
+                    Func<int> receiver = Receiver;
+                    var values = new int[1];
+                    values[index()] = 1;
+                    Select(receiver()).Value = 2;
+                    return values[0];
+
+                    int Index() => Positive(-1);
+                    int Receiver() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 2);
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EquivalentTo(new[]
+            {
+                source.IndexOf("Positive(-1)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal)
+            }));
+    }
+
+    [Test]
+    public async Task DelegateSubtractionDoesNotReachRemovedLocalFunctions()
+    {
+        var diagnostics = await Analyze(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    Func<int> callback = () => 1;
+                    callback -= Removed;
+                    return callback();
+
+                    int Removed() => Positive(-1);
+                }
+            }
+            """);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task ObservingMethodGroupsDoesNotReachLocalFunctions()
     {
         const string source =
@@ -484,6 +647,66 @@ public sealed class NestedRequiresCallSiteTests
         var diagnostics = await Analyze(source);
 
         AssertRequiresDiagnostics(diagnostics, 0);
+    }
+
+    [Test]
+    public async Task OnlyExecutingOrEscapedDelegateUsesReachNestedCallables()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                private static void Replace(out Func<int> callback) =>
+                    callback = () => 0;
+
+                public static int MetadataOnly() {
+                    Func<int> callback = Dead;
+                    _ = callback.Method;
+                    _ = callback.Target;
+                    return 0;
+
+                    int Dead() => Positive(-1);
+                }
+
+                public static int WriteOnlyOut() {
+                    Func<int> callback = Dead;
+                    Replace(out callback);
+                    return callback();
+
+                    int Dead() => Positive(-2);
+                }
+
+                public static int DiscardedCombination() {
+                    Func<int> callback =
+                        () => Positive(-3);
+                    _ = callback + (Func<int>)(() => 0);
+                    return 0;
+                }
+
+                public static int ConsumedCombination() {
+                    Func<int> callback =
+                        () => Positive(-4);
+                    var combined =
+                        callback + (Func<int>)(() => 0);
+                    return combined();
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-4)", StringComparison.Ordinal)));
     }
 
     [Test]
@@ -542,6 +765,45 @@ public sealed class NestedRequiresCallSiteTests
                     var consumed =
                         (Callback: (Func<int>)Reachable, Number: 2);
                     return consumed.Callback();
+
+                    int Dead() => Positive(-1);
+                    int Reachable() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics[0].Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-2)", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public async Task TupleItemAliasesReachNamedDelegateComponents()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Outer() {
+                    var unused = (
+                        Callback: (Func<int>)Dead,
+                        Number: 1);
+                    _ = unused.Item2;
+                    var consumed = (
+                        Number: 2,
+                        Callback: (Func<int>)Reachable);
+                    return consumed.Item2();
 
                     int Dead() => Positive(-1);
                     int Reachable() => Positive(-2);
@@ -799,6 +1061,156 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task NullMethodGroupOverwriteKeepsOldDelegateReachableInCatch()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private sealed class Target {
+                    public int Read() => 0;
+                }
+
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int CatchUse() {
+                    Func<int> callback = Reachable;
+                    Target target = null!;
+                    try { callback = target.Read; }
+                    catch (ArgumentException) { return callback(); }
+                    return callback();
+
+                    int Reachable() => Positive(-1);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 1);
+        Assert.That(
+            diagnostics.Single().Location.SourceSpan.Start,
+            Is.EqualTo(source.IndexOf(
+                "Positive(-1)", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public async Task ThrowingUserDefinedOperatorsKeepOldDelegateReachableInCatch()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                public struct Source {
+                    public static implicit operator Func<int>(Source value) =>
+                        throw new InvalidOperationException();
+
+                    public static bool operator &(Source left, Source right) =>
+                        throw new InvalidOperationException();
+
+                    public static bool operator !(Source value) =>
+                        throw new InvalidOperationException();
+
+                    public static Source operator +(Source left, Source right) =>
+                        throw new InvalidOperationException();
+
+                    public static Source operator ++(Source value) =>
+                        throw new InvalidOperationException();
+                }
+
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Conversion(Source source) {
+                    Func<int> callback = Reachable;
+                    try { callback = source; }
+                    catch (InvalidOperationException) { return callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-1);
+                }
+
+                public static int Binary(Source source) {
+                    Func<int> callback = Reachable;
+                    Func<int> replacement = () => 0;
+                    try {
+                        callback = source & source
+                            ? replacement
+                            : replacement;
+                    }
+                    catch (InvalidOperationException) { return callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-2);
+                }
+
+                public static int Unary(Source source) {
+                    Func<int> callback = Reachable;
+                    Func<int> replacement = () => 0;
+                    try {
+                        callback = !source
+                            ? replacement
+                            : replacement;
+                    }
+                    catch (InvalidOperationException) { return callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-3);
+                }
+
+                public static int Compound(Source source) {
+                    Func<int> callback = Reachable;
+                    Func<int> replacement = () => 0;
+                    try {
+                        source += source;
+                        callback = replacement;
+                    }
+                    catch (InvalidOperationException) { return callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-4);
+                }
+
+                public static int Increment(Source source) {
+                    Func<int> callback = Reachable;
+                    Func<int> replacement = () => 0;
+                    try {
+                        source++;
+                        callback = replacement;
+                    }
+                    catch (InvalidOperationException) { return callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-5);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 5);
+        Assert.That(
+            diagnostics.Select(diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EquivalentTo(new[] {
+                source.IndexOf("Positive(-1)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-3)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-4)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-5)", StringComparison.Ordinal)
+            }));
+    }
+
+    [Test]
     public async Task ExceptionHandlersCanConsumeTrackedDelegates()
     {
         const string source =
@@ -971,7 +1383,9 @@ public sealed class NestedRequiresCallSiteTests
             }
             """;
 
-        var diagnostics = await Analyze(source);
+        var diagnostics = await Analyze(
+            source,
+            allowCompilationErrors: true);
 
         AssertRequiresDiagnostics(diagnostics, 14);
         Assert.That(
@@ -991,6 +1405,52 @@ public sealed class NestedRequiresCallSiteTests
                 source.IndexOf("Positive(-13)", StringComparison.Ordinal),
                 source.IndexOf("Positive(-14)", StringComparison.Ordinal),
                 source.IndexOf("Positive(-15)", StringComparison.Ordinal)
+            }));
+    }
+
+    [Test]
+    public async Task NormalFinallyFlowCanConsumeTrackedDelegates()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int FinallyUse() {
+                    Func<int> callback = Reachable;
+                    try { _ = 0; }
+                    finally { _ = callback(); }
+                    return 0;
+
+                    int Reachable() => Positive(-1);
+                }
+
+                public static int FinallyReturn() {
+                    Func<int> callback = Reachable;
+                    try { return 0; }
+                    finally { _ = callback(); }
+
+                    int Reachable() => Positive(-2);
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 2);
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EquivalentTo(new[]
+            {
+                source.IndexOf("Positive(-1)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal)
             }));
     }
 
@@ -1021,6 +1481,64 @@ public sealed class NestedRequiresCallSiteTests
         var diagnostics = await Analyze(source);
 
         AssertRequiresDiagnostics(diagnostics, 1);
+    }
+
+    [Test]
+    public async Task NestedPatternAliasesReachOnlyTheirDelegateComponents()
+    {
+        const string source =
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static int Recursive() {
+                    var pair = (
+                        Callback: (Func<int>)Reachable,
+                        Number: 1);
+                    if (pair is (var callback, _)) return callback();
+                    return 0;
+
+                    int Reachable() => Positive(-1);
+                }
+
+                public static int List() {
+                    Func<int>[] callbacks = { Reachable };
+                    if (callbacks is [var callback]) return callback();
+                    return 0;
+
+                    int Reachable() => Positive(-2);
+                }
+
+                public static int RecursiveSibling() {
+                    var pair = (
+                        Dead: (Func<int>)Dead,
+                        Used: (Func<int>)Safe);
+                    if (pair is (var dead, var used)) return used();
+                    return 0;
+
+                    int Dead() => Positive(-3);
+                    int Safe() => 0;
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+
+        AssertRequiresDiagnostics(diagnostics, 2);
+        Assert.That(
+            diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start),
+            Is.EquivalentTo(new[]
+            {
+                source.IndexOf("Positive(-1)", StringComparison.Ordinal),
+                source.IndexOf("Positive(-2)", StringComparison.Ordinal)
+            }));
     }
 
     [Test]
@@ -1111,6 +1629,7 @@ public sealed class NestedRequiresCallSiteTests
         const string source =
             """
             using System;
+            using System.Linq.Expressions;
             using SharpProof.Attributes;
 
             public static class Fixture {
@@ -1153,7 +1672,8 @@ public sealed class NestedRequiresCallSiteTests
 
         var diagnostics = await Analyze(
             source,
-            enabledIds: ["SP0024"]);
+            enabledIds: ["SP0024"],
+            allowCompilationErrors: true);
 
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.Id),
@@ -1245,7 +1765,8 @@ public sealed class NestedRequiresCallSiteTests
                 }
             }
             """,
-            factory);
+            factory,
+            allowCompilationErrors: true);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1264,7 +1785,8 @@ public sealed class NestedRequiresCallSiteTests
     private static Task<ImmutableArray<Diagnostic>> Analyze(
         string source,
         IAnalyzerSessionFactory? sessionFactory = null,
-        string[]? enabledIds = null)
+        string[]? enabledIds = null,
+        bool allowCompilationErrors = false)
     {
         return AnalyzerTestHost.AnalyzeAsync(
             source,
@@ -1273,7 +1795,8 @@ public sealed class NestedRequiresCallSiteTests
             sessionFactory == null
                 ? null
                 : new SharpProofAnalyzer(
-                    sessionFactory));
+                    sessionFactory),
+            allowCompilationErrors: allowCompilationErrors);
     }
 
     private static void AssertRequiresDiagnostics(
@@ -1284,7 +1807,9 @@ public sealed class NestedRequiresCallSiteTests
             diagnostics.Select(static diagnostic =>
                 diagnostic.Id),
             Is.EqualTo(
-                Enumerable.Repeat("SP0027", count)));
+                Enumerable.Repeat("SP0027", count)),
+            string.Join(", ", diagnostics.Select(static diagnostic =>
+                diagnostic.Location.SourceSpan.Start)));
     }
 
     private sealed class RecordingSessionFactory :

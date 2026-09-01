@@ -92,11 +92,10 @@ internal static class FinalCompilationCollector
             return [];
         }
 
-        var packs = value.Split([';'], StringSplitOptions.RemoveEmptyEntries)
+        var packs = value.Split([';'], StringSplitOptions.None)
             .Select(static pack => pack.Trim())
-            .Where(static pack => pack.Length != 0)
             .ToArray();
-        if (packs.Length == 0)
+        if (packs.Any(static pack => pack.Length == 0))
         {
             throw new InvalidOperationException(
                 "SharpProofSpecificationPacks must contain a pack identifier.");

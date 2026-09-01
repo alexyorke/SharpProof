@@ -173,7 +173,7 @@ internal static class Program
         for (Exception? current = exception; current != null; current = current.InnerException)
         {
             if (current is DllNotFoundException or EntryPointNotFoundException or
-                BadImageFormatException or FileLoadException or FileNotFoundException ||
+                BadImageFormatException ||
                 string.Equals(current.GetType().FullName, "Microsoft.Z3.Z3Exception", StringComparison.Ordinal))
             {
                 return true;

@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace SharpProof.ArchitectureTest;
 
 [TestFixture]
-[NonParallelizable]
+[Parallelizable(ParallelScope.Children)]
 public sealed class DocumentationSupportContractTests
 {
     [TestCase("clean", true)]
@@ -20,6 +20,7 @@ public sealed class DocumentationSupportContractTests
     [TestCase("resource-claim-case", false)]
     [TestCase("resource-claim-spacing", false)]
     [TestCase("catalog-resource-drift", false)]
+    [TestCase("duplicate-acceptance-property", false)]
     [TestCase("check-plan-drift", false)]
     [TestCase("missing-vacuous-entry", false)]
     [TestCase("wrong-unavailable-meaning", false)]
@@ -87,6 +88,25 @@ public sealed class DocumentationSupportContractTests
             "-Mode WriteQualificationEvidence");
         Assert.That(workflow, Does.Contain("tooling acceptance"));
         Assert.That(workflow, Does.Contain("tooling release-qualification"));
+    }
+
+    [Test]
+    public async Task UnreleasedChangelogUsesTheCanonicalVerifierPlatform()
+    {
+        var changelog = await File.ReadAllTextAsync(Path.Combine(
+            FindRepositoryRoot(),
+            "CHANGELOG.md"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                changelog,
+                Does.Contain("canonical Linux amd64 container"));
+            Assert.That(changelog, Does.Not.Contain("Windows x64 verifier"));
+            Assert.That(
+                changelog,
+                Does.Not.Contain("Windows x64 worker containment"));
+        }
     }
 
     private static void AssertCommandGatePrecedes(

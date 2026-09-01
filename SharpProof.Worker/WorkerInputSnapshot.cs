@@ -13,7 +13,9 @@ internal sealed partial record WorkerInputSnapshot
         byte[] manifestBytes;
         try
         {
-            manifestBytes = CompilerManifestArtifactFile.ReadAllBytes(manifestPath);
+            manifestBytes = CompilerManifestArtifactFile.ReadAllBytes(
+                manifestPath,
+                cancellationToken: cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
         }
         catch (Exception exception) when (exception is
@@ -26,6 +28,7 @@ internal sealed partial record WorkerInputSnapshot
                 exception);
         }
         var digest = WorkerProtocolJson.ComputeSha256(manifestBytes);
+        cancellationToken.ThrowIfCancellationRequested();
         CompilerManifestArtifact manifest;
         try
         {
@@ -34,16 +37,20 @@ internal sealed partial record WorkerInputSnapshot
                 throw new InvalidDataException();
             }
 
-            manifest = CompilerManifestArtifactJson.Deserialize(DecodeUtf8(manifestBytes));
+            manifest = CompilerManifestArtifactJson.Deserialize(
+                DecodeUtf8(manifestBytes),
+                cancellationToken);
         }
         catch (Exception exception) when (exception is
             JsonException or InvalidDataException or DecoderFallbackException)
         {
             throw new IOException(ManifestInvalid, exception);
         }
+        cancellationToken.ThrowIfCancellationRequested();
         var inputHash = CompilerArtifactInputHash.Compute(request, manifestBytes, cacheIdentity.ToolIdentity,
             cacheIdentity.ToolVersion, cacheIdentity.WorkerBinarySha256, cacheIdentity.ApiSpecIdentity,
             cacheIdentity.ApiSpecVersion, cacheIdentity.ApiSpecContentSha256);
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(new WorkerInputSnapshot(manifest, inputHash));
     }
     private static string DecodeUtf8(byte[] bytes)

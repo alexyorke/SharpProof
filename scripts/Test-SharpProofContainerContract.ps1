@@ -407,7 +407,7 @@ if ($directoryBuildTargets -cnotmatch '_RequireSharpProofCanonicalContainer' -or
     throw 'Repository MSBuild entry points must reject host execution.'
 }
 if ($compose -cnotmatch [regex]::Escape(
-        "cpus: `${SHARPPROOF_CONTAINER_CPU_LIMIT:-$($acceptance.container.defaultCpuCount)}")) {
+        "cpus: `${SHARPPROOF_CONTAINER_CPU_LIMIT:-$($acceptance.container.defaultCpuLimit)}")) {
     throw 'Compose CPU defaults do not match the acceptance contract.'
 }
 $memoryGiB = [int]$acceptance.container.defaultMemoryMiB / 1024

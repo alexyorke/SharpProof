@@ -58,6 +58,10 @@ internal static class WorkerBinaryIdentity
             Directory.CreateDirectory(stagingDirectory);
             using var dependency = OpenRead(ChangeExtension(path, ".deps.json"));
             var components = RuntimeComponents(path, dependency);
+            dependency.Position = 0;
+            var dependencyBytes = ReadSnapshotBytes(
+                dependency,
+                MaximumDependenciesBytes);
             stagedHandles = new FileStream[components.Count];
             using var hash = new CanonicalHashWriter();
             hash.Add("SharpProof.WorkerBinarySet", 1);
@@ -65,9 +69,14 @@ internal static class WorkerBinaryIdentity
 #pragma warning disable CA2000 // Stream ownership transfers to the retained snapshot list.
             foreach (var component in components)
             {
-                var sourceBytes = CompilerManifestArtifactFile.ReadAllBytes(
-                    component.Value,
-                    MaximumComponentBytes);
+                var sourceBytes = string.Equals(
+                        component.Key,
+                        GetFileName(ChangeExtension(path, ".deps.json")),
+                        StringComparison.Ordinal)
+                    ? dependencyBytes
+                    : CompilerManifestArtifactFile.ReadAllBytes(
+                        component.Value,
+                        MaximumComponentBytes);
                 var sourceLength = sourceBytes.LongLength;
                 ValidateComponentLength(component.Key, sourceLength, ref totalBytes);
                 var stagedPath = Combine(
@@ -87,9 +96,12 @@ internal static class WorkerBinaryIdentity
                         component.Key,
                         stagedRead.Length,
                         ref stagedTotalBytes);
-                    EnsureStagedComponentConsistency(
-                        component.Value,
-                        stagedPath);
+                    if (!ReferenceEquals(sourceBytes, dependencyBytes))
+                    {
+                        EnsureStagedComponentConsistency(
+                            component.Value,
+                            stagedPath);
+                    }
                     hash.Add(component.Key).Add(stagedRead);
                 }
                 stagedHandles[stagedCount++] = OpenRead(stagedPath);
@@ -188,6 +200,34 @@ internal static class WorkerBinaryIdentity
             throw new InvalidDataException(
                 "A worker runtime component changed during staging.");
         }
+    }
+
+    private static byte[] ReadSnapshotBytes(FileStream stream, long maximumBytes)
+    {
+        if (stream.Length <= 0 || stream.Length > maximumBytes)
+        {
+            throw new InvalidDataException(
+                "The worker runtime component exceeds the byte limit.");
+        }
+
+        var bytes = new byte[checked((int)stream.Length)];
+        var offset = 0;
+        while (offset < bytes.Length)
+        {
+            var read = stream.Read(bytes, offset, bytes.Length - offset);
+            if (read == 0)
+            {
+                throw new InvalidDataException(
+                    "A worker runtime component changed while it was read.");
+            }
+            offset += read;
+        }
+        if (stream.ReadByte() >= 0)
+        {
+            throw new InvalidDataException(
+                "A worker runtime component changed while it was read.");
+        }
+        return bytes;
     }
 
     private static SortedDictionary<string, string> RuntimeComponents(
@@ -301,9 +341,12 @@ internal sealed class WorkerRuntimeClosureSnapshot(
 
 internal static class CompilerManifestArtifactJson
 {
-    internal static string Serialize(CompilerManifestArtifact artifact)
+    internal static string Serialize(
+        CompilerManifestArtifact artifact,
+        CancellationToken cancellationToken = default)
     {
         artifact = ArgumentNullGuard.NotNull(artifact, nameof(artifact));
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!HasValidDiagnosticShapes(artifact.CompilerDiagnostics))
         {
@@ -322,11 +365,14 @@ internal static class CompilerManifestArtifactJson
                 .OrderBy(static item => item?.OwnerKind)
                 .ThenBy(static item => item?.OwnerId, StringComparer.Ordinal)
         ];
-        Validate(artifact);
+        cancellationToken.ThrowIfCancellationRequested();
+        Validate(artifact, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         var json = JsonSerializer.Serialize(
                 artifact,
                 WorkerProtocolJson.Options) +
             "\n";
+        cancellationToken.ThrowIfCancellationRequested();
         if (Encoding.UTF8.GetByteCount(json) >
             CompilerManifestArtifactFile.MaximumBytes)
         {
@@ -337,61 +383,126 @@ internal static class CompilerManifestArtifactJson
         return json;
     }
 
-    internal static CompilerManifestArtifact Deserialize(string json)
+    internal static CompilerManifestArtifact Deserialize(
+        string json,
+        CancellationToken cancellationToken = default)
     {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
+        cancellationToken.ThrowIfCancellationRequested();
         RequireSpecificationPackAuthorityProperties(json);
+        cancellationToken.ThrowIfCancellationRequested();
         RequireDiagnosticClassificationProperties(json);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
             json, WorkerProtocolJson.Options) ??
             throw new JsonException("A compiler manifest artifact is required.");
-        Validate(artifact);
-        if (Serialize(artifact) != json)
+        cancellationToken.ThrowIfCancellationRequested();
+        Validate(artifact, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Serialize(artifact, cancellationToken) != json)
         {
             throw new JsonException("The compiler manifest artifact is not canonical.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return artifact;
     }
 
     internal static ImmutableArray<CompilerCallablePreparation> DecodeCallables(
-        CompilerManifestArtifact artifact)
+        CompilerManifestArtifact artifact,
+        CancellationToken cancellationToken = default)
     {
         // DecodeCallables is also used by in-memory hydration probes that
         // deliberately mutate lowered evidence after the wire seal. Let the
         // existing lowerer report those malformed-body cases; wire reads and
         // writes still enforce the feature-scope seal below.
-        Validate(artifact, validateFeatureScope: false);
+        Validate(
+            artifact,
+            validateFeatureScope: false,
+            validateDecodability: false,
+            cancellationToken);
         return CompilerLoweredArtifact.Decode(
             artifact.Callables,
             artifact.Manifest,
-            artifact.Compilation);
+            artifact.Compilation,
+            cancellationToken);
     }
 
-    internal static void Validate(CompilerManifestArtifact value)
+    internal static void Validate(
+        CompilerManifestArtifact value,
+        CancellationToken cancellationToken = default)
     {
-        Validate(value, validateFeatureScope: true);
+        Validate(
+            value,
+            validateFeatureScope: true,
+            validateDecodability: true,
+            cancellationToken);
     }
 
     private static void Validate(
         CompilerManifestArtifact value,
-        bool validateFeatureScope)
+        bool validateFeatureScope,
+        bool validateDecodability,
+        CancellationToken cancellationToken)
     {
-        if (!HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation) ||
-            !HasValidEnvelope(value) ||
-            (validateFeatureScope && !HasValidFeatureScope(value)) ||
-            !HasValidLocationAuthorities(value) ||
-            !HasMatchingCallables(value.Callables, value.Manifest) ||
-            !HasValidCallableStates(
-                value.Callables,
-                value.CompilerDiagnostics.Length != 0) ||
-            !HasValidEffectReplayTrees(value.Callables, value.Compilation))
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(
+            HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation, cancellationToken));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(HasValidEnvelope(value));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(!validateFeatureScope || HasValidFeatureScope(value));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(HasValidLocationAuthorities(value, cancellationToken));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(HasMatchingCallables(value.Callables, value.Manifest));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(HasValidCallableStates(
+            value.Callables,
+            value.CompilerDiagnostics.Length != 0));
+        cancellationToken.ThrowIfCancellationRequested();
+        RequireValid(HasValidEffectReplayTrees(
+            value.Callables,
+            value.Compilation));
+
+        cancellationToken.ThrowIfCancellationRequested();
+        CompilationFingerprint.ValidateShape(value.Compilation);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (validateDecodability &&
+            !HasDecodableCallables(value, cancellationToken))
         {
-            throw new JsonException("The compiler manifest artifact is invalid.");
+            throw new JsonException(
+                "The compiler manifest callable payload is invalid.");
         }
 
-        CompilationFingerprint.ValidateShape(value.Compilation);
+        static void RequireValid(bool condition)
+        {
+            if (!condition)
+            {
+                throw new JsonException(
+                    "The compiler manifest artifact is invalid.");
+            }
+        }
+    }
+
+    private static bool HasDecodableCallables(
+        CompilerManifestArtifact value,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _ = CompilerLoweredArtifact.Decode(
+                value.Callables,
+                value.Manifest,
+                value.Compilation,
+                cancellationToken);
+            return true;
+        }
+        catch (InvalidDataException)
+        {
+            return false;
+        }
     }
 
     private static bool HasValidEnvelope(CompilerManifestArtifact? value)
@@ -412,7 +523,8 @@ internal static class CompilerManifestArtifactJson
         WorkerProtocolJson.IsDefined(value.Features, WorkerFeatureSet.Unspecified) &&
         WorkerProtocolJson.IsSha256(value.CompilationSha256) &&
         value.CompilationSha256 == CompilationFingerprint.ComputeSha256(
-            value.Compilation, value.CompilerDiagnostics) &&
+            value.Compilation, value.CompilerDiagnostics,
+            value.MaximumExpressionDepth) &&
         WorkerProtocolJson.ValidateManifest(value.Manifest).IsValid;
     }
 
@@ -529,8 +641,35 @@ internal static class CompilerManifestArtifactJson
                 }
             }
 
+            var loweredAuthorities = lowered.EffectAuthorities;
+            if (loweredAuthorities == null ||
+                loweredAuthorities.Length != effects.Length)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < effects.Length; index++)
+            {
+                if (!CompilerEffectAuthority.Matches(
+                        loweredEffects[index],
+                        loweredAuthorities[index],
+                        effects[index]!,
+                        value.Compilation))
+                {
+                    return false;
+                }
+            }
+
             if (lowered.FailureReason != CompilerCallableArtifactReasonCatalog.SuccessReason)
             {
+                if (lowered.Graph != null ||
+                    lowered.Body != null ||
+                    lowered.Clauses is not { Length: 0 } ||
+                    lowered.Variables is not { Length: 0 })
+                {
+                    return false;
+                }
+
                 continue;
             }
 
@@ -635,11 +774,12 @@ internal static class CompilerManifestArtifactJson
 
     private static bool HasValidDiagnostics(
         CompilerDiagnosticArtifact[]? diagnostics,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        CancellationToken cancellationToken)
     {
         return HasValidDiagnosticShapes(diagnostics) &&
             CompilerDiagnosticArtifactOrdering.IsCanonical(diagnostics!) &&
-            diagnostics!.All(item => HasValidDiagnosticBinding(item, compilation));
+            diagnostics!.All(item => HasValidDiagnosticBinding(item, compilation, cancellationToken));
     }
 
     private static bool HasValidDiagnosticShapes(
@@ -649,13 +789,17 @@ internal static class CompilerManifestArtifactJson
             item != null &&
             WorkerProtocolJson.IsCompilerDiagnosticCode(item.Code) &&
             !string.IsNullOrWhiteSpace(item.Message) &&
+            item.SourceTreePath != null &&
+            item.SourceTreeSha256 != null &&
+            item.SourceLineMapSha256 != null &&
             item.Location is { Path: not null } location &&
             WorkerProtocolJson.HasValidLocationOrNone(location)) == true;
     }
 
     private static bool HasValidDiagnosticBinding(
         CompilerDiagnosticArtifact value,
-        CompilerCompilationSnapshot? compilation)
+        CompilerCompilationSnapshot? compilation,
+        CancellationToken cancellationToken)
     {
         if (value?.Location is not { } location)
         {
@@ -682,11 +826,13 @@ internal static class CompilerManifestArtifactJson
             value.SourceTreePath,
             value.SourceTreeSha256,
             value.SourceLineMapSha256,
-            compilation);
+            compilation,
+            cancellationToken: cancellationToken);
     }
 
     private static bool HasValidLocationAuthorities(
-        CompilerManifestArtifact? value)
+        CompilerManifestArtifact? value,
+        CancellationToken cancellationToken)
     {
         if (value?.LocationAuthorities is not { } authorities ||
             value.Manifest is not { } manifest ||
@@ -725,6 +871,7 @@ internal static class CompilerManifestArtifactJson
 
         for (var index = 0; index < expected.Length; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var authority = authorities[index];
             var row = expected[index];
             if (!Enum.IsDefined(
@@ -743,7 +890,8 @@ internal static class CompilerManifestArtifactJson
                     authority.SourceTreeSha256,
                     authority.SourceLineMapSha256,
                     compilation,
-                    allowNone: true))
+                    allowNone: true,
+                    cancellationToken: cancellationToken))
             {
                 return false;
             }
@@ -842,14 +990,21 @@ internal static class CompilerManifestArtifactFile
 
     internal static byte[] ReadAllBytes(
         string path,
-        int maximumBytes = MaximumBytes)
+        int maximumBytes = MaximumBytes,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         using var stream = Open(path, out var length, maximumBytes);
+        cancellationToken.ThrowIfCancellationRequested();
         var bytes = new byte[length];
         var offset = 0;
         while (offset < bytes.Length)
         {
-            var read = stream.Read(bytes, offset, bytes.Length - offset);
+            cancellationToken.ThrowIfCancellationRequested();
+            var read = stream.Read(
+                bytes,
+                offset,
+                Math.Min(64 * 1024, bytes.Length - offset));
             if (read == 0)
             {
                 throw new InvalidDataException(
@@ -858,7 +1013,9 @@ internal static class CompilerManifestArtifactFile
 
             offset += read;
         }
+        cancellationToken.ThrowIfCancellationRequested();
         EnsureEndOfFile(stream.ReadByte());
+        cancellationToken.ThrowIfCancellationRequested();
         return bytes;
     }
 

@@ -29,6 +29,54 @@ public sealed class ContractApiIdentityResolverTests
         }
     }
 
+    [Test]
+    public void ExactInMemoryPackagePayloadIsAccepted()
+    {
+        var assembly = typeof(SharpProof.Attributes.Contract).Assembly;
+        var reference = MetadataReference.CreateFromImage(
+            File.ReadAllBytes(assembly.Location));
+        var resolver = ContractApiIdentityResolver.ForCompilation(
+            CreateConsumer(reference));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reference.FilePath, Is.Null);
+            Assert.That(resolver.Contract, Is.Not.Null);
+            Assert.That(
+                resolver.ResolveAttribute(ContractApiMetadata.NotNull),
+                Is.Not.Null);
+        }
+    }
+
+    [Test]
+    public void DuplicateAuthenticReferenceViewsRemainAccepted()
+    {
+        var assembly = typeof(SharpProof.Attributes.Contract).Assembly;
+        var reference = MetadataReference.CreateFromFile(assembly.Location);
+        var resolver = ContractApiIdentityResolver.ForCompilation(
+            CreateConsumer(reference, duplicateReference: true));
+
+        Assert.That(resolver.Contract, Is.Not.Null);
+    }
+
+    [Test]
+    public void UnapprovedInMemoryContractPayloadIsRejected()
+    {
+        var reference = MetadataReference.CreateFromImage(
+            EmitContractImage(validContractShape: true));
+        var resolver = ContractApiIdentityResolver.ForCompilation(
+            CreateConsumer(reference));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(reference.FilePath, Is.Null);
+            Assert.That(resolver.Contract, Is.Null);
+            Assert.That(
+                resolver.ResolveAttribute(ContractApiMetadata.NotNull),
+                Is.Null);
+        }
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void UnapprovedContractPayloadRejectsSamePackageAttributes(
@@ -105,7 +153,8 @@ public sealed class ContractApiIdentityResolverTests
     }
 
     private static CSharpCompilation CreateConsumer(
-        PortableExecutableReference contractReference)
+        PortableExecutableReference contractReference,
+        bool duplicateReference = false)
     {
         var tree = CSharpSyntaxTree.ParseText(
             """
@@ -127,7 +176,9 @@ public sealed class ContractApiIdentityResolverTests
         var compilation = CSharpCompilation.Create(
             "MalformedContractConsumer",
             [tree],
-            PlatformReferences.Add(contractReference),
+            duplicateReference
+                ? PlatformReferences.Add(contractReference).Add(contractReference)
+                : PlatformReferences.Add(contractReference),
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));

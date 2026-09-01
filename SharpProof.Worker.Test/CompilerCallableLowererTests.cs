@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -91,19 +90,53 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
-    public void ResolvedSpecCallIsBoundToExactLoweredInstruction()
+    public void LeadingGotoCannotSelectAnUnreachableReturnBeforeAReachableLoop()
     {
         var preparation = Prepare(
             """
             using SharpProof.Attributes;
             internal static class Subject {
-                internal static int Absolute(int value) {
-                    Contract.Ensures(Contract.Result<int>() >= 0);
-                    return System.Math.Abs(value);
+                internal static int SelectReachable(int value) {
+                    Contract.Ensures(
+                        Contract.Result<int>() == value);
+                    goto Loop;
+                Dead:
+                    return 0;
+
+                Loop:
+                    if (value == 0) {
+                        return value;
+                    }
+                    value = value - 1;
+                    goto Loop;
                 }
             }
             """,
-            "Absolute");
+            "SelectReachable");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.False);
+            Assert.That(
+                preparation.FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+        }
+    }
+
+    [Test]
+    public void ResolvedNonThrowingSpecCallIsBoundToExactLoweredInstruction()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static string Concat(string left, string right) {
+                    Contract.Ensures(Contract.Result<string>() != null);
+                    return string.Concat(left, right);
+                }
+            }
+            """,
+            "Concat");
 
         Assert.That(
             preparation.IsSuccess,
@@ -119,10 +152,36 @@ public sealed class CompilerCallableLowererTests
         {
             Assert.That(
                 descriptor.WitnessIdentifier,
-                Is.EqualTo("bcl.math.abs.int32"));
-            Assert.That(descriptor.CallIdentity, Is.EqualTo("M:System.Math.Abs(System.Int32)"));
+                Is.EqualTo("bcl.string.concat.string-string"));
+            Assert.That(
+                descriptor.CallIdentity,
+                Is.EqualTo("M:System.String.Concat(System.String,System.String)"));
             Assert.That(descriptor.ConsumesMemoryHavoc, Is.False);
             Assert.That(call.Id, Is.EqualTo(descriptor.Instruction));
+        }
+    }
+
+    [Test]
+    public void MayThrowSpecCallWithoutCompletionConditionIsRejected()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Absolute(int value) {
+                    Contract.Ensures(Contract.Result<int>() >= 0);
+                    return System.Math.Abs(value);
+                }
+            }
+            """,
+            "Absolute");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(preparation.IsSuccess, Is.False);
+            Assert.That(
+                preparation.FailureReason,
+                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
         }
     }
 
@@ -166,6 +225,67 @@ public sealed class CompilerCallableLowererTests
             Assert.That(descriptor.NormalRelation.Type, Is.EqualTo(preparation.Factory.BooleanType));
             Assert.That(call.Id, Is.EqualTo(descriptor.Instruction));
         }
+    }
+
+    [Test]
+    public void RelativeSourceSummaryTreePathBindsToCapturedSnapshot()
+    {
+        var parse = new CSharpParseOptions(
+            LanguageVersion.CSharp12,
+            preprocessorSymbols: [Contract.ConditionalSymbol]);
+        var mainPath = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "RelativeSummarySubject.cs");
+        var trees = new[]
+        {
+            CSharpSyntaxTree.ParseText(
+                """
+                #undef SHARPPROOF_CONTRACTS
+                using SharpProof.Attributes;
+                internal static class Subject {
+                    internal static bool Verify(bool value) {
+                        Contract.Ensures(
+                            Contract.Result<bool>() == value);
+                        return Helper.Read(value);
+                    }
+                }
+                """,
+                parse,
+                mainPath),
+            CSharpSyntaxTree.ParseText(
+                """
+                #undef SHARPPROOF_CONTRACTS
+                internal static class Helper {
+                    internal static bool Read(bool value) => value;
+                }
+                """,
+                parse,
+                "generated/helper.g.cs")
+        };
+        var compilation = CSharpCompilation.Create(
+            "RelativeSourceSummaryTreePath",
+            trees,
+            WorkerTestMetadataReferences.WithSharpProof,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var discovery = new ClaimManifestBuilder(compilation).Build();
+
+        var artifact = CompilerManifestArtifactProducer.Create(
+            compilation,
+            TestContext.CurrentContext.WorkDirectory,
+            "net8.0",
+            WorkerFeatureSet.All,
+            discovery,
+            WorkerBudgets.DefaultMaximumExpressionDepth,
+            CancellationToken.None);
+
+        var evidence = artifact.Compilation.SummaryEvidence.Single(row =>
+            row.Origin == CompilerSummaryOrigin.Source);
+        Assert.That(
+            evidence.SourcePath,
+            Is.EqualTo(CompilerCaptureAuthority.NormalizePath(
+                "generated/helper.g.cs")));
     }
 
     [Test]
@@ -312,7 +432,7 @@ public sealed class CompilerCallableLowererTests
     }
 
     [Test]
-    public async Task MixedEffectAndRequiresUnsupportedBodyIsTypedIncomplete()
+    public async Task MixedEffectAndRequiresUnsupportedBodyPreservesEffectEvidence()
     {
         var preparation = Prepare(
             """
@@ -339,18 +459,31 @@ public sealed class CompilerCallableLowererTests
                 Is.EqualTo(WorkerClaimReason.UnsupportedBody));
             Assert.That(preparation.Entry.ClaimIds, Has.Length.EqualTo(1));
             Assert.That(
+                preparation.EffectClaims.Single().Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Proven));
+            Assert.That(
                 verification.Callable.Coverage,
-                Is.EqualTo(WorkerCallableCoverage.Incomplete));
+                Is.EqualTo(WorkerCallableCoverage.Complete));
             Assert.That(
                 verification.Callable.Reason,
-                Is.EqualTo(WorkerCallableCoverageReason.SemanticUnknown));
+                Is.EqualTo(WorkerCallableCoverageReason.None));
             Assert.That(verification.Claims, Has.Length.EqualTo(1));
             Assert.That(
                 verification.Claims[0].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
+                Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(
                 verification.Claims[0].Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
+                Is.EqualTo(WorkerClaimReason.None));
+            Assert.That(
+                verification.Claims[0].EffectCertainty,
+                Is.EqualTo(
+                    WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
+            Assert.That(
+                verification.Claims[0].ProofCore,
+                Is.EqualTo([
+                    "compiler-effect:" + preparation.EffectClaims.Single()
+                        .EvidenceSha256
+                ]));
         }
     }
 
@@ -451,6 +584,44 @@ public sealed class CompilerCallableLowererTests
             Throws.InstanceOf<OperationCanceledException>());
     }
 
+    [Test]
+    public async Task UnsignaledBackendCancellationIsInfrastructureFailure()
+    {
+        var preparation = Prepare(
+            """
+            using SharpProof.Attributes;
+            internal static class Subject {
+                internal static int Identity(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return value;
+                }
+            }
+            """,
+            "Identity");
+        using var projectBoundary = new CancellationTokenSource();
+
+        var verification = await CallableVerificationPolicy.VerifyTargetAsync(
+            new CallableVerifier(
+                new UnsignaledCancellationBackend(),
+                WorkerBudgets.DefaultMaximumExpressionDepth),
+            preparation,
+            new WorkerBudgets(),
+            null,
+            WorkerBudgets.DefaultMethodWallTimeMilliseconds,
+            projectBoundary,
+            CancellationToken.None);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                verification.Callable.Reason,
+                Is.EqualTo(WorkerCallableCoverageReason.InfrastructureFailure));
+            Assert.That(
+                verification.Claims.Select(static claim => claim.Reason),
+                Is.All.EqualTo(WorkerClaimReason.InfrastructureFailure));
+        }
+    }
+
     private static CompilerCallablePreparation Prepare(
         string source,
         string methodName)
@@ -500,14 +671,10 @@ public sealed class CompilerCallableLowererTests
         var parse = new CSharpParseOptions(
             LanguageVersion.CSharp12,
             preprocessorSymbols: [Contract.ConditionalSymbol]);
-        var paths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Append(typeof(Contract).Assembly.Location)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
         var compilation = CSharpCompilation.Create(
             "CompilerCallableLowererTests",
             [CSharpSyntaxTree.ParseText(source, parse, "Subject.cs")],
-            paths.Select(static path => MetadataReference.CreateFromFile(path)),
+            WorkerTestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
@@ -535,6 +702,17 @@ public sealed class CompilerCallableLowererTests
             Interlocked.Increment(ref _callCount);
             throw new AssertionException(
                 "A zero-claim callable reached the SMT backend.");
+        }
+    }
+
+    private sealed class UnsignaledCancellationBackend : ISmtBackend
+    {
+        public Task<BackendCheckResult> CheckAsync(
+            VerificationQuery query,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromException<BackendCheckResult>(
+                new OperationCanceledException());
         }
     }
 }

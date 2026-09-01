@@ -24,7 +24,8 @@ internal sealed class CompilerResponseEvidenceAuthority :
         _targets = targets;
     }
 
-    public IEnumerable<string> Validate(WorkerVerifyResponse response)
+    public IEnumerable<string> Validate(WorkerVerifyResponse response,
+        CancellationToken cancellationToken = default)
     {
         if (response == null)
         {
@@ -41,6 +42,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
         foreach (var target in _targets)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!callables.TryGetValue(target.Entry.CallableId, out var callable))
             {
                 continue;
@@ -51,7 +53,8 @@ internal sealed class CompilerResponseEvidenceAuthority :
             {
                 if (claims.TryGetValue(claimId, out var claim))
                 {
-                    ValidateClaim(target, claim, errors);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    ValidateClaim(target, claim, errors, cancellationToken);
                 }
             }
         }
@@ -74,7 +77,8 @@ internal sealed class CompilerResponseEvidenceAuthority :
     private static void ValidateClaim(
         CompilerCallablePreparation target,
         WorkerClaimResult result,
-        HashSet<string> errors)
+        HashSet<string> errors,
+        CancellationToken cancellationToken)
     {
         if (!target.IsSuccess)
         {
@@ -135,7 +139,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         }
         else
         {
-            ValidatePostconditionClaim(target, result, errors);
+            ValidatePostconditionClaim(target, result, errors, cancellationToken);
         }
     }
 
@@ -144,9 +148,16 @@ internal sealed class CompilerResponseEvidenceAuthority :
         WorkerClaimResult result,
         HashSet<string> errors)
     {
-        var isEffect = target.EffectClaims.Any(
+        var effect = target.EffectClaims.FirstOrDefault(
             evidence => evidence.ClaimId == result.ClaimId);
-        var expectedCertainty = isEffect
+        if (effect != null &&
+            target.FailureReason != WorkerClaimReason.UnsupportedCallable)
+        {
+            ValidateFailedTargetEffectClaim(target, effect, result, errors);
+            return;
+        }
+
+        var expectedCertainty = effect != null
             ? WorkerEffectEvidenceCertainty.Unavailable
             : WorkerEffectEvidenceCertainty.Unspecified;
 
@@ -166,6 +177,44 @@ internal sealed class CompilerResponseEvidenceAuthority :
             target.Entry.Assumptions,
             [],
             errors);
+    }
+
+    private static void ValidateFailedTargetEffectClaim(
+        CompilerCallablePreparation target,
+        CompilerEffectClaimArtifact evidence,
+        WorkerClaimResult result,
+        HashSet<string> errors)
+    {
+        var replayFailed = evidence.Outcome == WorkerClaimOutcome.Refuted &&
+            result.Outcome == WorkerClaimOutcome.Unknown &&
+            result.Reason == WorkerClaimReason.CounterexampleReplayFailed &&
+            result.EffectCertainty ==
+                WorkerEffectEvidenceCertainty.Unavailable;
+        var matchesCompilerEvidence =
+            result.Outcome == evidence.Outcome &&
+            result.Reason == evidence.Reason &&
+            result.EffectCertainty == evidence.Certainty;
+        if (!replayFailed && !matchesCompilerEvidence)
+        {
+            errors.Add("response.evidence_authority");
+        }
+
+        IEnumerable<string> expectedUsed =
+            result.Outcome == WorkerClaimOutcome.Proven &&
+            result.EffectCertainty ==
+                WorkerEffectEvidenceCertainty.TrustedCompleteBoundary
+                    ? target.Entry.Assumptions
+                        .Where(static assumption =>
+                            assumption.Kind ==
+                                WorkerAssumptionKind.TrustedBoundary)
+                        .Select(static assumption => assumption.Id)
+                    : [];
+        ValidateAssumptionShape(
+            result.Assumptions,
+            target.Entry.Assumptions,
+            expectedUsed,
+            errors);
+        ValidateEffectClaim(target, evidence, result, errors);
     }
 
     private static void ValidateAssumptionShape(
@@ -245,7 +294,8 @@ internal sealed class CompilerResponseEvidenceAuthority :
     private static void ValidatePostconditionClaim(
         CompilerCallablePreparation target,
         WorkerClaimResult result,
-        HashSet<string> errors)
+        HashSet<string> errors,
+        CancellationToken cancellationToken)
     {
         if (!IsCanonicalProofCore(result.ProofCore) ||
             !IsCanonicalModel(result.Model))
@@ -257,7 +307,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         {
             if (result.ProofCore is { Length: > 0 } ||
                 result.Vacuity != WorkerVacuityKind.None ||
-                !TryReplayPostcondition(target, result, out _))
+                !TryReplayPostcondition(target, result, out _, cancellationToken))
             {
                 errors.Add("response.model_authority");
             }
@@ -595,11 +645,20 @@ internal sealed class CompilerResponseEvidenceAuthority :
         var unexpectedEffects = witness.Effects & ~evidence.Constraint.AllowedEffects;
         var unexpectedCapabilities =
             witness.Capabilities & ~evidence.Constraint.AllowedCapabilities;
+        const WorkerEffectSet impureState =
+            WorkerEffectSet.ReadsCapturedState |
+            WorkerEffectSet.ReadsStaticState |
+            WorkerEffectSet.ReadsAmbientState |
+            WorkerEffectSet.WritesReceiverState |
+            WorkerEffectSet.WritesArgumentState |
+            WorkerEffectSet.WritesCapturedState |
+            WorkerEffectSet.WritesStaticState |
+            WorkerEffectSet.WritesAmbientState;
         return evidence.ContractKind switch
         {
             WorkerEffectContractKind.EnforcePure =>
-                witness.Effects != WorkerEffectSet.None ||
-                witness.Capabilities != WorkerEffectCapabilitySet.None,
+                witness.Capabilities != WorkerEffectCapabilitySet.None ||
+                (witness.Effects & impureState) != WorkerEffectSet.None,
             WorkerEffectContractKind.ZeroAllocations =>
                 (witness.Effects & WorkerEffectSet.Allocates) != 0,
             WorkerEffectContractKind.AllowedCapabilities =>
@@ -625,11 +684,12 @@ internal sealed class CompilerResponseEvidenceAuthority :
     private static bool TryReplayPostcondition(
         CompilerCallablePreparation target,
         WorkerClaimResult result,
-        out ImmutableDictionary<IrVarId, IrValue> model)
+        out ImmutableDictionary<IrVarId, IrValue> model,
+        CancellationToken cancellationToken = default)
     {
         model = ImmutableDictionary<IrVarId, IrValue>.Empty;
         if (!TryCreateModel(target, result.Model, out model) ||
-            !EntryAssumptionsHold(target, model) ||
+            !EntryAssumptionsHold(target, model, cancellationToken) ||
             target.Body is not { } body)
         {
             return false;
@@ -637,6 +697,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var final = model.ToBuilder();
             if (body.Kind == CompilerPreparedBodyKind.Program)
             {
@@ -649,6 +710,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
                 var initial = ImmutableDictionary.CreateBuilder<IrVarId, IrValue>();
                 foreach (var binding in body.ParameterBindings)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (!model.TryGetValue(binding.Value, out var value))
                     {
                         return false;
@@ -667,7 +729,8 @@ internal sealed class CompilerResponseEvidenceAuthority :
                 var execution = new IrProgramInterpreter(target.Factory).Execute(
                     program,
                     initial.ToImmutable(),
-                    (int)maximumSteps);
+                    (int)maximumSteps,
+                    cancellationToken);
                 if (execution.Status != IrProgramExecutionStatus.Returned)
                 {
                     return false;
@@ -675,6 +738,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
                 foreach (var binding in body.ParameterBindings)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (!execution.Values.TryGetValue(binding.Key, out var value))
                     {
                         return false;
@@ -712,6 +776,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
             foreach (var variable in target.Variables.Where(static variable =>
                          variable.Role == CompilerVariableRole.PreState))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!variable.CurrentStateVariable.HasValue ||
                     !model.TryGetValue(variable.CurrentStateVariable.Value, out var value) ||
                     value.Type != target.Factory.GetVariableInfo(variable.Variable).Type)
@@ -720,6 +785,22 @@ internal sealed class CompilerResponseEvidenceAuthority :
                 }
 
                 final[variable.Variable] = value;
+            }
+
+            foreach (var variable in target.Variables)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!final.TryGetValue(variable.Variable, out var value))
+                {
+                    continue;
+                }
+
+                if (!CompilerSourceIntegerDomain.Contains(
+                        variable.SourceIntegerInterval,
+                        value))
+                {
+                    return false;
+                }
             }
 
             var ensures = target.Clauses.Where(static clause =>
@@ -733,7 +814,9 @@ internal sealed class CompilerResponseEvidenceAuthority :
             }
 
             var evaluated = new IrInterpreter(target.Factory).Evaluate(
-                ensures[ordinal].Condition, final);
+                ensures[ordinal].Condition,
+                final,
+                cancellationToken);
             return evaluated.Status == IrEvaluationStatus.Value &&
                 evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: false };
         }
@@ -747,14 +830,19 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
     private static bool EntryAssumptionsHold(
         CompilerCallablePreparation target,
-        IReadOnlyDictionary<IrVarId, IrValue> model)
+        IReadOnlyDictionary<IrVarId, IrValue> model,
+        CancellationToken cancellationToken)
     {
         var interpreter = new IrInterpreter(target.Factory);
         foreach (var clause in target.Clauses.Where(static clause =>
                      clause.Kind is CompilerContractKind.Requires or
                          CompilerContractKind.Assume))
         {
-            var evaluated = interpreter.Evaluate(clause.Condition, model);
+            cancellationToken.ThrowIfCancellationRequested();
+            var evaluated = interpreter.Evaluate(
+                clause.Condition,
+                model,
+                cancellationToken);
             if (evaluated.Status != IrEvaluationStatus.Value ||
                 evaluated.Value is not { Kind: IrValueKind.Boolean, Boolean: true })
             {

@@ -152,7 +152,7 @@ internal static class CompilerEffectClaimArtifactCodec
         }
 
         return replay.Events.Select((item, index) =>
-                HasValidReplayEvent(item, index)).All(static valid => valid);
+            HasValidReplayEvent(item, index)).All(static valid => valid);
     }
 
     private static bool HasValidReplayEvent(CompilerEffectReplayEventArtifact? value, int ordinal)
@@ -164,6 +164,7 @@ internal static class CompilerEffectClaimArtifactCodec
             !WorkerProtocolJson.IsSha256(value.SyntaxTreeSnapshotSha256) ||
             !WorkerProtocolJson.IsSha256(value.SyntaxTreeLineMapSha256) ||
             value.SourceTreeOrdinal < 0 ||
+            value.SourceTreeOrdinal != value.SyntaxTreeOrdinal ||
             string.IsNullOrWhiteSpace(value.SourceTreePath) ||
             !WorkerProtocolJson.IsSha256(value.SourceTreeSha256) ||
             !WorkerProtocolJson.IsSha256(value.SourceLineMapSha256) ||
@@ -175,7 +176,7 @@ internal static class CompilerEffectClaimArtifactCodec
             !HasOptionalText(value.TypeDocumentationId) ||
             !HasOptionalText(value.SpecWitnessIdentifier) ||
             value.ScalarOperands is not { Length: 0 } ||
-            value.ExactExceptionTypeHierarchy is not { Length: 0 } ||
+            value.ExactExceptionTypeHierarchy is not { } ||
             !WorkerProtocolJson.HasValidLocation(value.Location) ||
             value.Location.Start != value.SyntaxStart ||
             value.Location.Length != value.SyntaxLength)
@@ -183,14 +184,31 @@ internal static class CompilerEffectClaimArtifactCodec
             return false;
         }
 
-        return value.Kind == CompilerEffectReplayEventKind.ManagedObjectAllocation
-            ?
+        if (value.SpecWitnessIdentifier != null)
+        {
+            return false;
+        }
+
+        return value.Kind switch
+        {
+            CompilerEffectReplayEventKind.ManagedObjectAllocation or
+            CompilerEffectReplayEventKind.MonitorCall =>
                 !string.IsNullOrWhiteSpace(value.MemberIdentity) &&
-                value.SpecWitnessIdentifier == null
-            :
+                value.ExactExceptionTypeHierarchy.Length == 0,
+            CompilerEffectReplayEventKind.ManagedArrayAllocation or
+            CompilerEffectReplayEventKind.EmptyLock =>
                 string.IsNullOrEmpty(value.MemberIdentity) &&
                 value.MemberDocumentationId == null &&
-                value.SpecWitnessIdentifier == null;
+                value.ExactExceptionTypeHierarchy.Length == 0,
+            CompilerEffectReplayEventKind.ExplicitThrow =>
+                !string.IsNullOrWhiteSpace(value.MemberIdentity) &&
+                value.ExactExceptionTypeHierarchy.Length > 0 &&
+                HasCanonicalStrings(value.ExactExceptionTypeHierarchy) &&
+                value.ExactExceptionTypeHierarchy.Contains(
+                    value.TypeIdentity,
+                    StringComparer.Ordinal),
+            _ => false
+        };
     }
 
     private static bool HasOptionalText(string? value)
@@ -290,7 +308,10 @@ internal static class CompilerEffectClaimArtifactCodec
             hash.Add(value.OperationIdentitySha256);
         }
 
-        hash.Add(value.MemberIdentity, value.MemberDocumentationId,
+        // Array-allocation events canonically have no member identity. Treat
+        // the wire-level null and empty representations as the same value so
+        // replay semantics and operation hashes cannot diverge.
+        hash.Add(value.MemberIdentity ?? string.Empty, value.MemberDocumentationId,
             value.TypeIdentity, value.TypeDocumentationId,
             value.SpecWitnessIdentifier);
         hash.Add(value.SourceTreeOrdinal, value.SourceTreePath,

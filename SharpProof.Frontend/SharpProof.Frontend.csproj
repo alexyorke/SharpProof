@@ -44,11 +44,24 @@
       <Output TaskParameter="Items"
               ItemName="_SharpProofAttributesHashed" />
     </GetFileHash>
+    <Exec Command="pwsh -NoLogo -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)/../scripts/Get-SharpProofModuleVersionId.ps1&quot; -Path &quot;%(_SharpProofAttributesTargetPath.FullPath)&quot;"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput"
+              ItemName="_SharpProofAttributesModuleVersionId" />
+    </Exec>
+    <Error Condition="'@(_SharpProofAttributesModuleVersionId)' == ''"
+           Text="SharpProof.Attributes module version ID was not resolved." />
     <ItemGroup>
       <_SharpProofAttributesPayloadIdentity
           Include="System.Reflection.AssemblyMetadataAttribute">
         <_Parameter1>SharpProof.Attributes.SHA256</_Parameter1>
         <_Parameter2>%(_SharpProofAttributesHashed.FileHash)</_Parameter2>
+      </_SharpProofAttributesPayloadIdentity>
+      <_SharpProofAttributesPayloadIdentity
+          Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>SharpProof.Attributes.MVID</_Parameter1>
+        <_Parameter2>@(_SharpProofAttributesModuleVersionId)</_Parameter2>
       </_SharpProofAttributesPayloadIdentity>
     </ItemGroup>
     <WriteCodeFragment Language="C#"

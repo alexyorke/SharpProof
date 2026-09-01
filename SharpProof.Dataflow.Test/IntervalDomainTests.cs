@@ -41,6 +41,62 @@ public sealed class IntervalDomainTests
     }
 
     [Test]
+    public void SignedCarrierEndpointsCanonicalizeToUnboundedBounds()
+    {
+        var fullRange = _domain.Range(long.MinValue, long.MaxValue);
+        var lowerEndpoint = _domain.Range(long.MinValue, 0);
+        var upperEndpoint = _domain.Range(0, long.MaxValue);
+
+        Assert.That(fullRange, Is.EqualTo(_domain.Top));
+        Assert.That(fullRange.LowerBound, Is.Null);
+        Assert.That(fullRange.UpperBound, Is.Null);
+        Assert.That(lowerEndpoint.LowerBound, Is.Null);
+        Assert.That(upperEndpoint.UpperBound, Is.Null);
+        Assert.That(_domain.AreEquivalent(fullRange, _domain.Top), Is.True);
+    }
+
+    [Test]
+    public void SignedCarrierEndpointsCanonicalizeForCongruentIntervals()
+    {
+        var explicitLowerEndpoint = _domain.Create(long.MinValue, 0, 3, 0);
+        var explicitUpperEndpoint = _domain.Create(0, long.MaxValue, 3, 0);
+
+        Assert.That(
+            explicitLowerEndpoint,
+            Is.EqualTo(_domain.Create(null, 0, 3, 0)));
+        Assert.That(explicitLowerEndpoint.LowerBound, Is.Null);
+        Assert.That(
+            explicitUpperEndpoint,
+            Is.EqualTo(_domain.Create(0, null, 3, 0)));
+        Assert.That(explicitUpperEndpoint.UpperBound, Is.Null);
+    }
+
+    [Test]
+    public void Int64BoundaryRangesHaveOneCanonicalRepresentation()
+    {
+        var implicitLower = _domain.Range(null, 5);
+        var explicitLower = _domain.Range(long.MinValue, 5);
+        var implicitUpper = _domain.Range(-5, null);
+        var explicitUpper = _domain.Range(-5, long.MaxValue);
+        var addedLower = _domain.Add(
+            _domain.Range(long.MinValue, 0),
+            _domain.Range(0, 5));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(explicitLower, Is.EqualTo(implicitLower));
+            Assert.That(
+                explicitLower.GetHashCode(),
+                Is.EqualTo(implicitLower.GetHashCode()));
+            Assert.That(explicitUpper, Is.EqualTo(implicitUpper));
+            Assert.That(
+                explicitUpper.GetHashCode(),
+                Is.EqualTo(implicitUpper.GetHashCode()));
+            Assert.That(addedLower, Is.EqualTo(implicitLower));
+        }
+    }
+
+    [Test]
     public void JoinComputesCongruenceHull()
     {
         var joined = _domain.Join(_domain.Constant(2), _domain.Constant(6));

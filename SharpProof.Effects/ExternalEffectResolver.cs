@@ -73,6 +73,8 @@ internal sealed class ExternalEffectResolver
 
         EffectSummary? resolved = null;
         var preconditionFree = true;
+        var invalidAttributes =
+            ImmutableArray.CreateBuilder<EffectContractInvalidAttribute>();
         foreach (var attribute in attributes)
         {
             if (!TryDecodeContract(
@@ -81,23 +83,29 @@ internal sealed class ExternalEffectResolver
                     out var candidate,
                     out var candidatePreconditionFree))
             {
-                return Invalid(attribute, "expected a complete, internally consistent effect summary");
+                invalidAttributes.Add(new(
+                    attribute,
+                    "expected a complete, internally consistent effect summary"));
+                continue;
             }
             if (resolved != null && !resolved.Equals(candidate))
             {
-                return Invalid(attribute, "expected duplicate declarations to describe identical effects");
+                invalidAttributes.Add(new(
+                    attribute,
+                    "expected duplicate declarations to describe identical effects"));
+                continue;
             }
             resolved = candidate;
             preconditionFree &= candidatePreconditionFree;
+        }
+        if (invalidAttributes.Count != 0)
+        {
+            return Invalid(invalidAttributes.ToImmutable());
         }
         if (!_trustedBoundaries.AuthorizesDeclaredContracts(method))
         {
             return new(EffectContractResolutionKind.Untrusted, resolved!);
         }
-
-        // An external instance contract cannot certify that a companion
-        // contract is precondition-free until companion metadata is bound.
-        preconditionFree &= method.IsStatic;
 
         if (resolved!.Completeness != EffectCompleteness.Complete)
         {
@@ -119,12 +127,13 @@ internal sealed class ExternalEffectResolver
         return new(EffectContractResolutionKind.Valid, resolved!);
     }
 
-    private static EffectContractResolution Invalid(AttributeData attribute, string reason)
+    private static EffectContractResolution Invalid(
+        ImmutableArray<EffectContractInvalidAttribute> invalidAttributes)
     {
         return new(
             EffectContractResolutionKind.Invalid,
             EffectSummaryOperations.UnknownBoundary(EffectUncertainty.InvalidContract),
-            attribute, reason);
+            invalidAttributes);
     }
 
     private IEnumerable<AttributeData> EnumerateDirectContractAttributes(IMethodSymbol method)

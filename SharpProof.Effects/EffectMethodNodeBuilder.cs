@@ -10,6 +10,8 @@ internal sealed class EffectMethodNodeBuilder
     private readonly EffectAnalysisSession _session;
     private readonly Compilation _compilation;
     private readonly ManagedAbstractFlow _managedFlow;
+    private readonly Dictionary<INamedTypeSymbol, EffectBeforeFieldInitNode>
+        _beforeFieldInitNodes = new(SymbolEqualityComparer.Default);
 
     internal EffectMethodNodeBuilder(
         EffectAnalysisSession session,
@@ -32,6 +34,13 @@ internal sealed class EffectMethodNodeBuilder
             return new EffectMethodNode(EffectSummaryOperations.UnknownBoundary(
                 EffectUncertainty.UnsupportedOperation), [], []);
         }
+        if (TryBuildNonCompletingStaticInitialization(
+                method,
+                cancellationToken,
+                out var initialization))
+        {
+            return initialization;
+        }
 
         var graph = TryCreateControlFlowGraph(root, cancellationToken);
         var abstractAnalysis = graph == null
@@ -45,23 +54,39 @@ internal sealed class EffectMethodNodeBuilder
             _session, method, calls, root, abstractAnalysis?.Result,
             allowDirectWitnesses:
                 graph != null &&
-                HasDefiniteBodyEntry(method, _session.ApiSpecs));
-        var initializers = ScanConstructorMemberInitializers(
+                HasDefiniteBodyEntry(method, _session.ApiSpecs),
+            cancellationToken);
+        var preBodyInitializers = method.MethodKind ==
+            MethodKind.StaticConstructor
+                ? ScanConstructorMemberInitializers(
+                    method,
+                    scanner,
+                    cancellationToken)
+                : EffectStep.Empty;
+        var constructorPlan = CreateConstructorInitializationPlan(
             method,
+            root,
             scanner,
             cancellationToken);
-        var localSummary = initializers.Summary;
-        if (initializers.CompletesNormally)
+        EnsureBeforeFieldInitNode(method, cancellationToken);
+        var localSummary = preBodyInitializers.Summary;
+        if (preBodyInitializers.CompletesNormally)
         {
-            var bodySummary = graph == null
-                ? EffectSummaryOperations.Join(
-                    scanner.Scan(root),
-                    EffectSummaryOperations.Unsupported())
-                : AnalyzeControlFlowGraph(graph, scanner);
+            var bodyAnalysis = graph == null
+                ? AnalyzeWithoutControlFlowGraph(
+                    root,
+                    scanner,
+                    constructorPlan)
+                : AnalyzeControlFlowGraph(
+                    graph,
+                    scanner,
+                    constructorPlan);
+            var bodySummary = bodyAnalysis.Summary;
 
             // Cyclic scalar flow does not invalidate the conservative
             // all-block effect scan.
-            if (abstractAnalysis is
+            if (bodyAnalysis.BodyEntryReached &&
+                abstractAnalysis is
                 {
                     IsComplete: false,
                     IncompleteReason: not
@@ -74,11 +99,19 @@ internal sealed class EffectMethodNodeBuilder
                         abstractAnalysis.IncompleteReason));
             }
 
+            var lexicalRoot = bodyAnalysis.BodyEntryReached ||
+                constructorPlan == null
+                    ? root
+                    : constructorPlan.Value.Initializer;
             localSummary = EffectSummaryOperations.Join(
                 localSummary,
                 bodySummary,
-                scanner.ScanLexicalControlEffects(root),
-                scanner.ScanUsingDisposalEffects(root));
+                lexicalRoot == null
+                    ? EffectSummary.Empty
+                    : scanner.ScanLexicalControlEffects(lexicalRoot),
+                bodyAnalysis.BodyEntryReached
+                    ? scanner.ScanUsingDisposalEffects(root)
+                    : EffectSummary.Empty);
         }
 
         localSummary = EffectSummaryOperations.Join(
@@ -99,10 +132,86 @@ internal sealed class EffectMethodNodeBuilder
                               StaticConstructorCanAffectEntry(constructor))) &&
             HasPotentialStaticInitialization(
                 method.ContainingType,
-                _session.ApiSpecs)
+                _session.ApiSpecs,
+                cancellationToken)
                 ? EffectSummaryOperations.UnknownBoundary(EffectUncertainty.UnmodeledCall)
                 : EffectSummary.Empty);
         return new EffectMethodNode(localSummary, [.. calls], scanner.DirectWitnesses);
+    }
+
+    private ConstructorInitializationPlan? CreateConstructorInitializationPlan(
+        IMethodSymbol method,
+        IOperation root,
+        OperationEffectScanner scanner,
+        CancellationToken cancellationToken)
+    {
+        if (method.MethodKind != MethodKind.Constructor ||
+            root is not IConstructorBodyOperation constructorBody)
+        {
+            return null;
+        }
+
+        var invocation = GetConstructorInitializerInvocation(constructorBody);
+        var delegatesToThis = invocation != null &&
+            SymbolEqualityComparer.Default.Equals(
+                invocation.TargetMethod.ContainingType.OriginalDefinition,
+                method.ContainingType.OriginalDefinition);
+        return new ConstructorInitializationPlan(
+            constructorBody.Initializer,
+            delegatesToThis
+                ? static () => EffectStep.Empty
+                : () => ScanMemberInitializers(
+                    method,
+                    scanner,
+                    staticInitializers: false,
+                    cancellationToken));
+    }
+
+    internal static IInvocationOperation? GetConstructorInitializerInvocation(
+        IConstructorBodyOperation body)
+    {
+        return body.Initializer?.DescendantsAndSelf()
+            .OfType<IInvocationOperation>()
+            .FirstOrDefault(static invocation =>
+                invocation.TargetMethod.MethodKind == MethodKind.Constructor);
+    }
+
+    private bool TryBuildNonCompletingStaticInitialization(
+        IMethodSymbol method,
+        CancellationToken cancellationToken,
+        out EffectMethodNode initialization)
+    {
+        initialization = default;
+        if (!method.IsStatic ||
+            method.MethodKind == MethodKind.StaticConstructor ||
+            method.ContainingType.IsGenericType ||
+            !SymbolEqualityComparer.Default.Equals(
+                method.ContainingAssembly,
+                _compilation.Assembly))
+        {
+            return false;
+        }
+
+        var constructor = method.ContainingType.StaticConstructors
+            .FirstOrDefault(static candidate =>
+                !candidate.IsImplicitlyDeclared &&
+                candidate.DeclaringSyntaxReferences.Length != 0);
+        if (constructor == null ||
+            HasLexicalThrow(constructor) ||
+            new DefiniteOperationFacts(
+                _compilation,
+                cancellationToken).MethodCanCompleteNormally(constructor))
+        {
+            return false;
+        }
+
+        var constructorNode = Build(constructor, cancellationToken);
+        initialization = new EffectMethodNode(
+            _session.WrapTypeInitializationFailures(
+                constructorNode.LocalSummary),
+            constructorNode.Calls,
+            []);
+        return true;
     }
 
     private EffectStep ScanConstructorMemberInitializers(
@@ -116,25 +225,108 @@ internal sealed class EffectMethodNodeBuilder
             return EffectStep.Empty;
         }
 
+        return ScanMemberInitializers(
+            method,
+            scanner,
+            staticInitializers,
+            cancellationToken);
+    }
+
+    private void EnsureBeforeFieldInitNode(
+        IMethodSymbol method,
+        CancellationToken cancellationToken)
+    {
+        if (!CanTriggerBeforeFieldInitInitialization(method) ||
+            !HasPotentialStaticInitialization(
+                method.ContainingType,
+                _session.ApiSpecs,
+                cancellationToken) ||
+            _beforeFieldInitNodes.ContainsKey(method.ContainingType))
+        {
+            return;
+        }
+
+        var initializer = method.ContainingType.StaticConstructors
+            .SingleOrDefault(static constructor =>
+                constructor.IsImplicitlyDeclared);
+        if (initializer == null)
+        {
+            _beforeFieldInitNodes.Add(
+                method.ContainingType,
+                new EffectBeforeFieldInitNode(
+                    EffectSummaryOperations.UnknownBoundary(
+                        EffectUncertainty.UnsupportedOperation),
+                    []));
+            return;
+        }
+
+        var calls = new List<EffectCallSite>();
+        var result = EffectStep.Empty;
+        var write = EffectSummaryOperations.Write(EffectRegionSet.Create(
+            EffectRegionId.Static()));
+        foreach (var syntaxReference in GetMemberInitializerReferences(
+                     _compilation,
+                     method.ContainingType,
+                     staticInitializers: true))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var declaration = syntaxReference.GetSyntax(cancellationToken);
+            var expression = EffectProjections.GetInitializerExpression(
+                declaration);
+            if (expression == null)
+            {
+                continue;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(_compilation, expression.SyntaxTree);
+            var operation = model.GetOperation(expression, cancellationToken);
+            if (operation == null)
+            {
+                result = result.Then(new EffectStep(
+                    EffectSummaryOperations.Unsupported(),
+                    true));
+                continue;
+            }
+
+            var scanner = new OperationEffectScanner(
+                _session,
+                initializer,
+                calls,
+                operation,
+                abstractFlow: null,
+                allowDirectWitnesses: false,
+                cancellationToken);
+            result = result.Then(scanner.ScanSequence([operation]));
+            if (!result.CompletesNormally)
+            {
+                break;
+            }
+
+            result = result.Then(new EffectStep(write, true));
+        }
+
+        _beforeFieldInitNodes.Add(
+            method.ContainingType,
+            new EffectBeforeFieldInitNode(
+                _session.WrapTypeInitializationFailures(result.Summary),
+                [.. calls]));
+    }
+
+    private EffectStep ScanMemberInitializers(
+        IMethodSymbol method,
+        OperationEffectScanner scanner,
+        bool staticInitializers,
+        CancellationToken cancellationToken)
+    {
+
         var result = EffectStep.Empty;
         var write = EffectSummaryOperations.Write(EffectRegionSet.Create(
             staticInitializers ? EffectRegionId.Static() : EffectRegionId.Receiver));
-        var syntaxTreeOrder = _compilation.SyntaxTrees
-            .Select(static (tree, ordinal) => (tree, ordinal))
-            .ToDictionary(
-                static item => item.tree,
-                static item => item.ordinal);
-        var references = method.ContainingType.GetMembers()
-            .Where(member => !member.IsImplicitlyDeclared &&
-                IsInitializableMember(member, staticInitializers))
-            .SelectMany(static member => member.DeclaringSyntaxReferences)
-            .OrderBy(reference => syntaxTreeOrder.TryGetValue(
-                    reference.SyntaxTree,
-                    out var ordinal)
-                ? ordinal
-                : int.MaxValue)
-            .ThenBy(static reference => reference.Span.Start);
-        foreach (var syntaxReference in references)
+        foreach (var syntaxReference in GetMemberInitializerReferences(
+                     _compilation,
+                     method.ContainingType,
+                     staticInitializers))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var declaration = syntaxReference.GetSyntax(cancellationToken);
@@ -167,17 +359,70 @@ internal sealed class EffectMethodNodeBuilder
         return result;
     }
 
+    internal bool TryGetBeforeFieldInitNode(
+        IMethodSymbol method,
+        out EffectBeforeFieldInitNode node)
+    {
+        if (!CanTriggerBeforeFieldInitInitialization(method))
+        {
+            node = default;
+            return false;
+        }
+
+        return _beforeFieldInitNodes.TryGetValue(
+            method.ContainingType,
+            out node);
+    }
+
+    internal static IEnumerable<SyntaxReference>
+        GetMemberInitializerReferences(
+        Compilation compilation,
+        INamedTypeSymbol type,
+        bool staticInitializers)
+    {
+        var syntaxTreeOrder = compilation.SyntaxTrees
+            .Select(static (tree, ordinal) => (tree, ordinal))
+            .ToDictionary(
+                static item => item.tree,
+                static item => item.ordinal);
+        return type.GetMembers()
+            .Where(member => !member.IsImplicitlyDeclared &&
+                IsInitializableMember(member, staticInitializers))
+            .SelectMany(static member => member.DeclaringSyntaxReferences)
+            .OrderBy(reference => syntaxTreeOrder.TryGetValue(
+                    reference.SyntaxTree,
+                    out var ordinal)
+                ? ordinal
+                : int.MaxValue)
+            .ThenBy(static reference => reference.Span.Start);
+    }
+
     internal static bool HasPotentialStaticInitialization(
         INamedTypeSymbol type,
         ResolvedApiSpecTable apiSpecs)
     {
+        return HasPotentialStaticInitialization(
+            type,
+            apiSpecs,
+            CancellationToken.None);
+    }
+
+    private static bool HasPotentialStaticInitialization(
+        INamedTypeSymbol type,
+        ResolvedApiSpecTable apiSpecs,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (type.TypeKind == TypeKind.Error)
         {
             return true;
         }
 
         if (type.SpecialType == SpecialType.System_Object &&
-            HasApprovedSystemObjectConstructor(type, apiSpecs))
+            HasApprovedSystemObjectConstructor(
+                type,
+                apiSpecs,
+                cancellationToken))
         {
             return false;
         }
@@ -187,19 +432,54 @@ internal sealed class EffectMethodNodeBuilder
             return true;
         }
 
-        var result = type.StaticConstructors.Any(static constructor =>
-            constructor.DeclaringSyntaxReferences.Length != 0) ||
-            type.GetMembers().Any(member =>
-            !member.IsImplicitlyDeclared &&
-            IsInitializableMember(member, staticInitializers: true) &&
-            member.DeclaringSyntaxReferences.Any(reference =>
-                EffectProjections.GetInitializerExpression(reference.GetSyntax()) != null));
-        return result;
+        foreach (var constructor in type.StaticConstructors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (constructor.DeclaringSyntaxReferences.Length != 0)
+            {
+                return true;
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (var member in type.GetMembers())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (member.IsImplicitlyDeclared ||
+                !IsInitializableMember(member, staticInitializers: true))
+            {
+                continue;
+            }
+
+            foreach (var reference in member.DeclaringSyntaxReferences)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (EffectProjections.GetInitializerExpression(
+                        reference.GetSyntax(cancellationToken)) != null)
+                {
+                    return true;
+                }
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return false;
     }
 
     internal static bool HasPotentialConstructionInitialization(
         INamedTypeSymbol type,
         ResolvedApiSpecTable apiSpecs)
+    {
+        return HasPotentialConstructionInitialization(
+            type,
+            apiSpecs,
+            CancellationToken.None);
+    }
+
+    internal static bool HasPotentialConstructionInitialization(
+        INamedTypeSymbol type,
+        ResolvedApiSpecTable apiSpecs,
+        CancellationToken cancellationToken)
     {
         const int maximumBaseTypeDepth = 256;
         var seen = new HashSet<INamedTypeSymbol>(
@@ -207,12 +487,14 @@ internal sealed class EffectMethodNodeBuilder
         INamedTypeSymbol? current = type;
         for (var depth = 0; current != null; depth++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (depth >= maximumBaseTypeDepth ||
                 current.TypeKind == TypeKind.Error ||
                 !seen.Add(current.OriginalDefinition) ||
                 HasPotentialStaticInitialization(
                     current,
-                    apiSpecs))
+                    apiSpecs,
+                    cancellationToken))
             {
                 return true;
             }
@@ -220,6 +502,7 @@ internal sealed class EffectMethodNodeBuilder
             current = current.BaseType;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return false;
     }
 
@@ -230,10 +513,23 @@ internal sealed class EffectMethodNodeBuilder
         var type = method.ContainingType;
         return method.MethodKind == MethodKind.Constructor &&
         method.IsImplicitlyDeclared &&
-        method.Parameters.IsDefaultOrEmpty &&
+        CanBeImplicitlyInvoked(method.Parameters) &&
         type.DeclaringSyntaxReferences.Length != 0 &&
         !HasPotentialStaticInitialization(type, apiSpecs) &&
         !HasInstanceMemberInitializer(type);
+    }
+
+    internal static bool IsSourceImplicitParameterlessConstructor(
+        IMethodSymbol method)
+    {
+        method = method.OriginalDefinition;
+        return method is
+        {
+            MethodKind: MethodKind.Constructor,
+            IsImplicitlyDeclared: true,
+            Parameters.IsDefaultOrEmpty: true
+        } && method.ContainingType.OriginalDefinition
+            .DeclaringSyntaxReferences.Length != 0;
     }
 
     internal static IMethodSymbol? GetUniqueParameterlessBaseConstructor(
@@ -241,9 +537,19 @@ internal sealed class EffectMethodNodeBuilder
     {
         var candidates = constructor.ContainingType.BaseType?
             .InstanceConstructors
-            .Where(static candidate => candidate.Parameters.IsDefaultOrEmpty)
+            .Where(static candidate =>
+                CanBeImplicitlyInvoked(candidate.Parameters))
             .ToImmutableArray() ?? [];
         return candidates.Length == 1 ? candidates[0] : null;
+    }
+
+    private static bool CanBeImplicitlyInvoked(
+        ImmutableArray<IParameterSymbol> parameters)
+    {
+        // The compiler may omit the argument list for an implicit base call
+        // when every parameter has a default, including a params parameter.
+        return parameters.All(static parameter =>
+            parameter.IsOptional || parameter.IsParams);
     }
 
     private static bool HasInstanceMemberInitializer(INamedTypeSymbol type)
@@ -258,13 +564,23 @@ internal sealed class EffectMethodNodeBuilder
 
     private static bool HasApprovedSystemObjectConstructor(
         INamedTypeSymbol type,
-        ResolvedApiSpecTable apiSpecs)
+        ResolvedApiSpecTable apiSpecs,
+        CancellationToken cancellationToken)
     {
-        return type.InstanceConstructors.Any(constructor =>
-            constructor.Parameters.IsDefaultOrEmpty &&
-            apiSpecs.TryGet(constructor, out var spec) &&
-            spec.Template.Target.WitnessIdentifier ==
-            "bcl.object.ctor");
+        foreach (var constructor in type.InstanceConstructors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (constructor.Parameters.IsDefaultOrEmpty &&
+                apiSpecs.TryGet(constructor, out var spec) &&
+                spec.Template.Target.WitnessIdentifier ==
+                "bcl.object.ctor")
+            {
+                return true;
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return false;
     }
 
     private static bool HasDefiniteBodyEntry(
@@ -279,20 +595,26 @@ internal sealed class EffectMethodNodeBuilder
              apiSpecs));
     }
 
-    private static bool CanTriggerOwnTypeInitialization(IMethodSymbol method)
+    internal static bool CanTriggerOwnTypeInitialization(IMethodSymbol method)
     {
         return method.MethodKind == MethodKind.Constructor ||
         method.MethodKind != MethodKind.StaticConstructor &&
         (method.IsStatic || method.ContainingType.IsValueType);
     }
 
+    internal static bool CanTriggerBeforeFieldInitInitialization(
+        IMethodSymbol method)
+    {
+        return method.IsStatic &&
+            method.MethodKind != MethodKind.StaticConstructor &&
+            method.ContainingType.StaticConstructors.All(
+                static constructor => constructor.IsImplicitlyDeclared);
+    }
+
     private bool StaticConstructorCanAffectEntry(
         IMethodSymbol constructor)
     {
-        if (constructor.DeclaringSyntaxReferences.Any(reference =>
-            reference.GetSyntax().DescendantNodesAndSelf().Any(
-                static syntax => syntax is ThrowStatementSyntax or
-                    ThrowExpressionSyntax)))
+        if (HasLexicalThrow(constructor))
         {
             return true;
         }
@@ -301,6 +623,14 @@ internal sealed class EffectMethodNodeBuilder
                 _compilation,
                 CancellationToken.None).MethodCanCompleteNormally(
                     constructor);
+    }
+
+    private static bool HasLexicalThrow(IMethodSymbol constructor)
+    {
+        return constructor.DeclaringSyntaxReferences.Any(reference =>
+            reference.GetSyntax().DescendantNodesAndSelf().Any(
+                static syntax => syntax is ThrowStatementSyntax or
+                    ThrowExpressionSyntax));
     }
 
     private static bool IsInitializableMember(
@@ -317,24 +647,59 @@ internal sealed class EffectMethodNodeBuilder
         };
     }
 
-    private static EffectSummary AnalyzeControlFlowGraph(
+    private static MethodBodyAnalysis AnalyzeWithoutControlFlowGraph(
+        IOperation root,
+        OperationEffectScanner scanner,
+        ConstructorInitializationPlan? constructorPlan)
+    {
+        if (constructorPlan is not { } plan ||
+            root is not IConstructorBodyOperation constructorBody)
+        {
+            return new MethodBodyAnalysis(
+                EffectSummaryOperations.Join(
+                    scanner.Scan(root),
+                    EffectSummaryOperations.Unsupported()),
+                BodyEntryReached: true);
+        }
+
+        var step = plan.Initializer == null
+            ? EffectStep.Empty
+            : scanner.ScanSequence([plan.Initializer]);
+        if (step.CompletesNormally)
+        {
+            step = step.Then(plan.ScanMemberInitializers());
+        }
+        var bodyEntryReached = step.CompletesNormally;
+        var body = (IOperation?)constructorBody.BlockBody ??
+            constructorBody.ExpressionBody;
+        if (bodyEntryReached && body != null)
+        {
+            step = step.Then(scanner.ScanSequence([body]));
+        }
+
+        return new MethodBodyAnalysis(
+            EffectSummaryOperations.Join(
+                step.Summary,
+                EffectSummaryOperations.Unsupported()),
+            bodyEntryReached);
+    }
+
+    private static MethodBodyAnalysis AnalyzeControlFlowGraph(
         ControlFlowGraph graph,
-        OperationEffectScanner scanner)
+        OperationEffectScanner scanner,
+        ConstructorInitializationPlan? constructorPlan)
     {
         var summary = EffectSummary.Empty;
         var pending = new SortedSet<int> { graph.Blocks[0].Ordinal };
+        var constructorInitializersScanned = false;
+        var bodyEntryReached = constructorPlan == null;
+        var exceptionalEntriesAdded = false;
         var exceptionalRegionOperations =
             CreateExceptionalRegionOperations(graph);
         var finallyEntries = CreateFinallyEntries(graph);
-        foreach (var block in graph.Blocks.Where(static block =>
-                     block.Predecessors.All(static predecessor =>
-                         predecessor.Semantics !=
-                             ControlFlowBranchSemantics.Regular)))
+        if (constructorPlan == null)
         {
-            if (IsExceptionalEntryReachable(block))
-            {
-                pending.Add(block.Ordinal);
-            }
+            AddExceptionalEntries();
         }
 
         var visited = new HashSet<int>();
@@ -348,13 +713,26 @@ internal sealed class EffectMethodNodeBuilder
             }
 
             var block = graph.Blocks[ordinal];
-            var step = scanner.ScanSequence(
-                block.Operations.Where(scanner.IsReachable));
+            var step = EffectStep.Empty;
+            if (block.Ordinal == graph.Blocks[0].Ordinal &&
+                constructorPlan is { Initializer: null } entryPlan)
+            {
+                step = ApplyConstructorInitializers(step, entryPlan);
+            }
+            foreach (var operation in block.Operations.Where(
+                         scanner.IsReachable))
+            {
+                step = ScanOperation(step, operation);
+                if (!step.CompletesNormally)
+                {
+                    break;
+                }
+            }
             if (step.CompletesNormally &&
                 block.BranchValue != null &&
                 scanner.IsReachable(block.BranchValue))
             {
-                step = step.Then(scanner.ScanSequence([block.BranchValue]));
+                step = ScanOperation(step, block.BranchValue);
             }
 
             summary = EffectSummaryOperations.Join(summary, step.Summary);
@@ -373,11 +751,65 @@ internal sealed class EffectMethodNodeBuilder
             AddRegularSuccessor(block.ConditionalSuccessor);
         }
 
-        return ManagedAbstractFlow.IsAcyclic(graph)
+        var result = ManagedAbstractFlow.IsAcyclic(graph, visited)
             ? summary
             : EffectSummaryOperations.Join(
                 summary,
                 EffectSummaryOperations.MayDiverge());
+        return new MethodBodyAnalysis(result, bodyEntryReached);
+
+        EffectStep ScanOperation(
+            EffectStep current,
+            IOperation operation)
+        {
+            current = current.Then(scanner.ScanSequence([operation]));
+            if (!current.CompletesNormally ||
+                constructorInitializersScanned ||
+                constructorPlan is not { } plan ||
+                plan.Initializer == null ||
+                !ManagedFlowResult.HasSameIdentity(
+                    operation,
+                    plan.Initializer))
+            {
+                return current;
+            }
+
+            return ApplyConstructorInitializers(current, plan);
+        }
+
+        EffectStep ApplyConstructorInitializers(
+            EffectStep current,
+            ConstructorInitializationPlan plan)
+        {
+            constructorInitializersScanned = true;
+            current = current.Then(plan.ScanMemberInitializers());
+            bodyEntryReached = current.CompletesNormally;
+            if (bodyEntryReached)
+            {
+                AddExceptionalEntries();
+            }
+            return current;
+        }
+
+        void AddExceptionalEntries()
+        {
+            if (exceptionalEntriesAdded)
+            {
+                return;
+            }
+
+            exceptionalEntriesAdded = true;
+            foreach (var candidate in graph.Blocks.Where(static block =>
+                         block.Predecessors.All(static predecessor =>
+                             predecessor.Semantics !=
+                                 ControlFlowBranchSemantics.Regular)))
+            {
+                if (IsExceptionalEntryReachable(candidate))
+                {
+                    pending.Add(candidate.Ordinal);
+                }
+            }
+        }
 
         void AddRegularSuccessor(ControlFlowBranch? branch)
         {
@@ -474,6 +906,14 @@ internal sealed class EffectMethodNodeBuilder
             }
         }
     }
+
+    private readonly record struct ConstructorInitializationPlan(
+        IOperation? Initializer,
+        Func<EffectStep> ScanMemberInitializers);
+
+    private readonly record struct MethodBodyAnalysis(
+        EffectSummary Summary,
+        bool BodyEntryReached);
 
     private readonly record struct FinallyEntry(
         int EntryOrdinal,
@@ -659,3 +1099,7 @@ internal sealed class EffectMethodNodeBuilder
         }
     }
 }
+
+internal readonly record struct EffectBeforeFieldInitNode(
+    EffectSummary LocalSummary,
+    ImmutableArray<EffectCallSite> Calls);

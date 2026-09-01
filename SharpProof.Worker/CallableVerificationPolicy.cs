@@ -12,18 +12,15 @@ internal static class CallableVerificationPolicy
             return Unknown(target, WorkerClaimReason.Canceled, WorkerCallableCoverageReason.Canceled);
         }
 
-        if (!target.IsSuccess)
-        {
-            return Unknown(target, target.FailureReason,
-                target.FailureReason == WorkerClaimReason.UnsupportedCallable
-                    ? WorkerCallableCoverageReason.UnsupportedCallable
-                    : WorkerCallableCoverageReason.SemanticUnknown);
-        }
-
         using var methodBoundary = CancellationTokenSource.CreateLinkedTokenSource(projectBoundary.Token);
         methodBoundary.CancelAfter(methodWallTimeMilliseconds);
         try
         {
+            if (!target.IsSuccess)
+            {
+                return FailedLowering(target, methodBoundary.Token);
+            }
+
             var proof = await verifier.VerifyWithEntryFeasibilityAsync(
                 target,
                 new MethodResourceBudget(readConsumedResourceCount, budgets.QueryRlimit, budgets.MethodRlimit),
@@ -40,9 +37,7 @@ internal static class CallableVerificationPolicy
                         methodBoundary.Token)))
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
-            var reason = records.Any(static record => record.Outcome == WorkerClaimOutcome.Unknown)
-                ? WorkerCallableCoverageReason.SemanticUnknown
-                : WorkerCallableCoverageReason.None;
+            var reason = ProjectCallableReason(records);
             return Result(target, reason, records);
         }
         catch (OperationCanceledException)
@@ -53,10 +48,20 @@ internal static class CallableVerificationPolicy
                     WorkerCallableCoverageReason.Canceled);
             }
 
-            var timeout = projectBoundary.IsCancellationRequested
-                ? (WorkerClaimReason.ProjectTimeout, WorkerCallableCoverageReason.ProjectTimeout)
-                : (WorkerClaimReason.MethodTimeout, WorkerCallableCoverageReason.MethodTimeout);
-            return Unknown(target, timeout.Item1, timeout.Item2);
+            if (projectBoundary.IsCancellationRequested)
+            {
+                return Unknown(target, WorkerClaimReason.ProjectTimeout,
+                    WorkerCallableCoverageReason.ProjectTimeout);
+            }
+
+            if (methodBoundary.IsCancellationRequested)
+            {
+                return Unknown(target, WorkerClaimReason.MethodTimeout,
+                    WorkerCallableCoverageReason.MethodTimeout);
+            }
+
+            return Unknown(target, WorkerClaimReason.InfrastructureFailure,
+                WorkerCallableCoverageReason.InfrastructureFailure);
         }
         catch (Exception exception) when (
             exception is not OutOfMemoryException and not StackOverflowException)
@@ -71,6 +76,62 @@ internal static class CallableVerificationPolicy
         WorkerCallableCoverageReason callableReason)
     {
         return Result(target, callableReason, CallableClaimResultAssembler.Unknowns(target, claimReason));
+    }
+
+    internal static CallableVerificationResult FailedLowering(
+        CompilerCallablePreparation target,
+        CancellationToken cancellationToken)
+    {
+        if (target.FailureReason == WorkerClaimReason.UnsupportedCallable)
+        {
+            return Unknown(
+                target,
+                WorkerClaimReason.UnsupportedCallable,
+                WorkerCallableCoverageReason.UnsupportedCallable);
+        }
+
+        var effectClaims = target.EffectClaims.ToDictionary(
+            static evidence => evidence.ClaimId,
+            StringComparer.Ordinal);
+        var claims = target.Entry.ClaimIds.Select((claimId, index) =>
+            effectClaims.TryGetValue(claimId, out var evidence)
+                ? EffectClaimResultAssembler.Assemble(
+                    target,
+                    evidence,
+                    CallableEntryFeasibility.Feasible,
+                    cancellationToken)
+                : CallableClaimResultAssembler.Unknown(
+                    target,
+                    index,
+                    target.FailureReason)).ToImmutableArray();
+        var reason = claims.Length == 0
+            ? WorkerCallableCoverageReason.SemanticUnknown
+            : ProjectCallableReason(claims);
+        return Result(target, reason, claims);
+    }
+
+    private static WorkerCallableCoverageReason ProjectCallableReason(
+        ImmutableArray<WorkerClaimResult> claims)
+    {
+        var unknownReasons = claims
+            .Where(static claim =>
+                claim.Outcome == WorkerClaimOutcome.Unknown)
+            .Select(static claim => claim.Reason)
+            .ToArray();
+        return unknownReasons.Length == 0
+            ? WorkerCallableCoverageReason.None
+            : unknownReasons.All(static value =>
+                value == WorkerClaimReason.UnsupportedCallable)
+                ? WorkerCallableCoverageReason.UnsupportedCallable
+                : unknownReasons.All(static value =>
+                    value == WorkerClaimReason.UnsupportedContract)
+                    ? WorkerCallableCoverageReason.UnsupportedContract
+                    : unknownReasons.Any(static value => value is
+                        WorkerClaimReason.InfrastructureFailure or
+                        WorkerClaimReason.BackendUnavailable or
+                        WorkerClaimReason.MalformedBackendResult)
+                        ? WorkerCallableCoverageReason.InfrastructureFailure
+                        : WorkerCallableCoverageReason.SemanticUnknown;
     }
 
     private static CallableVerificationResult Result(

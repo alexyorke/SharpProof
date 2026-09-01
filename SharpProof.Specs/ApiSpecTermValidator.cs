@@ -6,10 +6,28 @@ namespace SharpProof.Specs;
 /// </summary>
 internal static class ApiSpecTermValidator
 {
+    private const int MaximumExpressionDepth = 256;
+
     internal static TermFacts Validate(
         SpecTermDeclaration declaration,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
         ApiSpecFacets facets)
+    {
+        return Validate(
+            declaration,
+            variables,
+            facets,
+            depth: 1,
+            new Dictionary<SpecTermDeclaration, TermFacts>(
+                DeclarationReferenceComparer.Instance));
+    }
+
+    private static TermFacts Validate(
+        SpecTermDeclaration declaration,
+        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+        ApiSpecFacets facets,
+        int depth,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
         if (declaration == null)
         {
@@ -18,6 +36,30 @@ internal static class ApiSpecTermValidator
                 nameof(declaration));
         }
 
+        if (depth > MaximumExpressionDepth)
+        {
+            throw new ArgumentException(
+                "Spec expressions exceed the expression depth limit.",
+                nameof(declaration));
+        }
+
+        if (validated.TryGetValue(declaration, out var facts))
+        {
+            return facts;
+        }
+
+        facts = ValidateCore(declaration, variables, facets, depth, validated);
+        validated.Add(declaration, facts);
+        return facts;
+    }
+
+    private static TermFacts ValidateCore(
+        SpecTermDeclaration declaration,
+        IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
+        ApiSpecFacets facets,
+        int depth,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
+    {
         switch (declaration)
         {
             case SpecVariableDeclaration variable:
@@ -37,14 +79,15 @@ internal static class ApiSpecTermValidator
 
                 var nonNull = info.Role == SpecVariableRole.Receiver ||
                     info.Role == SpecVariableRole.Result &&
-                    (facets.Nullness.Result == SpecNullness.NonNull ||
-                     facets.Cardinality.Result is
-                         SpecCardinality.Empty or
-                         SpecCardinality.NonEmpty or
-                         SpecCardinality.Exact);
+                    facets.Nullness.Result == SpecNullness.NonNull;
                 return new(info.Type, true, nonNull, null);
             case SpecBooleanDeclaration boolean:
-                return new(boolean.Type, true, false, null);
+                return new(
+                    boolean.Type,
+                    true,
+                    false,
+                    null,
+                    boolean.Value);
             case SpecIntegerDeclaration integer:
                 return new(integer.Type, true, false, integer.Value);
             case SpecStringDeclaration text:
@@ -52,6 +95,13 @@ internal static class ApiSpecTermValidator
                 {
                     throw new ArgumentException(
                         "String constants cannot be null.",
+                        nameof(declaration));
+                }
+
+                if (!Utf16WellFormedness.IsWellFormed(text.Value))
+                {
+                    throw new ArgumentException(
+                        "String constants require well-formed UTF-16.",
                         nameof(declaration));
                 }
 
@@ -66,13 +116,13 @@ internal static class ApiSpecTermValidator
 
                 return new(nullValue.Type, true, false, null);
             case SpecUnaryDeclaration unary:
-                return ValidateUnary(unary, variables, facets);
+                return ValidateUnary(unary, variables, facets, depth, validated);
             case SpecBinaryDeclaration binary:
-                return ValidateBinary(binary, variables, facets);
+                return ValidateBinary(binary, variables, facets, depth, validated);
             case SpecConditionalDeclaration conditional:
-                return ValidateConditional(conditional, variables, facets);
+                return ValidateConditional(conditional, variables, facets, depth, validated);
             case SpecLengthDeclaration length:
-                var value = Validate(length.Value, variables, facets);
+                var value = Validate(length.Value, variables, facets, depth + 1, validated);
                 if (value.Type is not (
                     IrTypeKind.String or IrTypeKind.Sequence))
                 {
@@ -96,9 +146,16 @@ internal static class ApiSpecTermValidator
     private static TermFacts ValidateUnary(
         SpecUnaryDeclaration unary,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        int depth,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
-        var operand = Validate(unary.Operand, variables, facets);
+        var operand = Validate(
+            unary.Operand,
+            variables,
+            facets,
+            depth + 1,
+            validated);
         var expected = IrOperatorCatalog.Get(unary.Operator).Operand;
         if (operand.Type != expected || unary.Type != expected)
         {
@@ -121,16 +178,32 @@ internal static class ApiSpecTermValidator
                 ? operand.IsTotal
                 : integer.HasValue,
             false,
-            integer);
+            integer,
+            unary.Operator == IrUnaryOperator.Not &&
+            operand.Boolean is { } boolean
+                ? !boolean
+                : null);
     }
 
     private static TermFacts ValidateBinary(
         SpecBinaryDeclaration binary,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        int depth,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
-        var left = Validate(binary.Left, variables, facets);
-        var right = Validate(binary.Right, variables, facets);
+        var left = Validate(
+            binary.Left,
+            variables,
+            facets,
+            depth + 1,
+            validated);
+        var right = Validate(
+            binary.Right,
+            variables,
+            facets,
+            depth + 1,
+            validated);
         var shape = IrOperatorCatalog.Get(binary.Operator);
         var operandTypesMatch = shape.Operand.HasValue
             ? left.Type == shape.Operand.Value &&
@@ -162,21 +235,49 @@ internal static class ApiSpecTermValidator
             integer = result;
         }
 
+        var boolean = binary.Operator switch
+        {
+            IrBinaryOperator.AndAlso when left.Boolean == false => false,
+            IrBinaryOperator.AndAlso when left.Boolean == true => right.Boolean,
+            IrBinaryOperator.OrElse when left.Boolean == true => true,
+            IrBinaryOperator.OrElse when left.Boolean == false => right.Boolean,
+            _ => null
+        };
         return new(
             shape.Result,
-            arithmetic ? integer.HasValue : left.IsTotal && right.IsTotal,
+            arithmetic
+                ? integer.HasValue
+                : IsBinaryTotal(binary.Operator, left, right),
             binary.Operator == IrBinaryOperator.StringConcat,
-            integer);
+            integer,
+            boolean);
     }
 
     private static TermFacts ValidateConditional(
         SpecConditionalDeclaration conditional,
         IReadOnlyDictionary<(SpecVariableRole Role, int Ordinal), SpecVariableInfo> variables,
-        ApiSpecFacets facets)
+        ApiSpecFacets facets,
+        int depth,
+        Dictionary<SpecTermDeclaration, TermFacts> validated)
     {
-        var condition = Validate(conditional.Condition, variables, facets);
-        var whenTrue = Validate(conditional.WhenTrue, variables, facets);
-        var whenFalse = Validate(conditional.WhenFalse, variables, facets);
+        var condition = Validate(
+            conditional.Condition,
+            variables,
+            facets,
+            depth + 1,
+            validated);
+        var whenTrue = Validate(
+            conditional.WhenTrue,
+            variables,
+            facets,
+            depth + 1,
+            validated);
+        var whenFalse = Validate(
+            conditional.WhenFalse,
+            variables,
+            facets,
+            depth + 1,
+            validated);
         if (condition.Type != IrTypeKind.Boolean ||
             whenTrue.Type != whenFalse.Type ||
             conditional.Type != whenTrue.Type)
@@ -186,11 +287,41 @@ internal static class ApiSpecTermValidator
                 nameof(conditional));
         }
 
-        return new(
-            conditional.Type,
-            condition.IsTotal && whenTrue.IsTotal && whenFalse.IsTotal,
-            whenTrue.IsNonNull && whenFalse.IsNonNull,
-            null);
+        var selected = condition.Boolean switch
+        {
+            true => whenTrue,
+            false => whenFalse,
+            null => (TermFacts?)null
+        };
+        return selected is { } branch
+            ? new(
+                conditional.Type,
+                condition.IsTotal && branch.IsTotal,
+                branch.IsNonNull,
+                branch.Integer,
+                branch.Boolean)
+            : new(
+                conditional.Type,
+                condition.IsTotal && whenTrue.IsTotal && whenFalse.IsTotal,
+                whenTrue.IsNonNull && whenFalse.IsNonNull,
+                null);
+    }
+
+    private static bool IsBinaryTotal(
+        IrBinaryOperator @operator,
+        TermFacts left,
+        TermFacts right)
+    {
+        return @operator switch
+        {
+            IrBinaryOperator.AndAlso =>
+                left.IsTotal &&
+                (left.Boolean == false || right.IsTotal),
+            IrBinaryOperator.OrElse =>
+                left.IsTotal &&
+                (left.Boolean == true || right.IsTotal),
+            _ => left.IsTotal && right.IsTotal
+        };
     }
 
     private static bool TryNegate(long value, out long result)
@@ -222,5 +353,26 @@ internal static class ApiSpecTermValidator
         IrTypeKind Type,
         bool IsTotal,
         bool IsNonNull,
-        long? Integer);
+        long? Integer,
+        bool? Boolean = null);
+
+    private sealed class DeclarationReferenceComparer :
+        IEqualityComparer<SpecTermDeclaration>
+    {
+        internal static DeclarationReferenceComparer Instance { get; } =
+            new();
+
+        public bool Equals(
+            SpecTermDeclaration? left,
+            SpecTermDeclaration? right)
+        {
+            return ReferenceEquals(left, right);
+        }
+
+        public int GetHashCode(SpecTermDeclaration declaration)
+        {
+            return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(
+                declaration);
+        }
+    }
 }

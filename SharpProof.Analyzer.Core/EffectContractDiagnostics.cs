@@ -18,12 +18,17 @@ internal static class EffectContractDiagnostics
         }
 
         var contract = session.ResolveEffectContract(method);
-        var invalid = contract.InvalidAttribute;
-        if (contract is { Kind: EffectContractResolutionKind.Invalid } &&
-            invalid != null)
+        if (contract is not { Kind: EffectContractResolutionKind.Invalid } ||
+            contract.InvalidAttributes.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        foreach (var invalid in contract.InvalidAttributes)
         {
             ReportInvalidOnce(
-                invalid, "[EffectContract]", contract.InvalidReason, location, session, reportDiagnostic);
+                invalid.Attribute, "[EffectContract]", invalid.Reason,
+                location, session, reportDiagnostic);
         }
     }
 
@@ -385,7 +390,8 @@ internal static class EffectContractDiagnostics
     private static string FormatDiagnosticTypes(
         IEnumerable<INamedTypeSymbol> types)
     {
-        return string.Join(", ", types.Select(static type => type.Name)
+        return string.Join(", ", types.Select(static type =>
+                CompilerIdentityBridge.CreateTypeDisplay(type))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal));
     }

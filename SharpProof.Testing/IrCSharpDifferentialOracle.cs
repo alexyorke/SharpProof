@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.Loader;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -67,13 +68,14 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
                 "Generated C# did not compile: " + errors);
         }
 
-        image.Position = 0;
-        var assembly = Assembly.Load(image.ToArray());
-        var method = assembly.GetType("SharpProofGeneratedOracle")!.GetMethod(
-            "Evaluate",
-            BindingFlags.Public | BindingFlags.Static)!;
+        var loadContext = new DifferentialOracleLoadContext();
         try
         {
+            image.Position = 0;
+            var assembly = loadContext.LoadFromStream(image);
+            var method = assembly.GetType("SharpProofGeneratedOracle")!.GetMethod(
+                "Evaluate",
+                BindingFlags.Public | BindingFlags.Static)!;
             var runtimeValues = new Dictionary<IrValue, object?>(
                 ReferenceEqualityComparer.Instance);
             var actual = method.Invoke(
@@ -86,6 +88,21 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         {
             return CompareException(interpreted, exception.InnerException);
         }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    private sealed class DifferentialOracleLoadContext() :
+        AssemblyLoadContext(
+            "SharpProofDifferentialOracle",
+            isCollectible: true)
+    {
+        protected override Assembly? Load(AssemblyName assemblyName)
+        {
+            return null;
+        }
     }
 
     private bool TryCreateProgram(
@@ -96,7 +113,13 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         out string reason)
     {
         var variables = new SortedDictionary<int, IrVarId>();
-        if (!TryAppendExpression(new StringBuilder(), term, variables, out _, out reason))
+        var terms = new List<IrTerm>();
+        if (!TryCollectTerms(
+                term,
+                variables,
+                new HashSet<IrId>(),
+                terms,
+                out reason))
         {
             program = "";
             orderedVariables = [];
@@ -106,18 +129,26 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         orderedVariables = [.. variables.Values];
         foreach (var variable in orderedVariables)
         {
-            if (!values.ContainsKey(variable))
+            if (!values.TryGetValue(variable, out var value))
             {
                 program = "";
                 reason = "A referenced variable has no concrete value.";
                 return false;
             }
+
+            var variableType = _factory.GetVariableInfo(variable).Type;
+            if (value == null || value.Type != variableType)
+            {
+                program = "";
+                reason = "A referenced variable has an invalid concrete value.";
+                return false;
+            }
         }
 
-        var expression = new StringBuilder();
-        if (!TryAppendExpression(expression, term, variables, out var returnType, out reason))
+        if (!TryGetCSharpType(term.Type, out var returnType))
         {
             program = "";
+            reason = "The result type is outside the executable oracle subset.";
             return false;
         }
 
@@ -149,8 +180,16 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
             source.Append(variable.Value.ToString(CultureInfo.InvariantCulture));
         }
         source.AppendLine(") {");
+        foreach (var current in terms)
+        {
+            if (!TryAppendLazyDeclaration(source, current, out reason))
+            {
+                program = "";
+                return false;
+            }
+        }
         source.Append("        return checked(");
-        source.Append(expression);
+        AppendLazyValue(source, term);
         source.AppendLine(");");
         source.AppendLine("    }");
         source.AppendLine("}");
@@ -159,19 +198,99 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         return true;
     }
 
-    private bool TryAppendExpression(
-        StringBuilder builder,
+    private bool TryCollectTerms(
         IrTerm term,
         IDictionary<int, IrVarId> variables,
-        out string type,
+        ISet<IrId> visited,
+        ICollection<IrTerm> terms,
         out string reason)
     {
-        if (!TryGetCSharpType(term.Type, out type))
+        if (!visited.Add(term.Id))
+        {
+            reason = "";
+            return true;
+        }
+        if (!TryGetCSharpType(term.Type, out _))
         {
             reason = "The result type is outside the executable oracle subset.";
             return false;
         }
 
+        switch (term)
+        {
+            case IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm:
+                break;
+            case IrVariableTerm variable:
+                variables[variable.Variable.Value] = variable.Variable;
+                break;
+            case IrUnaryTerm unary when !TryCollectTerms(
+                unary.Operand, variables, visited, terms, out reason):
+                return false;
+            case IrUnaryTerm:
+                break;
+            case IrBinaryTerm binary when
+                !TryCollectTerms(binary.Left, variables, visited, terms, out reason) ||
+                !TryCollectTerms(binary.Right, variables, visited, terms, out reason):
+                return false;
+            case IrBinaryTerm:
+                break;
+            case IrConditionalTerm conditional when
+                !TryCollectTerms(
+                    conditional.Condition, variables, visited, terms, out reason) ||
+                !TryCollectTerms(
+                    conditional.WhenTrue, variables, visited, terms, out reason) ||
+                !TryCollectTerms(
+                    conditional.WhenFalse, variables, visited, terms, out reason):
+                return false;
+            case IrConditionalTerm:
+                break;
+            case IrCastTerm cast when !TryCollectTerms(
+                cast.Operand, variables, visited, terms, out reason):
+                return false;
+            case IrCastTerm:
+                break;
+            case IrLengthTerm length when !TryCollectTerms(
+                length.Value, variables, visited, terms, out reason):
+                return false;
+            case IrLengthTerm:
+                break;
+            case IrSequenceAccessTerm access when
+                !TryCollectTerms(
+                    access.Sequence, variables, visited, terms, out reason) ||
+                !TryCollectTerms(
+                    access.Index, variables, visited, terms, out reason):
+                return false;
+            case IrSequenceAccessTerm:
+                break;
+            case IrOpaqueTerm:
+                reason = "The term contains an opaque call.";
+                return false;
+            default:
+                reason = "The term kind is outside the executable oracle subset.";
+                return false;
+        }
+
+        terms.Add(term);
+        reason = "";
+        return true;
+    }
+
+    private bool TryAppendLazyDeclaration(
+        StringBuilder builder,
+        IrTerm term,
+        out string reason)
+    {
+        if (!TryGetCSharpType(term.Type, out var type))
+        {
+            reason = "The result type is outside the executable oracle subset.";
+            return false;
+        }
+
+        builder.Append("        var t");
+        builder.Append(term.Id.Value.ToString(CultureInfo.InvariantCulture));
+        builder.Append(" = new System.Lazy<");
+        builder.Append(type);
+        builder.Append(">(() => checked(");
         switch (term)
         {
             case IrBooleanTerm boolean:
@@ -191,91 +310,50 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
                 builder.Append(")null!)");
                 break;
             case IrVariableTerm variable:
-                variables[variable.Variable.Value] = variable.Variable;
                 builder.Append('v');
                 builder.Append(variable.Variable.Value.ToString(CultureInfo.InvariantCulture));
                 break;
             case IrUnaryTerm unary:
                 builder.Append('(');
                 builder.Append(unary.Operator == IrUnaryOperator.Not ? '!' : '-');
-                if (!TryAppendExpression(builder, unary.Operand, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, unary.Operand);
                 builder.Append(')');
                 break;
             case IrBinaryTerm binary:
                 builder.Append('(');
-                if (!TryAppendExpression(builder, binary.Left, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, binary.Left);
                 builder.Append(' ');
                 builder.Append(BinaryToken(binary.Operator));
                 builder.Append(' ');
-                if (!TryAppendExpression(builder, binary.Right, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, binary.Right);
                 builder.Append(')');
                 break;
             case IrConditionalTerm conditional:
                 builder.Append('(');
-                if (!TryAppendExpression(builder, conditional.Condition, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, conditional.Condition);
                 builder.Append(" ? ");
-                if (!TryAppendExpression(builder, conditional.WhenTrue, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, conditional.WhenTrue);
                 builder.Append(" : ");
-                if (!TryAppendExpression(builder, conditional.WhenFalse, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, conditional.WhenFalse);
                 builder.Append(')');
                 break;
             case IrCastTerm cast:
                 builder.Append("((");
                 builder.Append(type);
                 builder.Append(')');
-                if (!TryAppendExpression(builder, cast.Operand, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, cast.Operand);
                 builder.Append(')');
                 break;
             case IrLengthTerm length:
                 builder.Append('(');
-                if (!TryAppendExpression(builder, length.Value, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, length.Value);
                 builder.Append(").Length");
                 break;
             case IrSequenceAccessTerm access:
                 builder.Append('(');
-                if (!TryAppendExpression(builder, access.Sequence, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, access.Sequence);
                 builder.Append(")[");
-                if (!TryAppendExpression(builder, access.Index, variables, out _, out reason))
-                {
-                    return false;
-                }
-
+                AppendLazyValue(builder, access.Index);
                 builder.Append(']');
                 break;
             case IrOpaqueTerm:
@@ -285,9 +363,16 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
                 reason = "The term kind is outside the executable oracle subset.";
                 return false;
         }
-
+        builder.AppendLine("));");
         reason = "";
         return true;
+    }
+
+    private static void AppendLazyValue(StringBuilder builder, IrTerm term)
+    {
+        builder.Append('t');
+        builder.Append(term.Id.Value.ToString(CultureInfo.InvariantCulture));
+        builder.Append(".Value");
     }
 
     private bool TryGetCSharpType(IrTypeId type, out string name)
@@ -425,19 +510,76 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
                 "Compiled C# returned normally while the IR did not.");
         }
 
-        var agrees = interpreted.Value!.Kind switch
-        {
-            IrValueKind.Boolean => actual is bool value && value == interpreted.Value.Boolean,
-            IrValueKind.Integer => actual is long value && value == interpreted.Value.Integer,
-            IrValueKind.String => actual is string value &&
-                                  string.Equals(value, interpreted.Value.String, StringComparison.Ordinal),
-            IrValueKind.Null => actual == null,
-            _ => false
-        };
+        var agrees = ValuesAgree(interpreted.Value!, actual);
         return new DifferentialResult(
             agrees ? DifferentialStatus.Agreement : DifferentialStatus.Mismatch,
             interpreted,
             agrees ? "" : "Compiled C# and the IR interpreter produced different values.");
+    }
+
+    private static bool ValuesAgree(IrValue interpreted, object? actual)
+    {
+        var comparedSequences = new Dictionary<IrValue, HashSet<Array>>(
+            ReferenceEqualityComparer.Instance);
+        return ValuesAgreeCore(interpreted, actual, comparedSequences);
+    }
+
+    private static bool ValuesAgreeCore(
+        IrValue interpreted,
+        object? actual,
+        IDictionary<IrValue, HashSet<Array>> comparedSequences)
+    {
+        return interpreted.Kind switch
+        {
+            IrValueKind.Boolean =>
+                actual is bool value && value == interpreted.Boolean,
+            IrValueKind.Integer =>
+                actual is long value && value == interpreted.Integer,
+            IrValueKind.String => actual is string value &&
+                                  string.Equals(
+                                      value,
+                                      interpreted.String,
+                                      StringComparison.Ordinal),
+            IrValueKind.Null => actual == null,
+            IrValueKind.Reference =>
+                ReferenceEquals(actual, interpreted.Reference),
+            IrValueKind.Sequence =>
+                SequenceAgrees(interpreted, actual, comparedSequences),
+            _ => false
+        };
+    }
+
+    private static bool SequenceAgrees(
+        IrValue interpreted,
+        object? actual,
+        IDictionary<IrValue, HashSet<Array>> comparedSequences)
+    {
+        if (actual is not Array array ||
+            array.Rank != 1 ||
+            array.Length != interpreted.Elements.Length)
+        {
+            return false;
+        }
+        if (!comparedSequences.TryGetValue(interpreted, out var comparedArrays))
+        {
+            comparedArrays = new HashSet<Array>(ReferenceEqualityComparer.Instance);
+            comparedSequences.Add(interpreted, comparedArrays);
+        }
+        if (!comparedArrays.Add(array))
+        {
+            return true;
+        }
+        for (var index = 0; index < array.Length; index++)
+        {
+            if (!ValuesAgreeCore(
+                    interpreted.Elements[index],
+                    array.GetValue(index),
+                    comparedSequences))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static DifferentialResult CompareException(

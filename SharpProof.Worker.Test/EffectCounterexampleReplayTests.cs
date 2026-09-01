@@ -258,6 +258,106 @@ public sealed class EffectCounterexampleReplayTests
     }
 
     [Test]
+    public void ResponseAuthorityRejectsAllocationOnlyEnforcePureRefutation()
+    {
+        var fixture = CreateFixture(
+            CompilerEffectReplayEventKind.ManagedObjectAllocation);
+        fixture.Evidence.ContractKind =
+            WorkerEffectContractKind.EnforcePure;
+        CompilerEffectClaimArtifactCodec.Seal(fixture.Evidence);
+
+        var replayed = EffectClaimResultAssembler.Assemble(
+            fixture.Target,
+            fixture.Evidence);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                replayed.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                replayed.Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleReplayFailed));
+            Assert.That(replayed.EffectWitness, Is.Null);
+        }
+
+        var response = new WorkerVerifyResponse
+        {
+            CallableResults = [new WorkerCallableResult
+            {
+                CallableId = fixture.Target.Entry.CallableId,
+                Assumptions = fixture.Target.Entry.Assumptions
+            }],
+            ClaimResults = [new WorkerClaimResult
+            {
+                ClaimId = fixture.Evidence.ClaimId,
+                Outcome = WorkerClaimOutcome.Refuted,
+                Reason = WorkerClaimReason.None,
+                EffectCertainty =
+                    WorkerEffectEvidenceCertainty.DefiniteViolation,
+                ProofCore = [],
+                Model = [],
+                EffectWitness = fixture.Evidence.Witness,
+                Assumptions = fixture.Target.Entry.Assumptions
+            }]
+        };
+        var errors = new CompilerResponseEvidenceAuthority(
+                [fixture.Target])
+            .Validate(response)
+            .ToArray();
+
+        Assert.That(
+            errors,
+            Does.Contain("response.effect_witness_authority"));
+    }
+
+    [Test]
+    public void CapabilityReplayRefutesACombinedContractWhenItsEffectIsAllowed()
+    {
+        foreach (var kind in new[]
+                 {
+                     CompilerEffectReplayEventKind.MonitorCall,
+                     CompilerEffectReplayEventKind.EmptyLock
+                 })
+        {
+            var fixture = CreateFixture(kind);
+            fixture.Evidence.ContractKind =
+                WorkerEffectContractKind.EffectContract;
+            fixture.Evidence.Constraint.AllowedEffects =
+                WorkerEffectSet.Synchronizes;
+            fixture.Evidence.Constraint.AllowedCapabilities =
+                WorkerEffectCapabilitySet.None;
+            CompilerEffectClaimArtifactCodec.Seal(fixture.Evidence);
+
+            var result = EffectClaimResultAssembler.Assemble(
+                fixture.Target,
+                fixture.Evidence);
+
+            AssertRefuted(fixture.Evidence.Witness!, result);
+        }
+    }
+
+    [Test]
+    public void ExceptionReplayRefutesACombinedContractWhenThrowingIsAllowed()
+    {
+        var fixture = CreateFixture(
+            CompilerEffectReplayEventKind.ExplicitThrow);
+        fixture.Evidence.ContractKind =
+            WorkerEffectContractKind.EffectContract;
+        fixture.Evidence.Constraint.AllowedEffects =
+            WorkerEffectSet.Throws;
+        fixture.Evidence.Constraint.AllowedExceptionTypes =
+            [ArgumentExceptionIdentity];
+        CompilerEffectClaimArtifactCodec.Seal(fixture.Evidence);
+
+        var result = EffectClaimResultAssembler.Assemble(
+            fixture.Target,
+            fixture.Evidence);
+
+        AssertRefuted(fixture.Evidence.Witness!, result);
+    }
+
+    [Test]
     public void WorkerOwnsCanonicalReplayHashing()
     {
         var fixture = CreateFixture(
@@ -346,6 +446,57 @@ public sealed class EffectCounterexampleReplayTests
                 Is.EqualTo(WorkerClaimOutcome.Refuted),
                 kind.ToString());
         }
+    }
+
+    [TestCase("proven")]
+    [TestCase("unknown")]
+    [TestCase("unsupported-contract")]
+    [TestCase("entry-failure")]
+    public void CanceledNonRefutedEffectAssemblyCannotPublish(
+        string scenario)
+    {
+        var fixture = CreateFixture(
+            CompilerEffectReplayEventKind.ManagedObjectAllocation);
+        var entryFeasibility = CallableEntryFeasibility.Feasible;
+        switch (scenario)
+        {
+            case "proven":
+                fixture.Evidence.Outcome = WorkerClaimOutcome.Proven;
+                fixture.Evidence.Reason = WorkerClaimReason.None;
+                fixture.Evidence.Certainty = WorkerEffectEvidenceCertainty
+                    .CompleteMayEffectSummary;
+                break;
+            case "unknown":
+                fixture.Evidence.Outcome = WorkerClaimOutcome.Unknown;
+                fixture.Evidence.Reason =
+                    WorkerClaimReason.EffectSummaryIncomplete;
+                fixture.Evidence.Certainty = WorkerEffectEvidenceCertainty
+                    .IncompleteMayEffectSummary;
+                break;
+            case "unsupported-contract":
+                fixture.Evidence.Outcome = WorkerClaimOutcome.Unknown;
+                fixture.Evidence.Reason =
+                    WorkerClaimReason.UnsupportedContract;
+                fixture.Evidence.Certainty =
+                    WorkerEffectEvidenceCertainty.Unavailable;
+                break;
+            case "entry-failure":
+                entryFeasibility = CallableEntryFeasibility.Unknown(
+                    WorkerClaimReason.ResourceLimit);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(scenario));
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>((Action)(() =>
+            EffectClaimResultAssembler.Assemble(
+                fixture.Target,
+                fixture.Evidence,
+                entryFeasibility,
+                cancellation.Token)));
     }
 
     [Test]
@@ -454,6 +605,20 @@ public sealed class EffectCounterexampleReplayTests
         var isObject =
             kind ==
             CompilerEffectReplayEventKind.ManagedObjectAllocation;
+        var isArray =
+            kind ==
+            CompilerEffectReplayEventKind.ManagedArrayAllocation;
+        var isThrow =
+            kind == CompilerEffectReplayEventKind.ExplicitThrow;
+        var isLock =
+            kind == CompilerEffectReplayEventKind.EmptyLock;
+        var isMonitor =
+            kind == CompilerEffectReplayEventKind.MonitorCall;
+        if (!isObject && !isArray && !isThrow && !isLock && !isMonitor)
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind));
+        }
+
         var snapshot = new CompilerSyntaxTreeSnapshot
         {
             Path = "Subject.cs",
@@ -463,7 +628,7 @@ public sealed class EffectCounterexampleReplayTests
                 new CompilerSourceLineMapEntry
                 {
                     SourceStart = 0,
-                    SourceLength = 0,
+                    SourceLength = 9,
                     MappedPath = "MappedSubject.cs",
                     MappedLine = 0,
                     MappedColumn = 0
@@ -471,7 +636,7 @@ public sealed class EffectCounterexampleReplayTests
                 new CompilerSourceLineMapEntry
                 {
                     SourceStart = 10,
-                    SourceLength = 12,
+                    SourceLength = 90,
                     MappedPath = "MappedSubject.cs",
                     MappedLine = 6,
                     MappedColumn = 4
@@ -494,25 +659,43 @@ public sealed class EffectCounterexampleReplayTests
             SyntaxLength = location.Length,
             MemberIdentity = isObject
                 ? "Assembly::M:Subject.#ctor"
-                : string.Empty,
+                : isThrow
+                    ? "Assembly::M:System.InvalidOperationException.#ctor"
+                    : isMonitor
+                        ? "Assembly::M:System.Threading.Monitor.Enter"
+                        : string.Empty,
             MemberDocumentationId = isObject
                 ? "M:Subject.#ctor"
-                : null,
+                : isThrow
+                    ? "M:System.InvalidOperationException.#ctor"
+                    : isMonitor
+                        ? "M:System.Threading.Monitor.Enter(System.Object)"
+                        : null,
             TypeIdentity = isObject
                 ? "Assembly::Subject"
-                : "Assembly::System.Object[]",
+                : isArray
+                    ? "Assembly::System.Object[]"
+                    : isThrow
+                        ? InvalidOperationExceptionIdentity
+                        : "Assembly::T:System.Threading.Monitor",
             TypeDocumentationId = isObject
                 ? "T:Subject"
-                : "T:System.Object[]",
+                : isArray
+                    ? "T:System.Object[]"
+                    : isThrow
+                        ? "T:System.InvalidOperationException"
+                        : "T:System.Threading.Monitor",
             ScalarOperands = [],
-            ExactExceptionTypeHierarchy = [],
+            ExactExceptionTypeHierarchy = isThrow
+                ? [ExceptionIdentity, InvalidOperationExceptionIdentity]
+                : [],
             Location = location,
             SourceTreeOrdinal = 0,
             SourceTreePath = snapshot.Path,
             SourceTreeSha256 = snapshot.Sha256,
             SourceLineMapSha256 = snapshot.LineMapSha256
         };
-        var detail = isObject
+        var detail = isObject || isMonitor
             ? effectEvent.MemberDocumentationId!
             : effectEvent.TypeDocumentationId!;
         var evidence = new CompilerEffectClaimArtifact
@@ -529,9 +712,24 @@ public sealed class EffectCounterexampleReplayTests
             {
                 Kind = isObject
                     ? "managed-allocation"
-                    : "managed-array-allocation",
+                    : isArray
+                        ? "managed-array-allocation"
+                        : isThrow
+                            ? "explicit-throw"
+                            : isMonitor
+                                ? "synchronization-call"
+                                : "synchronization-lock",
                 Detail = detail,
-                Effects = WorkerEffectSet.Allocates,
+                Effects = isObject || isArray
+                    ? WorkerEffectSet.Allocates
+                    : isThrow
+                        ? WorkerEffectSet.Throws
+                        : WorkerEffectSet.Synchronizes,
+                Capabilities = isLock || isMonitor
+                    ? WorkerEffectCapabilitySet.Synchronization
+                    : WorkerEffectCapabilitySet.None,
+                ExactExceptionTypeHierarchy =
+                    [.. effectEvent.ExactExceptionTypeHierarchy],
                 Location = Copy(location)
             },
             Replay = new CompilerEffectReplayArtifact
@@ -571,6 +769,23 @@ public sealed class EffectCounterexampleReplayTests
             }
         };
         return new ReplayFixture(target, evidence, effectEvent);
+    }
+
+    private static void AssertRefuted(
+        WorkerEffectViolationWitness expected,
+        WorkerClaimResult actual)
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(actual.Outcome, Is.EqualTo(
+                WorkerClaimOutcome.Refuted));
+            Assert.That(actual.Reason, Is.EqualTo(
+                WorkerClaimReason.None));
+            Assert.That(actual.EffectCertainty, Is.EqualTo(
+                WorkerEffectEvidenceCertainty.DefiniteViolation));
+            Assert.That(actual.EffectWitness, Is.Not.Null);
+            AssertWitnessesEqual(expected, actual.EffectWitness!);
+        }
     }
 
     private static void AssertWitnessesEqual(
@@ -650,6 +865,12 @@ public sealed class EffectCounterexampleReplayTests
     private const string ClaimId = "spc1:allocation";
     private static readonly string TreeSha256 =
         new('1', 64);
+    private const string ArgumentExceptionIdentity =
+        "Assembly::T:System.ArgumentException";
+    private const string ExceptionIdentity =
+        "Assembly::T:System.Exception";
+    private const string InvalidOperationExceptionIdentity =
+        "Assembly::T:System.InvalidOperationException";
 
     private sealed record ReplayFixture(
         CompilerCallablePreparation Target,

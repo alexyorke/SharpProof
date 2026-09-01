@@ -36,6 +36,7 @@ public sealed class ContainerContractInfo
 
 public static class ContainerContract
 {
+    private const int MaximumContractBytes = 16 * 1024;
     private const string DefaultContractPath =
         "/etc/sharpproof/container-contract.json";
     private const string EmbeddedToolchainName =
@@ -75,6 +76,32 @@ public static class ContainerContract
         using var actualDocument = ReadBoundedJson(contractPath);
         var expected = expectedDocument.RootElement;
         var actual = actualDocument.RootElement;
+        if (actual.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidDataException(
+                "The SharpProof container contract root is not a JSON object.");
+        }
+        var required = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "schemaVersion", "contractVersion", "platform", "dotnetSdkVersion",
+            "dotnetMinimumSdkVersion", "dotnetMinimumSdkFrameworkVersion",
+            "dotnetTestRuntimeVersion", "dotnetBaseImage", "dotnetBaseImageDigest",
+            "powershellVersionLine", "powershellImageDigest", "z3Version",
+            "z3LibraryBytes", "z3LibrarySha256", "verifierPackageId"
+        };
+        foreach (var property in actual.EnumerateObject())
+        {
+            if (!required.Remove(property.Name))
+            {
+                throw new InvalidDataException(
+                    $"The SharpProof container contract property '{property.Name}' is unknown or duplicated.");
+            }
+        }
+        if (required.Count != 0)
+        {
+            throw new InvalidDataException(
+                $"The SharpProof container contract property '{required.First()}' is missing.");
+        }
         RequireInteger(actual, "schemaVersion", 1);
         RequireInteger(
             actual,
@@ -88,6 +115,13 @@ public static class ContainerContract
             actual,
             "dotnetSdkVersion",
             RequireString(expected.GetProperty("dotnet"), "sdkVersion"));
+        RequireString(actual, "dotnetMinimumSdkVersion", RequireString(expected.GetProperty("dotnet"), "minimumSdkVersion"));
+        RequireString(actual, "dotnetMinimumSdkFrameworkVersion", RequireString(expected.GetProperty("dotnet"), "minimumSdkFrameworkVersion"));
+        RequireString(actual, "dotnetTestRuntimeVersion", RequireString(expected.GetProperty("dotnet"), "testRuntimeVersion"));
+        RequireString(actual, "dotnetBaseImage", RequireString(expected.GetProperty("dotnet"), "baseImage"));
+        RequireString(actual, "dotnetBaseImageDigest", RequireString(expected.GetProperty("dotnet"), "baseImageDigest"));
+        RequireString(actual, "powershellVersionLine", RequireString(expected.GetProperty("powershell"), "versionLine"));
+        RequireString(actual, "powershellImageDigest", RequireString(expected.GetProperty("powershell"), "imageDigest"));
         RequireString(
             actual,
             "z3Version",
@@ -172,22 +206,64 @@ public static class ContainerContract
 
     private static JsonDocument ReadBoundedJson(string path)
     {
+        // Reject empty special files before open so a FIFO cannot block while
+        // waiting for a writer. The opened stream is bounded again below
+        // because this path metadata is only a preflight observation.
         var information = new FileInfo(path);
-        if (information.Length <= 0 || information.Length > 16 * 1024)
+        if (information.Length <= 0 ||
+            information.Length > MaximumContractBytes)
         {
             throw new InvalidDataException(
                 "The SharpProof container contract has an invalid size.");
         }
+
         using var stream = new FileStream(
             path,
             FileMode.Open,
             FileAccess.Read,
-            FileShare.Read);
-        return JsonDocument.Parse(stream, new JsonDocumentOptions
+            FileShare.Read,
+            bufferSize: 4096,
+            options: FileOptions.SequentialScan);
+        return ReadBoundedJson(stream);
+    }
+
+    private static JsonDocument ReadBoundedJson(Stream stream)
+    {
+        var bytes = new byte[MaximumContractBytes + 1];
+        var length = 0;
+        while (length < bytes.Length)
         {
-            CommentHandling = JsonCommentHandling.Disallow,
-            AllowTrailingCommas = false
-        });
+            var read = stream.Read(bytes, length, bytes.Length - length);
+            if (read == 0)
+            {
+                break;
+            }
+
+            length += read;
+        }
+
+        if (length <= 0 || length > MaximumContractBytes)
+        {
+            throw new InvalidDataException(
+                "The SharpProof container contract has an invalid size.");
+        }
+
+        try
+        {
+            return JsonDocument.Parse(
+                bytes.AsMemory(0, length),
+                new JsonDocumentOptions
+                {
+                    CommentHandling = JsonCommentHandling.Disallow,
+                    AllowTrailingCommas = false
+                });
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidDataException(
+                "The SharpProof container contract JSON is invalid.",
+                exception);
+        }
     }
 
     private static int RequireInteger(JsonElement element, string name)

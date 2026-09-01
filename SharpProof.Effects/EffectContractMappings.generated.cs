@@ -173,11 +173,15 @@ internal readonly record struct EffectCallPreconditionContext(
     IOperation Origin
 );
 
+internal readonly record struct EffectContractInvalidAttribute(
+    AttributeData Attribute,
+    string Reason
+);
+
 internal readonly record struct EffectContractResolution(
     EffectContractResolutionKind Kind,
     EffectSummary Summary,
-    AttributeData? InvalidAttribute = null,
-    string InvalidReason = ""
+    ImmutableArray<EffectContractInvalidAttribute> InvalidAttributes = default
 );
 
 internal readonly record struct EffectMethodNode(

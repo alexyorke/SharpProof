@@ -23,7 +23,8 @@ public enum FrontendAbstention
     UnsupportedControlFlow,
     UnsupportedStatement,
     UnsupportedMutation,
-    UnknownOperationKind
+    UnknownOperationKind,
+    ExpressionDepthLimit
 }
 
 public readonly struct FrontendSubsetClassification
@@ -32,6 +33,11 @@ public readonly struct FrontendSubsetClassification
         FrontendSubsetDecision decision,
         FrontendAbstention abstention)
     {
+        if (!Enum.IsDefined(typeof(FrontendAbstention), abstention))
+        {
+            throw new ArgumentOutOfRangeException(nameof(abstention));
+        }
+
         var valid = decision switch
         {
             FrontendSubsetDecision.Exact =>
@@ -109,6 +115,11 @@ public readonly struct FrontendProgramAbstention
             throw new ArgumentException(
                 "A program abstention requires an operation identity.",
                 nameof(operation));
+        }
+
+        if (!Enum.IsDefined(typeof(FrontendAbstention), reason))
+        {
+            throw new ArgumentOutOfRangeException(nameof(reason));
         }
 
         if (reason == FrontendAbstention.None)

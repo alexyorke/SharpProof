@@ -69,6 +69,13 @@ internal static class LanguageSubsetGate
             foreach (var operation in root.DescendantsAndSelf())
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                // The outer callable's language subset must not be decided by
+                // an unused local function or lambda. Those callables are
+                // analyzed independently when selected/reachable.
+                if (operation != root && IsNestedCallableOperation(operation))
+                {
+                    continue;
+                }
                 if (!OperationKindDecisions.TryGetValue(operation.Kind, out var supported) || !supported)
                 {
                     return LanguageSubsetDecision.Abstain(
@@ -93,6 +100,19 @@ internal static class LanguageSubsetGate
         }
 
         return LanguageSubsetDecision.Supported;
+    }
+
+    private static bool IsNestedCallableOperation(IOperation operation)
+    {
+        for (var parent = operation.Parent; parent != null; parent = parent.Parent)
+        {
+            if (parent is ILocalFunctionOperation or IAnonymousFunctionOperation)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static ImmutableArray<IOperation> GetFallbackRoots(
@@ -135,6 +155,7 @@ internal static class LanguageSubsetGate
 
         return method.MethodKind is
             MethodKind.Ordinary or
+            MethodKind.AnonymousFunction or
             MethodKind.Constructor or
             MethodKind.StaticConstructor or
             MethodKind.PropertyGet or
@@ -202,10 +223,38 @@ internal static class LanguageSubsetGate
             return true;
         }
 
-        var accessors = new[] { property.Property.GetMethod, property.Property.SetMethod };
-        var availableAccessors = accessors.Where(static accessor => accessor != null).ToArray();
-        return availableAccessors.Length != 0 &&
-               availableAccessors.All(accessor => hasResolvedGenericApiSpec(accessor!));
+        return GetAccessedPropertyAccessors(property).All(accessor =>
+            accessor != null && hasResolvedGenericApiSpec(accessor));
+    }
+
+    private static IEnumerable<IMethodSymbol?> GetAccessedPropertyAccessors(
+        IPropertyReferenceOperation property)
+    {
+        if (property.Parent is INameOfOperation)
+        {
+            yield break;
+        }
+
+        if (property.Parent is ISimpleAssignmentOperation assignment &&
+            ReferenceEquals(assignment.Target, property))
+        {
+            yield return property.Property.SetMethod;
+            yield break;
+        }
+
+        if ((property.Parent is ICoalesceAssignmentOperation coalesce &&
+             ReferenceEquals(coalesce.Target, property)) ||
+            (property.Parent is ICompoundAssignmentOperation compound &&
+             ReferenceEquals(compound.Target, property)) ||
+            (property.Parent is IIncrementOrDecrementOperation increment &&
+             ReferenceEquals(increment.Target, property)))
+        {
+            yield return property.Property.GetMethod;
+            yield return property.Property.SetMethod;
+            yield break;
+        }
+
+        yield return property.Property.GetMethod;
     }
 
     private static bool SupportsCall(

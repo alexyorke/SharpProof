@@ -117,11 +117,6 @@ public sealed class IrInterpreter(IrFactory factory)
 
     private IrEvaluationResult EvaluateCore(IrTerm term, EvaluationState state)
     {
-        if (state.Results.TryGetValue(term.Id, out var cached))
-        {
-            return cached;
-        }
-
         state.CancellationToken.ThrowIfCancellationRequested();
 
         // Evaluation is deliberately lazy — conditionals and AndAlso/OrElse
@@ -135,6 +130,11 @@ public sealed class IrInterpreter(IrFactory factory)
                 "The term nests deeper than " +
                 MaximumEvaluationDepth.ToString(CultureInfo.InvariantCulture) +
                 " levels.");
+        }
+
+        if (state.Results.TryGetValue(term.Id, out var cached))
+        {
+            return cached;
         }
 
         state.Depth++;
@@ -409,8 +409,8 @@ public sealed class IrInterpreter(IrFactory factory)
                 return Value(_factory.CreateNullValue(cast.Type));
             }
 
-            return Fault(IrExceptionKind.InvalidCast,
-                "Null cannot be cast to a non-nullable IR type.");
+            return Fault(IrExceptionKind.NullReference,
+                "Null cannot be unboxed to a non-nullable IR type.");
         }
         if (target.Kind == IrTypeKind.String &&
             operand.Value.Kind == IrValueKind.Reference)
@@ -419,6 +419,22 @@ public sealed class IrInterpreter(IrFactory factory)
                 ? Text(value)
                 : Fault(IrExceptionKind.InvalidCast,
                     "The concrete reference is not a string.");
+        }
+        if (target.Kind == IrTypeKind.Integer &&
+            operand.Value.Kind == IrValueKind.Reference)
+        {
+            return operand.Value.Reference is long value
+                ? Integer(value)
+                : Fault(IrExceptionKind.InvalidCast,
+                    "The concrete reference does not contain a boxed integer.");
+        }
+        if (target.Kind == IrTypeKind.Boolean &&
+            operand.Value.Kind == IrValueKind.Reference)
+        {
+            return operand.Value.Reference is bool value
+                ? Boolean(value)
+                : Fault(IrExceptionKind.InvalidCast,
+                    "The concrete reference does not contain a boxed boolean.");
         }
 
         return Unsupported(IrUnsupportedReason.UnsupportedCast,

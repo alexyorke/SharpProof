@@ -70,6 +70,12 @@ Relative paths are resolved from the project directory before this projection;
 absolute paths retain their configured directory. Single-target behavior is
 unchanged.
 
+Configured request, result, and compiler-manifest paths follow the same
+multitarget projection as SARIF:
+`<directory>/<target-framework>/<filename>`. This keeps each inner build's
+published evidence triple isolated. Their default paths are already scoped by
+the target framework beneath the intermediate output directory.
+
 Container verification also initializes an internal, compiler-visible
 `_SharpProofCompilerManifestPath` beneath the isolated invocation directory.
 The final analyzer compilation atomically writes the manifest there. The
@@ -115,7 +121,7 @@ SharpProof does not inspect or duplicate cgroup enforcement.
 
 `SharpProofVerifyMaximumExpressionDepth` is also a compiler-visible property.
 The collector parses it, enforces the 1-through-256 range, and seals it into the
-schema-15 compiler artifact. The launcher supplies the same property as the
+schema-18 compiler artifact. The launcher supplies the same property as the
 worker request budget. A mismatch is `CompilerManifestMismatch` and stops
 before cache lookup or backend creation; neither side may silently use a
 different depth.
@@ -220,7 +226,7 @@ is the observed runner total rather than the requested budget.
 | IDE edit maximum | At most 250 ms |
 
 The active contract also fixes protocol version 11, cache schema version 13,
-claim-manifest schema version 4, compiler artifact schema version 15,
+claim-manifest schema version 4, compiler artifact schema version 18,
 relational-summary schema version 2, and specification-pack schema version 1, along
 with exact proof-kernel and component TCB path inventories, formatting-neutral
 Roslyn complexity ratchets, and the reference surfaces `netstandard2.0`,

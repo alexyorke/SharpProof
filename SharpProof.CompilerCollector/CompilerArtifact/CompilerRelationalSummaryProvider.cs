@@ -18,6 +18,7 @@ internal sealed record CompilerSummaryEvidenceAuthority(
 
 internal sealed class CompilerRelationalSummaryProvider
 {
+    private const int MaximumDependencyDepth = 64;
     private readonly CSharpCompilation _compilation;
     private readonly IrFactory _factory;
     private readonly ResolvedApiSpecTable _apiSpecs;
@@ -30,6 +31,7 @@ internal sealed class CompilerRelationalSummaryProvider
         new(SymbolEqualityComparer.Default);
     private readonly HashSet<IMethodSymbol> _active =
         new(SymbolEqualityComparer.Default);
+    private bool _dependencyResourceLimitReached;
 
     internal CompilerImplementationIlAbstentionReason LastImplementationIlAbstention
     {
@@ -96,11 +98,28 @@ internal sealed class CompilerRelationalSummaryProvider
             return summary.Signature.Member == member;
         }
 
-        if (_failed.Contains(method) || !_active.Add(method))
+        if (_failed.Contains(method) || _active.Contains(method))
         {
             summary = null;
             return false;
         }
+
+        if (_active.Count == 0)
+        {
+            _dependencyResourceLimitReached = false;
+        }
+
+        if (_active.Count >= MaximumDependencyDepth)
+        {
+            _dependencyResourceLimitReached = true;
+            LastImplementationIlAbstention =
+                CompilerImplementationIlAbstentionReason
+                    .SummaryResourceLimit;
+            summary = null;
+            return false;
+        }
+
+        _active.Add(method);
 
         try
         {
@@ -125,7 +144,11 @@ internal sealed class CompilerRelationalSummaryProvider
                     cancellationToken,
                     out summary))
             {
-                LastImplementationIlAbstention = implementationIlAbstention;
+                LastImplementationIlAbstention =
+                    _dependencyResourceLimitReached
+                        ? CompilerImplementationIlAbstentionReason
+                            .SummaryResourceLimit
+                        : implementationIlAbstention;
                 _failed.Add(method);
                 return false;
             }
@@ -143,6 +166,7 @@ internal sealed class CompilerRelationalSummaryProvider
 
             _summaries.Add(method, summary!);
             _authorities.Add(method, authority);
+            _dependencyResourceLimitReached = false;
             return true;
         }
         finally
@@ -224,8 +248,9 @@ internal sealed class CompilerRelationalSummaryProvider
 
             if (binding.Symbol is not IParameterSymbol parameter ||
                 !SymbolEqualityComparer.Default.Equals(
-                    Normalize((IMethodSymbol)parameter.ContainingSymbol),
-                    method) ||
+                    Normalize((IMethodSymbol)parameter.ContainingSymbol)
+                        .OriginalDefinition,
+                    method.OriginalDefinition) ||
                 parameter.Ordinal < 0 ||
                 parameter.Ordinal >= parameters.Length ||
                 _factory.GetVariableInfo(binding.Variable).Type !=
@@ -283,20 +308,25 @@ internal sealed class CompilerRelationalSummaryProvider
     private bool IsSourceCandidate(IMethodSymbol method)
     {
         method = Normalize(method);
-        return method.MethodKind == MethodKind.Ordinary &&
-            method.IsStatic &&
-            !method.IsAbstract &&
-            !method.IsExtern &&
-            method.TypeParameters.IsEmpty &&
-            method.ContainingType.TypeParameters.IsEmpty &&
+        return method is
+        {
+            MethodKind: MethodKind.Ordinary,
+            IsStatic: true,
+            IsAbstract: false,
+            IsExtern: false,
+            TypeParameters.IsEmpty: true,
+            DeclaringSyntaxReferences.Length: 1
+        } &&
+            // Reference IDs use `0 or ``0 only for unresolved type parameters.
+            DocumentationCommentId.CreateReferenceId(method.ContainingType)
+                .IndexOf('`') < 0 &&
             SymbolEqualityComparer.Default.Equals(
                 method.ContainingAssembly,
                 _compilation.Assembly) &&
             method.Parameters.All(static parameter =>
                 parameter.RefKind == RefKind.None &&
                 IsScalar(parameter.Type)) &&
-            IsScalar(method.ReturnType) &&
-            method.DeclaringSyntaxReferences.Length == 1;
+            IsScalar(method.ReturnType);
     }
 
     private static bool IsScalar(ITypeSymbol type)
@@ -309,7 +339,7 @@ internal sealed class CompilerRelationalSummaryProvider
     {
         method = method.ReducedFrom ?? method;
         method = method.PartialImplementationPart ?? method;
-        return method.OriginalDefinition;
+        return method.ConstructedFrom;
     }
 
     private static string EvidenceSha256(
@@ -355,7 +385,8 @@ internal sealed class CompilerRelationalSummaryProvider
                 callIdentity,
                 provenance.EvidenceSha256,
                 provenance.EvidenceIdentity,
-                declaration.SyntaxTree.FilePath ?? string.Empty,
+                CompilerCaptureAuthority.NormalizePath(
+                    declaration.SyntaxTree.FilePath ?? string.Empty),
                 CompilerCompilationCapture.ComputeTextSha256(sourceText),
                 declaration.FullSpan.Start,
                 declaration.FullSpan.Length,

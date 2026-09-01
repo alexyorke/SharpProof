@@ -15,6 +15,7 @@ param(
         'resource-claim-case',
         'resource-claim-spacing',
         'catalog-resource-drift',
+        'duplicate-acceptance-property',
         'check-plan-drift',
         'missing-vacuous-entry',
         'wrong-unavailable-meaning',
@@ -32,6 +33,7 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $relativePath = switch ($Mutation) {
     'stale-contract-api-silence' { 'docs\diagnostic-examples.md' }
     'catalog-resource-drift' { 'eng\acceptance\contract.json' }
+    'duplicate-acceptance-property' { 'eng\acceptance\contract.json' }
     'protocol-certainty-schema-drift' {
         'SharpProof.Worker.Protocol\ProtocolModel.schema.json'
     }
@@ -55,10 +57,12 @@ $relativePath = switch ($Mutation) {
     }
     default { 'README.md' }
 }
-$readmePath = Join-Path $repositoryRoot $relativePath
-$originalBytes = [IO.File]::ReadAllBytes($readmePath)
+$sourcePath = Join-Path $repositoryRoot $relativePath
+$sourceBytes = [IO.File]::ReadAllBytes($sourcePath)
+$overridePath = Join-Path ([IO.Path]::GetTempPath()) (
+    'sharpproof-documentation-' + [Guid]::NewGuid().ToString('N') + '.txt')
 try {
-    $text = [Text.Encoding]::UTF8.GetString($originalBytes)
+    $text = [Text.Encoding]::UTF8.GetString($sourceBytes)
     switch ($Mutation) {
         'stale-win-x64' {
             $text += "`nSharpProof.Verifier.Win-x64 is supported.`n"
@@ -90,35 +94,35 @@ try {
         }
         'wrong-container-cpu' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 12 CPUs and 40960 MiB.',
+                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                'Containers use 12 CPUs and up to 40960 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'wrong-container-memory' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 16 CPUs and 32768 MiB.',
+                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                'Containers use all CPUs available to Docker and up to 32768 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'missing-resource-claim' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
+                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
                 '',
                 [StringComparison]::Ordinal)
         }
         'duplicate-resource-claim' {
-            $text += "`nThe default container budget is 16 CPUs and 40960 MiB.`n"
+            $text += "`nContainers use all CPUs available to Docker and up to 40960 MiB by default.`n"
         }
         'resource-claim-case' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 16 cpus and 40960 MiB.',
+                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                'Containers use all cpus available to Docker and up to 40960 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'resource-claim-spacing' {
             $text = $text.Replace(
-                'The default container budget is 16 CPUs and 40960 MiB.',
-                'The default container budget is 16 CPUs  and 40960 MiB.',
+                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                'Containers use all CPUs  available to Docker and up to 40960 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'catalog-resource-drift' {
@@ -127,10 +131,17 @@ try {
                 '"mutationParallelism": 5',
                 [StringComparison]::Ordinal)
         }
+        'duplicate-acceptance-property' {
+            $text = $text.Replace(
+                '"mutationParallelism": 4',
+                '"mutationParallelism": 99,`n        "mutationParallelism": 4',
+                [StringComparison]::Ordinal)
+        }
         'check-plan-drift' {
             $text = $text.Replace(
-                ('The default Debug check performs one Debug solution build, ' +
-                 'one additional Debug package-test build, and 3'),
+                ('The default Debug check concurrently performs one Debug ' +
+                 'solution build and one Release package-product build, then ' +
+                 'runs 3'),
                 ('The default Debug check reuses one build for every package ' +
                  'and test phase, with 3'),
                 [StringComparison]::Ordinal)
@@ -173,11 +184,16 @@ try {
         }
     }
     [IO.File]::WriteAllText(
-        $readmePath,
+        $overridePath,
         $text,
         [Text.UTF8Encoding]::new($false))
-    & (Join-Path $PSScriptRoot 'Generate-Readme.ps1') -Verify
+    & (Join-Path $PSScriptRoot 'Generate-Readme.ps1') `
+        -Verify `
+        -TextOverrideRelativePath $relativePath `
+        -TextOverridePath $overridePath
 }
 finally {
-    [IO.File]::WriteAllBytes($readmePath, $originalBytes)
+    if ([IO.File]::Exists($overridePath)) {
+        [IO.File]::Delete($overridePath)
+    }
 }

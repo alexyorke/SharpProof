@@ -563,8 +563,8 @@ foreach ($declaration in $declarations) {
 $envelope = Get-RequiredMember $schema 'artifactEnvelope' 'schema'
 if ([string](Get-RequiredMember $envelope 'schema' 'artifact envelope') -ne
         'SharpProof.CompilerManifest' -or
-    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 15) {
-    throw 'The compiler-artifact envelope must remain schema version 15.'
+    [int](Get-RequiredMember $envelope 'version' 'artifact envelope') -ne 18) {
+    throw 'The compiler-artifact envelope must remain schema version 18.'
 }
 
 $catalogs = @(Get-RequiredMember $schema 'wireEnumCatalogs' 'schema')
@@ -1387,8 +1387,8 @@ $evidence = Get-RequiredMember $schema 'effectEvidence' 'schema'
 $domain = [string](Get-RequiredMember $evidence 'domain' 'effect evidence')
 $evidenceVersion = [int](Get-RequiredMember $evidence 'version' 'effect evidence')
 if ($domain -ne 'SharpProof.CompilerEffectClaimEvidence' -or
-    $evidenceVersion -ne 8) {
-    throw 'Compiler effect evidence must preserve domain version 8.'
+    $evidenceVersion -ne 9) {
+    throw 'Compiler effect evidence must preserve domain version 9.'
 }
 $protocolSchema = Get-Content -LiteralPath $ProtocolSchemaPath -Raw |
     ConvertFrom-Json -Depth 100

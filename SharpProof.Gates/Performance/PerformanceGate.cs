@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -59,6 +60,10 @@ internal sealed record PerformanceSmokeResult(
 internal static class PerformanceGate
 {
     private const int RetainedCompilationCount = 40;
+    private static readonly TimeSpan PackageBuildProcessTimeout =
+        TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan ProcessTerminationTimeout =
+        TimeSpan.FromSeconds(5);
 
     public static Task<PerformanceGateResult> RunAsync(
         string repositoryRoot,
@@ -155,10 +160,8 @@ internal static class PerformanceGate
         var retainedIncreaseMiB =
             (unannotatedAdvisoryRetained - baselineRetained) /
             (1024d * 1024d);
-        WarmEnabledAnalyzerRetentionPaths(
-            contract.Warmups,
-            cancellationToken);
         var enabledRetention = MeasureEnabledAnalyzerRetention(
+            contract.Warmups,
             cancellationToken);
 
         var editMeasurement = await MeasureIdeEditsAsync(
@@ -534,6 +537,7 @@ internal static class PerformanceGate
                 <LangVersion>12.0</LangVersion>
                 <Deterministic>true</Deterministic>
                 <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+                <WarningsAsErrors>$(WarningsAsErrors);AD0001;CS8032;CS8034;CS8785</WarningsAsErrors>
                 <SharpProofAnalyzerDirectory>{analyzerDirectory}</SharpProofAnalyzerDirectory>
                 <_SharpProofContractForGeneratorPath>{generatorPath}</_SharpProofContractForGeneratorPath>
                 <_SharpProofSharedDirectory>{sharedDirectory}</_SharpProofSharedDirectory>
@@ -605,12 +609,35 @@ internal static class PerformanceGate
         }
     }
 
-    private static async Task<double> RunDotnetAsync(
+    private static Task<double> RunDotnetAsync(
         string project,
         bool restore,
         string? symbol,
         CancellationToken cancellationToken)
     {
+        return RunDotnetAsync(
+            project,
+            restore,
+            symbol,
+            PackageBuildProcessTimeout,
+            cancellationToken);
+    }
+
+    private static async Task<double> RunDotnetAsync(
+        string project,
+        bool restore,
+        string? symbol,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        if (timeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(timeout),
+                timeout,
+                "The process timeout must be positive.");
+        }
+
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
@@ -637,30 +664,36 @@ internal static class PerformanceGate
             throw new InvalidOperationException(
                 "The performance probe process did not start.");
         var standardOutput = process.StandardOutput.ReadToEndAsync(
-            cancellationToken);
+            CancellationToken.None);
         var standardError = process.StandardError.ReadToEndAsync(
+            CancellationToken.None);
+        using var boundary = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
+        boundary.CancelAfter(timeout);
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            await process.WaitForExitAsync(cancellationToken)
+            await process.WaitForExitAsync(boundary.Token)
                 .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception)
+            when (!cancellationToken.IsCancellationRequested &&
+                  boundary.IsCancellationRequested)
+        {
+            await TerminateProcessAsync(process).ConfigureAwait(false);
+            throw new TimeoutException(
+                "The package performance " +
+                (restore ? "restore" : "build") +
+                " probe exceeded its " +
+                timeout.TotalSeconds.ToString(
+                    "0.###",
+                    CultureInfo.InvariantCulture) +
+                "-second wall-time limit.",
+                exception);
         }
         catch
         {
-            if (!process.HasExited)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (InvalidOperationException)
-                {
-                }
-            }
-
-            await process.WaitForExitAsync(CancellationToken.None)
-                .ConfigureAwait(false);
+            await TerminateProcessAsync(process).ConfigureAwait(false);
             throw;
         }
         stopwatch.Stop();
@@ -676,6 +709,37 @@ internal static class PerformanceGate
         }
 
         return stopwatch.Elapsed.TotalMilliseconds;
+    }
+
+    private static async Task TerminateProcessAsync(Process process)
+    {
+        if (!process.HasExited)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        if (process.HasExited)
+        {
+            return;
+        }
+
+        using var termination = new CancellationTokenSource(
+            ProcessTerminationTimeout);
+        try
+        {
+            await process.WaitForExitAsync(termination.Token)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+            when (termination.IsCancellationRequested)
+        {
+        }
     }
 
     private static void WarmRetentionPaths(
@@ -787,29 +851,41 @@ internal static class PerformanceGate
             .Length;
     }
 
-    private static void WarmEnabledAnalyzerRetentionPaths(
+    private static ImmutableArray<WeakReference<Compilation>>
+        WarmEnabledAnalyzerRetentionPaths(
         int warmups,
         CancellationToken cancellationToken)
     {
+        var compilations =
+            ImmutableArray.CreateBuilder<WeakReference<Compilation>>(warmups);
+        var analyzer = new SharpProofAnalyzer();
         for (var index = 0; index < warmups; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _ = AnalyzeEnabledCompilation(
+            compilations.Add(AnalyzeEnabledCompilation(
                 CreateEnabledSource(index),
                 $"EnabledRetentionWarmup_{index}",
-                cancellationToken);
+                analyzer,
+                cancellationToken));
         }
         ForceCollection();
+        GC.KeepAlive(analyzer);
+        return compilations.ToImmutable();
     }
 
     private static EnabledAnalyzerRetentionMeasurement
         MeasureEnabledAnalyzerRetention(
+            int warmups,
             CancellationToken cancellationToken)
     {
+        var analyzer = new SharpProofAnalyzer();
         ForceCollection();
         var before = GC.GetTotalMemory(forceFullCollection: true);
         var compilations =
-            new List<WeakReference<Compilation>>(RetainedCompilationCount);
+            new List<WeakReference<Compilation>>(
+                warmups + RetainedCompilationCount);
+        compilations.AddRange(
+            WarmEnabledAnalyzerRetentionPaths(warmups, cancellationToken));
         for (var index = 0; index < RetainedCompilationCount; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -817,6 +893,7 @@ internal static class PerformanceGate
                 AnalyzeEnabledCompilation(
                     CreateEnabledSource(index),
                     $"EnabledRetention_{index}",
+                    analyzer,
                     cancellationToken));
         }
         ForceCollection();
@@ -824,6 +901,7 @@ internal static class PerformanceGate
         var retainedCompilationCount = compilations.Count(
             static compilation => compilation.TryGetTarget(out _));
         GC.KeepAlive(compilations);
+        GC.KeepAlive(analyzer);
         return new EnabledAnalyzerRetentionMeasurement(
             retainedCompilationCount,
             Math.Max(0, after - before) / (1024d * 1024d));
@@ -833,6 +911,7 @@ internal static class PerformanceGate
     private static WeakReference<Compilation> AnalyzeEnabledCompilation(
         string source,
         string assemblyName,
+        DiagnosticAnalyzer analyzer,
         CancellationToken cancellationToken)
     {
         var compilation = AnalyzerGateHost.CreateCompilation(
@@ -840,7 +919,7 @@ internal static class PerformanceGate
             assemblyName);
         _ = AnalyzerGateHost.AnalyzeAsync(
                 compilation,
-                new SharpProofAnalyzer(),
+                analyzer,
                 "effects",
                 concurrentAnalysis: true,
                 cancellationToken)
@@ -1199,11 +1278,272 @@ internal static class PerformanceGate
         var verifierTargets = XDocument.Load(Path.Combine(
             verifierRoot,
             "SharpProof.Verifier.targets"));
+        ValidateClosedPackagePolicy(
+            portableProps,
+            portableTargets,
+            verifierProps,
+            verifierTargets);
         ValidateAdvisoryPackagePolicy(
             portableProps,
             portableTargets,
             verifierProps,
             verifierTargets);
+        ValidateEvaluatedAdvisoryPackagePolicy(
+            portableRoot,
+            verifierRoot);
+    }
+
+    private static void ValidateClosedPackagePolicy(
+        XDocument portableProps,
+        XDocument portableTargets,
+        XDocument verifierProps,
+        XDocument verifierTargets)
+    {
+        foreach (var document in new[]
+                 {
+                     portableProps,
+                     portableTargets,
+                     verifierProps,
+                     verifierTargets
+                 })
+        {
+            if (document.Root?.Attribute("Sdk") != null ||
+                document.Descendants().Any(static element =>
+                    element.Name.LocalName is
+                        "Import" or "ImportGroup" or "Sdk"))
+            {
+                throw new InvalidDataException(
+                    "Package policy files must be closed over their MSBuild " +
+                    "behavior and cannot import additional projects or SDKs.");
+            }
+        }
+
+        foreach (var props in new[] { portableProps, verifierProps })
+        {
+            if (props.Descendants().Any(static element =>
+                    element.Name.LocalName is "Target" or "UsingTask"))
+            {
+                throw new InvalidDataException(
+                    "Package props files cannot register executable targets " +
+                    "or tasks.");
+            }
+        }
+    }
+
+    private static void ValidateEvaluatedAdvisoryPackagePolicy(
+        string portableRoot,
+        string verifierRoot)
+    {
+        var temporary = Directory.CreateTempSubdirectory(
+            "sharpproof-evaluated-package-policy-");
+        try
+        {
+            var project = Path.Combine(temporary.FullName, "Policy.proj");
+            new XDocument(
+                new XElement(
+                    "Project",
+                    Import(portableRoot, "SharpProof.props"),
+                    Import(verifierRoot, "SharpProof.Verifier.props"),
+                    Import(portableRoot, "SharpProof.targets"),
+                    Import(verifierRoot, "SharpProof.Verifier.targets")))
+                .Save(project);
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                WorkingDirectory = temporary.FullName,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add("msbuild");
+            startInfo.ArgumentList.Add(project);
+            startInfo.ArgumentList.Add("--nologo");
+            startInfo.ArgumentList.Add(
+                "-getProperty:SharpProofProfile,SharpProofFeatures," +
+                "SharpProofVerify,_SharpProofProfileNormalized," +
+                "SharpProofVerifyPolicy,SharpProofAssumptionPolicy," +
+                "_SharpProofPortablePackagePresent," +
+                "_SharpProofVerifierPackagePresent");
+            startInfo.ArgumentList.Add("-getItem:Analyzer");
+            foreach (var name in new[]
+                     {
+                         "SharpProofProfile",
+                         "SharpProofFeatures",
+                         "SharpProofVerify",
+                         "SharpProofVerifyPolicy",
+                         "SharpProofAssumptionPolicy",
+                         "DesignTimeBuild",
+                         "BuildingProject",
+                         "_SharpProofProfileNormalized"
+                     })
+            {
+                foreach (var key in startInfo.Environment.Keys
+                             .Where(key => string.Equals(
+                                 key,
+                                 name,
+                                 StringComparison.OrdinalIgnoreCase))
+                             .ToArray())
+                {
+                    startInfo.Environment.Remove(key);
+                }
+            }
+            startInfo.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
+            startInfo.Environment["DOTNET_NOLOGO"] = "1";
+
+            using var process = Process.Start(startInfo) ??
+                throw new InvalidDataException(
+                    "The evaluated package policy probe did not start.");
+            var standardOutput = process.StandardOutput.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(milliseconds: 30000))
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit();
+                throw new InvalidDataException(
+                    "The evaluated package policy probe exceeded 30 seconds.");
+            }
+            var output = standardOutput.GetAwaiter().GetResult();
+            var error = standardError.GetAwaiter().GetResult();
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidDataException(
+                    "The evaluated package policy probe failed: " +
+                    TruncateProbeOutput(output + Environment.NewLine + error));
+            }
+
+            ValidateEvaluatedAdvisoryPackagePolicy(output);
+        }
+        finally
+        {
+            temporary.Delete(recursive: true);
+        }
+
+        static XElement Import(string root, string file)
+        {
+            return new XElement(
+                "Import",
+                new XAttribute("Project", Path.Combine(root, file)));
+        }
+    }
+
+    private static void ValidateEvaluatedAdvisoryPackagePolicy(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            var properties = root.GetProperty("Properties");
+            var analyzers = root.GetProperty("Items")
+                .GetProperty("Analyzer")
+                .EnumerateArray()
+                .Select(static item => new
+                {
+                    Identity = item.GetProperty("Identity").GetString(),
+                    Role = item.TryGetProperty(
+                            "SharpProofAnalyzerRole",
+                            out var role)
+                        ? role.GetString()
+                        : null,
+                    Visible = item.TryGetProperty("Visible", out var visible)
+                        ? visible.GetString()
+                        : null
+                })
+                .ToArray();
+            var entryPoint = analyzers.Where(static analyzer =>
+                    string.Equals(
+                        analyzer.Role,
+                        "EntryPoint",
+                        StringComparison.Ordinal))
+                .ToArray();
+            var generator = analyzers.Where(static analyzer =>
+                    string.Equals(
+                        analyzer.Role,
+                        "Generator",
+                        StringComparison.Ordinal))
+                .ToArray();
+            var dependencies = analyzers.Where(static analyzer =>
+                    string.Equals(
+                        analyzer.Role,
+                        "Dependency",
+                        StringComparison.Ordinal))
+                .ToArray();
+            if (!PropertyEquals(properties, "SharpProofProfile", "advisory") ||
+                !PropertyEquals(properties, "SharpProofFeatures", "all") ||
+                !PropertyEquals(properties, "SharpProofVerify", "false") ||
+                !PropertyEquals(
+                    properties,
+                    "_SharpProofProfileNormalized",
+                    "advisory") ||
+                !PropertyEquals(
+                    properties,
+                    "SharpProofVerifyPolicy",
+                    "advisory") ||
+                !PropertyEquals(
+                    properties,
+                    "SharpProofAssumptionPolicy",
+                    "allow") ||
+                !PropertyEquals(
+                    properties,
+                    "_SharpProofPortablePackagePresent",
+                    "true") ||
+                !PropertyEquals(
+                    properties,
+                    "_SharpProofVerifierPackagePresent",
+                    "true") ||
+                analyzers.Length != 17 ||
+                entryPoint.Length != 1 ||
+                generator.Length != 1 ||
+                dependencies.Length != 15 ||
+                analyzers.Any(static analyzer => analyzer.Role is not
+                    ("EntryPoint" or "Generator" or "Dependency")) ||
+                !string.Equals(
+                    Path.GetFileName(entryPoint[0].Identity),
+                    "SharpProof.Analyzer.dll",
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    Path.GetFileName(generator[0].Identity),
+                    "SharpProof.ContractForGenerator.dll",
+                    StringComparison.Ordinal) ||
+                dependencies.Any(static dependency => !string.Equals(
+                    dependency.Visible,
+                    "false",
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidDataException(
+                    "Evaluated package behavior must enable advisory analysis " +
+                    "and omit verifier work by default.");
+            }
+        }
+        catch (Exception exception) when (
+            exception is JsonException or KeyNotFoundException or
+                InvalidOperationException)
+        {
+            throw new InvalidDataException(
+                "The evaluated package policy probe returned malformed data.",
+                exception);
+        }
+    }
+
+    private static bool PropertyEquals(
+        JsonElement properties,
+        string name,
+        string expected)
+    {
+        return properties.TryGetProperty(name, out var property) &&
+            string.Equals(
+                property.GetString(),
+                expected,
+                StringComparison.Ordinal);
+    }
+
+    private static string TruncateProbeOutput(string value)
+    {
+        const int maximumLength = 2000;
+        return value.Length <= maximumLength
+            ? value
+            : value[..maximumLength] + "...";
     }
 
     internal static void ValidateAdvisoryPackagePolicy(

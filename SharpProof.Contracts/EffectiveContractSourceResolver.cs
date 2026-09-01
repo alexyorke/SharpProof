@@ -27,10 +27,20 @@ internal sealed class EffectiveContractSourceResolver
     internal EffectiveContractSourceResolver(
         Compilation compilation,
         ContractClauseInventoryBuilder clauses)
+        : this(compilation, clauses, CancellationToken.None)
     {
+    }
+
+    internal EffectiveContractSourceResolver(
+        Compilation compilation,
+        ContractClauseInventoryBuilder clauses,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         _clauses = ArgumentNullGuard.NotNull(clauses, nameof(clauses));
         _companions = ContractForSymbolMatcher.DiscoverCompanions(
-            ArgumentNullGuard.NotNull(compilation, nameof(compilation)));
+            ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
+            cancellationToken);
     }
 
     internal ImmutableArray<ContractForSymbolMatcher.CompanionDescriptor> Companions =>
@@ -39,36 +49,65 @@ internal sealed class EffectiveContractSourceResolver
     internal static EffectiveContractSourceResolver ForCompilation(
         Compilation compilation)
     {
+        return ForCompilation(compilation, CancellationToken.None);
+    }
+
+    internal static EffectiveContractSourceResolver ForCompilation(
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         return Cache.GetValue(
             ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
-            static value => new(
+            value => new(
                 value,
-                ContractClauseInventoryBuilder.ForCompilation(value)));
+                ContractClauseInventoryBuilder.ForCompilation(value),
+                cancellationToken));
     }
 
     internal EffectiveContractSourceResolution Resolve(
         IMethodSymbol target,
         IOperation? implementationBody = null)
     {
+        return Resolve(
+            target,
+            implementationBody,
+            CancellationToken.None);
+    }
+
+    internal EffectiveContractSourceResolution Resolve(
+        IMethodSymbol target,
+        IOperation? implementationBody,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         target = ArgumentNullGuard.NotNull(target, nameof(target));
 
         target = ContractClauseInventoryBuilder.NormalizeCallable(target);
         return implementationBody == null
-            ? _cache.GetOrAdd(target, ResolveUncached)
-            : ResolveCore(target, implementationBody);
+            ? _cache.GetOrAdd(
+                target,
+                value => ResolveUncached(value, cancellationToken))
+            : ResolveCore(target, implementationBody, cancellationToken);
     }
 
     private EffectiveContractSourceResolution ResolveUncached(
-        IMethodSymbol target)
+        IMethodSymbol target,
+        CancellationToken cancellationToken)
     {
-        return ResolveCore(target, null);
+        return ResolveCore(target, null, cancellationToken);
     }
 
     private EffectiveContractSourceResolution ResolveCore(
         IMethodSymbol target,
-        IOperation? implementationBody)
+        IOperation? implementationBody,
+        CancellationToken cancellationToken)
     {
-        var direct = _clauses.Create(target, implementationBody);
+        cancellationToken.ThrowIfCancellationRequested();
+        var direct = _clauses.Create(
+            target,
+            implementationBody,
+            cancellationToken);
         if (direct.Clauses.Any(static clause => clause.IsValid))
         {
             return Create(
@@ -79,6 +118,16 @@ internal sealed class EffectiveContractSourceResolver
                 direct.HasPlacementErrors
                     ? ContractBindingFailure.InvalidClausePlacement
                     : ContractBindingFailure.None);
+        }
+
+        if (direct.HasPlacementErrors)
+        {
+            return Create(
+                target,
+                direct,
+                direct,
+                usesCompanion: false,
+                ContractBindingFailure.InvalidClausePlacement);
         }
 
         if (target.MethodKind == MethodKind.Ordinary)
@@ -98,7 +147,10 @@ internal sealed class EffectiveContractSourceResolver
 
             if (companion.Method != null)
             {
-                var inventory = _clauses.Create(companion.Method);
+                var inventory = _clauses.Create(
+                    companion.Method,
+                    implementationBody: null,
+                    cancellationToken: cancellationToken);
                 var failure = inventory.ImplementationBody == null
                     ? ContractBindingFailure.CompanionBodyUnavailable
                     : inventory.HasPlacementErrors

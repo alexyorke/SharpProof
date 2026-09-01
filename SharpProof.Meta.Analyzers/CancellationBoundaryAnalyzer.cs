@@ -108,51 +108,13 @@ internal static class CancellationBoundaryAnalyzer
         {
             return false;
         }
-        var operation = Unwrap(context.SemanticModel.GetOperation(
-            filter, context.CancellationToken));
-        if (operation is IIsTypeOperation typeTest &&
-            Unwrap(typeTest.ValueOperand) is ILocalReferenceOperation typeTested)
-        {
-            if (!SymbolEqualityComparer.Default.Equals(
-                    typeTested.Local, caughtLocal))
-            {
-                return false;
-            }
-            return IsOrDerivesFrom(cancellationType, typeTest.TypeOperand);
-        }
-        if (operation is not IIsPatternOperation patternTest ||
-            Unwrap(patternTest.Value) is not ILocalReferenceOperation tested ||
-            !SymbolEqualityComparer.Default.Equals(tested.Local, caughtLocal))
-        {
-            return false;
-        }
-        return PatternIncludesAllCancellation(
-            patternTest.Pattern, caughtType, cancellationType);
-    }
 
-    private static bool PatternIncludesAllCancellation(
-        IPatternOperation pattern,
-        ITypeSymbol? caughtType,
-        INamedTypeSymbol cancellationType)
-    {
-        return pattern switch
-        {
-            ITypePatternOperation typePattern =>
-                IsOrDerivesFrom(cancellationType, typePattern.MatchedType),
-            IBinaryPatternOperation binary
-                when binary.OperatorKind == BinaryOperatorKind.Or =>
-                PatternIncludesAllCancellation(
-                    binary.LeftPattern, caughtType, cancellationType) ||
-                PatternIncludesAllCancellation(
-                    binary.RightPattern, caughtType, cancellationType),
-            IBinaryPatternOperation binary
-                when binary.OperatorKind == BinaryOperatorKind.And =>
-                PatternIncludesAllCancellation(
-                    binary.LeftPattern, caughtType, cancellationType) &&
-                PatternIncludesAllCancellation(
-                    binary.RightPattern, caughtType, cancellationType),
-            _ => false
-        };
+        return EvaluateCancellationFilter(
+                GetFilterOperation(filter, context),
+                caughtLocal,
+                caughtType,
+                cancellationType) ==
+            CancellationFilterOutcome.ReturnsTrue;
     }
 
     private static bool CatchesCancellation(
@@ -176,36 +138,219 @@ internal static class CancellationBoundaryAnalyzer
         {
             return false;
         }
-
-        var constant = context.SemanticModel.GetConstantValue(
-            filter, context.CancellationToken);
-        if (constant is { HasValue: true, Value: false })
+        if (context.SemanticModel.GetConstantValue(
+                filter, context.CancellationToken) is
+            { HasValue: true, Value: false })
         {
             return true;
         }
-
-        ExpressionSyntax patternExpression = filter;
-        while (patternExpression is ParenthesizedExpressionSyntax parenthesized)
-        {
-            patternExpression = parenthesized.Expression;
-        }
         if (clause.Declaration == null ||
-            patternExpression is not IsPatternExpressionSyntax ||
             context.SemanticModel.GetDeclaredSymbol(
                 clause.Declaration,
-                context.CancellationToken) is not ILocalSymbol caughtLocal ||
-            Unwrap(context.SemanticModel.GetOperation(
-                patternExpression, context.CancellationToken)) is not
-                IIsPatternOperation patternTest ||
-            Unwrap(patternTest.Value) is not ILocalReferenceOperation tested ||
-            !SymbolEqualityComparer.Default.Equals(
-                tested.Local, caughtLocal))
+                context.CancellationToken) is not ILocalSymbol caughtLocal)
         {
             return false;
         }
 
-        return PatternExcludesCancellation(
-            patternTest.Pattern, caughtType, cancellationType);
+        return (EvaluateCancellationFilter(
+                    GetFilterOperation(filter, context),
+                    caughtLocal,
+                    caughtType,
+                    cancellationType) &
+                CancellationFilterOutcome.ReturnsTrue) == 0;
+    }
+
+    private static IOperation? GetFilterOperation(
+        ExpressionSyntax expression,
+        SyntaxNodeAnalysisContext context)
+    {
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            expression = parenthesized.Expression;
+        }
+
+        return context.SemanticModel.GetOperation(
+            expression, context.CancellationToken);
+    }
+
+    private static CancellationFilterOutcome EvaluateCancellationFilter(
+        IOperation? operation,
+        ILocalSymbol caughtLocal,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType)
+    {
+        operation = Unwrap(operation);
+        if (operation?.ConstantValue is
+            { HasValue: true, Value: bool constant })
+        {
+            return constant
+                ? CancellationFilterOutcome.ReturnsTrue
+                : CancellationFilterOutcome.ReturnsFalse;
+        }
+
+        return operation switch
+        {
+            IIsTypeOperation typeTest
+                when ReferencesLocal(typeTest.ValueOperand, caughtLocal) =>
+                EvaluateTypeTest(
+                    typeTest.TypeOperand, caughtType, cancellationType),
+            IIsPatternOperation patternTest
+                when ReferencesLocal(patternTest.Value, caughtLocal) =>
+                EvaluatePattern(
+                    patternTest.Pattern, caughtType, cancellationType),
+            IUnaryOperation
+            {
+                OperatorMethod: null,
+                OperatorKind: UnaryOperatorKind.Not
+            } unary =>
+                Negate(EvaluateCancellationFilter(
+                    unary.Operand,
+                    caughtLocal,
+                    caughtType,
+                    cancellationType)),
+            IBinaryOperation
+            {
+                OperatorMethod: null,
+                OperatorKind: BinaryOperatorKind.ConditionalOr
+            } binary =>
+                ConditionalOr(
+                    EvaluateCancellationFilter(
+                        binary.LeftOperand,
+                        caughtLocal,
+                        caughtType,
+                        cancellationType),
+                    EvaluateCancellationFilter(
+                        binary.RightOperand,
+                        caughtLocal,
+                        caughtType,
+                        cancellationType)),
+            IBinaryOperation
+            {
+                OperatorMethod: null,
+                OperatorKind: BinaryOperatorKind.ConditionalAnd
+            } binary =>
+                ConditionalAnd(
+                    EvaluateCancellationFilter(
+                        binary.LeftOperand,
+                        caughtLocal,
+                        caughtType,
+                        cancellationType),
+                    EvaluateCancellationFilter(
+                        binary.RightOperand,
+                        caughtLocal,
+                        caughtType,
+                        cancellationType)),
+            _ => CancellationFilterOutcome.Unknown
+        };
+    }
+
+    private static CancellationFilterOutcome EvaluatePattern(
+        IPatternOperation pattern,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType)
+    {
+        return pattern switch
+        {
+            ITypePatternOperation typePattern =>
+                EvaluateTypeTest(
+                    typePattern.MatchedType, caughtType, cancellationType),
+            IConstantPatternOperation constantPattern
+                when IsNullConstant(constantPattern.Value) =>
+                CancellationFilterOutcome.ReturnsFalse,
+            IConstantPatternOperation =>
+                CancellationFilterOutcome.ReturnsFalse |
+                CancellationFilterOutcome.ReturnsTrue,
+            IDiscardPatternOperation => CancellationFilterOutcome.ReturnsTrue,
+            INegatedPatternOperation negated =>
+                Negate(EvaluatePattern(
+                    negated.Pattern, caughtType, cancellationType)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.Or =>
+                ConditionalOr(
+                    EvaluatePattern(
+                        binary.LeftPattern, caughtType, cancellationType),
+                    EvaluatePattern(
+                        binary.RightPattern, caughtType, cancellationType)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.And =>
+                ConditionalAnd(
+                    EvaluatePattern(
+                        binary.LeftPattern, caughtType, cancellationType),
+                    EvaluatePattern(
+                        binary.RightPattern, caughtType, cancellationType)),
+            _ => CancellationFilterOutcome.Unknown
+        };
+    }
+
+    private static CancellationFilterOutcome EvaluateTypeTest(
+        ITypeSymbol matchedType,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType)
+    {
+        if (IsAssignableTo(cancellationType, matchedType) ||
+            IsAssignableTo(caughtType, matchedType))
+        {
+            return CancellationFilterOutcome.ReturnsTrue;
+        }
+        return TypePatternExcludesCancellation(matchedType, cancellationType)
+            ? CancellationFilterOutcome.ReturnsFalse
+            : CancellationFilterOutcome.ReturnsFalse |
+              CancellationFilterOutcome.ReturnsTrue;
+    }
+
+    private static CancellationFilterOutcome Negate(
+        CancellationFilterOutcome outcome)
+    {
+        var result = outcome & CancellationFilterOutcome.Throws;
+        if ((outcome & CancellationFilterOutcome.ReturnsFalse) != 0)
+        {
+            result |= CancellationFilterOutcome.ReturnsTrue;
+        }
+        if ((outcome & CancellationFilterOutcome.ReturnsTrue) != 0)
+        {
+            result |= CancellationFilterOutcome.ReturnsFalse;
+        }
+        return result;
+    }
+
+    private static CancellationFilterOutcome ConditionalAnd(
+        CancellationFilterOutcome left,
+        CancellationFilterOutcome right)
+    {
+        var result = left & CancellationFilterOutcome.Throws;
+        if ((left & CancellationFilterOutcome.ReturnsFalse) != 0)
+        {
+            result |= CancellationFilterOutcome.ReturnsFalse;
+        }
+        if ((left & CancellationFilterOutcome.ReturnsTrue) != 0)
+        {
+            result |= right;
+        }
+        return result;
+    }
+
+    private static CancellationFilterOutcome ConditionalOr(
+        CancellationFilterOutcome left,
+        CancellationFilterOutcome right)
+    {
+        var result = left & CancellationFilterOutcome.Throws;
+        if ((left & CancellationFilterOutcome.ReturnsTrue) != 0)
+        {
+            result |= CancellationFilterOutcome.ReturnsTrue;
+        }
+        if ((left & CancellationFilterOutcome.ReturnsFalse) != 0)
+        {
+            result |= right;
+        }
+        return result;
+    }
+
+    private static bool ReferencesLocal(
+        IOperation? operation,
+        ILocalSymbol local)
+    {
+        return Unwrap(operation) is ILocalReferenceOperation reference &&
+            SymbolEqualityComparer.Default.Equals(reference.Local, local);
     }
 
     private static IOperation? Unwrap(IOperation? operation)
@@ -214,7 +359,7 @@ internal static class CancellationBoundaryAnalyzer
         {
             switch (operation)
             {
-                case IConversionOperation conversion:
+                case IConversionOperation { OperatorMethod: null } conversion:
                     operation = conversion.Operand;
                     continue;
                 case IParenthesizedOperation parenthesized:
@@ -226,42 +371,28 @@ internal static class CancellationBoundaryAnalyzer
         }
     }
 
-    private static bool PatternExcludesCancellation(
-        IPatternOperation pattern,
-        ITypeSymbol? caughtType,
+    private static bool TypePatternExcludesCancellation(
+        ITypeSymbol matchedType,
         INamedTypeSymbol? cancellationType)
     {
-        switch (pattern)
-        {
-            case ITypePatternOperation typePattern:
-                return typePattern.MatchedType.TypeKind == TypeKind.Class &&
-                       !IsOrDerivesFrom(
-                           cancellationType, typePattern.MatchedType) &&
-                       !IsOrDerivesFrom(
-                           typePattern.MatchedType, cancellationType);
-            case INegatedPatternOperation
-            {
-                Pattern: ITypePatternOperation excludedPattern
-            }:
-                return IsOrDerivesFrom(
-                           cancellationType, excludedPattern.MatchedType) ||
-                       IsAssignableTo(
-                           caughtType, excludedPattern.MatchedType);
-            case IBinaryPatternOperation binary
-                when binary.OperatorKind == BinaryOperatorKind.Or:
-                return PatternExcludesCancellation(
-                           binary.LeftPattern, caughtType, cancellationType) &&
-                       PatternExcludesCancellation(
-                           binary.RightPattern, caughtType, cancellationType);
-            case IBinaryPatternOperation binary
-                when binary.OperatorKind == BinaryOperatorKind.And:
-                return PatternExcludesCancellation(
-                           binary.LeftPattern, caughtType, cancellationType) ||
-                       PatternExcludesCancellation(
-                           binary.RightPattern, caughtType, cancellationType);
-            default:
-                return false;
-        }
+        return matchedType.TypeKind == TypeKind.Class &&
+            !IsOrDerivesFrom(cancellationType, matchedType) &&
+            !IsOrDerivesFrom(matchedType, cancellationType);
+    }
+
+    private static bool IsNullConstant(IOperation operation)
+    {
+        return Unwrap(operation)?.ConstantValue is { HasValue: true, Value: null };
+    }
+
+    [Flags]
+    private enum CancellationFilterOutcome
+    {
+        None = 0,
+        ReturnsFalse = 1,
+        ReturnsTrue = 2,
+        Throws = 4,
+        Unknown = ReturnsFalse | ReturnsTrue | Throws
     }
 
     private static bool IsOrDerivesFrom(
@@ -310,8 +441,32 @@ internal static class CancellationBoundaryAnalyzer
 
     private static bool RethrowsCancellationImmediately(CatchClauseSyntax clause)
     {
-        return clause.Block.Statements.FirstOrDefault() is
-            ThrowStatementSyntax { Expression: null };
+        if (clause.Block.Statements.FirstOrDefault() is not
+            ThrowStatementSyntax { } throwStatement)
+        {
+            return false;
+        }
+
+        if (throwStatement.Expression == null)
+        {
+            return true;
+        }
+
+        // `throw caught;` is equivalent to a bare rethrow when it is the
+        // caught exception itself. Do not authorize arbitrary expressions
+        // (including another exception or a method call) at this boundary.
+        var expression = throwStatement.Expression;
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
+            expression = parenthesized.Expression;
+        }
+
+        return clause.Declaration?.Identifier is { } identifier &&
+            expression is IdentifierNameSyntax thrownIdentifier &&
+            string.Equals(
+                identifier.ValueText,
+                thrownIdentifier.Identifier.ValueText,
+                StringComparison.Ordinal);
     }
 
     private static bool IsAuditedCancellationBoundary(
@@ -368,12 +523,7 @@ internal static class CancellationBoundaryAnalyzer
             return false;
         }
 
-        return ThrowsIfCallerCancellationRequested(
-                   clause,
-                   context,
-                   method,
-                   symbols) ||
-               ReifiesCallerCancellation(clause, context, method, symbols);
+        return ReifiesCallerCancellation(clause, context, method, symbols);
     }
 
     private static bool ReifiesWorkerProgramCancellation(
@@ -429,6 +579,11 @@ internal static class CancellationBoundaryAnalyzer
                 respondMethod.Parameters[0].Type,
                 symbols[
                     SharpProofSoundnessAnalyzer.KnownType.WorkerVerifyResponse]) ||
+            !PublishesWorkerResponse(
+                respondMethod,
+                context,
+                method,
+                symbols) ||
             respond.Arguments.SingleOrDefault(candidate =>
                 candidate.Parameter?.Ordinal == 0) is not { Value: { } response } ||
             Unwrap(response) is not IInvocationOperation create)
@@ -472,6 +627,88 @@ internal static class CancellationBoundaryAnalyzer
                    runStatusArgument?.Value,
                    symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerRunStatus],
                    "Canceled");
+    }
+
+    private static bool PublishesWorkerResponse(
+        IMethodSymbol respondMethod,
+        SyntaxNodeAnalysisContext context,
+        IMethodSymbol mainMethod,
+        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
+    {
+        var localSyntax = respondMethod.DeclaringSyntaxReferences
+            .SingleOrDefault()?
+            .GetSyntax(context.CancellationToken) as
+            LocalFunctionStatementSyntax;
+        if (localSyntax?.Body is not { Statements.Count: 2 } body ||
+            body.Statements[0] is not
+                ExpressionStatementSyntax { Expression: { } publishExpression } ||
+            body.Statements[1] is not
+                ReturnStatementSyntax { Expression: { } resultExpression } ||
+            context.SemanticModel.GetConstantValue(
+                resultExpression,
+                context.CancellationToken) is not
+                { HasValue: true, Value: 0 })
+        {
+            return false;
+        }
+
+        if (Unwrap(context.SemanticModel.GetOperation(
+                publishExpression,
+                context.CancellationToken)) is not IAwaitOperation awaited)
+        {
+            return false;
+        }
+
+        var publication = Unwrap(awaited.Operation);
+        if (publication is IInvocationOperation configureAwait &&
+            configureAwait.TargetMethod is
+            {
+                Name: "ConfigureAwait",
+                IsStatic: false,
+                Parameters.Length: 1
+            } &&
+            configureAwait.TargetMethod.Parameters[0].Type.SpecialType ==
+                SpecialType.System_Boolean)
+        {
+            publication = Unwrap(configureAwait.Instance);
+        }
+
+        if (publication is not IInvocationOperation write ||
+            write.TargetMethod is not
+            {
+                Name: "WriteResponseAtomicAsync",
+                MethodKind: MethodKind.Ordinary,
+                IsStatic: true,
+                Arity: 0,
+                Parameters.Length: 2
+            } writeMethod ||
+            !IsSameType(
+                writeMethod.ContainingType,
+                symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerProgram]) ||
+            writeMethod.Parameters[0].Type.SpecialType !=
+                SpecialType.System_String ||
+            !IsSameType(
+                writeMethod.Parameters[1].Type,
+                symbols[
+                    SharpProofSoundnessAnalyzer.KnownType.WorkerVerifyResponse]))
+        {
+            return false;
+        }
+
+        var path = write.Arguments.SingleOrDefault(candidate =>
+            candidate.Parameter?.Ordinal == 0);
+        var response = write.Arguments.SingleOrDefault(candidate =>
+            candidate.Parameter?.Ordinal == 1);
+        return Unwrap(path?.Value) is ILocalReferenceOperation
+        {
+            Local.Name: "resultPath"
+        } resultPath &&
+            SymbolEqualityComparer.Default.Equals(
+                resultPath.Local.ContainingSymbol,
+                mainMethod) &&
+            ReferencesParameter(
+                response?.Value,
+                respondMethod.Parameters[0]);
     }
 
     private static bool ReifiesWorkerVerificationCancellation(
@@ -536,6 +773,10 @@ internal static class CancellationBoundaryAnalyzer
                     SharpProofSoundnessAnalyzer.KnownType.CancellationToken]) ||
             !ReferencesParameter(
                 cancellationRequested.Instance,
+                method.Parameters[1]) ||
+            !PreservesIncomingParameterValue(
+                context,
+                method,
                 method.Parameters[1]) ||
             Unwrap(context.SemanticModel.GetOperation(
                 resultExpression,
@@ -619,28 +860,6 @@ internal static class CancellationBoundaryAnalyzer
                IsSameType(field.Field.ContainingType, expectedType);
     }
 
-    private static bool ThrowsIfCallerCancellationRequested(
-        CatchClauseSyntax clause,
-        SyntaxNodeAnalysisContext context,
-        IMethodSymbol method,
-        SharpProofSoundnessAnalyzer.KnownSymbols symbols)
-    {
-        if (clause.Block.Statements.FirstOrDefault() is not
-                ExpressionStatementSyntax expression ||
-            context.SemanticModel.GetOperation(
-                expression.Expression,
-                context.CancellationToken) is not IInvocationOperation invocation ||
-            invocation.TargetMethod.Name != "ThrowIfCancellationRequested" ||
-            !IsSameType(
-                invocation.TargetMethod.ContainingType,
-                symbols[SharpProofSoundnessAnalyzer.KnownType.CancellationToken]))
-        {
-            return false;
-        }
-
-        return ReferencesParameter(invocation.Instance, method.Parameters[6]);
-    }
-
     private static bool ReifiesCallerCancellation(
         CatchClauseSyntax clause,
         SyntaxNodeAnalysisContext context,
@@ -659,6 +878,10 @@ internal static class CancellationBoundaryAnalyzer
                 symbols[SharpProofSoundnessAnalyzer.KnownType.CancellationToken]) ||
             !ReferencesParameter(
                 cancellationRequested.Instance,
+                method.Parameters[6]) ||
+            !PreservesIncomingParameterValue(
+                context,
+                method,
                 method.Parameters[6]) ||
             SoleReturn(cancellationIf.Statement)?.Expression is not
                 ExpressionSyntax returnExpression ||
@@ -732,15 +955,78 @@ internal static class CancellationBoundaryAnalyzer
         IOperation? receiver,
         IParameterSymbol parameter)
     {
-        while (receiver is IConversionOperation conversion)
-        {
-            receiver = conversion.Operand;
-        }
+        receiver = Unwrap(receiver);
 
         return receiver is IParameterReferenceOperation reference &&
                SymbolEqualityComparer.Default.Equals(
                    reference.Parameter,
                    parameter);
+    }
+
+    private static bool PreservesIncomingParameterValue(
+        SyntaxNodeAnalysisContext context,
+        IMethodSymbol method,
+        IParameterSymbol parameter)
+    {
+        var declaration = method.DeclaringSyntaxReferences.SingleOrDefault();
+        if (declaration == null ||
+            declaration.SyntaxTree != context.Node.SyntaxTree ||
+            context.SemanticModel.GetOperation(
+                declaration.GetSyntax(context.CancellationToken),
+                context.CancellationToken) is not { } root)
+        {
+            return false;
+        }
+
+        return !root.DescendantsAndSelf().Any(operation =>
+            WritesParameter(operation, parameter));
+    }
+
+    private static bool WritesParameter(
+        IOperation operation,
+        IParameterSymbol parameter)
+    {
+        return operation switch
+        {
+            IAssignmentOperation assignment =>
+                TargetsParameter(assignment.Target, parameter),
+            IIncrementOrDecrementOperation increment =>
+                ReferencesParameter(increment.Target, parameter),
+            IArgumentOperation argument
+                when argument.Parameter?.RefKind is RefKind.Ref or RefKind.Out =>
+                ReferencesParameter(argument.Value, parameter),
+            IInvocationOperation invocation
+                when HasWritableReducedReceiver(invocation) =>
+                ReferencesParameter(invocation.Instance, parameter),
+            IVariableDeclaratorOperation declarator
+                when declarator.Symbol.RefKind != RefKind.None =>
+                ReferencesParameter(declarator.Initializer?.Value, parameter),
+            _ => false
+        };
+    }
+
+    private static bool HasWritableReducedReceiver(
+        IInvocationOperation invocation)
+    {
+        var reduced = invocation.TargetMethod.ReducedFrom;
+        return reduced != null &&
+               reduced.Parameters.Length > 0 &&
+               reduced.Parameters[0].RefKind is RefKind.Ref or RefKind.Out;
+    }
+
+    private static bool TargetsParameter(
+        IOperation operation,
+        IParameterSymbol parameter)
+    {
+        operation = Unwrap(operation) ?? operation;
+        if (ReferencesParameter(operation, parameter))
+        {
+            return true;
+        }
+
+        return operation is ITupleOperation tuple &&
+               tuple.Elements.Any(element =>
+                   TargetsParameter(element, parameter));
     }
 
     private static bool IsAuditedWorkerMain(

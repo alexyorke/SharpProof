@@ -5,6 +5,7 @@ namespace SharpProof.Effects;
 
 internal sealed class OperationCompletionEvaluator
 {
+    private readonly ManagedFlowResult? _abstractFlow;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly IMethodSymbol _caller;
     private readonly Compilation _compilation;
@@ -19,17 +20,20 @@ internal sealed class OperationCompletionEvaluator
         IMethodSymbol caller,
         Func<IOperation?, IOperation, bool> isProvenNull,
         Func<IOperation?, IOperation, bool> isProvenNonNull,
-        Func<IInvocationOperation, bool> isImplicitLockEnterWithNullValue)
+        Func<IInvocationOperation, bool> isImplicitLockEnterWithNullValue,
+        ManagedFlowResult? abstractFlow = null,
+        CancellationToken cancellationToken = default)
     {
+        _abstractFlow = abstractFlow;
         _apiSpecs = session.ApiSpecs;
         _caller = caller;
         _compilation = session.Compilation;
         _completionFacts = new DefiniteOperationFacts(
             session.Compilation,
-            CancellationToken.None);
+            cancellationToken);
         _staticInitializationFacts = new DefiniteOperationFacts(
             session.Compilation,
-            CancellationToken.None);
+            cancellationToken);
         _isProvenNull = isProvenNull;
         _isProvenNonNull = isProvenNonNull;
         _isImplicitLockEnterWithNullValue = isImplicitLockEnterWithNullValue;
@@ -68,13 +72,18 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteField(field),
             IArrayElementReferenceOperation element =>
                 CanCompleteArrayElement(element),
-            IAnonymousObjectCreationOperation or
-                IDelegateCreationOperation =>
+            IAnonymousObjectCreationOperation =>
                 ChildrenCanComplete(operation),
+            IDelegateCreationOperation delegateCreation =>
+                CanCompleteDelegateCreation(delegateCreation),
             IObjectCreationOperation creation =>
                 CanCompleteConstruction(creation),
             IArrayCreationOperation array =>
                 CanCompleteArrayCreation(array),
+            IArrayInitializerOperation initializer =>
+                ChildrenCanComplete(initializer),
+            IInterpolatedStringOperation interpolation =>
+                CanCompleteInterpolatedString(interpolation),
             IConditionalAccessOperation conditional =>
                 CanCompleteConditionalAccess(conditional),
             IWithOperation withOperation =>
@@ -82,6 +91,8 @@ internal sealed class OperationCompletionEvaluator
             ILockOperation @lock => CanCompleteLock(@lock),
             IFlowCaptureOperation capture =>
                 CanCompleteNormally(capture.Value),
+            IAwaitOperation awaitOperation =>
+                CanCompleteNormally(awaitOperation.Operation),
             IMethodReferenceOperation methodReference =>
                 CanCompleteMethodReference(methodReference),
             IArgumentOperation argument =>
@@ -96,6 +107,8 @@ internal sealed class OperationCompletionEvaluator
             ICompoundAssignmentOperation assignment =>
                 CanCompleteCompoundValue(assignment) &&
                 CanCompleteWriteTarget(assignment.Target),
+            IEventAssignmentOperation eventAssignment =>
+                CanCompleteEventAssignment(eventAssignment),
             IParenthesizedOperation parenthesized =>
                 CanCompleteNormally(parenthesized.Operand),
             IConversionOperation conversion =>
@@ -108,9 +121,9 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteWriteTarget(increment.Target),
             IConditionalOperation conditional =>
                 CanCompleteConditional(conditional),
-            ITryOperation @try =>
-                (@try.Finally == null || CanCompleteNormally(@try.Finally)) &&
-                ChildrenCanComplete(@try),
+            ICoalesceOperation coalesce =>
+                CanCompleteCoalesce(coalesce),
+            ITryOperation @try => CanCompleteTry(@try),
             ISwitchExpressionOperation switchExpression =>
                 CanCompleteSwitchExpression(switchExpression),
             ISwitchExpressionArmOperation arm =>
@@ -152,6 +165,20 @@ internal sealed class OperationCompletionEvaluator
                     switchExpression.Value,
                     switchExpression))
             .Any(CanCompleteNormally);
+    }
+
+    private bool CanCompleteTry(ITryOperation @try)
+    {
+        if (@try.Finally != null && !CanCompleteNormally(@try.Finally))
+        {
+            return false;
+        }
+
+        return CanCompleteNormally(@try.Body) ||
+            @try.Catches.Any(catchClause =>
+                (catchClause.Filter == null ||
+                 CanCompleteNormally(catchClause.Filter)) &&
+                CanCompleteNormally(catchClause.Handler));
     }
 
     private bool CanCompletePatternEvaluation(
@@ -196,9 +223,9 @@ internal sealed class OperationCompletionEvaluator
         if (pattern is not IRecursivePatternOperation recursive ||
             pattern.InputType?.IsValueType != true &&
                 !inputDefinitelyNonNull ||
-            !SymbolEqualityComparer.Default.Equals(
-                recursive.MatchedType,
-                pattern.InputType))
+            !IsGuaranteedRecursivePatternTypeMatch(
+                pattern.InputType,
+                recursive.MatchedType))
         {
             return true;
         }
@@ -244,6 +271,26 @@ internal sealed class OperationCompletionEvaluator
             }
         }
         return true;
+    }
+
+    private bool IsGuaranteedRecursivePatternTypeMatch(
+        ITypeSymbol? inputType,
+        ITypeSymbol? matchedType)
+    {
+        if (inputType == null || matchedType == null ||
+            inputType.TypeKind == TypeKind.Dynamic)
+        {
+            return false;
+        }
+        if (SymbolEqualityComparer.Default.Equals(inputType, matchedType))
+        {
+            return true;
+        }
+
+        var conversion = _compilation.ClassifyCommonConversion(
+            inputType,
+            matchedType);
+        return conversion.IsImplicit && conversion.IsReference;
     }
 
     private bool CanCompleteListPattern(
@@ -515,7 +562,8 @@ internal sealed class OperationCompletionEvaluator
         {
             expression = returnBody;
         }
-        else if (declaration.DescendantNodes()
+        else if (declaration.DescendantNodes(
+                     static node => node is not LocalFunctionStatementSyntax)
                      .OfType<ArrowExpressionClauseSyntax>()
                      .FirstOrDefault() is { Expression: { } arrowBody })
         {
@@ -592,15 +640,23 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
+        var hasUncertainVirtualDispatch =
+            origin is IInvocationOperation { IsVirtual: true } invocation &&
+            method.ContainingType?.IsSealed != true &&
+            !method.IsSealed &&
+            SymbolEqualityComparer.Default.Equals(
+                invocation.TargetMethod.OriginalDefinition,
+                method.OriginalDefinition);
         return StaticInitializationMayComplete(method) &&
-            (method.DeclaringSyntaxReferences.Length == 0 ||
+            (hasUncertainVirtualDispatch ||
+             !DefiniteOperationFacts.HasSourceCompletionFlow(method) ||
              _completionFacts.MethodCanCompleteNormally(method));
     }
 
     internal bool CanMethodCompleteNormally(IMethodSymbol method)
     {
         return StaticInitializationMayComplete(method) &&
-            (method.DeclaringSyntaxReferences.Length == 0 ||
+            (!DefiniteOperationFacts.HasSourceCompletionFlow(method) ||
              _completionFacts.MethodCanCompleteNormally(method));
     }
 
@@ -707,7 +763,23 @@ internal sealed class OperationCompletionEvaluator
         return ChildrenCanComplete(methodReference) &&
             (methodReference.Method.IsStatic ||
              methodReference.Instance == null ||
+             MethodGroupConversionFacts
+                 .UsesDelegateConstructorNullCheck(methodReference) ||
              !_isProvenNull(methodReference.Instance, methodReference));
+    }
+
+    private bool CanCompleteDelegateCreation(
+        IDelegateCreationOperation delegateCreation)
+    {
+        if (!ChildrenCanComplete(delegateCreation))
+        {
+            return false;
+        }
+
+        var methodReference = MethodGroupConversionFacts
+            .GetDelegateConstructorCheckedTarget(delegateCreation);
+        return methodReference?.Instance is not { } instance ||
+            !_isProvenNull(instance, methodReference);
     }
 
     private bool CanCompleteField(IFieldReferenceOperation field)
@@ -722,10 +794,56 @@ internal sealed class OperationCompletionEvaluator
     {
         return CanCompleteNormally(element.ArrayReference) &&
             !_isProvenNull(element.ArrayReference, element) &&
-            element.Indices.All(CanCompleteNormally);
+            element.Indices.All(CanCompleteNormally) &&
+            ArrayAccessMayComplete(element) &&
+            ArrayStoreMayComplete(element);
     }
 
-    private bool CanCompleteWriteTarget(IOperation target)
+    private bool ArrayStoreMayComplete(IArrayElementReferenceOperation element)
+    {
+        if (element.Parent is not IAssignmentOperation { Target: IArrayElementReferenceOperation target, Value: { } value } ||
+            !ReferenceEquals(target, element) ||
+            element.ArrayReference.Type is not IArrayTypeSymbol array ||
+            array.ElementType.IsValueType || value.Type == null ||
+            value.ConstantValue is { HasValue: true, Value: null })
+        {
+            return true;
+        }
+
+        return _compilation.ClassifyCommonConversion(value.Type, array.ElementType).IsImplicit;
+    }
+
+    private bool ArrayAccessMayComplete(
+        IArrayElementReferenceOperation element)
+    {
+        if (_abstractFlow == null ||
+            element.Indices.Length != 1 ||
+            !_abstractFlow.TryEvaluate(
+                element,
+                element.ArrayReference,
+                out var array) ||
+            !_abstractFlow.TryEvaluate(
+                element,
+                element.Indices[0],
+                out var index) ||
+            !array.TryGetCardinality(out var length) ||
+            !index.TryGetInteger(out var interval))
+        {
+            return true;
+        }
+
+        if (interval.UpperBound is { } maximumIndex && maximumIndex < 0)
+        {
+            return false;
+        }
+
+        return length.UpperBound is not { } maximumLength ||
+            maximumLength > 0 &&
+            (interval.LowerBound is not { } minimumIndex ||
+             minimumIndex < maximumLength);
+    }
+
+    internal bool CanCompleteWriteTarget(IOperation target)
     {
         return target switch
         {
@@ -743,6 +861,10 @@ internal sealed class OperationCompletionEvaluator
             ILocalReferenceOperation or
                 IParameterReferenceOperation or
                 IDiscardOperation => true,
+            // A ref-return invocation can be the target of an assignment.
+            // Its completion is still governed by invocation semantics; the
+            // fallback must not treat a nonreturning callee as completing.
+            IInvocationOperation invocation => CanCompleteNormally(invocation),
             _ => true
         };
     }
@@ -765,6 +887,22 @@ internal sealed class OperationCompletionEvaluator
             CanCompleteWriteTarget(assignment.Target);
     }
 
+    private bool CanCompleteCoalesce(ICoalesceOperation coalesce)
+    {
+        if (!CanCompleteNormally(coalesce.Value))
+        {
+            return false;
+        }
+
+        if (_isProvenNonNull(coalesce.Value, coalesce))
+        {
+            return true;
+        }
+
+        return !_isProvenNull(coalesce.Value, coalesce) ||
+            CanCompleteNormally(coalesce.WhenNull);
+    }
+
     private bool CanCompleteDeconstruction(
         IDeconstructionAssignmentOperation deconstruction)
     {
@@ -773,17 +911,22 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        var phasesMayComplete = !TryGetDeconstructionInfo(
-            _compilation,
-            deconstruction,
-            out var info) ||
+        return CanCompleteDeconstructionPhases(deconstruction) &&
+            CanCompleteDeconstructionTarget(deconstruction.Target);
+    }
+
+    internal bool CanCompleteDeconstructionPhases(
+        IDeconstructionAssignmentOperation deconstruction)
+    {
+        return !TryGetDeconstructionInfo(
+                _compilation,
+                deconstruction,
+                out var info) ||
             DeconstructionPhasesMayComplete(
                 info,
                 deconstruction.Value,
                 isRoot: true,
                 origin: deconstruction);
-        return phasesMayComplete &&
-            CanCompleteDeconstructionTarget(deconstruction.Target);
     }
 
     private bool CanCompleteDeconstructionTarget(IOperation target)
@@ -855,17 +998,57 @@ internal sealed class OperationCompletionEvaluator
     internal bool CanCompleteCompoundValue(
         ICompoundAssignmentOperation assignment)
     {
-        if (!CanCompleteNormally(assignment.Target) ||
-            !CanCompleteNormally(assignment.Value))
-        {
-            return false;
-        }
+        return CanCompleteNormally(assignment.Target) &&
+            CanCompleteCompoundInConversion(assignment) &&
+            CanCompleteNormally(assignment.Value) &&
+            CanCompleteCompoundOperator(assignment) &&
+            CanCompleteCompoundOutConversion(assignment);
+    }
+    internal bool CanCompleteCompoundInConversion(
+        ICompoundAssignmentOperation assignment)
+    {
+        return CanCompleteCompoundConversion(
+            assignment.InConversion.MethodSymbol,
+            assignment);
+    }
 
+    internal bool CanCompleteCompoundOperator(
+        ICompoundAssignmentOperation assignment)
+    {
+        if (ConversionEffectClassifier.SkipsLiftedOperator(
+                assignment,
+                _abstractFlow))
+        {
+            return true;
+        }
         if (assignment.OperatorKind is
                 BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder &&
             assignment.Value.ConstantValue is { HasValue: true, Value: 0 })
         {
-            return false;
+            return LiftedOperatorMayBeSkipped(
+                assignment.IsLifted,
+                assignment.Target,
+                assignment.Value,
+                assignment);
+        }
+
+        if (StringConcatenationEffectResolver
+            .IsBuiltInStringConcatenation(assignment))
+        {
+            return StringConcatenationEffectResolver
+                    .CanFormattedValueCompleteNormally(
+                        assignment.Target,
+                        assignment,
+                        _compilation,
+                        _abstractFlow,
+                        this) &&
+                StringConcatenationEffectResolver
+                    .CanFormattedValueCompleteNormally(
+                        assignment.Value,
+                        assignment,
+                        _compilation,
+                        _abstractFlow,
+                        this);
         }
 
         return assignment.OperatorMethod == null ||
@@ -875,11 +1058,30 @@ internal sealed class OperationCompletionEvaluator
                 assignment);
     }
 
+    internal bool CanCompleteCompoundOutConversion(
+        ICompoundAssignmentOperation assignment)
+    {
+        return CanCompleteCompoundConversion(
+            assignment.OutConversion.MethodSymbol,
+            assignment);
+    }
+
+    private bool CanCompleteCompoundConversion(
+        IMethodSymbol? method,
+        ICompoundAssignmentOperation assignment)
+    {
+        return method == null ||
+            CanCompleteInvocation(method, instance: null, assignment);
+    }
+
     internal bool CanCompleteIncrementValue(
         IIncrementOrDecrementOperation increment)
     {
         return CanCompleteNormally(increment.Target) &&
-            (increment.OperatorMethod == null ||
+            (ConversionEffectClassifier.SkipsLiftedOperator(
+                 increment,
+                 _abstractFlow) ||
+             increment.OperatorMethod == null ||
              CanCompleteInvocation(
                  increment.OperatorMethod,
                  instance: null,
@@ -890,16 +1092,27 @@ internal sealed class OperationCompletionEvaluator
     {
         if (creation.Arguments.Any(argument =>
                 !CanCompleteNormally(argument.Value)) ||
-            creation.Constructor is not { } constructor ||
-            !StaticInitializationMayComplete(constructor) ||
-            constructor.DeclaringSyntaxReferences.Length != 0 &&
-            !_completionFacts.MethodCanCompleteNormally(constructor))
+            !CanCompleteConstructorCall(creation))
         {
             return false;
         }
 
         return creation.Initializer == null ||
             CanCompleteNormally(creation.Initializer);
+    }
+
+    internal bool CanCompleteConstructorCall(
+        IObjectCreationOperation creation)
+    {
+        if (creation.Constructor is not { } constructor ||
+            !StaticInitializationMayComplete(constructor) ||
+            DefiniteOperationFacts.HasSourceCompletionFlow(constructor) &&
+            !_completionFacts.MethodCanCompleteNormally(constructor))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private bool CanCompleteArrayCreation(IArrayCreationOperation array)
@@ -914,6 +1127,64 @@ internal sealed class OperationCompletionEvaluator
 
         return array.Initializer == null ||
             CanCompleteNormally(array.Initializer);
+    }
+
+    private bool CanCompleteEventAssignment(
+        IEventAssignmentOperation assignment)
+    {
+        if (assignment.EventReference is not IEventReferenceOperation reference ||
+            !CanCompleteNormally(assignment.HandlerValue))
+        {
+            return false;
+        }
+
+        var accessor = assignment.Adds
+            ? reference.Event.AddMethod
+            : reference.Event.RemoveMethod;
+        return accessor != null &&
+            CanCompleteInvocation(accessor, reference.Instance, assignment);
+    }
+
+    private bool CanCompleteInterpolatedString(
+        IInterpolatedStringOperation interpolation)
+    {
+        if (interpolation.ConstantValue.HasValue)
+        {
+            return true;
+        }
+
+        var defersFormatting = StringConcatenationEffectResolver
+            .DefersInterpolationFormatting(
+                interpolation,
+                _compilation);
+        foreach (var part in interpolation.Parts)
+        {
+            if (part is not IInterpolationOperation value)
+            {
+                continue;
+            }
+
+            if (!CanCompleteNormally(value.Expression) ||
+                !CanCompleteNormally(value.Alignment) ||
+                !CanCompleteNormally(value.FormatString))
+            {
+                return false;
+            }
+            if (!defersFormatting &&
+                value.Alignment == null &&
+                value.FormatString == null &&
+                !StringConcatenationEffectResolver
+                    .CanFormattedValueCompleteNormally(
+                        value.Expression,
+                        value,
+                        _compilation,
+                        _abstractFlow,
+                        this))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private bool StaticInitializationMayComplete(ISymbol member)
@@ -1003,7 +1274,27 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        if (conversion.Type?.IsValueType == true &&
+        var methodReference = MethodGroupConversionFacts
+            .GetDelegateConstructorCheckedTarget(conversion);
+        if (methodReference?.Instance is { } methodInstance &&
+            _isProvenNull(methodInstance, methodReference))
+        {
+            return false;
+        }
+
+        if (ConversionEffectClassifier
+                .IsLiftedNullableUserConversion(conversion) &&
+            (_isProvenNull(conversion.Operand, conversion) ||
+             ConversionEffectClassifier.SkipsLiftedOperator(
+                 conversion,
+                 _abstractFlow)))
+        {
+            return true;
+        }
+
+        if (conversion.OperatorMethod == null &&
+            conversion.Type?.IsValueType == true &&
+            !ManagedAbstractValue.IsNullableType(conversion.Type) &&
             conversion.Operand.ConstantValue is
             { HasValue: true, Value: null })
         {
@@ -1041,16 +1332,70 @@ internal sealed class OperationCompletionEvaluator
 
             if (binary.OperatorMethod != null)
             {
-                var truthOperatorName = binary.OperatorKind ==
-                    BinaryOperatorKind.ConditionalAnd
-                        ? "op_False"
-                        : "op_True";
-                var truthOperator = binary.OperatorMethod.ContainingType
-                    .GetMembers(truthOperatorName)
-                    .OfType<IMethodSymbol>()
-                    .FirstOrDefault(method => method.Parameters.Length == 1);
-                return truthOperator == null ||
-                    CanMethodCompleteNormally(truthOperator);
+                var truthOperator = ConditionalTruthOperatorFacts.Resolve(
+                    binary);
+                if (truthOperator != null &&
+                    !CanMethodCompleteNormally(truthOperator))
+                {
+                    return false;
+                }
+
+                if (truthOperator != null &&
+                    ConditionalTruthOperatorFacts.ReturnsConstant(
+                        _compilation,
+                        truthOperator,
+                        out var truthResult))
+                {
+                    if (truthResult)
+                    {
+                        return true;
+                    }
+
+                    return CanCompleteNormally(binary.RightOperand) &&
+                        CanCompleteInvocation(
+                            binary.OperatorMethod,
+                            instance: null,
+                            binary);
+                }
+
+                // A refined truth value only determines whether the right
+                // operand is skipped. When it is evaluated, both the right
+                // operand and the user-defined conditional operator are
+                // mandatory completion points.
+                var leftValue = false;
+                var hasLeftValue = binary.LeftOperand.ConstantValue.HasValue &&
+                    binary.LeftOperand.ConstantValue.Value is bool;
+                if (hasLeftValue &&
+                    binary.LeftOperand.ConstantValue.Value is bool constantLeftValue)
+                {
+                    leftValue = constantLeftValue;
+                }
+                if (!hasLeftValue && _abstractFlow?.TryEvaluate(
+                        binary,
+                        binary.LeftOperand,
+                        out var abstractLeft) == true)
+                {
+                    hasLeftValue = abstractLeft.TryGetBoolean(out leftValue);
+                }
+
+                if (hasLeftValue)
+                {
+                    var shortCircuits = binary.OperatorKind ==
+                        BinaryOperatorKind.ConditionalAnd
+                            ? !leftValue
+                            : leftValue;
+                    if (shortCircuits)
+                    {
+                        return true;
+                    }
+                }
+
+                return CanCompleteNormally(binary.RightOperand) &&
+                    (binary.OperatorMethod == null ||
+                     CanCompleteInvocation(
+                         binary.OperatorMethod,
+                         instance: null,
+                         binary));
             }
 
             return true;
@@ -1061,11 +1406,22 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
+        if (ConversionEffectClassifier.SkipsLiftedOperator(
+                binary,
+                _abstractFlow))
+        {
+            return true;
+        }
+
         if (binary.OperatorKind is
                 BinaryOperatorKind.Divide or BinaryOperatorKind.Remainder &&
             binary.RightOperand.ConstantValue is { HasValue: true, Value: 0 })
         {
-            return false;
+            return LiftedOperatorMayBeSkipped(
+                binary.IsLifted,
+                binary.LeftOperand,
+                binary.RightOperand,
+                binary);
         }
 
         return binary.OperatorMethod == null ||
@@ -1078,11 +1434,34 @@ internal sealed class OperationCompletionEvaluator
     private bool CanCompleteUnary(IUnaryOperation unary)
     {
         return CanCompleteNormally(unary.Operand) &&
-            (unary.OperatorMethod == null ||
+            (ConversionEffectClassifier.SkipsLiftedOperator(
+                 unary,
+                 _abstractFlow) ||
+             unary.OperatorMethod == null ||
              CanCompleteInvocation(
                  unary.OperatorMethod,
                  instance: null,
                  unary));
+    }
+
+    private bool LiftedOperatorMayBeSkipped(
+        bool isLifted,
+        IOperation left,
+        IOperation right,
+        IOperation origin)
+    {
+        return isLifted &&
+            (NullableOperandMayBeNull(left, origin) ||
+             NullableOperandMayBeNull(right, origin));
+    }
+
+    private bool NullableOperandMayBeNull(
+        IOperation operand,
+        IOperation origin)
+    {
+        return ManagedAbstractValue.IsNullableType(operand.Type) &&
+            !DefiniteOperationFacts.IsDefinitelyNonNull(operand) &&
+            _abstractFlow?.ProvesNonNull(origin, operand) != true;
     }
 
     private bool CanCompleteConditional(IConditionalOperation conditional)
