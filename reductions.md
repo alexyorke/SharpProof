@@ -1570,3 +1570,53 @@ Method: normalized 14-line sliding-window hashing across all 1,058 non-generated
 
 > **⚠ Skipped deliberately:** the four exception-constructor witnesses (`ApiSpecRuntimeOracleTests.cs:245-316`) plus their `Observe*ConstructorEffect` wrappers (`:757-796`) look like ~65 lines of `Exception` vs `InvalidOperationException` duplication, but each edge depends on a *distinct typed static field* (`s_exceptionConstructorReceiver`, `s_invalidOperationExceptionConstructorReceiver`) reached from `[MethodImpl(NoInlining)]` invokers whose IL shape is exactly what `ObserveAllocation` measures via `GC.GetAllocatedBytesForCurrentThread`. Generifying them risks changing the allocation measurement.
 
+---
+
+## Deep pass: Worker.Protocol + Contracts + their test projects (round 5)
+
+**Estimated savings: ~340 LOC.**
+
+### 1. Shared test-compilation factory for `SharpProof.Contracts.Test`
+- **Files:** `ConstructedGenericContractTests.cs:594-621`, `ContractClauseInventoryTests.cs:443-473`, `PartialMethodContractTests.cs:462-491`, `ContractIntrinsicValidationTests.cs:85-106`, `ContractBinderTests.cs:1668-1693`, `ContractApiIdentityTests.cs:174-187`, `ContractForMetadataSignatureTests.cs:206-218`
+- **Est. LOC saved:** ~100
+- **Why it's safe:** Five `CreateCompilation` bodies are structurally identical — `CSharpSyntaxTree.ParseText` with `preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]`, `CSharpCompilation.Create("<prefix>_" + Guid.NewGuid().ToString("N"), …, ContractTestMetadataReferences.WithSharpProof, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: Enable, …))`, then the error assertion. The only deltas are `allowUnsafe` (true only in `ConstructedGenericContractTests`), `LanguageVersion.Preview` vs `CSharp12` (only `PartialMethodContractTests`), `includeSharpProofReference`/`outputKind` (only `ContractClauseInventoryTests`), and a cosmetic assembly-name prefix — all already parameters or constants. Separately, the no-error assertion block appears at **7** sites (grep for `GetDiagnostics()` returns exactly those), and `AssertNoErrors` is already defined twice character-for-character apart from wrapping.
+- **Proposed change:** Add `Create(...)` and `AssertNoErrors(...)` to the existing `ContractTestMetadataReferences.cs` (already the shared-infrastructure file), with `assemblyPrefix`, `languageVersion`, `allowUnsafe`, `outputKind`, `includeSharpProofReference` as defaulted parameters.
+
+### 2. Collapse the `ITarget`/`TargetContracts` source skeleton into a helper
+- **Files:** `SharpProof.ContractForGenerator.Test/ContractForValidatorGeneratorTests.cs:2063` (existing `Run` helper), 36 call sites
+- **Est. LOC saved:** ~120
+- **Why it's safe:** The file contains 71 `using SharpProof.Attributes;`, 48 `public interface ITarget`, 43 `[ContractFor(typeof(ITarget))]`, and 56 `public static class TargetContracts` occurrences; 36 use the exact block form. A helper emitting byte-identical source text leaves the compilation, generator run, and diagnostics unchanged.
+- **Proposed change:** Add `RunTarget(string targetMembers, string contractMembers, string contractModifiers = "")` beside the existing `Run`, interpolating the 6-line skeleton; call sites supply only the two member bodies (~4 net lines each).
+
+### 3. Merge the default-value-exactness test family into one `[TestCase]` table
+- **Files:** `ContractForValidatorGeneratorTests.cs:39-66, 68-92, 196-230` (mismatch family) and `:94-123, :125-143` (match family)
+- **Est. LOC saved:** ~60
+- **Why it's safe:** `FloatingDefaultBitsMustMatchExactly` (4 cases), `DecimalDefaultRepresentationMustMatchExactly` (2), and `NonFloatingDefaultsRemainExact` (5) have byte-identical bodies apart from `decimal` being hardcoded instead of `{{type}}` in the decimal one — all three call `Run` with the same template and assert `Is.EqualTo(["SPCF0005"])`. Likewise `EqualFloatingDefaultsRemainExact` (9) and `CompilerNormalizedNaNSignDefaultsMatch` share the shape `(type, targetDefault, companionDefault) → Diagnostics Is.Empty`. Every input tuple is preserved, so coverage is bit-for-bit identical.
+- **Proposed change:** One `DefaultsMismatchIsReported(type, targetDefault, companionDefault)` with 11 `[TestCase]`s and one `EqualDefaultsAreAccepted(...)` with 10; delete the three redundant bodies.
+
+### 4. Remove the discarded `requiredProperties` plumbing and the `*JsonProperties` arrays
+- **Files:** `SharpProof.Worker.Protocol/ProtocolJson.cs:78-86, :1028-1033`; `ProtocolModel.generated.cs:462-468` (**generated**); `scripts/Generate-ProtocolModel.ps1:669-690` (**template**)
+- **Est. LOC saved:** ~40
+- **Why it's safe:** `Deserialize<T>` opens with `_ = requiredProperties;` — **the parameter is discarded and never used.** Its two arguments, `WorkerVerifyRequestJsonProperties` and `WorkerVerifyResponseJsonProperties`, have no other consumer except a reflection-based assertion at `SharpProof.Worker.Test/ProtocolModelSchemaTests.cs:206-212`. Wire behaviour is unaffected: required-property enforcement actually happens in `EnsureJsonShape` → `EnsureObjectShape` (`ProtocolJsonSupport.cs:58-86`), which reads `WorkerProtocolMetadata.JsonObjectShapes` and already checks exact property count, name, and order — the same schema data the arrays restate.
+- **⚠ Cross-area coordination:** requires the owner of `SharpProof.Worker.Test` to delete `AssertRequiredJsonRoots`, whose equivalent coverage remains in the `JsonObjectShapes` assertions.
+- **Proposed change:** Drop the `requiredProperties` parameter from `Deserialize<T>` and delete the `${name}JsonProperties` emission loop from `Generate-ProtocolModel.ps1`, then regenerate — never hand-edit the `.generated.cs`.
+
+### 5. Pairwise-match helper in `ContractForSymbolMatcher`
+- **Files:** `SharpProof.Contracts/ContractForSymbolMatcher.cs:128-131, :353-355, :585-587, :696-707, :707-709, :750-752, :838-842`
+- **Est. LOC saved:** ~16
+- **Why it's safe:** Seven sites repeat `left.Length == right.Length && left.Select((item, index) => pred(item, right[index])).All(static matches => matches)`. A helper performing the same length guard and the same short-circuiting `All` is observationally identical — `Enumerable.All` already stops at the first `false`, and all predicates are pure symbol comparisons with no side effects.
+- **Proposed change:** Add `private static bool PairwiseMatch<T>(ImmutableArray<T> left, ImmutableArray<T> right, Func<T,T,bool> match)`; rewrite the seven sites as single expressions.
+
+### 6. Drop unread `GeneratorRun` properties
+- **Files:** `SharpProof.ContractForGenerator.Test/GeneratorTestHost.cs:261-273` (declaration), `:125-130` (construction)
+- **Est. LOC saved:** ~6
+- **Why it's safe:** Targeted grep across both test projects finds exactly one occurrence each of `InputCompilation` and `OutputCompilation` — the declarations themselves. `Driver` has one real consumer (`ContractForValidatorGeneratorTests.cs:2013`) and stays. `GeneratorRun` is `internal`, test-only, never serialized or compared.
+- **Proposed change:** Remove the two constructor parameters and properties, and the corresponding arguments at `RunCore`'s `new GeneratorRun(...)`.
+
+> **Measured negatives — checked, nothing to harvest.**
+> **`ProtocolJson.cs` per-field validation is ALREADY table-driven.** Every repeated field check goes through `Validator.Rules(value, WorkerProtocolMetadata.*Rules, prefix)` (`ProtocolJsonSupport.cs:334-345`) against generated `WorkerProtocolRule<T>` rows. Only **9** `errors.Check(...)` calls in the whole file express a per-field predicate not already in a rule table, and each is a genuine cross-field invariant (`response.request_mismatch`, `response.input_mismatch`, `response.elapsed_request_envelope`, …). Error construction is single-sourced in `Validator.Add` (`:306-313`). **No table-driving win remains here** — this directly answers the brief's largest hypothesis for this area.
+> **No dead members.** A per-identifier frequency count over all 587 tracked `.cs` files for the 246 declared members of the hand-written `SharpProof.Contracts` and `SharpProof.Worker.Protocol` files returned only three count-1 hits — `CanSeek`, `CanWrite`, `Seek` in `BoundedReadStream.cs` — which are mandatory `Stream` overrides, not dead.
+> **Single-caller private helpers exist but are not worth inlining:** ~18 in `ProtocolJson.cs` (`ValidateRun`, `ValidateSummary`, `ValidateCacheForRequest`, `VersionsEqual`, …), each saving a signature and braces (~4 lines) while destroying the readability of `ValidateResponse`.
+> **No verbose immutable carriers to convert:** the hand-written `SharpProof.Contracts` types are `partial` behaviour extensions on generated types with no state of their own.
+> **No `Does.Contain` literal run:** only **22** such assertions across both test projects, and the two actual loops (`ContractBinderTests.cs:1632`, `ContractForValidatorGeneratorTests.cs:2058`) are already table-driven over a `forbidden` array. The ArchitectureTest pattern has no analogue here — a second independent rejection of that hypothesis.
+
