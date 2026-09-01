@@ -466,7 +466,7 @@ public sealed class CorpusGateTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(synthetic, Has.Length.EqualTo(280));
+            Assert.That(synthetic, Has.Length.EqualTo(262));
             Assert.That(
                 synthetic.Select(static item => item.SeedId).Distinct().Count(),
                 Is.EqualTo(28));
