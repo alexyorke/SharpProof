@@ -61,10 +61,13 @@ function Invoke-GitLines {
     return $output
 }
 
-function Get-GitTreeEntries {
+function Invoke-GitBinary {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Revision
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Operation
     )
 
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
@@ -73,22 +76,13 @@ function Get-GitTreeEntries {
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
-    foreach ($argument in @(
-            '-C',
-            $resolvedRepository,
-            '-c',
-            'core.quotePath=false',
-            'ls-tree',
-            '-r',
-            '-z',
-            '--full-tree',
-            $Revision)) {
+    foreach ($argument in @('-C', $resolvedRepository) + $Arguments) {
         $startInfo.ArgumentList.Add($argument)
     }
 
     $process = [Diagnostics.Process]::Start($startInfo)
     if ($null -eq $process) {
-        throw 'Reading tracked release paths did not start Git.'
+        throw "$Operation did not start Git."
     }
     try {
         $errorTask = $process.StandardError.ReadToEndAsync()
@@ -100,10 +94,10 @@ function Get-GitTreeEntries {
             $errorText = $errorTask.GetAwaiter().GetResult()
             if ($process.ExitCode -ne 0) {
                 throw (
-                    'Reading tracked release paths failed with exit code ' +
-                    "$($process.ExitCode). $errorText")
+                    "$Operation failed with exit code $($process.ExitCode). " +
+                    $errorText)
             }
-            $bytes = $output.ToArray()
+            return $output.ToArray()
         }
         finally {
             $output.Dispose()
@@ -112,6 +106,24 @@ function Get-GitTreeEntries {
     finally {
         $process.Dispose()
     }
+}
+
+function Get-GitTreeEntries {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Revision
+    )
+
+    $bytes = Invoke-GitBinary `
+        -Arguments @(
+            '-c',
+            'core.quotePath=false',
+            'ls-tree',
+            '-r',
+            '-z',
+            '--full-tree',
+            $Revision) `
+        -Operation 'Reading tracked release paths'
 
     $encoding = [Text.UTF8Encoding]::new($false, $true)
     $entries = [Collections.Generic.List[object]]::new()
@@ -200,53 +212,9 @@ function Get-GitBlobBytes {
         [string]$Path
     )
 
-    $temporaryPath = [IO.Path]::GetTempFileName()
-    try {
-        $startInfo = [Diagnostics.ProcessStartInfo]::new()
-        $startInfo.FileName = 'git'
-        $startInfo.UseShellExecute = $false
-        $startInfo.CreateNoWindow = $true
-        $startInfo.RedirectStandardOutput = $true
-        $startInfo.RedirectStandardError = $true
-        $startInfo.ArgumentList.Add('-C')
-        $startInfo.ArgumentList.Add($resolvedRepository)
-        $startInfo.ArgumentList.Add('cat-file')
-        $startInfo.ArgumentList.Add('blob')
-        $startInfo.ArgumentList.Add($ObjectId)
-
-        $process = [Diagnostics.Process]::Start($startInfo)
-        if ($null -eq $process) {
-            throw "Reading '$Path' did not start Git."
-        }
-        try {
-            $errorTask = $process.StandardError.ReadToEndAsync()
-            $stream = [IO.File]::Create($temporaryPath)
-            try {
-                $copyTask = $process.StandardOutput.BaseStream.CopyToAsync(
-                    $stream)
-                $process.WaitForExit()
-                $null = $copyTask.GetAwaiter().GetResult()
-            }
-            finally {
-                $stream.Dispose()
-            }
-            $errorText = $errorTask.GetAwaiter().GetResult()
-            if ($process.ExitCode -ne 0) {
-                throw (
-                    "Reading '$Path' blob $ObjectId failed with exit code " +
-                    "$($process.ExitCode). $errorText")
-            }
-        }
-        finally {
-            $process.Dispose()
-        }
-        return [IO.File]::ReadAllBytes($temporaryPath)
-    }
-    finally {
-        if ([IO.File]::Exists($temporaryPath)) {
-            [IO.File]::Delete($temporaryPath)
-        }
-    }
+    return Invoke-GitBinary `
+        -Arguments @('cat-file', 'blob', $ObjectId) `
+        -Operation "Reading '$Path' blob $ObjectId"
 }
 
 function Test-ApprovedMetadataPath {

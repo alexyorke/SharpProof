@@ -43,15 +43,12 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanTopology.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanIdentity.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationDestination.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 
-$packageOrder = @(
-    'SharpProof.Attributes',
-    'SharpProof',
-    'SharpProof.Verifier'
-)
+$packageOrder = $SharpProofPackagePushOrder
 
 function Get-RequiredProperty {
     param(
@@ -144,72 +141,6 @@ function Resolve-ReleaseDotNet {
             "requires '$SdkVersion'.")
     }
     return $path
-}
-
-function Get-PackageIdentity {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-
-    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
-    try {
-        $nuspecEntries = @(
-            $archive.Entries |
-                Where-Object {
-                    $_.FullName.EndsWith(
-                        '.nuspec',
-                        [StringComparison]::OrdinalIgnoreCase)
-                }
-        )
-        if ($nuspecEntries.Count -ne 1) {
-            throw "Package '$Path' must contain exactly one nuspec."
-        }
-        $reader = [IO.StreamReader]::new($nuspecEntries[0].Open())
-        try {
-            [xml]$nuspec = $reader.ReadToEnd()
-        }
-        finally {
-            $reader.Dispose()
-        }
-        $namespaces = [Xml.XmlNamespaceManager]::new($nuspec.NameTable)
-        $namespaces.AddNamespace(
-            'n',
-            $nuspec.DocumentElement.NamespaceURI)
-        $metadata = $nuspec.SelectSingleNode(
-            '/n:package/n:metadata',
-            $namespaces)
-        if ($null -eq $metadata) {
-            throw "Package '$Path' has no nuspec metadata."
-        }
-        $id = $metadata.SelectSingleNode('n:id', $namespaces)
-        $version = $metadata.SelectSingleNode('n:version', $namespaces)
-        $repository = $metadata.SelectSingleNode(
-            'n:repository',
-            $namespaces)
-        if ($null -eq $id -or
-            $null -eq $version -or
-            $null -eq $repository) {
-            throw "Package '$Path' has incomplete identity metadata."
-        }
-        $repositoryType = $repository.GetAttribute('type')
-        $repositoryUrl = $repository.GetAttribute('url')
-        $repositoryCommit = $repository.GetAttribute('commit')
-        if ($repositoryType -ne 'git' -or
-            $repositoryUrl -ne
-                'https://github.com/alexyorke/SharpProof' -or
-            $repositoryCommit -notmatch '^[0-9a-fA-F]{40}$') {
-            throw "Package '$Path' has invalid repository metadata."
-        }
-        return [pscustomobject][ordered]@{
-            id = $id.InnerText
-            version = $version.InnerText
-            repositoryCommit = $repositoryCommit.ToLowerInvariant()
-        }
-    }
-    finally {
-        $archive.Dispose()
-    }
 }
 
 function Get-ArtifactPath {
@@ -432,8 +363,10 @@ function Get-ValidatedRelease {
         $symbolsPath = Get-ArtifactPath `
             -Directory $Directory `
             -FileName ([string]$symbols[0].fileName)
-        $mainIdentity = Get-PackageIdentity -Path $mainPath
-        $symbolsIdentity = Get-PackageIdentity -Path $symbolsPath
+        $mainIdentity = Get-SharpProofPackageIdentity `
+            -Path $mainPath -RequireRepository
+        $symbolsIdentity = Get-SharpProofPackageIdentity `
+            -Path $symbolsPath -RequireRepository
         if ($mainIdentity.id -ne $packageId -or
             $symbolsIdentity.id -ne $packageId -or
             $mainIdentity.version -ne $version -or

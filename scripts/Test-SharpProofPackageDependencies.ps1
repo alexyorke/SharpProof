@@ -1,4 +1,6 @@
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
 function Test-SharpProofSpdxPackageChecksum {
     param(
@@ -178,36 +180,11 @@ function Get-SharpProofNuspecDependencyModel {
         [string]$PackagePath
     )
 
-    $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
-    try {
-        $entries = @($archive.Entries | Where-Object {
-            $_.FullName.EndsWith(
-                '.nuspec',
-                [StringComparison]::OrdinalIgnoreCase)
-        })
-        if ($entries.Count -ne 1) {
-            throw "Package '$PackagePath' must contain exactly one nuspec."
-        }
-        $reader = [IO.StreamReader]::new($entries[0].Open())
-        try {
-            [xml]$document = $reader.ReadToEnd()
-        }
-        finally {
-            $reader.Dispose()
-        }
-    }
-    finally {
-        $archive.Dispose()
-    }
-
-    $manager = [Xml.XmlNamespaceManager]::new($document.NameTable)
-    $manager.AddNamespace('n', $document.DocumentElement.NamespaceURI)
-    $metadata = $document.SelectSingleNode(
-        '/n:package/n:metadata',
-        $manager)
-    if ($null -eq $metadata) {
-        throw "Package '$PackagePath' has no nuspec metadata."
-    }
+    $metadata = Get-SharpProofNuspecMetadata -Path $PackagePath
+    $manager = [Xml.XmlNamespaceManager]::new(
+        $metadata.OwnerDocument.NameTable)
+    $manager.AddNamespace(
+        'n', $metadata.OwnerDocument.DocumentElement.NamespaceURI)
     $idNode = $metadata.SelectSingleNode('n:id', $manager)
     $versionNode = $metadata.SelectSingleNode('n:version', $manager)
     $licenseNodes = @($metadata.SelectNodes('n:license', $manager))
@@ -552,11 +529,9 @@ function Test-SharpProofThirdPartyComponentProjection {
     $expected = @($ExpectedComponents |
         ForEach-Object { ConvertTo-ComponentRecord $_ } |
         Sort-Object packageId, id, version)
-    if ($actual.Count -ne $expected.Count -or
-        ($actual | ConvertTo-Json -Depth 4 -Compress) -cne
-            ($expected | ConvertTo-Json -Depth 4 -Compress)) {
-        throw 'Third-party component inventory does not match the authenticated catalog projection.'
-    }
+    Assert-SharpProofCanonicalMatch `
+        -Actual $actual -Expected $expected -Depth 4 `
+        -Message 'Third-party component inventory does not match the authenticated catalog projection.'
 }
 
 function Test-SharpProofSbomComponentGraph {
@@ -678,11 +653,9 @@ function Test-SharpProofSbomTopology {
             spdxId = [string]$_.SPDXID
         }
     } | Sort-Object name, version)
-    if ($actualPackages.Count -ne $expectedPackages.Count -or
-        ($actualPackages | ConvertTo-Json -Compress) -cne
-            ($expectedPackages | ConvertTo-Json -Compress)) {
-        throw 'SPDX SBOM package identities are not the exact canonical graph.'
-    }
+    Assert-SharpProofCanonicalMatch `
+        -Actual $actualPackages -Expected $expectedPackages -Depth 2 `
+        -Message 'SPDX SBOM package identities are not the exact canonical graph.'
 
     $expectedDescribes = @($FirstPartyPackageIds |
         ForEach-Object { Get-SharpProofDependencySpdxId -Name $_ } |
@@ -740,11 +713,10 @@ function Test-SharpProofSbomTopology {
             to = [string]$_.relatedSpdxElement
         }
     } | Sort-Object from, type, to)
-    if ($actualRelationships.Count -ne $expectedRelationships.Count -or
-        ($actualRelationships | ConvertTo-Json -Compress) -cne
-            ($expectedRelationships | ConvertTo-Json -Compress)) {
-        throw 'SPDX relationships are not the exact canonical topology.'
-    }
+    Assert-SharpProofCanonicalMatch `
+        -Actual $actualRelationships -Expected $expectedRelationships `
+        -Depth 2 `
+        -Message 'SPDX relationships are not the exact canonical topology.'
 }
 
 function Test-SharpProofSbomArtifactScope {

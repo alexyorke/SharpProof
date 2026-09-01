@@ -14,6 +14,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
@@ -181,11 +182,7 @@ function Test-SampleProjectInventory {
     }
 
     $allowedPackages = [Collections.Generic.HashSet[string]]::new(
-        [string[]]@(
-            'SharpProof',
-            'SharpProof.Attributes',
-            'SharpProof.Verifier'
-        ),
+        [string[]]$SharpProofPackageIds,
         [StringComparer]::Ordinal)
     [xml]$sharedProject = Get-Content -LiteralPath (
         Join-Path $samplesRoot 'Directory.Build.props') -Raw

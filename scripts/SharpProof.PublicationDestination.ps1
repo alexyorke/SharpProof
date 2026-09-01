@@ -2,6 +2,8 @@ if (-not (Get-Command Test-SharpProofReleaseVersionSyntax `
         -CommandType Function -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 }
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
 function Resolve-SharpProofPublicationHttpsDestination {
     param(
@@ -75,6 +77,11 @@ function Get-SharpProofPublicationFixtureArchiveCatalog {
             } |
             Sort-Object FullName)
     foreach ($file in $archives) {
+        $metadata = Get-SharpProofNuspecMetadata -Path $file.FullName
+        $namespaces = [Xml.XmlNamespaceManager]::new(
+            $metadata.OwnerDocument.NameTable)
+        $namespaces.AddNamespace(
+            'n', [string]$metadata.OwnerDocument.DocumentElement.NamespaceURI)
         try {
             $archive = [IO.Compression.ZipFile]::OpenRead($file.FullName)
         }
@@ -82,24 +89,6 @@ function Get-SharpProofPublicationFixtureArchiveCatalog {
             throw "Fixture archive is malformed: '$($file.FullName)'."
         }
         try {
-            $nuspecEntries = @($archive.Entries | Where-Object {
-                $_.FullName.EndsWith(
-                    '.nuspec', [StringComparison]::OrdinalIgnoreCase)
-            })
-            if ($nuspecEntries.Count -ne 1) {
-                throw "Fixture archive must contain exactly one nuspec: '$($file.FullName)'."
-            }
-            $reader = [IO.StreamReader]::new($nuspecEntries[0].Open())
-            try { [xml]$nuspec = $reader.ReadToEnd() }
-            finally { $reader.Dispose() }
-            $namespaces = [Xml.XmlNamespaceManager]::new($nuspec.NameTable)
-            $namespaces.AddNamespace(
-                'n', [string]$nuspec.DocumentElement.NamespaceURI)
-            $metadata = $nuspec.SelectSingleNode(
-                '/n:package/n:metadata', $namespaces)
-            if ($null -eq $metadata) {
-                throw "Fixture archive nuspec identity is incomplete: '$($file.FullName)'."
-            }
             $ids = @($metadata.SelectNodes('n:id', $namespaces))
             $versions = @($metadata.SelectNodes('n:version', $namespaces))
             if ($ids.Count -ne 1 -or $versions.Count -ne 1) {
@@ -236,13 +225,9 @@ function Test-SharpProofPublicationDestinationAuthority {
     $expected = New-SharpProofPublicationDestinationAuthority `
         -Source $Source -SymbolSource $SymbolSource `
         -FixtureDirectory $FixtureDirectory -InputSnapshot $InputSnapshot
-    $actualNames = @($Authority.PSObject.Properties.Name | Sort-Object)
-    $expectedNames = @($expected.PSObject.Properties.Name | Sort-Object)
-    if (($actualNames -join "`0") -cne ($expectedNames -join "`0") -or
-        ($Authority | ConvertTo-Json -Compress -Depth 5) -cne
-            ($expected | ConvertTo-Json -Compress -Depth 5)) {
-        throw 'Publication destination authority is invalid.'
-    }
+    Assert-SharpProofCanonicalMatch `
+        -Actual $Authority -Expected $expected -Depth 5 `
+        -Message 'Publication destination authority is invalid.'
 }
 
 function New-SharpProofPublicationActionAuthority {
@@ -328,13 +313,9 @@ function Test-SharpProofPublicationActionAuthority {
         -Mode $Mode -MainState $MainState `
         -FixtureMainState $FixtureMainState `
         -FixtureSymbolsState $FixtureSymbolsState
-    $actualNames = @($Authority.PSObject.Properties.Name)
-    $expectedNames = @($expected.PSObject.Properties.Name)
-    if (($actualNames -join "`0") -cne ($expectedNames -join "`0") -or
-        ($Authority | ConvertTo-Json -Compress) -cne
-            ($expected | ConvertTo-Json -Compress)) {
-        throw 'Publication action authority is invalid.'
-    }
+    Assert-SharpProofCanonicalMatch `
+        -Actual $Authority -Expected $expected -Depth 2 `
+        -Message 'Publication action authority is invalid.'
 }
 
 function Get-SharpProofRemoteMainPackageUrl {

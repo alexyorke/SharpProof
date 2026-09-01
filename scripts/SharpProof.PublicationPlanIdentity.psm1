@@ -2,6 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanTopology.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationDestination.ps1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
 function Test-SharpProofPublicationVersionSyntax {
     param([Parameter(Mandatory = $true)][string]$Version)
@@ -260,8 +261,7 @@ function Test-SharpProofPublicationPlanIdentity {
         }
     }
 
-    $packageIds = @(
-        'SharpProof.Attributes','SharpProof','SharpProof.Verifier')
+    $packageIds = $SharpProofPackagePushOrder
     $packages = @($Plan.packages)
     if ($packages.Count -ne $packageIds.Count) {
         throw 'Publication plan package decisions are incomplete.'

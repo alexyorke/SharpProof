@@ -22,73 +22,7 @@ $resolvedOutput = $null
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
-
-function Get-PackageIdentity {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-
-    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
-    try {
-        $nuspecEntries = @(
-            $archive.Entries |
-                Where-Object {
-                    $_.FullName.EndsWith(
-                        '.nuspec',
-                        [StringComparison]::OrdinalIgnoreCase)
-                }
-        )
-        if ($nuspecEntries.Count -ne 1) {
-            throw "Package '$Path' must contain exactly one nuspec."
-        }
-        $reader = [IO.StreamReader]::new($nuspecEntries[0].Open())
-        try {
-            [xml]$nuspec = $reader.ReadToEnd()
-        }
-        finally {
-            $reader.Dispose()
-        }
-        $namespaces = [Xml.XmlNamespaceManager]::new($nuspec.NameTable)
-        $namespaces.AddNamespace(
-            'n',
-            $nuspec.DocumentElement.NamespaceURI)
-        $metadata = $nuspec.SelectSingleNode(
-            '/n:package/n:metadata',
-            $namespaces)
-        if ($null -eq $metadata) {
-            throw "Package '$Path' has no nuspec metadata."
-        }
-        $id = $metadata.SelectSingleNode('n:id', $namespaces)
-        $version = $metadata.SelectSingleNode('n:version', $namespaces)
-        $repository = $metadata.SelectSingleNode(
-            'n:repository',
-            $namespaces)
-        if ($null -eq $id -or
-            $null -eq $version -or
-            $null -eq $repository) {
-            throw "Package '$Path' has incomplete release metadata."
-        }
-        $repositoryType = $repository.GetAttribute('type')
-        $repositoryUrl = $repository.GetAttribute('url')
-        $repositoryCommit = $repository.GetAttribute('commit')
-        if ($repositoryType -ne 'git' -or
-            $repositoryUrl -ne
-                'https://github.com/alexyorke/SharpProof' -or
-            $repositoryCommit -notmatch '^[0-9a-fA-F]{40}$') {
-            throw "Package '$Path' has invalid repository metadata."
-        }
-        return [pscustomobject][ordered]@{
-            Id = $id.InnerText
-            Version = $version.InnerText
-            RepositoryUrl = $repositoryUrl
-            RepositoryCommit = $repositoryCommit.ToLowerInvariant()
-        }
-    }
-    finally {
-        $archive.Dispose()
-    }
-}
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
 function Write-AtomicText {
     param(
@@ -585,17 +519,14 @@ Test-SharpProofExactRegularFileSet `
     -ExpectedFileNames @($packageFiles.Name) `
     -Owner 'Release package input'
 
-$expectedIds = @(
-    'SharpProof',
-    'SharpProof.Attributes',
-    'SharpProof.Verifier'
-) | Sort-Object
+$expectedIds = $SharpProofPackageIds
 $identities = @(
     $packageFiles |
         ForEach-Object {
             [pscustomobject][ordered]@{
                 File = $_
-                Identity = Get-PackageIdentity -Path $_.FullName
+                Identity = Get-SharpProofPackageIdentity `
+                    -Path $_.FullName -RequireRepository
             }
         }
 )

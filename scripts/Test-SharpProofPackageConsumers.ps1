@@ -25,58 +25,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
-
-function Get-PackageIdentity {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-
-    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
-    try {
-        $nuspecEntries = @(
-            $archive.Entries |
-                Where-Object {
-                    $_.FullName.EndsWith(
-                        '.nuspec',
-                        [StringComparison]::OrdinalIgnoreCase)
-                }
-        )
-        if ($nuspecEntries.Count -ne 1) {
-            throw "Package '$Path' must contain exactly one nuspec."
-        }
-        $reader = [IO.StreamReader]::new($nuspecEntries[0].Open())
-        try {
-            [xml]$nuspec = $reader.ReadToEnd()
-        }
-        finally {
-            $reader.Dispose()
-        }
-        $namespaces = [Xml.XmlNamespaceManager]::new($nuspec.NameTable)
-        $namespaces.AddNamespace(
-            'n',
-            $nuspec.DocumentElement.NamespaceURI)
-        $metadata = $nuspec.SelectSingleNode(
-            '/n:package/n:metadata',
-            $namespaces)
-        if ($null -eq $metadata) {
-            throw "Package '$Path' has no nuspec metadata."
-        }
-        $id = $metadata.SelectSingleNode('n:id', $namespaces)
-        $version = $metadata.SelectSingleNode('n:version', $namespaces)
-        if ($null -eq $id -or $null -eq $version) {
-            throw "Package '$Path' has an incomplete nuspec identity."
-        }
-        return [pscustomobject]@{
-            Id = $id.InnerText
-            Version = $version.InnerText
-            Path = $Path
-        }
-    }
-    finally {
-        $archive.Dispose()
-    }
-}
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
 function Resolve-SharpProofPackageSource {
     param(
@@ -102,17 +51,13 @@ function Resolve-SharpProofPackageSource {
     }
     $identities = @(
         $packageFiles |
-            ForEach-Object { Get-PackageIdentity -Path $_.FullName }
+            ForEach-Object { Get-SharpProofPackageIdentity -Path $_.FullName }
     )
     $symbolIdentities = @(
         $symbolPackageFiles |
-            ForEach-Object { Get-PackageIdentity -Path $_.FullName }
+            ForEach-Object { Get-SharpProofPackageIdentity -Path $_.FullName }
     )
-    $expectedIds = @(
-        'SharpProof',
-        'SharpProof.Attributes',
-        'SharpProof.Verifier'
-    ) | Sort-Object
+    $expectedIds = $SharpProofPackageIds
     $actualIds = @($identities.Id | Sort-Object)
     if (($actualIds -join '|') -ne ($expectedIds -join '|')) {
         throw "SharpProof package source IDs must be exactly '$($expectedIds -join ', ')'; found '$($actualIds -join ', ')'."
@@ -156,7 +101,9 @@ function Get-SharpProofPortablePackageVersion {
     )
 
     $package = Get-ChildItem -LiteralPath $Source -File -Filter '*.nupkg' |
-        ForEach-Object { Get-PackageIdentity -Path $_.FullName } |
+        ForEach-Object {
+            Get-SharpProofPackageIdentity -Path $_.FullName
+        } |
         Where-Object { $_.Id -eq 'SharpProof' }
     if (@($package).Count -ne 1) {
         throw "The package source must contain exactly one SharpProof package."
@@ -225,7 +172,9 @@ function New-FrameworkPackageSource {
 
     $unexpectedPackages = @(
         Get-ChildItem -LiteralPath $frameworkSource -File -Filter '*.nupkg' |
-            ForEach-Object { Get-PackageIdentity -Path $_.FullName } |
+            ForEach-Object {
+                Get-SharpProofPackageIdentity -Path $_.FullName
+            } |
             Where-Object {
                 $_.Id.StartsWith(
                     'SharpProof',
