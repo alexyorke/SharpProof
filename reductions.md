@@ -1400,3 +1400,108 @@ Method: normalized 14-line sliding-window hashing across all 1,058 non-generated
 - **Why it is recorded but not recommended:** Every one of these is a `Assert.That(` head whose arguments were wrapped onto following lines despite `.editorconfig:13` permitting 140 columns. Rewrapping is behaviour-preserving and would remove several thousand lines, but it is **pure formatting churn**: it improves nothing, produces an unreviewable diff across every test file in the solution, and would conflict with all other work in flight. Recorded so the number is known and nobody rediscovers it as a "win".
 - **Proposed change:** If ever done, do it as a mechanical formatter pass in one isolated commit touching nothing else — never by hand, and never mixed with a substantive change.
 
+---
+
+## Deep pass: Analyzer.Test big files (round 5)
+
+**Estimated savings: ~1,225 LOC, all substantive** — no pure-reflow items included in this total.
+
+### 1. Table-drive the 59 single-source / single-assert tests in `RequiresAndControlTests`
+- **Files:** `SharpProof.Analyzer.Test/RequiresAndControlTests.cs` — 59 methods (e.g. `:1384, :1412, :1561, :1586, :1624, :1689, :1743, :1890, :1930, :2006, :2558, :2697`, plus 47 more); **1,815 of the file's 3,145 lines sit in these methods**
+- **Est. LOC saved:** ~530 (net **~410** beyond the already-proposed `AssertIds` helper, which this subsumes for these sites)
+- **Why it's safe:** All 59 bodies are structurally identical modulo three values — the embedded source literal, the mode, and the enabled/expected diagnostic id list. 51 of the 59 use the *exact* same `("contracts", ["SP0027"])` pair; the rest vary only in mode (`null`, `"effects"`, `"all-experimental"`) and id (`SP0002`/`SP0024`/`SP0047`). The single assertion is always `Assert.That(diagnostics.Select(d => d.Id), Is.EqualTo([...]))` or `Is.Empty`. **No test in this set carries a second distinct assertion**, so nothing is dropped. `.SetName(...)` on each `TestCaseData` preserves the current test names verbatim in runner output.
+- **Proposed change:** One `[TestCaseSource(nameof(ReplayCases))]` method taking `(string source, string? mode, string[] enabledIds, string[] expectedIds)`; each case becomes a `TestCaseData` whose only non-source lines are the `yield return`, the two `"""` fences, and the args/`SetName` line — 14 scaffold lines down to ~5.
+
+### 2. Shared embedded-fixture builder for the `Fixture`/`Positive` preamble in two more files
+- **Files:** `AnalyzerModeAndEffectTests.cs` (45 literals with the `using SharpProof.Attributes;` + blank + `public static class Fixture {` preamble); `RequiresAndControlTests.cs` (31 with that preamble, and 38 that additionally contain the byte-identical 3-line `static void Positive(int value) { Contract.Requires(value > 0); }` — 67 total occurrences at `:1392, :1420, :1455, :1466, :1473`, …)
+- **Est. LOC saved:** ~380 (135 + 245)
+- **Why it's safe:** Pure text-level factoring of the *fixture source*, not of assertions. The analyzer sees a byte-identical compilation unit as long as the builder emits the same preamble; every diagnostic id, count and message assertion is untouched. **Distinct from the previously-reported `NestedRequiresCallSiteTests.cs` preamble finding** — these are two different files not covered by it.
+- **⚠ Caveat:** `AnalyzerModeAndEffectTests.cs` has three tests asserting on `SourceSpan.Start` derived from `source.IndexOf(...)`; those still work because the offset is computed from the built string, but the builder must be applied *before* the `IndexOf`.
+- **Proposed change:** Add `private static string Fixture(string body)` and a `FixtureWithPositive(string body)` variant to each fixture class; call sites pass only the varying member text via `$$"""…"""`.
+
+### 3. Extract the repeated `RequiresCallSiteDiscovery` arrange block
+- **Files:** `RequiresCallSiteDiscoveryTests.cs` — 17 `new RequiresCallSiteDiscovery(` sites; 17 `compilation.SyntaxTrees.Single()`, 16 `GetSemanticModel(tree)`, 12 `(IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!`. First two at `:19-40` and `:63-80`
+- **Est. LOC saved:** ~145
+- **Why it's safe:** The block is mechanical construction (tree → declaration → semantic model → caller symbol → `.Get(callerContracts: null)`) and contains **no assertions**. The file already proves the pattern is helper-worthy — it has `GetMethod(...)` at `:1774` for the *symbol* half but nothing for the *discovery* half, so tests re-inline ~11 lines each.
+- **Proposed change:** Add `private static ImmutableArray<RequiresCallSiteCandidate>? Discover<TSyntax>(CSharpCompilation, Func<TSyntax,bool>? select = null, ContractSet? callerContracts = null)`, collapsing each 11-line arrange to 1-3 lines. Two sites pass a non-null `callerContracts` and one asserts `HasPotentialCallSite` instead of `.Get` — keep those as an overload rather than forcing them through the helper.
+
+### 4. `AssertRequiresAt(diagnostics, source, params markers)` for the location-assert runs
+- **Files:** `NestedRequiresCallSiteTests.cs` — 19 `SourceSpan.Start` assert sites (`:374, :411, :480, :521, :565, :683, :719, :755, :794, :834, :922, :1030, :1034, :1073, :1179, :1368, :1425, :1512, :1659`), 12 of which pair with `source.IndexOf("Positive(-N)", StringComparison.Ordinal)`; 26 tests call `AssertRequiresDiagnostics`
+- **Est. LOC saved:** ~130
+- **Why it's safe:** At every site the count assertion (`AssertRequiresDiagnostics(diagnostics, N)`) is strictly implied by the location list length, and the location assertion is always "the reported spans equal the offsets of these `Positive(-N)` markers". One helper asserting both the id sequence *and* the ordered/equivalent offsets preserves both checks exactly.
+- **⚠ Caveat:** keep `Is.EquivalentTo` vs `Is.EqualTo` as a helper flag — three sites use unordered comparison, and collapsing them to ordered would *strengthen* the assertion and could flake. Pass ordering explicitly.
+- **Proposed change:** Add `AssertRequiresAt(...)` beside the existing `AssertRequiresDiagnostics` (`:1778`); replace the 5-8 line assert pairs with one call.
+
+### 5. Message-contains assertion helper
+- **Files:** `AnalyzerModeAndEffectTests.cs` (13 indexed + 3 by-id sites: `:208, :231, :258, :282, :285, :310, :313, :459, :463, :467, :1196, :2070`, …), `RequiresAndControlTests.cs` (3), `FinalCompilationCollectorTests.cs:53`
+- **Est. LOC saved:** ~40
+- **Why it's safe:** Each site is a verbatim 3-line (indexed) or 4-line (`.Single(d => d.Id == "X")`) `Assert.That(….GetMessage(CultureInfo.InvariantCulture), Does.Contain(literal))`. Collapsing keeps the same subject and the same `Does.Contain` constraint. **Leave the ~30 further `GetMessage` calls that bind to a local `var message = …` first** — those legitimately reuse the local.
+- **Proposed change:** Two one-line helpers in a shared internal `DiagnosticAssert` static class; mechanical replacement at the 20 sites.
+
+> **Negative results.** **No dead code:** zero `[Ignore]`, `[Explicit]`, or commented-out tests across all six files. `AnalyzerTestHost.EmitImage` (`:190`), `EmitReference` (`:203`) and `FindRepositoryRoot` (`:227`) *look* single-referenced by in-file grep but are `internal` and used from other test files — **do not delete** (another instance of the trap that in-file scanning creates). **No strictly-subsumed tests:** only one duplicated source literal exists in this area (a 6-line `public sealed class Subject` fixture appearing twice in `RequiresCallSiteDiscoveryTests.cs`), and the two tests around it assert different things. The 4 delegate tests at `RequiresCallSiteDiscoveryTests.cs:1075/1110/1152/1182` share a structure but each asserts a distinct target-resolution outcome — merging would save only ~15 lines and obscure four separate behaviours; **skipped deliberately**. `FinalCompilationCollectorTests.cs` is already well-factored (`CollectorWorkspace`, `CreateCompilation`, `AnalyzeCollectorAsync`, `Options`) and already uses `[TestCase]` 37 times.
+
+---
+
+## Deep pass: Package.Test big files (round 5)
+
+**Estimated savings: ~650 LOC** (of 12,677 across the four files), all non-overlapping with the six prior findings for these files.
+
+### 1. Path-addressed JSON assertion helper for `JsonElement` navigation
+- **Files:** `PackageLayoutSmokeTests.cs` (40 asserts / 184 lines), `LauncherArgumentTests.cs:1683-1740` and elsewhere (27 asserts / 96 lines), `WorkerMsBuildIntegrationTests.cs` (11 asserts / 36 lines)
+- **Est. LOC saved:** ~220
+- **Why it's safe:** Measured mechanically: **78 `Assert.That(...)` statements containing `GetProperty(` and spanning ≥3 physical lines, totalling 316 lines.** Each is a pure navigate-then-compare; a helper `AssertJson(root, "runs[0].results[0].level", "error")` preserves the exact expected value and the exact navigation path one-for-one. Every distinct expected value survives; nothing is merged away. Terminal accessor variance (`GetString`/`GetInt32`/`GetBoolean`/`GetArrayLength`) is handled by overloads on the expected argument. Current shape example at `LauncherArgumentTests.cs:1714-1719`.
+- **Proposed change:** One shared `JsonAssert.Path(JsonElement root, string path, object expected)` (~25 lines, in a file shared by the three fixtures); rewrite the 78 multi-line asserts as single lines.
+
+### 2. Collapse the three near-identical scratch-worker project factories
+- **Files:** `WorkerMsBuildIntegrationTests.cs:3832-3896` (`CreateResultlessWorkerAsync`), `:3897-3943` (`CreateMalformedWorkerAsync`), `:3944-4002` (`CreateMalformedThenHangWorkerAsync`)
+- **Est. LOC saved:** ~110
+- **Why it's safe:** All three create a subdirectory, write an identical `<Project Sdk="Microsoft.NET.Sdk">` Exe/net8.0 csproj, write a `Program.cs`, run `dotnet build -c Release --nologo /nodeReuse:false`, throw on non-zero exit, and return `bin/Release/net8.0/<Name>.dll`. The only differences are directory name, project name, and the `Program.cs` body. **No assertion exists in any of the three** — they are pure fixtures, so no coverage can be lost.
+- **⚠ One-off to preserve:** `CreateMalformedWorkerAsync` carries a `Condition="'$(TargetFrameworks)' == ''"` on `<TargetFramework>`, behaviourally identical here since no `TargetFrameworks` is set — keep it as an optional csproj-fragment parameter for zero risk.
+- **Proposed change:** Add `CreateScratchWorkerAsync(string name, string programSource)` (~40 lines); reduce the three methods to a name plus a verbatim `Program.cs` string each.
+
+### 3. `BuildOkAsync` / `BuildFailsAsync` wrappers around the build-then-assert-exit-code pair
+- **Files:** `WorkerMsBuildIntegrationTests.cs` (70 occurrences of `Assert.That(<x>.ExitCode, Is.Zero, <x>.Output);`), `PackageLayoutSmokeTests.cs` (35 occurrences)
+- **Est. LOC saved:** ~80
+- **Why it's safe:** All 105 sites are the same single-line assertion immediately after a `BuildAsync`/`RestoreAsync`/`RunDotNetAsync` call, each passing the process output as the NUnit failure message. Wrapping keeps both the exit-code check and the output-as-message diagnostic verbatim. Sites asserting `Is.Not.Zero` and then checking output text are a separate, smaller family — leave those or give them their own wrapper.
+- **Proposed change:** Add `BuildOkAsync(...)` to `ConsumerProject` (and the equivalent on `PackageWorkspace`) performing the assert internally and returning the result; delete the 105 standalone assert lines.
+
+### 4. Argument-array builder for the launcher `verify` command line
+- **Files:** `LauncherArgumentTests.cs` — 18 `string[] arguments = [` literals, 15 carrying the full `"verify" / --worker / --request / --result / --compiler-manifest / --verify-policy "advisory" / --assumption-policy "allow"` spine (`:471-481, :522-532, :554-564, :577-587, :605-620`)
+- **Est. LOC saved:** ~90
+- **Why it's safe:** The 15 blocks are ~11 lines each (~165 total) and differ only in which of the five path slots is overridden; the two policy flags are byte-identical in all 15. A builder with those as defaults and named optional overrides reproduces the exact same `string[]` fed to `LauncherArguments.TryParse`, so parser coverage is unchanged. **Distinct from the already-reported `RequestProjectionRejects*` grouping** — this applies to the argument literal itself, including in non-rejection tests (`DisabledCachePathDoesNotParticipateInIoTopology:607`, `CompletePublicationAcceptsSarif:297`).
+- **Proposed change:** Add `private static string[] VerifyArgs(worker, request, result, manifest, cache, sarif)` with all-optional parameters; replace the 15 literals with one call each.
+
+### 5. Shared tail for the worker-companion alias-rejection tests
+- **Files:** `WorkerMsBuildIntegrationTests.cs:2341-2382`, `:2383-2440`, `:2298-2339`
+- **Est. LOC saved:** ~40
+- **Why it's safe:** Beyond the already-reported 18-line staging preamble, the *tail* is also duplicated: `collisionCompanion = Path.ChangeExtension(collisionWorker, ".deps.json")`, `expectedBytes = await File.ReadAllBytesAsync(...)`, the four-tuple `RunVerificationTargetAsync(...)` call, and an `EnterMultipleScope` block asserting non-zero exit + companion still exists + bytes unchanged. The three tests keep distinct assertions (the symlink test has no message assertion; the hard-link test adds `Does.Contain("aliases a protected file identity")`; the first asserts a different message and file existence rather than bytes) — passing the expected message as an optional parameter preserves all three.
+- **Proposed change:** Add `AssertCompanionAliasRejectedAsync(project, collisionWorker, aliasPath, string? expectedMessage)` covering staging + invocation + the shared assertion cluster.
+
+### 6. Local escape helper inside `CreateProjectXml`
+- **Files:** `WorkerMsBuildIntegrationTests.cs:4316-4400`
+- **Est. LOC saved:** ~35
+- **Why it's safe:** Twelve consecutive `SecurityElement.Escape(Path.Combine(repository, …))` initialisations (`props`, `verifierProps`, `analyzerDirectory`, `generatorDirectory`, `collectorDirectory`, `targets`, `verifierTargets`, `worker`, `launcher`, `protocol`, `buildTasks`, `attributes`) each occupy 3-6 wrapped lines. A local `static string Esc(params string[] parts) => SecurityElement.Escape(Path.Combine(parts));` makes each one line producing byte-identical XML. Fixture construction only — no assertions involved.
+- **Proposed change:** Introduce the local `Esc` function; rewrite the twelve initialisers as one-liners.
+
+### 7. Consolidate small helpers duplicated across the four fixtures
+- **Files:** `WorkerMsBuildIntegrationTests.cs:3544-3560` and `PackageLayoutSmokeTests.cs:1596-1612` (`RequireContainerWorker`, byte-identical bar the message); 21 `new System.Text.UTF8Encoding(false)` argument lines (9 + 12); `CreateSharedCompilationServerId` at `PackageLayoutSmokeTests.cs:2473` duplicated at `FinalCompilationProbeTests.cs:853`
+- **Est. LOC saved:** ~45
+- **Why it's safe:** `RequireContainerWorker` has identical gating logic (Linux + x64 process + x64 OS + `SHARPPROOF_CONTAINER=1`, then `ContainerContract.ValidateRequired()`), and the skip message text is already identical. A `WriteUtf8(path, text)` helper removes one argument line per call site without changing the BOM-less encoding. `CreateSharedCompilationServerId` differs only in the ID prefix and the `typeof(...)` used for the MVID.
+- **Proposed change:** Move `RequireContainerWorker`, `WriteUtf8`, and a parameterised `CreateSharedCompilationServerId` into a shared static `PackageTestEnvironment` class.
+
+### 8. Policy-escalation assertion helper
+- **Files:** `WorkerMsBuildIntegrationTests.cs:1363-1392`, `:2775-2811`
+- **Est. LOC saved:** ~30
+- **Why it's safe:** Both tests repeat "build with one policy property → assert exit code zero/non-zero → assert output contains `info|warning|error SP004x`" four times each. A helper taking (policy name, policy value, expected diagnostic text, expected-failure flag) preserves each distinct expected string.
+- **⚠ Keep inline:** the two extra assertions — `Does.Not.Contain("SharpProof verifier failed with exit code")` and `Does.Contain("total=1, user=0, trusted=1")` — must stay as separate explicit lines.
+- **Proposed change:** Add `AssertPolicyDiagnosticAsync(project, (string,string) policy, string expected, bool expectFailure)` for the 7 escalation steps; keep the two trailing assertions inline.
+
+> **Measured negatives — do not pursue.**
+> **(a) The ArchitectureTest "bare `Does.Contain` run" pattern does NOT replicate here.** This was explicitly tested: the 107 `Does.Contain` calls across the four files are scattered one-or-two per test with different subjects (`build.Output`, `manifest`, `failed.Output`), not in contiguous table-able runs. Table-driving them would cost more than it saves.
+> **(b)** No `[Ignore]`, `[Explicit]`, or commented-out tests in any of the four files.
+> **(c)** A reflective scan for private members referenced only at their declaration found **zero** dead helpers or unused fields.
+> **(d)** No test is strictly subsumed by another. The `SupervisorReadiness*` group (`BuildTaskTests.cs:281-380`, 5 tests) *looks* TestCase-shaped but each supplies a structurally different callback lambda; parameterising would require passing delegates and would not shrink the file.
+> **(e)** The `Expected*` string arrays at `PackageLayoutSmokeTests.cs:26-146` (~120 lines) could be composed from prefix + shared filename lists, but that would make the expected package layout **implicit rather than literal** — low confidence, deliberately skipped.
+>
+> **Reflow-only (excluded from all totals):** across the four files there are **553 multi-line `Assert.That` statements totalling 2,198 lines**, most wrapping purely for an ~80-column habit. Only the 78 counted in finding 1 represent substantive structural duplication; the rest is formatting, not redundancy.
+
