@@ -200,6 +200,24 @@ function Assert-SharpProofFuzzRunnerResult {
         & $AfterValidation $Path
     }
 
+    # The validator owns the bytes it accepted.  Re-seal them over the
+    # validated path after the callback so a replacement during validation
+    # cannot become the artifact cited by the campaign summary.  Move the
+    # snapshot into place atomically and clean up on failure.
+    $temporary = Join-Path ([IO.Path]::GetDirectoryName(
+            [IO.Path]::GetFullPath($Path))) (
+        '.' + [IO.Path]::GetFileName($Path) + '.' +
+        [Guid]::NewGuid().ToString('N') + '.validated.tmp')
+    try {
+        [IO.File]::WriteAllBytes($temporary, $bytes)
+        [IO.File]::Move($temporary, $Path, $true)
+    }
+    finally {
+        if ([IO.File]::Exists($temporary)) {
+            [IO.File]::Delete($temporary)
+        }
+    }
+
     $result = $json | ConvertFrom-Json -ErrorAction Stop
     $result | Add-Member -NotePropertyName ResultSha256 -NotePropertyValue (
         [Convert]::ToHexString(
