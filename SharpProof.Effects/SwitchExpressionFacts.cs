@@ -496,6 +496,154 @@ internal static class SwitchExpressionFacts
         };
     }
 
+    internal static SwitchExpressionSelection GetPatternSelection(
+        Compilation compilation,
+        IPatternOperation pattern,
+        object? value,
+        ITypeSymbol? inputType)
+    {
+        return pattern switch
+        {
+            IDiscardPatternOperation => SwitchExpressionSelection.Always,
+            ITypePatternOperation typePattern => MatchTypePattern(
+                compilation,
+                typePattern.MatchedType,
+                value,
+                inputType,
+                matchesNull: false),
+            IDeclarationPatternOperation
+            { MatchedType: { } matchedType } declaration => MatchTypePattern(
+                compilation,
+                matchedType,
+                value,
+                inputType,
+                declaration.MatchesNull),
+            IDeclarationPatternOperation => SwitchExpressionSelection.Maybe,
+            IConstantPatternOperation constant
+                when constant.Value.ConstantValue is { HasValue: true } item =>
+                Equals(value, item.Value)
+                    ? SwitchExpressionSelection.Always
+                    : SwitchExpressionSelection.Never,
+            IRelationalPatternOperation relational =>
+                MatchRelationalPattern(relational, value),
+            INegatedPatternOperation negated => Negate(GetPatternSelection(
+                compilation,
+                negated.Pattern,
+                value,
+                inputType)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.And => And(
+                    GetPatternSelection(
+                        compilation,
+                        binary.LeftPattern,
+                        value,
+                        inputType),
+                    GetPatternSelection(
+                        compilation,
+                        binary.RightPattern,
+                        value,
+                        inputType)),
+            IBinaryPatternOperation binary
+                when binary.OperatorKind == BinaryOperatorKind.Or => Or(
+                    GetPatternSelection(
+                        compilation,
+                        binary.LeftPattern,
+                        value,
+                        inputType),
+                    GetPatternSelection(
+                        compilation,
+                        binary.RightPattern,
+                        value,
+                        inputType)),
+            _ => SwitchExpressionSelection.Maybe
+        };
+    }
+
+    private static SwitchExpressionSelection MatchTypePattern(
+        Compilation compilation,
+        ITypeSymbol matchedType,
+        object? value,
+        ITypeSymbol? inputType,
+        bool matchesNull)
+    {
+        if (value == null)
+        {
+            return matchesNull
+                ? SwitchExpressionSelection.Always
+                : SwitchExpressionSelection.Never;
+        }
+        var actualType = inputType?.TypeKind == TypeKind.Enum
+            ? inputType
+            : value switch
+            {
+                bool => compilation.GetSpecialType(SpecialType.System_Boolean),
+                byte => compilation.GetSpecialType(SpecialType.System_Byte),
+                sbyte => compilation.GetSpecialType(SpecialType.System_SByte),
+                short => compilation.GetSpecialType(SpecialType.System_Int16),
+                ushort => compilation.GetSpecialType(SpecialType.System_UInt16),
+                int => compilation.GetSpecialType(SpecialType.System_Int32),
+                uint => compilation.GetSpecialType(SpecialType.System_UInt32),
+                long => compilation.GetSpecialType(SpecialType.System_Int64),
+                ulong => compilation.GetSpecialType(SpecialType.System_UInt64),
+                char => compilation.GetSpecialType(SpecialType.System_Char),
+                float => compilation.GetSpecialType(SpecialType.System_Single),
+                double => compilation.GetSpecialType(SpecialType.System_Double),
+                decimal => compilation.GetSpecialType(SpecialType.System_Decimal),
+                string => compilation.GetSpecialType(SpecialType.System_String),
+                _ => null
+            };
+        if (actualType == null || actualType.TypeKind == TypeKind.Error)
+        {
+            return SwitchExpressionSelection.Maybe;
+        }
+        return compilation.ClassifyCommonConversion(actualType, matchedType).IsImplicit
+            ? SwitchExpressionSelection.Always
+            : SwitchExpressionSelection.Never;
+    }
+
+    private static SwitchExpressionSelection MatchRelationalPattern(
+        IRelationalPatternOperation pattern,
+        object? value)
+    {
+        var constantValue = pattern.Value.ConstantValue;
+        if (value is not IComparable comparable ||
+            !constantValue.HasValue ||
+            constantValue.Value == null)
+        {
+            return SwitchExpressionSelection.Never;
+        }
+        var constant = constantValue.Value;
+        if (value is double valueDouble && double.IsNaN(valueDouble) ||
+            constant is double constantDouble && double.IsNaN(constantDouble) ||
+            value is float valueFloat && float.IsNaN(valueFloat) ||
+            constant is float constantFloat && float.IsNaN(constantFloat))
+        {
+            return SwitchExpressionSelection.Never;
+        }
+
+        int comparison;
+        try
+        {
+            comparison = comparable.CompareTo(constant);
+        }
+        catch (ArgumentException)
+        {
+            return SwitchExpressionSelection.Maybe;
+        }
+
+        var matches = pattern.OperatorKind switch
+        {
+            BinaryOperatorKind.LessThan => comparison < 0,
+            BinaryOperatorKind.LessThanOrEqual => comparison <= 0,
+            BinaryOperatorKind.GreaterThan => comparison > 0,
+            BinaryOperatorKind.GreaterThanOrEqual => comparison >= 0,
+            _ => false
+        };
+        return matches
+            ? SwitchExpressionSelection.Always
+            : SwitchExpressionSelection.Never;
+    }
+
     private static SwitchExpressionSelection Negate(
         SwitchExpressionSelection selection)
     {

@@ -2045,13 +2045,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
             foreach (var arm in switchExpression.Arms)
             {
                 var match = switchCompilation == null
-                    ? ConstantPatternMatch.Unknown
-                    : GetConstantPatternMatch(
+                    ? SwitchExpressionSelection.Maybe
+                    : SwitchExpressionFacts.GetPatternSelection(
                         switchCompilation,
                         arm.Pattern,
                         input,
                         switchExpression.Value.Type);
-                if (match == ConstantPatternMatch.No)
+                if (match == SwitchExpressionSelection.Never)
                 {
                     continue;
                 }
@@ -2065,7 +2065,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     if (operationFacts != null &&
                         !operationFacts.MayCompleteNormally(arm.Guard))
                     {
-                        if (match == ConstantPatternMatch.Yes)
+                        if (match == SwitchExpressionSelection.Always)
                         {
                             yield break;
                         }
@@ -2084,7 +2084,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 }
                 var guardIsTrue = arm.Guard == null ||
                     arm.Guard.ConstantValue is { HasValue: true, Value: true };
-                if (match == ConstantPatternMatch.Yes && guardIsTrue)
+                if (match == SwitchExpressionSelection.Always && guardIsTrue)
                 {
                     break;
                 }
@@ -2105,223 +2105,6 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 yield break;
             }
         }
-    }
-
-    private static ConstantPatternMatch GetConstantPatternMatch(
-        Compilation compilation,
-        IPatternOperation pattern,
-        object? input,
-        ITypeSymbol? inputType)
-    {
-        return pattern switch
-        {
-            IDiscardPatternOperation => ConstantPatternMatch.Yes,
-            ITypePatternOperation typePattern =>
-                MatchTypePattern(
-                    compilation,
-                    typePattern.MatchedType,
-                    input,
-                    inputType,
-                    matchesNull: false),
-            IDeclarationPatternOperation
-            { MatchedType: { } declarationMatchedType } declarationPattern =>
-                MatchTypePattern(
-                    compilation,
-                    declarationMatchedType,
-                    input,
-                    inputType,
-                    declarationPattern.MatchesNull),
-            IDeclarationPatternOperation => ConstantPatternMatch.Unknown,
-            IConstantPatternOperation
-            {
-                Value.ConstantValue: { HasValue: true } constant
-            } => Equals(constant.Value, input)
-                ? ConstantPatternMatch.Yes
-                : ConstantPatternMatch.No,
-            IRelationalPatternOperation relational =>
-                MatchRelationalPattern(relational, input),
-            INegatedPatternOperation negated =>
-                Negate(GetConstantPatternMatch(
-                    compilation,
-                    negated.Pattern,
-                    input,
-                    inputType)),
-            IBinaryPatternOperation binary
-                when binary.OperatorKind == BinaryOperatorKind.And =>
-                And(
-                    GetConstantPatternMatch(
-                        compilation,
-                        binary.LeftPattern,
-                        input,
-                        inputType),
-                    GetConstantPatternMatch(
-                        compilation,
-                        binary.RightPattern,
-                        input,
-                        inputType)),
-            IBinaryPatternOperation binary
-                when binary.OperatorKind == BinaryOperatorKind.Or =>
-                Or(
-                    GetConstantPatternMatch(
-                        compilation,
-                        binary.LeftPattern,
-                        input,
-                        inputType),
-                    GetConstantPatternMatch(
-                        compilation,
-                        binary.RightPattern,
-                        input,
-                        inputType)),
-            _ => ConstantPatternMatch.Unknown
-        };
-    }
-
-    private static ConstantPatternMatch MatchTypePattern(
-        Compilation compilation,
-        ITypeSymbol matchedType,
-        object? input,
-        ITypeSymbol? inputType,
-        bool matchesNull)
-    {
-        if (input == null)
-        {
-            return matchesNull
-                ? ConstantPatternMatch.Yes
-                : ConstantPatternMatch.No;
-        }
-        var actualType = inputType?.TypeKind == TypeKind.Enum
-            ? inputType
-            : input switch
-            {
-                bool => compilation.GetSpecialType(
-                    SpecialType.System_Boolean),
-                byte => compilation.GetSpecialType(
-                    SpecialType.System_Byte),
-                sbyte => compilation.GetSpecialType(
-                    SpecialType.System_SByte),
-                short => compilation.GetSpecialType(
-                    SpecialType.System_Int16),
-                ushort => compilation.GetSpecialType(
-                    SpecialType.System_UInt16),
-                int => compilation.GetSpecialType(
-                    SpecialType.System_Int32),
-                uint => compilation.GetSpecialType(
-                    SpecialType.System_UInt32),
-                long => compilation.GetSpecialType(
-                    SpecialType.System_Int64),
-                ulong => compilation.GetSpecialType(
-                    SpecialType.System_UInt64),
-                char => compilation.GetSpecialType(
-                    SpecialType.System_Char),
-                float => compilation.GetSpecialType(
-                    SpecialType.System_Single),
-                double => compilation.GetSpecialType(
-                    SpecialType.System_Double),
-                decimal => compilation.GetSpecialType(
-                    SpecialType.System_Decimal),
-                string => compilation.GetSpecialType(
-                    SpecialType.System_String),
-                _ => null
-            };
-        if (actualType == null || actualType.TypeKind == TypeKind.Error)
-        {
-            return ConstantPatternMatch.Unknown;
-        }
-        return compilation
-            .ClassifyCommonConversion(actualType, matchedType)
-            .IsImplicit
-            ? ConstantPatternMatch.Yes
-            : ConstantPatternMatch.No;
-    }
-
-    private static ConstantPatternMatch MatchRelationalPattern(
-        IRelationalPatternOperation pattern,
-        object? input)
-    {
-        var constantValue = pattern.Value.ConstantValue;
-        if (input is not IComparable comparable ||
-            !constantValue.HasValue ||
-            constantValue.Value == null)
-        {
-            return ConstantPatternMatch.No;
-        }
-        var constant = constantValue.Value;
-        if (input is double inputDouble && double.IsNaN(inputDouble) ||
-            constant is double constantDouble && double.IsNaN(constantDouble) ||
-            input is float inputFloat && float.IsNaN(inputFloat) ||
-            constant is float constantFloat && float.IsNaN(constantFloat))
-        {
-            return ConstantPatternMatch.No;
-        }
-
-        int comparison;
-        try
-        {
-            comparison = comparable.CompareTo(constant);
-        }
-        catch (ArgumentException)
-        {
-            return ConstantPatternMatch.Unknown;
-        }
-
-        var matches = pattern.OperatorKind switch
-        {
-            BinaryOperatorKind.LessThan => comparison < 0,
-            BinaryOperatorKind.LessThanOrEqual => comparison <= 0,
-            BinaryOperatorKind.GreaterThan => comparison > 0,
-            BinaryOperatorKind.GreaterThanOrEqual => comparison >= 0,
-            _ => false
-        };
-        return matches
-            ? ConstantPatternMatch.Yes
-            : ConstantPatternMatch.No;
-    }
-
-    private static ConstantPatternMatch Negate(ConstantPatternMatch value)
-    {
-        return value switch
-        {
-            ConstantPatternMatch.Yes => ConstantPatternMatch.No,
-            ConstantPatternMatch.No => ConstantPatternMatch.Yes,
-            _ => ConstantPatternMatch.Unknown
-        };
-    }
-
-    private static ConstantPatternMatch And(
-        ConstantPatternMatch left,
-        ConstantPatternMatch right)
-    {
-        if (left == ConstantPatternMatch.No ||
-            right == ConstantPatternMatch.No)
-        {
-            return ConstantPatternMatch.No;
-        }
-        return left == ConstantPatternMatch.Yes &&
-               right == ConstantPatternMatch.Yes
-            ? ConstantPatternMatch.Yes
-            : ConstantPatternMatch.Unknown;
-    }
-
-    private static ConstantPatternMatch Or(
-        ConstantPatternMatch left,
-        ConstantPatternMatch right)
-    {
-        if (left == ConstantPatternMatch.Yes ||
-            right == ConstantPatternMatch.Yes)
-        {
-            return ConstantPatternMatch.Yes;
-        }
-        return left == ConstantPatternMatch.No &&
-               right == ConstantPatternMatch.No
-            ? ConstantPatternMatch.No
-            : ConstantPatternMatch.Unknown;
-    }
-
-    private enum ConstantPatternMatch
-    {
-        No,
-        Yes,
-        Unknown
     }
 
     private static ImmutableArray<RequiresCallTarget> GetPropertyCalls(
