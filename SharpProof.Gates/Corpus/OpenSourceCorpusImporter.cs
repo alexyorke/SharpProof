@@ -425,41 +425,17 @@ SOFTWARE.
             startInfo.ArgumentList.Add(argument);
         }
 
-        using var process = Process.Start(startInfo) ??
-            throw new InvalidOperationException("Could not start Git.");
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        try
-        {
-            await process.WaitForExitAsync(cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch
-        {
-            if (!process.HasExited)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (InvalidOperationException)
-                {
-                }
-            }
-
-            await process.WaitForExitAsync(CancellationToken.None)
-                .ConfigureAwait(false);
-            throw;
-        }
-        var output = (await outputTask.ConfigureAwait(false)).Trim();
-        var error = (await errorTask.ConfigureAwait(false)).Trim();
-        if (process.ExitCode != 0)
+        var result = await GateProcess.RunCapturedAsync(
+                startInfo,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (result.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                $"git {string.Join(" ", arguments)} failed: {error}");
+                $"git {string.Join(" ", arguments)} failed: {result.Error.Trim()}");
         }
 
-        return output;
+        return result.Output.Trim();
     }
 
     private static async Task<byte[]> ReadGitBlobAsync(
@@ -495,16 +471,7 @@ SOFTWARE.
         }
         catch
         {
-            if (!process.HasExited)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (InvalidOperationException)
-                {
-                }
-            }
+            GateProcess.KillTree(process);
 
             await process.WaitForExitAsync(CancellationToken.None)
                 .ConfigureAwait(false);

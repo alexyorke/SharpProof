@@ -693,16 +693,7 @@ internal static class PerformanceGate
 
     private static async Task TerminateProcessAsync(Process process)
     {
-        if (!process.HasExited)
-        {
-            try
-            {
-                process.Kill(entireProcessTree: true);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-        }
+        GateProcess.KillTree(process);
 
         if (process.HasExited)
         {
@@ -1371,7 +1362,7 @@ internal static class PerformanceGate
             var standardError = process.StandardError.ReadToEndAsync();
             if (!process.WaitForExit(milliseconds: 30000))
             {
-                process.Kill(entireProcessTree: true);
+                GateProcess.KillTree(process);
                 process.WaitForExit();
                 throw new InvalidDataException(
                     "The evaluated package policy probe exceeded 30 seconds.");

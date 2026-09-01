@@ -95,43 +95,16 @@ internal static class PackageBuildSdkPin
             CreateNoWindow = true
         };
         startInfo.ArgumentList.Add("--version");
-        using var process = Process.Start(startInfo) ??
-            throw new InvalidOperationException(
-                "The .NET SDK identity probe did not start.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync(
-            cancellationToken);
-        var standardError = process.StandardError.ReadToEndAsync(
-            cancellationToken);
-        try
-        {
-            await process.WaitForExitAsync(cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch
-        {
-            if (!process.HasExited)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (InvalidOperationException)
-                {
-                }
-            }
-
-            await process.WaitForExitAsync(CancellationToken.None)
-                .ConfigureAwait(false);
-            throw;
-        }
-
-        var output = (await standardOutput.ConfigureAwait(false)).Trim();
-        var error = (await standardError.ConfigureAwait(false)).Trim();
-        if (process.ExitCode != 0 || output.Length == 0)
+        var result = await GateProcess.RunCapturedAsync(
+                startInfo,
+                cancellationToken)
+            .ConfigureAwait(false);
+        var output = result.Output.Trim();
+        if (result.ExitCode != 0 || output.Length == 0)
         {
             throw new InvalidOperationException(
                 "The .NET SDK identity probe failed with exit code " +
-                $"{process.ExitCode}: {error}");
+                $"{result.ExitCode}: {result.Error.Trim()}");
         }
 
         return output;
