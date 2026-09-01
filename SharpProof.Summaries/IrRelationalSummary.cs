@@ -7,12 +7,6 @@ public enum IrSummaryOrigin
     SpecificationPack = 2
 }
 
-public enum IrSummaryCompleteness
-{
-    CompleteNormalRelation = 0,
-    Incomplete = 1
-}
-
 public enum IrSummaryAbstentionReason
 {
     None = 0,
@@ -29,17 +23,6 @@ public enum IrSummaryEffect
 {
     None = 0,
     MayThrow = 1
-}
-
-public enum IrSummaryTermination
-{
-    TerminatesOrThrows = 0,
-    Unknown = 1
-}
-
-public enum IrSummaryExceptionKind
-{
-    UnknownRuntime = 0
 }
 
 public sealed class IrSummaryProvenance
@@ -116,25 +99,6 @@ public sealed class IrSummarySignature(
         throw new ArgumentNullException(nameof(provenance));
 }
 
-public sealed class IrExceptionalSummaryExit
-{
-    internal IrExceptionalSummaryExit(
-        IrSummaryExceptionKind kind,
-        IrTerm? condition)
-    {
-        Kind = kind;
-        Condition = condition;
-    }
-
-    public IrSummaryExceptionKind Kind { get; }
-
-    /// <summary>
-    /// Null denotes a conservative exceptional exit whose exact input
-    /// partition is not expressible in the current IR.
-    /// </summary>
-    public IrTerm? Condition { get; }
-}
-
 public sealed class IrRelationalSummary
 {
     internal IrRelationalSummary(
@@ -143,23 +107,18 @@ public sealed class IrRelationalSummary
         ImmutableArray<IrVarId> existentialVariables,
         IrTerm normalCompletion,
         IrTerm normalRelation,
-        ImmutableArray<IrExceptionalSummaryExit> exceptionalExits,
         ImmutableArray<IrMemberId> dependencies,
         ImmutableArray<IrSummaryProvenance> dependencyProvenance,
-        IrSummaryEffect effects,
-        IrSummaryTermination termination)
+        IrSummaryEffect effects)
     {
         Factory = factory;
         Signature = signature;
         ExistentialVariables = existentialVariables;
         NormalCompletion = normalCompletion;
         NormalRelation = normalRelation;
-        ExceptionalExits = exceptionalExits;
         Dependencies = dependencies;
         DependencyProvenance = dependencyProvenance;
         Effects = effects;
-        Termination = termination;
-        Completeness = IrSummaryCompleteness.CompleteNormalRelation;
     }
 
     public IrFactory Factory { get; }
@@ -172,17 +131,12 @@ public sealed class IrRelationalSummary
 
     public IrTerm NormalRelation { get; }
 
-    public ImmutableArray<IrExceptionalSummaryExit> ExceptionalExits { get; }
-
     public ImmutableArray<IrMemberId> Dependencies { get; }
 
     public ImmutableArray<IrSummaryProvenance> DependencyProvenance { get; }
 
     public IrSummaryEffect Effects { get; }
 
-    public IrSummaryTermination Termination { get; }
-
-    public IrSummaryCompleteness Completeness { get; }
 }
 
 public sealed class IrRelationalSummaryBuildResult

@@ -471,11 +471,6 @@ public sealed class ArchitectureTests
         Assert.That(typeof(Assumption).GetConstructors(), Is.Empty);
         Assert.That(typeof(EffectSummary).GetConstructors(), Is.Empty);
         Assert.That(
-            typeof(ProofJustification).IsAssignableFrom(
-                typeof(ApproximatedJustification)),
-            Is.False);
-
-        Assert.That(
             FindRelativeCallers(productionFiles, "new Assumption("),
             Is.EqualTo([
                 "SharpProof.Worker/CallableEvidenceBuilder.cs",

@@ -1,15 +1,5 @@
 namespace SharpProof.Verify;
 
-public enum ApproximationReason
-{
-    UnsupportedOperation,
-    UnresolvedApi,
-    AbstractJoin,
-    Widening,
-    Budget,
-    ExternalBoundary
-}
-
 public enum ProofDiagnosticKind
 {
     EffectContract,
@@ -73,11 +63,6 @@ public sealed class LoweredJustification(OperationId operation) : ProofJustifica
 public sealed class UserAssumedJustification(SourceLocationId location) : ProofJustification
 {
     public SourceLocationId Location { get; } = location;
-}
-
-public sealed class ApproximatedJustification(ApproximationReason reason) : Justification
-{
-    public ApproximationReason Reason { get; } = reason;
 }
 
 public sealed class Assumption

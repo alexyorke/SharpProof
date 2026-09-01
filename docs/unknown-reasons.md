@@ -68,22 +68,6 @@ Purity depends on observable read/write regions and capabilities;
 zero-allocation depends on allocation; capability contracts depend on the
 capability set; and exception contracts depend on the escaping-exception set.
 
-## Approximation provenance
-
-Facts that over-approximate execution use
-`SharpProof.Verify.ApproximationReason`:
-
-- `UnsupportedOperation`
-- `UnresolvedApi`
-- `AbstractJoin`
-- `Widening`
-- `Budget`
-- `ExternalBoundary`
-
-An `ApproximatedJustification` is deliberately not a `ProofJustification`.
-Approximate facts therefore cannot be promoted into assumptions or appear as
-evidence authorizing `Proven`.
-
 ## SMT backend failures
 
 `SharpProof.Verify.BackendFailureReason` has these exact values:

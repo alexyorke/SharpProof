@@ -5,34 +5,14 @@ using System.Text.Json;
 
 namespace SharpProof.Host;
 
-public sealed class ContainerContractInfo
-{
-    internal ContainerContractInfo(
-        int contractVersion,
-        string platform,
-        string dotNetSdkVersion,
-        string z3Version,
-        long z3LibraryBytes,
-        string z3LibrarySha256,
-        string verifierPackageId)
-    {
-        ContractVersion = contractVersion;
-        Platform = platform;
-        DotNetSdkVersion = dotNetSdkVersion;
-        Z3Version = z3Version;
-        Z3LibraryBytes = z3LibraryBytes;
-        Z3LibrarySha256 = z3LibrarySha256;
-        VerifierPackageId = verifierPackageId;
-    }
-
-    public int ContractVersion { get; }
-    public string Platform { get; }
-    public string DotNetSdkVersion { get; }
-    public string Z3Version { get; }
-    public long Z3LibraryBytes { get; }
-    public string Z3LibrarySha256 { get; }
-    public string VerifierPackageId { get; }
-}
+public sealed record ContainerContractInfo(
+    int ContractVersion,
+    string Platform,
+    string DotNetSdkVersion,
+    string Z3Version,
+    long Z3LibraryBytes,
+    string Z3LibrarySha256,
+    string VerifierPackageId);
 
 public static class ContainerContract
 {

@@ -776,32 +776,15 @@ internal static class Program
         }
     }
 
-    private sealed class PublicationMember
+    private sealed record PublicationMember(string Path, byte[] Content)
     {
-        internal PublicationMember(string path, byte[] content)
-        {
-            Path = path;
-            Content = content;
-        }
-
-        internal string Path { get; }
-        internal byte[] Content { get; }
         internal string? Temporary { get; set; }
     }
 
-    private sealed class PreviousPublication : IDisposable
+    private sealed record PreviousPublication(
+        bool IsComplete,
+        Dictionary<string, string> BackupPaths) : IDisposable
     {
-        internal PreviousPublication(
-            bool isComplete,
-            Dictionary<string, string> backupPaths)
-        {
-            IsComplete = isComplete;
-            BackupPaths = backupPaths;
-        }
-
-        internal bool IsComplete { get; }
-        internal Dictionary<string, string> BackupPaths { get; }
-
         public void Dispose()
         {
             foreach (var path in BackupPaths.Values)

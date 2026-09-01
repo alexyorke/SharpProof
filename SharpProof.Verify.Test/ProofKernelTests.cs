@@ -309,22 +309,6 @@ public sealed class ProofKernelTests
     }
 
     [Test]
-    public void ApproximationIsNotAProofJustification()
-    {
-        Assert.That(
-            typeof(ProofJustification).IsAssignableFrom(typeof(ApproximatedJustification)),
-            Is.False);
-        Assert.That(
-            typeof(Assumption)
-                .GetConstructors(
-                    BindingFlags.Instance | BindingFlags.NonPublic)
-                .Single()
-                .GetParameters()[2]
-                .ParameterType,
-            Is.EqualTo(typeof(ProofJustification)));
-    }
-
-    [Test]
     public void CancellationPropagatesInsteadOfBecomingSemanticUnknown()
     {
         var fixture = CreateFixture();

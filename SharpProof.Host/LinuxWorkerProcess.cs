@@ -10,19 +10,9 @@ public enum LinuxWorkerCompletionKind
     TimedOut
 }
 
-public sealed class LinuxWorkerCompletion
-{
-    internal LinuxWorkerCompletion(
-        LinuxWorkerCompletionKind kind,
-        int exitCode)
-    {
-        Kind = kind;
-        ExitCode = exitCode;
-    }
-
-    public LinuxWorkerCompletionKind Kind { get; }
-    public int ExitCode { get; }
-}
+public sealed record LinuxWorkerCompletion(
+    LinuxWorkerCompletionKind Kind,
+    int ExitCode);
 
 public sealed partial class LinuxWorkerProcess : IDisposable
 {

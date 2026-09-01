@@ -268,19 +268,12 @@ public static class IrRelationalSummaryBuilder
                 return Failure();
             }
 
-            var exceptional = _mayThrow
-                ? ImmutableArray.Create(
-                    new IrExceptionalSummaryExit(
-                        IrSummaryExceptionKind.UnknownRuntime,
-                        condition: null))
-                : ImmutableArray<IrExceptionalSummaryExit>.Empty;
             var summary = new IrRelationalSummary(
                 Factory,
                 _signature,
                 [.. _existentials],
                 normalCompletion,
                 normalRelation,
-                exceptional,
                 [.. _dependencies.OrderBy(
                     static member => member.Value)],
                 [.. _dependencyProvenance
@@ -292,8 +285,7 @@ public static class IrRelationalSummaryBuilder
                     .ThenBy(static item => item.Key.EvidenceSha256,
                         StringComparer.Ordinal)
                     .Select(static item => item.Value)],
-                _mayThrow ? IrSummaryEffect.MayThrow : IrSummaryEffect.None,
-                IrSummaryTermination.TerminatesOrThrows);
+                _mayThrow ? IrSummaryEffect.MayThrow : IrSummaryEffect.None);
             return new IrRelationalSummaryBuildResult(
                 summary,
                 IrSummaryAbstentionReason.None);
