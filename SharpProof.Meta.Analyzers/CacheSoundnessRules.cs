@@ -666,6 +666,11 @@ internal static class CacheSoundnessRules
             return nonCacheable;
         }
 
+        bool Recurse(IOperation value)
+        {
+            return IsNonCacheableSemanticAnswer(value, root, resolving);
+        }
+
         return operation switch
         {
             IFieldReferenceOperation field
@@ -674,40 +679,19 @@ internal static class CacheSoundnessRules
             IObjectCreationOperation creation =>
                 (IsSemanticAnswerType(creation.Type) &&
                  IsNonCacheableName(creation.Type?.Name)) ||
-                creation.Arguments.Any(argument =>
-                    IsNonCacheableSemanticAnswer(
-                        argument.Value,
-                        root,
-                        resolving)),
+                creation.Arguments.Any(argument => Recurse(argument.Value)),
             ILocalReferenceOperation local => ResolveLocal(
                 local,
                 root,
                 resolving),
             IConditionalOperation conditional =>
-                IsNonCacheableSemanticAnswer(
-                    conditional.WhenTrue,
-                    root,
-                    resolving) ||
+                Recurse(conditional.WhenTrue) ||
                 conditional.WhenFalse != null &&
-                IsNonCacheableSemanticAnswer(
-                    conditional.WhenFalse,
-                    root,
-                    resolving),
+                Recurse(conditional.WhenFalse),
             ISwitchExpressionOperation switchExpression =>
-                switchExpression.Arms.Any(arm =>
-                    IsNonCacheableSemanticAnswer(
-                        arm.Value,
-                        root,
-                        resolving)),
+                switchExpression.Arms.Any(arm => Recurse(arm.Value)),
             ICoalesceOperation coalesce =>
-                IsNonCacheableSemanticAnswer(
-                    coalesce.Value,
-                    root,
-                    resolving) ||
-                IsNonCacheableSemanticAnswer(
-                    coalesce.WhenNull,
-                    root,
-                    resolving),
+                Recurse(coalesce.Value) || Recurse(coalesce.WhenNull),
             IPropertyReferenceOperation property => ResolveProperty(
                 property,
                 resolving),
@@ -772,6 +756,15 @@ internal static class CacheSoundnessRules
                 unwrappedConstant);
         }
 
+        bool Recurse(IOperation value)
+        {
+            return IsNonCacheableNumericEnumValue(
+                value,
+                enumType,
+                root,
+                resolving);
+        }
+
         return operation switch
         {
             ILocalReferenceOperation local =>
@@ -781,35 +774,13 @@ internal static class CacheSoundnessRules
                     root,
                     resolving),
             IConditionalOperation conditional =>
-                IsNonCacheableNumericEnumValue(
-                    conditional.WhenTrue,
-                    enumType,
-                    root,
-                    resolving) ||
+                Recurse(conditional.WhenTrue) ||
                 conditional.WhenFalse != null &&
-                IsNonCacheableNumericEnumValue(
-                    conditional.WhenFalse,
-                    enumType,
-                    root,
-                    resolving),
+                Recurse(conditional.WhenFalse),
             ISwitchExpressionOperation switchExpression =>
-                switchExpression.Arms.Any(arm =>
-                    IsNonCacheableNumericEnumValue(
-                        arm.Value,
-                        enumType,
-                        root,
-                        resolving)),
+                switchExpression.Arms.Any(arm => Recurse(arm.Value)),
             ICoalesceOperation coalesce =>
-                IsNonCacheableNumericEnumValue(
-                    coalesce.Value,
-                    enumType,
-                    root,
-                    resolving) ||
-                IsNonCacheableNumericEnumValue(
-                    coalesce.WhenNull,
-                    enumType,
-                    root,
-                    resolving),
+                Recurse(coalesce.Value) || Recurse(coalesce.WhenNull),
             _ => true
         };
     }
@@ -1750,63 +1721,38 @@ internal static class CacheSoundnessRules
         HashSet<string> resolvingNames)
     {
         var names = ImmutableArray.CreateBuilder<string>();
+        void AddNames(ExpressionSyntax value)
+        {
+            names.AddRange(GetExpressionValueNames(
+                value,
+                owner,
+                syntax,
+                resolving,
+                resolvingNames));
+        }
+
         switch (expression)
         {
             case ParenthesizedExpressionSyntax parenthesized:
-                names.AddRange(GetExpressionValueNames(
-                    parenthesized.Expression,
-                    owner,
-                    syntax,
-                    resolving,
-                    resolvingNames));
+                AddNames(parenthesized.Expression);
                 break;
             case CastExpressionSyntax cast:
-                names.AddRange(GetExpressionValueNames(
-                    cast.Expression,
-                    owner,
-                    syntax,
-                    resolving,
-                    resolvingNames));
+                AddNames(cast.Expression);
                 break;
             case ConditionalExpressionSyntax conditional:
-                names.AddRange(GetExpressionValueNames(
-                    conditional.WhenTrue,
-                    owner,
-                    syntax,
-                    resolving,
-                    resolvingNames));
-                names.AddRange(GetExpressionValueNames(
-                    conditional.WhenFalse,
-                    owner,
-                    syntax,
-                    resolving,
-                    resolvingNames));
+                AddNames(conditional.WhenTrue);
+                AddNames(conditional.WhenFalse);
                 break;
             case SwitchExpressionSyntax switchExpression:
                 foreach (var arm in switchExpression.Arms)
                 {
-                    names.AddRange(GetExpressionValueNames(
-                        arm.Expression,
-                        owner,
-                        syntax,
-                        resolving,
-                        resolvingNames));
+                    AddNames(arm.Expression);
                 }
                 break;
             case BinaryExpressionSyntax binary
                 when binary.IsKind(SyntaxKind.CoalesceExpression):
-                names.AddRange(GetExpressionValueNames(
-                    binary.Left,
-                    owner,
-                    syntax,
-                    resolving,
-                    resolvingNames));
-                names.AddRange(GetExpressionValueNames(
-                    binary.Right,
-                    owner,
-                    syntax,
-                    resolving,
-                    resolvingNames));
+                AddNames(binary.Left);
+                AddNames(binary.Right);
                 break;
             case IdentifierNameSyntax identifier:
                 names.AddRange(GetIdentifierValueNames(
@@ -1837,24 +1783,14 @@ internal static class CacheSoundnessRules
                 {
                     foreach (var argument in creation.ArgumentList.Arguments)
                     {
-                        names.AddRange(GetExpressionValueNames(
-                            argument.Expression,
-                            owner,
-                            syntax,
-                            resolving,
-                            resolvingNames));
+                        AddNames(argument.Expression);
                     }
                 }
                 break;
             case ImplicitObjectCreationExpressionSyntax implicitCreation:
                 foreach (var argument in implicitCreation.ArgumentList.Arguments)
                 {
-                    names.AddRange(GetExpressionValueNames(
-                        argument.Expression,
-                        owner,
-                        syntax,
-                        resolving,
-                        resolvingNames));
+                    AddNames(argument.Expression);
                 }
                 break;
         }
@@ -1893,11 +1829,7 @@ internal static class CacheSoundnessRules
             foreach (var value in values)
             {
                 names.AddRange(GetExpressionValueNames(
-                    value,
-                    owner,
-                    syntax,
-                    resolving,
-                    resolvingNames));
+                    value, owner, syntax, resolving, resolvingNames));
             }
             return names.ToImmutable();
         }
