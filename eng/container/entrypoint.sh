@@ -139,6 +139,17 @@ case "${command_name}" in
           "${task_root}/${untracked_path}"
       done < <(git -C "${repo_root}" ls-files \
         --others --exclude-standard -z --)
+      # Package jobs download nupkg/snupkg inputs under nupkgs/. Those file
+      # extensions are intentionally ignored by Git, so the general untracked
+      # copy above cannot see them. Preserve only ignored package-job inputs;
+      # do not broaden the snapshot to other ignored build output.
+      while IFS= read -r -d '' package_path; do
+        mkdir -p -- "${task_root}/$(dirname -- "${package_path}")"
+        cp -a -- \
+          "${repo_root}/${package_path}" \
+          "${task_root}/${package_path}"
+      done < <(git -C "${repo_root}" ls-files \
+        --others --ignored --exclude-standard -z -- nupkgs/)
     else
       tar \
         --exclude='./artifacts' \

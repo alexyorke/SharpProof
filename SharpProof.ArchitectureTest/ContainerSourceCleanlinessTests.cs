@@ -143,6 +143,34 @@ public sealed class ContainerSourceCleanlinessTests
         }
     }
 
+    [Test]
+    public async Task GitBoundCommandPreservesIgnoredPackageInputs()
+    {
+        var repository = await CreateRepositoryAsync();
+        try
+        {
+            var packageDirectory = Path.Combine(repository, "nupkgs");
+            Directory.CreateDirectory(packageDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(packageDirectory, "SharpProof.1.0.0.nupkg"),
+                "fixture");
+
+            var result = await RunEntrypointAsync(
+                repository,
+                "package-consumers");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.ExitCode, Is.Zero, result.Error);
+                Assert.That(result.Output, Does.Contain("package:fixture"));
+            }
+        }
+        finally
+        {
+            Directory.Delete(repository, recursive: true);
+        }
+    }
+
     [TestCase("contract")]
     [TestCase("build")]
     public async Task FiniteCommandsRunFromAnArchiveWithoutGit(string command)
@@ -239,7 +267,11 @@ public sealed class ContainerSourceCleanlinessTests
             "Write-Output ('production:' + (Get-Content Project/Production.cs -Raw).Trim())\n" +
             "Write-Output ('deleted:' + (Test-Path Project/Deleted.cs))\n" +
             "Write-Output ('untracked:' + (Test-Path Project/Untracked.cs))\n" +
+            "Write-Output ('package:' + $(if (Test-Path nupkgs/SharpProof.1.0.0.nupkg) { (Get-Content nupkgs/SharpProof.1.0.0.nupkg -Raw).Trim() } else { 'missing' }))\n" +
             "Write-Output ('executable:' + [bool]([IO.File]::GetUnixFileMode('scripts/executable.sh') -band [IO.UnixFileMode]::UserExecute))\n");
+        await File.WriteAllTextAsync(
+            Path.Combine(repository, ".gitignore"),
+            "*.nupkg\n*.snupkg\n");
         await File.WriteAllTextAsync(
             Path.Combine(repository, "scripts", "executable.sh"),
             "#!/usr/bin/env bash\nexit 0\n");
