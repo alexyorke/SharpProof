@@ -1004,7 +1004,6 @@ internal sealed class OperationCompletionEvaluator
             CanCompleteCompoundOperator(assignment) &&
             CanCompleteCompoundOutConversion(assignment);
     }
-
     internal bool CanCompleteCompoundInConversion(
         ICompoundAssignmentOperation assignment)
     {
