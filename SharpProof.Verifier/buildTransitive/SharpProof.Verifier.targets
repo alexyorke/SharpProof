@@ -112,7 +112,7 @@
       <_SharpProofCompilerOwnedOutput Include="$(ProjectRuntimeConfigDevFilePath)" Condition="'$(ProjectRuntimeConfigDevFilePath)' != ''" />
     </ItemGroup>
     <SharpProof.BuildTasks.InvalidatePublishedResult
-        Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"
+        Condition="'$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'"
         ResultPath="$(_SharpProofEffectiveResultFile)"
         ProjectDirectory="$(MSBuildProjectDirectory)"
         RequestPath="$(_SharpProofEffectiveRequestFile)"
@@ -250,7 +250,7 @@
 
   <Target Name="SharpProofResetPublishedVerification"
           BeforeTargets="Clean"
-          Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
+          Condition="'$(DesignTimeBuild)' != 'true'">
     <PropertyGroup>
       <_SharpProofCleanVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofCleanVerifyDirectory>
       <_SharpProofCleanCompilerManifestStagingPath>$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'compiler-manifest.staging.json'))</_SharpProofCleanCompilerManifestStagingPath>
