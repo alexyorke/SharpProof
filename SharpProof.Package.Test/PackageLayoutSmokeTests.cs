@@ -782,6 +782,7 @@ public sealed class PackageLayoutSmokeTests
             var packageBuild = Directory.CreateDirectory(
                 Path.Combine(packageRoot.FullName, "buildTransitive"));
             foreach (var fileName in new[] {
+                         "SharpProof.ConsumerContract.props",
                          "SharpProof.props",
                          "SharpProof.targets"
                      })
@@ -838,6 +839,19 @@ public sealed class PackageLayoutSmokeTests
             File.Copy(
                 Path.Combine(repository, "SharpProof.AnalyzerConsumer.props"),
                 sourceProps);
+            var sourcePackageBuild = Directory.CreateDirectory(Path.Combine(
+                sourceRoot.FullName,
+                "SharpProof.Package",
+                "buildTransitive"));
+            File.Copy(
+                Path.Combine(
+                    repository,
+                    "SharpProof.Package",
+                    "buildTransitive",
+                    "SharpProof.ConsumerContract.props"),
+                Path.Combine(
+                    sourcePackageBuild.FullName,
+                    "SharpProof.ConsumerContract.props"));
             var sourceProject = Path.Combine(root, "SourceConsumer.csproj");
             await File.WriteAllTextAsync(
                 sourceProject,
@@ -1997,6 +2011,7 @@ public sealed class PackageLayoutSmokeTests
             [
                 "_rels/.rels",
                 "[Content_Types].xml",
+                "buildTransitive/SharpProof.ConsumerContract.props",
                 "buildTransitive/SharpProof.props",
                 "buildTransitive/SharpProof.targets",
                 "LICENSE",
@@ -2292,6 +2307,9 @@ public sealed class PackageLayoutSmokeTests
                     entry.Contains("libz3", StringComparison.OrdinalIgnoreCase) ||
                     entry.Contains("NativeSmtLocator", StringComparison.Ordinal)));
 
+        Assert.That(
+            entries,
+            Does.Contain("buildTransitive/SharpProof.ConsumerContract.props"));
         Assert.That(
             entries,
             Does.Contain("buildTransitive/SharpProof.props"));

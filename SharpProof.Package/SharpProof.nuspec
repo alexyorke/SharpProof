@@ -21,6 +21,7 @@
   </metadata>
   <files>
     <file src="buildTransitive\SharpProof.props" target="buildTransitive" />
+    <file src="buildTransitive\SharpProof.ConsumerContract.props" target="buildTransitive" />
     <file src="buildTransitive\SharpProof.targets" target="buildTransitive" />
     <file src="..\README.md" />
     <file src="..\LICENSE" />
