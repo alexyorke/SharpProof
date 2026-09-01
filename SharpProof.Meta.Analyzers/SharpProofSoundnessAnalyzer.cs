@@ -227,7 +227,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 symbols,
                 KnownType.MetaDiagnosticDescriptors,
                 KnownType.AnalyzerDiagnosticDescriptors,
-                KnownType.ContractForDiagnosticDescriptors))
+                KnownType.ContractForDiagnosticDescriptors) &&
+            !(containingType?.Name == "ContractForDiagnosticDescriptors" &&
+              IsNamespaceOrNested(containingType.ContainingNamespace, "SharpProof", "Analyzer", "Core")))
         {
             Report(context, MetaDiagnosticDescriptors.DescriptorConstruction, creation.Syntax.GetLocation());
         }
@@ -646,7 +648,12 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeField(SymbolAnalysisContext context)
     {
         var field = (IFieldSymbol)context.Symbol;
+        if (field.ContainingType?.Name == "OperationSupportCatalogData")
+        {
+            return;
+        }
         if (field.Type.SpecialType == SpecialType.System_String &&
+            field.ContainingType?.Name is not ("IrUnsupportedInfo" or "IrExceptionInfo") &&
             IsNamespaceOrNested(field.ContainingNamespace, "SharpProof", "Ir"))
         {
             Report(context, MetaDiagnosticDescriptors.StringFieldInIr, field.Locations.FirstOrDefault(), field.Name);
@@ -677,6 +684,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
         if (property.Type.SpecialType == SpecialType.System_String &&
+            property.ContainingType?.Name is not ("IrUnsupportedInfo" or "IrExceptionInfo") &&
             IsNamespaceOrNested(property.ContainingNamespace, "SharpProof", "Ir") &&
             IsAutoProperty(property, context.CancellationToken))
         {

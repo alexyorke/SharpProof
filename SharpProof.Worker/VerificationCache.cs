@@ -335,8 +335,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         return false;
     }
 
-    private static bool IsHexDigit(char value) =>
-        value is >= '0' and <= '9' or >= 'a' and <= 'f';
+    private static bool IsHexDigit(char value)
+    {
+        return value is >= '0' and <= '9' or >= 'a' and <= 'f';
+    }
 
     private static bool IsHexMarker(string value, int start)
     {

@@ -101,18 +101,19 @@ internal static class OpenSourceCorpusImporter
                 $"expected {RepositoryUrl}.");
         }
 
-        var licenseSourcePath = Path.Combine(resolvedUpstreamRoot, "LICENSE");
-        if (!File.Exists(licenseSourcePath))
-        {
-            throw new InvalidDataException(
-                $"The upstream MIT license is missing: {licenseSourcePath}");
-        }
+        await VerifyCommitBelongsToApprovedRemoteAsync(
+                commit,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         var licenseText = OpenSourceCorpusCatalog.NormalizeLineEndings(
-            await File.ReadAllTextAsync(
-                    licenseSourcePath,
-                    cancellationToken)
-                .ConfigureAwait(false));
+            Encoding.UTF8.GetString(
+                await ReadGitBlobAsync(
+                        resolvedUpstreamRoot,
+                        commit,
+                        "LICENSE",
+                        cancellationToken)
+                    .ConfigureAwait(false)));
         if (!licenseText.StartsWith(
                 "The MIT License (MIT)",
                 StringComparison.Ordinal))
@@ -123,6 +124,7 @@ internal static class OpenSourceCorpusImporter
 
         var (files, candidates) = await DiscoverSourcesAsync(
                 resolvedUpstreamRoot,
+                commit,
                 cancellationToken)
             .ConfigureAwait(false);
         var selected = SelectDiverseCandidates(candidates, TargetMethodCount);
@@ -132,7 +134,9 @@ internal static class OpenSourceCorpusImporter
         var existingSupport = LoadExistingSupport(corpusDirectory);
         var licenseTargetPath = Path.GetFullPath(
             Path.Combine(corpusDirectory, LicenseRelativePath));
-        EnsureContained(corpusDirectory, licenseTargetPath);
+        OpenSourceCorpusCatalog.EnsureContained(
+            corpusDirectory,
+            licenseTargetPath);
         var licenseContent = licenseText.EndsWith('\n')
             ? licenseText
             : licenseText + "\n";
@@ -228,6 +232,7 @@ internal static class OpenSourceCorpusImporter
         ImmutableArray<OpenSourceCorpusFile> Files,
         ImmutableArray<ImportCandidate> Candidates)> DiscoverSourcesAsync(
         string upstreamRoot,
+        string commit,
         CancellationToken cancellationToken)
     {
         var sourceRoots = new[] {
@@ -248,7 +253,7 @@ internal static class OpenSourceCorpusImporter
         var declarationHashes = new HashSet<string>(StringComparer.Ordinal);
         var trackedPaths = await ReadGitAsync(
                 upstreamRoot,
-                ["ls-files", "--cached", "--", "Algorithms", "DataStructures"],
+                ["ls-tree", "-r", "--name-only", commit, "--", "Algorithms", "DataStructures"],
                 cancellationToken)
             .ConfigureAwait(false);
         foreach (var relativePath in trackedPaths
@@ -256,17 +261,14 @@ internal static class OpenSourceCorpusImporter
                      .Where(static path => path.EndsWith(".cs", StringComparison.Ordinal))
                      .OrderBy(static path => path, StringComparer.Ordinal))
         {
-            var path = Path.Combine(
-                upstreamRoot,
-                relativePath.Replace('/', Path.DirectorySeparatorChar));
-            if (!File.Exists(path))
-            {
-                throw new InvalidDataException(
-                    $"Tracked upstream source file is missing: {relativePath}");
-            }
             var content = OpenSourceCorpusCatalog.NormalizeLineEndings(
-                await File.ReadAllTextAsync(path, cancellationToken)
-                    .ConfigureAwait(false));
+                Encoding.UTF8.GetString(
+                    await ReadGitBlobAsync(
+                            upstreamRoot,
+                            commit,
+                            relativePath,
+                            cancellationToken)
+                        .ConfigureAwait(false)));
             files.Add(
                 new OpenSourceCorpusFile(
                     SourceId,
@@ -431,18 +433,64 @@ internal static class OpenSourceCorpusImporter
         return output;
     }
 
-    private static void EnsureContained(string root, string path)
+    private static async Task<byte[]> ReadGitBlobAsync(
+        string workingDirectory,
+        string commit,
+        string relativePath,
+        CancellationToken cancellationToken,
+        string gitExecutable = "git")
     {
-        var relative = Path.GetRelativePath(Path.GetFullPath(root), path);
-        if (Path.IsPathRooted(relative) ||
-            relative.Split(
-                    Path.DirectorySeparatorChar,
-                    Path.AltDirectorySeparatorChar)
-                .Any(static part => part == ".."))
+        var startInfo = new ProcessStartInfo(gitExecutable)
         {
-            throw new InvalidDataException(
-                $"Generated OSS corpus path escaped its directory: {path}");
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("cat-file");
+        startInfo.ArgumentList.Add("blob");
+        startInfo.ArgumentList.Add($"{commit}:{relativePath}");
+
+        using var process = Process.Start(startInfo) ??
+            throw new InvalidOperationException("Could not start Git.");
+        using var output = new MemoryStream();
+        var outputTask = process.StandardOutput.BaseStream.CopyToAsync(
+            output,
+            cancellationToken);
+        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
+        catch
+        {
+            if (!process.HasExited)
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+
+            await process.WaitForExitAsync(CancellationToken.None)
+                .ConfigureAwait(false);
+            throw;
+        }
+
+        await outputTask.ConfigureAwait(false);
+        var error = (await errorTask.ConfigureAwait(false)).Trim();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"git cat-file blob {commit}:{relativePath} failed: {error}");
+        }
+
+        return output.ToArray();
     }
 
     private static string NormalizeRepositoryUrl(string value)
@@ -457,6 +505,53 @@ internal static class OpenSourceCorpusImporter
                 ".git",
                 string.Empty,
                 StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task VerifyCommitBelongsToApprovedRemoteAsync(
+        string commit,
+        CancellationToken cancellationToken)
+    {
+        var verificationRoot = Directory.CreateTempSubdirectory(
+            "SharpProof-OSS-origin-");
+        try
+        {
+            await ReadGitAsync(
+                    verificationRoot.FullName,
+                    ["init", "--bare", "--quiet"],
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await ReadGitAsync(
+                    verificationRoot.FullName,
+                    [
+                        "fetch",
+                        "--no-tags",
+                        "--quiet",
+                        RepositoryUrl,
+                        "+refs/heads/*:refs/sharpproof-approved/*"
+                    ],
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            try
+            {
+                await ReadGitAsync(
+                        verificationRoot.FullName,
+                        ["cat-file", "-e", $"{commit}^{{commit}}"],
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw new InvalidDataException(
+                    $"Upstream HEAD {commit} is not a commit from the " +
+                    $"approved repository {RepositoryUrl}.",
+                    exception);
+            }
+        }
+        finally
+        {
+            verificationRoot.Delete(recursive: true);
+        }
     }
 
     private sealed record ImportCandidate(

@@ -8,7 +8,7 @@ Nothing here has been applied; each entry is a proposal with evidence.
 
 ## Summary
 
-141 findings across six labeled rounds, 20 disjoint areas. **Total estimated reduction: ~10,138 lines.**
+164 findings across eleven labeled rounds, 20 disjoint areas. **Total estimated reduction: ~11,182 lines.**
 
 Round one split the C# solution by project. Round two covered what that split could not see: the 36k-line PowerShell tooling layer, the code generators and their output, the four largest single files, cross-project duplication, and the docs.
 
@@ -1979,3 +1979,14 @@ Every "unused" claim below was grepped across **all tracked file types** with no
 > ### Negative result: `samples/`, `eng/pilots/` and `.opencode/` contain nothing removable
 > **Do not propose sample or pilot deletions.** All 8 sample projects are named explicitly in `scripts/Test-SharpProofSamples.ps1`, which *asserts* the count is exactly 8 (`:169-172`) and that `SharpProof.Samples.slnx` matches disk exactly (`:207-215`). All 5 pilots are enumerated in `eng/pilots/catalog.json` and consumed by `PilotAuthorityTests.cs`, `Test-SharpProofPilots.ps1`, `Test-SharpProofPilotReport.ps1`, `Test-SharpProofPilotAuthorityFixtures.ps1`, `Get-SharpProofPilotPackageAuthority.ps1`, and `.github/workflows/package-consumers.yml`. `.opencode/` is asserted live by `OpenCodePluginDependencyTests.cs` and referenced from `opencode.json`. Every sample/pilot source file is 10-34 lines, so even a duplicate-teaching argument buys almost nothing while forcing edits to a hard-coded inventory count.
 
+---
+
+## Round 10 — Gates corpus link handling
+
+### 1. Remove redundant derived-exception catches in `ResolveLink`
+
+- **Files:** `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:416-423`
+- **Est. LOC saved:** ~4 net.
+- **Confidence:** High.
+- **Rationale:** `FileNotFoundException` and `DirectoryNotFoundException` derive from `IOException`. Their handlers are empty and occur immediately before an empty `IOException` handler, so removing the two specialized catches preserves the same swallowed exception behavior while simplifying the catch block.
+- **Validation:** Run `SharpProof.Gates` and `SharpProof.Gates.Test`, especially corpus link and path-containment tests; confirm missing-file, missing-directory, and other-IO-error behavior remains unchanged.
