@@ -198,8 +198,8 @@ workspace isolation, test targets, resource overrides, and when a disposable
 docker compose run --rm tooling qualification command is preferable.
 
 Containers use all CPUs available to Docker and up to 40960 MiB by default.
-Semantic-test scheduling uses every container-visible CPU (or the value of
-`SHARPPROOF_SEMANTIC_TEST_PARALLELISM`, between 1 and the visible CPU count).
+Semantic-test scheduling uses every container-visible CPU.
+Set `SHARPPROOF_SEMANTIC_TEST_PARALLELISM` to cap it between 1 and the visible CPU count.
 Package integration tests use 75% of container-visible CPU lanes by default.
 Other test-project concurrency auto-detects the available CPUs and uses one lane per 2 CPUs.
 Parallel prerequisite builds use 75% of container-visible CPU lanes by default.
