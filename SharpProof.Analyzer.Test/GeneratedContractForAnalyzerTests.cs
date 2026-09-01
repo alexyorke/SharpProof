@@ -313,6 +313,35 @@ public sealed class GeneratedContractForAnalyzerTests
     }
 
     [Test]
+    public async Task GeneratedCompanionReportsNestedIntrinsicMisuse()
+    {
+        var diagnostics = await AnalyzeGeneratedAsync(
+            """
+            using SharpProof.Attributes;
+
+            [ContractFor(typeof(IService))]
+            public static class ServiceContracts
+            {
+                public static int Map(IService receiver, int value)
+                {
+                    int Local() => Contract.Result<int>();
+                    return Local();
+                }
+            }
+            """,
+            additionalDiagnosticIds: ["SP0024"]);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(["SP0024"]));
+        Assert.That(
+            diagnostics.Single().GetMessage(
+                System.Globalization.CultureInfo.InvariantCulture),
+            Does.Contain("Contract.Result")
+                .And.Contain("expected use inside Contract.Ensures"));
+    }
+
+    [Test]
     public async Task MixedGeneratedCompanionBodyIsNotAnalyzedAsAnImplementation()
     {
         const string input = """
