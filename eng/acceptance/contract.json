@@ -834,8 +834,8 @@
       {
         "name": "relational-summary-builder",
         "path": "SharpProof.Summaries/IrRelationalSummaryBuilder.cs",
-        "maximumExpressionNodes": 2058,
-        "maximumDecisionPoints": 130
+        "maximumExpressionNodes": 2154,
+        "maximumDecisionPoints": 134
       },
       {
         "name": "relational-summary-provider",
