@@ -1995,7 +1995,7 @@ public sealed class ClaimManifestBuilderTests
         var compilation = CSharpCompilation.Create(
             "MalformedBaseTypeTests",
             [tree],
-            WorkerTestMetadataReferences.WithSharpProof,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions:
@@ -2616,7 +2616,7 @@ public sealed class ClaimManifestBuilderTests
                 source.Source,
                 parseOptions,
                 source.FileName)),
-            WorkerTestMetadataReferences.WithSharpProof,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 outputKind,
                 nullableContextOptions: NullableContextOptions.Enable));

@@ -471,7 +471,7 @@ public sealed class PartialMethodContractTests
                 source.Source,
                 parseOptions,
                 source.FileName)),
-            ContractTestMetadataReferences.WithSharpProof,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));

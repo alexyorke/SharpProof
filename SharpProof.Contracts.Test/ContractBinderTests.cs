@@ -1661,7 +1661,7 @@ public sealed class ContractBinderTests
             var compilation = CSharpCompilation.Create(
                 "Contracts_" + Guid.NewGuid().ToString("N"),
                 [syntaxTree],
-                ContractTestMetadataReferences.WithSharpProof,
+                TestMetadataReferences.WithSharpProof,
                 new CSharpCompilationOptions(
                     OutputKind.DynamicallyLinkedLibrary,
                     nullableContextOptions: NullableContextOptions.Enable,

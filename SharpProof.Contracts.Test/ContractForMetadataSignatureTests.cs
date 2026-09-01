@@ -47,7 +47,7 @@ public sealed class ContractForMetadataSignatureTests
         var compilation = CSharpCompilation.Create(
             "CompoundMetadataSignatureIdentity",
             [syntaxTree],
-            ContractTestMetadataReferences.WithSharpProof.Add(targetReference),
+            TestMetadataReferences.WithSharpProof.Add(targetReference),
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));

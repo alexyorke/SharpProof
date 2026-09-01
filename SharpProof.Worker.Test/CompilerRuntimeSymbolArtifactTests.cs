@@ -106,7 +106,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
         var compilation = CSharpCompilation.Create(
             "CompilerRuntimeSymbolArtifactTests",
             [CSharpSyntaxTree.ParseText(source, parse, "Subject.cs")],
-            WorkerTestMetadataReferences.WithSharpProof,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions:

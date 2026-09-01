@@ -454,8 +454,8 @@ public sealed class ContractClauseInventoryTests
             "ClauseInventory_" + Guid.NewGuid().ToString("N"),
             [syntaxTree],
             includeSharpProofReference
-                ? ContractTestMetadataReferences.WithSharpProof
-                : ContractTestMetadataReferences.Platform,
+                ? TestMetadataReferences.WithSharpProof
+                : TestMetadataReferences.Platform,
             new CSharpCompilationOptions(
                 outputKind,
                 nullableContextOptions: NullableContextOptions.Enable));

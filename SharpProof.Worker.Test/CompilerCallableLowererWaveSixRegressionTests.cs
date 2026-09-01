@@ -150,7 +150,7 @@ public sealed class CompilerCallableLowererWaveSixRegressionTests
                 Path.Combine(
                     TestContext.CurrentContext.WorkDirectory,
                     "CompilerCallableLowererWaveSixSubject.cs"))],
-            WorkerTestMetadataReferences.WithSharpProof,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));

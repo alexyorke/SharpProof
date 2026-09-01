@@ -2,9 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using SharpProof.Attributes;
 
-namespace SharpProof.Worker.Test;
-
-internal static class WorkerTestMetadataReferences
+internal static class TestMetadataReferences
 {
     internal static ImmutableArray<MetadataReference> Platform { get; } =
         CreatePlatformReferences();

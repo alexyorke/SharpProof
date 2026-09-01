@@ -265,7 +265,7 @@ public sealed class CompilerCallableLowererTests
         var compilation = CSharpCompilation.Create(
             "RelativeSourceSummaryTreePath",
             trees,
-            WorkerTestMetadataReferences.WithSharpProof,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
@@ -674,7 +674,7 @@ public sealed class CompilerCallableLowererTests
         var compilation = CSharpCompilation.Create(
             "CompilerCallableLowererTests",
             [CSharpSyntaxTree.ParseText(source, parse, "Subject.cs")],
-            WorkerTestMetadataReferences.WithSharpProof,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));

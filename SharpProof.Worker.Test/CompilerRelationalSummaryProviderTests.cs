@@ -192,7 +192,7 @@ public sealed class CompilerRelationalSummaryProviderTests
         var compilation = CSharpCompilation.Create(
             "CompilerRelationalSummaryProviderTests",
             [CSharpSyntaxTree.ParseText(source, parse, "Subject.cs")],
-            WorkerTestMetadataReferences.WithSharpProof,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));

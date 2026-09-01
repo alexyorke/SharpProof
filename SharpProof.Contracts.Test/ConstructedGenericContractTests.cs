@@ -601,7 +601,7 @@ public sealed class ConstructedGenericContractTests
         var compilation = CSharpCompilation.Create(
             "ConstructedContracts_" + Guid.NewGuid().ToString("N"),
             [syntaxTree],
-            ContractTestMetadataReferences.WithSharpProof,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable,

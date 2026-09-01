@@ -90,7 +90,7 @@ public sealed class ContractIntrinsicValidationTests
         var compilation = CSharpCompilation.Create(
             "ContractIntrinsicValidation_" + Guid.NewGuid().ToString("N"),
             [tree],
-            ContractTestMetadataReferences.WithSharpProof,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
