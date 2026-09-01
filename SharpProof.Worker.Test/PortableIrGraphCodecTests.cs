@@ -371,6 +371,93 @@ public sealed class PortableIrGraphCodecTests
     }
 
     [Test]
+    public void DecoderRejectsDocumentationOnlyCallIdentitySpoof()
+    {
+        var factory = new IrFactory();
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "call:SubjectAssembly::M:Subject.Transform(System.Int32)",
+            factory.IntegerType,
+            isStatic: true,
+            factory.IntegerType);
+        var argument = factory.CreateVariable("value", factory.IntegerType);
+        var result = factory.CreateVariable("result", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.SetEntry(entry);
+        builder.Call(
+            entry,
+            factory.CreateOperation("call"),
+            result,
+            member,
+            receiver: null,
+            factory.Variable(argument));
+        builder.Return(
+            entry,
+            factory.CreateOperation("return"),
+            factory.Variable(result));
+        var graph = PortableIrGraphCodec.Encode(
+            factory,
+            builder.Build(),
+            [factory.Variable(argument)]).Graph;
+        var callMember = graph.Members.Single();
+        callMember.DocumentationCommentId =
+            "M:System.Linq.Enumerable.Empty``1";
+
+        Assert.Throws<InvalidDataException>(
+            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+    }
+
+    [Test]
+    public void DecoderPreservesSuffixBoundCallIdentityRoundTrip()
+    {
+        var factory = new IrFactory();
+        var member = factory.GetOrCreateMember(
+            factory.CreateIdentity(),
+            factory.ObjectType,
+            "call:SubjectAssembly::M:Subject.Transform(System.Int32)",
+            factory.IntegerType,
+            isStatic: true,
+            factory.IntegerType);
+        var argument = factory.CreateVariable("value", factory.IntegerType);
+        var result = factory.CreateVariable("result", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        builder.SetEntry(entry);
+        builder.Call(
+            entry,
+            factory.CreateOperation("call"),
+            result,
+            member,
+            receiver: null,
+            factory.Variable(argument));
+        builder.Return(
+            entry,
+            factory.CreateOperation("return"),
+            factory.Variable(result));
+        var encoded = PortableIrGraphCodec.Encode(
+            factory,
+            builder.Build(),
+            [factory.Variable(argument)]);
+        encoded.Graph.Members.Single().DocumentationCommentId =
+            "M:Subject.Transform(System.Int32)";
+
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(
+            encoded.Graph,
+            WorkerProtocolJson.Options);
+        var serialized = JsonSerializer.Deserialize<PortableIrGraph>(
+            bytes,
+            WorkerProtocolJson.Options)!;
+
+        var decoded = PortableIrGraphCodec.Decode(serialized);
+        Assert.That(decoded.Program, Is.Not.Null);
+        Assert.That(
+            serialized.Members.Single().DocumentationCommentId,
+            Is.EqualTo("M:Subject.Transform(System.Int32)"));
+    }
+
+    [Test]
     public void DecoderRejectsNonCanonicalOptionalSentinels()
     {
         var fixture = CreateFixture();

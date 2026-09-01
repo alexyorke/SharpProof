@@ -126,14 +126,11 @@ internal static partial class PortableIrGraphCodec
             decoded.Roots,
             externalVariables,
             cancellationToken).Graph;
-        if (canonical.Members.Length == graph.Members.Length)
+        foreach (var member in canonical.Members)
         {
-            for (var index = 0; index < canonical.Members.Length; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                canonical.Members[index].DocumentationCommentId =
-                    graph.Members[index].DocumentationCommentId;
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            member.DocumentationCommentId =
+                CallDocumentationCommentId(member.Name);
         }
         var actual = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
             graph,
@@ -146,6 +143,40 @@ internal static partial class PortableIrGraphCodec
         Require(
             actual.SequenceEqual(expected),
             "Portable IR metadata is not the canonical encoder image.");
+    }
+
+    private static string? CallDocumentationCommentId(string name)
+    {
+        const string prefix = "call:";
+        const string delimiter = "::";
+        if (!name.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var delimiterIndex = name.Substring(prefix.Length).IndexOf(
+            delimiter,
+            StringComparison.Ordinal);
+        if (delimiterIndex >= 0)
+        {
+            delimiterIndex += prefix.Length;
+        }
+        if (delimiterIndex <= prefix.Length)
+        {
+            return null;
+        }
+
+        var documentationCommentId = name.Substring(
+            delimiterIndex + delimiter.Length);
+        var displaySuffix = documentationCommentId.IndexOf('~');
+        if (displaySuffix >= 0)
+        {
+            documentationCommentId = documentationCommentId.Substring(0, displaySuffix);
+        }
+        return documentationCommentId.StartsWith("M:", StringComparison.Ordinal) &&
+            documentationCommentId.Length > 2
+            ? documentationCommentId
+            : null;
     }
 
     private static InvalidDataException Bad(string message, Exception? inner = null)
