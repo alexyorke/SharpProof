@@ -274,6 +274,43 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public async Task ReportsForbiddenApiCapturedAsMethodReference()
+    {
+        var diagnostics = await Analyze(
+            """
+            using Microsoft.CodeAnalysis;
+            namespace SharpProof.Frontend;
+            static class C {
+                static Compilation M(Compilation compilation, SyntaxTree oldTree, SyntaxTree newTree) {
+                    System.Func<SyntaxTree, SyntaxTree, Compilation> replace =
+                        compilation.ReplaceSyntaxTree;
+                    return replace(oldTree, newTree);
+                }
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA001"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ReportsDynamicInvocationInSoundnessCriticalLayer()
+    {
+        var diagnostics = await Analyze(
+            """
+            namespace SharpProof.Frontend;
+            static class C {
+                static object M(dynamic value) => value.GetDiagnostics();
+            }
+            """);
+
+        Assert.That(
+            diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA001"),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public void CacheReachingDefinitionsObserveCancellationBeforeGraphConstruction()
     {
         var rules = typeof(SharpProofSoundnessAnalyzer).Assembly.GetType(
@@ -1372,6 +1409,47 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)),
                 Has.Some.Contains("Changed"));
         }
+    }
+
+    [Test]
+    public async Task AnalyzesGeneratedMutableStaticStorage()
+    {
+        const string source =
+            """
+            namespace SharpProof.Analyzer;
+            static class GeneratedPolicy {
+                internal static int[] Policies = [];
+            }
+            """;
+
+        var diagnostics = await AnalyzeGenerated(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA002"));
+    }
+
+    [Test]
+    public async Task AnalyzesGeneratedSemanticCacheWrites()
+    {
+        const string source =
+            """
+            namespace SharpProof.Verify;
+            enum Answer { Unknown }
+            sealed class ProofCache {
+                internal void Add(string key, Answer answer) { }
+            }
+            sealed class GeneratedCacheWriter {
+                internal void Write(ProofCache cache) =>
+                    cache.Add("answer", Answer.Unknown);
+            }
+            """;
+
+        var diagnostics = await AnalyzeGenerated(source);
+
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Does.Contain("SPMETA010"));
     }
 
     [Test]
@@ -3341,6 +3419,26 @@ public sealed class SharpProofSoundnessAnalyzerTests
         var compilation = CSharpCompilation.Create(
             "MetaAnalyzerTest",
             [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12))],
+            PlatformReferences,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var compilerErrors = compilation.GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        Assert.That(compilerErrors, Is.Empty);
+
+        return await compilation
+            .WithAnalyzers([new SharpProofSoundnessAnalyzer()])
+            .GetAnalyzerDiagnosticsAsync();
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeGenerated(string source)
+    {
+        var compilation = CSharpCompilation.Create(
+            "MetaAnalyzerGeneratedTest",
+            [CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.CSharp12),
+                path: "Generated.g.cs")],
             PlatformReferences,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var compilerErrors = compilation.GetDiagnostics()

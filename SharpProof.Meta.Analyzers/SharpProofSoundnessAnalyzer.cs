@@ -94,11 +94,15 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         }
 
         context.EnableConcurrentExecution();
-        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+        context.ConfigureGeneratedCodeAnalysis(
+            GeneratedCodeAnalysisFlags.Analyze |
+            GeneratedCodeAnalysisFlags.ReportDiagnostics);
         context.RegisterCompilationStartAction(startContext =>
         {
             var symbols = new KnownSymbols(startContext.Compilation);
             startContext.RegisterOperationAction(c => AnalyzeInvocation(c, symbols), OperationKind.Invocation);
+            startContext.RegisterOperationAction(c => AnalyzeMethodReference(c, symbols), OperationKind.MethodReference);
+            startContext.RegisterOperationAction(AnalyzeDynamicInvocation, OperationKind.DynamicInvocation);
             startContext.RegisterOperationAction(
                 CacheSoundnessRules.AnalyzeAssignment,
                 OperationKind.SimpleAssignment,
@@ -134,7 +138,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
     {
         var invocation = (IInvocationOperation)context.Operation;
         var method = invocation.TargetMethod.OriginalDefinition;
-        if (IsForbidden(method, invocation, context.ContainingSymbol, symbols))
+        if (IsForbidden(method, invocation.Instance?.Type ?? method.ContainingType, context.ContainingSymbol, symbols))
         {
             Report(context, MetaDiagnosticDescriptors.ForbiddenRoslynApi, invocation.Syntax.GetLocation(), method.Name);
         }
@@ -147,9 +151,32 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         CacheSoundnessRules.AnalyzeWrite(context, invocation);
     }
 
+    private static void AnalyzeMethodReference(OperationAnalysisContext context, KnownSymbols symbols)
+    {
+        var methodReference = (IMethodReferenceOperation)context.Operation;
+        var method = methodReference.Method.OriginalDefinition;
+        if (IsForbidden(
+                method,
+                methodReference.Instance?.Type ?? method.ContainingType,
+                context.ContainingSymbol,
+                symbols))
+        {
+            Report(context, MetaDiagnosticDescriptors.ForbiddenRoslynApi, methodReference.Syntax.GetLocation(), method.Name);
+        }
+    }
+
+    private static void AnalyzeDynamicInvocation(OperationAnalysisContext context)
+    {
+        Report(
+            context,
+            MetaDiagnosticDescriptors.ForbiddenRoslynApi,
+            context.Operation.Syntax.GetLocation(),
+            "dynamic invocation");
+    }
+
     private static bool IsForbidden(
         IMethodSymbol method,
-        IInvocationOperation invocation,
+        ITypeSymbol? receiverType,
         ISymbol containingSymbol,
         KnownSymbols symbols)
     {
@@ -186,7 +213,6 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        var receiverType = invocation.Instance?.Type ?? method.ContainingType;
         return IsSameType(receiverType, symbols[KnownType.Symbol]) ||
                receiverType?.AllInterfaces.Any(value => IsSameType(value, symbols[KnownType.Symbol])) == true;
     }
