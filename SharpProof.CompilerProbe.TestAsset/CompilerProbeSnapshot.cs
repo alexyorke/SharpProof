@@ -488,21 +488,89 @@ internal static class CompilerProbeSnapshot
         var image = method?.Invoke(metadata, null);
         if (image is null)
         {
-            var reader = metadata.GetType().GetFields(
-                System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.NonPublic)
-                .Select(field => field.GetValue(metadata))
-                .OfType<System.Reflection.PortableExecutable.PEReader>()
-                .SingleOrDefault();
-            image = reader?.GetEntireImage();
+            image = FindRetainedPortableImage(
+                metadata,
+                depth: 4,
+                []);
         }
         if (image is System.Collections.Immutable.ImmutableArray<byte> bytes &&
             !bytes.IsDefault)
         {
             return ProbeHash.Bytes(bytes.ToArray());
         }
+        if (image is System.Reflection.PortableExecutable.PEMemoryBlock block)
+        {
+            return ProbeHash.Bytes(block.GetContent().ToArray());
+        }
 
         return string.Empty;
+    }
+
+    private static System.Collections.Immutable.ImmutableArray<byte>
+        FindRetainedPortableImage(
+            object? value,
+            int depth,
+            List<object> visited)
+    {
+        if (value is null || depth < 0)
+        {
+            return default;
+        }
+        if (value is System.Reflection.PortableExecutable.PEReader reader)
+        {
+            return reader.GetEntireImage().GetContent();
+        }
+        if (value is System.Collections.Immutable.ImmutableArray<byte> bytes &&
+            !bytes.IsDefault)
+        {
+            return bytes;
+        }
+        var type = value.GetType();
+        if (type.IsPrimitive || type.IsEnum || value is string or Delegate ||
+            visited.Any(item => ReferenceEquals(item, value)))
+        {
+            return default;
+        }
+        visited.Add(value);
+
+        if (value is System.Collections.IEnumerable sequence)
+        {
+            var count = 0;
+            foreach (var item in sequence)
+            {
+                var found = FindRetainedPortableImage(
+                    item,
+                    depth - 1,
+                    visited);
+                if (!found.IsDefault || ++count >= 32)
+                {
+                    return found;
+                }
+            }
+        }
+
+        const System.Reflection.BindingFlags flags =
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic |
+            System.Reflection.BindingFlags.DeclaredOnly;
+        for (var current = type;
+             current != null;
+             current = current.BaseType)
+        {
+            foreach (var field in current.GetFields(flags))
+            {
+                var found = FindRetainedPortableImage(
+                    field.GetValue(value),
+                    depth - 1,
+                    visited);
+                if (!found.IsDefault)
+                {
+                    return found;
+                }
+            }
+        }
+        return default;
     }
 
     private static CSharpCompilation GetReferencedCompilation(

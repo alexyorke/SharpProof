@@ -43,7 +43,8 @@ public static partial class WorkerProtocolJson
         var expectedLength = new FileInfo(path).Length;
         if (expectedLength <= 0 || expectedLength > MaximumJsonBytes)
         {
-            throw new InvalidDataException("The JSON file exceeds the size limit.");
+            throw new InvalidDataException(
+                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
         }
 
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,

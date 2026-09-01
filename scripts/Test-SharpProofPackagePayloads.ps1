@@ -64,12 +64,28 @@ function Get-SharpProofPayloadSpecifications {
     )
 
     if ($PackageId -eq 'SharpProof.Attributes') {
-        return ,([pscustomobject][ordered]@{
-            Entry = 'lib/netstandard2.0/SharpProof.Attributes.dll'
-            Source = Join-Path `
-                $RepositoryRoot `
-                'SharpProof.Attributes/bin/Release/netstandard2.0/SharpProof.Attributes.dll'
-        })
+        return @(
+            [pscustomobject][ordered]@{
+                Entry = 'lib/netstandard2.0/SharpProof.Attributes.dll'
+                Source = Join-Path `
+                    $RepositoryRoot `
+                    'SharpProof.Attributes/bin/Release/netstandard2.0/SharpProof.Attributes.dll'
+            }
+            [pscustomobject][ordered]@{
+                Entry = 'lib/netstandard2.0/SharpProof.Attributes.xml'
+                Source = Join-Path `
+                    $RepositoryRoot `
+                    'SharpProof.Attributes/SharpProof.Attributes.xml'
+            }
+            [pscustomobject][ordered]@{
+                Entry = 'LICENSE'
+                Source = Join-Path $RepositoryRoot 'LICENSE'
+            }
+            [pscustomobject][ordered]@{
+                Entry = 'README.md'
+                Source = Join-Path $RepositoryRoot 'README.md'
+            }
+        )
     }
     $nuspecRelativePath = switch ($PackageId) {
         'SharpProof' { 'SharpProof.Package/SharpProof.nuspec' }
@@ -90,14 +106,15 @@ function Get-SharpProofPayloadSpecifications {
                 # payload, including executable MSBuild props/targets and
                 # catalogs.  Restricting this to binaries leaves behavioral
                 # package inputs mutable without changing the evidence.
-                $_.src -notmatch '\$nativeroot\$' -or
-                $_.src -match '\.(?:dll|so)$'
+                $_.GetAttribute('src') -notmatch '\.pdb$' -and (
+                    $_.GetAttribute('src') -notmatch '\$nativeroot\$' -or
+                    $_.GetAttribute('src') -match '\.(?:dll|so)$')
             } |
             ForEach-Object {
-                $source = ([string]$_.src).
+                $source = ([string]$_.GetAttribute('src')).
                     Replace('$configuration$', 'Release').
                     Replace('\', [IO.Path]::DirectorySeparatorChar)
-                $target = ([string]$_.target).
+                $target = ([string]$_.GetAttribute('target')).
                     Replace('\', '/')
                 [pscustomobject][ordered]@{
                     Entry = if ([string]::IsNullOrEmpty($target)) {
@@ -173,7 +190,12 @@ function Test-SharpProofPackagePayload {
         $payloadEntries = @(
             $archive.Entries |
                 Where-Object {
-                    $_.FullName -ne ($PackageId.ToLowerInvariant() + '.nuspec')
+                    $_.FullName -ne ($PackageId.ToLowerInvariant() + '.nuspec') -and
+                    $_.FullName -ne '_rels/.rels' -and
+                    $_.FullName -ne '[Content_Types].xml' -and
+                    -not $_.FullName.StartsWith(
+                        'package/services/metadata/core-properties/',
+                        [StringComparison]::Ordinal)
                 }
         )
         $duplicate = @(

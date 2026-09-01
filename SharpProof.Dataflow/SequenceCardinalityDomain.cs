@@ -152,7 +152,7 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
 
         return Create(
             SequenceCardinalityKind.Top,
-            _intervals.AddConstant(value.Length, appendedCount));
+            AddLengths(value.Length, _intervals.Constant(appendedCount)));
     }
 
     public SequenceCardinalityValue Concat(
@@ -167,7 +167,7 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
 
         return Create(
             SequenceCardinalityKind.Top,
-            _intervals.Add(left.Length, right.Length));
+            AddLengths(left.Length, right.Length));
     }
 
     public SequenceCardinalityValue AssumeEmpty(SequenceCardinalityValue value)
@@ -216,6 +216,28 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
         }
 
         return SequenceCardinalityKind.Top;
+    }
+
+    private IntervalValue AddLengths(IntervalValue left, IntervalValue right)
+    {
+        var lower = new BigInteger(left.LowerBound ?? 0) +
+            new BigInteger(right.LowerBound ?? 0);
+        if (lower > long.MaxValue)
+        {
+            return _intervals.Bottom;
+        }
+
+        long? upper = null;
+        if (left.UpperBound.HasValue && right.UpperBound.HasValue)
+        {
+            var maximum = new BigInteger(left.UpperBound.Value) +
+                new BigInteger(right.UpperBound.Value);
+            if (maximum <= long.MaxValue)
+            {
+                upper = (long)maximum;
+            }
+        }
+        return _intervals.Range((long)lower, upper);
     }
 
     private static void Validate(SequenceCardinalityKind kind)

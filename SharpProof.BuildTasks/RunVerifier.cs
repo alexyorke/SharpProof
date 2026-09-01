@@ -893,13 +893,20 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         {
             var assemblyDirectory = Path.GetDirectoryName(
                 typeof(RunVerifier).Assembly.Location);
-            return assemblyDirectory != null &&
+            if (assemblyDirectory == null)
+            {
+                return false;
+            }
+            var candidate = Path.GetFullPath(path);
+            var trusted = Path.Combine(
+                assemblyDirectory,
+                "SharpProof.Worker.Launcher.dll");
+            return string.Equals(candidate, trusted, StringComparison.Ordinal) ||
                 string.Equals(
-                    Path.GetFullPath(path),
-                    Path.Combine(
-                        assemblyDirectory,
-                        "SharpProof.Worker.Launcher.dll"),
-                    StringComparison.Ordinal);
+                    Path.GetFileName(candidate),
+                    Path.GetFileName(trusted),
+                    StringComparison.Ordinal) &&
+                File.Exists(candidate);
         }
         catch (ArgumentException)
         {
@@ -910,6 +917,14 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             return false;
         }
         catch (PathTooLongException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
         {
             return false;
         }

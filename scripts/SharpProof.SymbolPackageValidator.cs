@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -216,7 +217,6 @@ internal static class SharpProofSymbolPackageValidator
         }
 
         using var pdbImage = CopyToMemory(pdbEntry);
-        ValidatePdbChecksum(peReader, assemblyEntry, pdbImage);
         MetadataReaderProvider provider;
         MetadataReader reader;
         try
@@ -242,6 +242,7 @@ internal static class SharpProofSymbolPackageValidator
                 codeViewEntries[0],
                 expectedSourceUrl);
         }
+        ValidatePdbChecksum(peReader, assemblyEntry, pdbImage);
     }
 
     private static void ValidatePdbChecksum(
@@ -278,8 +279,10 @@ internal static class SharpProofSymbolPackageValidator
                 "PDB checksum.");
         }
 
-        pdbImage.Position = 0;
-        var actual = SHA256.HashData(pdbImage);
+        var content = pdbImage.ToArray();
+        var idOffset = PortablePdbIdOffset(content);
+        Array.Clear(content, idOffset, 20);
+        var actual = SHA256.HashData(content);
         if (!checksum.Checksum.AsSpan().SequenceEqual(actual))
         {
             throw new InvalidDataException(
@@ -287,6 +290,69 @@ internal static class SharpProofSymbolPackageValidator
                 "match the packaged portable PDB.");
         }
         pdbImage.Position = 0;
+    }
+
+    private static int PortablePdbIdOffset(byte[] content)
+    {
+        const uint metadataSignature = 0x424A5342;
+        const string pdbStreamName = "#Pdb";
+        try
+        {
+            var position = 0;
+            uint ReadUInt32()
+            {
+                var value = BinaryPrimitives.ReadUInt32LittleEndian(
+                    content.AsSpan(position, sizeof(uint)));
+                position += sizeof(uint);
+                return value;
+            }
+            ushort ReadUInt16()
+            {
+                var value = BinaryPrimitives.ReadUInt16LittleEndian(
+                    content.AsSpan(position, sizeof(ushort)));
+                position += sizeof(ushort);
+                return value;
+            }
+
+            if (ReadUInt32() != metadataSignature)
+            {
+                throw new InvalidDataException("Portable PDB metadata signature is invalid.");
+            }
+            position += sizeof(ushort) * 2 + sizeof(uint);
+            var versionLength = checked((int)ReadUInt32());
+            position = checked((position + versionLength + 3) & ~3);
+            _ = ReadUInt16();
+            var streamCount = ReadUInt16();
+            for (var index = 0; index < streamCount; index++)
+            {
+                var offset = checked((int)ReadUInt32());
+                var size = checked((int)ReadUInt32());
+                var nameStart = position;
+                while (content[position] != 0)
+                {
+                    position++;
+                }
+                var name = Encoding.ASCII.GetString(
+                    content,
+                    nameStart,
+                    position - nameStart);
+                position = checked((position + 1 + 3) & ~3);
+                if (name == pdbStreamName)
+                {
+                    if (size < 20 || offset < 0 || offset > content.Length - 20)
+                    {
+                        break;
+                    }
+                    return offset;
+                }
+            }
+        }
+        catch (Exception exception) when (exception is
+            ArgumentOutOfRangeException or IndexOutOfRangeException or OverflowException)
+        {
+            throw new InvalidDataException("Portable PDB metadata is malformed.", exception);
+        }
+        throw new InvalidDataException("Portable PDB metadata has no valid #Pdb stream.");
     }
 
     private static void ValidatePortablePdb(

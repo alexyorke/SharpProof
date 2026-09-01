@@ -214,7 +214,7 @@ public sealed class FinalCompilationProbeTests
                 "canonical Linux amd64 container"));
         _ = await ProbeArtifact.ReadAsync(workspace.PackedProbeArtifactPath);
         _ = await CompilerManifestArtifact.ReadAsync(
-            workspace.CompilerManifestPath);
+            workspace.InvocationCompilerManifestPath);
     }
 
     [Test]
@@ -615,6 +615,10 @@ public sealed class FinalCompilationProbeTests
                 root,
                 "published",
                 "compiler-manifest.json");
+            InvocationCompilerManifestPath = Path.Combine(
+                root,
+                "invocation",
+                "compiler-manifest.json");
             PackedProbeArtifactPath = Path.Combine(
                 root,
                 "probe",
@@ -640,6 +644,10 @@ public sealed class FinalCompilationProbeTests
             get;
         }
         internal string CompilerManifestPath
+        {
+            get;
+        }
+        internal string InvocationCompilerManifestPath
         {
             get;
         }
@@ -979,7 +987,7 @@ public sealed class FinalCompilationProbeTests
                     <SharpProofVerifyRequestFile>{Escape(Path.Combine(_root, "published", "request.json"))}</SharpProofVerifyRequestFile>
                     <SharpProofVerifyResultFile>{Escape(VerifyResultPath)}</SharpProofVerifyResultFile>
                     <SharpProofCompilerManifestFile>{Escape(Path.Combine(_root, "published", "compiler-manifest.json"))}</SharpProofCompilerManifestFile>
-                    <_SharpProofCompilerManifestPath>{Escape(CompilerManifestPath)}</_SharpProofCompilerManifestPath>
+                    <_SharpProofCompilerManifestPath>{Escape(InvocationCompilerManifestPath)}</_SharpProofCompilerManifestPath>
                     <SharpProofVerifyCacheDirectory>{Escape(Path.Combine(_root, "published", "cache"))}</SharpProofVerifyCacheDirectory>
                     <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
                     <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>

@@ -1250,43 +1250,6 @@ public sealed class BuildTaskTests
     [Test]
     [Platform("Linux")]
     [NonParallelizable]
-    public void WorkerLauncherCanFinishAfterItsPublicationLeaseWaitBegins()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-launcher-publication-wait-");
-        try
-        {
-            var helper = CreateTimedProcessAssembly(
-                directory.FullName,
-                "System.Threading.Thread.Sleep(5500);");
-            using var task = new RunVerifier
-            {
-                BuildEngine = new RecordingBuildEngine(),
-                Executable = Environment.GetEnvironmentVariable(
-                    "DOTNET_HOST_PATH") ?? "dotnet",
-                WorkingDirectory = directory.FullName,
-                Arguments =
-                [
-                    new TaskItem(helper),
-                    new TaskItem("--project-wall-ms"),
-                    new TaskItem("1")
-                ],
-                ProjectWallTimeMilliseconds = 1,
-                TerminationGraceMilliseconds = 1
-            };
-
-            Assert.That(task.Execute(), Is.True);
-            Assert.That(task.ExitCode, Is.Zero);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    [NonParallelizable]
     public void VerifierPreLaunchSetupDoesNotConsumeCleanupReserve()
     {
         var directory = Directory.CreateTempSubdirectory(

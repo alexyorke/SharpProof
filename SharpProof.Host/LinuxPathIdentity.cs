@@ -287,6 +287,7 @@ public static partial class LinuxPathIdentity
                 throw new IOException(
                     "SharpProof publication path identity changed while acquiring locks.");
             }
+            ConfirmAncestorIdentity(ancestorIdentity);
             BindPublicationSet(canonicalPaths);
             var lease = new PublicationLease([.. locks]);
             ownershipTransferred = true;
@@ -422,12 +423,24 @@ public static partial class LinuxPathIdentity
             var current = Path.GetDirectoryName(path) ?? "/";
             while (true)
             {
-                if (NativeMethods.LStat(current, out var information) != 0 ||
-                    (information.Mode & FileTypeMask) != FileTypeDirectory)
+                if (NativeMethods.LStat(current, out var information) != 0)
                 {
-                    throw new IOException("SharpProof publication path ancestors changed during identity capture.");
+                    var error = Marshal.GetLastPInvokeError();
+                    if (error != ErrorNoEntry)
+                    {
+                        throw new IOException(
+                            "SharpProof publication path ancestors changed during identity capture.");
+                    }
                 }
-                identities[current] = information;
+                else
+                {
+                    if ((information.Mode & FileTypeMask) != FileTypeDirectory)
+                    {
+                        throw new IOException(
+                            "SharpProof publication path ancestors changed during identity capture.");
+                    }
+                    identities[current] = information;
+                }
                 if (current == "/")
                 {
                     break;

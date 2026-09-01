@@ -286,20 +286,21 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
             new BigInteger(right.LowerBound ?? long.MinValue);
         var maximum = new BigInteger(left.UpperBound ?? long.MaxValue) +
             new BigInteger(right.UpperBound ?? long.MaxValue);
-        // An unbounded endpoint can overflow while the opposite endpoint is
-        // still exactly representable. Preserve each endpoint independently;
-        // collapsing the whole interval to Top loses useful lower bounds (in
-        // particular, sequence concatenation can forget guaranteed
-        // non-emptiness merely because its upper bound is unbounded).
-        lower = left.LowerBound.HasValue && right.LowerBound.HasValue &&
-                minimum >= long.MinValue && minimum <= long.MaxValue
+        if (minimum < long.MinValue || minimum > long.MaxValue ||
+            maximum < long.MinValue || maximum > long.MaxValue)
+        {
+            lower = null;
+            upper = null;
+            return false;
+        }
+
+        lower = left.LowerBound.HasValue && right.LowerBound.HasValue
             ? (long)minimum
             : null;
-        upper = left.UpperBound.HasValue && right.UpperBound.HasValue &&
-                maximum >= long.MinValue && maximum <= long.MaxValue
+        upper = left.UpperBound.HasValue && right.UpperBound.HasValue
             ? (long)maximum
             : null;
-        return lower.HasValue || upper.HasValue;
+        return true;
     }
 
     private static bool TryCongruentBoundary(

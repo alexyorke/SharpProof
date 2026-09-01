@@ -1,7 +1,11 @@
+using System.Collections.Concurrent;
+
 namespace SharpProof.Worker;
 
 internal sealed partial class VerificationCache(string directory, long maximumBytes)
 {
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim>
+        ProcessLocks = new(StringComparer.Ordinal);
     private readonly string _directory = Path.GetFullPath(
         ArgumentNullGuard.NotNull(directory, nameof(directory)));
     private readonly long _maximumBytes = ArgumentNullGuard.RequirePositive(
@@ -42,6 +46,15 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             cacheLock = AcquireLock(_directory);
             RecoverInterruptedTransactions(cancellationToken);
             ValidatePath(path);
+            if (!File.Exists(path))
+            {
+                if (TryStageCapacity(path, staged, cancellationToken))
+                {
+                    committed = true;
+                    DiscardStaged(staged);
+                }
+                return null;
+            }
             var file = new FileInfo(path);
             if (file.Length > Math.Min(
                     _maximumBytes,
@@ -252,10 +265,12 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         ValidatePath(directory, lockPath);
         Directory.CreateDirectory(directory);
         ValidatePath(directory, lockPath);
-        var mutex = new Semaphore(1, 1, "SharpProof.VerificationCache." + HashText(Path.GetFullPath(directory)));
-        if (!mutex.WaitOne(0))
+        var lockIdentity = HashText(Path.GetFullPath(directory));
+        var processLock = ProcessLocks.GetOrAdd(
+            lockIdentity,
+            static _ => new SemaphoreSlim(1, 1));
+        if (!processLock.Wait(0))
         {
-            mutex.Dispose();
             throw new IOException("The verification cache is locked.");
         }
         FileStream? cacheLock = null;
@@ -265,26 +280,24 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             cacheLock = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             ValidatePath(directory, lockPath);
             ownershipTransferred = true;
-            return new CacheLock(mutex, cacheLock);
+            return new CacheLock(processLock, cacheLock);
         }
         finally
         {
             if (!ownershipTransferred)
             {
                 cacheLock?.Dispose();
-                mutex.Release();
-                mutex.Dispose();
+                processLock.Release();
             }
         }
     }
 
-    private sealed class CacheLock(Semaphore mutex, FileStream file)
+    private sealed class CacheLock(SemaphoreSlim processLock, FileStream file)
     {
         public void Dispose()
         {
             file.Dispose();
-            mutex.Release();
-            mutex.Dispose();
+            processLock.Release();
         }
     }
 

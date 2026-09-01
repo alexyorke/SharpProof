@@ -130,14 +130,16 @@ internal static partial class VerifierProcessSupervisor
                 Environment.ProcessId,
                 CleanupMilliseconds,
                 descriptorReserves: descriptorReserves.Skip(1).ToArray(),
-                supervisorPidFd: descriptorReserves[0]);
+                supervisorPidFd: descriptorReserves[0],
+                managedProcessId: process.Id);
             cleanup = RetryCleanup(
                 cleanup,
                 descriptorReserves[0],
-                static (pidFd) => StopDescendants(
+                (pidFd) => StopDescendants(
                     Environment.ProcessId,
                     RetryCleanupMilliseconds,
-                    supervisorPidFd: pidFd));
+                    supervisorPidFd: pidFd,
+                    managedProcessId: process.Id));
             var hadDescendants = cleanup.HadDescendants;
             if (!cleanup.Complete)
             {
@@ -224,7 +226,8 @@ internal static partial class VerifierProcessSupervisor
         Func<int, int>? openPidFd = null,
         Func<int, int, int>? sendSignal = null,
         IReadOnlyList<int>? descriptorReserves = null,
-        int supervisorPidFd = -1)
+        int supervisorPidFd = -1,
+        int managedProcessId = -1)
     {
         CloseDescriptors(descriptorReserves ?? []);
         var foundAny = false;
@@ -307,7 +310,7 @@ internal static partial class VerifierProcessSupervisor
             }
             if (supervisorId == Environment.ProcessId)
             {
-                ReapExitedChildren();
+                ReapExitedChildren(discovered, managedProcessId);
             }
             Thread.Yield();
         }
@@ -315,10 +318,11 @@ internal static partial class VerifierProcessSupervisor
         // A failed pidfd probe proves that the retained identity is gone, so
         // scanning the numeric PID here could otherwise inspect an unrelated
         // process. Only use the process table while the identity is verified.
-        var complete = supervisorPidFd >= 0
-            ? (sendSignal?.Invoke(supervisorPidFd, SignalNone) ??
-               SendPidFdSignal(supervisorPidFd, SignalNone)) != 0
-            : DescendantProcessIds(supervisorId).Count == 0;
+        var supervisorGone = supervisorPidFd >= 0 &&
+            (sendSignal?.Invoke(supervisorPidFd, SignalNone) ??
+             SendPidFdSignal(supervisorPidFd, SignalNone)) != 0;
+        var complete = supervisorGone ||
+            DescendantProcessIds(supervisorId).Count == 0;
         return new DescendantStopResult(foundAny, complete);
     }
 
@@ -474,6 +478,17 @@ internal static partial class VerifierProcessSupervisor
                    out _,
                    1) > 0)
         {
+        }
+    }
+
+    private static void ReapExitedChildren(
+        IEnumerable<int> processIds,
+        int excludedProcessId)
+    {
+        foreach (var processId in processIds.Where(
+                     processId => processId != excludedProcessId))
+        {
+            _ = NativeMethods.WaitForProcess(processId, out _, 1);
         }
     }
 
