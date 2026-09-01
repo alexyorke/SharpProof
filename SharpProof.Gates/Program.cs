@@ -45,19 +45,21 @@ internal static class Program
                         JsonDefaults.Indented));
                 return corpus.Passed && performance.Passed ? 0 : 1;
             }
-            if (command == "corpus")
+            if (command is "corpus" or "performance")
             {
-                var result = await CorpusGate.RunAsync(root)
-                    .ConfigureAwait(false);
-                Console.WriteLine(
-                    JsonSerializer.Serialize(
-                        CreateStandaloneEnvelope(
-                            root,
-                            command,
-                            result.Passed,
-                            result),
-                        JsonDefaults.Indented));
-                return result.Passed ? 0 : 1;
+                object result = command == "corpus"
+                    ? await CorpusGate.RunAsync(root).ConfigureAwait(false)
+                    : await PerformanceGate.RunAsync(root).ConfigureAwait(false);
+                var passed = result switch
+                {
+                    CorpusGateResult corpus => corpus.Passed,
+                    PerformanceGateResult performance => performance.Passed,
+                    _ => false
+                };
+                Console.WriteLine(JsonSerializer.Serialize(
+                    CreateStandaloneEnvelope(root, command, passed, result),
+                    JsonDefaults.Indented));
+                return passed ? 0 : 1;
             }
             if (command == "corpus-print")
             {
@@ -72,20 +74,6 @@ internal static class Program
                     .ConfigureAwait(false);
                 Console.WriteLine("Updated the canonical corpus snapshot.");
                 return 0;
-            }
-            if (command == "performance")
-            {
-                var result = await PerformanceGate.RunAsync(root)
-                    .ConfigureAwait(false);
-                Console.WriteLine(
-                    JsonSerializer.Serialize(
-                        CreateStandaloneEnvelope(
-                            root,
-                            command,
-                            result.Passed,
-                            result),
-                        JsonDefaults.Indented));
-                return result.Passed ? 0 : 1;
             }
             if (command == "performance-smoke")
             {
