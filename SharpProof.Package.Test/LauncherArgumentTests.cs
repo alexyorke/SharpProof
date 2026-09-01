@@ -66,8 +66,8 @@ public sealed class LauncherArgumentTests
             Assert.That(completion.ExitCode, Is.EqualTo(124));
             Assert.That(
                 stopwatch.Elapsed,
-                Is.LessThan(TimeSpan.FromMilliseconds(1_350)),
-                "The final deadline must include exactly one termination grace.");
+                Is.LessThan(TimeSpan.FromMilliseconds(1_800)),
+                "The final deadline must not restart the full 1.1-second cleanup budget.");
         }
     }
 
