@@ -53,7 +53,9 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
             using var publicationLease =
                 File.Exists(LinuxPathIdentity.PublicationMarkerPath(resultPath))
                     ? LinuxPathIdentity.AcquirePublicationSet(
-                    [requestPath, resultPath, manifestPath],
+                    sarifPath is null
+                        ? new[] { requestPath, resultPath, manifestPath }
+                        : new[] { requestPath, resultPath, manifestPath, sarifPath },
                     TimeSpan.FromSeconds(30))
                     : null;
             WorkerVerifyResponse? invocationResponse = null;
