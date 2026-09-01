@@ -37,8 +37,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build the pinned Linux amd64 toolchain
-        uses: ./.github/actions/build-tooling
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
 
       - name: Validate release tag and checked-in version in-container
         if: startsWith(github.ref, 'refs/tags/v')
@@ -104,14 +105,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download exact NuGet artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
-          path: nupkgs
-
-      - name: Build the pinned toolchain
-        uses: ./.github/actions/build-tooling
+      - uses: ./.github/actions/prepare-qualified-packages
 
       - name: Run analyzer and real verifier consumers
         run: >-
@@ -171,14 +165,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download exact NuGet artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
-          path: nupkgs
-
-      - name: Build the pinned toolchain
-        uses: ./.github/actions/build-tooling
+      - uses: ./.github/actions/prepare-qualified-packages
 
       - name: Require an annotated exact tag in-container
         run: >-
@@ -283,10 +270,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
-          path: nupkgs
+      - uses: ./.github/actions/prepare-qualified-packages
       - name: Validate private-feed configuration
         env:
           NUGET_PRIVATE_API_KEY: ${{ secrets.NUGET_PRIVATE_API_KEY }}
@@ -294,8 +278,6 @@ jobs:
         run: |
           test -n "${NUGET_PRIVATE_SOURCE}"
           test -n "${NUGET_PRIVATE_API_KEY}"
-      - name: Build the pinned toolchain
-        uses: ./.github/actions/build-tooling
       - name: Publish already-qualified private-preview bytes in-container
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_PRIVATE_API_KEY }}
@@ -327,10 +309,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
-          path: nupkgs
+      - uses: ./.github/actions/prepare-qualified-packages
       - name: Validate public-feed configuration
         env:
           NUGET_USER: ${{ vars.NUGET_USER }}
@@ -340,8 +319,6 @@ jobs:
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         with:
           user: ${{ vars.NUGET_USER }}
-      - name: Build the pinned toolchain
-        uses: ./.github/actions/build-tooling
       - name: Publish already-qualified package and symbol bytes in-container
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}

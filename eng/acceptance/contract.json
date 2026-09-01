@@ -93,6 +93,7 @@
   "releaseAuthorityClosure": {
     "paths": [
       ".github/actions/build-tooling/action.yml",
+      ".github/actions/prepare-qualified-packages/action.yml",
       ".github/workflows/nightly.yml",
       ".github/workflows/package-consumers.yml",
       "SharpProof.Analyzer.Core/AnalyzerDiagnostic.catalog.json",
@@ -684,6 +685,7 @@
         "name": "releaseAuthorityDerivedLeaves",
         "paths": [
           ".github/actions/build-tooling/action.yml",
+          ".github/actions/prepare-qualified-packages/action.yml",
           ".github/workflows/nightly.yml",
           "SharpProof.Gates/Program.cs",
           "SharpProof.Gates/SharpProof.Gates.csproj",

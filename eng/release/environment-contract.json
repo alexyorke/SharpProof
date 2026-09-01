@@ -16,11 +16,11 @@
   "workflowJobs": [
     {
       "id": "publish-private-preview",
-      "canonicalSha256": "3e7d5e03388806b12a4380341458166ba8a4a5c69ff536e29088a8345177abb7"
+      "canonicalSha256": "211a632d87fadd7f33b1aadbfb0bc31a34e6e1dcd1bda5b0033934d619b6cdba"
     },
     {
       "id": "publish",
-      "canonicalSha256": "c8ff6b2162bf62fd02ae4efc15aa5f6530d51ff699d180b8f50cd40bd1bd83aa"
+      "canonicalSha256": "a2f645155bd819ad2302d0ee05cece1da2cb2d787ebbfca4a84325861b63cdd3"
     }
   ],
   "environments": [
