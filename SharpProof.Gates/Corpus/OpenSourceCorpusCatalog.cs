@@ -357,8 +357,7 @@ internal static class OpenSourceCorpusCatalog
         ValidateRelativePath(source.LicenseFile, $"source {source.Id} license");
         var licensePath = Path.GetFullPath(
             Path.Combine(corpusDirectory, source.LicenseFile));
-        var relative = Path.GetRelativePath(corpusDirectory, licensePath);
-        ValidateRelativePath(relative, $"source {source.Id} resolved license");
+        EnsureContained(corpusDirectory, licensePath);
         if (!File.Exists(licensePath))
         {
             throw new InvalidDataException(
@@ -390,6 +389,91 @@ internal static class OpenSourceCorpusCatalog
             throw new InvalidDataException(
                 $"OSS corpus {description} path must be relative and contained.");
         }
+    }
+
+    internal static void EnsureContained(string root, string path)
+    {
+        var lexicalRoot = Path.GetFullPath(root);
+        var lexicalPath = Path.GetFullPath(path);
+        var lexicalRelative = Path.GetRelativePath(lexicalRoot, lexicalPath);
+        if (Path.IsPathRooted(lexicalRelative) ||
+            lexicalRelative.Split(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar)
+                .Any(static part => part == ".."))
+        {
+            throw new InvalidDataException(
+                $"Generated OSS corpus path escaped its directory: {path}");
+        }
+
+        var resolvedRoot = ResolvePath(lexicalRoot);
+        var resolvedPath = ResolvePath(lexicalPath);
+        var resolvedRelative = Path.GetRelativePath(resolvedRoot, resolvedPath);
+        if (Path.IsPathRooted(resolvedRelative) ||
+            resolvedRelative.Split(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar)
+                .Any(static part => part == ".."))
+        {
+            throw new InvalidDataException(
+                $"Generated OSS corpus path follows a link outside its directory: {path}");
+        }
+    }
+
+    private static string ResolvePath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var current = Path.GetPathRoot(fullPath) ?? string.Empty;
+        var relative = Path.GetRelativePath(current, fullPath);
+        foreach (var part in relative.Split(
+                     Path.DirectorySeparatorChar,
+                     Path.AltDirectorySeparatorChar))
+        {
+            if (part.Length == 0 || part == ".")
+            {
+                continue;
+            }
+
+            var candidate = Path.Combine(current, part);
+            var link = ResolveLink(candidate);
+            if (link != null)
+            {
+                current = link;
+                continue;
+            }
+            current = candidate;
+        }
+
+        return Path.GetFullPath(current);
+    }
+
+    private static string? ResolveLink(string path)
+    {
+        foreach (FileSystemInfo info in [new FileInfo(path), new DirectoryInfo(path)])
+        {
+            try
+            {
+                var target = info.ResolveLinkTarget(returnFinalTarget: true);
+                if (target != null)
+                {
+                    return target.FullName;
+                }
+            }
+            catch (FileNotFoundException)
+            {
+            }
+            catch (DirectoryNotFoundException)
+            {
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+
+        return null;
     }
 
     private static bool IsLowerHex(string value, int length)

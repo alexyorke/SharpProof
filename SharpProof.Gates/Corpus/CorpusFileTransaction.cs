@@ -29,6 +29,12 @@ internal static class CorpusFileTransaction
         var destinations = updates
             .Select(static update => Path.GetFullPath(update.Path))
             .ToArray();
+        foreach (var destination in destinations)
+        {
+            OpenSourceCorpusCatalog.EnsureContained(
+                transactionRoot,
+                destination);
+        }
         if (destinations.Distinct(StringComparer.Ordinal).Count() !=
             destinations.Length)
         {

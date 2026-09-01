@@ -79,6 +79,42 @@ public sealed class CorpusGateTests
     }
 
     [Test]
+    [Platform("Linux")]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public void CorpusContainmentRejectsSymlinkTargetsOutsideRoot()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        var outside = Path.Combine(
+            Path.GetTempPath(),
+            "SharpProof.Gates.Test",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        Directory.CreateDirectory(outside);
+        var target = Path.Combine(outside, "license.txt");
+        var link = Path.Combine(root, "license.txt");
+        try
+        {
+            File.WriteAllText(target, "outside\n");
+            File.CreateSymbolicLink(link, target);
+
+            var exception = Assert.Throws<InvalidDataException>((Action)(() =>
+                OpenSourceCorpusCatalog.EnsureContained(root, link)));
+
+            Assert.That(
+                exception!.Message,
+                Does.Contain("follows a link outside its directory"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
+    [Test]
     public void UnassignedCorpusDiagnosticFailsTheGate()
     {
         var descriptor = new DiagnosticDescriptor(
