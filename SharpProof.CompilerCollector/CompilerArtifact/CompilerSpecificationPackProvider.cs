@@ -331,7 +331,9 @@ internal sealed class CompilerSpecificationPackProvider
                 value.ToString("x2", CultureInfo.InvariantCulture)));
         return approved.Any(candidate =>
             candidate.Name == identity.Name &&
-            candidate.PublicKeyToken == token);
+            candidate.PublicKeyToken == token &&
+            candidate.PublicKey == string.Concat(identity.PublicKey.Select(static value =>
+                value.ToString("x2", CultureInfo.InvariantCulture))));
     }
 
     private static IMethodSymbol Normalize(IMethodSymbol method)
@@ -498,7 +500,8 @@ internal sealed class CompilerSpecificationPackProvider
                 assemblyElement,
                 "assembly",
                 "name",
-                "publicKeyToken");
+                "publicKeyToken",
+                "publicKey");
             var name = RequiredString(
                 assemblyElement,
                 "name",
@@ -508,6 +511,19 @@ internal sealed class CompilerSpecificationPackProvider
                 "publicKeyToken",
                 "assembly",
                 allowEmpty: true);
+            var publicKey = RequiredString(
+                assemblyElement,
+                "publicKey",
+                "assembly",
+                allowEmpty: true);
+            if (publicKey.Length == 0 || publicKey.Length % 2 != 0 ||
+                !publicKey.All(static character =>
+                    character is >= '0' and <= '9' or
+                    >= 'a' and <= 'f'))
+            {
+                throw new InvalidDataException(
+                    "A specification-pack public key is invalid.");
+            }
             if (token.Length != 0 &&
                 (token.Length != 16 || !token.All(static character =>
                     character is >= '0' and <= '9' or
@@ -517,7 +533,7 @@ internal sealed class CompilerSpecificationPackProvider
                     "A specification-pack public-key token is invalid.");
             }
 
-            var key = name + "|" + token;
+            var key = name + "|" + token + "|" + publicKey;
             if (previousAssembly != null &&
                 StringComparer.Ordinal.Compare(previousAssembly, key) >= 0)
             {
@@ -526,7 +542,7 @@ internal sealed class CompilerSpecificationPackProvider
             }
 
             previousAssembly = key;
-            assemblies.Add(new AssemblyIdentity(name, token));
+            assemblies.Add(new AssemblyIdentity(name, token, publicKey));
         }
 
         if (assemblies.Count == 0)
@@ -839,7 +855,8 @@ internal sealed class CompilerSpecificationPackProvider
 
     private sealed record AssemblyIdentity(
         string Name,
-        string PublicKeyToken);
+        string PublicKeyToken,
+        string PublicKey);
 
     private abstract record Term(IrTypeKind Type);
 
