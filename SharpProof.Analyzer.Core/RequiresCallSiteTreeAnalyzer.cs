@@ -1,3 +1,5 @@
+using SharpProof.Roslyn;
+
 namespace SharpProof.Analyzer;
 
 internal static partial class RequiresCallSiteTreeAnalyzer
@@ -828,7 +830,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     {
                         if (exceptionalStateSurvivesKill)
                         {
-                            foreach (var successor in ExceptionalSuccessors(
+                            foreach (var successor in RoslynCfgThrowFacts.ExceptionalSuccessors(
                                          graph,
                                          block))
                             {
@@ -843,7 +845,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     }
                     if (BlockMayThrow(block, after))
                     {
-                        foreach (var successor in ExceptionalSuccessors(
+                        foreach (var successor in RoslynCfgThrowFacts.ExceptionalSuccessors(
                                      graph,
                                      block))
                         {
@@ -1139,7 +1141,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 .Where(operation => operation.Syntax.Span.End > after)
                 .SelectMany(static operation =>
                     operation.DescendantsAndSelf())
-                .Any(static operation => OperationMayThrow(operation));
+                .Any(static operation =>
+                    RoslynCfgThrowFacts.OperationMayThrow(operation));
         }
 
         private static bool HasEnclosingSimpleAssignment(
@@ -1216,91 +1219,10 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                         .SelectMany(static candidate =>
                             candidate.DescendantsAndSelf())
                         .Any(static candidate =>
-                            OperationMayThrow(candidate));
+                            RoslynCfgThrowFacts.OperationMayThrow(candidate));
                 }
             }
             return false;
-        }
-
-        private static bool OperationMayThrow(IOperation operation)
-        {
-            if (operation is IConversionOperation conversion)
-            {
-                return conversion.OperatorMethod != null ||
-                    conversion.IsChecked ||
-                    (!conversion.IsTryCast && !conversion.IsImplicit &&
-                     (conversion.Conversion.IsReference ||
-                      conversion.Operand.Type?.IsReferenceType == true &&
-                      conversion.Type?.IsValueType == true));
-            }
-            if (operation is IMethodReferenceOperation methodReference)
-            {
-                return !methodReference.Method.IsStatic &&
-                    methodReference.Instance?.Type?.IsReferenceType == true;
-            }
-            return operation is
-                IThrowOperation or
-                IInvocationOperation or
-                IDynamicInvocationOperation or
-                IDynamicObjectCreationOperation or
-                IDynamicIndexerAccessOperation or
-                IFunctionPointerInvocationOperation or
-                IObjectCreationOperation or
-                IArrayCreationOperation or
-                IArrayElementReferenceOperation or
-                IDynamicMemberReferenceOperation or
-                IFieldReferenceOperation { Instance: not null } or
-                IPropertyReferenceOperation or
-                IEventAssignmentOperation or
-                ILockOperation or
-                IAwaitOperation or
-                ICompoundAssignmentOperation { OperatorMethod: not null } or
-                ICompoundAssignmentOperation
-                { IsChecked: true } or
-                ICompoundAssignmentOperation
-                {
-                    OperatorKind: BinaryOperatorKind.Divide or
-                        BinaryOperatorKind.Remainder
-                } or
-                IBinaryOperation { OperatorMethod: not null } or
-                IBinaryOperation { IsChecked: true } or
-                IBinaryOperation
-                {
-                    OperatorKind: BinaryOperatorKind.Divide or
-                        BinaryOperatorKind.Remainder
-                } or
-                IUnaryOperation { OperatorMethod: not null } or
-                IUnaryOperation { IsChecked: true } or
-                IIncrementOrDecrementOperation { OperatorMethod: not null } or
-                IIncrementOrDecrementOperation { IsChecked: true };
-        }
-
-        private static IEnumerable<BasicBlock> ExceptionalSuccessors(
-            ControlFlowGraph graph,
-            BasicBlock block)
-        {
-            var yielded = new HashSet<int>();
-            for (var region = block.EnclosingRegion;
-                 region != null;
-                 region = region.EnclosingRegion)
-            {
-                if (region.Kind != ControlFlowRegionKind.Try ||
-                    region.EnclosingRegion is not { } owner)
-                {
-                    continue;
-                }
-                foreach (var handler in owner.NestedRegions.Where(candidate =>
-                             candidate.Kind is ControlFlowRegionKind.Filter or
-                                 ControlFlowRegionKind.Catch or
-                                 ControlFlowRegionKind.FilterAndHandler or
-                                 ControlFlowRegionKind.Finally))
-                {
-                    if (yielded.Add(handler.FirstBlockOrdinal))
-                    {
-                        yield return graph.Blocks[handler.FirstBlockOrdinal];
-                    }
-                }
-            }
         }
 
         private static int GetReferenceOrder(

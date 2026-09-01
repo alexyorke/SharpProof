@@ -19,6 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\eng\RoslynCfgThrowFacts.cs"
+             Link="RoslynCfgThrowFacts.cs" />
     <Compile Include="..\SharpProof.Specs\Polyfills\IsExternalInit.cs"
              Link="Polyfills\IsExternalInit.cs" />
   </ItemGroup>

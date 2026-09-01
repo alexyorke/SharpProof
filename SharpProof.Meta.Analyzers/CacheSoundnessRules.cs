@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Text;
+using SharpProof.Roslyn;
 
 namespace SharpProof.Meta.Analyzers;
 
@@ -1017,7 +1018,7 @@ internal static class CacheSoundnessRules
                     input,
                     root,
                     cancellationToken);
-                foreach (var successor in ExceptionalSuccessors(
+                foreach (var successor in RoslynCfgThrowFacts.ExceptionalSuccessors(
                              graph,
                              block,
                              cancellationToken))
@@ -1180,7 +1181,7 @@ internal static class CacheSoundnessRules
                              root,
                              cancellationToken)))
         {
-            if (OperationMayThrow(candidate))
+            if (RoslynCfgThrowFacts.OperationMayThrow(candidate))
             {
                 exceptional.UnionWith(state);
             }
@@ -1195,81 +1196,6 @@ internal static class CacheSoundnessRules
             state.Add(value);
         }
         return exceptional;
-    }
-
-    private static bool OperationMayThrow(IOperation operation)
-    {
-        if (operation is IConversionOperation conversion)
-        {
-            return conversion.IsChecked ||
-                (!conversion.IsTryCast && !conversion.IsImplicit &&
-                 (conversion.Conversion.IsReference ||
-                  conversion.Operand.Type?.IsReferenceType == true &&
-                  conversion.Type?.IsValueType == true));
-        }
-
-        return operation is
-            IThrowOperation or
-            IInvocationOperation or
-            IDynamicInvocationOperation or
-            IDynamicObjectCreationOperation or
-            IDynamicIndexerAccessOperation or
-            IFunctionPointerInvocationOperation or
-            IObjectCreationOperation or
-            IArrayCreationOperation or
-            IArrayElementReferenceOperation or
-            IDynamicMemberReferenceOperation or
-            IFieldReferenceOperation { Instance: not null } or
-            IPropertyReferenceOperation or
-            IEventAssignmentOperation or
-            ILockOperation or
-            IAwaitOperation or
-            ICompoundAssignmentOperation { IsChecked: true } or
-            ICompoundAssignmentOperation
-            {
-                OperatorKind: BinaryOperatorKind.Divide or
-                    BinaryOperatorKind.Remainder
-            } or
-            IBinaryOperation { IsChecked: true } or
-            IBinaryOperation
-            {
-                OperatorKind: BinaryOperatorKind.Divide or
-                    BinaryOperatorKind.Remainder
-            } or
-            IUnaryOperation { IsChecked: true } or
-            IIncrementOrDecrementOperation { IsChecked: true };
-    }
-
-    private static IEnumerable<BasicBlock> ExceptionalSuccessors(
-        ControlFlowGraph graph,
-        BasicBlock block,
-        CancellationToken cancellationToken)
-    {
-        var yielded = new HashSet<int>();
-        for (var region = block.EnclosingRegion;
-             region != null;
-             region = region.EnclosingRegion)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (region.Kind != ControlFlowRegionKind.Try ||
-                region.EnclosingRegion is not { } owner)
-            {
-                continue;
-            }
-
-            foreach (var handler in owner.NestedRegions.Where(candidate =>
-                         candidate.Kind is ControlFlowRegionKind.Filter or
-                             ControlFlowRegionKind.Catch or
-                             ControlFlowRegionKind.FilterAndHandler or
-                             ControlFlowRegionKind.Finally))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (yielded.Add(handler.FirstBlockOrdinal))
-                {
-                    yield return graph.Blocks[handler.FirstBlockOrdinal];
-                }
-            }
-        }
     }
 
     private static IEnumerable<IOperation> InEvaluationOrder(
