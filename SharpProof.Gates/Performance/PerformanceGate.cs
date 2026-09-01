@@ -145,14 +145,16 @@ internal static class PerformanceGate
             callFreeSource,
             contract.Warmups,
             cancellationToken);
-        var baselineRetained = MeasureCompilerOnlyRetainedBytes(
+        var baselineRetained = MeasureRetainedBytes(
             callFreeSource,
             "Baseline",
+            runAnalyzer: false,
             cancellationToken);
         var unannotatedAdvisoryRetained =
-            MeasureUnannotatedAdvisoryAnalyzerRetainedBytes(
+            MeasureRetainedBytes(
             callFreeSource,
             "UnannotatedAdvisory",
+            runAnalyzer: true,
             cancellationToken);
         var retainedRatio = Ratio(
             unannotatedAdvisoryRetained,
@@ -744,39 +746,17 @@ internal static class PerformanceGate
         ForceCollection();
     }
 
-    private static long MeasureCompilerOnlyRetainedBytes(
+    private static long MeasureRetainedBytes(
         string source,
         string kind,
+        bool runAnalyzer,
         CancellationToken cancellationToken)
     {
         ForceCollection();
         var before = GC.GetTotalMemory(forceFullCollection: true);
         var retained = new List<Compilation>(RetainedCompilationCount);
-        for (var index = 0; index < RetainedCompilationCount; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var compilation = AnalyzerGateHost.CreateCompilation(
-                source,
-                $"Retained_{kind}_{index}");
-            _ = compilation.GetDiagnostics(cancellationToken);
-            retained.Add(compilation);
-        }
-        ForceCollection();
-        var after = GC.GetTotalMemory(forceFullCollection: true);
-        GC.KeepAlive(retained);
-        return Math.Max(1, after - before);
-    }
-
-    private static long MeasureUnannotatedAdvisoryAnalyzerRetainedBytes(
-        string source,
-        string kind,
-        CancellationToken cancellationToken)
-    {
-        ForceCollection();
-        var before = GC.GetTotalMemory(forceFullCollection: true);
-        var retained = new List<Compilation>(RetainedCompilationCount);
-        var sessionFactory = new CountingSessionFactory();
-        var analyzer = new SharpProofAnalyzer(sessionFactory);
+        var sessionFactory = runAnalyzer ? new CountingSessionFactory() : null;
+        var analyzer = runAnalyzer ? new SharpProofAnalyzer(sessionFactory!) : null;
         var diagnosticCount = 0;
         for (var index = 0; index < RetainedCompilationCount; index++)
         {
@@ -785,14 +765,17 @@ internal static class PerformanceGate
                 source,
                 $"Retained_{kind}_{index}");
             _ = compilation.GetDiagnostics(cancellationToken);
-            diagnosticCount += AnalyzeUnannotatedAdvisory(
-                compilation,
-                analyzer,
-                cancellationToken);
+            if (analyzer != null)
+            {
+                diagnosticCount += AnalyzeUnannotatedAdvisory(
+                    compilation,
+                    analyzer,
+                    cancellationToken);
+            }
             retained.Add(compilation);
         }
-        if (diagnosticCount != 0 ||
-            sessionFactory.CreateCount != 0)
+        if (analyzer != null &&
+            (diagnosticCount != 0 || sessionFactory!.CreateCount != 0))
         {
             throw new InvalidOperationException(
                 "Unannotated call-free advisory retention must stay quiet " +
