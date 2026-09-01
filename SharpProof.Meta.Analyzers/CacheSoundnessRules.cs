@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SharpProof.Meta.Analyzers;
 
@@ -370,7 +371,7 @@ internal static class CacheSoundnessRules
         IOperation root,
         LocalResolution resolving)
     {
-        if (!resolving.Add(reference.Local))
+        if (!resolving.Add(reference))
         {
             return true;
         }
@@ -382,11 +383,12 @@ internal static class CacheSoundnessRules
                 root,
                 resolving.CancellationToken);
             return writes.Length == 0 || writes.Any(value =>
+                IsSelfReference(value, reference.Local) ||
                 IsNonCacheableValueFactory(value, root, resolving));
         }
         finally
         {
-            resolving.Remove(reference.Local);
+            resolving.Remove(reference);
         }
     }
 
@@ -598,7 +600,7 @@ internal static class CacheSoundnessRules
         IOperation root,
         LocalResolution resolving)
     {
-        if (!resolving.Add(reference.Local))
+        if (!resolving.Add(reference))
         {
             return false;
         }
@@ -610,11 +612,12 @@ internal static class CacheSoundnessRules
                     root,
                     resolving.CancellationToken)
                 .Any(value =>
+                    !IsSelfReference(value, reference.Local) &&
                     IsCacheReceiver(value, null, root, resolving));
         }
         finally
         {
-            resolving.Remove(reference.Local);
+            resolving.Remove(reference);
         }
     }
 
@@ -817,7 +820,7 @@ internal static class CacheSoundnessRules
         IOperation root,
         LocalResolution resolving)
     {
-        if (!resolving.Add(reference.Local))
+        if (!resolving.Add(reference))
         {
             return true;
         }
@@ -829,6 +832,7 @@ internal static class CacheSoundnessRules
                 root,
                 resolving.CancellationToken);
             return writes.Length == 0 || writes.Any(value =>
+                IsSelfReference(value, reference.Local) ||
                 IsNonCacheableNumericEnumValue(
                     value,
                     enumType,
@@ -837,7 +841,7 @@ internal static class CacheSoundnessRules
         }
         finally
         {
-            resolving.Remove(reference.Local);
+            resolving.Remove(reference);
         }
     }
 
@@ -909,7 +913,7 @@ internal static class CacheSoundnessRules
         IOperation root,
         LocalResolution resolving)
     {
-        if (!resolving.Add(reference.Local))
+        if (!resolving.Add(reference))
         {
             // A repeated local produced by a plain local initializer or
             // assignment is an alias cycle; the outer frame evaluates the
@@ -935,7 +939,7 @@ internal static class CacheSoundnessRules
         }
         finally
         {
-            resolving.Remove(reference.Local);
+            resolving.Remove(reference);
         }
     }
 
@@ -962,6 +966,15 @@ internal static class CacheSoundnessRules
         }
 
         return false;
+    }
+
+    private static bool IsSelfReference(
+        IOperation operation,
+        ILocalSymbol local)
+    {
+        operation = UnwrapValue(operation);
+        return operation is ILocalReferenceOperation reference &&
+            SymbolEqualityComparer.Default.Equals(reference.Local, local);
     }
 
     private static IOperation[] GetReachingLocalValues(
@@ -2036,6 +2049,8 @@ internal static class CacheSoundnessRules
     {
         private readonly HashSet<ILocalSymbol> _locals = new(
             SymbolEqualityComparer.Default);
+        private readonly Dictionary<ILocalSymbol, HashSet<TextSpan>> _points =
+            new(SymbolEqualityComparer.Default);
 
         internal LocalResolution(
             CancellationToken cancellationToken,
@@ -2064,6 +2079,32 @@ internal static class CacheSoundnessRules
         internal void Remove(ILocalSymbol local)
         {
             _locals.Remove(local);
+        }
+
+        internal bool Add(ILocalReferenceOperation reference)
+        {
+            CancellationToken.ThrowIfCancellationRequested();
+            if (!_points.TryGetValue(reference.Local, out var points))
+            {
+                points = [];
+                _points.Add(reference.Local, points);
+            }
+
+            return points.Add(reference.Syntax.Span);
+        }
+
+        internal void Remove(ILocalReferenceOperation reference)
+        {
+            if (!_points.TryGetValue(reference.Local, out var points))
+            {
+                return;
+            }
+
+            points.Remove(reference.Syntax.Span);
+            if (points.Count == 0)
+            {
+                _points.Remove(reference.Local);
+            }
         }
     }
 }
