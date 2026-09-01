@@ -564,7 +564,7 @@ internal static class Program
             Encoding.UTF8.GetBytes(
                 WorkerProtocolJson.SerializeResponse(response))));
 
-        var previous = CapturePreviousPublication(members);
+        using var previous = CapturePreviousPublication(members);
         var commitStarted = false;
         try
         {
@@ -601,13 +601,26 @@ internal static class Program
     private static PreviousPublication CapturePreviousPublication(
         IReadOnlyList<PublicationMember> members)
     {
-        var content = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        var backups = new Dictionary<string, string>(StringComparer.Ordinal);
         var complete = true;
         foreach (var member in members)
         {
             if (File.Exists(member.Path))
             {
-                content.Add(member.Path, File.ReadAllBytes(member.Path));
+                // Keep rollback snapshots on disk. Reading every destination into
+                // managed memory made publication allocation proportional to the
+                // size of all existing outputs.
+                var backup = AtomicFile.PrepareStaged(member.Path);
+                try
+                {
+                    File.Copy(member.Path, backup);
+                    backups.Add(member.Path, backup);
+                }
+                catch
+                {
+                    AtomicFile.TryDeleteStaged(backup);
+                    throw;
+                }
                 continue;
             }
 
@@ -620,7 +633,7 @@ internal static class Program
             complete = false;
         }
 
-        return new PreviousPublication(complete, content);
+        return new PreviousPublication(complete, backups);
     }
 
     private static void StagePublication(
@@ -673,14 +686,15 @@ internal static class Program
         IReadOnlyList<PublicationMember> members,
         PreviousPublication previous)
     {
-        var restoreMembers = members
-            .Select(member => new PublicationMember(
-                member.Path,
-                previous.Content[member.Path]))
-            .ToArray();
+        var restoreMembers = members.ToArray();
         try
         {
-            StagePublication(restoreMembers);
+            foreach (var member in restoreMembers)
+            {
+                member.Temporary = AtomicFile.PrepareStaged(member.Path);
+                File.Copy(previous.BackupPaths[member.Path], member.Temporary);
+                LinuxPathIdentity.SyncDirectory(Path.GetDirectoryName(member.Path)!);
+            }
             foreach (var member in restoreMembers)
             {
                 PublishMember(member);
@@ -760,18 +774,26 @@ internal static class Program
         internal string? Temporary { get; set; }
     }
 
-    private sealed class PreviousPublication
+    private sealed class PreviousPublication : IDisposable
     {
         internal PreviousPublication(
             bool isComplete,
-            Dictionary<string, byte[]> content)
+            Dictionary<string, string> backupPaths)
         {
             IsComplete = isComplete;
-            Content = content;
+            BackupPaths = backupPaths;
         }
 
         internal bool IsComplete { get; }
-        internal Dictionary<string, byte[]> Content { get; }
+        internal Dictionary<string, string> BackupPaths { get; }
+
+        public void Dispose()
+        {
+            foreach (var path in BackupPaths.Values)
+            {
+                AtomicFile.TryDeleteStaged(path);
+            }
+        }
     }
 
     private static Task WriteLauncherFailureAsync(
