@@ -6,6 +6,7 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Frontend;
 using SharpProof.Ir;
@@ -635,17 +636,10 @@ public sealed record GeneratedCSharpCase(
         get; init;
     }
 
-    public string Source =>
-        "#nullable enable\n" +
-        "public static class SharpProofGeneratedFrontend {\n" +
-        "    public static " +
-        ReturnType(Expression.Type) +
-        " Target(long left, long right, bool condition, string? text, long[]? values, object? reference) => " +
-        Expression.Render() +
-        ";\n" +
-        "}\n";
+    public string Source => FrontendDifferentialOracle.CreateBatchSource(
+        [this], indexedMethods: false);
 
-    private static string ReturnType(GeneratedExpressionType type)
+    internal static string ReturnType(GeneratedExpressionType type)
     {
         return type switch
         {
@@ -950,21 +944,9 @@ public sealed class FrontendDifferentialOracle
         cancellationToken.ThrowIfCancellationRequested();
 
         var source = CreateBatchSource(generatedCases);
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.CSharp12),
-            cancellationToken: cancellationToken);
-        var compilation = CSharpCompilation.Create(
-            "SharpProofFrontendFuzz",
-            [syntaxTree],
-            References.Value,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                optimizationLevel: OptimizationLevel.Release,
-                checkOverflow: true,
-                nullableContextOptions: NullableContextOptions.Enable));
-        using var image = new MemoryStream();
-        var emit = compilation.Emit(image, cancellationToken: cancellationToken);
+        var (syntaxTree, compilation, image, emit) = CompileGenerated(
+            source, "SharpProofFrontendFuzz", cancellationToken);
+        using var imageScope = image;
         if (!emit.Success)
         {
             var failure = Mismatch(
@@ -1115,21 +1097,9 @@ public sealed class FrontendDifferentialOracle
         cancellationToken.ThrowIfCancellationRequested();
 
         var source = CreateSemanticEdgeSource(cases);
-        var syntaxTree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(LanguageVersion.CSharp12),
-            cancellationToken: cancellationToken);
-        var compilation = CSharpCompilation.Create(
-            "SharpProofFrontendSemanticEdges",
-            [syntaxTree],
-            References.Value,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                optimizationLevel: OptimizationLevel.Release,
-                checkOverflow: true,
-                nullableContextOptions: NullableContextOptions.Enable));
-        using var image = new MemoryStream();
-        var emit = compilation.Emit(image, cancellationToken: cancellationToken);
+        var (syntaxTree, compilation, image, emit) = CompileGenerated(
+            source, "SharpProofFrontendSemanticEdges", cancellationToken);
+        using var imageScope = image;
         if (!emit.Success)
         {
             return IsolateSemanticEdgeFailure(
@@ -1564,8 +1534,9 @@ public sealed class FrontendDifferentialOracle
         }
     }
 
-    private static string CreateBatchSource(
-        IReadOnlyList<GeneratedCSharpCase> generatedCases)
+    internal static string CreateBatchSource(
+        IReadOnlyList<GeneratedCSharpCase> generatedCases,
+        bool indexedMethods = true)
     {
         var builder = new StringBuilder();
         builder.AppendLine("#nullable enable");
@@ -1574,9 +1545,10 @@ public sealed class FrontendDifferentialOracle
         {
             var generated = generatedCases[index];
             builder.Append("    public static ");
-            builder.Append(ReturnType(generated.Expression.Type));
+            builder.Append(GeneratedCSharpCase.ReturnType(
+                generated.Expression.Type));
             builder.Append(' ');
-            builder.Append(MethodName(index));
+            builder.Append(indexedMethods ? MethodName(index) : "Target");
             builder.Append(
                 "(long left, long right, bool condition, string? text, long[]? values, object? reference) => ");
             builder.Append(generated.Expression.Render());
@@ -1639,15 +1611,40 @@ public sealed class FrontendDifferentialOracle
             CultureInfo.InvariantCulture);
     }
 
-    private static string ReturnType(GeneratedExpressionType type)
+    private static (
+        SyntaxTree SyntaxTree,
+        CSharpCompilation Compilation,
+        MemoryStream Image,
+        EmitResult Emit) CompileGenerated(
+            string source,
+            string assemblyName,
+            CancellationToken cancellationToken)
     {
-        return type switch
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            new CSharpParseOptions(LanguageVersion.CSharp12),
+            cancellationToken: cancellationToken);
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            [syntaxTree],
+            References.Value,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release,
+                checkOverflow: true,
+                nullableContextOptions: NullableContextOptions.Enable));
+        var image = new MemoryStream();
+        try
         {
-            GeneratedExpressionType.Boolean => "bool",
-            GeneratedExpressionType.Integer => "long",
-            GeneratedExpressionType.String => "string?",
-            _ => throw new ArgumentOutOfRangeException(nameof(type))
-        };
+            var emit = compilation.Emit(
+                image, cancellationToken: cancellationToken);
+            return (syntaxTree, compilation, image, emit);
+        }
+        catch
+        {
+            image.Dispose();
+            throw;
+        }
     }
 
     private static FrontendDifferentialResult CompareOutcomes(
