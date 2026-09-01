@@ -4915,6 +4915,34 @@ public sealed class WorkerTests
         }
     }
 
+    [TestCase("rollback")]
+    [TestCase("eviction")]
+    public async Task InterruptedCacheTransactionIsRecovered(string transactionKind)
+    {
+        using var project = TestProject.Create(RefutationSource);
+        var request = project.CreateRequest(cacheEnabled: true);
+        var backend = new SpuriousModelBackend();
+        using var worker = new SharpProofWorker(backend);
+        var first = await worker.VerifyAsync(request);
+        var cacheFile = Directory.GetFiles(
+            project.CacheDirectory,
+            "*.sharp-proof-cache.json").Single();
+        var artifact = cacheFile + "." +
+            Guid.NewGuid().ToString("N") + "." + transactionKind;
+        File.Move(cacheFile, artifact);
+
+        var recovered = await worker.VerifyAsync(request);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
+            Assert.That(recovered.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
+            Assert.That(backend.CallCount, Is.EqualTo(1));
+            Assert.That(File.Exists(cacheFile), Is.True);
+            Assert.That(File.Exists(artifact), Is.False);
+        }
+    }
+
     [Test]
     public async Task CacheHitEvictsOlderEntriesUnderTheActiveByteBound()
     {

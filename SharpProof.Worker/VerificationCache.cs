@@ -40,6 +40,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         try
         {
             cacheLock = AcquireLock(_directory);
+            RecoverInterruptedTransactions(cancellationToken);
             ValidatePath(path);
             var file = new FileInfo(path);
             if (file.Length > Math.Min(
@@ -168,6 +169,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         try
         {
             cacheLock = AcquireLock(_directory);
+            RecoverInterruptedTransactions(cancellationToken);
             var payload = JsonSerializer.Serialize(new CachePayload(
                 manifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
             var envelope = new CacheEnvelope(WorkerCacheVersions.Current,
@@ -269,6 +271,84 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 cacheLock.Dispose();
             }
         }
+    }
+
+    private void RecoverInterruptedTransactions(CancellationToken cancellationToken)
+    {
+        foreach (var file in new DirectoryInfo(_directory).EnumerateFiles(
+                     "*", SearchOption.TopDirectoryOnly))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!TryGetOwnedTransactionOriginal(file.Name, out var originalName))
+            {
+                continue;
+            }
+
+            var originalPath = Path.Combine(_directory, originalName);
+            ValidatePath(file.FullName);
+            ValidatePath(originalPath);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (File.Exists(originalPath))
+            {
+                File.Delete(file.FullName);
+            }
+            else
+            {
+                File.Move(file.FullName, originalPath);
+            }
+        }
+    }
+
+    private static bool TryGetOwnedTransactionOriginal(
+        string fileName,
+        out string originalName)
+    {
+        originalName = string.Empty;
+        foreach (var suffix in new[] { ".rollback", ".eviction" })
+        {
+            if (!fileName.EndsWith(suffix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var markerLength = 1 + 32 + suffix.Length;
+            if (fileName.Length <= markerLength)
+            {
+                continue;
+            }
+
+            var markerStart = fileName.Length - markerLength;
+            if (fileName[markerStart] != '.' ||
+                !IsHexMarker(fileName, markerStart + 1))
+            {
+                continue;
+            }
+
+            var candidate = fileName[..markerStart];
+            if (IsOwnedCacheEntry(candidate))
+            {
+                originalName = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsHexDigit(char value) =>
+        value is >= '0' and <= '9' or >= 'a' and <= 'f';
+
+    private static bool IsHexMarker(string value, int start)
+    {
+        for (var index = start; index < start + 32; index++)
+        {
+            if (!IsHexDigit(value[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private bool TryStageCapacity(
