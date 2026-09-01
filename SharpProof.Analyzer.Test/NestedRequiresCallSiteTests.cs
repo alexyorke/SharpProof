@@ -443,6 +443,30 @@ public sealed class NestedRequiresCallSiteTests
     }
 
     [Test]
+    public async Task NameofReferencesDoNotReachLocalFunctions()
+    {
+        var diagnostics = await Analyze(
+            """
+            using SharpProof.Attributes;
+
+            public static class Fixture {
+                private static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+
+                public static string Outer() {
+                    return nameof(Dead);
+
+                    int Dead() => Positive(-1);
+                }
+            }
+            """);
+
+        Assert.That(diagnostics, Is.Empty);
+    }
+
+    [Test]
     public async Task GenericAndMethodGroupReferencesReachLocalFunctions()
     {
         const string source =

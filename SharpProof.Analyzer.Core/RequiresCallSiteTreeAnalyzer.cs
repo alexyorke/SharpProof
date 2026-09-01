@@ -510,6 +510,10 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             ControlFlowGraph graph,
             IOperation value)
         {
+            if (IsInsideNameOf(value))
+            {
+                return false;
+            }
             if (IsDirectDelegateRemovalOperand(value.Syntax) ||
                 IsDiscardedDelegateConversion(value.Syntax))
             {
@@ -550,6 +554,20 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             return semanticModel.GetOperation(
                 discard,
                 cancellationToken) is IDiscardOperation;
+        }
+
+        private static bool IsInsideNameOf(IOperation value)
+        {
+            for (var operation = value.Parent;
+                 operation != null;
+                 operation = operation.Parent)
+            {
+                if (operation is INameOfOperation)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private bool TryGetLocalDestination(
