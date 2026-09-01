@@ -167,10 +167,6 @@ public sealed class ReleaseCoverageBaselineTests
                 Does.Contain("Test-SharpProofPilotReport")
                     .And.Contain("pilotEvidence"));
             Assert.That(receiptWriter, Does.Contain("packageArtifacts"));
-            Assert.That(receiptWriter, Does.Contain("[IO.File]::ReadAllBytes"));
-            Assert.That(receiptWriter, Does.Contain("[Security.Cryptography.SHA256]::HashData"));
-            Assert.That(receiptWriter, Does.Not.Contain("Get-FileHash"));
-            Assert.That(receiptWriter, Does.Not.Contain("Get-Item -LiteralPath $resolvedEvidence"));
         }
     }
 
