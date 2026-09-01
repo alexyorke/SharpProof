@@ -41,11 +41,11 @@ Round one split the C# solution by project. Round two covered what that split co
 
 Genuinely dead code is rare here. Eight areas ran explicit reachability sweeps (declared-identifier frequency counts across the whole repo, excluding `artifacts/`, `bin/`, `obj/`) and found **zero** unreferenced types or methods. The real deletions are few:
 
-- **`SharpProof.Dataflow` abstract-domain arithmetic** (~95 LOC) — no production callers, and it carries filed soundness bug **BUG-453** (`BUGS.md:251`), which the deletion closes.
+- **`SharpProof.Dataflow` abstract-domain arithmetic** (~95 LOC) — no production callers. ⚠ **The original claim that this closes soundness bug BUG-453 was FABRICATED and is withdrawn** — `BUGS.md` is 48 lines and its highest entry is BUG-286; no BUG-453 exists anywhere in the repo. The deletion is still valid on the dead-code evidence alone, but it closes nothing.
 - **17 unreferenced `compose.yaml` services** (~88 LOC) — no invocation anywhere in workflows, scripts, or docs.
 - **An unreachable dispatch arm** at `ExceptionHandlerReachability.cs:1227-1245` (~19 LOC) — see the latent-bug note below.
 - **Dead locals and an unreachable `finally`** in `Test-SharpProofPackageConsumers.ps1:256-276` (~10 LOC).
-- **Two dead parameters** on `Test-SharpProofCoverage.ps1` (~20 LOC).
+- ~~Two dead parameters on `Test-SharpProofCoverage.ps1`~~ — ⛔ **REFUTED, do not apply.** `-BaselinePath` and `-ReportOnly` have six live callers in `SharpProof.ArchitectureTest/CoverageScriptTests.cs:823, :828, :883, :887, :1162, :1176` and two live behavioural branches in the script itself.
 - **An unreferenced script**, `scripts/Get-SharpProofModuleVersionId.ps1` (30 LOC) — referenced by nothing outside the git index.
 - **A degenerate single-arm `case`** wrapping 55 lines of `entrypoint.sh` (~5 LOC).
 - **Three orphaned soundness notes** in `docs/` (~157 LOC), indexed by nothing.
@@ -104,7 +104,9 @@ those tests exercise no remaining behavior.
 - **Why it's safe:** All four are pure data holders with an explicit ctor + get-only properties and no equality/`ToString` contract in play. `ContainerContractInfo` is constructed in exactly one place (`ContainerContract.cs:116`) and only read via properties; `LinuxWorkerCompletion` is constructed only at `LinuxWorkerProcess.cs:113/162/165` and consumers read only `.Kind`/`.ExitCode` (`Program.cs:250`, `LauncherArgumentTests.cs:39/65/95/154/158/233`, `WorkerProgramTests.cs:114`). `PublicationMember`/`PreviousPublication` are `private sealed` nested types used only inside `Program.cs`. None is JSON-serialized (protocol DTOs live in `ProtocolModel.generated.cs`, untouched).
 - **Proposed change:** Convert to positional records, deleting hand-written constructors and property declarations.
 
-### 2. Duplicated `ValidateForRequest` overloads in the protocol validator
+### 2. ⛔ REFUTED — Duplicated `ValidateForRequest` overloads in the protocol validator
+
+> **DO NOT APPLY AS WRITTEN.** Verified against the code: `IWorkerResponseEvidenceAuthority` is an **`internal` interface** (`SharpProof.Worker.Protocol/ResponseEvidenceAuthority.cs:8`), while the surviving `ValidateForRequest` is `public`. A public method cannot take an internal parameter type (CS0051), so the merge **does not compile**; making it compile requires demoting the method to `internal`, which removes a public API member. Separately, the launcher branch at `Program.cs:377-400` is not three ways into the same overload pair — the first arm (`:380`) calls a *different* method, `WorkerProtocolJson.Validate(response)`, when `expectedManifest`/`expectedInputHash` are null, so collapsing the branch would skip that path. Only the last two arms are genuinely mergeable. Cited line numbers are also off by ~3 (actual: `:196` and `:228`).
 - **Files:** `SharpProof.Worker.Protocol/ProtocolJson.cs:193-259`; caller branch `SharpProof.Worker.Launcher/Program.cs:377-400`
 - **Est. LOC saved:** ~45
 - **Why it's safe:** The `internal` overload (line 224) is byte-for-byte the `public` one (line 193) plus one extra `evidenceAuthority` null-check and a final argument; both end in the same `ValidateResponse(...)` call. `ValidateResponse` already declares `IWorkerResponseEvidenceAuthority? evidenceAuthority = null` (lines 313-319), so a null authority is already supported. The launcher's `if/else if/else` at `Program.cs:378-400` exists purely to pick between the two overloads with otherwise identical arguments.
@@ -235,8 +237,8 @@ those tests exercise no remaining behavior.
 ### 1. Dead abstract-domain arithmetic
 - **Files:** `SharpProof.Dataflow/SequenceCardinalityDomain.cs:136-186` (`Append`/`Concat`/`AssumeEmpty`/`AssumeNonEmpty`), `SharpProof.Dataflow/IntervalDomain.cs:170-200,269-…` (`Add`/`AddConstant`/`TryAddBounds`)
 - **Est. LOC saved:** ~95 in-area (+ ~60 of tests in `SharpProof.Dataflow.Test`)
-- **Why it's safe:** Repo-wide grep shows **zero production callers**. The only production consumers of `SequenceCardinalityDomain` are `SharpProof.Worker/SpecResultDomainProjection.cs:34` and `SharpProof.Worker/WorkerProjections.generated.cs:71-82`, which use only `Empty/NonEmpty/KnownLength/Top/Bottom`. `IntervalDomain.Add` has exactly two callers, both inside `SequenceCardinalityDomain.Append/Concat`; `AddConstant` has one (`Append`); `TryAddBounds` is private, called only from `Add`. All remaining references are tests. **`BUGS.md:251` (BUG-453) records a soundness bug that lives entirely in this dead code.**
-- **Proposed change:** Delete the seven members and the tests that exist only to exercise them. Closes BUG-453 by deletion.
+- **Why it's safe:** Repo-wide grep shows **zero production callers**. The only production consumers of `SequenceCardinalityDomain` are `SharpProof.Worker/SpecResultDomainProjection.cs:34` and `SharpProof.Worker/WorkerProjections.generated.cs:71-82`, which use only `Empty/NonEmpty/KnownLength/Top/Bottom`. `IntervalDomain.Add` has exactly two callers, both inside `SequenceCardinalityDomain.Append/Concat`; `AddConstant` has one (`Append`); `TryAddBounds` is private, called only from `Add`. All remaining references are tests. ~~`BUGS.md:251` (BUG-453) records a soundness bug that lives entirely in this dead code.~~ ⚠ **WITHDRAWN — BUG-453 does not exist** (`BUGS.md` is 48 lines; highest entry BUG-286). Independently verified. The dead-code evidence below stands; the bug-closure payoff does not.
+- **Proposed change:** Delete the seven members and the tests that exist only to exercise them. (Closes no filed bug — see above.) **Verification note:** the dead-code claim itself was independently CONFIRMED, including that `SharpProof.Projection.catalog.json:167-172`, the generator input, references only `Empty/NonEmpty/KnownLength/Top/Bottom`. One caveat found: `eng/acceptance/algorithm-size-ratchets.json:47,54` pins node/decision-point upper bounds for both files — deletion will not trip them, but the numbers go stale.
 
 ### 2. Duplicated IR child-enumeration in the SMT encoder
 - **Files:** `SharpProof.Smt/IrSmtBackend.cs:468-487` (`QueryEncoder.Children`) vs `SharpProof.Ir/IrTraversal.cs:4-21`
@@ -625,10 +627,10 @@ those tests exercise no remaining behavior.
 - **Why it's safe:** All four sites are the identical four-step sequence — `Join-Path $repositoryRoot 'artifacts/timings'`, `CreateDirectory`, `$path + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'`, `ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM`, `Move-Item -Force`. Only the payload object differs. The semantic and package tests additionally share an identical 10-line "read prior timings when `-Fast`" loop (`Invoke-SharpProofSemanticTests.ps1:141-150` = `Invoke-SharpProofPackageTests.ps1:255-264`).
 - **Proposed change:** Add `Write-SharpProofTimingEvidence -Path -Payload` and a `Get-SharpProofPriorTimingPaths -Stem -Fast` helper to the shared module.
 
-### 7. Dead parameters on the coverage validator
+### 7. ⛔ REFUTED — Dead parameters on the coverage validator
 - **Files:** `scripts/Test-SharpProofCoverage.ps1:10` (`-BaselinePath`), `:16` (`-ReportOnly`), and their uses at `:167-176`, `:227-229`, `:885`
 - **Est. LOC saved:** ~20
-- **Why it's safe:** The script's only caller in the repo is `scripts/Invoke-SharpProofContainer.ps1:490`, which splats a hashtable containing only `CoverageRoot`, `ComparisonRef`, `SummaryPath`, and conditionally `IncludeWorkingTree` (`Invoke-SharpProofContainer.ps1:481-489`). A repo-wide grep for `ReportOnly` and `BaselinePath` outside `Test-SharpProofCoverage.ps1` returns no other hits (the only `BaselinePath` matches are an unrelated local `$caseBaselinePath` in `Test-SharpProofMutationEvidence.ps1`). Nothing in `.github/`, `eng/`, `docs/`, or `compose.yaml` passes them.
+- **⛔ DO NOT APPLY. The safety claim below is false.** The original grep was scoped to `.ps1` only and missed the C# callers. `SharpProof.ArchitectureTest/CoverageScriptTests.cs` passes both parameters at **`:823, :828, :883, :887, :1162, :1176`** — six live call sites. Both are also live *inside* the script: `-ReportOnly` gates behaviour at `Test-SharpProofCoverage.ps1:227` (skipping the `ComparisonRef` requirement) and `:885` (suppressing the failure exit); `-BaselinePath` selects the baseline at `:167-177`. Deleting them breaks at least three architecture tests and silently changes report-only pass/fail semantics. *(Original, incorrect reasoning retained below for the record.)* ~~The script's only caller in the repo is `scripts/Invoke-SharpProofContainer.ps1:490`, which splats a hashtable containing only `CoverageRoot`, `ComparisonRef`, `SummaryPath`, and conditionally `IncludeWorkingTree`. A repo-wide grep for `ReportOnly` and `BaselinePath` outside `Test-SharpProofCoverage.ps1` returns no other hits~~ (the only `BaselinePath` matches are an unrelated local `$caseBaselinePath` in `Test-SharpProofMutationEvidence.ps1`). Nothing in `.github/`, `eng/`, `docs/`, or `compose.yaml` passes them.
 - **Proposed change:** Remove both parameters and inline the default baseline path; the `-ReportOnly` removal also simplifies the `ComparisonRef`-required guard at line 227 and the final failure throw at 885.
 
 ---
@@ -1831,4 +1833,57 @@ Scope: `Frontend.Test`, `Ir.Test`, `Meta.Analyzers.Test`, `Dataflow.Test`, `Summ
 - **Proposed change:** `GeneratedDomainPropertyTestsBase<TDomain, TValue>` holding the three shared tests; override the widening test per fixture.
 
 > **Nothing dead.** Targeted repo-wide greps on `Shape`, `CreateAliasedTypeReference`, `IsMonitorHeld`, `CreateUnusedBooleanModelQuery`, `IsLiveNativeObject`, `ThrowAfterOwning`, `BuildIdentitySummary`, `CreatePrintableTerm` — all have real call sites (`IsLiveNativeObject` is used once, at `IrSmtBackendTests.cs:623`). The three `ArgumentNullGuardBoundaryTests.cs` files (Ir/Dataflow/Smt) share a name but assert on disjoint APIs and share no code — **not** a consolidation candidate.
+
+---
+
+# ⚠ VERIFICATION PASS — read before acting on anything above
+
+An adversarial pass re-checked the 16 highest-risk claims in this document against the actual code, actively trying to falsify each one. **Result: 10 confirmed, 3 refuted, 3 partial.** The refuted entries have been struck in place at their original locations; this section records the evidence.
+
+**The three claims to strike before anyone works from this document:**
+
+### ⛔ REFUTED — "`Test-SharpProofCoverage.ps1` has two dead parameters"
+- **Evidence:** The original grep was scoped to `.ps1` files and missed the C# callers. `SharpProof.ArchitectureTest/CoverageScriptTests.cs` passes both at `:823, :828, :883, :887, :1162, :1176` — six live call sites. Both are also live *inside* the script: `-ReportOnly` gates behaviour at `:227` (skips the `ComparisonRef` requirement) and `:885` (suppresses the failure exit); `-BaselinePath` selects the baseline at `:167-177`.
+- **Impact if applied:** Breaks at least three architecture tests immediately and silently changes report-only pass/fail semantics. **The worst claim in the document.**
+
+### ⛔ REFUTED — "Deleting the dataflow arithmetic closes soundness bug BUG-453"
+- **Evidence:** `BUGS.md` is **48 lines**; there is no line 251. The highest entry is **BUG-286**. `grep BUG-453` across all markdown returns only this document. `grep SequenceCardinality BUGS.md` returns nothing. **Independently re-verified by the writer.**
+- **Impact if applied:** The stated payoff was fabricated. The deletion is still justified on its dead-code evidence — which **was** confirmed — but it closes nothing, and an auditor checking the change against `BUGS.md` would find a dangling reference.
+
+### ⛔ REFUTED — "Merge the duplicate `ValidateForRequest` overloads"
+- **Evidence:** `IWorkerResponseEvidenceAuthority` is an `internal interface` (`ResponseEvidenceAuthority.cs:8`); the surviving `ValidateForRequest` is `public`. A public method cannot take an internal parameter type — **CS0051, does not compile**. Making it compile requires demoting to `internal`, i.e. removing a public API member. The launcher branch at `Program.cs:377-400` is also not three ways into one overload pair: the first arm (`:380`) calls a *different* method, `WorkerProtocolJson.Validate(response)`, when `expectedManifest`/`expectedInputHash` are null.
+- **Impact if applied:** Does not compile; "fixed" naively, it drops a public API member and skips the manifest/hash-null path.
+
+## Partial — apply with the stated correction
+
+### ◐ `ProtocolJson.Deserialize<T>`'s discarded `requiredProperties`
+The discard at `:1028-1030` is **confirmed**. But the `*JsonProperties` arrays are **not test-only** as claimed — repo-wide grep finds **no test consumer at all**. They are consumed at `ProtocolJson.cs:80` and `:85` (as the discarded argument) and emitted by the generator at `scripts/Generate-ProtocolModel.ps1:675` into `ProtocolModel.generated.cs:462,465`. The removal must go through the generator; the "one test" the claim depended on does not exist.
+
+### ◐ Record/primary-constructor conversions "no equality contract in play"
+`ContainerContractInfo` (`ContainerContract.cs:8-34`) and `LinuxWorkerCompletion` (`LinuxWorkerProcess.cs:13-25`) are `public sealed class` with **`internal`** constructors. A positional record's primary constructor is **public** — so the conversion promotes an internal ctor to public and adds `Deconstruct`/`with`/value equality. **This is the exact objection this document uses to formally reject the same idea for `IrModel.generated.cs` — the document contradicts itself.** Mitigating: `SharpProof.Host.csproj:6` sets `IsPackable=false`, and no `Is.EqualTo` on the objects themselves was found (only on `.Kind`), so equality semantics really are unobserved. Cited construction site is `:144`, not `:116`.
+
+### ◐ "Byte-identical" spot-checks — content right, line numbers wrong
+`AcceptanceScriptTests.cs:260-287` vs `CoverageScriptTests.cs:1643-1670`: `diff` is **empty** — confirmed exactly as cited. `IrSmtBackend.QueryEncoder.Children` vs `IrTraversal.GetChildren`: confirmed semantically, but the range is `:482-501`, not `:468-487`. `WorkerMsBuildIntegrationTests` collision preamble: content is character-identical but `2304-2320` matches `2347-2363`/`2390-2406`, not the cited `2349-2364`/`2392-2407`. `IsSameType` duplication is real but lives at `CancellationBoundaryAnalyzer.cs:1045` and `SharpProofSoundnessAnalyzer.cs:953`, not `:1021`/`:900`.
+
+## Confirmed — safe to act on
+
+| Claim | Note |
+|---|---|
+| Dataflow `Append`/`Concat`/`AssumeEmpty`/`AssumeNonEmpty`/`Add`/`AddConstant`/`TryAddBounds` have no production callers | Also verified the generator input `SharpProof.Projection.catalog.json:167-172` references only `Empty/NonEmpty/KnownLength/Top/Bottom`. Caveat: `eng/acceptance/algorithm-size-ratchets.json:47,54` pins upper bounds for both files — deletion won't trip them, but the numbers go stale |
+| `ExceptionHandlerReachability.cs` conversion arm is unreachable | Confirmed; block is `1226-1244` (doc said 1227-1245). The latent-bug framing is right — `GetPotentialNullReceiver` for method-group conversions never runs |
+| `AnalyzerGateHost.AnalyzeAsync(string,…)` and `CreateOptions` have zero callers | Every call site passes a `Compilation`; no reflection |
+| `scripts/Get-SharpProofModuleVersionId.ps1` referenced by nothing | Only wildcard script enumeration in the repo globs `Generate-*.ps1` only |
+| 17 unreferenced `compose.yaml` services | `BuildSchedulingTests.cs:180-200,255-259` pins only `loop:` and a count of 2 `DOTNET_CLI_USE_MSBUILD_SERVER` — both in dev/loop, unaffected |
+| 3 never-built Dockerfile stages | Confirmed; the document's own blocking-dependency warning is correct — do not apply alone |
+| `Test-SharpProofPackageConsumers.ps1` unused local + unreachable `finally` | Confirmed; `Pop-Location` at `:276` must be retained |
+| `GhostProbe.TouchObject` declaration-only | Sole occurrence in the repo; no name-based reflection in the file |
+| Write-only `IrSummaryCompleteness` / `IrSummaryTermination` | Confirmed. **Unflagged caveat:** both are `public enum` on `public` properties, so this is an API-surface removal on `SharpProof.Summaries` |
+
+> ### What this pass says about the rest of the document
+> Three of sixteen high-risk claims were wrong, and the failure modes are instructive rather than random:
+> 1. **Scope-limited greps.** The worst error came from grepping only `.ps1` for a PowerShell parameter and missing six C# callers. Any "no other callers" claim in this document that did not search *all* file types should be treated as unverified.
+> 2. **Invented corroboration.** A bug ID was cited with a line number, and neither existed. Treat every external reference here — bug IDs, contract keys, line numbers — as unchecked unless this section confirms it.
+> 3. **Line numbers drift.** Four separate spot-checks found correct *content* at wrong *line numbers*. Re-locate by content, never by line number.
+>
+> The confirmed items are safe. The unexamined majority of this document has **not** been through this pass, and by extrapolation roughly one in five of its riskiest claims may not survive contact with the code. **Re-run the cited evidence before applying anything, exactly as the Validation protocol above prescribes.**
 
