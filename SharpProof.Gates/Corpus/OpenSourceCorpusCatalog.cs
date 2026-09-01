@@ -449,7 +449,7 @@ internal static class OpenSourceCorpusCatalog
 
     private static string? ResolveLink(string path)
     {
-        foreach (FileSystemInfo info in [new FileInfo(path), new DirectoryInfo(path)])
+        foreach (FileSystemInfo info in new FileSystemInfo[] { new FileInfo(path), new DirectoryInfo(path) })
         {
             try
             {
