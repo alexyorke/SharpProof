@@ -420,6 +420,46 @@ public static partial class LinuxPathIdentity
                 Path.DirectorySeparatorChar;
     }
 
+    private static Dictionary<string, LinuxStat> CaptureAncestorIdentity(
+        string[] canonicalPaths)
+    {
+        var identities = new Dictionary<string, LinuxStat>(StringComparer.Ordinal);
+        foreach (var path in canonicalPaths)
+        {
+            var current = Path.GetDirectoryName(path) ?? "/";
+            while (true)
+            {
+                if (NativeMethods.LStat(current, out var information) != 0 ||
+                    (information.Mode & FileTypeMask) != FileTypeDirectory)
+                {
+                    throw new IOException("SharpProof publication path ancestors changed during identity capture.");
+                }
+                identities[current] = information;
+                if (current == "/")
+                {
+                    break;
+                }
+                current = Path.GetDirectoryName(current) ?? "/";
+            }
+        }
+        return identities;
+    }
+
+    private static void ConfirmAncestorIdentity(
+        Dictionary<string, LinuxStat> expected)
+    {
+        foreach (var pair in expected)
+        {
+            if (NativeMethods.LStat(pair.Key, out var actual) != 0 ||
+                (actual.Mode & FileTypeMask) != FileTypeDirectory ||
+                !SameFile(pair.Value, actual))
+            {
+                throw new IOException(
+                    "SharpProof publication path ancestor identity changed while acquiring locks.");
+            }
+        }
+    }
+
     private static string PublicationLockNameForCanonicalPath(
         string canonicalPath)
     {
