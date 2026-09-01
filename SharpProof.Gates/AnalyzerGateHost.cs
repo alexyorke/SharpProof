@@ -65,7 +65,12 @@ internal static class AnalyzerGateHost
             CancellationToken cancellationToken = default)
     {
         var compilation = CreateCompilation(source);
-        ThrowIfCompilationHasErrors(compilation, cancellationToken);
+        ThrowIfCompilationHasErrors(
+            compilation,
+            int.MaxValue,
+            static errors => new InvalidOperationException(
+                "Corpus source did not compile:" + Environment.NewLine + errors),
+            cancellationToken);
         return await AnalyzeWithSemanticOutcomesAsync(
                 compilation,
                 mode,
@@ -127,22 +132,21 @@ internal static class AnalyzerGateHost
             .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
     }
 
-    private static void ThrowIfCompilationHasErrors(
+    internal static void ThrowIfCompilationHasErrors(
         Compilation compilation,
+        int limit,
+        Func<string, Exception> createException,
         CancellationToken cancellationToken)
     {
         var errors = compilation.GetDiagnostics(cancellationToken)
             .Where(static diagnostic =>
                 diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToImmutableArray();
-        if (!errors.IsDefaultOrEmpty)
+            .Take(limit)
+            .Select(static diagnostic => diagnostic.ToString())
+            .ToArray();
+        if (errors.Length != 0)
         {
-            throw new InvalidOperationException(
-                "Corpus source did not compile:" +
-                Environment.NewLine +
-                string.Join(
-                    Environment.NewLine,
-                    errors.Select(static diagnostic => diagnostic.ToString())));
+            throw createException(string.Join(Environment.NewLine, errors));
         }
     }
 

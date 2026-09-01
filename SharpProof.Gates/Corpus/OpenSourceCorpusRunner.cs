@@ -104,21 +104,13 @@ internal static class OpenSourceCorpusRunner
         var compilation = template
             .RemoveSyntaxTrees(template.SyntaxTrees)
             .AddSyntaxTrees(trees);
-        var compilerErrors = compilation.GetDiagnostics(cancellationToken)
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .Take(25)
-            .ToImmutableArray();
-        if (!compilerErrors.IsDefaultOrEmpty)
-        {
-            throw new InvalidDataException(
+        AnalyzerGateHost.ThrowIfCompilationHasErrors(
+            compilation,
+            25,
+            static errors => new InvalidDataException(
                 "The pinned OSS corpus did not compile:" +
-                Environment.NewLine +
-                string.Join(
-                    Environment.NewLine,
-                    compilerErrors.Select(static diagnostic =>
-                        diagnostic.ToString())));
-        }
+                Environment.NewLine + errors),
+            cancellationToken);
 
         var factory = new RecordingSessionFactory(targets.ToImmutable());
         var diagnostics = await AnalyzerGateHost.AnalyzeAsync(
