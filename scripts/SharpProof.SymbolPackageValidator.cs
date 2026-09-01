@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -215,6 +216,7 @@ internal static class SharpProofSymbolPackageValidator
         }
 
         using var pdbImage = CopyToMemory(pdbEntry);
+        ValidatePdbChecksum(peReader, assemblyEntry, pdbImage);
         MetadataReaderProvider provider;
         MetadataReader reader;
         try
@@ -240,6 +242,51 @@ internal static class SharpProofSymbolPackageValidator
                 codeViewEntries[0],
                 expectedSourceUrl);
         }
+    }
+
+    private static void ValidatePdbChecksum(
+        PEReader peReader,
+        ZipArchiveEntry assemblyEntry,
+        MemoryStream pdbImage)
+    {
+        var checksumEntries = peReader.ReadDebugDirectory()
+            .Where(static entry => entry.Type == DebugDirectoryEntryType.PdbChecksum)
+            .ToArray();
+        if (checksumEntries.Length != 1)
+        {
+            throw new InvalidDataException(
+                $"Assembly '{assemblyEntry.FullName}' must contain exactly one " +
+                "PDB checksum debug directory entry.");
+        }
+
+        PdbChecksumDebugDirectoryData checksum;
+        try
+        {
+            checksum = peReader.ReadPdbChecksumDebugDirectoryData(checksumEntries[0]);
+        }
+        catch (BadImageFormatException exception)
+        {
+            throw new InvalidDataException(
+                $"Assembly '{assemblyEntry.FullName}' has a malformed PDB checksum entry.",
+                exception);
+        }
+        if (!string.Equals(checksum.AlgorithmName, "SHA256", StringComparison.Ordinal) ||
+            checksum.Checksum.Length != SHA256.HashSizeInBytes)
+        {
+            throw new InvalidDataException(
+                $"Assembly '{assemblyEntry.FullName}' must use a 32-byte SHA256 " +
+                "PDB checksum.");
+        }
+
+        pdbImage.Position = 0;
+        var actual = SHA256.HashData(pdbImage);
+        if (!checksum.Checksum.AsSpan().SequenceEqual(actual))
+        {
+            throw new InvalidDataException(
+                $"Assembly '{assemblyEntry.FullName}' PDB checksum does not " +
+                "match the packaged portable PDB.");
+        }
+        pdbImage.Position = 0;
     }
 
     private static void ValidatePortablePdb(
