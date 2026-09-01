@@ -22,7 +22,7 @@ internal static class CompilerRelationalSummaryVersions
 internal static class CompilerSpecificationPackCatalogVersions
 {
     internal const int Current = 1;
-    internal const string Sha256 = "e001d50e56a0c44f4bb9aa678feac6298b3e0665585f3a228112e33da7f5b459";
+    internal const string Sha256 = "14d0e3b98982e7f19d90a90624caf95fa444f6131e7543518b3bfd7ff9198c22";
     internal const string PackIds = "dotnet.scalar";
     internal const string PackIdentities = "dotnet.scalar@1";
 }
