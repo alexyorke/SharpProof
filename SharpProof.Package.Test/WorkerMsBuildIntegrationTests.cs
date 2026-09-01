@@ -2301,23 +2301,8 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var baseline = await project.BuildAsync(verify: true);
-        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
-
-        var sourceWorker = WorkerOutputPath();
         var collisionWorker = project.CollisionWorkerPath;
-        Directory.CreateDirectory(Path.GetDirectoryName(collisionWorker)!);
-        File.Copy(sourceWorker, collisionWorker, overwrite: true);
-        foreach (var extension in new[] { ".deps.json", ".runtimeconfig.json" })
-        {
-            File.Copy(
-                Path.ChangeExtension(sourceWorker, extension),
-                Path.ChangeExtension(collisionWorker, extension),
-                overwrite: true);
-        }
-
-        var collisionCompanion = Path.ChangeExtension(
-            collisionWorker, ".deps.json");
+        var collisionCompanion = await StageCollisionWorkerAsync(project);
         var failed = await project.RunVerificationTargetAsync(
             ("_SharpProofCompilerManifestPath", project.CompilerManifestPath),
             ("SharpProofWorkerPath", collisionWorker),
@@ -2344,23 +2329,8 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var baseline = await project.BuildAsync(verify: true);
-        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
-
-        var sourceWorker = WorkerOutputPath();
         var collisionWorker = project.CollisionWorkerPath;
-        Directory.CreateDirectory(Path.GetDirectoryName(collisionWorker)!);
-        File.Copy(sourceWorker, collisionWorker, overwrite: true);
-        foreach (var extension in new[] { ".deps.json", ".runtimeconfig.json" })
-        {
-            File.Copy(
-                Path.ChangeExtension(sourceWorker, extension),
-                Path.ChangeExtension(collisionWorker, extension),
-                overwrite: true);
-        }
-
-        var collisionCompanion = Path.ChangeExtension(
-            collisionWorker, ".deps.json");
+        var collisionCompanion = await StageCollisionWorkerAsync(project);
         var expectedBytes = await File.ReadAllBytesAsync(collisionCompanion);
         var symbolicAlias = Path.Combine(
             Path.GetDirectoryName(project.ResultPath)!,
@@ -2387,23 +2357,8 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         RequireContainerWorker();
         using var project = ConsumerProject.Create(IdentitySource);
-        var baseline = await project.BuildAsync(verify: true);
-        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
-
-        var sourceWorker = WorkerOutputPath();
         var collisionWorker = project.CollisionWorkerPath;
-        Directory.CreateDirectory(Path.GetDirectoryName(collisionWorker)!);
-        File.Copy(sourceWorker, collisionWorker, overwrite: true);
-        foreach (var extension in new[] { ".deps.json", ".runtimeconfig.json" })
-        {
-            File.Copy(
-                Path.ChangeExtension(sourceWorker, extension),
-                Path.ChangeExtension(collisionWorker, extension),
-                overwrite: true);
-        }
-
-        var collisionCompanion = Path.ChangeExtension(
-            collisionWorker, ".deps.json");
+        var collisionCompanion = await StageCollisionWorkerAsync(project);
         var expectedBytes = await File.ReadAllBytesAsync(collisionCompanion);
         var hardLink = Path.Combine(
             Path.GetDirectoryName(project.ResultPath)!,
@@ -2440,6 +2395,27 @@ public sealed class WorkerMsBuildIntegrationTests
                 await File.ReadAllBytesAsync(collisionCompanion),
                 Is.EqualTo(expectedBytes));
         }
+    }
+
+    private static async Task<string> StageCollisionWorkerAsync(
+        ConsumerProject project)
+    {
+        var baseline = await project.BuildAsync(verify: true);
+        Assert.That(baseline.ExitCode, Is.Zero, baseline.Output);
+
+        var sourceWorker = WorkerOutputPath();
+        var collisionWorker = project.CollisionWorkerPath;
+        Directory.CreateDirectory(Path.GetDirectoryName(collisionWorker)!);
+        File.Copy(sourceWorker, collisionWorker, overwrite: true);
+        foreach (var extension in new[] { ".deps.json", ".runtimeconfig.json" })
+        {
+            File.Copy(
+                Path.ChangeExtension(sourceWorker, extension),
+                Path.ChangeExtension(collisionWorker, extension),
+                overwrite: true);
+        }
+
+        return Path.ChangeExtension(collisionWorker, ".deps.json");
     }
 
     [Test]
