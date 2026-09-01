@@ -290,10 +290,10 @@ $portablePropsPath = Join-Path `
     $repositoryRoot `
     'SharpProof.Package\buildTransitive\SharpProof.props'
 [xml]$portableProps = Get-Content -LiteralPath $portablePropsPath -Raw
-$portableTargetsPath = Join-Path `
+$consumerContractPath = Join-Path `
     $repositoryRoot `
-    'SharpProof.Package\buildTransitive\SharpProof.targets'
-[xml]$portableTargets = Get-Content -LiteralPath $portableTargetsPath -Raw
+    'SharpProof.Package\buildTransitive\SharpProof.ConsumerContract.props'
+[xml]$consumerContract = Get-Content -LiteralPath $consumerContractPath -Raw
 $verifierPropsPath = Join-Path `
     $repositoryRoot `
     'SharpProof.Verifier\buildTransitive\SharpProof.Verifier.props'
@@ -498,8 +498,8 @@ foreach ($assertion in @(
 }
 
 foreach ($default in @(
-        @{ Document = $portableTargets; Property = 'SharpProofProfile'; Owner = 'portable package'; Expected = $contract.analyzer.defaultProfile },
-        @{ Document = $portableTargets; Property = 'SharpProofFeatures'; Owner = 'portable package'; Expected = $contract.analyzer.defaultFeatures },
+        @{ Document = $consumerContract; Property = 'SharpProofProfile'; Owner = 'consumer contract'; Expected = $contract.analyzer.defaultProfile },
+        @{ Document = $consumerContract; Property = 'SharpProofFeatures'; Owner = 'consumer contract'; Expected = $contract.analyzer.defaultFeatures },
         @{ Document = $verifierTargets; Property = 'SharpProofVerifyPolicy'; Owner = 'verifier package'; Expected = $contract.analyzer.defaultVerifyPolicy },
         @{ Document = $verifierTargets; Property = 'SharpProofAssumptionPolicy'; Owner = 'verifier package'; Expected = $contract.analyzer.defaultAssumptionPolicy })) {
     Assert-Equal `
