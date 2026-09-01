@@ -767,16 +767,6 @@ function New-SharpProofPublicationStage {
             }
         }
 
-        # The package paths are subsequently handed to dotnet by name.  Keep
-        # the containing directory non-writable for the remainder of the
-        # publication so an atomic unlink/rename cannot swap a validated file
-        # between hashing and upload.  The files are already 0400; removing
-        # directory write permission closes the pathname replacement gap.
-        & chmod 0500 -- $stageRoot
-        if ($LASTEXITCODE -ne 0) {
-            throw 'Could not lock the private publication staging directory.'
-        }
-
         $stagedRelease = Get-ValidatedRelease `
             -Directory $stageRoot `
             -RepositoryCommit $RepositoryCommit
@@ -807,7 +797,6 @@ function New-SharpProofPublicationStage {
     }
     catch {
         if (Test-Path -LiteralPath $stageRoot -PathType Container) {
-            & chmod 0700 -- $stageRoot 2>$null
             Remove-Item -LiteralPath $stageRoot -Recurse -Force
         }
         throw
@@ -1034,7 +1023,6 @@ try {
 }
 finally {
     if (Test-Path -LiteralPath $publicationStage.Root -PathType Container) {
-        & chmod 0700 -- $publicationStage.Root 2>$null
         Remove-Item -LiteralPath $publicationStage.Root -Recurse -Force
     }
 }
