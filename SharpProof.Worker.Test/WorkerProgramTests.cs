@@ -223,6 +223,68 @@ public sealed class WorkerProgramTests
 
     [Test]
     [NonParallelizable]
+    public async Task TimeoutKillsDescendantWhenWorkerExitsDuringTerminationGrace()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            Assert.Ignore("The direct worker is supported only in the Linux container.");
+        }
+
+        var directory = Path.Combine(
+            TestContext.CurrentContext.WorkDirectory,
+            "SharpProof-worker-timeout-descendant-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var pidPath = Path.Combine(directory, "descendant.pid");
+        const string script =
+            "sleep 300 & child=$!; printf '%s\\n' \"$child\" > \"$1\"; " +
+            "trap 'exit 0' TERM; while :; do sleep 1; done";
+        LinuxWorkerProcess? worker = null;
+        var descendantPid = 0;
+        try
+        {
+            worker = LinuxWorkerProcess.Start(
+                "/bin/bash",
+                ["-c", script, "sharpproof-timeout", pidPath],
+                directory);
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => File.Exists(pidPath),
+                    TimeSpan.FromSeconds(5)),
+                Is.True);
+            Assert.That(
+                int.TryParse(await File.ReadAllTextAsync(pidPath), out descendantPid),
+                Is.True);
+
+            var completion = worker.WaitForExit(
+                TimeSpan.FromMilliseconds(100),
+                TimeSpan.FromSeconds(2));
+
+            Assert.That(completion.Kind, Is.EqualTo(LinuxWorkerCompletionKind.TimedOut));
+            Assert.That(
+                SpinWait.SpinUntil(
+                    () => !Directory.Exists($"/proc/{descendantPid}"),
+                    TimeSpan.FromSeconds(2)),
+                Is.True,
+                "The worker descendant survived timeout cleanup.");
+        }
+        finally
+        {
+            worker?.Dispose();
+            if (descendantPid > 0 && Directory.Exists($"/proc/{descendantPid}"))
+            {
+                using var descendant = Process.GetProcessById(descendantPid);
+                descendant.Kill();
+                await descendant.WaitForExitAsync();
+            }
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    [NonParallelizable]
     public async Task InvalidProjectedRequestDisposesRuntimeSnapshotBeforeReturning()
     {
         var directory = Path.Combine(

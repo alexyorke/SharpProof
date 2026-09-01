@@ -188,11 +188,13 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         {
             return false;
         }
+        var descendants = CaptureDescendants(process.Id);
         if (NativeMethods.Kill(process.Id, SignalTerminate) != 0)
         {
             if (Marshal.GetLastPInvokeError() == 3 &&
                 process.WaitForExit(0))
             {
+                KillCapturedDescendants(descendants);
                 return false;
             }
             throw NativeFailure(
@@ -224,7 +226,88 @@ public sealed partial class LinuxWorkerProcess : IDisposable
                     "The SharpProof worker did not terminate within its grace period.");
             }
         }
+        KillCapturedDescendants(descendants);
         return true;
+    }
+
+    private static List<(int ProcessId, ulong StartTime)> CaptureDescendants(
+        int rootProcessId)
+    {
+        var parentByProcess = new Dictionary<int, (int ParentId, ulong StartTime)>();
+        foreach (var directory in Directory.EnumerateDirectories("/proc"))
+        {
+            if (!int.TryParse(Path.GetFileName(directory), out var processId) ||
+                !TryReadProcessStat(processId, out var parentId, out var startTime))
+            {
+                continue;
+            }
+            parentByProcess[processId] = (parentId, startTime);
+        }
+
+        var descendants = new List<(int ProcessId, ulong StartTime)>();
+        var pending = new Queue<int>([rootProcessId]);
+        while (pending.TryDequeue(out var parentId))
+        {
+            foreach (var pair in parentByProcess)
+            {
+                if (pair.Value.ParentId != parentId)
+                {
+                    continue;
+                }
+                descendants.Add((pair.Key, pair.Value.StartTime));
+                pending.Enqueue(pair.Key);
+            }
+        }
+        return descendants;
+    }
+
+    private static void KillCapturedDescendants(
+        IReadOnlyList<(int ProcessId, ulong StartTime)> descendants)
+    {
+        foreach (var (processId, startTime) in descendants)
+        {
+            if (!TryReadProcessStat(processId, out _, out var currentStartTime) ||
+                currentStartTime != startTime)
+            {
+                continue;
+            }
+            if (NativeMethods.Kill(processId, SignalKill) != 0 &&
+                Marshal.GetLastPInvokeError() != 3)
+            {
+                throw NativeFailure(
+                    "SharpProof could not terminate a worker descendant.");
+            }
+        }
+    }
+
+    private static bool TryReadProcessStat(
+        int processId,
+        out int parentId,
+        out ulong startTime)
+    {
+        parentId = 0;
+        startTime = 0;
+        try
+        {
+            var stat = File.ReadAllText($"/proc/{processId}/stat");
+            var closeName = stat.LastIndexOf(')');
+            if (closeName < 0)
+            {
+                return false;
+            }
+            var fields = stat[(closeName + 2)..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return fields.Length > 19 &&
+                int.TryParse(fields[1], out parentId) &&
+                ulong.TryParse(fields[19], out startTime);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static void TerminateNow(Process process)
