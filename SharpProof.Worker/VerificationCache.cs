@@ -272,7 +272,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             if (!ownershipTransferred)
             {
                 cacheLock?.Dispose();
-                mutex.ReleaseMutex();
+                mutex.Release();
                 mutex.Dispose();
             }
         }
@@ -283,7 +283,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         public void Dispose()
         {
             file.Dispose();
-            mutex.ReleaseMutex();
+            mutex.Release();
             mutex.Dispose();
         }
     }
