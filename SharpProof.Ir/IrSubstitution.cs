@@ -66,44 +66,14 @@ public static class IrSubstitution
         Dictionary<IrVarId, IrTerm> replacements,
         Dictionary<IrId, IrTerm> memo)
     {
-        var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
-        pending.Push((root, false));
-        while (pending.Count != 0)
-        {
-            var (term, childrenReady) = pending.Pop();
-            if (memo.ContainsKey(term.Id))
-            {
-                continue;
-            }
-
-            if (term is IrVariableTerm variable &&
-                replacements.TryGetValue(variable.Variable, out var replacement))
-            {
-                memo.Add(term.Id, replacement);
-                continue;
-            }
-
-            var children = IrTraversal.GetChildren(term);
-            if (!childrenReady && children.Length != 0)
-            {
-                // Re-queue below the children so every child is rewritten by the
-                // time this term is popped again.
-                pending.Push((term, true));
-                foreach (var child in children)
-                {
-                    if (!memo.ContainsKey(child.Id))
-                    {
-                        pending.Push((child, false));
-                    }
-                }
-
-                continue;
-            }
-
-            memo.Add(term.Id, RewriteNode(factory, term, memo));
-        }
-
-        return memo[root.Id];
+        return IrTraversal.FoldBottomUp(
+            root,
+            memo,
+            (term, rewritten) => RewriteNode(factory, term, rewritten),
+            term => term is IrVariableTerm variable &&
+                replacements.TryGetValue(variable.Variable, out var replacement)
+                    ? (true, replacement)
+                    : (false, null!));
     }
 
     private static IrTerm RewriteNode(

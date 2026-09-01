@@ -144,40 +144,17 @@ public static class IrTermAnalysis
     {
         ArgumentNullGuard.NotNull(root, nameof(root));
         ArgumentNullGuard.NotNull(memo, nameof(memo));
-        var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
-        pending.Push((root, false));
-        while (pending.Count != 0)
-        {
-            var (term, childrenReady) = pending.Pop();
-            if (memo.ContainsKey(term.Id))
+        return IrTraversal.FoldBottomUp(
+            root,
+            memo,
+            static (term, depths) =>
             {
-                continue;
-            }
-
-            var children = IrTraversal.GetChildren(term);
-            if (!childrenReady && children.Length != 0)
-            {
-                pending.Push((term, true));
-                foreach (var child in children)
+                var depth = 1;
+                foreach (var child in IrTraversal.GetChildren(term))
                 {
-                    if (!memo.ContainsKey(child.Id))
-                    {
-                        pending.Push((child, false));
-                    }
+                    depth = Math.Max(depth, 1 + depths[child.Id]);
                 }
-
-                continue;
-            }
-
-            var depth = 1;
-            foreach (var child in children)
-            {
-                depth = Math.Max(depth, 1 + memo[child.Id]);
-            }
-
-            memo.Add(term.Id, depth);
-        }
-
-        return memo[root.Id];
+                return depth;
+            });
     }
 }
