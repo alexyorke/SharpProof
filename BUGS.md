@@ -9,9 +9,8 @@ Priority definitions:
 - **P2 - Medium:** Usually fails closed or causes false positives, incomplete diagnostics, bounded reliability problems, or narrower correctness errors.
 - **P3 - Low:** Minor precision, canonicalization, test, documentation, or low-impact operational issue.
 
-## P0 - Critical (2)
+## P0 - Critical (1)
 
-- **BUG-108 [P0] - Portable member semantic IDs are not bound during canonical decoding:** PortableIrGraphCodec restores artifact-supplied documentation IDs after canonical re-encoding instead of binding them to declaring type, name, and signature. A shape-compatible call can impersonate an approved API and receive its specification, yielding an unsound proof.
 - **BUG-146 [P0] - Source-location authority is not bound to claim ownership:** CompilerManifestArtifact validates owner and location pairs against mutable manifest rows and source geometry but never independently binds a predicate or callable to that span. Resealed evidence can report a verified claim at another valid source location while passing authority checks.
 
 ## P1 - High (25)
