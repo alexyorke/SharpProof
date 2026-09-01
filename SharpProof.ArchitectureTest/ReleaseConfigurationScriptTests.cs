@@ -10,7 +10,7 @@ public sealed class ReleaseConfigurationScriptTests
     public async Task EffectiveReleaseRefSetsMustEqualTheContract()
     {
         var script = Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Test-SharpProofReleaseConfigurationFixtures.ps1");
         var start = new ProcessStartInfo
@@ -37,17 +37,4 @@ public sealed class ReleaseConfigurationScriptTests
             (await output) + Environment.NewLine + await error);
     }
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("Repository root not found.");
-    }
 }

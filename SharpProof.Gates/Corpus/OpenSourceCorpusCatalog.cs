@@ -263,10 +263,7 @@ internal static class OpenSourceCorpusCatalog
             }
         }
 
-        var sourceFileCount = document.Methods
-            .Select(static method => $"{method.SourceId}|{method.Path}")
-            .Distinct(StringComparer.Ordinal)
-            .Count();
+        var sourceFileCount = CountSourceFiles(document.Methods);
         if (sourceFileCount < MinimumSourceFileCount)
         {
             throw new InvalidDataException(
@@ -458,12 +455,6 @@ internal static class OpenSourceCorpusCatalog
                 {
                     return target.FullName;
                 }
-            }
-            catch (FileNotFoundException)
-            {
-            }
-            catch (DirectoryNotFoundException)
-            {
             }
             catch (IOException)
             {

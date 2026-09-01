@@ -211,7 +211,7 @@ public static class CompilerIdentityBridge
         return prefix + "/" + symbol.Kind + ":" + symbol.MetadataName;
     }
 
-    private sealed class OperationReferenceComparer : IEqualityComparer<IOperation>
+    internal sealed class OperationReferenceComparer : IEqualityComparer<IOperation>
     {
         internal static OperationReferenceComparer Instance { get; } = new();
 

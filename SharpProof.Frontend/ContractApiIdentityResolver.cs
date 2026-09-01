@@ -390,8 +390,14 @@ internal sealed class ContractApiIdentityResolver
         HasSingleClause(contract, ContractApiMetadata.RequiresMethodName) &&
         HasSingleClause(contract, ContractApiMetadata.EnsuresMethodName) &&
         HasSingleClause(contract, ContractApiMetadata.AssumeMethodName) &&
-        HasSingleResult(contract) &&
-        HasSingleOld(contract);
+        HasSingleGenericIdentityMethod(
+            contract,
+            ContractApiMetadata.ResultMethodName,
+            parameterCount: 0) &&
+        HasSingleGenericIdentityMethod(
+            contract,
+            ContractApiMetadata.OldMethodName,
+            parameterCount: 1);
     }
 
     private bool HasSingleClause(
@@ -459,10 +465,13 @@ internal sealed class ContractApiIdentityResolver
             };
     }
 
-    private static bool HasSingleResult(INamedTypeSymbol contract)
+    private static bool HasSingleGenericIdentityMethod(
+        INamedTypeSymbol contract,
+        string name,
+        int parameterCount)
     {
         var members = contract
-            .GetMembers(ContractApiMetadata.ResultMethodName)
+            .GetMembers(name)
             .OfType<IMethodSymbol>()
             .ToImmutableArray();
         return members.Length == 1 &&
@@ -472,47 +481,24 @@ internal sealed class ContractApiIdentityResolver
                 DeclaredAccessibility: Accessibility.Public,
                 IsStatic: true,
                 Arity: 1,
-                Parameters.Length: 0,
                 ReturnsByRef: false,
                 ReturnsByRefReadonly: false
             } method &&
+            method.Parameters.Length == parameterCount &&
             HasUnconstrainedTypeParameter(method.TypeParameters[0]) &&
             SymbolEqualityComparer.Default.Equals(
                 method.ReturnType,
-                method.TypeParameters[0]);
-    }
-
-    private static bool HasSingleOld(INamedTypeSymbol contract)
-    {
-        var members = contract
-            .GetMembers(ContractApiMetadata.OldMethodName)
-            .OfType<IMethodSymbol>()
-            .ToImmutableArray();
-        return members.Length == 1 &&
-            members[0] is
-            {
-                MethodKind: MethodKind.Ordinary,
-                DeclaredAccessibility: Accessibility.Public,
-                IsStatic: true,
-                Arity: 1,
-                ReturnsByRef: false,
-                ReturnsByRefReadonly: false
-            } method &&
-            method.Parameters.Length == 1 &&
-            method.Parameters[0] is
+                method.TypeParameters[0]) &&
+            (parameterCount == 0 || method.Parameters[0] is
             {
                 RefKind: RefKind.None,
                 ScopedKind: ScopedKind.None,
                 IsParams: false,
                 IsOptional: false
             } parameter &&
-            HasUnconstrainedTypeParameter(method.TypeParameters[0]) &&
-            SymbolEqualityComparer.Default.Equals(
-                method.ReturnType,
-                method.TypeParameters[0]) &&
             SymbolEqualityComparer.Default.Equals(
                 parameter.Type,
-                method.TypeParameters[0]);
+                method.TypeParameters[0]));
     }
 
     private static bool HasUnconstrainedTypeParameter(

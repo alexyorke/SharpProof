@@ -6222,7 +6222,7 @@ public sealed class WorkerTests
     public void AcceptanceContractMatchesWorkerDefaults()
     {
         var contractPath = Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "eng",
             "acceptance",
             "contract.json");
@@ -7120,24 +7120,6 @@ public sealed class WorkerTests
                 response.InputHash,
                 response.Manifest,
                 authority).Errors.Select(static error => error.Code));
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(
-                    directory.FullName,
-                    "SharpProof.Release.props")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Repository root was not found.");
     }
 
     private static void SetDeclaredMaxStack(

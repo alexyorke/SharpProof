@@ -74,7 +74,7 @@ public sealed class GeneratedFileHelperTests
                 "-File",
                 probe,
                 "-Helper",
-                Path.Combine(RepositoryRoot(), "scripts", "GeneratedFileHelpers.ps1"),
+                Path.Combine(TestRepository.FindRoot(), "scripts", "GeneratedFileHelpers.ps1"),
                 "-Output",
                 output
             })
@@ -101,7 +101,7 @@ public sealed class GeneratedFileHelperTests
     public async Task GeneratedUpdatesUseAtomicSameDirectoryReplacement()
     {
         var source = await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "GeneratedFileHelpers.ps1"));
         var start = source.IndexOf(
@@ -117,19 +117,4 @@ public sealed class GeneratedFileHelperTests
         Assert.That(body, Does.Not.Contain("[System.IO.File]::WriteAllText("));
     }
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the repository root.");
-    }
 }

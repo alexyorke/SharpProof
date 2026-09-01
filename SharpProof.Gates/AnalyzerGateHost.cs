@@ -58,34 +58,6 @@ internal static class AnalyzerGateHost
             options);
     }
 
-    internal static Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
-        string source,
-        string? mode,
-        CancellationToken cancellationToken = default)
-    {
-        var compilation = CreateCompilation(source);
-        var errors = compilation.GetDiagnostics(cancellationToken)
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToImmutableArray();
-        if (!errors.IsDefaultOrEmpty)
-        {
-            throw new InvalidOperationException(
-                "Corpus source did not compile:" +
-                Environment.NewLine +
-                string.Join(
-                    Environment.NewLine,
-                    errors.Select(static diagnostic => diagnostic.ToString())));
-        }
-
-        return AnalyzeAsync(
-            compilation,
-            new SharpProofAnalyzer(),
-            mode,
-            concurrentAnalysis: true,
-            cancellationToken);
-    }
-
     internal static async Task<AnalyzerGateAnalysis>
         AnalyzeWithSemanticOutcomesAsync(
             string source,
@@ -153,18 +125,6 @@ internal static class AnalyzerGateHost
                 .ConfigureAwait(false))
             .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
             .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
-    }
-
-    internal static AnalyzerOptions CreateOptions(string? mode)
-    {
-        var values = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
-        if (mode != null)
-        {
-            values.Add("sharpproof_features", mode);
-        }
-
-        return new AnalyzerOptions([], new GateOptionsProvider(values));
     }
 
     private static void ThrowIfCompilationHasErrors(

@@ -51,7 +51,9 @@ public sealed class FiniteDomainSmtDifferentialOracle
                 nameof(formula));
         }
 
-        var variables = CollectVariables(formula);
+        var variables = IrTermAnalysis.CollectVariables(formula)
+            .OrderBy(static variable => variable.Value)
+            .ToImmutableArray();
         if (!TryGetFiniteDomainAssignmentCount(
                 factory,
                 variables,
@@ -143,7 +145,9 @@ public sealed class FiniteDomainSmtDifferentialOracle
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var variables = CollectVariables(formula);
+        var variables = IrTermAnalysis.CollectVariables(formula)
+            .OrderBy(static variable => variable.Value)
+            .ToImmutableArray();
         if (!TryGetFiniteDomainAssignmentCount(
                 factory,
                 variables,
@@ -411,62 +415,6 @@ public sealed class FiniteDomainSmtDifferentialOracle
         return result;
     }
 
-    private static ImmutableArray<IrVarId> CollectVariables(IrTerm root)
-    {
-        var variables = new SortedDictionary<int, IrVarId>();
-        var seen = new HashSet<IrId>();
-        Visit(root);
-        return [.. variables.Values];
-
-        void Visit(IrTerm term)
-        {
-            if (!seen.Add(term.Id))
-            {
-                return;
-            }
-
-            switch (term)
-            {
-                case IrVariableTerm variable:
-                    variables[variable.Variable.Value] = variable.Variable;
-                    break;
-                case IrOpaqueTerm opaque:
-                    if (opaque.Receiver != null)
-                    {
-                        Visit(opaque.Receiver);
-                    }
-
-                    foreach (var argument in opaque.Arguments)
-                    {
-                        Visit(argument);
-                    }
-
-                    break;
-                case IrUnaryTerm unary:
-                    Visit(unary.Operand);
-                    break;
-                case IrBinaryTerm binary:
-                    Visit(binary.Left);
-                    Visit(binary.Right);
-                    break;
-                case IrConditionalTerm conditional:
-                    Visit(conditional.Condition);
-                    Visit(conditional.WhenTrue);
-                    Visit(conditional.WhenFalse);
-                    break;
-                case IrCastTerm cast:
-                    Visit(cast.Operand);
-                    break;
-                case IrLengthTerm length:
-                    Visit(length.Value);
-                    break;
-                case IrSequenceAccessTerm access:
-                    Visit(access.Sequence);
-                    Visit(access.Index);
-                    break;
-            }
-        }
-    }
 }
 
 public static class IrStructuralShrinker

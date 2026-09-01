@@ -716,7 +716,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
         var startInfo = new ProcessStartInfo
         {
             FileName = "pwsh",
-            WorkingDirectory = RepositoryRoot(),
+            WorkingDirectory = TestRepository.FindRoot(),
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -745,7 +745,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
     private static string CatalogPath()
     {
         return Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Specs",
             "DefaultApiSpecCatalog.json");
     }
@@ -753,29 +753,9 @@ public sealed class DefaultApiSpecCatalogGenerationTests
     private static string GeneratorPath()
     {
         return Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Generate-ApiSpecCatalog.ps1");
-    }
-
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(
-            TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(
-                    Path.Combine(
-                        directory.FullName,
-                        "SharpProof.Release.props")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "The repository root was not found.");
     }
 
     private readonly record struct GeneratorResult(

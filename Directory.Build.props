@@ -23,6 +23,12 @@
     <SharpProofTestProject Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectName)', 'Test$'))">true</SharpProofTestProject>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(SharpProofTestProject)' == 'true'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
   <PropertyGroup>
     <SharpProofProductionProject Condition="
       '$(MSBuildProjectName)' == 'SharpProof.Analyzer' Or
@@ -77,6 +83,14 @@
     -->
     <Compile Include="$(MSBuildThisFileDirectory)SharpProof.Ir\IrIdentifierAliases.cs"
              Link="IrIdentifierAliases.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(SharpProofTestProject)' == 'true'">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit3TestAdapter" />
+    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestRepository.cs"
+             Link="TestRepository.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(SharpProofProductionProject)' == 'true'">

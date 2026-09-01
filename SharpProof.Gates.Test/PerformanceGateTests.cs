@@ -1033,31 +1033,8 @@ public sealed class PerformanceGateTests
     private static Task<double> RunPerformanceProbeDotnetAsync(
         string project,
         bool restore,
-        string? symbol)
-    {
-        var method = typeof(PerformanceGate).GetMethod(
-            "RunDotnetAsync",
-            BindingFlags.NonPublic | BindingFlags.Static,
-            binder: null,
-            [
-                typeof(string),
-                typeof(bool),
-                typeof(string),
-                typeof(CancellationToken)
-            ],
-            modifiers: null) ??
-            throw new InvalidOperationException(
-                "Could not find the package performance process runner.");
-        return (Task<double>)method.Invoke(
-            null,
-            [project, restore, symbol, CancellationToken.None])!;
-    }
-
-    private static Task<double> RunPerformanceProbeDotnetAsync(
-        string project,
-        bool restore,
         string? symbol,
-        TimeSpan timeout)
+        TimeSpan? timeout = null)
     {
         var method = typeof(PerformanceGate).GetMethod(
             "RunDotnetAsync",
@@ -1076,6 +1053,7 @@ public sealed class PerformanceGateTests
                 "process runner.");
         return (Task<double>)method.Invoke(
             null,
-            [project, restore, symbol, timeout, CancellationToken.None])!;
+            [project, restore, symbol, timeout ?? TimeSpan.FromMinutes(2),
+                CancellationToken.None])!;
     }
 }

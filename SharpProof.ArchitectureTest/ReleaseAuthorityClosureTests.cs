@@ -11,7 +11,7 @@ public sealed class ReleaseAuthorityClosureTests
     public async Task ReleaseAuthorityClosureIsIndependentAndMutationDiscriminating(
         string scriptName)
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var start = new ProcessStartInfo("pwsh")
         {
             UseShellExecute = false,
@@ -30,17 +30,4 @@ public sealed class ReleaseAuthorityClosureTests
             (await output) + Environment.NewLine + await error);
     }
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("Repository root not found.");
-    }
 }

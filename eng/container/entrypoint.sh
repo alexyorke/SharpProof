@@ -109,8 +109,6 @@ if requires_clean_exact_commit_source "${command_name}"; then
   assert_clean_exact_commit_source
 fi
 
-case "${command_name}" in
-  *)
     task_root="$(mktemp -d /tmp/sharpproof-task.XXXXXXXX)"
     mkdir -p "${repo_root}/artifacts"
     if [[ "${source_has_git}" = "true" ]]; then
@@ -176,5 +174,3 @@ case "${command_name}" in
     cd "${task_root}"
     exec pwsh -NoLogo -NoProfile -File ./scripts/Invoke-SharpProofContainer.ps1 \
       -Command "${command_name}" "$@"
-    ;;
-esac

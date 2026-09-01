@@ -217,7 +217,8 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         }
         finally
         {
-            AddResourceCount(meter.Consumed);
+            _consumedResourceCount = checked(
+                _consumedResourceCount + meter.Consumed);
         }
     }
 
@@ -271,11 +272,6 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         {
             parameters.Add(name, value);
         }
-    }
-
-    private void AddResourceCount(long observed)
-    {
-        _consumedResourceCount = checked(_consumedResourceCount + observed);
     }
 
     private static BackendCheckResult CreateUnsatisfiable(
@@ -433,11 +429,11 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 Expr expression;
                 if (type == _factory.BooleanType)
                 {
-                    expression = Own(_context.MkBoolConst(name));
+                    expression = _owner.Own(_context.MkBoolConst(name));
                 }
                 else if (type == _factory.IntegerType)
                 {
-                    expression = Own(_context.MkIntConst(name));
+                    expression = _owner.Own(_context.MkIntConst(name));
                 }
                 else
                 {
@@ -472,32 +468,11 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                     continue;
                 }
                 maximumDepths[term.Id] = depth;
-                foreach (var child in Children(term))
+                foreach (var child in IrTraversal.GetChildren(term))
                 {
                     pending.Push((child, depth + 1));
                 }
             }
-        }
-
-        private static ImmutableArray<IrTerm> Children(IrTerm term)
-        {
-            return term switch
-            {
-                IrOpaqueTerm opaque => [.. opaque.Receiver == null
-                    ? opaque.Arguments
-                    : opaque.Arguments.Insert(0, opaque.Receiver)],
-                IrUnaryTerm unary => [unary.Operand],
-                IrBinaryTerm binary => [binary.Left, binary.Right],
-                IrConditionalTerm conditional => [
-                    conditional.Condition,
-                    conditional.WhenTrue,
-                    conditional.WhenFalse
-                ],
-                IrCastTerm cast => [cast.Operand],
-                IrLengthTerm length => [length.Value],
-                IrSequenceAccessTerm access => [access.Sequence, access.Index],
-                _ => []
-            };
         }
 
         internal ImmutableArray<IrVarId> Variables
@@ -507,12 +482,6 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         internal ImmutableArray<IrVarId> IntegerVariables
         {
             get;
-        }
-
-        private T Own<T>(T expression)
-            where T : Expr
-        {
-            return _owner.Own(expression);
         }
 
         internal Expr GetVariable(IrVarId variable)
@@ -543,8 +512,8 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             var encoded = term switch
             {
                 IrBooleanTerm boolean => Defined(
-                    Own(boolean.Value ? _context.MkTrue() : _context.MkFalse())),
-                IrIntegerTerm integer => Defined(Own(_context.MkInt(integer.Value))),
+                    _owner.Own(boolean.Value ? _context.MkTrue() : _context.MkFalse())),
+                IrIntegerTerm integer => Defined(_owner.Own(_context.MkInt(integer.Value))),
                 IrStringTerm text => EncodeString(text),
                 IrVariableTerm variable => Defined(GetVariable(variable.Variable)),
                 IrUnaryTerm unary => EncodeUnary(unary),
@@ -568,7 +537,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 throw new UnsupportedIrEncodingException();
             }
 
-            return Defined(Own(_context.MkString(value)));
+            return Defined(_owner.Own(_context.MkString(value)));
         }
 
         private EncodedValue EncodeUnary(IrUnaryTerm unary)
@@ -577,9 +546,9 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             return unary.Operator switch
             {
                 IrUnaryOperator.Not when operand.Value is BoolExpr boolean =>
-                    new EncodedValue(Own(_context.MkNot(boolean)), operand.Defined),
+                    new EncodedValue(_owner.Own(_context.MkNot(boolean)), operand.Defined),
                 IrUnaryOperator.Negate when operand.Value is ArithExpr integer =>
-                    Bounded(Own(_context.MkUnaryMinus(integer)), operand.Defined),
+                    Bounded(_owner.Own(_context.MkUnaryMinus(integer)), operand.Defined),
                 _ => throw new UnsupportedIrEncodingException()
             };
         }
@@ -604,11 +573,11 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 left.Value is BoolExpr leftBoolean &&
                 right.Value is BoolExpr rightBoolean)
             {
-                var value = Own(_context.MkAnd(leftBoolean, rightBoolean));
-                var shortCircuitDefined = Own(_context.MkAnd(
+                var value = _owner.Own(_context.MkAnd(leftBoolean, rightBoolean));
+                var shortCircuitDefined = _owner.Own(_context.MkAnd(
                     left.Defined,
-                    Own(_context.MkOr(
-                        Own(_context.MkNot(leftBoolean)),
+                    _owner.Own(_context.MkOr(
+                        _owner.Own(_context.MkNot(leftBoolean)),
                         right.Defined))));
                 return new EncodedValue(value, shortCircuitDefined);
             }
@@ -617,28 +586,28 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 left.Value is BoolExpr leftOrBoolean &&
                 right.Value is BoolExpr rightOrBoolean)
             {
-                var value = Own(_context.MkOr(leftOrBoolean, rightOrBoolean));
-                var shortCircuitDefined = Own(_context.MkAnd(
+                var value = _owner.Own(_context.MkOr(leftOrBoolean, rightOrBoolean));
+                var shortCircuitDefined = _owner.Own(_context.MkAnd(
                     left.Defined,
-                    Own(_context.MkOr(leftOrBoolean, right.Defined))));
+                    _owner.Own(_context.MkOr(leftOrBoolean, right.Defined))));
                 return new EncodedValue(value, shortCircuitDefined);
             }
 
-            var defined = Own(_context.MkAnd(left.Defined, right.Defined));
+            var defined = _owner.Own(_context.MkAnd(left.Defined, right.Defined));
             return binary.Operator switch
             {
-                IrBinaryOperator.Add => Bounded(Own(_context.MkAdd(Integer(left), Integer(right))), defined),
-                IrBinaryOperator.Subtract => Bounded(Own(_context.MkSub(Integer(left), Integer(right))), defined),
-                IrBinaryOperator.Multiply => Bounded(Own(_context.MkMul(Integer(left), Integer(right))), defined),
+                IrBinaryOperator.Add => Bounded(_owner.Own(_context.MkAdd(Integer(left), Integer(right))), defined),
+                IrBinaryOperator.Subtract => Bounded(_owner.Own(_context.MkSub(Integer(left), Integer(right))), defined),
+                IrBinaryOperator.Multiply => Bounded(_owner.Own(_context.MkMul(Integer(left), Integer(right))), defined),
                 IrBinaryOperator.Divide or IrBinaryOperator.Remainder =>
                     EncodeDivision(binary.Operator, left, right, defined),
-                IrBinaryOperator.Equal => new EncodedValue(Own(_context.MkEq(left.Value, right.Value)), defined),
+                IrBinaryOperator.Equal => new EncodedValue(_owner.Own(_context.MkEq(left.Value, right.Value)), defined),
                 IrBinaryOperator.NotEqual => new EncodedValue(
-                    Own(_context.MkNot(Own(_context.MkEq(left.Value, right.Value)))), defined),
-                IrBinaryOperator.LessThan => Comparison(Own(_context.MkLt(Integer(left), Integer(right))), defined),
-                IrBinaryOperator.LessThanOrEqual => Comparison(Own(_context.MkLe(Integer(left), Integer(right))), defined),
-                IrBinaryOperator.GreaterThan => Comparison(Own(_context.MkGt(Integer(left), Integer(right))), defined),
-                IrBinaryOperator.GreaterThanOrEqual => Comparison(Own(_context.MkGe(Integer(left), Integer(right))), defined),
+                    _owner.Own(_context.MkNot(_owner.Own(_context.MkEq(left.Value, right.Value)))), defined),
+                IrBinaryOperator.LessThan => new EncodedValue(_owner.Own(_context.MkLt(Integer(left), Integer(right))), defined),
+                IrBinaryOperator.LessThanOrEqual => new EncodedValue(_owner.Own(_context.MkLe(Integer(left), Integer(right))), defined),
+                IrBinaryOperator.GreaterThan => new EncodedValue(_owner.Own(_context.MkGt(Integer(left), Integer(right))), defined),
+                IrBinaryOperator.GreaterThanOrEqual => new EncodedValue(_owner.Own(_context.MkGe(Integer(left), Integer(right))), defined),
                 _ => throw new UnsupportedIrEncodingException()
             };
         }
@@ -652,11 +621,11 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             var quotient = DivideTowardZero(leftInteger, rightInteger);
             var result = @operator == IrBinaryOperator.Divide
                 ? quotient
-                : Own(_context.MkSub(
+                : _owner.Own(_context.MkSub(
                     leftInteger,
-                    Own(_context.MkMul(quotient, rightInteger))));
+                    _owner.Own(_context.MkMul(quotient, rightInteger))));
             return Bounded(result,
-                Own(_context.MkAnd(defined, DivisionDefined(leftInteger, rightInteger))));
+                _owner.Own(_context.MkAnd(defined, DivisionDefined(leftInteger, rightInteger))));
         }
 
         private EncodedValue EncodeConditional(IrConditionalTerm conditional)
@@ -680,15 +649,15 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 throw new UnsupportedIrEncodingException();
             }
 
-            var value = Own(_context.MkITE(
+            var value = _owner.Own(_context.MkITE(
                 condition.Value,
                 whenTrue.Value,
                 whenFalse.Value));
-            var branchDefined = (BoolExpr)Own(_context.MkITE(
+            var branchDefined = (BoolExpr)_owner.Own(_context.MkITE(
                 condition.Value,
                 whenTrue.Defined,
                 whenFalse.Defined));
-            var defined = Own(_context.MkAnd(condition.Defined, branchDefined));
+            var defined = _owner.Own(_context.MkAnd(condition.Defined, branchDefined));
             return new EncodedValue(value, defined);
         }
 
@@ -705,31 +674,26 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 throw new UnsupportedIrEncodingException();
             }
 
-            return Bounded(Own(_context.MkLength(sequence)), value.Defined);
+            return Bounded(_owner.Own(_context.MkLength(sequence)), value.Defined);
         }
 
         private EncodedValue Defined(Expr expression)
         {
-            return new(expression, Own(_context.MkTrue()));
+            return new(expression, _owner.Own(_context.MkTrue()));
         }
 
         private EncodedValue Bounded(ArithExpr expression, BoolExpr defined)
         {
-            var lowerBound = Own(_context.MkGe(
+            var lowerBound = _owner.Own(_context.MkGe(
                 expression,
-                Own(_context.MkInt(long.MinValue))));
-            var upperBound = Own(_context.MkLe(
+                _owner.Own(_context.MkInt(long.MinValue))));
+            var upperBound = _owner.Own(_context.MkLe(
                 expression,
-                Own(_context.MkInt(long.MaxValue))));
-            return new(expression, Own(_context.MkAnd(
+                _owner.Own(_context.MkInt(long.MaxValue))));
+            return new(expression, _owner.Own(_context.MkAnd(
                 defined,
                 lowerBound,
                 upperBound)));
-        }
-
-        private static EncodedValue Comparison(BoolExpr expression, BoolExpr defined)
-        {
-            return new(expression, defined);
         }
 
         private static ArithExpr Integer(EncodedValue value)
@@ -739,38 +703,38 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
         private ArithExpr DivideTowardZero(ArithExpr left, ArithExpr right)
         {
-            var zero = Own(_context.MkInt(0));
-            var leftMagnitude = (ArithExpr)Own(_context.MkITE(
-                Own(_context.MkGe(left, zero)),
+            var zero = _owner.Own(_context.MkInt(0));
+            var leftMagnitude = (ArithExpr)_owner.Own(_context.MkITE(
+                _owner.Own(_context.MkGe(left, zero)),
                 left,
-                Own(_context.MkUnaryMinus(left))));
-            var rightMagnitude = (ArithExpr)Own(_context.MkITE(
-                Own(_context.MkGe(right, zero)),
+                _owner.Own(_context.MkUnaryMinus(left))));
+            var rightMagnitude = (ArithExpr)_owner.Own(_context.MkITE(
+                _owner.Own(_context.MkGe(right, zero)),
                 right,
-                Own(_context.MkUnaryMinus(right))));
-            var magnitude = Own(_context.MkDiv(leftMagnitude, rightMagnitude));
-            var signsDiffer = Own(_context.MkXor(
-                Own(_context.MkLt(left, zero)),
-                Own(_context.MkLt(right, zero))));
-            return (ArithExpr)Own(_context.MkITE(
+                _owner.Own(_context.MkUnaryMinus(right))));
+            var magnitude = _owner.Own(_context.MkDiv(leftMagnitude, rightMagnitude));
+            var signsDiffer = _owner.Own(_context.MkXor(
+                _owner.Own(_context.MkLt(left, zero)),
+                _owner.Own(_context.MkLt(right, zero))));
+            return (ArithExpr)_owner.Own(_context.MkITE(
                 signsDiffer,
-                Own(_context.MkUnaryMinus(magnitude)),
+                _owner.Own(_context.MkUnaryMinus(magnitude)),
                 magnitude));
         }
 
         private BoolExpr DivisionDefined(ArithExpr left, ArithExpr right)
         {
-            var nonzero = Own(_context.MkNot(Own(_context.MkEq(
+            var nonzero = _owner.Own(_context.MkNot(_owner.Own(_context.MkEq(
                 right,
-                Own(_context.MkInt(0))))));
-            var notOverflow = Own(_context.MkNot(Own(_context.MkAnd(
-                Own(_context.MkEq(
+                _owner.Own(_context.MkInt(0))))));
+            var notOverflow = _owner.Own(_context.MkNot(_owner.Own(_context.MkAnd(
+                _owner.Own(_context.MkEq(
                     left,
-                    Own(_context.MkInt(long.MinValue)))),
-                Own(_context.MkEq(
+                    _owner.Own(_context.MkInt(long.MinValue)))),
+                _owner.Own(_context.MkEq(
                     right,
-                    Own(_context.MkInt(-1))))))));
-            return Own(_context.MkAnd(nonzero, notOverflow));
+                    _owner.Own(_context.MkInt(-1))))))));
+            return _owner.Own(_context.MkAnd(nonzero, notOverflow));
         }
     }
 
@@ -822,7 +786,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         }
     }
 
-    private sealed class EncodedValue(Expr value, BoolExpr defined)
+    private readonly struct EncodedValue(Expr value, BoolExpr defined)
     {
         internal Expr Value { get; } = value;
         internal BoolExpr Defined { get; } = defined;

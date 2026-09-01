@@ -1368,7 +1368,10 @@ internal static class CacheSoundnessRules
             IInvocationOperation invocation =>
                 GetRefOrOutWriteValue(invocation, local),
             IDeconstructionAssignmentOperation deconstruction =>
-                GetDeconstructionWriteValue(deconstruction, local),
+                GetDeconstructionWriteValue(
+                    UnwrapValue(deconstruction.Target),
+                    UnwrapValue(deconstruction.Value),
+                    local),
             _ => null
         };
     }
@@ -1402,16 +1405,6 @@ internal static class CacheSoundnessRules
     private static bool IsWritableReference(RefKind refKind)
     {
         return refKind is RefKind.Ref or RefKind.Out;
-    }
-
-    private static IOperation? GetDeconstructionWriteValue(
-        IDeconstructionAssignmentOperation assignment,
-        ILocalSymbol local)
-    {
-        return GetDeconstructionWriteValue(
-            UnwrapValue(assignment.Target),
-            UnwrapValue(assignment.Value),
-            local);
     }
 
     private static IOperation? GetDeconstructionWriteValue(

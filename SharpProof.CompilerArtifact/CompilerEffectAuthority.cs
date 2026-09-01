@@ -21,7 +21,7 @@ internal static class CompilerEffectAuthority
             Witness = CopyWitness(evidence.Witness),
             Replay = CopyReplay(evidence.Replay),
             Evidence = evidence.Evidence,
-            Source = CopyLocation(entry.Location),
+            Source = CompilerSourceLocationAuthority.CopyLocation(entry.Location),
             SourceTreePath = sourceTreePath ?? string.Empty
         };
     }
@@ -90,7 +90,9 @@ internal static class CompilerEffectAuthority
                 authority.Reason != evidence.Reason ||
                 authority.Certainty != evidence.Certainty ||
                 authority.Evidence != evidence.Evidence ||
-                !LocationsEqual(authority.Source, expected.Location) ||
+                !CompilerSourceLocationAuthority.LocationsEqual(
+                    authority.Source,
+                    expected.Location) ||
                 !ConstraintsEqual(authority.Constraint, evidence.Constraint) ||
                 !WitnessesEqual(authority.Witness, evidence.Witness) ||
                 !ReplaysEqual(authority.Replay, evidence.Replay))
@@ -170,7 +172,7 @@ internal static class CompilerEffectAuthority
                 StringComparer.Ordinal);
     }
 
-    private static bool WitnessesEqual(
+    internal static bool WitnessesEqual(
         WorkerEffectViolationWitness? left,
         WorkerEffectViolationWitness? right)
     {
@@ -186,7 +188,9 @@ internal static class CompilerEffectAuthority
             left.ExactExceptionTypeHierarchy.SequenceEqual(
                 right.ExactExceptionTypeHierarchy,
                 StringComparer.Ordinal) &&
-            LocationsEqual(left.Location, right.Location);
+            CompilerSourceLocationAuthority.LocationsEqual(
+                left.Location,
+                right.Location);
     }
 
     private static bool ReplaysEqual(
@@ -201,15 +205,6 @@ internal static class CompilerEffectAuthority
         return left.PathKind == right.PathKind &&
             left.ConstraintSha256 == right.ConstraintSha256 &&
             left.Events.SequenceEqual(right.Events, ReplayEventComparer.Instance);
-    }
-
-    private static bool LocationsEqual(
-        WorkerSourceLocation left,
-        WorkerSourceLocation right)
-    {
-        return left != null && right != null &&
-            (left.Path, left.Start, left.Length, left.Line, left.Column) ==
-            (right.Path, right.Start, right.Length, right.Line, right.Column);
     }
 
     private static CompilerEffectConstraintArtifact CopyConstraint(
@@ -236,7 +231,8 @@ internal static class CompilerEffectAuthority
                 Effects = value.Effects,
                 Capabilities = value.Capabilities,
                 ExactExceptionTypeHierarchy = [.. value.ExactExceptionTypeHierarchy],
-                Location = CopyLocation(value.Location)
+                Location = CompilerSourceLocationAuthority.CopyLocation(
+                    value.Location)
             };
     }
 
@@ -274,24 +270,11 @@ internal static class CompilerEffectAuthority
             SpecWitnessIdentifier = value.SpecWitnessIdentifier,
             ScalarOperands = [.. value.ScalarOperands],
             ExactExceptionTypeHierarchy = [.. value.ExactExceptionTypeHierarchy],
-            Location = CopyLocation(value.Location),
+            Location = CompilerSourceLocationAuthority.CopyLocation(value.Location),
             SourceTreeOrdinal = value.SourceTreeOrdinal,
             SourceTreePath = value.SourceTreePath,
             SourceTreeSha256 = value.SourceTreeSha256,
             SourceLineMapSha256 = value.SourceLineMapSha256
-        };
-    }
-
-    private static WorkerSourceLocation CopyLocation(
-        WorkerSourceLocation value)
-    {
-        return new WorkerSourceLocation
-        {
-            Path = value?.Path ?? string.Empty,
-            Start = value?.Start ?? 0,
-            Length = value?.Length ?? 0,
-            Line = value?.Line ?? 0,
-            Column = value?.Column ?? 0
         };
     }
 
@@ -330,7 +313,9 @@ internal static class CompilerEffectAuthority
                 left.SourceTreePath == right.SourceTreePath &&
                 left.SourceTreeSha256 == right.SourceTreeSha256 &&
                 left.SourceLineMapSha256 == right.SourceLineMapSha256 &&
-                LocationsEqual(left.Location, right.Location);
+                CompilerSourceLocationAuthority.LocationsEqual(
+                    left.Location,
+                    right.Location);
         }
 
         public int GetHashCode(

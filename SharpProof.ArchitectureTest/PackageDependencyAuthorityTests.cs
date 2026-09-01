@@ -258,7 +258,7 @@ public sealed class PackageDependencyAuthorityTests
     [Test]
     public async Task EveryReleaseAuthorityUsesTheExactSbomTopology()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         foreach (var scriptName in new[]
                  {
                      "New-SharpProofReleaseEvidence.ps1",
@@ -297,7 +297,7 @@ public sealed class PackageDependencyAuthorityTests
         string mutation,
         bool expectedSuccess)
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var result = await RunSpdxChecksumAuthorityAsync(root, mutation);
         Assert.That(
             result.ExitCode == 0,
@@ -520,7 +520,7 @@ public sealed class PackageDependencyAuthorityTests
 
     private static async Task<ProcessResult> RunAuthorityAsync(string[] paths)
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = TestRepository.FindRoot();
         var runner = Path.Combine(
             Path.GetDirectoryName(paths[0])!,
             "run-authority.ps1");
@@ -569,7 +569,7 @@ public sealed class PackageDependencyAuthorityTests
         string root,
         string mutation)
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = TestRepository.FindRoot();
         var runner = Path.Combine(root, "run-sbom-authority.ps1");
         await File.WriteAllTextAsync(
             runner,
@@ -608,7 +608,7 @@ public sealed class PackageDependencyAuthorityTests
         string root,
         string mutation)
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = TestRepository.FindRoot();
         var runner = Path.Combine(root, "run-sbom-license-authority.ps1");
         await File.WriteAllTextAsync(
             runner,
@@ -661,7 +661,7 @@ public sealed class PackageDependencyAuthorityTests
         string root,
         string mutation)
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = TestRepository.FindRoot();
         var runner = Path.Combine(root, "run-component-authority.ps1");
         await File.WriteAllTextAsync(
             runner,
@@ -703,7 +703,7 @@ public sealed class PackageDependencyAuthorityTests
         string root,
         string mutation)
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = TestRepository.FindRoot();
         var runner = Path.Combine(root, "run-sbom-topology-authority.ps1");
         await File.WriteAllTextAsync(
             runner,
@@ -839,20 +839,6 @@ public sealed class PackageDependencyAuthorityTests
         {
             File.Delete(runner);
         }
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var current = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (current is not null)
-        {
-            if (File.Exists(Path.Combine(current.FullName, "SharpProof.sln")))
-            {
-                return current.FullName;
-            }
-            current = current.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
     }
 
     private sealed record ProcessResult(int ExitCode, string Output);

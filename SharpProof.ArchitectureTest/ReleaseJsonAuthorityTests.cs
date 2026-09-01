@@ -10,7 +10,7 @@ public sealed class ReleaseJsonAuthorityTests
     [Test]
     public async Task ReleaseJsonFixturesRejectNoncanonicalStructures()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var start = new ProcessStartInfo("pwsh")
         {
             WorkingDirectory = root,
@@ -39,7 +39,7 @@ public sealed class ReleaseJsonAuthorityTests
     [Test]
     public async Task EveryReleaseConsumerUsesTheSharedStrictJsonAuthority()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         foreach (var path in new[]
         {
             "scripts/New-SharpProofReleaseEvidence.ps1",
@@ -54,17 +54,4 @@ public sealed class ReleaseJsonAuthorityTests
         }
     }
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("Repository root not found.");
-    }
 }

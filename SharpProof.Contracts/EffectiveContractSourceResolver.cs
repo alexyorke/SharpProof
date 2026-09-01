@@ -26,15 +26,8 @@ internal sealed class EffectiveContractSourceResolver
 
     internal EffectiveContractSourceResolver(
         Compilation compilation,
-        ContractClauseInventoryBuilder clauses)
-        : this(compilation, clauses, CancellationToken.None)
-    {
-    }
-
-    internal EffectiveContractSourceResolver(
-        Compilation compilation,
         ContractClauseInventoryBuilder clauses,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _clauses = ArgumentNullGuard.NotNull(clauses, nameof(clauses));
@@ -47,14 +40,8 @@ internal sealed class EffectiveContractSourceResolver
         _companions;
 
     internal static EffectiveContractSourceResolver ForCompilation(
-        Compilation compilation)
-    {
-        return ForCompilation(compilation, CancellationToken.None);
-    }
-
-    internal static EffectiveContractSourceResolver ForCompilation(
         Compilation compilation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Cache.GetValue(
@@ -67,18 +54,8 @@ internal sealed class EffectiveContractSourceResolver
 
     internal EffectiveContractSourceResolution Resolve(
         IMethodSymbol target,
-        IOperation? implementationBody = null)
-    {
-        return Resolve(
-            target,
-            implementationBody,
-            CancellationToken.None);
-    }
-
-    internal EffectiveContractSourceResolution Resolve(
-        IMethodSymbol target,
-        IOperation? implementationBody,
-        CancellationToken cancellationToken)
+        IOperation? implementationBody = null,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         target = ArgumentNullGuard.NotNull(target, nameof(target));

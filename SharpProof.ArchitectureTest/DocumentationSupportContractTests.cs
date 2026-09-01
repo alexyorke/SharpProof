@@ -32,7 +32,7 @@ public sealed class DocumentationSupportContractTests
         string mutation,
         bool expectedSuccess)
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var info = new ProcessStartInfo
         {
             FileName = "pwsh",
@@ -63,7 +63,7 @@ public sealed class DocumentationSupportContractTests
     [Test]
     public async Task DocumentationGatePrecedesPackagingAndReleaseEvidence()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var acceptance = await File.ReadAllTextAsync(Path.Combine(
             root, "eng", "acceptance", "Verify.ps1"));
         var dispatcher = await File.ReadAllTextAsync(Path.Combine(
@@ -94,7 +94,7 @@ public sealed class DocumentationSupportContractTests
     public async Task UnreleasedChangelogUsesTheCanonicalVerifierPlatform()
     {
         var changelog = await File.ReadAllTextAsync(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "CHANGELOG.md"));
 
         using (Assert.EnterMultipleScope())
@@ -141,17 +141,4 @@ public sealed class DocumentationSupportContractTests
         Assert.That(thirdIndex, Is.GreaterThan(secondIndex), third);
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
-    }
 }

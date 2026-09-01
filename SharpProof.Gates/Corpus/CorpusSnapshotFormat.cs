@@ -81,6 +81,18 @@ internal static class CorpusSnapshotFormat
 
     private static bool IsCanonicalData(string? line)
     {
+        return TryParseData(line, out var expectation) &&
+            string.Equals(
+                line,
+                expectation.ToCanonicalLine(),
+                StringComparison.Ordinal);
+    }
+
+    internal static bool TryParseData(
+        string? line,
+        out SnapshotExpectation expectation)
+    {
+        expectation = null!;
         if (!IsData(line))
         {
             return false;
@@ -109,15 +121,12 @@ internal static class CorpusSnapshotFormat
                     diagnostic,
                     StringComparer.Ordinal)
             ];
-        var expectation = new SnapshotExpectation(
+        expectation = new SnapshotExpectation(
             parts[0],
             verdict,
             semanticOutcome,
             diagnostics);
-        return string.Equals(
-            line,
-            expectation.ToCanonicalLine(),
-            StringComparison.Ordinal);
+        return true;
     }
 
     private static bool IsData(string? line)

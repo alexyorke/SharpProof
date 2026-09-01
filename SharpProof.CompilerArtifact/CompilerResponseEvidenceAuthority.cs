@@ -262,7 +262,9 @@ internal sealed class CompilerResponseEvidenceAuthority :
         {
             if (result.Model is { Length: > 0 } ||
                 result.ProofCore is { Length: > 0 } ||
-                !WitnessesEqual(result.EffectWitness, evidence.Witness) ||
+                !CompilerEffectAuthority.WitnessesEqual(
+                    result.EffectWitness,
+                    evidence.Witness) ||
                 !WitnessContradictsContract(evidence, result.EffectWitness))
             {
                 errors.Add("response.effect_witness_authority");
@@ -939,31 +941,4 @@ internal sealed class CompilerResponseEvidenceAuthority :
         return false;
     }
 
-    private static bool WitnessesEqual(
-        WorkerEffectViolationWitness? actual,
-        WorkerEffectViolationWitness? expected)
-    {
-        if (actual == null || expected == null)
-        {
-            return actual == null && expected == null;
-        }
-
-        return actual.Kind == expected.Kind &&
-            actual.Detail == expected.Detail &&
-            actual.Effects == expected.Effects &&
-            actual.Capabilities == expected.Capabilities &&
-            actual.ExactExceptionTypeHierarchy.SequenceEqual(
-                expected.ExactExceptionTypeHierarchy,
-                StringComparer.Ordinal) &&
-            LocationsEqual(actual.Location, expected.Location);
-    }
-
-    private static bool LocationsEqual(
-        WorkerSourceLocation? left,
-        WorkerSourceLocation? right)
-    {
-        return left != null && right != null &&
-            (left.Path, left.Start, left.Length, left.Line, left.Column) ==
-            (right.Path, right.Start, right.Length, right.Line, right.Column);
-    }
 }

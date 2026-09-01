@@ -18,11 +18,11 @@ public sealed class CoverageScriptTests
     public void ContainerCoverageRequiresExplicitComparisonAuthority()
     {
         var script = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofContainer.ps1"));
         var workflow = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             ".github",
             "workflows",
             "coverage.yml"));
@@ -719,7 +719,7 @@ public sealed class CoverageScriptTests
         bool featureChangesTcb,
         int expectedChangedFiles)
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var repository = Path.Combine(
             Path.GetTempPath(),
             "sharpproof-coverage-diff-" + Guid.NewGuid().ToString("N"));
@@ -844,7 +844,7 @@ public sealed class CoverageScriptTests
     private static async Task<ProcessResult> RunCoverageIdentityFixtureAsync(
         IReadOnlyList<CoverageEntry> entries)
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var repository = Path.Combine(
             Path.GetTempPath(),
             "sharpproof-coverage-identity-" + Guid.NewGuid().ToString("N"));
@@ -933,7 +933,7 @@ public sealed class CoverageScriptTests
         bool targetClosesMethod,
         double minimumChangedTcbLinePercent = 100)
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var repository = Path.Combine(
             Path.GetTempPath(),
             "sharpproof-coverage-unmapped-" + Guid.NewGuid().ToString("N"));
@@ -1105,7 +1105,7 @@ public sealed class CoverageScriptTests
             "sharpproof-coverage-authority-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(repository);
         await InitializeRepositoryAsync(repository);
-        await WriteFixtureAsync(RepositoryRoot(), repository);
+        await WriteFixtureAsync(TestRepository.FindRoot(), repository);
         await CommitAllAsync(repository, "root");
         return repository;
     }
@@ -1684,21 +1684,6 @@ public sealed class CoverageScriptTests
             File.SetAttributes(path, FileAttributes.Normal);
         }
         Directory.Delete(repository, recursive: true);
-    }
-
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Could not find the repository root.");
     }
 
     private sealed record ProcessResult(

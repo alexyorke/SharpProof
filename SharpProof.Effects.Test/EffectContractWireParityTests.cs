@@ -7,7 +7,7 @@ public sealed class EffectContractWireParityTests
     public void GeneratedEffectCatalogContainsNoAnalysisAlgorithms()
     {
         var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Effects",
             "EffectContractMappings.generated.cs"));
 
@@ -377,19 +377,4 @@ public sealed class EffectContractWireParityTests
             StringComparer.Ordinal);
     }
 
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory != null;
-             directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException(
-            "SharpProof repository root was not found.");
-    }
 }

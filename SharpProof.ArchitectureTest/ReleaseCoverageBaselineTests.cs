@@ -21,7 +21,7 @@ public sealed class ReleaseCoverageBaselineTests
     [Test]
     public void ReleaseQualificationImportsEveryUpstreamResult()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var workflow = File.ReadAllText(Path.Combine(
             root,
             ".github",
@@ -44,7 +44,7 @@ public sealed class ReleaseCoverageBaselineTests
     public void ReleaseQualificationInitializesBeforeSdkAndAvoidsStaleExitCodes()
     {
         var workflow = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             ".github",
             "workflows",
             "package-consumers.yml"));
@@ -105,7 +105,7 @@ public sealed class ReleaseCoverageBaselineTests
     [Test]
     public void QualificationWriterRevalidatesArtifactsAndGateReceipts()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var writer = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -173,7 +173,7 @@ public sealed class ReleaseCoverageBaselineTests
     [Test]
     public async Task QualificationReceiptRejectsMalformedPackageIdentityEvidence()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var parent = Path.Combine(root, "artifacts", "qualification-fixtures");
         var workspace = Path.Combine(parent, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
@@ -257,7 +257,7 @@ public sealed class ReleaseCoverageBaselineTests
     [Test]
     public async Task QualificationReceiptRejectsMalformedFailedAndStaleEvidence()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var parent = Path.Combine(root, "artifacts", "qualification-fixtures");
         var workspace = Path.Combine(parent, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
@@ -333,7 +333,7 @@ public sealed class ReleaseCoverageBaselineTests
     [Test]
     public void ReleaseWorkflowUsesTheAllowlistedImmutableBaseline()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var resolver = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -388,7 +388,7 @@ public sealed class ReleaseCoverageBaselineTests
     [Test]
     public async Task ResolverSelectsExactCommitsAndFailsClosed()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var head = await RunAsync(
             root,
             "git",
@@ -503,7 +503,7 @@ public sealed class ReleaseCoverageBaselineTests
     public void ReleaseDigestCanonicalStreamIncludesGitModeAndType()
     {
         var script = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Get-SharpProofReleaseDigests.ps1"));
         var digestStart = script.IndexOf(
@@ -543,7 +543,7 @@ public sealed class ReleaseCoverageBaselineTests
     [Test]
     public async Task ReleaseDigestsBindEntryModeAndRemainCultureStable()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var repository = Path.Combine(
             Path.GetTempPath(),
             "sharpproof-release-digest-" + Guid.NewGuid().ToString("N"));
@@ -853,7 +853,7 @@ public sealed class ReleaseCoverageBaselineTests
     public async Task TrustedComputingBaseRejectsNoncanonicalPaths(
         string path)
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         const string command = """
             . $env:SHARPPROOF_TCB_HELPER
             $contract = [pscustomobject]@{
@@ -1017,22 +1017,6 @@ public sealed class ReleaseCoverageBaselineTests
                 AnsiPattern,
                 string.Empty,
                 System.Text.RegularExpressions.RegexOptions.CultureInvariant));
-    }
-
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Could not find the repository root.");
     }
 
     private sealed record ProcessResult(

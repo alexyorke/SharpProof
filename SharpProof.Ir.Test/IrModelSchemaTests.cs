@@ -194,7 +194,7 @@ public sealed class IrModelSchemaTests
     [Test]
     public void ComputedModelBehaviorRemainsHandwritten()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var generated = File.ReadAllText(Path.Combine(
             root,
             "SharpProof.Ir",
@@ -472,20 +472,9 @@ public sealed class IrModelSchemaTests
     private static JsonDocument ReadSchema()
     {
         return JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Ir",
             "IrModel.schema.json")));
     }
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null &&
-               !File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-        {
-            directory = directory.Parent;
-        }
-        return directory?.FullName ??
-            throw new InvalidOperationException("Repository root was not found.");
-    }
 }

@@ -23,7 +23,7 @@ public sealed class ReleasePublicationScriptTests
     {
         var script = await File.ReadAllTextAsync(
             Path.Combine(
-                FindRepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "Publish-SharpProofRelease.ps1"));
 
@@ -33,7 +33,7 @@ public sealed class ReleasePublicationScriptTests
     [Test]
     public async Task PublisherUsesTheRepositorySdkPolicyForRealPushes()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var script = await File.ReadAllTextAsync(
             Path.Combine(root, "scripts", "Publish-SharpProofRelease.ps1"));
         var globalJson = await File.ReadAllTextAsync(
@@ -52,7 +52,7 @@ public sealed class ReleasePublicationScriptTests
     [Test]
     public async Task PublicationDocumentationDescribesFailClosedDuplicates()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var documentationPaths = new[]
         {
             Path.Combine(root, "README.md"),
@@ -103,7 +103,7 @@ public sealed class ReleasePublicationScriptTests
     [Test]
     public async Task OfflinePlanIsOrderedAndProjectsEveryExistingArtifactCollision()
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = TestRepository.FindRoot();
         var repositoryHead = await RunProcessAsync(
             repositoryRoot,
             "git",
@@ -136,7 +136,7 @@ public sealed class ReleasePublicationScriptTests
             "-NoProfile",
             "-File",
             Path.Combine(
-                FindRepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "New-SharpProofReleaseEvidence.ps1"),
             "-PackageSource",
@@ -247,7 +247,7 @@ public sealed class ReleasePublicationScriptTests
         }
 
         var previousRevision = await RunProcessAsync(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "git",
             "rev-parse",
             "HEAD^");
@@ -270,13 +270,13 @@ public sealed class ReleasePublicationScriptTests
         }
 
         var evidence = await RunProcessAsync(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "pwsh",
             "-NoLogo",
             "-NoProfile",
             "-File",
             Path.Combine(
-                FindRepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "New-SharpProofReleaseEvidence.ps1"),
             "-PackageSource",
@@ -296,7 +296,7 @@ public sealed class ReleasePublicationScriptTests
     [Test]
     public async Task EveryReleaseAuthorityUsesStrictSymbolValidation()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         foreach (var scriptName in new[]
                  {
                      "New-SharpProofReleaseEvidence.ps1",
@@ -387,7 +387,7 @@ public sealed class ReleasePublicationScriptTests
                         var bytes = image.ToArray();
                         var head = Encoding.ASCII.GetBytes(
                             (await RunProcessAsync(
-                                FindRepositoryRoot(),
+                                TestRepository.FindRoot(),
                                 "git",
                                 "rev-parse",
                                 "HEAD")).Output.Trim());
@@ -426,13 +426,13 @@ public sealed class ReleasePublicationScriptTests
         }
 
         var evidence = await RunProcessAsync(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "pwsh",
             "-NoLogo",
             "-NoProfile",
             "-File",
             Path.Combine(
-                FindRepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "New-SharpProofReleaseEvidence.ps1"),
             "-PackageSource",
@@ -537,16 +537,16 @@ public sealed class ReleasePublicationScriptTests
             "-PackageVersion $Version -RepositoryCommit $Commit\n",
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         var head = (await RunProcessAsync(
-            FindRepositoryRoot(), "git", "rev-parse", "HEAD")).Output.Trim();
+            TestRepository.FindRoot(), "git", "rev-parse", "HEAD")).Output.Trim();
         var result = await RunProcessAsync(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "pwsh",
             "-NoLogo",
             "-NoProfile",
             "-File",
             probePath,
             Path.Combine(
-                FindRepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "Test-SharpProofSymbolPackages.ps1"),
             mainPath,
@@ -568,7 +568,7 @@ public sealed class ReleasePublicationScriptTests
     [Test]
     public async Task EveryReleaseAuthorityBindsExactPackageRoles()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         foreach (var scriptName in new[]
                  {
                      "New-SharpProofReleaseEvidence.ps1",
@@ -595,7 +595,7 @@ public sealed class ReleasePublicationScriptTests
     [Test]
     public async Task EveryReleaseAuthorityUsesExactPackagePayloadValidation()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         foreach (var scriptName in new[]
                  {
                      "New-SharpProofReleaseEvidence.ps1",
@@ -714,13 +714,13 @@ public sealed class ReleasePublicationScriptTests
         }
 
         var evidence = await RunProcessAsync(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "pwsh",
             "-NoLogo",
             "-NoProfile",
             "-File",
             Path.Combine(
-                FindRepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "New-SharpProofReleaseEvidence.ps1"),
             "-PackageSource",
@@ -876,13 +876,13 @@ public sealed class ReleasePublicationScriptTests
         string planPath)
     {
         return RunProcessAsync(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "pwsh",
             "-NoLogo",
             "-NoProfile",
             "-File",
             Path.Combine(
-                FindRepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "Publish-SharpProofRelease.ps1"),
             "-PackageSource",
@@ -967,26 +967,6 @@ public sealed class ReleasePublicationScriptTests
             CompressionLevel.Optimal);
         using var output = replacement.Open();
         output.Write(contents);
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(
-            typeof(ReleasePublicationScriptTests).Assembly.Location);
-        while (directory != null)
-        {
-            if (File.Exists(
-                    Path.Combine(
-                        directory.FullName,
-                        "SharpProof.Release.props")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Repository root was not found.");
     }
 
     private sealed class PublicationWorkspace : IDisposable

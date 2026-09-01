@@ -68,7 +68,7 @@ public sealed class ArchitectureTests
     [Test]
     public void RepositoryRestoreIsHermeticLockedAndSdkPinned()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         using var globalJson = JsonDocument.Parse(
             File.ReadAllText(Path.Combine(root, "global.json")));
         var sdk = globalJson.RootElement.GetProperty("sdk");
@@ -294,7 +294,7 @@ public sealed class ArchitectureTests
         {
             Assert.That(
                 File.ReadAllText(Path.Combine(
-                    RepositoryRoot(), path.Replace('/', Path.DirectorySeparatorChar))),
+                    TestRepository.FindRoot(), path.Replace('/', Path.DirectorySeparatorChar))),
                 Does.Not.Contain("Microsoft.CodeAnalysis.AnalyzerUtilities"),
                 path);
         }
@@ -418,7 +418,7 @@ public sealed class ArchitectureTests
     public void EffectArrayCardinalityRequiresCompilerBoundSymbolIdentity()
     {
         var source = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Effects",
             "OperationEffectScanner.cs"));
 
@@ -542,10 +542,10 @@ public sealed class ArchitectureTests
             Assert.That(entry.MaximumMemberDecisionPoints, Is.Positive, entry.Path);
 
             var fullPath = Path.GetFullPath(
-                Path.Combine(RepositoryRoot(), entry.Path));
+                Path.Combine(TestRepository.FindRoot(), entry.Path));
             Assert.That(
                 fullPath.StartsWith(
-                    RepositoryRoot() + Path.DirectorySeparatorChar,
+                    TestRepository.FindRoot() + Path.DirectorySeparatorChar,
                     StringComparison.OrdinalIgnoreCase),
                 Is.True,
                 entry.Path);
@@ -557,7 +557,7 @@ public sealed class ArchitectureTests
     public void TrustedComputingBaseDeclarationNamesEveryRequiredPath()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            RepositoryRoot(), "eng", "acceptance", "contract.json")));
+            TestRepository.FindRoot(), "eng", "acceptance", "contract.json")));
         var root = document.RootElement;
         Assert.That(
             root.GetProperty("trustedKernel")
@@ -626,7 +626,7 @@ public sealed class ArchitectureTests
             Is.EqualTo(canonicalTcb.Length),
             "The canonical TCB union must not contain duplicate ownership.");
         var mutationCatalog = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Test-SharpProofTrustedMutations.ps1"));
         var mutationTargets = Regex.Matches(
@@ -644,10 +644,10 @@ public sealed class ArchitectureTests
         // Every declared path must also resolve to a file inside the tree.
         foreach (var path in canonicalTcb)
         {
-            var full = Path.GetFullPath(Path.Combine(RepositoryRoot(), path));
+            var full = Path.GetFullPath(Path.Combine(TestRepository.FindRoot(), path));
             Assert.That(
                 full.StartsWith(
-                    RepositoryRoot() + Path.DirectorySeparatorChar,
+                    TestRepository.FindRoot() + Path.DirectorySeparatorChar,
                     StringComparison.OrdinalIgnoreCase),
                 Is.True,
                 path + " escapes the repository root.");
@@ -680,13 +680,13 @@ public sealed class ArchitectureTests
                 .And.Contain("SharpProof.Worker/Program.cs"));
         Assert.That(
             File.ReadAllText(Path.Combine(
-                RepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "Get-SharpProofReleaseDigests.ps1")),
             Does.Contain("Get-SharpProofTcbPaths"));
         Assert.That(
             File.ReadAllText(Path.Combine(
-                RepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "Test-SharpProofCoverage.ps1")),
             Does.Contain("Get-SharpProofTcbPaths")
@@ -704,7 +704,7 @@ public sealed class ArchitectureTests
     [Test]
     public void DeclarationOnlyTcbCoverageExceptionsAreExplicitAndNonExecutable()
     {
-        var repository = RepositoryRoot();
+        var repository = TestRepository.FindRoot();
         using var baseline = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             repository,
             "eng",
@@ -759,7 +759,7 @@ public sealed class ArchitectureTests
     [Test]
     public void PreviewConfigurationInterfaceMatchesFrozenSnapshot()
     {
-        var repository = RepositoryRoot();
+        var repository = TestRepository.FindRoot();
         using var snapshotDocument = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(
                 repository,
@@ -907,7 +907,7 @@ public sealed class ArchitectureTests
     public void PilotPackageVersionDerivesFromReleaseOwner()
     {
         var pilotProps = XDocument.Load(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "eng",
             "pilots",
             "Directory.Build.props"));
@@ -931,7 +931,7 @@ public sealed class ArchitectureTests
     public void PilotRunnerPreservesRootedInputAndOutputPaths()
     {
         var script = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Test-SharpProofPilots.ps1"));
 
@@ -955,7 +955,7 @@ public sealed class ArchitectureTests
     public void ContainerConsumerMatrixUsesCatalogOwnedNet8ReferencePacks()
     {
         var script = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Test-SharpProofPackageConsumers.ps1"));
 
@@ -978,7 +978,7 @@ public sealed class ArchitectureTests
     [Test]
     public void WorkflowCommandsUsePowerShellSafeMsBuildSwitches()
     {
-        var workflowRoot = Path.Combine(RepositoryRoot(), ".github", "workflows");
+        var workflowRoot = Path.Combine(TestRepository.FindRoot(), ".github", "workflows");
         var violations = Directory
             .EnumerateFiles(workflowRoot, "*.yml", SearchOption.TopDirectoryOnly)
             .Concat(Directory.EnumerateFiles(
@@ -1014,7 +1014,7 @@ public sealed class ArchitectureTests
     [Test]
     public void ReleasePackageWorkflowBindsTheExactRepositoryCommit()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var workflow = File.ReadAllText(Path.Combine(
             root,
             ".github",
@@ -1049,7 +1049,7 @@ public sealed class ArchitectureTests
     public void ContainerMutationEvidenceUsesAPersistentRelativePath()
     {
         var container = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofContainer.ps1"));
 
@@ -1074,7 +1074,7 @@ public sealed class ArchitectureTests
                     "'trusted-mutations.json')"));
 
             var mutationDriver = File.ReadAllText(Path.Combine(
-                RepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "Test-SharpProofTrustedMutations.ps1"));
             Assert.That(
@@ -1085,7 +1085,7 @@ public sealed class ArchitectureTests
                 Does.Contain("$completedMutationNames.Contains"));
 
             var parallelDriver = File.ReadAllText(Path.Combine(
-                RepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "Invoke-SharpProofTrustedMutationsParallel.ps1"));
             Assert.That(parallelDriver, Does.Contain("MutationShardCount"));
@@ -1098,7 +1098,7 @@ public sealed class ArchitectureTests
                 Does.Contain("selection = 'full'"));
 
             var scheduler = File.ReadAllText(Path.Combine(
-                RepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "SharpProof.MutationScheduling.psm1"));
             Assert.That(scheduler, Does.Contain("CatalogOrdinal"));
@@ -1111,7 +1111,7 @@ public sealed class ArchitectureTests
     public void ContainerDependencyAuditRestoresTheDisposableClone()
     {
         var container = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofContainer.ps1"));
         var branchStart = container.IndexOf(
@@ -1134,7 +1134,7 @@ public sealed class ArchitectureTests
     public void ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed()
     {
         var container = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofContainer.ps1"));
         var branchStart = container.IndexOf(
@@ -1162,7 +1162,7 @@ public sealed class ArchitectureTests
     [Test]
     public void ContainerTestConcurrencyIsCatalogOwnedAndProjectScoped()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,
             "eng",
@@ -1326,7 +1326,7 @@ public sealed class ArchitectureTests
     [Test]
     public void AcceptanceTimingEvidenceHasACatalogOwnedCanonicalShape()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,
             "eng",
@@ -1370,7 +1370,7 @@ public sealed class ArchitectureTests
     [Test]
     public void DevContainerIsNonRootPinnedAndDoesNotNestDocker()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,
             ".devcontainer",
@@ -1453,7 +1453,7 @@ public sealed class ArchitectureTests
     public void CanonicalTaskSetupCopiesOnlyWorkingTreeDeltas()
     {
         var entrypoint = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "eng",
             "container",
             "entrypoint.sh"));
@@ -1476,7 +1476,7 @@ public sealed class ArchitectureTests
     public void RepositoryMsBuildEntryPointsRejectHostExecution()
     {
         var targets = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "Directory.Build.targets"));
 
         using (Assert.EnterMultipleScope())
@@ -1497,7 +1497,7 @@ public sealed class ArchitectureTests
     public void MutationCatalogTargetsArePreflightedBeforeTests()
     {
         var mutationDriver = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Test-SharpProofTrustedMutations.ps1"));
         var archiveExpansion = mutationDriver.IndexOf(
@@ -1529,7 +1529,7 @@ public sealed class ArchitectureTests
     public void RepositoryAutomationRunsProductToolingOnlyInDocker()
     {
         var workflowRoot = Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             ".github",
             "workflows");
         var workflows = Directory
@@ -1557,7 +1557,7 @@ public sealed class ArchitectureTests
     public void DockerWorkflowsCapCpuUseToHostedRunnerCapacity()
     {
         var workflowRoot = Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             ".github",
             "workflows");
         var dockerWorkflows = Directory
@@ -1582,11 +1582,11 @@ public sealed class ArchitectureTests
     public void WorkerProcessBoundaryUsesADirectLinuxChildAndStdinRelease()
     {
         var host = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Host",
             "LinuxWorkerProcess.cs"));
         var launcher = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Worker.Launcher",
             "Program.cs"));
 
@@ -1608,7 +1608,7 @@ public sealed class ArchitectureTests
     public void NativeZ3ResolverLoadsOnlyTheContainerVerifiedPath()
     {
         var host = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Host",
             "ContainerNativeLibrary.cs"));
 
@@ -1640,7 +1640,7 @@ public sealed class ArchitectureTests
     public void WorkerClosureRetainsStagedComponentsUntilSnapshotDisposal()
     {
         var source = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.CompilerArtifact",
             "CompilerManifestArtifact.cs"));
 
@@ -1690,7 +1690,7 @@ public sealed class ArchitectureTests
     [Test]
     public void PerformanceContractIsIsolatedFromBroadTestAndCoverageRuns()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var performanceTests = File.ReadAllText(Path.Combine(
             root,
             "SharpProof.Gates.Test",
@@ -1850,7 +1850,7 @@ public sealed class ArchitectureTests
     [Test]
     public void CoverageCollectionPreservesTrustedContractPayloadIdentity()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var collector = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -1950,7 +1950,7 @@ public sealed class ArchitectureTests
     [Test]
     public void PackageFeedConstructionIsDemandDriven()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var feed = File.ReadAllText(Path.Combine(
             root,
             "SharpProof.Package.Test",
@@ -1993,7 +1993,7 @@ public sealed class ArchitectureTests
     [Test]
     public void ContractApiMetadataNamesHaveOneSourceOfTruth()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var catalog = Path.GetFullPath(Path.Combine(
             root,
             "SharpProof.Frontend",
@@ -2026,7 +2026,7 @@ public sealed class ArchitectureTests
     [Test]
     public void DeclarativeModelOutputsContainOnlyStorageDeclarations()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         using var catalog = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,
             "SharpProof.DeclarativeModels.catalog.json")));
@@ -2066,7 +2066,7 @@ public sealed class ArchitectureTests
     public void ProductionComplexityRationaleBindsTheExactCeilings()
     {
         using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "eng",
             "acceptance",
             "contract.json")));
@@ -2092,7 +2092,7 @@ public sealed class ArchitectureTests
         var violations = new List<string>();
         foreach (var entry in ReadSizeRatchetManifest().Files)
         {
-            var fullPath = Path.Combine(RepositoryRoot(), entry.Path);
+            var fullPath = Path.Combine(TestRepository.FindRoot(), entry.Path);
             var source = File.ReadAllText(fullPath);
             var tree = CSharpSyntaxTree.ParseText(
                 source,
@@ -2230,7 +2230,7 @@ public sealed class ArchitectureTests
     private static SizeRatchetManifest ReadSizeRatchetManifest()
     {
         var path = Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "eng",
             "acceptance",
             "algorithm-size-ratchets.json");
@@ -2297,8 +2297,8 @@ public sealed class ArchitectureTests
     private static string ProjectDirectory(string project)
     {
         return project == "SharpProof.Fuzz"
-            ? Path.Combine(RepositoryRoot(), "Tools", project)
-            : Path.Combine(RepositoryRoot(), project);
+            ? Path.Combine(TestRepository.FindRoot(), "Tools", project)
+            : Path.Combine(TestRepository.FindRoot(), project);
     }
 
     private static string ReadProductionSources(string project)
@@ -2343,7 +2343,7 @@ public sealed class ArchitectureTests
     [Test]
     public void NightlyFuzzCampaignIsContainerConnectedAndEvidenceBound()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var workflow = File.ReadAllText(Path.Combine(
             root, ".github", "workflows", "nightly.yml"));
         var dispatcher = File.ReadAllText(Path.Combine(
@@ -2413,22 +2413,7 @@ public sealed class ArchitectureTests
 
     private static string Relative(string path)
     {
-        return Path.GetRelativePath(RepositoryRoot(), path).Replace('\\', '/');
-    }
-
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("Could not find the repository root.");
+        return Path.GetRelativePath(TestRepository.FindRoot(), path).Replace('\\', '/');
     }
 
     [SuppressMessage(

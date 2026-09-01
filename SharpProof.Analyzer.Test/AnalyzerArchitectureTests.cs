@@ -165,7 +165,7 @@ public sealed class AnalyzerArchitectureTests
     [Test]
     public void AnalyzerProjectKeepsTheSolverOutOfProcess()
     {
-        var root = AnalyzerTestHost.FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var project = File.ReadAllText(
             Path.Combine(
                 root,
@@ -226,7 +226,7 @@ public sealed class AnalyzerArchitectureTests
     [Test]
     public void ReleaseTrackingMatchesCurrentSupportedDescriptors()
     {
-        var root = AnalyzerTestHost.FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var analyzerDirectory = Path.Combine(
             root,
             "SharpProof.Analyzer");

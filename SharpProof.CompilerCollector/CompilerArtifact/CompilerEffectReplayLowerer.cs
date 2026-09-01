@@ -132,10 +132,9 @@ internal static class CompilerEffectReplayLowerer
                     CompilerIdentityBridge.CreateTypeDisplay(type);
                 typeDocumentationId =
                     DocumentationCommentId.CreateReferenceId(type);
-                witnessDetail = !string.IsNullOrWhiteSpace(
-                    memberDocumentationId)
-                    ? memberDocumentationId!
-                    : memberIdentity;
+                witnessDetail = PreferDocumentationId(
+                    memberDocumentationId,
+                    memberIdentity);
                 break;
             case (
                 EffectDirectEventKind.ManagedArrayAllocation,
@@ -151,10 +150,9 @@ internal static class CompilerEffectReplayLowerer
                     CompilerIdentityBridge.CreateTypeDisplay(type);
                 typeDocumentationId =
                     DocumentationCommentId.CreateReferenceId(type);
-                witnessDetail = !string.IsNullOrWhiteSpace(
-                    typeDocumentationId)
-                    ? typeDocumentationId!
-                    : typeIdentity;
+                witnessDetail = PreferDocumentationId(
+                    typeDocumentationId,
+                    typeIdentity);
                 break;
             case (
                 EffectDirectEventKind.ExplicitThrow,
@@ -186,10 +184,9 @@ internal static class CompilerEffectReplayLowerer
                 exactExceptionTypeHierarchy =
                     CompilerExceptionTypeIdentity.EncodeHierarchy(
                         exceptionType);
-                witnessDetail = !string.IsNullOrWhiteSpace(
-                    typeDocumentationId)
-                    ? typeDocumentationId!
-                    : typeIdentity;
+                witnessDetail = PreferDocumentationId(
+                    typeDocumentationId,
+                    typeIdentity);
                 break;
             case (
                 EffectDirectEventKind.MonitorCall,
@@ -207,10 +204,9 @@ internal static class CompilerEffectReplayLowerer
                 typeDocumentationId =
                     DocumentationCommentId.CreateReferenceId(
                         invocation.TargetMethod.ContainingType);
-                witnessDetail = !string.IsNullOrWhiteSpace(
-                    memberDocumentationId)
-                    ? memberDocumentationId!
-                    : memberIdentity;
+                witnessDetail = PreferDocumentationId(
+                    memberDocumentationId,
+                    memberIdentity);
                 break;
             case (
                 EffectDirectEventKind.EmptyLock,
@@ -229,10 +225,9 @@ internal static class CompilerEffectReplayLowerer
                     CompilerIdentityBridge.CreateTypeDisplay(monitorType);
                 typeDocumentationId =
                     DocumentationCommentId.CreateReferenceId(monitorType);
-                witnessDetail = !string.IsNullOrWhiteSpace(
-                    typeDocumentationId)
-                    ? typeDocumentationId!
-                    : typeIdentity;
+                witnessDetail = PreferDocumentationId(
+                    typeDocumentationId,
+                    typeIdentity);
                 break;
             default:
                 return false;
@@ -269,6 +264,15 @@ internal static class CompilerEffectReplayLowerer
             SourceLineMapSha256 = sourceLineMapSha256
         };
         return true;
+    }
+
+    private static string PreferDocumentationId(
+        string? documentationId,
+        string identity)
+    {
+        return string.IsNullOrWhiteSpace(documentationId)
+            ? identity
+            : documentationId!;
     }
 
     private static bool IsDefiniteObjectAllocation(

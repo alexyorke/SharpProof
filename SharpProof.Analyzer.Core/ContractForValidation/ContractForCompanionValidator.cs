@@ -264,7 +264,7 @@ internal static class ContractForCompanionValidator
         }
     }
 
-    private static Diagnostic At(
+    internal static Diagnostic At(
         DiagnosticDescriptor descriptor,
         Location location,
         params object?[] arguments)

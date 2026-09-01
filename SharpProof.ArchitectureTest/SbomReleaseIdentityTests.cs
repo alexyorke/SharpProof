@@ -70,7 +70,7 @@ public sealed class SbomReleaseIdentityTests
     [Test]
     public async Task EverySbomAuthorityConsumerUsesTheSharedValidator()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var generator = await File.ReadAllTextAsync(Path.Combine(
             root,
             "scripts",
@@ -117,7 +117,7 @@ public sealed class SbomReleaseIdentityTests
     private static async Task<(int ExitCode, string Output)> RunFixtureAsync(
         string mutation)
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var info = new ProcessStartInfo
         {
             FileName = "pwsh",
@@ -231,17 +231,4 @@ public sealed class SbomReleaseIdentityTests
             [info, timeout])!;
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
-    }
 }

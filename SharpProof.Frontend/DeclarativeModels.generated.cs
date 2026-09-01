@@ -23,21 +23,9 @@ public sealed partial class FrontendLoweringResult
         Classification = classification;
         Variables = variables;
     }
-
-    public IrTerm Term
-    {
-        get;
-    }
-
-    public FrontendSubsetClassification Classification
-    {
-        get;
-    }
-
-    public ImmutableArray<FrontendVariableBinding> Variables
-    {
-        get;
-    }
+    public IrTerm Term { get; }
+    public FrontendSubsetClassification Classification { get; }
+    public ImmutableArray<FrontendVariableBinding> Variables { get; }
 }
 
 public sealed partial class FrontendProgramLoweringResult
@@ -60,29 +48,9 @@ public sealed partial class FrontendProgramLoweringResult
         Captures = captures;
         Abstentions = abstentions;
     }
-
-    public IrProgram Program
-    {
-        get;
-    }
-
-    public FrontendSubsetClassification Classification
-    {
-        get;
-    }
-
-    public ImmutableArray<FrontendVariableBinding> Variables
-    {
-        get;
-    }
-
-    public ImmutableArray<IrVarId> Captures
-    {
-        get;
-    }
-
-    public ImmutableArray<FrontendProgramAbstention> Abstentions
-    {
-        get;
-    }
+    public IrProgram Program { get; }
+    public FrontendSubsetClassification Classification { get; }
+    public ImmutableArray<FrontendVariableBinding> Variables { get; }
+    public ImmutableArray<IrVarId> Captures { get; }
+    public ImmutableArray<FrontendProgramAbstention> Abstentions { get; }
 }

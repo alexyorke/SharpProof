@@ -153,7 +153,7 @@ internal static class CallableEntryFeasibilityEvaluator
             RefutedOutcome => CallableEntryFeasibility.Feasible,
             UnknownOutcome unknown =>
                 CallableEntryFeasibility.Unknown(
-                    CallableClaimResultAssembler.MapAbstention(
+                    WorkerProjections.MapAbstention(
                         unknown.Reason)),
             _ => CallableEntryFeasibility.Unknown(
                 WorkerClaimReason.MalformedBackendResult)

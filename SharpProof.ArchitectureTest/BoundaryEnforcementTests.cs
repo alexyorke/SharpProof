@@ -57,7 +57,7 @@ public sealed class BoundaryEnforcementTests
     [Test]
     public void BannedApiAnalyzerIsScopedToProductionProjects()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var props = XDocument.Load(Path.Combine(root, "Directory.Build.props"));
         var marker = props
             .Descendants("SharpProofProductionProject")
@@ -112,7 +112,7 @@ public sealed class BoundaryEnforcementTests
     [Test]
     public void GeneratedProductionFilesAreExplicitlyApproved()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,
             "eng",
@@ -169,7 +169,7 @@ public sealed class BoundaryEnforcementTests
     public void BannedSymbolInventoryCoversEverySoundnessBoundary()
     {
         var text = File.ReadAllText(
-            Path.Combine(RepositoryRoot(), "BannedSymbols.txt"));
+            Path.Combine(TestRepository.FindRoot(), "BannedSymbols.txt"));
         var required = new[] {
             "Compilation.ReplaceSyntaxTree(Microsoft.CodeAnalysis.SyntaxTree,Microsoft.CodeAnalysis.SyntaxTree)",
             "Compilation.AddSyntaxTrees(Microsoft.CodeAnalysis.SyntaxTree[])",
@@ -239,7 +239,7 @@ public sealed class BoundaryEnforcementTests
         Assert.That(suppressionFiles, Is.EqualTo([expected]));
 
         var adapter = File.ReadAllText(
-            Path.Combine(RepositoryRoot(), adapterProject, adapterFile));
+            Path.Combine(TestRepository.FindRoot(), adapterProject, adapterFile));
         Assert.That(
             adapter,
             Does.Contain("The single audited boundary"));
@@ -331,7 +331,7 @@ public sealed class BoundaryEnforcementTests
     {
         Assert.That(
             File.Exists(Path.Combine(
-                RepositoryRoot(),
+                TestRepository.FindRoot(),
                 "SharpProof.Analyzer",
                 "AnalyzerDiagnosticCatalog.cs")),
             Is.False);
@@ -366,7 +366,7 @@ public sealed class BoundaryEnforcementTests
         }
 
         var generated = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Analyzer.Core",
             "GeneratedDiagnosticDescriptors.generated.cs"));
         Assert.That(
@@ -455,7 +455,7 @@ public sealed class BoundaryEnforcementTests
             @"Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj"
         ];
         var actual = File.ReadLines(
-                Path.Combine(RepositoryRoot(), "SharpProof.sln"))
+                Path.Combine(TestRepository.FindRoot(), "SharpProof.sln"))
             .Select(line => Regex.Match(
                 line,
                 "^Project\\(.*\\) = \".*\", \"(?<path>[^\"]+\\.csproj)\""))
@@ -468,7 +468,7 @@ public sealed class BoundaryEnforcementTests
         {
             Assert.That(
                 File.Exists(Path.Combine(
-                    RepositoryRoot(),
+                    TestRepository.FindRoot(),
                     project.Replace(
                         '\\',
                         Path.DirectorySeparatorChar))),
@@ -482,7 +482,7 @@ public sealed class BoundaryEnforcementTests
     {
         var packageFile =
             Path.Combine(
-                RepositoryRoot(),
+                TestRepository.FindRoot(),
                 "SharpProof.Package",
                 "SharpProof.Package.csproj");
         var package = XDocument.Load(packageFile);
@@ -566,7 +566,7 @@ public sealed class BoundaryEnforcementTests
     private static IEnumerable<string> SourceFiles(string project)
     {
         return Directory.GetFiles(
-                Path.Combine(RepositoryRoot(), ProjectDirectory(project)),
+                Path.Combine(TestRepository.FindRoot(), ProjectDirectory(project)),
                 "*.cs",
                 SearchOption.AllDirectories)
             .Where(static path =>
@@ -589,7 +589,7 @@ public sealed class BoundaryEnforcementTests
     private static string ProjectFile(string project)
     {
         return Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             ProjectDirectory(project),
             project + ".csproj");
     }
@@ -603,7 +603,7 @@ public sealed class BoundaryEnforcementTests
 
     private static string Relative(string path)
     {
-        return Path.GetRelativePath(RepositoryRoot(), path).Replace('\\', '/');
+        return Path.GetRelativePath(TestRepository.FindRoot(), path).Replace('\\', '/');
     }
 
     private static int Count(string text, string value)
@@ -621,21 +621,4 @@ public sealed class BoundaryEnforcementTests
         return count;
     }
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(
-                    directory.FullName,
-                    "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Could not find the repository root.");
-    }
 }

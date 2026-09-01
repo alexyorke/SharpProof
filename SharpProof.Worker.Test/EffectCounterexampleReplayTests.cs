@@ -397,7 +397,7 @@ public sealed class EffectCounterexampleReplayTests
             Is.Not.EqualTo(operationIdentity));
 
         var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Worker",
             "EffectCounterexampleReplayer.cs"));
         using (Assert.EnterMultipleScope())
@@ -840,25 +840,6 @@ public sealed class EffectCounterexampleReplayTests
             Line = source.Line,
             Column = source.Column
         };
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(
-                 TestContext.CurrentContext.TestDirectory);
-             directory != null;
-             directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(
-                    directory.FullName,
-                    "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new DirectoryNotFoundException(
-            "Could not find the SharpProof repository root.");
     }
 
     private const string CallableId = "M:Subject.Allocate";

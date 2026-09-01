@@ -684,7 +684,8 @@ internal static class CompilerManifestArtifactJson
             if (loweredPostconditions.Length != postconditions.Length ||
                 !loweredPostconditions.Select(static clause => clause?.ClaimId)
                     .SequenceEqual(postconditions.Select(static claim => claim!.ClaimId), StringComparer.Ordinal) ||
-                !loweredPostconditions.Select(static clause => ManifestEvidence(clause!.Evidence))
+                !loweredPostconditions.Select(static clause =>
+                    CompilerLoweredArtifact.ManifestEvidence(clause!.Evidence))
                     .SequenceEqual(postconditions.Select(static claim => claim!.Evidence)))
             {
                 return false;
@@ -713,18 +714,6 @@ internal static class CompilerManifestArtifactJson
         }
 
         return true;
-    }
-
-    private static WorkerClaimEvidence ManifestEvidence(
-        CompilerContractEvidence value)
-    {
-        return value switch
-        {
-            CompilerContractEvidence.CompilerBoundInvocation => WorkerClaimEvidence.DirectClause,
-            CompilerContractEvidence.ClosedAttribute => WorkerClaimEvidence.ReturnAttribute,
-            CompilerContractEvidence.Companion => WorkerClaimEvidence.CompanionClause,
-            _ => WorkerClaimEvidence.Unspecified
-        };
     }
 
     private static void RequireSpecificationPackAuthorityProperties(string json)

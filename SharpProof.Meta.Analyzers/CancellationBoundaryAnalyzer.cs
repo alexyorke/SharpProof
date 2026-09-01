@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
+using static SharpProof.Meta.Analyzers.SharpProofSoundnessAnalyzer;
 
 namespace SharpProof.Meta.Analyzers;
 
@@ -371,6 +372,26 @@ internal static class CancellationBoundaryAnalyzer
         }
     }
 
+    private static IOperation? UnwrapConfigureAwait(
+        IOperation? operation,
+        INamedTypeSymbol? awaitedType = null)
+    {
+        operation = Unwrap(operation);
+        return operation is IInvocationOperation configureAwait &&
+            configureAwait.TargetMethod is
+            {
+                Name: "ConfigureAwait",
+                IsStatic: false,
+                Parameters.Length: 1
+            } method &&
+            method.Parameters[0].Type.SpecialType == SpecialType.System_Boolean &&
+            (awaitedType == null || SymbolEqualityComparer.Default.Equals(
+                method.ContainingType,
+                awaitedType))
+                ? Unwrap(configureAwait.Instance)
+                : operation;
+    }
+
     private static bool TypePatternExcludesCancellation(
         ITypeSymbol matchedType,
         INamedTypeSymbol? cancellationType)
@@ -545,22 +566,9 @@ internal static class CancellationBoundaryAnalyzer
             return false;
         }
 
-        var responseOperation = Unwrap(awaited.Operation);
-        if (responseOperation is IInvocationOperation configureAwait &&
-            configureAwait.TargetMethod is
-            {
-                Name: "ConfigureAwait",
-                IsStatic: false,
-                Parameters.Length: 1
-            } &&
-            SymbolEqualityComparer.Default.Equals(
-                configureAwait.TargetMethod.ContainingType,
-                symbols.TaskOfInt32) &&
-            configureAwait.TargetMethod.Parameters[0].Type.SpecialType ==
-                SpecialType.System_Boolean)
-        {
-            responseOperation = Unwrap(configureAwait.Instance);
-        }
+        var responseOperation = UnwrapConfigureAwait(
+            awaited.Operation,
+            symbols.TaskOfInt32);
 
         if (responseOperation is not IInvocationOperation respond ||
             respond.TargetMethod is not
@@ -659,19 +667,7 @@ internal static class CancellationBoundaryAnalyzer
             return false;
         }
 
-        var publication = Unwrap(awaited.Operation);
-        if (publication is IInvocationOperation configureAwait &&
-            configureAwait.TargetMethod is
-            {
-                Name: "ConfigureAwait",
-                IsStatic: false,
-                Parameters.Length: 1
-            } &&
-            configureAwait.TargetMethod.Parameters[0].Type.SpecialType ==
-                SpecialType.System_Boolean)
-        {
-            publication = Unwrap(configureAwait.Instance);
-        }
+        var publication = UnwrapConfigureAwait(awaited.Operation);
 
         if (publication is not IInvocationOperation write ||
             write.TargetMethod is not
@@ -1042,14 +1038,4 @@ internal static class CancellationBoundaryAnalyzer
         arguments.ElementType.SpecialType == SpecialType.System_String;
     }
 
-    private static bool IsSameType(
-        ITypeSymbol? actual,
-        INamedTypeSymbol? expected)
-    {
-        return actual != null &&
-        expected != null &&
-        SymbolEqualityComparer.Default.Equals(
-            actual.OriginalDefinition,
-            expected.OriginalDefinition);
-    }
 }

@@ -535,6 +535,12 @@ internal static partial class SemanticClaimIdentity
         return method.PartialImplementationPart ?? method;
     }
 
+    internal static IMethodSymbol NormalizeCandidate(IMethodSymbol method)
+    {
+        method = method.ReducedFrom ?? method;
+        return method.PartialImplementationPart ?? method;
+    }
+
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
     {
         return left.SyntaxTree == right.SyntaxTree && left.Span == right.Span;

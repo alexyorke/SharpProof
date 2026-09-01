@@ -67,7 +67,7 @@ public sealed class DevCheckCommandPlanTests
     [Test]
     public async Task DeveloperCheckConsumesThePlanAuthority()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var script = await File.ReadAllTextAsync(Path.Combine(
             root, "scripts", "Invoke-SharpProofDevCheck.ps1"));
 
@@ -81,7 +81,7 @@ public sealed class DevCheckCommandPlanTests
 
     private static async Task<JsonDocument> ReadPlan(string configuration)
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var info = new ProcessStartInfo
         {
             FileName = "pwsh",
@@ -105,17 +105,4 @@ public sealed class DevCheckCommandPlanTests
         return JsonDocument.Parse(await output);
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
-    }
 }

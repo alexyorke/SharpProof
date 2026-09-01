@@ -23,31 +23,11 @@ public sealed partial class ContractClauseOccurrence
         SourceOrdinal = sourceOrdinal;
         Invocation = invocation;
     }
-
-    public BoundContractKind Kind
-    {
-        get;
-    }
-
-    public ContractClausePlacement Placement
-    {
-        get;
-    }
-
-    public int Ordinal
-    {
-        get;
-    }
-
-    public int SourceOrdinal
-    {
-        get;
-    }
-
-    public IInvocationOperation Invocation
-    {
-        get;
-    }
+    public BoundContractKind Kind { get; }
+    public ContractClausePlacement Placement { get; }
+    public int Ordinal { get; }
+    public int SourceOrdinal { get; }
+    public IInvocationOperation Invocation { get; }
 }
 
 public sealed partial class ContractClauseInventory
@@ -66,51 +46,20 @@ public sealed partial class ContractClauseInventory
         ImplementationBody = implementationBody;
         Clauses = clauses;
     }
-
-    public IMethodSymbol Callable
-    {
-        get;
-    }
-
-    public bool ContractApiAvailable
-    {
-        get;
-    }
-
-    public bool HasRejectedContractApiUsage
-    {
-        get;
-    }
-
-    public IOperation? ImplementationBody
-    {
-        get;
-    }
-
-    public ImmutableArray<ContractClauseOccurrence> Clauses
-    {
-        get;
-    }
+    public IMethodSymbol Callable { get; }
+    public bool ContractApiAvailable { get; }
+    public bool HasRejectedContractApiUsage { get; }
+    public IOperation? ImplementationBody { get; }
+    public ImmutableArray<ContractClauseOccurrence> Clauses { get; }
 }
 
 public sealed partial class ContractBindingResult
 {
-    private ContractBindingResult(
-        BoundMethodContracts? contracts,
-        ContractBindingFailure failure
-    )
+    private ContractBindingResult(BoundMethodContracts? contracts, ContractBindingFailure failure)
     {
         Contracts = contracts;
         Failure = failure;
     }
-
-    public BoundMethodContracts? Contracts
-    {
-        get;
-    }
-
-    public ContractBindingFailure Failure
-    {
-        get;
-    }
+    public BoundMethodContracts? Contracts { get; }
+    public ContractBindingFailure Failure { get; }
 }

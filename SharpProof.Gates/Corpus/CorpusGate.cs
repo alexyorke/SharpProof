@@ -44,20 +44,16 @@ internal static class CorpusGate
         var openSourceCases = cases
             .Where(static item => item.Origin == CorpusOrigin.OpenSource)
             .ToImmutableArray();
+        var corpusDirectory =
+            OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot);
         var snapshotPath = Path.Combine(
-            repositoryRoot,
-            "SharpProof.Gates",
-            "Corpus",
+            corpusDirectory,
             "expected.canonical.snapshot");
         var allowancePath = Path.Combine(
-            repositoryRoot,
-            "SharpProof.Gates",
-            "Corpus",
+            corpusDirectory,
             "proven-to-unknown.json");
         var unknownReasonRatchetPath = Path.Combine(
-            repositoryRoot,
-            "SharpProof.Gates",
-            "Corpus",
+            corpusDirectory,
             "unknown-reason-ratchet.json");
         var expected = LoadSnapshot(snapshotPath);
         var allowances = LoadAllowances(allowancePath);
@@ -382,10 +378,10 @@ internal static class CorpusGate
             .ConfigureAwait(false);
         var document = import?.Document ??
             OpenSourceCorpusCatalog.Load(repositoryRoot);
+        var corpusDirectory =
+            OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot);
         var snapshotPath = Path.Combine(
-            repositoryRoot,
-            "SharpProof.Gates",
-            "Corpus",
+            corpusDirectory,
             "expected.canonical.snapshot");
         var snapshot = await RenderActualSnapshotAsync(
                 document,
@@ -394,7 +390,7 @@ internal static class CorpusGate
         var updates = import?.Updates.ToList() ?? [];
         updates.Add(new CorpusFileUpdate(snapshotPath, snapshot));
         await CorpusFileTransaction.WriteAllAsync(
-                OpenSourceCorpusCatalog.GetCorpusDirectory(repositoryRoot),
+                corpusDirectory,
                 updates,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -539,40 +535,20 @@ internal static class CorpusGate
             SnapshotExpectation>(StringComparer.Ordinal);
         foreach (var rawLine in CorpusSnapshotFormat.ReadDataLines(path))
         {
-            var line = rawLine;
-
-            var parts = line.Split('|');
-            if (parts.Length != 4 ||
-                !Enum.TryParse<CorpusVerdict>(
-                    parts[1],
-                    ignoreCase: false,
-                    out var verdict) ||
-                !Enum.TryParse<AnalyzerSemanticOutcome>(
-                    parts[2],
-                    ignoreCase: false,
-                    out var semanticOutcome))
+            if (!CorpusSnapshotFormat.TryParseData(
+                    rawLine,
+                    out var expectation))
             {
                 throw new InvalidDataException(
                     $"Invalid corpus snapshot line: {rawLine}");
             }
 
-            ImmutableArray<string> diagnostics = parts[3].Length == 0
-                ? []
-                : [.. parts[3].Split(',')
-                    .OrderBy(static diagnostic =>
-                        diagnostic,
-                        StringComparer.Ordinal)
-                ];
             if (!result.TryAdd(
-                    parts[0],
-                    new SnapshotExpectation(
-                        parts[0],
-                        verdict,
-                        semanticOutcome,
-                        diagnostics)))
+                    expectation.CaseId,
+                    expectation))
             {
                 throw new InvalidDataException(
-                    $"Duplicate corpus snapshot case: {parts[0]}");
+                    $"Duplicate corpus snapshot case: {expectation.CaseId}");
             }
         }
         return result.ToImmutable();

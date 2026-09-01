@@ -215,7 +215,8 @@ internal sealed class CompilerSpecificationPackProvider
         IMethodSymbol method,
         out MethodDefinition definition)
     {
-        method = Normalize(method);
+        method = SemanticClaimIdentity.NormalizeCandidate(method)
+            .OriginalDefinition;
         var identity = method.GetDocumentationCommentId();
         if (identity == null ||
             !_methods.TryGetValue(identity, out var resolved) ||
@@ -332,13 +333,6 @@ internal sealed class CompilerSpecificationPackProvider
         return approved.Any(candidate =>
             candidate.Name == identity.Name &&
             candidate.PublicKeyToken == token);
-    }
-
-    private static IMethodSymbol Normalize(IMethodSymbol method)
-    {
-        method = method.ReducedFrom ?? method;
-        method = method.PartialImplementationPart ?? method;
-        return method.OriginalDefinition;
     }
 
     private static Catalog LoadCatalog()

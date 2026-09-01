@@ -41,7 +41,7 @@ internal sealed class DocumentationSnippetTests
 
     private static IEnumerable<TestCaseData> GetCSharpSnippets()
     {
-        var root = AnalyzerTestHost.FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var paths = new[] { Path.Combine(root, "README.md") }
             .Concat(Directory.EnumerateFiles(
                 Path.Combine(root, "docs"),

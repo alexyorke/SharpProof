@@ -57,18 +57,12 @@ internal sealed partial class SharpProofAnalyzerEngine
 
 internal static partial class AnalyzerFeaturePipeline
 {
-    private readonly partial record struct MethodSelection(
-        ContractSelectionFeatures Features,
-        bool IsSuppressed
-    );
+    private readonly partial record struct MethodSelection(ContractSelectionFeatures Features, bool IsSuppressed);
 }
 
 internal static partial class RequiresCallSiteAnalyzer
 {
-    private readonly partial record struct ClauseEvaluation(
-        bool? Value,
-        IrTerm Condition
-    );
+    private readonly partial record struct ClauseEvaluation(bool? Value, IrTerm Condition);
 }
 
 internal sealed partial class RequiresCallSiteDiscovery

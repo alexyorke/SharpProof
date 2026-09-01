@@ -7,10 +7,7 @@
 #nullable enable
 namespace SharpProof.Worker;
 
-internal sealed partial record WorkerInputSnapshot(
-    CompilerManifestArtifact CompilerManifest,
-    string InputHash
-);
+internal sealed partial record WorkerInputSnapshot(CompilerManifestArtifact CompilerManifest, string InputHash);
 
 internal sealed partial record CallableEntryFeasibility(
     CallableEntryFeasibilityKind Kind,
@@ -89,10 +86,7 @@ internal readonly partial record struct GuardedBodySummaryAssumption(
     IrTerm Predicate
 );
 
-internal readonly partial record struct SpecResultProjection(
-    IrVarId? NonNullVariable,
-    IrVarId? LengthVariable
-);
+internal readonly partial record struct SpecResultProjection(IrVarId? NonNullVariable, IrVarId? LengthVariable);
 
 internal sealed partial class AcyclicBlockPredicateExecutor
 {

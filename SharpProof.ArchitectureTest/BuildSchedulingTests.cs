@@ -12,7 +12,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void ProductionInventoryUsesBoundedCatalogOwnedParallelism()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         using var contract = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,
             "eng",
@@ -42,7 +42,7 @@ public sealed class BuildSchedulingTests
     public void PackageLayoutFixtureUsesIsolatedProcessShards()
     {
         var packageTests = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofPackageTests.ps1"));
 
@@ -70,7 +70,7 @@ public sealed class BuildSchedulingTests
     public void ContainmentTestsUseExclusiveFreshProcesses()
     {
         var packageTests = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofPackageTests.ps1"));
 
@@ -98,7 +98,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void PackageBuildsReuseOutputsAndUseScopedCompilerServers()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var packageTests = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -148,7 +148,7 @@ public sealed class BuildSchedulingTests
     public void SemanticBuildUsesOnlyItsRequiredProjectClosure()
     {
         var semantic = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofSemanticTests.ps1"));
 
@@ -176,7 +176,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void PersistentLoopReusesPrivateBuildOutputsAndSerializesCommands()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var compose = File.ReadAllText(Path.Combine(root, "compose.yaml"));
         var dockerfile = File.ReadAllText(Path.Combine(
             root,
@@ -237,7 +237,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void PersistentIterationsReuseBuildServersAndSafeTestWorkers()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var compose = File.ReadAllText(Path.Combine(root, "compose.yaml"));
         var analyzerAssembly = File.ReadAllText(Path.Combine(
             root,
@@ -279,7 +279,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void HostLoopSnapshotAvoidsBindMountGitDiffScanning()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var hostLoopPath = Path.Combine(
             root,
             "scripts",
@@ -325,7 +325,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void NestedPackageConsumersUseClosureScopedCompilerServers()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var fixtures = new[]
         {
             "FinalCompilationProbeTests.cs",
@@ -372,7 +372,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public async Task SolutionBuildsAndTestsUseStaticGraphScheduling()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var module = Path.Combine(
             root, "scripts", "SharpProof.ContainerExecution.psm1");
         var escapedModule = module.Replace("'", "''", StringComparison.Ordinal);
@@ -432,7 +432,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public async Task SemanticSchedulerUsesAllVisibleProcessorsUnlessCapped()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var module = Path.Combine(
             root, "scripts", "SharpProof.ContainerExecution.psm1");
         var escapedModule = module.Replace("'", "''", StringComparison.Ordinal);
@@ -503,7 +503,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public async Task PackageSchedulerUsesMeasuredProcessorBudgetUnlessCapped()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var module = Path.Combine(
             root, "scripts", "SharpProof.ContainerExecution.psm1");
         var escapedModule = module.Replace("'", "''", StringComparison.Ordinal);
@@ -562,7 +562,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void WorkerTestsRestoreOnlyTheWorkerProjectClosure()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var workerProject = File.ReadAllText(Path.Combine(
             root,
             "SharpProof.Worker.Test",
@@ -595,7 +595,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void WorkerTestsCanReuseACompletedBuild()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var container = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -620,7 +620,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void WarmTestCommandsForwardTheNoBuildSwitch()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var container = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -645,7 +645,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void FastTestBuildsSkipAnalyzersWithoutWeakeningQualification()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var container = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -692,7 +692,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void NoBuildProjectTestsCanUseTheBuiltAssemblyDirectly()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var module = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -723,7 +723,7 @@ public sealed class BuildSchedulingTests
     public void BuiltSingleProjectTestsBypassTheMsBuildTestTarget()
     {
         var container = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofContainer.ps1"));
 
@@ -745,7 +745,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void PackageWorkerDiscoveryUsesTheBuiltAssemblyDirectly()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var package = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -768,7 +768,7 @@ public sealed class BuildSchedulingTests
     public void PackageShardsUseBuiltAssembliesOutsideCoverage()
     {
         var package = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofPackageTests.ps1"));
 
@@ -796,7 +796,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void SemanticWorkerShardsUseBuiltAssembliesOutsideCoverage()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var semantic = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -816,7 +816,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void SemanticArchitectureShardsCoverEveryFixture()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var semantic = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -872,7 +872,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void SemanticShardingAlwaysSplitsTheCoverageHotspot()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var semantic = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -957,7 +957,7 @@ public sealed class BuildSchedulingTests
     [Test]
     public void ChangedTestsCanReuseACompletedBuild()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var changed = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -1001,17 +1001,4 @@ public sealed class BuildSchedulingTests
             .ToArray();
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
-    }
 }

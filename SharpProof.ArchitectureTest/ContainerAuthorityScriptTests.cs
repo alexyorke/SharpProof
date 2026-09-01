@@ -22,7 +22,7 @@ public sealed class ContainerAuthorityScriptTests
     [Test]
     public async Task ComposeToolingImageIsProjectPrivateAndOverrideable()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var compose = await File.ReadAllTextAsync(
             Path.Combine(root, "compose.yaml"));
         var imageLine = compose.Split('\n').Single(static line =>
@@ -55,7 +55,7 @@ public sealed class ContainerAuthorityScriptTests
     [Test]
     public void NamedStagesHaveStandaloneNonRootExecutionContracts()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var dockerfile = File.ReadAllText(Path.Combine(
             root,
             "eng",
@@ -237,7 +237,7 @@ public sealed class ContainerAuthorityScriptTests
         Func<string, string> mutateDockerfile,
         Func<string, string> mutateCompose)
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var fixture = Path.Combine(
             Path.GetTempPath(),
             "SharpProof.ContainerAuthority." + Guid.NewGuid().ToString("N"));
@@ -272,16 +272,6 @@ public sealed class ContainerAuthorityScriptTests
         {
             Directory.Delete(fixture, recursive: true);
         }
-    }
-
-    private static string RepositoryRoot()
-    {
-        var path = TestContext.CurrentContext.TestDirectory;
-        while (path is not null && !File.Exists(Path.Combine(path, "SharpProof.sln")))
-        {
-            path = Directory.GetParent(path)?.FullName;
-        }
-        return path ?? throw new InvalidOperationException("Repository root was not found.");
     }
 
     private static async Task<ProcessResult> RunAsync(

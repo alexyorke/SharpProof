@@ -25,7 +25,7 @@ public sealed class PublicationPlanSemanticAuthorityTests
         bool expectedValid)
     {
         var script = await File.ReadAllTextAsync(Path.Combine(
-            FindRepositoryRoot(), "scripts", "Publish-SharpProofRelease.ps1"));
+            TestRepository.FindRoot(), "scripts", "Publish-SharpProofRelease.ps1"));
         script = mutation switch
         {
             "malformed-rebound" => Remove(script, SbomParseAuthority),
@@ -103,17 +103,4 @@ public sealed class PublicationPlanSemanticAuthorityTests
         return script.Replace(authority, string.Empty, StringComparison.Ordinal);
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
-    }
 }

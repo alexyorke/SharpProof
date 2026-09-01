@@ -64,13 +64,21 @@ function Emit-Record([Collections.Generic.List[string]]$Lines,
     $parameters = @(Required $Record 'parameters' $Context)
     $modifierSource = if ($modifiers.Count -eq 0) { '' } else { ($modifiers -join ' ') + ' ' }
     $recordKeyword = if ($kind -eq 'recordStruct') { 'record struct' } else { 'record' }
-    $Lines.Add("$Indent$accessibility $modifierSource`partial $recordKeyword $name(")
-    for ($index = 0; $index -lt $parameters.Count; $index++) {
+    $parameterSources = for ($index = 0; $index -lt $parameters.Count; $index++) {
         $parameter = $parameters[$index]
         $type = TypeName ([string](Required $parameter 'type' "$Context parameter $index") ) "$Context parameter $index type"
         $parameterName = Identifier ([string](Required $parameter 'name' "$Context parameter $index") ) "$Context parameter $index name"
-        $comma = if ($index -lt $parameters.Count - 1) { ',' } else { '' }
-        $Lines.Add("$Indent    $type $parameterName$comma")
+        "$type $parameterName"
+    }
+    $declaration = "$Indent$accessibility $modifierSource`partial $recordKeyword $name(" + ($parameterSources -join ', ') + ');'
+    if ($declaration.Length -le 120) {
+        $Lines.Add($declaration)
+        return
+    }
+    $Lines.Add("$Indent$accessibility $modifierSource`partial $recordKeyword $name(")
+    for ($index = 0; $index -lt $parameterSources.Count; $index++) {
+        $comma = if ($index -lt $parameterSources.Count - 1) { ',' } else { '' }
+        $Lines.Add("$Indent    $($parameterSources[$index])$comma")
     }
     $Lines.Add("$Indent);")
 }
@@ -149,12 +157,18 @@ function Emit-Class([Collections.Generic.List[string]]$Lines,
     if ($storageTag) {
         $parameterSources.Add('StorageTag storage')
     }
-    $Lines.Add("$Indent    $constructorAccess $name(")
-    for ($index = 0; $index -lt $parameterSources.Count; $index++) {
-        $comma = if ($index -lt $parameterSources.Count - 1) { ',' } else { '' }
-        $Lines.Add("$Indent        $($parameterSources[$index])$comma")
+    $constructorDeclaration = "$Indent    $constructorAccess $name(" + ($parameterSources -join ', ') + ')'
+    if ($constructorDeclaration.Length -le 120) {
+        $Lines.Add($constructorDeclaration)
     }
-    $Lines.Add("$Indent    )")
+    else {
+        $Lines.Add("$Indent    $constructorAccess $name(")
+        for ($index = 0; $index -lt $parameterSources.Count; $index++) {
+            $comma = if ($index -lt $parameterSources.Count - 1) { ',' } else { '' }
+            $Lines.Add("$Indent        $($parameterSources[$index])$comma")
+        }
+        $Lines.Add("$Indent    )")
+    }
     $Lines.Add("$Indent    {")
     foreach ($assignment in $assignments) {
         $propertyName = Identifier ([string](Required $assignment 'property' "$Context assignment")) "$Context assignment property"
@@ -172,11 +186,7 @@ function Emit-Class([Collections.Generic.List[string]]$Lines,
         $propertyAccess = Identifier ([string](Required $property 'accessibility' "$Context property")) "$Context property accessibility"
         $propertyType = TypeName ([string](Required $property 'type' "$Context property")) "$Context property type"
         $propertyName = Identifier ([string](Required $property 'name' "$Context property")) "$Context property name"
-        $Lines.Add('')
-        $Lines.Add("$Indent    $propertyAccess $propertyType $propertyName")
-        $Lines.Add("$Indent    {")
-        $Lines.Add("$Indent        get;")
-        $Lines.Add("$Indent    }")
+        $Lines.Add("$Indent    $propertyAccess $propertyType $propertyName { get; }")
     }
     $Lines.Add("$Indent}")
 }

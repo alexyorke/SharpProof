@@ -983,7 +983,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         return current?.IsGlobalNamespace == true;
     }
 
-    private static bool IsSameType(ITypeSymbol? actual, INamedTypeSymbol? expected)
+    internal static bool IsSameType(ITypeSymbol? actual, INamedTypeSymbol? expected)
     {
         return actual != null &&
         expected != null &&

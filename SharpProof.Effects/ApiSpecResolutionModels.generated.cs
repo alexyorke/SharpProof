@@ -9,31 +9,15 @@ namespace SharpProof.Specs;
 
 public sealed partial class ApiSpecLookupResult
 {
-    public ApiSpecLookupResult(
-        ApiSpecLookupStatus status,
-        ResolvedApiSpec? spec,
-        ApiSpecLookupFailure? failure
-    )
+    public ApiSpecLookupResult(ApiSpecLookupStatus status, ResolvedApiSpec? spec, ApiSpecLookupFailure? failure)
     {
         Status = status;
         Spec = spec;
         Failure = failure;
     }
-
-    public ApiSpecLookupStatus Status
-    {
-        get;
-    }
-
-    public ResolvedApiSpec? Spec
-    {
-        get;
-    }
-
-    public ApiSpecLookupFailure? Failure
-    {
-        get;
-    }
+    public ApiSpecLookupStatus Status { get; }
+    public ResolvedApiSpec? Spec { get; }
+    public ApiSpecLookupFailure? Failure { get; }
 }
 
 public sealed partial record ApiSpecResolutionFailure(
@@ -43,10 +27,7 @@ public sealed partial record ApiSpecResolutionFailure(
     string Detail
 );
 
-public sealed partial record ResolvedApiSpec(
-    ApiSpecTemplate Template,
-    ISymbol Symbol
-);
+public sealed partial record ResolvedApiSpec(ApiSpecTemplate Template, ISymbol Symbol);
 
 public sealed partial record ApiSpecLookupFailure(
     ApiSpecLookupFailureKind Kind,

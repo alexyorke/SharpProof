@@ -1612,7 +1612,7 @@ public sealed class ContractBinderTests
     [Test]
     public void ProductionBinderContainsNoTextualOrSpeculativeBindingEscapeHatches()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var files = Directory.GetFiles(
             Path.Combine(root, "SharpProof.Contracts"),
             "*.cs",
@@ -1632,21 +1632,6 @@ public sealed class ContractBinderTests
                 Assert.That(text, Does.Not.Contain(token), file);
             }
         }
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, "SharpProof.Contracts")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("Repository root was not found.");
     }
 
     private sealed class ContractSubject : IDisposable

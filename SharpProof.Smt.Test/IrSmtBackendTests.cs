@@ -534,22 +534,6 @@ public sealed class IrSmtBackendTests
     }
 
     [Test]
-    public void ResourceAccountingAddsLowerFreshSnapshotsWithoutWrap()
-    {
-        using var backend = new IrSmtBackend();
-        var addResourceCount = typeof(IrSmtBackend).GetMethod(
-            "AddResourceCount",
-            System.Reflection.BindingFlags.Instance |
-            System.Reflection.BindingFlags.NonPublic);
-
-        Assert.That(addResourceCount, Is.Not.Null);
-        _ = addResourceCount!.Invoke(backend, [500L]);
-        _ = addResourceCount.Invoke(backend, [7L]);
-
-        Assert.That(backend.ConsumedResourceCount, Is.EqualTo(507));
-    }
-
-    [Test]
     public void UnsatCoreWrappersAreDisposedOnSuccessAndMalformedResult()
     {
         var successful = new[]

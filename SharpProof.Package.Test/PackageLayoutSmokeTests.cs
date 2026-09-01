@@ -328,7 +328,7 @@ public sealed class PackageLayoutSmokeTests
     public async Task SymbolPackagesAreExactPortableAndSourceLinked()
     {
         var feed = await PackagedProductFeed.GetAsync();
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = TestRepository.FindRoot();
         var revision = await RunProcessAsync(
             repositoryRoot,
             "git",
@@ -360,7 +360,7 @@ public sealed class PackageLayoutSmokeTests
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = ReleaseEvidenceWorkspace.Create(feed.Version);
         var script = Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "New-SharpProofReleaseEvidence.ps1");
         var arguments = new[] {
@@ -374,7 +374,7 @@ public sealed class PackageLayoutSmokeTests
             workspace.OutputDirectory
         };
         var invalidSbom = await RunProcessAsync(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "pwsh",
             [
                 .. arguments,
@@ -387,7 +387,7 @@ public sealed class PackageLayoutSmokeTests
             Does.Contain(
                 "SPDX document does not have the exact canonical property set and order"));
         var firstRun = await RunProcessAsync(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "pwsh",
             arguments);
         Assert.That(firstRun.ExitCode, Is.Zero, firstRun.Output);
@@ -398,7 +398,7 @@ public sealed class PackageLayoutSmokeTests
         var firstSbom = await File.ReadAllBytesAsync(
             workspace.SbomPath);
         var secondRun = await RunProcessAsync(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "pwsh",
             arguments);
         Assert.That(secondRun.ExitCode, Is.Zero, secondRun.Output);
@@ -488,11 +488,11 @@ public sealed class PackageLayoutSmokeTests
                 artifact.GetProperty("fileName").GetString())));
 
         var validationScript = Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Test-SharpProofReleaseArtifacts.ps1");
         var validation = await RunProcessAsync(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "pwsh",
             [
                 "-NoLogo",
@@ -776,7 +776,7 @@ public sealed class PackageLayoutSmokeTests
             Guid.NewGuid().ToString("N"));
         try
         {
-            var repository = FindRepositoryRoot();
+            var repository = TestRepository.FindRoot();
             var packageRoot = Directory.CreateDirectory(
                 Path.Combine(root, "package;layout"));
             var packageBuild = Directory.CreateDirectory(
@@ -2384,7 +2384,7 @@ public sealed class PackageLayoutSmokeTests
     {
         using var catalog = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(
-                FindRepositoryRoot(),
+                TestRepository.FindRoot(),
                 "eng",
                 "container",
                 "toolchain.json")));
@@ -2632,26 +2632,6 @@ public sealed class PackageLayoutSmokeTests
                     "CollectorDependency"));
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(
-            typeof(SharpProofWorker).Assembly.Location);
-        while (directory != null)
-        {
-            if (File.Exists(
-                    Path.Combine(
-                        directory.FullName,
-                        "SharpProof.Release.props")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Repository root was not found.");
-    }
-
     private sealed class PackageWorkspace : IDisposable
     {
         private readonly string _root;
@@ -2753,7 +2733,7 @@ public sealed class PackageLayoutSmokeTests
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
             File.Copy(
-                Path.Combine(FindRepositoryRoot(), "global.json"),
+                Path.Combine(TestRepository.FindRoot(), "global.json"),
                 Path.Combine(root, "global.json"));
             return new PackageWorkspace(root);
         }
@@ -2984,7 +2964,7 @@ public sealed class PackageLayoutSmokeTests
                     SecurityElement.Escape(property.Value) +
                     "</" + property.Name + ">"));
             var consumerProps = SecurityElement.Escape(Path.Combine(
-                FindRepositoryRoot(),
+                TestRepository.FindRoot(),
                 "SharpProof.AnalyzerConsumer.props"));
             File.WriteAllText(
                 ConsumerProject,
@@ -3002,7 +2982,7 @@ public sealed class PackageLayoutSmokeTests
 
         internal string WriteMappedSourceConsumerSolution()
         {
-            var repository = FindRepositoryRoot();
+            var repository = TestRepository.FindRoot();
             var consumerProps = SecurityElement.Escape(Path.Combine(
                 repository,
                 "SharpProof.AnalyzerConsumer.props"));

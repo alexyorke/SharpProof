@@ -244,7 +244,7 @@ public sealed class CompilerArtifactModelSchemaTests
     public void EffectEvidenceUnknownReasonsAreDerivedFromProtocolTuples()
     {
         using var protocol = JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Worker.Protocol",
             "ProtocolModel.schema.json")));
         var table = protocol.RootElement.GetProperty("validationTables")
@@ -924,22 +924,9 @@ public sealed class CompilerArtifactModelSchemaTests
     private static JsonDocument ReadSchema()
     {
         return JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.CompilerArtifact",
             "CompilerArtifactModel.schema.json")));
     }
 
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory != null;
-             directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-        }
-        throw new InvalidOperationException("Could not find repository root.");
-    }
 }

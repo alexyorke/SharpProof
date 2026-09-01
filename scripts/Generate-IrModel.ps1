@@ -492,28 +492,28 @@ foreach ($declaration in $declarations)
 
     if ($constructorImplementation -eq 'generated')
     {
-        if ($parameterSources.Count -le 3)
+        $baseSuffix = ''
+        if ($baseArguments.Count -ne 0)
         {
-            $parameterSource = $parameterSources -join ', '
-            $constructorLine =
-                "    $constructorAccessibility $name($parameterSource)"
-            if ($baseArguments.Count -ne 0)
-            {
-                $escapedBaseArguments = @(
-                    $baseArguments | ForEach-Object {
-                        $value = [string]$_
-                        if ($parameterNames.Contains($value))
-                        {
-                            ConvertTo-CSharpIdentifier $value
-                        }
-                        else
-                        {
-                            $value
-                        }
-                    })
-                $constructorLine +=
-                    " : base($($escapedBaseArguments -join ', '))"
-            }
+            $escapedBaseArguments = @(
+                $baseArguments | ForEach-Object {
+                    $value = [string]$_
+                    if ($parameterNames.Contains($value))
+                    {
+                        ConvertTo-CSharpIdentifier $value
+                    }
+                    else
+                    {
+                        $value
+                    }
+                })
+            $baseSuffix = " : base($($escapedBaseArguments -join ', '))"
+        }
+        $constructorLine =
+            "    $constructorAccessibility $name(" +
+            "$($parameterSources -join ', '))$baseSuffix"
+        if ($constructorLine.Length -le 120)
+        {
             $lines.Add($constructorLine)
         }
         else
@@ -531,24 +531,7 @@ foreach ($declaration in $declarations)
                 }
                 $lines.Add("        $($parameterSources[$index])$comma")
             }
-            $close = '    )'
-            if ($baseArguments.Count -ne 0)
-            {
-                $escapedBaseArguments = @(
-                    $baseArguments | ForEach-Object {
-                        $value = [string]$_
-                        if ($parameterNames.Contains($value))
-                        {
-                            ConvertTo-CSharpIdentifier $value
-                        }
-                        else
-                        {
-                            $value
-                        }
-                    })
-                $close += " : base($($escapedBaseArguments -join ', '))"
-            }
-            $lines.Add($close)
+            $lines.Add("    )$baseSuffix")
         }
         $lines.Add('    {')
         if ($assignments.Count -ne 0)
@@ -586,10 +569,7 @@ foreach ($declaration in $declarations)
         $lines.Add('')
         $lines.Add(
             "    $($property.accessibility) $($property.type) " +
-            "$($property.name)")
-        $lines.Add('    {')
-        $lines.Add('        get;')
-        $lines.Add('    }')
+            "$($property.name) { get; }")
     }
     $lines.Add('}')
 }

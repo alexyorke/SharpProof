@@ -671,7 +671,7 @@ public sealed class FinalCompilationProbeTests
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
             File.Copy(
-                Path.Combine(FindRepositoryRoot(), "global.json"),
+                Path.Combine(TestRepository.FindRoot(), "global.json"),
                 Path.Combine(root, "global.json"));
             return new ProbeWorkspace(root);
         }
@@ -1009,11 +1009,6 @@ public sealed class FinalCompilationProbeTests
                   </ItemGroup>
                 </Project>
                 """;
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            return PackagedProductFeed.FindRepositoryRoot();
         }
 
         private static string Escape(string value)

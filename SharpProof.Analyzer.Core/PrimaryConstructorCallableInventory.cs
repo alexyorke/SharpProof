@@ -27,14 +27,7 @@ internal static class PrimaryConstructorCallableInventory
                         TypeDeclarationSyntax owner &&
                     owner.Span == declaration.Span))
             .ToArray();
-        if (matches.Length != 1)
-        {
-            return false;
-        }
-
-        constructor = ContractClauseInventoryBuilder.NormalizeCallable(
-            matches[0]);
-        return true;
+        return TrySingle(matches, out constructor);
     }
 
     internal static bool TryGetSynthesizedDefault(
@@ -60,14 +53,7 @@ internal static class PrimaryConstructorCallableInventory
                 candidate.IsImplicitlyDeclared &&
                 candidate.Parameters.IsEmpty)
             .ToArray();
-        if (matches.Length != 1)
-        {
-            return false;
-        }
-
-        constructor = ContractClauseInventoryBuilder.NormalizeCallable(
-            matches[0]);
-        return true;
+        return TrySingle(matches, out constructor);
     }
 
     internal static bool IsDeclaration(
@@ -82,5 +68,15 @@ internal static class PrimaryConstructorCallableInventory
             SymbolEqualityComparer.Default.Equals(
                 constructor,
                 ContractClauseInventoryBuilder.NormalizeCallable(method));
+    }
+
+    private static bool TrySingle(
+        IMethodSymbol[] matches,
+        out IMethodSymbol constructor)
+    {
+        constructor = matches.Length == 1
+            ? ContractClauseInventoryBuilder.NormalizeCallable(matches[0])
+            : null!;
+        return constructor != null;
     }
 }

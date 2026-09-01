@@ -76,7 +76,7 @@ public sealed class VerifierPublicationTransactionTests
 
     private static string ReadLauncherSource()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         return File.ReadAllText(Path.Combine(
             root,
             "SharpProof.Worker.Launcher",
@@ -85,26 +85,11 @@ public sealed class VerifierPublicationTransactionTests
 
     private static string ReadAtomicFileSource()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         return File.ReadAllText(Path.Combine(
             root,
             "SharpProof.Ir",
             "AtomicFile.cs"));
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Repository root not found.");
-    }
 }

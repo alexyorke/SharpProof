@@ -75,34 +75,13 @@ public sealed class GeneratedCSharpExpression
         NodeCount = 1 + children.Sum(static child => child.NodeCount);
     }
 
-    public GeneratedExpressionKind Kind
-    {
-        get;
-    }
-    public GeneratedExpressionType Type
-    {
-        get;
-    }
-    public long IntegerValue
-    {
-        get;
-    }
-    public bool BooleanValue
-    {
-        get;
-    }
-    public string? StringValue
-    {
-        get;
-    }
-    public ImmutableArray<GeneratedCSharpExpression> Children
-    {
-        get;
-    }
-    public int NodeCount
-    {
-        get;
-    }
+    public GeneratedExpressionKind Kind { get; }
+    public GeneratedExpressionType Type { get; }
+    public long IntegerValue { get; }
+    public bool BooleanValue { get; }
+    public string? StringValue { get; }
+    public ImmutableArray<GeneratedCSharpExpression> Children { get; }
+    public int NodeCount { get; }
 
     public static GeneratedCSharpExpression Boolean(bool value)
     {
@@ -126,72 +105,51 @@ public sealed class GeneratedCSharpExpression
 
     public static GeneratedCSharpExpression Left()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.LeftParameter,
-            GeneratedExpressionType.Integer,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Integer);
     }
 
     public static GeneratedCSharpExpression Right()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.RightParameter,
-            GeneratedExpressionType.Integer,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Integer);
     }
 
     public static GeneratedCSharpExpression Condition()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.ConditionParameter,
-            GeneratedExpressionType.Boolean,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Boolean);
     }
 
     public static GeneratedCSharpExpression Text()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.TextParameter,
-            GeneratedExpressionType.String,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.String);
     }
 
     public static GeneratedCSharpExpression Values()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.ValuesParameter,
-            GeneratedExpressionType.Sequence,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Sequence);
     }
 
     public static GeneratedCSharpExpression Reference()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.ReferenceParameter,
-            GeneratedExpressionType.Reference,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Reference);
     }
 
     public static GeneratedCSharpExpression NullReference()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.NullReference,
-            GeneratedExpressionType.Reference,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.Reference);
     }
 
     public static GeneratedCSharpExpression String(string value)
@@ -212,12 +170,16 @@ public sealed class GeneratedCSharpExpression
 
     public static GeneratedCSharpExpression NullString()
     {
-        return new(
+        return Leaf(
             GeneratedExpressionKind.NullString,
-            GeneratedExpressionType.String,
-            0,
-            false,
-            []);
+            GeneratedExpressionType.String);
+    }
+
+    private static GeneratedCSharpExpression Leaf(
+        GeneratedExpressionKind kind,
+        GeneratedExpressionType type)
+    {
+        return new(kind, type, 0, false, []);
     }
 
     public static GeneratedCSharpExpression Length(

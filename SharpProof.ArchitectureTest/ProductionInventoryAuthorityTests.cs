@@ -143,7 +143,7 @@ public sealed class ProductionInventoryAuthorityTests
     [Test]
     public void ProductionConsumersUseOneInventoryAuthority()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var consumers = new[]
         {
             "scripts/Test-SharpProofCoverage.ps1",
@@ -175,7 +175,7 @@ public sealed class ProductionInventoryAuthorityTests
     [Test]
     public async Task ProductionComplexityGatePassesAgainstCanonicalInventory()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var result = await RunAsync(
             root,
             "pwsh",
@@ -243,10 +243,10 @@ public sealed class ProductionInventoryAuthorityTests
             Path.Combine(repository, "scripts", "Generate-Fixture.ps1"),
             "# generator input\n");
         File.Copy(
-            Path.Combine(RepositoryRoot(), "scripts", "Get-SharpProofProductionInventory.ps1"),
+            Path.Combine(TestRepository.FindRoot(), "scripts", "Get-SharpProofProductionInventory.ps1"),
             Path.Combine(repository, "scripts", "Get-SharpProofProductionInventory.ps1"));
         File.Copy(
-            Path.Combine(RepositoryRoot(), "scripts", "Get-SharpProofTcbPaths.ps1"),
+            Path.Combine(TestRepository.FindRoot(), "scripts", "Get-SharpProofTcbPaths.ps1"),
             Path.Combine(repository, "scripts", "Get-SharpProofTcbPaths.ps1"));
     }
 
@@ -336,20 +336,6 @@ public sealed class ProductionInventoryAuthorityTests
         {
             Directory.Delete(repository, recursive: true);
         }
-    }
-
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("Could not find the repository root.");
     }
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);

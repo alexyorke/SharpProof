@@ -2436,7 +2436,7 @@ public sealed class BuildTaskTests
         (int ExitCode, string Output)> RunCompilerHostGateAsync(
             string? profile)
     {
-        var repository = PackagedProductFeed.FindRepositoryRoot();
+        var repository = TestRepository.FindRoot();
         var targets = Path.Combine(
             repository,
             "SharpProof.Package",

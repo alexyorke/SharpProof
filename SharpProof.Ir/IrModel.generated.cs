@@ -112,20 +112,11 @@ public sealed partial class IrValue
             (type, kind, payload);
     }
 
-    public IrTypeId Type
-    {
-        get;
-    }
+    public IrTypeId Type { get; }
 
-    public IrValueKind Kind
-    {
-        get;
-    }
+    public IrValueKind Kind { get; }
 
-    internal object? Payload
-    {
-        get;
-    }
+    internal object? Payload { get; }
 }
 
 public sealed class IrUnsupportedInfo
@@ -136,15 +127,9 @@ public sealed class IrUnsupportedInfo
             (reason, detail);
     }
 
-    public IrUnsupportedReason Reason
-    {
-        get;
-    }
+    public IrUnsupportedReason Reason { get; }
 
-    public string Detail
-    {
-        get;
-    }
+    public string Detail { get; }
 }
 
 public sealed class IrExceptionInfo
@@ -155,15 +140,9 @@ public sealed class IrExceptionInfo
             (kind, detail);
     }
 
-    public IrExceptionKind Kind
-    {
-        get;
-    }
+    public IrExceptionKind Kind { get; }
 
-    public string Detail
-    {
-        get;
-    }
+    public string Detail { get; }
 }
 
 public sealed partial class IrEvaluationResult
@@ -179,25 +158,13 @@ public sealed partial class IrEvaluationResult
             (status, value, unsupported, exception);
     }
 
-    public IrEvaluationStatus Status
-    {
-        get;
-    }
+    public IrEvaluationStatus Status { get; }
 
-    public IrValue? Value
-    {
-        get;
-    }
+    public IrValue? Value { get; }
 
-    public IrUnsupportedInfo? Unsupported
-    {
-        get;
-    }
+    public IrUnsupportedInfo? Unsupported { get; }
 
-    public IrExceptionInfo? Exception
-    {
-        get;
-    }
+    public IrExceptionInfo? Exception { get; }
 }
 
 public sealed partial class IrProgramExecutionResult
@@ -216,40 +183,19 @@ public sealed partial class IrProgramExecutionResult
             (status, returnValue, instruction, unsupported, exception, values, steps);
     }
 
-    public IrProgramExecutionStatus Status
-    {
-        get;
-    }
+    public IrProgramExecutionStatus Status { get; }
 
-    public IrValue? ReturnValue
-    {
-        get;
-    }
+    public IrValue? ReturnValue { get; }
 
-    public IrInstruction? Instruction
-    {
-        get;
-    }
+    public IrInstruction? Instruction { get; }
 
-    public IrUnsupportedInfo? Unsupported
-    {
-        get;
-    }
+    public IrUnsupportedInfo? Unsupported { get; }
 
-    public IrExceptionInfo? Exception
-    {
-        get;
-    }
+    public IrExceptionInfo? Exception { get; }
 
-    public ImmutableDictionary<IrVarId, IrValue> Values
-    {
-        get;
-    }
+    public ImmutableDictionary<IrVarId, IrValue> Values { get; }
 
-    public int Steps
-    {
-        get;
-    }
+    public int Steps { get; }
 }
 
 public enum IrTermKind
@@ -276,36 +222,19 @@ public enum IrOpaquePurity
 
 public sealed class IrTypeInfo
 {
-    internal IrTypeInfo(
-        IrTypeId id,
-        IrStringId name,
-        IrTypeKind kind,
-        IrTypeId? elementType
-    )
+    internal IrTypeInfo(IrTypeId id, IrStringId name, IrTypeKind kind, IrTypeId? elementType)
     {
         (Id, Name, Kind, ElementType) =
             (id, name, kind, elementType);
     }
 
-    public IrTypeId Id
-    {
-        get;
-    }
+    public IrTypeId Id { get; }
 
-    public IrStringId Name
-    {
-        get;
-    }
+    public IrStringId Name { get; }
 
-    public IrTypeKind Kind
-    {
-        get;
-    }
+    public IrTypeKind Kind { get; }
 
-    public IrTypeId? ElementType
-    {
-        get;
-    }
+    public IrTypeId? ElementType { get; }
 }
 
 public sealed class IrVariableInfo
@@ -316,20 +245,11 @@ public sealed class IrVariableInfo
             (id, name, type);
     }
 
-    public IrVarId Id
-    {
-        get;
-    }
+    public IrVarId Id { get; }
 
-    public IrStringId Name
-    {
-        get;
-    }
+    public IrStringId Name { get; }
 
-    public IrTypeId Type
-    {
-        get;
-    }
+    public IrTypeId Type { get; }
 }
 
 public sealed class IrMemberInfo
@@ -348,40 +268,19 @@ public sealed class IrMemberInfo
             (id, identity, declaringType, name, returnType, isStatic, parameterTypes);
     }
 
-    public IrMemberId Id
-    {
-        get;
-    }
+    public IrMemberId Id { get; }
 
-    public IrIdentityId Identity
-    {
-        get;
-    }
+    public IrIdentityId Identity { get; }
 
-    public IrTypeId DeclaringType
-    {
-        get;
-    }
+    public IrTypeId DeclaringType { get; }
 
-    public IrStringId Name
-    {
-        get;
-    }
+    public IrStringId Name { get; }
 
-    public IrTypeId ReturnType
-    {
-        get;
-    }
+    public IrTypeId ReturnType { get; }
 
-    public bool IsStatic
-    {
-        get;
-    }
+    public bool IsStatic { get; }
 
-    public ImmutableArray<IrTypeId> ParameterTypes
-    {
-        get;
-    }
+    public ImmutableArray<IrTypeId> ParameterTypes { get; }
 }
 
 public sealed class IrOperationInfo
@@ -392,15 +291,9 @@ public sealed class IrOperationInfo
             (id, description);
     }
 
-    public OperationId Id
-    {
-        get;
-    }
+    public OperationId Id { get; }
 
-    public IrStringId? Description
-    {
-        get;
-    }
+    public IrStringId? Description { get; }
 }
 
 public abstract class IrTerm
@@ -411,20 +304,11 @@ public abstract class IrTerm
             (id, type, kind);
     }
 
-    public IrId Id
-    {
-        get;
-    }
+    public IrId Id { get; }
 
-    public IrTypeId Type
-    {
-        get;
-    }
+    public IrTypeId Type { get; }
 
-    public IrTermKind Kind
-    {
-        get;
-    }
+    public IrTermKind Kind { get; }
 }
 
 public sealed class IrBooleanTerm : IrTerm
@@ -434,10 +318,7 @@ public sealed class IrBooleanTerm : IrTerm
         Value = value;
     }
 
-    public bool Value
-    {
-        get;
-    }
+    public bool Value { get; }
 }
 
 public sealed class IrIntegerTerm : IrTerm
@@ -447,10 +328,7 @@ public sealed class IrIntegerTerm : IrTerm
         Value = value;
     }
 
-    public long Value
-    {
-        get;
-    }
+    public long Value { get; }
 }
 
 public sealed class IrStringTerm : IrTerm
@@ -460,10 +338,7 @@ public sealed class IrStringTerm : IrTerm
         Value = value;
     }
 
-    public IrStringId Value
-    {
-        get;
-    }
+    public IrStringId Value { get; }
 }
 
 public sealed class IrNullTerm : IrTerm
@@ -480,10 +355,7 @@ public sealed class IrVariableTerm : IrTerm
         Variable = variable;
     }
 
-    public IrVarId Variable
-    {
-        get;
-    }
+    public IrVarId Variable { get; }
 }
 
 public sealed class IrOpaqueTerm : IrTerm
@@ -502,30 +374,15 @@ public sealed class IrOpaqueTerm : IrTerm
             (member, receiver, arguments, purity, operation);
     }
 
-    public IrMemberId Member
-    {
-        get;
-    }
+    public IrMemberId Member { get; }
 
-    public IrTerm? Receiver
-    {
-        get;
-    }
+    public IrTerm? Receiver { get; }
 
-    public ImmutableArray<IrTerm> Arguments
-    {
-        get;
-    }
+    public ImmutableArray<IrTerm> Arguments { get; }
 
-    public IrOpaquePurity Purity
-    {
-        get;
-    }
+    public IrOpaquePurity Purity { get; }
 
-    public OperationId Operation
-    {
-        get;
-    }
+    public OperationId Operation { get; }
 }
 
 public sealed class IrUnaryTerm : IrTerm
@@ -541,15 +398,9 @@ public sealed class IrUnaryTerm : IrTerm
             (@operator, operand);
     }
 
-    public IrUnaryOperator Operator
-    {
-        get;
-    }
+    public IrUnaryOperator Operator { get; }
 
-    public IrTerm Operand
-    {
-        get;
-    }
+    public IrTerm Operand { get; }
 }
 
 public sealed class IrBinaryTerm : IrTerm
@@ -566,20 +417,11 @@ public sealed class IrBinaryTerm : IrTerm
             (@operator, left, right);
     }
 
-    public IrBinaryOperator Operator
-    {
-        get;
-    }
+    public IrBinaryOperator Operator { get; }
 
-    public IrTerm Left
-    {
-        get;
-    }
+    public IrTerm Left { get; }
 
-    public IrTerm Right
-    {
-        get;
-    }
+    public IrTerm Right { get; }
 }
 
 public sealed class IrConditionalTerm : IrTerm
@@ -596,20 +438,11 @@ public sealed class IrConditionalTerm : IrTerm
             (condition, whenTrue, whenFalse);
     }
 
-    public IrTerm Condition
-    {
-        get;
-    }
+    public IrTerm Condition { get; }
 
-    public IrTerm WhenTrue
-    {
-        get;
-    }
+    public IrTerm WhenTrue { get; }
 
-    public IrTerm WhenFalse
-    {
-        get;
-    }
+    public IrTerm WhenFalse { get; }
 }
 
 public sealed class IrCastTerm : IrTerm
@@ -619,10 +452,7 @@ public sealed class IrCastTerm : IrTerm
         Operand = operand;
     }
 
-    public IrTerm Operand
-    {
-        get;
-    }
+    public IrTerm Operand { get; }
 }
 
 public sealed class IrLengthTerm : IrTerm
@@ -632,10 +462,7 @@ public sealed class IrLengthTerm : IrTerm
         Value = value;
     }
 
-    public IrTerm Value
-    {
-        get;
-    }
+    public IrTerm Value { get; }
 }
 
 public sealed class IrSequenceAccessTerm : IrTerm
@@ -651,15 +478,9 @@ public sealed class IrSequenceAccessTerm : IrTerm
             (sequence, index);
     }
 
-    public IrTerm Sequence
-    {
-        get;
-    }
+    public IrTerm Sequence { get; }
 
-    public IrTerm Index
-    {
-        get;
-    }
+    public IrTerm Index { get; }
 }
 
 public enum IrInstructionKind
@@ -697,15 +518,9 @@ public abstract class IrLocation
             (type, kind);
     }
 
-    public IrTypeId Type
-    {
-        get;
-    }
+    public IrTypeId Type { get; }
 
-    public IrLocationKind Kind
-    {
-        get;
-    }
+    public IrLocationKind Kind { get; }
 }
 
 public sealed class IrMemberLocation : IrLocation
@@ -721,20 +536,11 @@ public sealed class IrMemberLocation : IrLocation
             (member, receiver, arguments);
     }
 
-    public IrMemberId Member
-    {
-        get;
-    }
+    public IrMemberId Member { get; }
 
-    public IrTerm? Receiver
-    {
-        get;
-    }
+    public IrTerm? Receiver { get; }
 
-    public ImmutableArray<IrTerm> Arguments
-    {
-        get;
-    }
+    public ImmutableArray<IrTerm> Arguments { get; }
 }
 
 public sealed class IrSequenceLocation : IrLocation
@@ -745,15 +551,9 @@ public sealed class IrSequenceLocation : IrLocation
             (sequence, index);
     }
 
-    public IrTerm Sequence
-    {
-        get;
-    }
+    public IrTerm Sequence { get; }
 
-    public IrTerm Index
-    {
-        get;
-    }
+    public IrTerm Index { get; }
 }
 
 public abstract partial class IrInstruction
@@ -764,20 +564,11 @@ public abstract partial class IrInstruction
             (id, kind, operation);
     }
 
-    public IrInstructionId Id
-    {
-        get;
-    }
+    public IrInstructionId Id { get; }
 
-    public IrInstructionKind Kind
-    {
-        get;
-    }
+    public IrInstructionKind Kind { get; }
 
-    public OperationId Operation
-    {
-        get;
-    }
+    public OperationId Operation { get; }
 }
 
 public sealed class IrAssignInstruction : IrInstruction
@@ -793,15 +584,9 @@ public sealed class IrAssignInstruction : IrInstruction
             (target, value);
     }
 
-    public IrVarId Target
-    {
-        get;
-    }
+    public IrVarId Target { get; }
 
-    public IrTerm Value
-    {
-        get;
-    }
+    public IrTerm Value { get; }
 }
 
 public sealed class IrLoadInstruction : IrInstruction
@@ -817,15 +602,9 @@ public sealed class IrLoadInstruction : IrInstruction
             (target, location);
     }
 
-    public IrVarId Target
-    {
-        get;
-    }
+    public IrVarId Target { get; }
 
-    public IrLocation Location
-    {
-        get;
-    }
+    public IrLocation Location { get; }
 }
 
 public sealed class IrStoreInstruction : IrInstruction
@@ -841,15 +620,9 @@ public sealed class IrStoreInstruction : IrInstruction
             (location, value);
     }
 
-    public IrLocation Location
-    {
-        get;
-    }
+    public IrLocation Location { get; }
 
-    public IrTerm Value
-    {
-        get;
-    }
+    public IrTerm Value { get; }
 }
 
 public sealed class IrCallInstruction : IrInstruction
@@ -867,51 +640,41 @@ public sealed class IrCallInstruction : IrInstruction
             (target, member, receiver, arguments);
     }
 
-    public IrVarId? Target
-    {
-        get;
-    }
+    public IrVarId? Target { get; }
 
-    public IrMemberId Member
-    {
-        get;
-    }
+    public IrMemberId Member { get; }
 
-    public IrTerm? Receiver
-    {
-        get;
-    }
+    public IrTerm? Receiver { get; }
 
-    public ImmutableArray<IrTerm> Arguments
-    {
-        get;
-    }
+    public ImmutableArray<IrTerm> Arguments { get; }
 }
 
 public sealed class IrAssumeInstruction : IrInstruction
 {
-    internal IrAssumeInstruction(IrInstructionId id, OperationId operation, IrTerm condition) : base(id, IrInstructionKind.Assume, operation)
+    internal IrAssumeInstruction(
+        IrInstructionId id,
+        OperationId operation,
+        IrTerm condition
+    ) : base(id, IrInstructionKind.Assume, operation)
     {
         Condition = condition;
     }
 
-    public IrTerm Condition
-    {
-        get;
-    }
+    public IrTerm Condition { get; }
 }
 
 public sealed class IrAssertInstruction : IrInstruction
 {
-    internal IrAssertInstruction(IrInstructionId id, OperationId operation, IrTerm condition) : base(id, IrInstructionKind.Assert, operation)
+    internal IrAssertInstruction(
+        IrInstructionId id,
+        OperationId operation,
+        IrTerm condition
+    ) : base(id, IrInstructionKind.Assert, operation)
     {
         Condition = condition;
     }
 
-    public IrTerm Condition
-    {
-        get;
-    }
+    public IrTerm Condition { get; }
 }
 
 public sealed class IrHavocInstruction : IrInstruction
@@ -927,15 +690,9 @@ public sealed class IrHavocInstruction : IrInstruction
             (havocKind, variables);
     }
 
-    public IrHavocKind HavocKind
-    {
-        get;
-    }
+    public IrHavocKind HavocKind { get; }
 
-    public ImmutableArray<IrVarId> Variables
-    {
-        get;
-    }
+    public ImmutableArray<IrVarId> Variables { get; }
 }
 
 public sealed class IrBranchInstruction : IrInstruction
@@ -952,46 +709,39 @@ public sealed class IrBranchInstruction : IrInstruction
             (condition, whenTrue, whenFalse);
     }
 
-    public IrTerm Condition
-    {
-        get;
-    }
+    public IrTerm Condition { get; }
 
-    public IrBlockId WhenTrue
-    {
-        get;
-    }
+    public IrBlockId WhenTrue { get; }
 
-    public IrBlockId WhenFalse
-    {
-        get;
-    }
+    public IrBlockId WhenFalse { get; }
 }
 
 public sealed class IrGotoInstruction : IrInstruction
 {
-    internal IrGotoInstruction(IrInstructionId id, OperationId operation, IrBlockId target) : base(id, IrInstructionKind.Goto, operation)
+    internal IrGotoInstruction(
+        IrInstructionId id,
+        OperationId operation,
+        IrBlockId target
+    ) : base(id, IrInstructionKind.Goto, operation)
     {
         Target = target;
     }
 
-    public IrBlockId Target
-    {
-        get;
-    }
+    public IrBlockId Target { get; }
 }
 
 public sealed class IrReturnInstruction : IrInstruction
 {
-    internal IrReturnInstruction(IrInstructionId id, OperationId operation, IrTerm? value) : base(id, IrInstructionKind.Return, operation)
+    internal IrReturnInstruction(
+        IrInstructionId id,
+        OperationId operation,
+        IrTerm? value
+    ) : base(id, IrInstructionKind.Return, operation)
     {
         Value = value;
     }
 
-    public IrTerm? Value
-    {
-        get;
-    }
+    public IrTerm? Value { get; }
 }
 
 public sealed partial class IrBasicBlock
@@ -1002,42 +752,21 @@ public sealed partial class IrBasicBlock
             (id, name, instructions);
     }
 
-    public IrBlockId Id
-    {
-        get;
-    }
+    public IrBlockId Id { get; }
 
-    public IrStringId? Name
-    {
-        get;
-    }
+    public IrStringId? Name { get; }
 
-    public ImmutableArray<IrInstruction> Instructions
-    {
-        get;
-    }
+    public ImmutableArray<IrInstruction> Instructions { get; }
 }
 
 public sealed partial class IrProgram
 {
 
-    public IrFactory Factory
-    {
-        get;
-    }
+    public IrFactory Factory { get; }
 
-    internal long Scope
-    {
-        get;
-    }
+    internal long Scope { get; }
 
-    public IrBlockId Entry
-    {
-        get;
-    }
+    public IrBlockId Entry { get; }
 
-    public ImmutableArray<IrBasicBlock> Blocks
-    {
-        get;
-    }
+    public ImmutableArray<IrBasicBlock> Blocks { get; }
 }

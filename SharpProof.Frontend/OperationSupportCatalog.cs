@@ -16,11 +16,6 @@ internal static class OperationSupportCatalog
         OperationSupportStage stage,
         OperationKind kind)
     {
-        if (!Enum.IsDefined(typeof(OperationKind), kind))
-        {
-            return false;
-        }
-
         return OperationSupportProjections.GetSupported(stage).Contains(kind);
     }
 

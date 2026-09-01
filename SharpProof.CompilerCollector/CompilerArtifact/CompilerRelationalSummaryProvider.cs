@@ -92,7 +92,8 @@ internal sealed class CompilerRelationalSummaryProvider
         out IrRelationalSummary? summary)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        method = Normalize(method);
+        method = SemanticClaimIdentity.NormalizeCandidate(method)
+            .ConstructedFrom;
         if (_summaries.TryGetValue(method, out summary))
         {
             return summary.Signature.Member == member;
@@ -248,7 +249,9 @@ internal sealed class CompilerRelationalSummaryProvider
 
             if (binding.Symbol is not IParameterSymbol parameter ||
                 !SymbolEqualityComparer.Default.Equals(
-                    Normalize((IMethodSymbol)parameter.ContainingSymbol)
+                    SemanticClaimIdentity.NormalizeCandidate(
+                            (IMethodSymbol)parameter.ContainingSymbol)
+                        .ConstructedFrom
                         .OriginalDefinition,
                     method.OriginalDefinition) ||
                 parameter.Ordinal < 0 ||
@@ -307,7 +310,8 @@ internal sealed class CompilerRelationalSummaryProvider
 
     private bool IsSourceCandidate(IMethodSymbol method)
     {
-        method = Normalize(method);
+        method = SemanticClaimIdentity.NormalizeCandidate(method)
+            .ConstructedFrom;
         return method is
         {
             MethodKind: MethodKind.Ordinary,
@@ -333,13 +337,6 @@ internal sealed class CompilerRelationalSummaryProvider
     {
         return type.SpecialType == SpecialType.System_Boolean ||
             CSharpScalarSemantics.IsSupportedInteger(type.SpecialType);
-    }
-
-    private static IMethodSymbol Normalize(IMethodSymbol method)
-    {
-        method = method.ReducedFrom ?? method;
-        method = method.PartialImplementationPart ?? method;
-        return method.ConstructedFrom;
     }
 
     private static string EvidenceSha256(

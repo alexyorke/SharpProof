@@ -21,24 +21,8 @@ public sealed partial class EffectMethodResult
         Projection = projection;
         DirectWitnesses = directWitnesses;
     }
-
-    public IMethodSymbol Method
-    {
-        get;
-    }
-
-    public EffectSummary Summary
-    {
-        get;
-    }
-
-    public EffectProjection Projection
-    {
-        get;
-    }
-
-    internal ImmutableArray<EffectDirectWitness> DirectWitnesses
-    {
-        get;
-    }
+    public IMethodSymbol Method { get; }
+    public EffectSummary Summary { get; }
+    public EffectProjection Projection { get; }
+    internal ImmutableArray<EffectDirectWitness> DirectWitnesses { get; }
 }

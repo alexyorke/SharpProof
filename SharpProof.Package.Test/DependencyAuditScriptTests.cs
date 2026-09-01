@@ -300,7 +300,7 @@ public sealed class DependencyAuditScriptTests
     [Test]
     public void RepositoryAuditSourceIsExplicitAndHermetic()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var configuration = XDocument.Load(
             Path.Combine(root, "NuGet.Config"));
         var auditSources = configuration
@@ -344,26 +344,6 @@ public sealed class DependencyAuditScriptTests
             Assert.That(File.Exists(workspace.ConfigurationPath), Is.True);
             Assert.That(File.Exists(outsidePath), Is.False);
         }
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(
-            typeof(DependencyAuditScriptTests).Assembly.Location);
-        while (directory != null)
-        {
-            if (File.Exists(
-                    Path.Combine(
-                        directory.FullName,
-                        "SharpProof.Release.props")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Repository root was not found.");
     }
 
     private sealed class DependencyAuditWorkspace : IDisposable
@@ -606,13 +586,13 @@ public sealed class DependencyAuditScriptTests
                     "stale evidence");
             }
             return await RunProcessAsync(
-                FindRepositoryRoot(),
+                TestRepository.FindRoot(),
                 "pwsh",
                 "-NoLogo",
                 "-NoProfile",
                 "-File",
                 Path.Combine(
-                    FindRepositoryRoot(),
+                    TestRepository.FindRoot(),
                     "scripts",
                     "Test-SharpProofDependencyAudit.ps1"),
                 "-SolutionPath",

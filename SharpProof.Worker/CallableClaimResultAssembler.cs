@@ -55,7 +55,8 @@ internal static class CallableClaimResultAssembler
                 break;
             case UnknownOutcome unknown:
                 (record.Outcome, record.Reason) =
-                    (WorkerClaimOutcome.Unknown, MapAbstention(unknown.Reason));
+                    (WorkerClaimOutcome.Unknown,
+                        WorkerProjections.MapAbstention(unknown.Reason));
                 break;
             default:
                 (record.Outcome, record.Reason) =
@@ -147,18 +148,7 @@ internal static class CallableClaimResultAssembler
 
     private static WorkerModelValue ModelValue(string variable, IrValue value)
     {
-        var formatted = Format(value);
+        var formatted = WorkerProjections.FormatValue(value);
         return new WorkerModelValue { Variable = variable, Kind = formatted.Kind, Value = formatted.Value };
-    }
-
-    private static (string Kind, string Value) Format(IrValue value)
-    {
-        return WorkerProjections.FormatValue(value);
-    }
-
-    internal static WorkerClaimReason MapAbstention(
-        AbstentionReason reason)
-    {
-        return WorkerProjections.MapAbstention(reason);
     }
 }

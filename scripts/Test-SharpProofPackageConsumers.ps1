@@ -246,17 +246,11 @@ function Invoke-ConsumerDotNet {
         [string]$WorkingDirectory,
 
         [Parameter(Mandatory = $true)]
-        [string[]]$Arguments,
-
-        [Parameter(Mandatory = $true)]
-        [string]$RepositoryRoot
+        [string[]]$Arguments
     )
 
     Push-Location $WorkingDirectory
-    $capturePath = $null
     try {
-        $captureOutput = $Arguments[0] -eq '--version' -or
-            $Arguments[0] -eq 'msbuild'
         $output = & dotnet @Arguments 2>&1 | Out-String
         $exitCode = $LASTEXITCODE
         if (-not [string]::IsNullOrEmpty($output)) {
@@ -270,9 +264,6 @@ function Invoke-ConsumerDotNet {
         return $output.Trim()
     }
     finally {
-        if ($null -ne $capturePath -and [IO.File]::Exists($capturePath)) {
-            Remove-Item -LiteralPath $capturePath -Force
-        }
         Pop-Location
     }
 }
@@ -425,8 +416,7 @@ function Test-SharpProofFrameworkConsumers {
 
         $actualSdk = Invoke-ConsumerDotNet `
             -WorkingDirectory $root `
-            -Arguments @('--version') `
-            -RepositoryRoot $RepositoryRoot
+            -Arguments @('--version')
         if (-not [string]::IsNullOrWhiteSpace($SdkVersion) -and
             $actualSdk.Trim() -ne $SdkVersion) {
             throw (
@@ -488,16 +478,14 @@ function Test-SharpProofFrameworkConsumers {
                     $nugetConfig,
                     '--packages',
                     $cache,
-                    '--nologo') `
-                -RepositoryRoot $RepositoryRoot | Out-Null
+                    '--nologo') | Out-Null
             $analyzers = Invoke-ConsumerDotNet `
                 -WorkingDirectory $consumer `
                 -Arguments @(
                     'msbuild',
                     'Consumer.csproj',
                     '-getItem:Analyzer',
-                    '--nologo') `
-                -RepositoryRoot $RepositoryRoot
+                    '--nologo')
             Assert-SharpProofAnalyzerItems `
                 -Output $analyzers `
                 -Framework $framework
@@ -509,8 +497,7 @@ function Test-SharpProofFrameworkConsumers {
                     '--configuration',
                     $Configuration,
                     '--no-restore',
-                    '--nologo') `
-                -RepositoryRoot $RepositoryRoot | Out-Null
+                    '--nologo') | Out-Null
         }
     }
     finally {

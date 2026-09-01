@@ -10,7 +10,7 @@ public sealed class DependencyAutomationTests
     public void DependabotKeepsCompilerDependenciesOnPatchUpdates()
     {
         var configuration = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             ".github",
             "dependabot.yml"));
         var common = IgnoreBlock(
@@ -31,7 +31,7 @@ public sealed class DependencyAutomationTests
     public void ReusableSecurityFailsClosedOnDependencyAuditEvidence()
     {
         var workflow = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             ".github",
             "workflows",
             "security-reusable.yml"));
@@ -63,7 +63,7 @@ public sealed class DependencyAutomationTests
     public void NightlyFailsClosedOnRetainedDependencyAuditEvidence()
     {
         var workflow = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             ".github",
             "workflows",
             "nightly.yml"));
@@ -96,7 +96,7 @@ public sealed class DependencyAutomationTests
     public void ArchitectureDocumentsCollectorSplitAndCorpusRatchets()
     {
         var architecture = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "docs",
             "architecture.md"));
 
@@ -156,7 +156,7 @@ public sealed class DependencyAutomationTests
     public void RepositorySecurityKeepsCodeQlDisabled()
     {
         var workflowDirectory = Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             ".github",
             "workflows");
         var workflows = Directory.EnumerateFiles(workflowDirectory)
@@ -198,7 +198,7 @@ public sealed class DependencyAutomationTests
     public void RepositorySecurityPinsExternalWorkflowActionsToImmutableShas()
     {
         var workflowDirectory = Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             ".github",
             "workflows");
         var references = Directory.EnumerateFiles(workflowDirectory)
@@ -258,7 +258,7 @@ public sealed class DependencyAutomationTests
     [Test]
     public void RepositoryWorkflowsUseOnlyThePinnedContainerSdk()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var workflowDirectory = Path.Combine(root, ".github", "workflows");
         var workflows = string.Join("\n", Directory
             .EnumerateFiles(workflowDirectory)
@@ -361,20 +361,4 @@ public sealed class DependencyAutomationTests
         return string.Join('\n', lines[start..end]);
     }
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException(
-            "Could not find the repository root.");
-    }
 }

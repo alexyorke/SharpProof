@@ -44,7 +44,8 @@ internal static class CompilerImplementationIlSummaryLowerer
         CSharpCompilation compilation,
         IMethodSymbol method)
     {
-        method = Normalize(method);
+        method = SemanticClaimIdentity.NormalizeCandidate(method)
+            .OriginalDefinition;
         return method.MethodKind == MethodKind.Ordinary &&
             method.IsStatic &&
             !method.IsAbstract &&
@@ -76,7 +77,8 @@ internal static class CompilerImplementationIlSummaryLowerer
     {
         summary = null;
         reason = CompilerImplementationIlAbstentionReason.None;
-        method = Normalize(method);
+        method = SemanticClaimIdentity.NormalizeCandidate(method)
+            .OriginalDefinition;
         if (!IsCandidate(compilation, method))
         {
             reason = CompilerImplementationIlAbstentionReason.NotCandidate;
@@ -392,13 +394,6 @@ internal static class CompilerImplementationIlSummaryLowerer
                 MethodImplAttributes.IL &&
             (definition.ImplAttributes & MethodImplAttributes.ManagedMask) ==
                 MethodImplAttributes.Managed;
-    }
-
-    private static IMethodSymbol Normalize(IMethodSymbol method)
-    {
-        method = method.ReducedFrom ?? method;
-        method = method.PartialImplementationPart ?? method;
-        return method.OriginalDefinition;
     }
 
     private sealed class Translator

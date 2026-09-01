@@ -9,7 +9,7 @@ public sealed class FuzzRunnerEvidenceProcessSafetyTests
     public void EvidenceScriptsUseBoundedConcurrentProcessIO()
     {
         var source = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.ArchitectureTest",
             "FuzzRunnerEvidenceTests.cs"));
 
@@ -26,21 +26,4 @@ public sealed class FuzzRunnerEvidenceProcessSafetyTests
         }
     }
 
-    private static string RepositoryRoot()
-    {
-        var current = new DirectoryInfo(
-            TestContext.CurrentContext.TestDirectory);
-        while (current is not null)
-        {
-            if (File.Exists(Path.Combine(
-                    current.FullName,
-                    "SharpProof.sln")))
-            {
-                return current.FullName;
-            }
-            current = current.Parent;
-        }
-        throw new DirectoryNotFoundException(
-            "Could not find repository root.");
-    }
 }

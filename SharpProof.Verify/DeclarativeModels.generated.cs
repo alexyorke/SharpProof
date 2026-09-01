@@ -12,18 +12,11 @@ public sealed partial class BackendModel
     internal readonly struct StorageTag
     {
     }
-    internal BackendModel(
-        ImmutableDictionary<IrVarId, IrValue> assignments,
-        StorageTag storage
-    )
+    internal BackendModel(ImmutableDictionary<IrVarId, IrValue> assignments, StorageTag storage)
     {
         Assignments = assignments;
     }
-
-    public ImmutableDictionary<IrVarId, IrValue> Assignments
-    {
-        get;
-    }
+    public ImmutableDictionary<IrVarId, IrValue> Assignments { get; }
 }
 
 public sealed partial class Goal
@@ -31,32 +24,15 @@ public sealed partial class Goal
     internal readonly struct StorageTag
     {
     }
-    internal Goal(
-        IrTerm predicate,
-        ProofDiagnosticKind diagnostic,
-        SourceLocationId location,
-        StorageTag storage
-    )
+    internal Goal(IrTerm predicate, ProofDiagnosticKind diagnostic, SourceLocationId location, StorageTag storage)
     {
         Predicate = predicate;
         Diagnostic = diagnostic;
         Location = location;
     }
-
-    public IrTerm Predicate
-    {
-        get;
-    }
-
-    public ProofDiagnosticKind Diagnostic
-    {
-        get;
-    }
-
-    public SourceLocationId Location
-    {
-        get;
-    }
+    public IrTerm Predicate { get; }
+    public ProofDiagnosticKind Diagnostic { get; }
+    public SourceLocationId Location { get; }
 }
 
 public sealed partial class BackendCheckResult
@@ -77,84 +53,44 @@ public sealed partial class BackendCheckResult
         Model = model;
         FailureReason = failureReason;
     }
-
-    public BackendCheckStatus Status
-    {
-        get;
-    }
-
-    public ImmutableArray<int> UnsatCore
-    {
-        get;
-    }
-
-    public BackendModel? Model
-    {
-        get;
-    }
-
-    public BackendFailureReason FailureReason
-    {
-        get;
-    }
+    public BackendCheckStatus Status { get; }
+    public ImmutableArray<int> UnsatCore { get; }
+    public BackendModel? Model { get; }
+    public BackendFailureReason FailureReason { get; }
 }
 
 public sealed partial class ProvenOutcome : ProofOutcome
 {
-    internal ProvenOutcome(
-        ImmutableArray<ProofJustification> core
-    )
+    internal ProvenOutcome(ImmutableArray<ProofJustification> core)
     {
         Core = core;
     }
-
-    public ImmutableArray<ProofJustification> Core
-    {
-        get;
-    }
+    public ImmutableArray<ProofJustification> Core { get; }
 }
 
 public sealed partial class ValidatedModel
 {
-    internal ValidatedModel(
-        ImmutableDictionary<IrVarId, IrValue> assignments
-    )
+    internal ValidatedModel(ImmutableDictionary<IrVarId, IrValue> assignments)
     {
         Assignments = assignments;
     }
-
-    public ImmutableDictionary<IrVarId, IrValue> Assignments
-    {
-        get;
-    }
+    public ImmutableDictionary<IrVarId, IrValue> Assignments { get; }
 }
 
 public sealed partial class RefutedOutcome : ProofOutcome
 {
-    internal RefutedOutcome(
-        ValidatedModel model
-    )
+    internal RefutedOutcome(ValidatedModel model)
     {
         Model = model;
     }
-
-    public ValidatedModel Model
-    {
-        get;
-    }
+    public ValidatedModel Model { get; }
 }
 
 public sealed partial class UnknownOutcome : ProofOutcome
 {
-    internal UnknownOutcome(
-        AbstentionReason reason
-    )
+    internal UnknownOutcome(AbstentionReason reason)
     {
         Reason = reason;
     }
-
-    public AbstentionReason Reason
-    {
-        get;
-    }
+    public AbstentionReason Reason { get; }
 }

@@ -1,5 +1,7 @@
 namespace SharpProof.ContractForValidation;
 
+using static ContractForCompanionValidator;
+
 internal static class ContractForValidationEngine
 {
     internal static ImmutableArray<Diagnostic> Validate(
@@ -216,14 +218,6 @@ internal static class ContractForValidationEngine
                 companion, target.Target, attributeLocation, target.IsOpen));
         }
         return result.ToImmutable();
-    }
-
-    private static Diagnostic At(
-        DiagnosticDescriptor descriptor,
-        Location location,
-        params object?[] arguments)
-    {
-        return Diagnostic.Create(descriptor, location, arguments);
     }
 
     private static Location GetAttributeLocation(

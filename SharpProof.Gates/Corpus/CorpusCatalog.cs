@@ -278,29 +278,14 @@ internal static class CorpusCatalog
         CorpusVariant variant)
     {
         var suffix = seed.Id;
-        var className = variant switch
+        var (className, methodName, helperName, inputName) = variant switch
         {
-            CorpusVariant.Rename => $"Renamed_{suffix}",
-            CorpusVariant.EscapedIdentifiers => $"@Corpus_{suffix}",
-            _ => $"Corpus_{suffix}"
-        };
-        var methodName = variant switch
-        {
-            CorpusVariant.Rename => $"Evaluate_{suffix}",
-            CorpusVariant.EscapedIdentifiers => $"@Focus_{suffix}",
-            _ => $"Focus_{suffix}"
-        };
-        var helperName = variant switch
-        {
-            CorpusVariant.Rename => $"Pass_{suffix}",
-            CorpusVariant.EscapedIdentifiers => $"@Identity_{suffix}",
-            _ => $"Identity_{suffix}"
-        };
-        var inputName = variant switch
-        {
-            CorpusVariant.Rename => "value",
-            CorpusVariant.EscapedIdentifiers => "@input",
-            _ => "input"
+            CorpusVariant.Rename =>
+                ($"Renamed_{suffix}", $"Evaluate_{suffix}", $"Pass_{suffix}", "value"),
+            CorpusVariant.EscapedIdentifiers =>
+                ($"@Corpus_{suffix}", $"@Focus_{suffix}", $"@Identity_{suffix}", "@input"),
+            _ =>
+                ($"Corpus_{suffix}", $"Focus_{suffix}", $"Identity_{suffix}", "input")
         };
         var prelude = CreatePrelude(variant, helperName, inputName);
         var body = ReplaceTokens(

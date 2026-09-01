@@ -23,29 +23,9 @@ internal sealed partial class EffectiveContractSourceResolution
         UsesCompanion = usesCompanion;
         Failure = failure;
     }
-
-    internal IMethodSymbol Source
-    {
-        get;
-    }
-
-    internal ContractClauseInventory DirectInventory
-    {
-        get;
-    }
-
-    internal ContractClauseInventory Inventory
-    {
-        get;
-    }
-
-    internal bool UsesCompanion
-    {
-        get;
-    }
-
-    internal ContractBindingFailure Failure
-    {
-        get;
-    }
+    internal IMethodSymbol Source { get; }
+    internal ContractClauseInventory DirectInventory { get; }
+    internal ContractClauseInventory Inventory { get; }
+    internal bool UsesCompanion { get; }
+    internal ContractBindingFailure Failure { get; }
 }

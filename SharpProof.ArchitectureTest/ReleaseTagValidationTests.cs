@@ -19,7 +19,7 @@ public sealed class ReleaseTagValidationTests
         start.ArgumentList.Add("-NoProfile");
         start.ArgumentList.Add("-File");
         start.ArgumentList.Add(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "scripts",
             "Test-SharpProofReleaseTagFixtures.ps1"));
         using var process = Process.Start(start)!;
@@ -32,17 +32,4 @@ public sealed class ReleaseTagValidationTests
             (await output) + Environment.NewLine + await error);
     }
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException("Repository root not found.");
-    }
 }

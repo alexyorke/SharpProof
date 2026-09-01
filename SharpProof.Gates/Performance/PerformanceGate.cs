@@ -438,12 +438,14 @@ internal static class PerformanceGate
                     baselineProject,
                     restore: true,
                     symbol: null,
+                    PackageBuildProcessTimeout,
                     cancellationToken)
                 .ConfigureAwait(false);
             await RunDotnetAsync(
                     unannotatedAdvisoryProject,
                     restore: true,
                     symbol: null,
+                    PackageBuildProcessTimeout,
                     cancellationToken)
                 .ConfigureAwait(false);
             for (var index = 0; index < warmups; index++)
@@ -571,56 +573,34 @@ internal static class PerformanceGate
         bool unannotatedAdvisoryFirst,
         CancellationToken cancellationToken)
     {
+        Task<double> Run(string project)
+        {
+            return RunDotnetAsync(
+                project,
+                restore: false,
+                symbol,
+                PackageBuildProcessTimeout,
+                cancellationToken);
+        }
+
+        double baseline;
+        double unannotatedAdvisory;
         if (unannotatedAdvisoryFirst)
         {
-            var unannotatedAdvisory = await RunDotnetAsync(
-                    unannotatedAdvisoryProject,
-                    restore: false,
-                    symbol,
-                    cancellationToken)
+            unannotatedAdvisory = await Run(unannotatedAdvisoryProject)
                 .ConfigureAwait(false);
-            var baseline = await RunDotnetAsync(
-                    baselineProject,
-                    restore: false,
-                    symbol,
-                    cancellationToken)
+            baseline = await Run(baselineProject)
                 .ConfigureAwait(false);
-            return new PackageBuildPair(
-                baseline,
-                unannotatedAdvisory);
         }
         else
         {
-            var baseline = await RunDotnetAsync(
-                    baselineProject,
-                    restore: false,
-                    symbol,
-                    cancellationToken)
+            baseline = await Run(baselineProject)
                 .ConfigureAwait(false);
-            var unannotatedAdvisory = await RunDotnetAsync(
-                    unannotatedAdvisoryProject,
-                    restore: false,
-                    symbol,
-                    cancellationToken)
+            unannotatedAdvisory = await Run(unannotatedAdvisoryProject)
                 .ConfigureAwait(false);
-            return new PackageBuildPair(
-                baseline,
-                unannotatedAdvisory);
         }
-    }
 
-    private static Task<double> RunDotnetAsync(
-        string project,
-        bool restore,
-        string? symbol,
-        CancellationToken cancellationToken)
-    {
-        return RunDotnetAsync(
-            project,
-            restore,
-            symbol,
-            PackageBuildProcessTimeout,
-            cancellationToken);
+        return new PackageBuildPair(baseline, unannotatedAdvisory);
     }
 
     private static async Task<double> RunDotnetAsync(
@@ -1231,24 +1211,16 @@ internal static class PerformanceGate
 
         if (contract.SmokeWarmups < 1 ||
             contract.SmokeSamples < 2 ||
-            (contract.SmokeSamples & 1) != 0 ||
-            contract.SmokeMaximumRatio <= 0)
+            (contract.SmokeSamples & 1) != 0)
         {
             throw new InvalidDataException(
                 "The performance smoke protocol requires positive warmups, " +
-                "a positive even sample count, and a positive ratio limit.");
+                "and a positive even sample count.");
         }
 
-        if (contract.MaximumMedianRatio <= 0 ||
-            contract.MaximumP95Ratio <= 0 ||
-            contract.MaximumRetainedMemoryRatio <= 0 ||
-            contract.MaximumRetainedMemoryIncreaseMiB < 0 ||
+        if (contract.MaximumRetainedMemoryIncreaseMiB < 0 ||
             contract.MaximumEnabledRetainedCompilations < 0 ||
-            contract.MaximumEnabledRetainedMemoryIncreaseMiB < 0 ||
-            contract.IdeEditP95Milliseconds <= 0 ||
-            contract.IdeEditMaximumMilliseconds <= 0 ||
-            contract.CancellationP95Milliseconds <= 0 ||
-            contract.ForcedTerminationMilliseconds <= 0)
+            contract.MaximumEnabledRetainedMemoryIncreaseMiB < 0)
         {
             throw new InvalidDataException(
                 "The performance limits must be positive.");
@@ -1556,30 +1528,15 @@ internal static class PerformanceGate
             .Descendants("CompilerVisibleProperty")
             .Select(static element => (string?)element.Attribute("Include"))
             .ToHashSet(StringComparer.Ordinal);
-        var profile = portableTargets
-            .Descendants("SharpProofProfile")
-            .SingleOrDefault(
-                static element =>
-                    string.Equals(
-                        (string?)element.Attribute("Condition"),
-                        "'$(SharpProofProfile)' == ''",
-                        StringComparison.Ordinal));
-        var features = portableTargets
-            .Descendants("SharpProofFeatures")
-            .SingleOrDefault(
-                static element =>
-                    string.Equals(
-                        (string?)element.Attribute("Condition"),
-                        "'$(SharpProofFeatures)' == ''",
-                        StringComparison.Ordinal));
-        var verify = portableTargets
-            .Descendants("SharpProofVerify")
-            .SingleOrDefault(
-                static element =>
-                    string.Equals(
-                        (string?)element.Attribute("Condition"),
-                        "'$(SharpProofVerify)' == ''",
-                        StringComparison.Ordinal));
+        var profile = FindDefaultProperty(
+            portableTargets,
+            "SharpProofProfile");
+        var features = FindDefaultProperty(
+            portableTargets,
+            "SharpProofFeatures");
+        var verify = FindDefaultProperty(
+            portableTargets,
+            "SharpProofVerify");
         var analyzerGroups = portableTargets.Descendants("ItemGroup")
             .Where(static group =>
                 group.Elements("Analyzer").Any())
@@ -1654,20 +1611,12 @@ internal static class PerformanceGate
         var verifierHost = verifierProps
             .Descendants("_SharpProofVerifierHostSupported")
             .SingleOrDefault();
-        var verifyPolicy = verifierTargets
-            .Descendants("SharpProofVerifyPolicy")
-            .SingleOrDefault(static element =>
-                string.Equals(
-                    (string?)element.Attribute("Condition"),
-                    "'$(SharpProofVerifyPolicy)' == ''",
-                    StringComparison.Ordinal));
-        var assumptionPolicy = verifierTargets
-            .Descendants("SharpProofAssumptionPolicy")
-            .SingleOrDefault(static element =>
-                string.Equals(
-                    (string?)element.Attribute("Condition"),
-                    "'$(SharpProofAssumptionPolicy)' == ''",
-                    StringComparison.Ordinal));
+        var verifyPolicy = FindDefaultProperty(
+            verifierTargets,
+            "SharpProofVerifyPolicy");
+        var assumptionPolicy = FindDefaultProperty(
+            verifierTargets,
+            "SharpProofAssumptionPolicy");
         var verifierTarget = verifierTargets.Descendants("Target")
             .SingleOrDefault(static target =>
                 string.Equals(
@@ -1697,13 +1646,13 @@ internal static class PerformanceGate
             "'$(DesignTimeBuild)'!='true'AND'$(BuildingProject)'!='false'";
         var unexpectedCoreDependency = verifierTargets.Descendants("Target")
             .Where(target => !ReferenceEquals(target, verifierTarget))
-            .Any(target => SplitTargetList(
+            .Any(target => SplitMsBuildList(
                     (string?)target.Attribute("DependsOnTargets"))
                 .Contains(
                     "_SharpProofVerifyCore",
                     StringComparer.Ordinal));
         var callTargetInvokesCore = verifierTargets.Descendants("CallTarget")
-            .Any(call => SplitTargetList(
+            .Any(call => SplitMsBuildList(
                     (string?)call.Attribute("Targets"))
                 .Contains(
                     "_SharpProofVerifyCore",
@@ -1791,6 +1740,17 @@ internal static class PerformanceGate
         }
     }
 
+    private static XElement? FindDefaultProperty(
+        XDocument document,
+        string name)
+    {
+        return document.Descendants(name).SingleOrDefault(element =>
+            string.Equals(
+                (string?)element.Attribute("Condition"),
+                $"'$({name})' == ''",
+                StringComparison.Ordinal));
+    }
+
     private static string NormalizeMsBuildCondition(string? condition)
     {
         return string.Concat((condition ?? string.Empty)
@@ -1826,17 +1786,6 @@ internal static class PerformanceGate
                     StringSplitOptions.RemoveEmptyEntries)
                 .Select(static item => item.Trim())
                 .Where(static item => item.Length != 0)];
-    }
-
-    private static ImmutableArray<string> SplitTargetList(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value)
-            ? []
-            : [.. value.Split(
-                    [';'],
-                    StringSplitOptions.RemoveEmptyEntries)
-                .Select(static target => target.Trim())
-                .Where(static target => target.Length != 0)];
     }
 
     private sealed record EnabledAnalyzerRetentionMeasurement(

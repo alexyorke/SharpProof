@@ -23,13 +23,13 @@ public sealed class AcceptanceScriptTests
         bool expectedSuccess)
     {
         var result = await RunAsync(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "pwsh",
             "-NoLogo",
             "-NoProfile",
             "-File",
             Path.Combine(
-                RepositoryRoot(),
+                TestRepository.FindRoot(),
                 "scripts",
                 "Test-SharpProofAcceptanceTimingFixtures.ps1"),
             "-Mutation",
@@ -44,7 +44,7 @@ public sealed class AcceptanceScriptTests
     public async Task AcceptanceScriptOwnsRestoreInsideOuterTimeline()
     {
         var verify = await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot(), "eng", "acceptance", "Verify.ps1"));
+            TestRepository.FindRoot(), "eng", "acceptance", "Verify.ps1"));
         var started = verify.IndexOf(
             "$timingStartedUtc =", StringComparison.Ordinal);
         var dotnetWrapper = verify.IndexOf(
@@ -67,7 +67,7 @@ public sealed class AcceptanceScriptTests
         }
 
         var dispatcher = await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot(), "scripts", "Invoke-SharpProofContainer.ps1"));
+            TestRepository.FindRoot(), "scripts", "Invoke-SharpProofContainer.ps1"));
         Assert.That(
             dispatcher,
             Does.Not.Contain("SHARPPROOF_ACCEPTANCE_RESTORE_MILLISECONDS"));
@@ -149,7 +149,7 @@ public sealed class AcceptanceScriptTests
 
     private static string WriteHarness(string fixture)
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var source = File.ReadAllText(Path.Combine(
             root,
             "eng",
@@ -301,21 +301,6 @@ public sealed class AcceptanceScriptTests
             File.SetAttributes(file, FileAttributes.Normal);
         }
         Directory.Delete(path, recursive: true);
-    }
-
-    private static string RepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory != null;
-             directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-        }
-        throw new InvalidOperationException(
-            "Could not find the repository root.");
     }
 
     private sealed record ProcessResult(

@@ -234,20 +234,6 @@ internal static class AnalyzerTestHost
         return MetadataReference.CreateFromImage(stream.ToArray());
     }
 
-    internal static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory != null;
-             directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-        }
-        throw new InvalidOperationException("Could not find the repository root.");
-    }
-
     private static ImmutableArray<MetadataReference> CreateReferences()
     {
         var trustedPlatformAssemblies =

@@ -164,7 +164,7 @@ internal static class DiagnosticDescriptorCatalogAssertions
         var relativePath = Uri.UnescapeDataString(
             link[RepositoryHelpPrefix.Length..].Split('#')[0]);
         var targetPath = Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             relativePath.Replace('/', Path.DirectorySeparatorChar));
         Assert.That(File.Exists(targetPath), Is.True, id);
         var fragment = Uri.UnescapeDataString(uri.Fragment.TrimStart('#'));
@@ -208,26 +208,10 @@ internal static class DiagnosticDescriptorCatalogAssertions
     private static JsonDocument ReadCatalog()
     {
         return JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "eng",
             "diagnostics",
             "diagnostic-descriptors.v1.json")));
     }
 
-    private static string RepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory != null;
-             directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(
-                    directory.FullName,
-                    "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-        }
-        throw new InvalidOperationException(
-            "Could not find the repository root.");
-    }
 }

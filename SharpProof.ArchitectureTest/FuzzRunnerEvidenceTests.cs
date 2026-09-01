@@ -11,7 +11,7 @@ public sealed class FuzzRunnerEvidenceTests
     [Test]
     public async Task FuzzRunnerEvidenceUsesStrictSchemaFourDecoder()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var start = new ProcessStartInfo
         {
             FileName = "pwsh",
@@ -49,7 +49,7 @@ public sealed class FuzzRunnerEvidenceTests
     [Test]
     public async Task FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var start = new ProcessStartInfo
         {
             FileName = "pwsh",
@@ -133,20 +133,6 @@ public sealed class FuzzRunnerEvidenceTests
                 $"'{start.FileName}' did not exit within " +
                 $"{ScriptTimeout.TotalSeconds:N0} seconds.");
         }
-    }
-
-    private static string RepositoryRoot()
-    {
-        var current = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (current is not null)
-        {
-            if (File.Exists(Path.Combine(current.FullName, "SharpProof.sln")))
-            {
-                return current.FullName;
-            }
-            current = current.Parent;
-        }
-        throw new DirectoryNotFoundException("Could not find repository root.");
     }
 
     private sealed record ProcessResult(

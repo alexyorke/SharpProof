@@ -8,7 +8,7 @@ public sealed class NativeTestBootstrapTests
     [Test]
     public async Task SmtAndWorkerTestsInstallTheExactRequiredNativeBootstrap()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         foreach (var project in new[] { "SharpProof.Smt.Test", "SharpProof.Worker.Test" })
         {
             var path = Path.Combine(root, project, "ContainerNativeLibrarySetup.cs");
@@ -52,17 +52,4 @@ public sealed class NativeTestBootstrapTests
         return count;
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
-    }
 }

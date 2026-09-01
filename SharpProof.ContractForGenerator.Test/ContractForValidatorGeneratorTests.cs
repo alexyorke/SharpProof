@@ -2036,7 +2036,7 @@ public sealed class ContractForValidatorGeneratorTests
     [Test]
     public void GeneratorContainsNoTextualBindingOrSourceSynthesis()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var files = Directory.GetFiles(
             Path.Combine(root, "SharpProof.ContractForGenerator"),
             "*.cs",
@@ -2088,23 +2088,6 @@ public sealed class ContractForValidatorGeneratorTests
             .ToString();
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (Directory.Exists(Path.Combine(
-                    directory.FullName,
-                    "SharpProof.ContractForGenerator")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Repository root was not found.");
-    }
 }
 
 internal sealed class InvalidOutputGenerator : IIncrementalGenerator

@@ -191,7 +191,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             else if (completionOutcome is UnknownOutcome unknown)
             {
                 normalCompletionUnknown =
-                    CallableClaimResultAssembler.MapAbstention(
+                    WorkerProjections.MapAbstention(
                         unknown.Reason);
             }
         }

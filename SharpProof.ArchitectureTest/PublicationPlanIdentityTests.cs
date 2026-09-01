@@ -44,7 +44,7 @@ public sealed class PublicationPlanIdentityTests
     public async Task PublisherValidatesCurrentIdentitiesBeforeAndAfterWritingPlan()
     {
         var script = await File.ReadAllTextAsync(Path.Combine(
-            FindRepositoryRoot(), "scripts", "Publish-SharpProofRelease.ps1"));
+            TestRepository.FindRoot(), "scripts", "Publish-SharpProofRelease.ps1"));
         var create = script.IndexOf(
             "New-SharpProofPublicationPlanIdentities", StringComparison.Ordinal);
         var validate = script.IndexOf(
@@ -62,7 +62,7 @@ public sealed class PublicationPlanIdentityTests
     private static async Task<(int ExitCode, string Output)> RunFixtureAsync(
         string mutation)
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var info = new ProcessStartInfo
         {
             FileName = "pwsh",
@@ -85,17 +85,4 @@ public sealed class PublicationPlanIdentityTests
         return (process.ExitCode, await output + Environment.NewLine + await error);
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
-    }
 }

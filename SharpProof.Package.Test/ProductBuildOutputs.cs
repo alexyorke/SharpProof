@@ -30,7 +30,7 @@ internal static class ProductBuildOutputs
             throw new InvalidOperationException(
                 "The test build configuration was not found.");
         var path = Path.Combine(
-            PackagedProductFeed.FindRepositoryRoot(),
+            TestRepository.FindRoot(),
             project,
             "bin",
             configuration,

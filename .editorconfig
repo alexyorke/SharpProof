@@ -68,9 +68,6 @@ dotnet_diagnostic.CA1032.severity = none
 dotnet_diagnostic.CA1064.severity = none
 dotnet_diagnostic.CA2000.severity = none
 
-[SharpProof.Specs/ApiSpecModel.cs]
-dotnet_diagnostic.CA1720.severity = none
-
 [SharpProof.Worker.Launcher/Program.cs]
 dotnet_diagnostic.CA1849.severity = none
 

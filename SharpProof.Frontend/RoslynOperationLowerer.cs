@@ -56,7 +56,8 @@ public sealed class RoslynOperationLowerer
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
         var previousResults = _currentLoweringResults;
-        _currentLoweringResults = new(OperationReferenceComparer.Instance);
+        _currentLoweringResults = new(
+            CompilerIdentityBridge.OperationReferenceComparer.Instance);
         try
         {
             var lowered = LowerCore(operation);
@@ -1142,19 +1143,4 @@ public sealed class RoslynOperationLowerer
         }
     }
 
-    private sealed class OperationReferenceComparer : IEqualityComparer<IOperation>
-    {
-        internal static OperationReferenceComparer Instance { get; } = new();
-
-        public bool Equals(IOperation? left, IOperation? right)
-        {
-            return ReferenceEquals(left, right);
-        }
-
-        public int GetHashCode(IOperation operation)
-        {
-            return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(
-                operation);
-        }
-    }
 }

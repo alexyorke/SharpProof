@@ -10,7 +10,7 @@ public sealed class OpenCodePluginDependencyTests
     [Test]
     public async Task LocalPluginImportsHaveTrackedLockedDependencies()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         using var config = JsonDocument.Parse(await File.ReadAllTextAsync(
             Path.Combine(root, "opencode.json")));
         using var package = JsonDocument.Parse(await File.ReadAllTextAsync(
@@ -51,17 +51,4 @@ public sealed class OpenCodePluginDependencyTests
         Assert.That(ignored, Does.Not.Contain("package-lock.json"));
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
-    }
 }

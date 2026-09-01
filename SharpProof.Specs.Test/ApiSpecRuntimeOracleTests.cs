@@ -1812,10 +1812,5 @@ public sealed partial class ApiSpecRuntimeOracleTests
             return value;
         }
 
-        public object? TouchObject(object? value)
-        {
-            Touches++;
-            return value;
-        }
     }
 }

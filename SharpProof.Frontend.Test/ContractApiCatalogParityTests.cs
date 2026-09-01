@@ -52,7 +52,7 @@ public sealed class ContractApiCatalogParityTests
     public void CatalogIdentityMatchesTheExportedContractDeclaration()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
+            TestRepository.FindRoot(),
             "SharpProof.Frontend",
             "ContractApi.catalog.json")));
         var root = document.RootElement;
@@ -138,7 +138,7 @@ public sealed class ContractApiCatalogParityTests
         string mutation,
         string expectedError)
     {
-        var repository = RepositoryRoot();
+        var repository = TestRepository.FindRoot();
         var catalog = await File.ReadAllTextAsync(Path.Combine(
             repository,
             "SharpProof.Frontend",
@@ -262,19 +262,4 @@ public sealed class ContractApiCatalogParityTests
         }
     }
 
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException("The repository root was not found.");
-    }
 }

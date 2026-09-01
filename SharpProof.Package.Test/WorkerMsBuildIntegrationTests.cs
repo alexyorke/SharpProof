@@ -2960,7 +2960,7 @@ public sealed class WorkerMsBuildIntegrationTests
     [Test]
     public void PackagePropertiesMatchProtocolDefaults()
     {
-        var repository = ConsumerProject.FindRepositoryRoot();
+        var repository = TestRepository.FindRoot();
         var portableProps = XDocument.Load(Path.Combine(
             repository,
             "SharpProof.Package",
@@ -3051,7 +3051,7 @@ public sealed class WorkerMsBuildIntegrationTests
     [Test]
     public void CompilerManifestPropertiesAreVisibleBeforeEditorConfigGeneration()
     {
-        var repository = ConsumerProject.FindRepositoryRoot();
+        var repository = TestRepository.FindRoot();
         var packageProps = XDocument.Load(Path.Combine(
             repository,
             "SharpProof.Verifier",
@@ -3526,7 +3526,7 @@ public sealed class WorkerMsBuildIntegrationTests
             typeof(WorkerMsBuildIntegrationTests).Assembly.Location)!)
             .Parent?.Name ?? throw new InvalidOperationException(
                 "The test build configuration was not found.");
-        return Path.Combine(ConsumerProject.FindRepositoryRoot(), "SharpProof.Worker",
+        return Path.Combine(TestRepository.FindRoot(), "SharpProof.Worker",
             "bin", configuration, "net9.0", "SharpProof.Worker.dll");
     }
 
@@ -3536,7 +3536,7 @@ public sealed class WorkerMsBuildIntegrationTests
             typeof(WorkerMsBuildIntegrationTests).Assembly.Location)!)
             .Parent?.Name ?? throw new InvalidOperationException(
                 "The test build configuration was not found.");
-        return Path.Combine(ConsumerProject.FindRepositoryRoot(),
+        return Path.Combine(TestRepository.FindRoot(),
             "SharpProof.Worker.Launcher", "bin", configuration, "net9.0",
             "SharpProof.Worker.Protocol.dll");
     }
@@ -4050,7 +4050,7 @@ public sealed class WorkerMsBuildIntegrationTests
                 name);
             Directory.CreateDirectory(root);
             File.Copy(
-                Path.Combine(FindRepositoryRoot(), "global.json"),
+                Path.Combine(TestRepository.FindRoot(), "global.json"),
                 Path.Combine(root, "global.json"));
             File.WriteAllText(
                 Path.Combine(root, "Subject.cs"),
@@ -4316,7 +4316,7 @@ public sealed class WorkerMsBuildIntegrationTests
         private static string CreateProjectXml(
             IEnumerable<(string Name, string Value)> properties)
         {
-            var repository = FindRepositoryRoot();
+            var repository = TestRepository.FindRoot();
             var nativeZ3 = SecurityElement.Escape(
                 ContainerContract.ResolveZ3LibraryRequired());
             var attributes = SecurityElement.Escape(
@@ -4467,25 +4467,6 @@ public sealed class WorkerMsBuildIntegrationTests
                 """;
         }
 
-        internal static string FindRepositoryRoot()
-        {
-            var directory = new DirectoryInfo(
-                typeof(LauncherMarker).Assembly.Location);
-            while (directory != null)
-            {
-                if (File.Exists(
-                        Path.Combine(
-                            directory.FullName,
-                            "SharpProof.Release.props")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-            throw new InvalidOperationException(
-                "Repository root was not found.");
-        }
     }
 
     private readonly record struct BuildResult(

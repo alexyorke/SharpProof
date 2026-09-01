@@ -39,6 +39,12 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         3,
         long.MaxValue
     ];
+    private static readonly IrBinaryOperator[] IntegerOperators = [
+        IrBinaryOperator.Add, IrBinaryOperator.Subtract, IrBinaryOperator.Multiply,
+        IrBinaryOperator.Divide, IrBinaryOperator.Remainder];
+    private static readonly IrBinaryOperator[] ComparisonOperators = [
+        IrBinaryOperator.Equal, IrBinaryOperator.NotEqual, IrBinaryOperator.LessThan,
+        IrBinaryOperator.LessThanOrEqual, IrBinaryOperator.GreaterThan, IrBinaryOperator.GreaterThanOrEqual];
 
     private readonly IrFactory _factory = factory ?? throw new ArgumentNullException(nameof(factory));
     private readonly Random _random = new(seed);
@@ -203,27 +209,12 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
 
     private IrBinaryOperator RandomIntegerOperator()
     {
-        return _random.Next(5) switch
-        {
-            0 => IrBinaryOperator.Add,
-            1 => IrBinaryOperator.Subtract,
-            2 => IrBinaryOperator.Multiply,
-            3 => IrBinaryOperator.Divide,
-            _ => IrBinaryOperator.Remainder
-        };
+        return IntegerOperators[_random.Next(IntegerOperators.Length)];
     }
 
     private IrBinaryOperator RandomComparisonOperator()
     {
-        return _random.Next(6) switch
-        {
-            0 => IrBinaryOperator.Equal,
-            1 => IrBinaryOperator.NotEqual,
-            2 => IrBinaryOperator.LessThan,
-            3 => IrBinaryOperator.LessThanOrEqual,
-            4 => IrBinaryOperator.GreaterThan,
-            _ => IrBinaryOperator.GreaterThanOrEqual
-        };
+        return ComparisonOperators[_random.Next(ComparisonOperators.Length)];
     }
 
     private long NextInteger()

@@ -216,58 +216,29 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
             return false;
         }
 
-        switch (term)
+        if (term is IrOpaqueTerm)
         {
-            case IrBooleanTerm or IrIntegerTerm or IrStringTerm or IrNullTerm:
-                break;
-            case IrVariableTerm variable:
-                variables[variable.Variable.Value] = variable.Variable;
-                break;
-            case IrUnaryTerm unary when !TryCollectTerms(
-                unary.Operand, variables, visited, terms, out reason):
+            reason = "The term contains an opaque call.";
+            return false;
+        }
+        if (term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or
+            IrNullTerm or IrVariableTerm or IrUnaryTerm or IrBinaryTerm or
+            IrConditionalTerm or IrCastTerm or IrLengthTerm or
+            IrSequenceAccessTerm))
+        {
+            reason = "The term kind is outside the executable oracle subset.";
+            return false;
+        }
+        if (term is IrVariableTerm variable)
+        {
+            variables[variable.Variable.Value] = variable.Variable;
+        }
+        foreach (var child in IrTraversal.GetChildren(term))
+        {
+            if (!TryCollectTerms(child, variables, visited, terms, out reason))
+            {
                 return false;
-            case IrUnaryTerm:
-                break;
-            case IrBinaryTerm binary when
-                !TryCollectTerms(binary.Left, variables, visited, terms, out reason) ||
-                !TryCollectTerms(binary.Right, variables, visited, terms, out reason):
-                return false;
-            case IrBinaryTerm:
-                break;
-            case IrConditionalTerm conditional when
-                !TryCollectTerms(
-                    conditional.Condition, variables, visited, terms, out reason) ||
-                !TryCollectTerms(
-                    conditional.WhenTrue, variables, visited, terms, out reason) ||
-                !TryCollectTerms(
-                    conditional.WhenFalse, variables, visited, terms, out reason):
-                return false;
-            case IrConditionalTerm:
-                break;
-            case IrCastTerm cast when !TryCollectTerms(
-                cast.Operand, variables, visited, terms, out reason):
-                return false;
-            case IrCastTerm:
-                break;
-            case IrLengthTerm length when !TryCollectTerms(
-                length.Value, variables, visited, terms, out reason):
-                return false;
-            case IrLengthTerm:
-                break;
-            case IrSequenceAccessTerm access when
-                !TryCollectTerms(
-                    access.Sequence, variables, visited, terms, out reason) ||
-                !TryCollectTerms(
-                    access.Index, variables, visited, terms, out reason):
-                return false;
-            case IrSequenceAccessTerm:
-                break;
-            case IrOpaqueTerm:
-                reason = "The term contains an opaque call.";
-                return false;
-            default:
-                reason = "The term kind is outside the executable oracle subset.";
-                return false;
+            }
         }
 
         terms.Add(term);

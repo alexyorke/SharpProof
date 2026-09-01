@@ -1237,7 +1237,8 @@ internal static class CompilerLoweredArtifact
 
         return true;
     }
-    private static WorkerClaimEvidence ManifestEvidence(CompilerContractEvidence value)
+    internal static WorkerClaimEvidence ManifestEvidence(
+        CompilerContractEvidence value)
     {
         var index = (int)value;
         return index >= 0 && index < ManifestEvidenceMap.Length

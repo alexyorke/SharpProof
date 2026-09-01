@@ -13,8 +13,6 @@ namespace SharpProof.Worker.Launcher;
 
 internal static class Program
 {
-    private const int TerminationCleanupReserveMilliseconds = 100;
-
     internal static async Task<int> Main(string[] args)
     {
         return await RunMain(
@@ -244,8 +242,9 @@ internal static class Program
         LauncherArguments arguments, WorkerVerifyRequest request,
         string projectDirectory, string workerPath)
     {
-        var terminationStart = TimeSpan.FromMilliseconds(ComputeHardLimit(
-            request.Budgets.ProjectWallTimeMilliseconds,
+        var terminationStart = TimeSpan.FromMilliseconds(
+            WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
+            request,
             arguments.TerminationGraceMilliseconds));
         var finalLimit = TimeSpan.FromMilliseconds(ComputeFinalLimit(
             request.Budgets.ProjectWallTimeMilliseconds,
@@ -299,13 +298,6 @@ internal static class Program
     internal static string NormalizeAbsolutePath(string path)
     {
         return LinuxPathIdentity.Canonicalize(path);
-    }
-
-    internal static int ComputeHardLimit(
-        int projectMilliseconds, int terminationGraceMilliseconds)
-    {
-        return checked(projectMilliseconds + Math.Max(1,
-            terminationGraceMilliseconds - TerminationCleanupReserveMilliseconds));
     }
 
     internal static int ComputeFinalLimit(
@@ -921,16 +913,10 @@ internal static class Program
 
 internal static partial class LauncherPresentation
 {
-    internal static string Level(WorkerVerifyPolicy policy, string advisory)
+    internal static string Level(Enum policy, string advisory)
     {
         return Level((object)policy, advisory);
     }
-
-    internal static string Level(WorkerAssumptionPolicy policy, string advisory)
-    {
-        return Level((object)policy, advisory);
-    }
-
 }
 
 internal sealed partial class LauncherArguments

@@ -9,7 +9,7 @@ public sealed class StandaloneGateEvidenceTests
     [Test]
     public void StandaloneGateDecoderRejectsUnauthenticatedEvidence()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var start = new ProcessStartInfo
         {
             FileName = "pwsh",
@@ -38,7 +38,7 @@ public sealed class StandaloneGateEvidenceTests
     [Test]
     public void StandaloneGateProducerIsFreshBuildAndIdentityBound()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         var evidence = File.ReadAllText(Path.Combine(
             root,
             "scripts",
@@ -64,17 +64,4 @@ public sealed class StandaloneGateEvidenceTests
         }
     }
 
-    private static string RepositoryRoot()
-    {
-        var current = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (current is not null)
-        {
-            if (File.Exists(Path.Combine(current.FullName, "SharpProof.sln")))
-            {
-                return current.FullName;
-            }
-            current = current.Parent;
-        }
-        throw new DirectoryNotFoundException("Could not find repository root.");
-    }
 }

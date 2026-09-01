@@ -70,7 +70,7 @@ public sealed class ChangedTestSelectionTests
         string root,
         string changedInput)
     {
-        var repository = FindRepositoryRoot();
+        var repository = TestRepository.FindRoot();
         foreach (var directory in new[]
                  {
                      "scripts",
@@ -158,20 +158,6 @@ public sealed class ChangedTestSelectionTests
         var combined = (await output) + Environment.NewLine + (await error);
         Assert.That(process.ExitCode, Is.Zero, combined);
         return new ProcessResult(combined);
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
     }
 
     private sealed record ProcessResult(string Output);

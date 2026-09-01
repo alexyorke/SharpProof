@@ -95,34 +95,25 @@ public sealed class IrSummaryProvenance
     }
 }
 
-public sealed class IrSummarySignature
+public sealed class IrSummarySignature(
+    IrMemberId member,
+    IrVarId? receiver,
+    IEnumerable<IrVarId> parameters,
+    IrVarId result,
+    IrSummaryProvenance provenance)
 {
-    public IrSummarySignature(
-        IrMemberId member,
-        IrVarId? receiver,
-        IEnumerable<IrVarId> parameters,
-        IrVarId result,
-        IrSummaryProvenance provenance)
-    {
-        Member = member;
-        Receiver = receiver;
-        Parameters = parameters == null
-            ? throw new ArgumentNullException(nameof(parameters))
-            : parameters.ToImmutableArray();
-        Result = result;
-        Provenance = provenance ??
-            throw new ArgumentNullException(nameof(provenance));
-    }
+    public IrMemberId Member { get; } = member;
 
-    public IrMemberId Member { get; }
+    public IrVarId? Receiver { get; } = receiver;
 
-    public IrVarId? Receiver { get; }
+    public ImmutableArray<IrVarId> Parameters { get; } = parameters == null
+        ? throw new ArgumentNullException(nameof(parameters))
+        : parameters.ToImmutableArray();
 
-    public ImmutableArray<IrVarId> Parameters { get; }
+    public IrVarId Result { get; } = result;
 
-    public IrVarId Result { get; }
-
-    public IrSummaryProvenance Provenance { get; }
+    public IrSummaryProvenance Provenance { get; } = provenance ??
+        throw new ArgumentNullException(nameof(provenance));
 }
 
 public sealed class IrExceptionalSummaryExit

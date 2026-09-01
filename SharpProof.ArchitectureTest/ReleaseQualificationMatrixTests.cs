@@ -25,7 +25,7 @@ public sealed partial class ReleaseQualificationMatrixTests
     [Test]
     public void WorkflowExecutesTheExactCatalogOwnedQualificationMatrix()
     {
-        var root = RepositoryRoot();
+        var root = TestRepository.FindRoot();
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root, "eng", "acceptance", "preview-evidence.v1.json")));
         var matrix = document.RootElement
@@ -73,7 +73,7 @@ public sealed partial class ReleaseQualificationMatrixTests
     [Test]
     public async Task ReceiptWriterRejectsStaleAndPackageMismatchedMatrixRows()
     {
-        var sourceRoot = RepositoryRoot();
+        var sourceRoot = TestRepository.FindRoot();
         var fixture = Directory.CreateTempSubdirectory("sp004-receipts-");
         try
         {
@@ -143,7 +143,7 @@ public sealed partial class ReleaseQualificationMatrixTests
     [Test]
     public async Task ReceiptWriterRequiresReviewedPilotEvidence()
     {
-        var sourceRoot = RepositoryRoot();
+        var sourceRoot = TestRepository.FindRoot();
         var fixture = Directory.CreateTempSubdirectory("sp004-pilot-receipt-");
         try
         {
@@ -272,13 +272,6 @@ public sealed partial class ReleaseQualificationMatrixTests
         using var process = Process.Start(start)!;
         await process.WaitForExitAsync();
         return process.ExitCode;
-    }
-
-    private static string RepositoryRoot()
-    {
-        return Path.GetFullPath(Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            "..", "..", "..", ".."));
     }
 
     [GeneratedRegex(

@@ -45,10 +45,7 @@ internal sealed partial class ClaimManifestBuilder
         AttributeData? Attribute,
         ContractClausePlacement? Placement
     );
-    private readonly partial record struct AssumptionCandidate(
-        WorkerAssumptionKind Kind,
-        string Fingerprint
-    );
+    private readonly partial record struct AssumptionCandidate(WorkerAssumptionKind Kind, string Fingerprint);
     private readonly partial record struct CallableSeed(
         IMethodSymbol Method,
         SyntaxNode? Declaration,

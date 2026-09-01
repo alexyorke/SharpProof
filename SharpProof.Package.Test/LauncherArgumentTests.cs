@@ -1025,11 +1025,6 @@ public sealed class LauncherArgumentTests
     [Test]
     public void CombinedTimeoutOverflowIsRejectedBeforeStartingWorker()
     {
-        Action action = () => _ = Program.ComputeHardLimit(
-            int.MaxValue,
-            WorkerLauncherDefaults.TerminationGraceMilliseconds);
-
-        Assert.That(action, Throws.TypeOf<OverflowException>());
         Assert.That(
             (Action)(() => _ = Program.ComputeFinalLimit(
                 int.MaxValue,
@@ -1295,15 +1290,12 @@ public sealed class LauncherArgumentTests
         }
     }
 
-    [TestCase(1_000, 1_000, 1_900)]
-    [TestCase(1_000, 100, 1_001)]
-    [TestCase(1_000, 1, 1_001)]
-    public void CombinedTimeoutReservesCleanupTime(
-        int projectMilliseconds, int graceMilliseconds, int expected)
+    [TestCase(1_000, 1_000)]
+    [TestCase(1_000, 100)]
+    [TestCase(1_000, 1)]
+    public void FinalTimeoutIncludesCleanupTime(
+        int projectMilliseconds, int graceMilliseconds)
     {
-        Assert.That(
-            Program.ComputeHardLimit(projectMilliseconds, graceMilliseconds),
-            Is.EqualTo(expected));
         Assert.That(
             Program.ComputeFinalLimit(projectMilliseconds, graceMilliseconds),
             Is.EqualTo(projectMilliseconds + graceMilliseconds));

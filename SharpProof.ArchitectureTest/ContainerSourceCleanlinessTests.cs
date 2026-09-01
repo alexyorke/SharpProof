@@ -377,7 +377,7 @@ public sealed class ContainerSourceCleanlinessTests
             environment,
             "bash",
             Path.Combine(
-                RepositoryRoot(),
+                TestRepository.FindRoot(),
                 "eng",
                 "container",
                 "entrypoint.sh"),
@@ -432,21 +432,6 @@ public sealed class ContainerSourceCleanlinessTests
             process.ExitCode,
             await output,
             await error);
-    }
-
-    private static string RepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Could not find the repository root.");
     }
 
     private sealed record ProcessResult(

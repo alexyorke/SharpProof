@@ -169,11 +169,13 @@ internal static partial class AnalyzerFeaturePipeline
                     : outcome);
             return;
         }
-        context.ReportDiagnostic(Diagnostic.Create(
-            GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
-            AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(method, context.CancellationToken),
+        ReportSelectedAnalysisIncomplete(
+            context.ReportDiagnostic,
+            AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                method,
+                context.CancellationToken),
             method.Name,
-            LanguageSubsetAbstentionReason.MissingOperationRoot));
+            LanguageSubsetAbstentionReason.MissingOperationRoot);
         session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Abstained);
     }
 
@@ -280,13 +282,12 @@ internal static partial class AnalyzerFeaturePipeline
         {
             if (selection.Any)
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
-                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
+                ReportSelectedAnalysisIncomplete(
+                    context.ReportDiagnostic,
+                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                        declaration),
                     method.Name,
-                    subset.OperationKind is { } operation
-                        ? subset.Reason + " (" + operation + ")"
-                        : subset.Reason.ToString()));
+                    DescribeSubset(subset));
                 subsetIncompleteReported = true;
             }
 
@@ -326,11 +327,12 @@ internal static partial class AnalyzerFeaturePipeline
                 !method.IsAbstract &&
                 !method.IsExtern)
             {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
-                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(declaration),
+                ReportSelectedAnalysisIncomplete(
+                    context.ReportDiagnostic,
+                    AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                        declaration),
                     method.Name,
-                    "RequiresCallSiteAnalysisUnknown"));
+                    "RequiresCallSiteAnalysisUnknown");
             }
         }
 
@@ -410,13 +412,12 @@ internal static partial class AnalyzerFeaturePipeline
             context.CancellationToken);
         if (!subset.IsSupported)
         {
-            context.ReportDiagnostic(Diagnostic.Create(
-                GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
-                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(context.Node),
+            ReportSelectedAnalysisIncomplete(
+                context.ReportDiagnostic,
+                AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
+                    context.Node),
                 method.Name,
-                subset.OperationKind is { } operation
-                    ? subset.Reason + " (" + operation + ")"
-                    : subset.Reason.ToString()));
+                DescribeSubset(subset));
             session.RecordSemanticOutcome(
                 method,
                 AnalyzerSemanticOutcome.Abstained);
@@ -440,13 +441,13 @@ internal static partial class AnalyzerFeaturePipeline
         foreach (var method in session.GetUnrecordedSelectedSemicolonAccessors())
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            context.ReportDiagnostic(Diagnostic.Create(
-                GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+            ReportSelectedAnalysisIncomplete(
+                context.ReportDiagnostic,
                 AnalyzerSyntaxHelpers.GetCallableDeclarationLocation(
                     method,
                     context.CancellationToken),
                 method.Name,
-                LanguageSubsetAbstentionReason.MissingOperationRoot));
+                LanguageSubsetAbstentionReason.MissingOperationRoot);
             session.RecordSemanticOutcome(
                 method,
                 AnalyzerSemanticOutcome.Abstained);
@@ -804,14 +805,9 @@ internal static partial class AnalyzerFeaturePipeline
             reportDiagnostic(InvalidContractArgumentDiagnostics.Create(
                 "Contract." + clause.Kind,
                 "<placement>",
-                DescribePlacement(clause.Placement),
+                AnalyzerDiagnosticCatalog.DescribePlacement(clause.Placement),
                 clause.Location));
         }
-    }
-
-    private static string DescribePlacement(ContractClausePlacement placement)
-    {
-        return AnalyzerDiagnosticCatalog.DescribePlacement(placement);
     }
 
     private static MethodSelection GetSelection(
@@ -833,6 +829,26 @@ internal static partial class AnalyzerFeaturePipeline
         var suppressed = SharpProofControlAttributePolicy.ValidateAndShouldSuppress(
             method, session, reportDiagnostic, cancellationToken);
         return new(features, suppressed);
+    }
+
+    private static void ReportSelectedAnalysisIncomplete(
+        Action<Diagnostic> report,
+        Location location,
+        string methodName,
+        object reason)
+    {
+        report(Diagnostic.Create(
+            GeneratedDiagnosticDescriptors.SelectedAnalysisIncompleteRule,
+            location,
+            methodName,
+            reason));
+    }
+
+    private static string DescribeSubset(LanguageSubsetDecision subset)
+    {
+        return subset.OperationKind is { } operation
+            ? subset.Reason + " (" + operation + ")"
+            : subset.Reason.ToString();
     }
 
     private static SyntaxNode? FindDeclaration(

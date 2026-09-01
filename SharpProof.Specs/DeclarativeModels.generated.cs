@@ -19,21 +19,9 @@ public sealed partial class SpecInstantiationResult
         Postconditions = postconditions;
         Failure = failure;
     }
-
-    public SpecInstantiationStatus Status
-    {
-        get;
-    }
-
-    public ImmutableArray<IrTerm> Postconditions
-    {
-        get;
-    }
-
-    public SpecInstantiationFailure? Failure
-    {
-        get;
-    }
+    public SpecInstantiationStatus Status { get; }
+    public ImmutableArray<IrTerm> Postconditions { get; }
+    public SpecInstantiationFailure? Failure { get; }
 }
 
 public sealed partial record SpecInstantiationFailure(
@@ -46,9 +34,6 @@ public static partial class ApiSpecInstantiator
 {
     private sealed partial class Instantiation
     {
-        internal readonly partial record struct TermResult(
-            IrTerm? Term,
-            SpecInstantiationFailure? Failure
-        );
+        internal readonly partial record struct TermResult(IrTerm? Term, SpecInstantiationFailure? Failure);
     }
 }

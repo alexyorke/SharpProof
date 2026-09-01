@@ -166,13 +166,7 @@ internal sealed class ExceptionHandlerReachability(
                             switchExpression.Value) == true))
                 {
                     Add(
-                        _switchExpressionExceptionType is { } exceptionType
-                            ? new PotentialExceptions(
-                                ImmutableHashSet.Create<INamedTypeSymbol>(
-                                    SymbolEqualityComparer.Default,
-                                    exceptionType),
-                                Unknown: false)
-                            : UnknownPotential,
+                        Potential(_switchExpressionExceptionType),
                         switchExpression);
                 }
                 PushChildren(switchExpression);
@@ -212,11 +206,7 @@ internal sealed class ExceptionHandlerReachability(
                     is INamedTypeSymbol type)
                 {
                     Add(
-                        new PotentialExceptions(
-                            ImmutableHashSet.Create<INamedTypeSymbol>(
-                                SymbolEqualityComparer.Default,
-                                type),
-                            Unknown: false),
+                        Potential(type),
                         thrown);
                 }
                 else if (!definitelyNull &&
@@ -240,13 +230,7 @@ internal sealed class ExceptionHandlerReachability(
                 if (!definitelyNonNull)
                 {
                     Add(
-                        _nullReferenceExceptionType is { } nullReferenceException
-                            ? new PotentialExceptions(
-                                ImmutableHashSet.Create<INamedTypeSymbol>(
-                                    SymbolEqualityComparer.Default,
-                                    nullReferenceException),
-                                Unknown: false)
-                            : UnknownPotential,
+                        Potential(_nullReferenceExceptionType),
                         thrown);
                 }
                 continue;
@@ -1066,13 +1050,7 @@ internal sealed class ExceptionHandlerReachability(
                     if (!definitelyNonNull)
                     {
                         Add(
-                            _argumentNullExceptionType is { } argumentNull
-                                ? new PotentialExceptions(
-                                    ImmutableHashSet.Create<INamedTypeSymbol>(
-                                        SymbolEqualityComparer.Default,
-                                        argumentNull),
-                                    Unknown: false)
-                                : UnknownPotential,
+                            Potential(_argumentNullExceptionType),
                             @lock);
                     }
                     if (!definitelyNull)
@@ -1143,12 +1121,7 @@ internal sealed class ExceptionHandlerReachability(
                                     { } nullAwaiter)
                                 {
                                     Add(
-                                        new PotentialExceptions(
-                                            ImmutableHashSet.Create<
-                                                INamedTypeSymbol>(
-                                                SymbolEqualityComparer.Default,
-                                                nullAwaiter),
-                                            Unknown: false),
+                                    Potential(nullAwaiter),
                                         awaitOperation);
                                 }
                                 if (returnNullability ==
@@ -2018,11 +1991,7 @@ internal sealed class ExceptionHandlerReachability(
         {
             return UnknownPotential;
         }
-        return new PotentialExceptions(
-            ImmutableHashSet.Create<INamedTypeSymbol>(
-                SymbolEqualityComparer.Default,
-                exceptionType),
-            Unknown: false);
+        return Potential(exceptionType);
     }
 
     private bool AddStaticInitializationPotential(
@@ -2045,13 +2014,7 @@ internal sealed class ExceptionHandlerReachability(
             return true;
         }
         add(
-            _typeInitializationExceptionType is { } typeInitialization
-                ? new PotentialExceptions(
-                    ImmutableHashSet.Create<INamedTypeSymbol>(
-                        SymbolEqualityComparer.Default,
-                        typeInitialization),
-                    Unknown: false)
-                : UnknownPotential,
+            Potential(_typeInitializationExceptionType),
             origin);
         return !OperationCompletionEvaluator
                 .RequiresStaticInitializationCompletion(member) ||
@@ -2765,11 +2728,7 @@ internal sealed class ExceptionHandlerReachability(
                 {
                     result = Union(
                         result,
-                        new PotentialExceptions(
-                            ImmutableHashSet.Create<INamedTypeSymbol>(
-                                SymbolEqualityComparer.Default,
-                                nullReceiver),
-                            Unknown: false));
+                        Potential(nullReceiver));
                 }
                 if (returnNullability == ReturnNullability.Null)
                 {
@@ -3244,6 +3203,17 @@ internal sealed class ExceptionHandlerReachability(
             ImmutableHashSet.Create<INamedTypeSymbol>(
                 SymbolEqualityComparer.Default),
             Unknown: true);
+
+    private static PotentialExceptions Potential(INamedTypeSymbol? type)
+    {
+        return type == null
+            ? UnknownPotential
+            : new(
+                ImmutableHashSet.Create<INamedTypeSymbol>(
+                    SymbolEqualityComparer.Default,
+                    type),
+                Unknown: false);
+    }
 
     private static bool CanThrowUnknown(IOperation operation)
     {

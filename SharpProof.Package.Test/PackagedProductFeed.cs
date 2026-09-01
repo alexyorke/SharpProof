@@ -150,7 +150,7 @@ internal sealed class PackagedProductFeed : IDisposable
                 ownedRoot: null);
         }
 
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = TestRepository.FindRoot();
         var root = Path.Combine(
             Path.GetTempPath(),
             "SharpProof.PackagedProductFeed",
@@ -357,24 +357,6 @@ internal sealed class PackagedProductFeed : IDisposable
             (await standardError));
     }
 
-    internal static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(
-            typeof(PackagedProductFeed).Assembly.Location);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(
-                    directory.FullName,
-                    "SharpProof.Release.props")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-        throw new InvalidOperationException(
-            "Repository root was not found.");
-    }
 }
 
 internal sealed record PackagedPackage(

@@ -10,7 +10,7 @@ public sealed class ReleaseChecksumAuthorityTests
     [Test]
     public async Task ReleaseBundleAuthorityGuardsEveryReleaseConsumerAndUpload()
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         foreach (var relativePath in new[]
         {
             "scripts/New-SharpProofReleaseEvidence.ps1",
@@ -86,7 +86,7 @@ public sealed class ReleaseChecksumAuthorityTests
     private static async Task<(int ExitCode, string Output)> RunFixtureAsync(
         string mutation)
     {
-        var root = FindRepositoryRoot();
+        var root = TestRepository.FindRoot();
         var info = new ProcessStartInfo
         {
             FileName = "pwsh",
@@ -109,17 +109,4 @@ public sealed class ReleaseChecksumAuthorityTests
         return (process.ExitCode, await output + Environment.NewLine + await error);
     }
 
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (directory != null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "SharpProof.sln")))
-            {
-                return directory.FullName;
-            }
-            directory = directory.Parent;
-        }
-        throw new DirectoryNotFoundException("Repository root not found.");
-    }
 }
