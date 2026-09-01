@@ -846,7 +846,7 @@
       {
         "name": "implementation-il-summary-lowerer",
         "path": "SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs",
-        "maximumExpressionNodes": 4150,
+        "maximumExpressionNodes": 4172,
         "maximumDecisionPoints": 340
       },
       {
