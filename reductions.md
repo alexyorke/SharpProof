@@ -4225,14 +4225,6 @@ R654 is deferred: replay validation and the separate operation/evidence digest d
 
 R661 is a pending analyzer discovery traversal reduction candidate. Preserve the screening short-circuit, graph/flow analysis boundaries, cancellation checks, call-target resolution, and special initializer/pattern handling; share only reusable operation/call discovery where the same declaration and semantic model are analyzed.
 
-## Second survey, part two hundred three: R662 - repeated effect-operation tree enumeration
-
-| R662 | **`OperationEffectScanner` enumerates its entire operation root repeatedly during construction.** It first walks `root.DescendantsAndSelf()` to detect `ITryOperation`, walks it again to populate `_freshArrayTypes`, and then `ConversionOwnershipClassifier.BuildLocalRegions` materializes another root walk before its fixed-point analysis. These passes use the same immutable operation tree, with only the nested-callable/reachability policy differing. A constructor-scoped operation snapshot, with the relevant filtered view passed into local-region setup, can preserve nested-callable exclusions and the scanner's all-tree array map while removing repeated tree enumeration. | `SharpProof.Effects/OperationEffectScanner.cs:97-114`; `SharpProof.Effects/ConversionOwnershipClassifier.cs:214-245` |
-
-### Status (part two hundred three)
-
-R662 is a pending effect-scanner initialization reduction candidate. Preserve all-operation array tracking, nested-callable filtering, reachability fixed-point behavior, cancellation/exception semantics, and the try-specific reachability choice; share only the immutable root-operation enumeration.
-
 ## Second survey, part two hundred four: R663 - serial effect-body rescans
 
 | R663 | **`EffectMethodNodeBuilder.Build` rescans the same method body for three effect dimensions.** The CFG path visits reachable block operations through `AnalyzeControlFlowGraph` to build the ordinary body summary, then `Build` invokes `ScanLexicalControlEffects` over the lexical root and `ScanUsingDisposalEffects` over the full root. Those latter passes independently enumerate operations or disposal structures that the scanner has already visited, with only their effect-specific projections differing. A coordinated body walk or shared per-operation facts can preserve lexical versus reachable semantics, disposal ordering, and direct-witness behavior while avoiding repeated operation-tree work. | `SharpProof.Effects/EffectMethodNodeBuilder.cs:45-114,720-780`; `SharpProof.Effects/OperationEffectScanner.cs:135-220` |
@@ -4248,3 +4240,13 @@ R663 is a pending effect-method traversal reduction candidate. Preserve CFG reac
 ### Status (part two hundred five)
 
 R664 is a pending requires-tree CFG traversal reduction candidate. Preserve operation ordering, local-reference and anonymous-function classification, recursive child-CFG discovery, cancellation, exception fallback, and candidate-set semantics; share only the per-graph reachable-operation enumeration.
+
+## Second survey, part two hundred six: R665-R667 - repeated cache/replay preparation
+
+| R665 | **`VerificationCache.TryReadAsync` duplicates capacity-maintenance commit cleanup on a normal miss and malformed-read catch.** The missing-file branch and the handled-exception branch both call `TryStageCapacity(path, staged, cancellationToken)`, set `committed = true`, and discard the staged entries when maintenance succeeds. A small helper can centralize only this successful maintenance transition while leaving the catch's `LastReadUnavailable` state and exception swallowing separate. | `SharpProof.Worker/VerificationCache.cs:50-57,123-145` |
+| R666 | **`VerificationCache.ReplayCachedClaims` rebuilds a callable's postcondition array for every cached claim.** The target dictionary is created once, but each claim then runs `target.Clauses.Where(...).ToArray()` followed by `Array.FindIndex` over the same declaration set. Precomputing a first-match claim-to-ordinal map (or the postcondition list) per callable removes repeated clause enumeration and allocation while preserving bounds checks, claim-id matching, and fail-closed replay behavior. | `SharpProof.Worker/VerificationCache.cs:604-626` |
+| R667 | **`CallableCounterexampleReplayer.Replay` re-filters all clauses for every postcondition replay.** `CallableVerifier` invokes the replayer from its per-postcondition loop, and each call allocates a fresh `ensures` array from `target.Clauses` before checking the requested ordinal. Passing a prepared postcondition list/ordinal map from the target verification, or caching it at the callable boundary, removes this repeated scan while preserving the current out-of-range and malformed-target failures. | `SharpProof.Worker/CallableCounterexampleReplayer.cs:4-20`; `SharpProof.Worker/CallableVerifier.cs:197-203,261-263` |
+
+### Status (part two hundred six)
+
+R665-R667 are pending cache/replay preparation reduction candidates. Preserve cache transaction commit/rollback ownership, unavailable-read reporting, claim-id first-match semantics, cancellation, and fail-closed counterexample replay behavior; share only repeated declaration and capacity-maintenance preparation.

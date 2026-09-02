@@ -213,9 +213,10 @@ internal sealed class ConversionOwnershipClassifier
 
     internal void BuildLocalRegions(
         IOperation root,
-        Func<IOperation, bool> isReachable)
+        Func<IOperation, bool> isReachable,
+        ImmutableArray<IOperation> operations)
     {
-        var relevant = root.DescendantsAndSelf()
+        var relevant = operations
             .Where(operation => !IsInsideNestedCallable(operation, root))
             .ToImmutableArray();
         foreach (var declarator in relevant.OfType<IVariableDeclaratorOperation>())
