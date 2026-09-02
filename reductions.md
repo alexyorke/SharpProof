@@ -7419,3 +7419,23 @@ R849 is `applied`: the generator now owns one tag/alias descriptor list and
 
 R850 is `applied`: validated collector mappings are grouped once in first-seen
   owner order, so emission no longer filters the full catalog for each owner.
+
+## Second survey, part three hundred sixty-two: R851 - repeated constructor-parameter lookup in generator
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R851 | **`Generate-BoundContractModel.ps1` repeatedly scans constructor parameters while emitting assignments.** For every assignment, the generator runs `Where-Object` over the complete `$parameters` array to find the parameter whose lower-camel name matches the assigned property. The schema currently has 4-5 parameters and the same number of assignments in each of its three classes, so the generator repeats a linear lookup for every property even after it has already validated the parameter list. A per-class ordinal dictionary of parameter names can validate and resolve these assignments in one preparation pass while retaining the schema's assignment order. | `scripts/Generate-BoundContractModel.ps1:73-103`; `SharpProof.Contracts/BoundContractModel.schema.json` (`BoundContractClause`: 4/4, `BoundContractVariable`: 5/5, `BoundMethodContracts`: 5/5 parameters/assignments) |
+
+### Checked and not proposed (part three hundred sixty-two)
+
+- The assignment list remains separate from parameter order because the schema
+  controls constructor storage order independently of the declaration order.
+- The lower-camel matching rule should remain explicit and validated; this is
+  a lookup-structure reduction, not permission to infer assignments by position.
+- The enum and constructor-member loops are independent projections and are not
+  folded together merely because they share comma formatting.
+
+### Status (part three hundred sixty-two)
+
+R851 is `deferred`: the parameter lookup is a small build-time optimization and
+  clarity improvement, with no implementation change made during this audit.
