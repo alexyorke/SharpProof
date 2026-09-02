@@ -614,13 +614,9 @@ try {
                 break
             }
             $shard = $pending.Dequeue()
-            $startInfo = [Diagnostics.ProcessStartInfo]::new()
-            $startInfo.FileName = 'dotnet'
-            $startInfo.WorkingDirectory = $repositoryRoot
-            $startInfo.UseShellExecute = $false
-            $startInfo.RedirectStandardOutput = $true
-            $startInfo.RedirectStandardError = $true
-            $startInfo.Environment['SHARPPROOF_PACKAGE_SOURCE'] = $feed
+            $environment = @{
+                SHARPPROOF_PACKAGE_SOURCE = $feed
+            }
             $isolatedOutput = ''
             if ($coverageEnabled) {
                 $isolatedOutput = New-SharpProofIsolatedTestOutput `
@@ -634,8 +630,7 @@ try {
             $directVstest = -not $coverageEnabled -and
                 -not $nextIsExclusive
             if ($directVstest) {
-                $startInfo.Environment['DOTNET_HOST_PATH'] =
-                    $resolvedDotnetHost
+                $environment['DOTNET_HOST_PATH'] = $resolvedDotnetHost
             }
             $arguments = if ($directVstest) {
                 @('vstest', $testAssembly)
@@ -668,9 +663,11 @@ try {
                     '--settings', $resolvedCoverageSettings,
                     '--collect', 'Code Coverage;Format=Cobertura')
             }
-            foreach ($argument in $arguments) {
-                [void]$startInfo.ArgumentList.Add($argument)
-            }
+            $startInfo = New-SharpProofParallelProcessStartInfo `
+                -FileName 'dotnet' `
+                -WorkingDirectory $repositoryRoot `
+                -Arguments $arguments `
+                -Environment $environment
             $process = [Diagnostics.Process]::new()
             $process.StartInfo = $startInfo
             if (-not $process.Start()) {

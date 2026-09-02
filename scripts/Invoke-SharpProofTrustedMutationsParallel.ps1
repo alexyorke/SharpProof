@@ -310,13 +310,10 @@ try {
             continue
         }
         Remove-Item -LiteralPath $shard.Path -Force -ErrorAction SilentlyContinue
-        $startInfo = [Diagnostics.ProcessStartInfo]::new()
-        $startInfo.FileName = 'pwsh'
-        $startInfo.WorkingDirectory = $repositoryRoot
-        $startInfo.UseShellExecute = $false
-        $startInfo.RedirectStandardOutput = $true
-        $startInfo.RedirectStandardError = $true
-        foreach ($argument in @(
+        $startInfo = New-SharpProofParallelProcessStartInfo `
+            -FileName 'pwsh' `
+            -WorkingDirectory $repositoryRoot `
+            -Arguments @(
                 '-NoLogo', '-NoProfile', '-File',
                 (Join-Path $PSScriptRoot 'Test-SharpProofTrustedMutations.ps1'),
                 '-Configuration', $Configuration,
@@ -324,9 +321,7 @@ try {
                 '-ExpectedCommit', $ExpectedCommit,
                 '-BaselineEvidencePath', $baselineRelativePath,
                 '-MutationShardIndex', [string]$shard.Index,
-                '-MutationShardCount', [string]$parallelism)) {
-            [void]$startInfo.ArgumentList.Add($argument)
-        }
+                '-MutationShardCount', [string]$parallelism)
         $process = [Diagnostics.Process]::new()
         $process.StartInfo = $startInfo
         if (-not $process.Start()) {

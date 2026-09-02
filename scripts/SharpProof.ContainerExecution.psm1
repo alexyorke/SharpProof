@@ -409,20 +409,15 @@ function Invoke-SharpProofParallelDotnetBuilds {
                 "-p:SharedCompilationId=$sharedCompilationId")
             $effectiveArguments = @(
                 Add-SharpProofStaticGraphArgument -Arguments $arguments)
-            $startInfo = [Diagnostics.ProcessStartInfo]::new()
-            $startInfo.FileName = 'dotnet'
-            $startInfo.WorkingDirectory = $RepositoryRoot
-            $startInfo.UseShellExecute = $false
-            $startInfo.CreateNoWindow = $true
-            $startInfo.RedirectStandardOutput = $true
-            $startInfo.RedirectStandardError = $true
-            $startInfo.Environment['UseSharedCompilation'] = 'true'
-            $startInfo.Environment['SharedCompilationId'] =
-                $sharedCompilationId
-            $startInfo.Environment['MSBUILDDISABLENODEREUSE'] = '1'
-            foreach ($argument in $effectiveArguments) {
-                [void]$startInfo.ArgumentList.Add($argument)
-            }
+            $startInfo = New-SharpProofParallelProcessStartInfo `
+                -FileName 'dotnet' `
+                -WorkingDirectory $RepositoryRoot `
+                -Arguments $effectiveArguments `
+                -Environment @{
+                    UseSharedCompilation = 'true'
+                    SharedCompilationId = $sharedCompilationId
+                    'MSBUILDDISABLENODEREUSE' = '1'
+                }
             $process = [Diagnostics.Process]::new()
             $process.StartInfo = $startInfo
             if (-not $process.Start()) {
@@ -496,6 +491,39 @@ function Invoke-SharpProofParallelDotnetBuilds {
     }
 }
 
+function New-SharpProofParallelProcessStartInfo {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FileName,
+
+        [Parameter(Mandatory = $true)]
+        [string]$WorkingDirectory,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [System.Collections.IDictionary]$Environment
+    )
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FileName
+    $startInfo.WorkingDirectory = $WorkingDirectory
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    if ($null -ne $Environment) {
+        foreach ($entry in $Environment.GetEnumerator()) {
+            $startInfo.Environment[[string]$entry.Key] = [string]$entry.Value
+        }
+    }
+    foreach ($argument in $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+    return $startInfo
+}
+
 function New-SharpProofIsolatedTestOutput {
     [CmdletBinding()]
     param(
@@ -562,6 +590,7 @@ Export-ModuleMember -Function @(
     'Get-SharpProofDotnetWrapperPath',
     'Invoke-SharpProofCheckedCommand',
     'Invoke-SharpProofParallelDotnetBuilds',
+    'New-SharpProofParallelProcessStartInfo',
     'Invoke-SharpProofRequiredDotnet',
     'New-SharpProofIsolatedTestOutput',
     'Stop-SharpProofCompilerServer')

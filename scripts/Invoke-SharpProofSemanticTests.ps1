@@ -199,6 +199,7 @@ $architectureFixtures = @(
     'ReleaseQualificationMatrixTests',
     'ReleaseTagValidationTests',
     'ReleaseVersionAuthorityTests',
+    'SharedTestInfrastructureTests',
     'StandaloneGateEvidenceTests',
     'VerifierPublicationTransactionTests'
 )
@@ -427,15 +428,10 @@ try {
                 break
             }
             [void]$pending.Remove($task)
-            $startInfo = [Diagnostics.ProcessStartInfo]::new()
-            $startInfo.FileName = 'dotnet'
-            $startInfo.WorkingDirectory = $repositoryRoot
-            $startInfo.UseShellExecute = $false
-            $startInfo.RedirectStandardOutput = $true
-            $startInfo.RedirectStandardError = $true
-            $startInfo.Environment['SHARPPROOF_TEST_PROJECT_PARALLELISM'] =
-                $task.Slots.ToString(
+            $environment = @{
+                SHARPPROOF_TEST_PROJECT_PARALLELISM = $task.Slots.ToString(
                     [Globalization.CultureInfo]::InvariantCulture)
+            }
             $isolatedOutput = ''
             if ($coverageEnabled -and $task.IsolateOutput) {
                 $isolatedOutput = New-SharpProofIsolatedTestOutput `
@@ -484,9 +480,11 @@ try {
                         '--collect', 'Code Coverage;Format=Cobertura')
                 }
             }
-            foreach ($argument in $arguments) {
-                [void]$startInfo.ArgumentList.Add($argument)
-            }
+            $startInfo = New-SharpProofParallelProcessStartInfo `
+                -FileName 'dotnet' `
+                -WorkingDirectory $repositoryRoot `
+                -Arguments $arguments `
+                -Environment $environment
             $process = [Diagnostics.Process]::new()
             $process.StartInfo = $startInfo
             if (-not $process.Start()) {

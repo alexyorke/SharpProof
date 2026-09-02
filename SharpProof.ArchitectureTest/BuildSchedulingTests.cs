@@ -808,7 +808,7 @@ public sealed class BuildSchedulingTests
                 Does.Contain("ResolveLinkTarget($true)"));
             Assert.That(package,
                 Does.Contain(
-                    "$startInfo.Environment['DOTNET_HOST_PATH']"));
+                    "DOTNET_HOST_PATH'] = $resolvedDotnetHost"));
         }
     }
 
@@ -884,7 +884,7 @@ public sealed class BuildSchedulingTests
             Assert.That(
                 semantic,
                 Does.Contain(
-                    "$startInfo.Environment['SHARPPROOF_TEST_PROJECT_PARALLELISM']"));
+                    "SHARPPROOF_TEST_PROJECT_PARALLELISM = $task.Slots.ToString("));
         }
     }
 
