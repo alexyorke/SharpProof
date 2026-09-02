@@ -6361,3 +6361,26 @@ R804 is `deferred`: no implementation change is authorized in this audit, and
 the repeated scan is small and bounded by one callable's assumptions. It is a
 straightforward local cleanup if this validation path is being refactored, but
 it does not justify editing the implementation solely to remove a few scans.
+
+## Second survey, part three hundred sixteen: R805 - repeated feature-parity projection comparisons
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R805 | **`CompilerManifestArtifactJson.HasFeatureScopeParity` enumerates corresponding arrays once per projected field.** The effect check first projects `loweredEffects` and `effects` to claim IDs, then traverses both arrays again to compare contract kinds. The successful-callable postcondition check repeats the shape: one pair of projections compares claim IDs and a second pair compares manifest evidence. These are ordered, index-aligned arrays whose lengths are checked immediately before the comparisons. A bounded indexed comparison (or one shared paired projection with the required null guards) can compare the fields during one traversal per branch while preserving ordering, fail-closed malformed-row handling, and the later independent authority/evidence checks. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:635-641,703-710` |
+
+### Checked and not proposed (part three hundred sixteen)
+
+- R651 covers duplicate effect-evidence validation and authority matching;
+  R805 is only about the repeated identity/evidence projection enumerations
+  in this feature-parity method.
+- The effect-authority loop and the later declared-versus-lowered assumption
+  comparison remain separate because they have different inputs and policies.
+- The length checks and current null-sensitive validation behavior must remain
+  before any fused comparison; this is not a proposal to weaken malformed
+  manifest rejection or to merge the authority checks.
+
+### Status (part three hundred sixteen)
+
+R805 is `deferred`: the arrays are small per callable and the cleanup is local,
+but the current LINQ expressions are readable and no implementation edits are
+authorized in this audit.
