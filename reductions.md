@@ -6009,3 +6009,23 @@ implementation or build file was changed.
 
 R789 is `pending` and limited to offline framework package consumer setup. No
 implementation or build file was changed.
+
+## Second survey, part three hundred one: R790 - unconsumed supported-framework contract
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R790 | **The supported-target-framework contract is checked against a literal instead of driving the consumer matrix.** `eng/acceptance/contract.json` declares `supportedTargetFrameworks` as `netstandard2.0`, `net8.0`, and `net472`, but `eng/acceptance/Verify.ps1` only joins that field and compares it to a second hard-coded comma-separated string. The actual package-consumer qualification independently declares `$frameworks = @('netstandard2.0', 'net8.0', 'net472')`, and the release-qualification documentation repeats the same matrix. A contract reader can supply the framework loop and let the verifier assert the expected set/order from one authority; the consumer-specific `net472` reference-assembly branch would remain explicit. As written, changing the contract field does not change which frameworks are exercised, while changing the package-consumer list leaves the contract apparently valid only if its separate literal is also edited. | `eng/acceptance/contract.json:5-9`; `eng/acceptance/Verify.ps1:474`; `scripts/Test-SharpProofPackageConsumers.ps1:372-394`; `eng/release/preview-qualification.md:12` |
+
+### Checked and not proposed (part three hundred one)
+
+- The framework-specific package references and per-framework source/build
+  assertions remain distinct; this candidate concerns only the matrix's
+  source-of-truth and its duplicated literal.
+- The verifier's scalar contract assertions can stay explicit where no
+  runtime consumer uses the value; `supportedTargetFrameworks` is singled out
+  because a consumer matrix already exists and should consume it directly.
+
+### Status (part three hundred one)
+
+R790 is `pending` and limited to the acceptance/package-consumer framework
+matrix. No implementation or build file was changed.
