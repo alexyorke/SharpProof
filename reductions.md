@@ -6480,6 +6480,29 @@ precondition or after introducing a shared identity accumulator.
 ### Status (part three hundred twenty)
 
 R809 is `deferred`: caching the label vocabulary is a clean seam, but it would
-  thread another target-specific object through several private validation
-  methods. The repeated work becomes more material for callables with many
-  claims; until then, the current local construction remains easy to audit.
+thread another target-specific object through several private validation
+methods. The repeated work becomes more material for callables with many
+claims; until then, the current local construction remains easy to audit.
+
+## Second survey, part three hundred twenty-one: R810 - repeated clause-label projection
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R810 | **`CompilerResponseEvidenceAuthority` reconstructs the same clause-label tuples for three target-derived consumers.** `AllLabels` calls `ClauseLabels(target)` to admit every clause label, `EntryLabels` calls it again to select nontrivial `requires` labels, and `AssumptionIdsForCore` calls it once more to build the label-to-assumption map. These helpers are invoked from per-claim validation, and a single target can therefore rebuild the clause walk several times before the response-specific proof-core checks run. A target label catalog containing the clause tuples and the derived entry/assumption projections can feed all three consumers while preserving the distinct body, summary, domain, and requires-only policies. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:126-138,314-319,379-435,442-529` |
+
+### Checked and not proposed (part three hundred twenty-one)
+
+- R809 targets rebuilding the final all-label/entry-label sets; R810 records
+  the residual repeated `ClauseLabels` source projection used by those sets
+  and by assumption-ID extraction.
+- `requiresOnly` and `Assume` selection must remain separate, as must the
+  entry-only treatment of literal-true requires clauses.
+- Body, summary, and domain labels are not interchangeable with clause labels;
+  they remain separate derived projections in any catalog object.
+
+### Status (part three hundred twenty-one)
+
+R810 is `deferred`: the repeated clause walk is target-invariant and can be
+  cached, but introducing a label catalog would add plumbing to a fail-closed
+  authority. It is worthwhile if response validation profiles show many claims
+  per callable or if R809 is implemented.
