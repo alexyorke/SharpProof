@@ -240,6 +240,7 @@ function Get-PortablePdbModule {
         $pdb = $pdbProvider.GetMetadataReader()
         $sourceLines = [Collections.Generic.Dictionary[string, Collections.Generic.HashSet[int]]]::new([StringComparer]::Ordinal)
         $sourceRanges = [Collections.Generic.Dictionary[string, Collections.Generic.Dictionary[string, object]]]::new([StringComparer]::Ordinal)
+        $documentPaths = [Collections.Generic.Dictionary[System.Reflection.Metadata.DocumentHandle, string]]::new()
         foreach ($debugHandle in $pdb.MethodDebugInformation) {
             $methodHandle = [System.Reflection.Metadata.Ecma335.MetadataTokens]::MethodDefinitionHandle(
                 [System.Reflection.Metadata.Ecma335.MetadataTokens]::GetRowNumber(
@@ -252,7 +253,11 @@ function Get-PortablePdbModule {
                 if ($point.IsHidden) { continue }
                 $documentHandle = $point.Document
                 if ($documentHandle.IsNil) { $documentHandle = $debug.Document }
-                $sourceName = Get-PdbDocumentPath -Reader $pdb -Handle $documentHandle
+                $sourceName = $null
+                if (-not $documentPaths.TryGetValue($documentHandle, [ref]$sourceName)) {
+                    $sourceName = Get-PdbDocumentPath -Reader $pdb -Handle $documentHandle
+                    $documentPaths[$documentHandle] = $sourceName
+                }
                 $relativePath = Resolve-RepositoryPath -Candidate $sourceName -Description ($AssemblyPath + ':' + $point.StartLine)
                 if (-not $relativePath.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)) { throw "Production inventory PDB source is not C#: '$relativePath'." }
                 if ($relativePath.Contains('/obj/', [StringComparison]::Ordinal) -or $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) { continue }

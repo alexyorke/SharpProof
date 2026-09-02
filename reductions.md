@@ -4233,12 +4233,6 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disposal resolver intentionally use different roots and reachability/unwinding rules. A shared walk could alter direct-witness recording, constructor entry selection, disposal order, or fail-closed effect joins; keep the independent passes until reusable per-operation facts can be proven equivalent.
 
-| R674 | **`Get-SharpProofProductionInventory.Get-PortablePdbModule` canonicalizes repeated PDB document identities once per sequence point.** The sequence-point loop obtains a document handle/name and calls `Resolve-RepositoryPath` for every visible point, while a portable PDB commonly reuses the same document across many methods and points. A per-module document-handle or source-name cache can validate each document path once and reuse the canonical relative path; line/range validation, compile-membership checks, and compiler-generated filtering remain per point. | `scripts/Get-SharpProofProductionInventory.ps1:243-270` |
-
-### Status (part two hundred eleven)
-
-R674 is a pending PDB preparation reduction. Preserve PDB document containment and canonicality, per-point source/range checks, and fail-closed errors; share only repeated identity/path preparation.
-
 ## Second survey, part two hundred twelve: R675 - eager tooling-image build
 
 | R675 | **`build.ps1` builds the tooling image before profile preflight.** `Build-ToolingImage` runs unconditionally before the switch that rejects missing `-ComparisonRef` for `coverage` or missing `-PackageSource` for package-consumer, pilot, and release-plan profiles. Those invalid invocations can therefore perform a full Docker build before reporting a local argument error; the same ordering also makes any future profile validation pay the image-build cost first. Move pure parameter/profile validation ahead of image setup, while retaining the image build immediately before the first container invocation. | `build.ps1:40-42,61,74-106` |
