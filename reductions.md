@@ -134,6 +134,7 @@ the smallest relevant containerized test target passes.
 | R812 | Compare classified lowered calls with the existing indexed call set instead of recounting the IR | `SharpProof.Worker.Test`: CompilerCallableLowererTests, 20 passed |
 | R816 | Restore the security solution once, then run audit and build with `--no-restore` | `SharpProof.ArchitectureTest`: DependencyAutomationTests, 8 passed |
 | R817 | Reuse the container restore for the final package-consumer test invocation | `SharpProof.ArchitectureTest`: ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed, 1 passed |
+| R819 | Reuse the canonical pilot-project path set instead of rescanning relative paths for uniqueness | `SharpProof.ArchitectureTest`: PilotAuthorityTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6722,8 +6723,9 @@ changes the script's supported invocation contract.
 
 ### Status (part three hundred thirty)
 
-R819 is `deferred`: the duplicate scan is cheap for five rows, but the canonical
-  path set is the stronger invariant and is the clearer single authority.
+R819 is `applied`: the canonical path set established during catalog-row
+validation now owns project uniqueness, while library and category checks stay
+independent.
 
 ## Second survey, part three hundred thirty-one: R820 - implied proof-outcome assertions
 
@@ -6906,3 +6908,26 @@ R826 is `deferred`: the duplicated expression is only a few operations, but it
 R827 is `deferred`: the extra scan is bounded by one callable's clause list,
   but an internal compatibility shim adds API surface and a second caller path
   without serving production code.
+
+## Second survey, part three hundred thirty-nine: R828 - implied fuzz coverage conjunct
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R828 | **`FuzzSummary.Passed` checks `CoverageSatisfied` twice through an implication.** The property first requires `CoverageSatisfied == (Cases < FuzzOptions.DefaultCases || FrontendCoverage.HasExpandedCategories)`, then immediately requires `CoverageSatisfied` as a separate conjunct. Equality with the expected expression already forces the property to be `true` in the only accepted cases, so the later conjunct cannot reject an additional state. Removing that conjunct preserves the same predicate while making the pass criteria less repetitive. | `Tools/SharpProof.Fuzz/FuzzRunner.cs:81-113` |
+
+### Checked and not proposed (part three hundred thirty-nine)
+
+- The equality itself remains necessary because it rejects both a missing
+  required expanded-coverage result and an unexpected `CoverageSatisfied`
+  value for smaller campaigns.
+- The other `Passed` conditions independently validate schema, case count,
+  parallelism, failure storage, exception counts, abstentions, and all three
+  differential-oracle agreement totals.
+- This is a fuzz-summary predicate cleanup only; it does not relax coverage
+  generation or oracle execution.
+
+### Status (part three hundred thirty-nine)
+
+R828 is `deferred`: the duplicate boolean check has no measurable runtime cost,
+  but it obscures which part of the equality is authoritative in the final
+  pass/fail contract.

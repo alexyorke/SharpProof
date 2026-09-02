@@ -88,8 +88,7 @@ function Test-SharpProofPilotReport {
                 version = [string]$external[0].Version
             }
         }
-        if (@($catalog.pilots.project | Select-Object -Unique).Count -ne 5 -or
-            @($catalog.pilots.library | Select-Object -Unique).Count -ne 5 -or
+        if (@($catalog.pilots.library | Select-Object -Unique).Count -ne 5 -or
             @($catalog.pilots | Where-Object category -eq 'effect-heavy').Count -ne 2 -or
             @($catalog.pilots | Where-Object category -eq 'contract-heavy').Count -ne 2 -or
             @($catalog.pilots | Where-Object category -eq 'mixed-strict').Count -ne 1) { return $false }
