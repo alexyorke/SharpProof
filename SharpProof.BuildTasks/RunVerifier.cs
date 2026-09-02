@@ -1169,10 +1169,14 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     {
         (string Severity, string Code, string Marker)[] markers =
         {
-            ("warning", "SP0047", ": warning SP0047: "),
-            ("warning", "SP0048", ": warning SP0048: "),
-            ("error", "SP0047", ": error SP0047: "),
-            ("error", "SP0048", ": error SP0048: ")
+            ("warning", VerifierDiagnosticCodes.IncompleteSelectedCallable,
+                $": warning {VerifierDiagnosticCodes.IncompleteSelectedCallable}: "),
+            ("warning", VerifierDiagnosticCodes.AssumptionsDeclared,
+                $": warning {VerifierDiagnosticCodes.AssumptionsDeclared}: "),
+            ("error", VerifierDiagnosticCodes.IncompleteSelectedCallable,
+                $": error {VerifierDiagnosticCodes.IncompleteSelectedCallable}: "),
+            ("error", VerifierDiagnosticCodes.AssumptionsDeclared,
+                $": error {VerifierDiagnosticCodes.AssumptionsDeclared}: ")
         };
         diagnostic = null!;
         var selectedIndex = -1;

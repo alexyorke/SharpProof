@@ -90,7 +90,9 @@ internal static class VerifierDiagnosticTransport
     private static void Validate(VerifierDiagnostic diagnostic)
     {
         if (diagnostic.Severity is not ("warning" or "error") ||
-            diagnostic.Code is not ("SP0047" or "SP0048") ||
+            diagnostic.Code is not (
+                VerifierDiagnosticCodes.IncompleteSelectedCallable or
+                VerifierDiagnosticCodes.AssumptionsDeclared) ||
             diagnostic.File == null || diagnostic.Message == null ||
             diagnostic.Line < 0 || diagnostic.Column < 0)
         {

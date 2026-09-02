@@ -1,4 +1,5 @@
 using System.Text.Json;
+using SharpProof.Host;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Launcher;
@@ -38,10 +39,8 @@ internal static class SarifProjection
         if (assumptions.User + assumptions.Trusted != 0)
         {
             notifications.Add(Notification(
-                "SP0048",
-                "User assumption/trusted evidence declared: total=" +
-                    (assumptions.User + assumptions.Trusted) + ", user=" +
-                    assumptions.User + ", trusted=" + assumptions.Trusted + ".",
+                VerifierDiagnosticCodes.AssumptionsDeclared,
+                LauncherPresentation.AssumptionsDeclaredMessage(assumptions),
                 LauncherPresentation.Level(request.AssumptionPolicy, "note")));
         }
 
@@ -128,7 +127,7 @@ internal static class SarifProjection
         var callableId = result.CallableId;
         var reason = result.Reason;
         return Result(
-            "SP0047", "review",
+            VerifierDiagnosticCodes.IncompleteSelectedCallable, "review",
             LauncherPresentation.Level(request.VerifyPolicy, "note"),
             "Selected analysis is incomplete for " + callableId +
                 " (" + reason + ").",

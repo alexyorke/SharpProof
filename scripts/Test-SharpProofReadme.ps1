@@ -402,6 +402,7 @@ foreach ($productDocument in @(
 }
 
 $readme = Get-RequiredText 'README.md'
+$launcherDiagnosticCodes = @('SP0047', 'SP0048')
 $requiredReadmeText = @(
     $packageVersion,
     'SharpProofProfile',
@@ -410,8 +411,7 @@ $requiredReadmeText = @(
     'SharpProofAssumptionPolicy',
     'SharpProofVerify=true',
     'SharpProof.Worker',
-    'SP0047',
-    'SP0048',
+    $launcherDiagnosticCodes,
     'SP0027',
     'Proven',
     'Refuted',
@@ -519,7 +519,7 @@ foreach ($descriptor in @($analyzerDescriptorOutput[0].diagnostics)) {
             "$severity, " + $(if ($enabled) { 'on' } else { 'off' }) + '.')
     }
 }
-foreach ($launcherDiagnostic in @('SP0047', 'SP0048')) {
+foreach ($launcherDiagnostic in $launcherDiagnosticCodes) {
     $anchor = '<a id="' + $launcherDiagnostic.ToLowerInvariant() + '"></a>'
     if (-not $diagnosticReference.Contains(
             $anchor,

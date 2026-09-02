@@ -429,7 +429,8 @@ internal static class Program
         {
             ReportDiagnostic(
                 response.Manifest.Callables.First(callable => callable.CallableId == incomplete[0].CallableId).Location,
-                LauncherPresentation.Level(request.VerifyPolicy, "info"), "SP0047",
+                LauncherPresentation.Level(request.VerifyPolicy, "info"),
+                VerifierDiagnosticCodes.IncompleteSelectedCallable,
                 FormattableString.Invariant(
                     $"Selected analysis is incomplete: callables={incomplete.Length}, unknown-claims={unknownClaims}."));
         }
@@ -471,9 +472,9 @@ internal static class Program
 
         var total = assumptions.User + assumptions.Trusted;
         ReportDiagnostic(response.Manifest.Callables[0].Location,
-            LauncherPresentation.Level(policy, "info"), "SP0048",
-            FormattableString.Invariant(
-                $"User assumption/trusted evidence declared: total={total}, user={assumptions.User}, trusted={assumptions.Trusted}."));
+            LauncherPresentation.Level(policy, "info"),
+            VerifierDiagnosticCodes.AssumptionsDeclared,
+            LauncherPresentation.AssumptionsDeclaredMessage(assumptions));
         return policy == WorkerAssumptionPolicy.Error;
     }
 
