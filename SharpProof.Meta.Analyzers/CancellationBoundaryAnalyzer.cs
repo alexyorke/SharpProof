@@ -91,31 +91,13 @@ internal static class CancellationBoundaryAnalyzer
         INamedTypeSymbol cancellationType,
         SyntaxNodeAnalysisContext context)
     {
-        var filter = clause.Filter?.FilterExpression;
-        if (filter == null)
-        {
-            return true;
-        }
-        if (context.SemanticModel.GetConstantValue(
-                filter, context.CancellationToken) is
-            { HasValue: true, Value: true })
-        {
-            return true;
-        }
-        if (clause.Declaration == null ||
-            context.SemanticModel.GetDeclaredSymbol(
-                clause.Declaration,
-                context.CancellationToken) is not ILocalSymbol caughtLocal)
-        {
-            return false;
-        }
-
-        return EvaluateCancellationFilter(
-                GetFilterOperation(filter, context),
-                caughtLocal,
-                caughtType,
-                cancellationType) ==
-            CancellationFilterOutcome.ReturnsTrue;
+        var outcome = EvaluateFilter(
+            clause,
+            caughtType,
+            cancellationType,
+            context);
+        return outcome == CancellationFilterOutcome.None ||
+            outcome == CancellationFilterOutcome.ReturnsTrue;
     }
 
     private static bool CatchesCancellation(
@@ -135,30 +117,48 @@ internal static class CancellationBoundaryAnalyzer
         INamedTypeSymbol? cancellationType,
         SyntaxNodeAnalysisContext context)
     {
+        var outcome = EvaluateFilter(
+            clause,
+            caughtType,
+            cancellationType,
+            context);
+        return outcome != CancellationFilterOutcome.None &&
+            (outcome & CancellationFilterOutcome.ReturnsTrue) == 0;
+    }
+
+    private static CancellationFilterOutcome EvaluateFilter(
+        CatchClauseSyntax clause,
+        ITypeSymbol? caughtType,
+        INamedTypeSymbol? cancellationType,
+        SyntaxNodeAnalysisContext context)
+    {
         if (clause.Filter?.FilterExpression is not { } filter)
         {
-            return false;
+            return CancellationFilterOutcome.None;
         }
+
         if (context.SemanticModel.GetConstantValue(
                 filter, context.CancellationToken) is
-            { HasValue: true, Value: false })
+            { HasValue: true, Value: bool constant })
         {
-            return true;
+            return constant
+                ? CancellationFilterOutcome.ReturnsTrue
+                : CancellationFilterOutcome.ReturnsFalse;
         }
+
         if (clause.Declaration == null ||
             context.SemanticModel.GetDeclaredSymbol(
                 clause.Declaration,
                 context.CancellationToken) is not ILocalSymbol caughtLocal)
         {
-            return false;
+            return CancellationFilterOutcome.Unknown;
         }
 
-        return (EvaluateCancellationFilter(
-                    GetFilterOperation(filter, context),
-                    caughtLocal,
-                    caughtType,
-                    cancellationType) &
-                CancellationFilterOutcome.ReturnsTrue) == 0;
+        return EvaluateCancellationFilter(
+            GetFilterOperation(filter, context),
+            caughtLocal,
+            caughtType,
+            cancellationType);
     }
 
     private static IOperation? GetFilterOperation(

@@ -182,6 +182,7 @@ the smallest relevant containerized test target passes.
 | R571 | Share collectible runtime assembly test lifetime and resolver setup | `SharpProof.Analyzer.Test`: RuntimeFlagshipOracleTests and RuntimeRequiresOracleTests passed; `SharpProof.Effects.Test`: RuntimeEffectOracleTests, 7 passed |
 | R585 | Share the parameterized Worker throwing-backend fixture | `SharpProof.Worker.Test`: AcyclicBlockPredicateExecutorTests 14; CompilerCallableLowererTests 20; WorkerTcbEdgeCaseTests 44 passed |
 | R586 | Share Worker compiler-manifest compilation, discovery, and artifact construction | `SharpProof.Worker.Test`: CompilerManifestArtifactTests, 91 passed |
+| R619 | Share cancellation-filter evaluation prelude | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests, 162 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4196,7 +4197,11 @@ the generated `Generated.g.cs` path.
 
 ### Status (part one hundred sixty)
 
-R619 is a pending Meta-analyzer cleanup candidate. Preserve the current fail-closed behavior for missing catch locals and unknown outcomes, and preserve the opposite semantics for absent, constant-true, and constant-false filters; consolidate only the shared binding/evaluation setup.
+R619 is `applied`: one `EvaluateFilter` prelude now handles absent and
+constant filters, catch-local binding, operation lookup, and unknown outcomes;
+the inclusion/exclusion callers retain their opposite no-filter polarity and
+fail-closed outcome interpretation. SharpProofSoundnessAnalyzerTests passed
+(162).
 
 ## Second survey, part one hundred sixty-one: R620 - duplicate local-write traversal
 
