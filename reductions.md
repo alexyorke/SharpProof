@@ -4271,9 +4271,7 @@ R698 completed: the unused one-value `ExpectedSmt` parameter and all call-site p
 
 ### Status (part two hundred thirty-two)
 
-| R699 | **`Test-SharpProofFuzzRunnerResult.ps1` duplicates accepted/rejected fixture invocation.** `Assert-Accepted` and `Assert-Rejected` both serialize through `Write-Result`, call `Assert-SharpProofFuzzRunnerResult`, and pass the same expected case/seed/parallelism arguments; the second helper only changes exception handling and the optional parallelism value. A shared assertion wrapper with an explicit expected-success flag can remove the repeated validator call and argument plumbing while keeping the individual fixture names and malformed-result mutations. | `scripts/Test-SharpProofFuzzRunnerResult.ps1:33-64` |
-
-R699 is a pending fuzz-fixture helper reduction candidate. Preserve accepted-result return behavior, rejection diagnostics, expected-value overrides, and the final fixture coverage.
+R699 completed: accepted and rejected fuzz fixtures now share one result assertion wrapper with explicit success expectations, preserving expected-value overrides and rejection diagnostics.
 
 ### Status (part two hundred thirty-three)
 

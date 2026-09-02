@@ -36,15 +36,35 @@ function Write-Result([object]$Value, [string]$Name) {
     return $path
 }
 
+function Assert-Result(
+    [object]$Value,
+    [string]$Name,
+    [bool]$SuccessExpected,
+    [int]$Cases = 10,
+    [int]$Seed = 123,
+    [int]$MaximumParallelism = 4) {
+    $path = Write-Result $Value $Name
+    try {
+        Assert-SharpProofFuzzRunnerResult `
+            -Path $path `
+            -ExpectedCases $Cases -ExpectedSeed $Seed `
+            -ExpectedMaximumParallelism $MaximumParallelism | Out-Null
+    }
+    catch {
+        if (-not $SuccessExpected) { return }
+        throw
+    }
+    if (-not $SuccessExpected) {
+        throw "Fixture '$Name' was unexpectedly accepted."
+    }
+}
+
 function Assert-Accepted(
     [object]$Value,
     [string]$Name,
     [int]$Cases = 10,
     [int]$Seed = 123) {
-    Assert-SharpProofFuzzRunnerResult `
-        -Path (Write-Result $Value $Name) `
-        -ExpectedCases $Cases -ExpectedSeed $Seed `
-        -ExpectedMaximumParallelism 4 | Out-Null
+    Assert-Result $Value $Name $true $Cases $Seed
 }
 
 function Assert-Rejected(
@@ -53,14 +73,8 @@ function Assert-Rejected(
     [int]$Cases = 10,
     [int]$Seed = 123,
     [int]$MaximumParallelism = 4) {
-    try {
-        Assert-SharpProofFuzzRunnerResult `
-            -Path (Write-Result $Value $Name) `
-            -ExpectedCases $Cases -ExpectedSeed $Seed `
-            -ExpectedMaximumParallelism $MaximumParallelism | Out-Null
-    }
-    catch { return }
-    throw "Fixture '$Name' was unexpectedly accepted."
+    Assert-Result `
+        $Value $Name $false $Cases $Seed $MaximumParallelism
 }
 
 try {
