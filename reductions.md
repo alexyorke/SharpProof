@@ -3431,3 +3431,13 @@ identity checks for every package.
 R558 is a `pending` reduction candidate. Keep the topology-specific artifact-kind
 and six-artifact checks; consolidate only the repeated filename-set construction
 and validation before the regular-file scan.
+
+## Second survey, part one hundred one: R559 - loop inventory path guard
+
+| R559 | **`loop-command.sh` duplicates the same relative-path safety case.** The target-workspace reconciliation loop and the source-file materialization loop each reject an empty path, an absolute path, and paths containing `../` with an identical seven-line `case` block and different error text. A small `validate_relative_path` shell function can centralize the traversal guard while allowing the caller to keep its target/source-specific diagnostic. | `eng/container/loop-command.sh:167-180,189-203` |
+
+### Status (part one hundred one)
+
+R559 is a `pending` reduction candidate. Keep validation before both destructive
+or copying operations and preserve the distinct target/source error context; only
+share the path predicate.
