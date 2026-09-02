@@ -18,21 +18,6 @@ $OutputPath = Resolve-SharpProofPath $OutputPath (
 $BuildTasksOutputPath = Resolve-SharpProofPath $BuildTasksOutputPath (
     Join-Path $repositoryRoot 'SharpProof.BuildTasks\LauncherRuntimeCompanionInventory.generated.cs')
 
-function Assert-Properties {
-    param([object]$Value, [string[]]$Names, [string]$Context)
-    $actual = @($Value.PSObject.Properties.Name)
-    foreach ($name in $actual) {
-        if ($name -notin $Names) {
-            throw "$Context contains unsupported property '$name'."
-        }
-    }
-    foreach ($name in $Names) {
-        if ($name -notin $actual) {
-            throw "$Context is missing required property '$name'."
-        }
-    }
-}
-
 function Assert-UniqueJsonProperties {
     param([System.Text.Json.JsonElement]$Value, [string]$Context)
     if ($Value.ValueKind -eq [System.Text.Json.JsonValueKind]::Array) {

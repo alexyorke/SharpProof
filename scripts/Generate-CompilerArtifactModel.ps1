@@ -34,35 +34,6 @@ if (-not [IO.File]::Exists($ProtocolSchemaPath)) {
     throw "Protocol schema not found: $ProtocolSchemaPath"
 }
 
-function Get-MemberArray {
-    param([object]$Object, [string]$Name)
-
-    $member = $Object.PSObject.Properties[$Name]
-    if ($null -eq $member -or $null -eq $member.Value) {
-        return @()
-    }
-    return @($member.Value)
-}
-
-function Assert-Properties {
-    param(
-        [object]$Object,
-        [string[]]$Allowed,
-        [string]$Context)
-
-    $actual = @($Object.PSObject.Properties.Name)
-    foreach ($name in $actual) {
-        if ($name -notin $Allowed) {
-            throw "$Context contains unsupported property '$name'."
-        }
-    }
-    foreach ($name in $Allowed) {
-        if ($name -notin $actual) {
-            throw "$Context is missing required property '$name'."
-        }
-    }
-}
-
 function Assert-TypeName {
     param([string]$Value, [string]$Context)
 

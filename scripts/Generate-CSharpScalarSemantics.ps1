@@ -30,65 +30,6 @@ if (-not [IO.File]::Exists($CatalogPath)) {
     throw "C# scalar-semantics catalog not found: $CatalogPath"
 }
 
-function Assert-Properties {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object]$Value,
-
-        [Parameter(Mandatory = $true)]
-        [string[]]$Allowed,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Context
-    )
-
-    $actual = @($Value.PSObject.Properties.Name)
-    foreach ($name in $actual) {
-        if ($name -notin $Allowed) {
-            throw "$Context contains unsupported property '$name'."
-        }
-    }
-    foreach ($name in $Allowed) {
-        if ($name -notin $actual) {
-            throw "$Context is missing required property '$name'."
-        }
-    }
-}
-
-function Assert-EnumName {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object]$Value,
-
-        [Parameter(Mandatory = $true)]
-        [string[]]$Allowed,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Context
-    )
-
-    if ($Value -isnot [string] -or [string]$Value -notin $Allowed) {
-        throw "$Context must be one of: $($Allowed -join ', ')."
-    }
-    return [string]$Value
-}
-
-function Assert-CSharpIdentifier {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object]$Value,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Context
-    )
-
-    if ($Value -isnot [string] -or
-        [string]$Value -cnotmatch '\A[A-Z][A-Za-z0-9]*\z') {
-        throw "$Context must be a safe PascalCase C# identifier."
-    }
-    return [string]$Value
-}
-
 function Assert-Boolean {
     param(
         [Parameter(Mandatory = $true)]

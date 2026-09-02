@@ -25,31 +25,6 @@ if (-not [IO.File]::Exists($CatalogPath)) {
     throw "Contract API catalog not found: $CatalogPath"
 }
 
-function Assert-Properties {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object]$Value,
-
-        [Parameter(Mandatory = $true)]
-        [string[]]$Allowed,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Context
-    )
-
-    $actual = @($Value.PSObject.Properties.Name)
-    foreach ($name in $actual) {
-        if ($name -notin $Allowed) {
-            throw "$Context contains unsupported property '$name'."
-        }
-    }
-    foreach ($name in $Allowed) {
-        if ($name -notin $actual) {
-            throw "$Context is missing required property '$name'."
-        }
-    }
-}
-
 function Assert-UniqueJsonProperties {
     param(
         [Parameter(Mandatory = $true)]
@@ -85,40 +60,6 @@ function Assert-UniqueJsonProperties {
     }
 }
 
-function Assert-Identifier {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object]$Value,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Context
-    )
-
-    if ($Value -isnot [string] -or
-        [string]$Value -cnotmatch '\A[A-Z][A-Za-z0-9]*\z') {
-        throw "$Context must be a safe PascalCase C# identifier."
-    }
-    return [string]$Value
-}
-
-function Assert-EnumValue {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object]$Value,
-
-        [Parameter(Mandatory = $true)]
-        [string[]]$Allowed,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Context
-    )
-
-    if ($Value -isnot [string] -or [string]$Value -notin $Allowed) {
-        throw "$Context must be one of: $($Allowed -join ', ')."
-    }
-    return [string]$Value
-}
-
 $catalogJson = Get-Content -LiteralPath $CatalogPath -Raw
 $catalogDocument = [System.Text.Json.JsonDocument]::Parse($catalogJson)
 try {
@@ -148,7 +89,7 @@ if ($catalog.namespace -isnot [string] -or
         '\A[A-Z][A-Za-z0-9]*(\.[A-Z][A-Za-z0-9]*)*\z') {
     throw 'Contract API namespace is invalid.'
 }
-$contractType = Assert-Identifier `
+$contractType = Assert-PascalCaseIdentifier `
     -Value $catalog.contractType `
     -Context 'contractType'
 if ($catalog.conditionalSymbol -isnot [string] -or
@@ -168,8 +109,8 @@ foreach ($method in @($catalog.methods)) {
         -Value $method `
         -Allowed @('id', 'name', 'shape', 'clauseRole') `
         -Context 'contract API method'
-    $id = Assert-Identifier -Value $method.id -Context 'method id'
-    $name = Assert-Identifier -Value $method.name -Context "method '$id' name"
+    $id = Assert-PascalCaseIdentifier -Value $method.id -Context 'method id'
+    $name = Assert-PascalCaseIdentifier -Value $method.name -Context "method '$id' name"
     $shape = Assert-EnumValue `
         -Value $method.shape `
         -Allowed $methodShapes `
@@ -213,8 +154,8 @@ foreach ($attribute in @($catalog.attributes)) {
         -Value $attribute `
         -Allowed @('id', 'typeName', 'category', 'selection') `
         -Context 'contract API attribute'
-    $id = Assert-Identifier -Value $attribute.id -Context 'attribute id'
-    $typeName = Assert-Identifier `
+    $id = Assert-PascalCaseIdentifier -Value $attribute.id -Context 'attribute id'
+    $typeName = Assert-PascalCaseIdentifier `
         -Value $attribute.typeName `
         -Context "attribute '$id' typeName"
     $category = Assert-EnumValue `

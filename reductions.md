@@ -121,6 +121,7 @@ the smallest relevant containerized test target passes.
 | R253 | Rename the documentation validator to `Test-SharpProofReadme.ps1` and remove its output-only `-Verify` switch | Documentation validator; DocumentationSupportContractTests: 23; ContainedPathAuthorityTests: 1; `test-changed`: ArchitectureTest 389 and 36 package shards passed |
 | R266 | Remove the undefined `SHARPPROOF_PORTABLE_ARGUMENT_GUARD` preprocessor term | Ir.Test: 114; Dataflow.Test: 50; Smt.Test: 30 |
 | R267 | Forward the duplicate `ArgumentNullGuard` `int` overloads to their `long` implementations | Ir.Test: 114; Dataflow.Test: 50; Smt.Test: 30 |
+| R268 | Consolidate residual generator schema-reading helpers in `GeneratedFileHelpers.ps1`, retaining compatibility wrappers and schema-specific validators | Five generator `-Verify` checks; `test-changed`: ArchitectureTest 389 and 36 package shards passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -325,7 +326,6 @@ files. Same rules as part one: nothing implemented, nothing validated, all
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R268 | Schema-reading helpers are duplicated across generators beyond the validators already covered by R250: `Get-RequiredMember` byte-identical in 3 files, `Get-MemberArray` byte-identical in 2, `Assert-Properties` byte-identical in 2 at 24 lines each, `Assert-EnumName`/`Assert-EnumValue` byte-identical in 2 at 17 lines, and `Assert-CSharpIdentifier`/`Assert-Identifier` byte-identical in 2 at 15 lines. Together with R249 and R250 this is roughly 40 duplicated helper definitions in files that already share one dot-sourced module. | `Generate-CompilerArtifactModel.ps1:55,65`; `Generate-DiagnosticDescriptors.ps1:23`; `Generate-ProtocolModel.ps1:34,43`; `Generate-CSharpScalarSemantics.ps1:45,70,88`; `Generate-ContractApiCatalog.ps1:37,97,113` |
 | R269 | `Invoke-RequiredDotnet` is byte-identical in three test-invocation scripts, and `$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'` is repeated in six. `SharpProof.ContainerExecution.psm1` already exports eleven shared functions to these same scripts and is the obvious home. `Invoke-DotNet` in the container dispatcher and `Invoke-Docker` in `build.ps1` are the same run-check-`$LASTEXITCODE`-throw shape again. | `Invoke-SharpProofChangedTests.ps1:32,44`; `Invoke-SharpProofPackageTests.ps1:39,96`; `Invoke-SharpProofSemanticTests.ps1:37,82`; `Invoke-SharpProofCoverage.ps1:64`; `Invoke-SharpProofDevCheck.ps1:19`; `Invoke-SharpProofFuzzCampaign.ps1:81` |
 | R270 | `Get-SpdxPackageId` is byte-identical, 18 lines, in `New-SharpProofReleaseEvidence.ps1` (which produces the SBOM package IDs) and `Test-SharpProofReleaseArtifacts.ps1` (which validates them). The validator re-implements the producer's rule instead of importing it, so a change made in both places in the same edit passes the check while changing the released identifiers. This is release-evidence code, so it belongs under the same caution as deferred R110-R112, but the duplication itself weakens the check rather than protecting it. | `scripts/New-SharpProofReleaseEvidence.ps1:55-72`; `scripts/Test-SharpProofReleaseArtifacts.ps1:19-36` |
 | R271 | The release version grammar is a byte-identical six-line semver regex under two names: `Test-SharpProofReleaseVersionSyntax` in the release-version authority and `Test-SharpProofPublicationVersionSyntax` in the publication-plan identity module. | `scripts/Get-SharpProofReleaseVersion.ps1:1-10`; `scripts/SharpProof.PublicationPlanIdentity.psm1:7-16` |
@@ -382,7 +382,7 @@ files. Same rules as part one: nothing implemented, nothing validated, all
 
 ### Status (part two)
 
-R263-R265 and R268-R276 are `pending` and extend the same follow-up queue. R263, R265,
+R263-R265 and R269-R276 are `pending` and extend the same follow-up queue. R263, R265,
 R270, R272, R273, and R274 each carry a stated constraint - a security check that
 must survive, a possibly deliberate belt-and-braces item, release-evidence
 caution under R110-R112, a correctness inconsistency to settle first, a policy

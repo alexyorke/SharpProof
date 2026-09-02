@@ -16,6 +16,86 @@ function Get-RequiredMember
     return $member.Value
 }
 
+function Get-MemberArray
+{
+    param(
+        [object]$Object,
+        [string]$Name
+    )
+
+    $member = $Object.PSObject.Properties[$Name]
+    if ($null -eq $member -or $null -eq $member.Value)
+    {
+        return @()
+    }
+    return @($member.Value)
+}
+
+function Assert-Properties
+{
+    param(
+        [Alias('Value')][object]$Object,
+        [Alias('Names')][string[]]$Allowed,
+        [string]$Context
+    )
+
+    $actual = @($Object.PSObject.Properties.Name)
+    foreach ($name in $actual)
+    {
+        if ($name -notin $Allowed)
+        {
+            throw "$Context contains unsupported property '$name'."
+        }
+    }
+    foreach ($name in $Allowed)
+    {
+        if ($name -notin $actual)
+        {
+            throw "$Context is missing required property '$name'."
+        }
+    }
+}
+
+function Assert-EnumValue
+{
+    param(
+        [object]$Value,
+        [string[]]$Allowed,
+        [string]$Context
+    )
+
+    if ($Value -isnot [string] -or [string]$Value -notin $Allowed)
+    {
+        throw "$Context must be one of: $($Allowed -join ', ')."
+    }
+    return [string]$Value
+}
+
+function Assert-EnumName([object]$Value, [string[]]$Allowed, [string]$Context)
+{
+    return Assert-EnumValue $Value $Allowed $Context
+}
+
+function Assert-PascalCaseIdentifier
+{
+    param(
+        [object]$Value,
+        [string]$Context
+    )
+
+    if ($Value -isnot [string] -or
+        [string]$Value -cnotmatch '\A[A-Z][A-Za-z0-9]*\z')
+    {
+        throw "$Context must be a safe PascalCase C# identifier."
+    }
+    return [string]$Value
+}
+
+function Assert-CSharpIdentifier([object]$Value, [string]$Context)
+{
+    return Assert-PascalCaseIdentifier $Value $Context
+}
+
 function Assert-Identifier
 {
     param([string]$Value, [string]$Context)

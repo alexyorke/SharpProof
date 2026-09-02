@@ -22,15 +22,6 @@ if (-not [IO.File]::Exists($SchemaPath)) {
     throw "Protocol schema not found: $SchemaPath"
 }
 
-function Get-MemberArray {
-    param([object]$Object, [string]$Name)
-    $member = $Object.PSObject.Properties[$Name]
-    if ($null -eq $member -or $null -eq $member.Value) {
-        return @()
-    }
-    return @($member.Value)
-}
-
 function Add-WrappedAlternatives {
     param(
         [Collections.Generic.List[string]]$Lines,
