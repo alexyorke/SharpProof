@@ -389,8 +389,7 @@ internal sealed class CompilerSpecificationPackProvider
         {
             var pack = ParsePack(element);
             if (previousPack != null &&
-                StringComparer.Ordinal.Compare(previousPack, pack.Id) >= 0 ||
-                packs.ContainsKey(pack.Id))
+                StringComparer.Ordinal.Compare(previousPack, pack.Id) >= 0)
             {
                 throw new InvalidDataException(
                     "Specification-pack identifiers must be unique and sorted.");

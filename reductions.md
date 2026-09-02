@@ -191,6 +191,7 @@ the smallest relevant containerized test target passes.
 | R869 | Validate IR sequence elements while taking the immutable snapshot | `SharpProof.Ir.Test`: 114 passed |
 | R870 | Remove the redundant IR location type-table lookup | `SharpProof.Ir.Test`: 114 passed |
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
+| R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -8175,8 +8176,10 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred five)
 
-R895 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R895 is `applied`: catalog loading now relies on its existing strict increasing
+pack-ID check to reject duplicates and out-of-order entries, removing the
+redundant dictionary membership probe while preserving the fail-closed error.
+CompilerSpecificationPackProviderTests passed.
 
 ## Second survey, part four hundred six: R896 - double lookup before method insertion
 
