@@ -63,9 +63,17 @@ internal static class OpenSourceCorpusCatalog
         Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
     internal static string ComputeSha256(string value)
     {
+        return ComputeNormalizedSha256(NormalizeLineEndings(value));
+    }
+
+    [SuppressMessage(
+        "Globalization",
+        "CA1308:Normalize strings to uppercase",
+        Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
+    internal static string ComputeNormalizedSha256(string normalizedValue)
+    {
         return Convert.ToHexString(
-                SHA256.HashData(
-                    Encoding.UTF8.GetBytes(NormalizeLineEndings(value))))
+                SHA256.HashData(Encoding.UTF8.GetBytes(normalizedValue)))
             .ToLowerInvariant();
     }
 
@@ -163,7 +171,7 @@ internal static class OpenSourceCorpusCatalog
 
             var content = NormalizeLineEndings(file.Content);
             if (!string.Equals(
-                    ComputeSha256(content),
+                    ComputeNormalizedSha256(content),
                     file.ContentSha256,
                     StringComparison.Ordinal))
             {
@@ -222,7 +230,8 @@ internal static class OpenSourceCorpusCatalog
             }
 
             var declaration = FindDeclaration(sourceFile.Root, method);
-            var declarationHash = ComputeSha256(GetDeclaration(declaration));
+            var declarationHash = ComputeNormalizedSha256(
+                GetDeclaration(declaration));
             if (!string.Equals(
                     declarationHash,
                     method.DeclarationSha256,

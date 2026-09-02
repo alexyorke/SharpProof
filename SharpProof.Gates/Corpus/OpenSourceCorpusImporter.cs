@@ -303,7 +303,7 @@ SOFTWARE.
                 new OpenSourceCorpusFile(
                     SourceId,
                     relativePath,
-                    OpenSourceCorpusCatalog.ComputeSha256(content),
+                    OpenSourceCorpusCatalog.ComputeNormalizedSha256(content),
                     content));
             var tree = CSharpSyntaxTree.ParseText(
                 content,
@@ -323,7 +323,7 @@ SOFTWARE.
                 var declaration =
                     OpenSourceCorpusCatalog.GetDeclaration(method);
                 var hash =
-                    OpenSourceCorpusCatalog.ComputeSha256(declaration);
+                    OpenSourceCorpusCatalog.ComputeNormalizedSha256(declaration);
                 if (!declarationHashes.Add(hash))
                 {
                     continue;

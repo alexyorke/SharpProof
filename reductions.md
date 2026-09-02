@@ -185,6 +185,7 @@ the smallest relevant containerized test target passes.
 | R619 | Share cancellation-filter evaluation prelude | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests, 162 passed |
 | R620 | Share Meta-analyzer local-write candidate enumeration | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests, 162 passed |
 | R621 | Share Worker artifact-authority verification baseline | `SharpProof.Worker.Test`: WorkerTests, 148 passed |
+| R625 | Hash already-normalized corpus text without a second line-ending scan | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4260,7 +4261,10 @@ per-source URL, commit, license, and containment checks.
 
 ### Status (part one hundred sixty-six)
 
-R625 is a pending corpus hashing cleanup candidate. Preserve the current normalized-byte hash values and CRLF/CR compatibility; share or specialize only the normalization boundary so callers do not rescan canonical text.
+R625 is `applied`: corpus file and declaration callers now use an explicit
+normalized-input SHA-256 helper after their existing line-ending normalization;
+the public normalizing entry point and CRLF/CR compatibility remain unchanged.
+CorpusGateTests passed (23).
 
 ## Second survey, part one hundred sixty-seven: R626 - duplicate Effects test compilation factories
 
