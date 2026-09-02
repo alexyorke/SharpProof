@@ -14,15 +14,8 @@ if [[ "$(id -u)" = "0" ]] && id sharpproof >/dev/null 2>&1; then
     /home/sharpproof/.nuget/packages \
     /home/sharpproof/.dotnet \
     "${repo_root}"
-  chown sharpproof:sharpproof \
-    /home/sharpproof/.nuget \
-    /home/sharpproof/.nuget/NuGet \
-    /home/sharpproof/.nuget/packages \
-    /home/sharpproof/.dotnet \
-    "${repo_root}"
   if [[ "${command_name}" != "dev" ]]; then
     install -d -o sharpproof -g sharpproof "${repo_root}/artifacts"
-    chown sharpproof:sharpproof "${repo_root}/artifacts"
   fi
   export HOME=/home/sharpproof
   exec runuser --user sharpproof --preserve-environment -- \
