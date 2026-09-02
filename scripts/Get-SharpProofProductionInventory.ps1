@@ -24,12 +24,6 @@ function Get-PropertyValue {
     return [string]$property.Value
 }
 
-function Get-Sha256Hex {
-    param([Parameter(Mandatory = $true)] [string]$Path)
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Production inventory input is missing: '$Path'." }
-    return ([Security.Cryptography.SHA256]::HashData([IO.File]::ReadAllBytes($Path)) | ForEach-Object { $_.ToString('x2') }) -join ''
-}
-
 function Invoke-GitText {
     param([Parameter(Mandatory = $true)] [string[]]$Arguments)
     $output = @(& git -C $resolvedRepositoryRoot @Arguments 2>&1)
@@ -52,7 +46,7 @@ function Get-CanonicalFileRecord {
     param([Parameter(Mandatory = $true)] [string]$RelativePath, [Parameter()] [bool]$Generated = $false, [Parameter()] [string]$GeneratedReason = '')
     $fullPath = Join-Path $resolvedRepositoryRoot ($RelativePath.Replace('/', $pathSeparator))
     if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) { throw "Production inventory source file is missing: '$RelativePath'." }
-    return [pscustomobject][ordered]@{ path = $RelativePath; sha256 = Get-Sha256Hex -Path $fullPath; generated = $Generated; generatedReason = $GeneratedReason }
+    return [pscustomobject][ordered]@{ path = $RelativePath; generated = $Generated; generatedReason = $GeneratedReason }
 }
 
 function Get-InventoryParallelism {
@@ -132,7 +126,7 @@ function Get-GeneratedManifest {
         $full = Join-Path $resolvedRepositoryRoot ($item.Replace('/', $pathSeparator))
         if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { throw "Approved generated output is missing: '$item'." }
     }
-    return [pscustomobject][ordered]@{ paths = $paths; sha256 = Get-Sha256Hex -Path $path }
+    return [pscustomobject][ordered]@{ paths = $paths }
 }
 
 function Get-GeneratorSourceRecords {
@@ -142,7 +136,7 @@ function Get-GeneratorSourceRecords {
     foreach ($file in @(Get-ChildItem -LiteralPath $resolvedRepositoryRoot -Filter '*.catalog.json' -File -ErrorAction Stop)) { [void]$paths.Add((Resolve-RepositoryPath -Candidate $file.FullName -Description $file.Name)) }
     $engDirectory = Join-Path $resolvedRepositoryRoot 'eng'
     foreach ($file in @(Get-ChildItem -LiteralPath $engDirectory -Recurse -File -ErrorAction Stop | Where-Object { $_.Name -match '(?i)(catalog|schema|generator).*\.json$' })) { [void]$paths.Add((Resolve-RepositoryPath -Candidate $file.FullName -Description $file.Name)) }
-    return @($paths | Sort-Object | ForEach-Object { [pscustomobject][ordered]@{ path = $_; sha256 = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($_.Replace('/', $pathSeparator))) } })
+    return @($paths | Sort-Object | ForEach-Object { [pscustomobject][ordered]@{ path = $_ } })
 }
 
 function Get-SolutionProjectPaths {
@@ -295,7 +289,6 @@ function Get-PortablePdbModule {
             }
             [pscustomobject][ordered]@{
                 path = $path
-                sourceSha256 = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($path.Replace('/', $pathSeparator)))
                 sequencePoints = @($documentSequencePoints)
                 sequencePointRanges = @($sourceRanges[$path].Values | Sort-Object startLine, endLine)
             }
@@ -304,10 +297,8 @@ function Get-PortablePdbModule {
             project = $ProjectName
             assemblyName = $assemblyName
             assemblyPath = Resolve-RepositoryPath -Candidate $AssemblyPath -Description 'assembly'
-            assemblySha256 = Get-Sha256Hex -Path $AssemblyPath
             moduleMvid = $mvid
             pdbPath = Resolve-RepositoryPath -Candidate $PdbPath -Description 'PDB'
-            pdbSha256 = Get-Sha256Hex -Path $PdbPath
             pdbCodeViewGuid = $codeView.Guid.ToString('D')
             documents = @($documents)
         }
@@ -319,12 +310,6 @@ function Get-PortablePdbModule {
         $peReader.Dispose()
         $assemblyStream.Dispose()
     }
-}
-
-function Get-HashForObject {
-    param([Parameter(Mandatory = $true)] [string]$Domain, [Parameter(Mandatory = $true)] $Value)
-    $json = $Value | ConvertTo-Json -Depth 30 -Compress
-    return ([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($Domain + [char]0 + $json)) | ForEach-Object { $_.ToString('x2') }) -join ''
 }
 
 $commit = Invoke-GitText -Arguments @('rev-parse', 'HEAD')
@@ -377,7 +362,6 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
     $projectRecord = [pscustomobject][ordered]@{
         name = $projectName
         projectPath = Resolve-RepositoryPath -Candidate $projectPath -Description 'project'
-        projectSha256 = Get-Sha256Hex -Path $projectPath
         assemblyName = Get-PropertyValue -Properties $query.Properties -Name 'AssemblyName'
         targetFramework = Get-PropertyValue -Properties $query.Properties -Name 'TargetFramework'
         parseOptions = [pscustomobject][ordered]@{
@@ -399,7 +383,6 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
         $identity = Get-PropertyValue -Properties $item -Name 'Identity'
         $fullPath = Get-PropertyValue -Properties $item -Name 'FullPath'
         $relative = ''
-        $sha = ''
         if (-not [string]::IsNullOrWhiteSpace($fullPath)) {
             $normalizedAnalyzerPath = $fullPath.Replace('\', '/')
             $resolvedAnalyzerPath = if (
@@ -414,15 +397,17 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
                     $repositoryPrefix,
                     [StringComparison]::Ordinal)) {
                 $relative = Resolve-RepositoryPath -Candidate $fullPath -Description ("analyzer '" + $identity + "'")
-                $sha = Get-Sha256Hex -Path $resolvedAnalyzerPath
+                if (-not (Test-Path -LiteralPath $resolvedAnalyzerPath -PathType Leaf)) {
+                    throw "Production inventory analyzer is missing: '$relative'."
+                }
             }
         }
         if ([IO.Path]::IsPathRooted($identity)) { $identity = [IO.Path]::GetFileName($identity) }
-        [void]$analyzerRecords.Add([pscustomobject][ordered]@{ project = $projectName; identity = $identity; path = $relative; sha256 = $sha })
+        [void]$analyzerRecords.Add([pscustomobject][ordered]@{ project = $projectName; identity = $identity; path = $relative })
     }
     foreach ($item in @($query.Items.AdditionalFiles)) {
         $path = Get-ItemPath -Item $item -ProjectDirectory $projectDirectory
-        [void]$additionalFileRecords.Add([pscustomobject][ordered]@{ project = $projectName; path = $path; sha256 = Get-Sha256Hex -Path (Join-Path $resolvedRepositoryRoot ($path.Replace('/', $pathSeparator))) })
+        [void]$additionalFileRecords.Add([pscustomobject][ordered]@{ project = $projectName; path = $path })
     }
 }
 foreach ($projectName in $extraCoverageProjects) {
@@ -437,8 +422,6 @@ $generatorInputs = [pscustomobject][ordered]@{
     analyzers = @($analyzerRecords | Sort-Object project, identity, path)
     additionalFiles = @($additionalFileRecords | Sort-Object project, path)
 }
-$sourcePayload = [pscustomobject][ordered]@{ schemaVersion = 1; commit = $commit; configuration = $Configuration; generatedManifestSha256 = $manifest.sha256; generatorInputs = $generatorInputs; projects = $sortedProjects }
-$sourceUniverseSha256 = Get-HashForObject -Domain 'SharpProof.production-inventory.source.v1' -Value $sourcePayload
 $modules = [Collections.Generic.List[object]]::new()
 if ($RequirePdb) {
     foreach ($project in $sortedProjects) {
@@ -451,11 +434,9 @@ if ($RequirePdb) {
     }
 }
 $sortedModules = @($modules | Sort-Object project)
-$pdbPayload = [pscustomobject][ordered]@{ schemaVersion = 1; commit = $commit; configuration = $Configuration; sourceUniverseSha256 = $sourceUniverseSha256; modules = $sortedModules }
-$pdbUniverseSha256 = if ($RequirePdb) { Get-HashForObject -Domain 'SharpProof.production-inventory.pdb.v1' -Value $pdbPayload } else { '' }
 $sequencePointCount = 0
 foreach ($module in $sortedModules) { foreach ($document in @($module.documents)) { $sequencePointCount += @($document.sequencePoints).Count } }
-$authority = [pscustomobject][ordered]@{ schemaVersion = 1; commit = $commit; configuration = $Configuration; sourceUniverseSha256 = $sourceUniverseSha256; pdbUniverseSha256 = $pdbUniverseSha256; generatedManifestSha256 = $manifest.sha256; generatorInputs = $generatorInputs; projects = $sortedProjects; modules = $sortedModules; sequencePointCount = $sequencePointCount }
+$authority = [pscustomobject][ordered]@{ schemaVersion = 1; commit = $commit; configuration = $Configuration; generatorInputs = $generatorInputs; projects = $sortedProjects; modules = $sortedModules; sequencePointCount = $sequencePointCount }
 $json = $authority | ConvertTo-Json -Depth 30
 if ([string]::IsNullOrWhiteSpace($OutputPath)) { Write-Output $json } else {
     $fullOutputPath = [IO.Path]::GetFullPath($OutputPath)

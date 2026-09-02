@@ -178,8 +178,6 @@ try {
         roots = $roots
         authority = [ordered]@{
             commit = [string]$inventory.commit
-            sourceUniverseSha256 = [string]$inventory.sourceUniverseSha256
-            generatedManifestSha256 = [string]$inventory.generatedManifestSha256
         }
         exclusions = [ordered]@{
             generatedFiles = $approvedGeneratedFiles

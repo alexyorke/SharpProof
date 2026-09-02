@@ -54,13 +54,6 @@ if (-not (Test-Path -LiteralPath $executable -PathType Leaf) -or
     -not (Test-Path -LiteralPath $pdb -PathType Leaf)) {
     throw 'The freshly built standalone gate identity is incomplete.'
 }
-$executableSha256 = (Get-FileHash -LiteralPath $executable `
-    -Algorithm SHA256).Hash.ToLowerInvariant()
-$pdbSha256 = (Get-FileHash -LiteralPath $pdb `
-    -Algorithm SHA256).Hash.ToLowerInvariant()
-$contractSha256 = (Get-FileHash -LiteralPath (
-        Join-Path $repositoryRoot 'eng\acceptance\contract.json') `
-    -Algorithm SHA256).Hash.ToLowerInvariant()
 $stream = [IO.File]::OpenRead($executable)
 try {
     $peReader = [Reflection.PortableExecutable.PEReader]::new($stream)
@@ -121,10 +114,7 @@ try {
                 -Path $rawOutput `
                 -ExpectedGate $Gate `
                 -ExpectedCommit $sourceCommit `
-                -ExpectedExecutableSha256 $executableSha256 `
-                -ExpectedMvid $mvid `
-                -ExpectedPdbSha256 $pdbSha256 `
-                -ExpectedContractSha256 $contractSha256
+                -ExpectedMvid $mvid
         }
         catch {
             $failure = 'The gate result was not valid JSON: ' +
@@ -148,19 +138,12 @@ $envelope = [pscustomobject][ordered]@{
     gate = $Gate
     passed = $passed
     commit = $sourceCommit
-    acceptanceContractSha256 = $contractSha256
     executable = [pscustomobject][ordered]@{
-        sha256 = $executableSha256
         mvid = $mvid
-        pdbSha256 = $pdbSha256
     }
     exitCode = $exitCode
     failure = $failure
     result = if ($null -eq $gateResult) { $null } else { $gateResult.Result }
-    rawResultSha256 = if (Test-Path -LiteralPath $rawOutput -PathType Leaf) {
-        (Get-FileHash -LiteralPath $rawOutput `
-            -Algorithm SHA256).Hash.ToLowerInvariant()
-    } else { $null }
     rawOutput = [IO.Path]::GetRelativePath(
         $repositoryRoot,
         $rawOutput).Replace('\', '/')

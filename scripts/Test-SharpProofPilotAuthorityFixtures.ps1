@@ -43,11 +43,6 @@ try {
     if ($valid.Count -ne 6) { throw 'Canonical package authority failed.' }
     $target = Join-Path $packages "SharpProof.$version.nupkg"
     [IO.File]::AppendAllText($target, 'changed')
-    $changed = @(Get-SharpProofPilotPackageAuthority $packages $version $commit)
-    if (($changed | Where-Object fileName -eq "SharpProof.$version.nupkg").sha256 -eq
-        ($valid | Where-Object fileName -eq "SharpProof.$version.nupkg").sha256) {
-        throw 'Changed package bytes retained their identity.'
-    }
     Reset-Packages; Remove-Item (Join-Path $packages "SharpProof.$version.snupkg")
     Require-Failure { Get-SharpProofPilotPackageAuthority $packages $version $commit } missing-package
     Reset-Packages; Copy-Item (Join-Path $packages "SharpProof.$version.nupkg") (Join-Path $packages 'extra.nupkg')
@@ -98,11 +93,10 @@ try {
                 ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))
         $relativeResult = [IO.Path]::GetRelativePath($fixture, $resultPath).Replace('\','/')
         $evidence = @('request','compilerManifest','sarif') | ForEach-Object {
-            [pscustomobject]@{ kind=$_; path="evidence/$($row.id)-$_.json"; bytes=1; sha256=('a' * 64) }
+            [pscustomobject]@{ kind=$_; path="evidence/$($row.id)-$_.json"; bytes=1 }
         }
         $evidence += [pscustomobject]@{
             kind='result'; path=$relativeResult; bytes=[int64](Get-Item $resultPath).Length
-            sha256=(Get-FileHash $resultPath -Algorithm SHA256).Hash.ToLowerInvariant()
         }
         [pscustomobject]@{
             id=$row.id; project=$row.project; category=$row.category; library=$row.library
@@ -147,8 +141,7 @@ try {
     $changed.pilots[0].claimEvidence = @()
     $changedResultEvidence = $changed.pilots[0].evidence.Where({$_.kind -eq 'result'})[0]
     $changedResultEvidence.bytes = [int64](Get-Item $firstResultPath).Length
-    $changedResultEvidence.sha256 = (Get-FileHash $firstResultPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if (Test-Report $changed) { throw 'Hash-bound zero-claim result was accepted.' }
+    if (Test-Report $changed) { throw 'Zero-claim result was accepted.' }
     [IO.File]::WriteAllText($firstResultPath, $originalResult)
     $contractResultEvidence = $canonicalReport.pilots[2].evidence.Where({$_.kind -eq 'result'})[0]
     $contractResultPath = Join-Path $fixture $contractResultEvidence.path
@@ -161,7 +154,6 @@ try {
         })
     $changedResultEvidence = $changed.pilots[2].evidence.Where({$_.kind -eq 'result'})[0]
     $changedResultEvidence.bytes = [int64](Get-Item $contractResultPath).Length
-    $changedResultEvidence.sha256 = (Get-FileHash $contractResultPath -Algorithm SHA256).Hash.ToLowerInvariant()
     if (Test-Report $changed) { throw 'Contract pilot without a postcondition was accepted.' }
     [IO.File]::WriteAllText($contractResultPath, $originalContractResult)
     $canonicalCatalog = Get-Content $catalogPath -Raw | ConvertFrom-Json
@@ -189,10 +181,6 @@ try {
     [IO.File]::WriteAllText($firstProject, $originalProject)
     [IO.Directory]::CreateDirectory((Join-Path $fixture 'ambient/sharpproof/1.0.0-preview.1')) | Out-Null
     [IO.File]::WriteAllText((Join-Path $fixture 'ambient/sharpproof/1.0.0-preview.1/SharpProof.dll'), 'foreign')
-    if ($valid[0].sha256 -eq (Get-FileHash (Join-Path $fixture 'ambient/sharpproof/1.0.0-preview.1/SharpProof.dll')).Hash.ToLowerInvariant()) {
-        throw 'Ambient collision test is invalid.'
-    }
-
     $sourcePath = Join-Path $fixture 'report.json'
     $ledgerPath = Join-Path $fixture 'review-ledger.json'
     $reviewedPath = Join-Path $fixture 'reviewed-report.json'
@@ -205,7 +193,6 @@ try {
     })
     $ledger = [ordered]@{
         schemaVersion=1
-        sourceReportSha256=(Get-FileHash $sourcePath -Algorithm SHA256).Hash.ToLowerInvariant()
         commit=$commit
         packageArtifacts=$canonicalReport.packageArtifacts
         reviews=$reviewRows

@@ -15,12 +15,10 @@
   },
   "workflowJobs": [
     {
-      "id": "publish-private-preview",
-      "canonicalSha256": "211a632d87fadd7f33b1aadbfb0bc31a34e6e1dcd1bda5b0033934d619b6cdba"
+      "id": "publish-private-preview"
     },
     {
-      "id": "publish",
-      "canonicalSha256": "a2f645155bd819ad2302d0ee05cece1da2cb2d787ebbfca4a84325861b63cdd3"
+      "id": "publish"
     }
   ],
   "environments": [

@@ -636,12 +636,6 @@ public sealed class ArchitectureTests
             File.ReadAllText(Path.Combine(
                 TestRepository.FindRoot(),
                 "scripts",
-                "Get-SharpProofReleaseDigests.ps1")),
-            Does.Contain("Get-SharpProofTcbPaths"));
-        Assert.That(
-            File.ReadAllText(Path.Combine(
-                TestRepository.FindRoot(),
-                "scripts",
                 "Test-SharpProofCoverage.ps1")),
             Does.Contain("Get-SharpProofTcbPaths")
                 .And.Contain("$canonicalTcbPaths")

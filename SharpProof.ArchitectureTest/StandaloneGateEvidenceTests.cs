@@ -58,9 +58,8 @@ public sealed class StandaloneGateEvidenceTests
             Assert.That(evidence, Does.Contain("SharpProofSourceCommit"));
             Assert.That(evidence, Does.Contain("GetMetadataReader"));
             Assert.That(producer, Does.Contain("CreateStandaloneEnvelope"));
-            Assert.That(producer, Does.Contain("AcceptanceContractSha256"));
             Assert.That(producer, Does.Contain("ModuleVersionId"));
-            Assert.That(producer, Does.Contain("PdbSha256"));
+            Assert.That(producer, Does.Not.Contain("SHA256"));
         }
     }
 

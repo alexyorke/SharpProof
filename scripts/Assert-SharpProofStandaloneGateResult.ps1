@@ -21,10 +21,7 @@ function Assert-SharpProofStandaloneGateResult {
         [Parameter(Mandatory = $true)]
         [ValidateSet('corpus', 'performance')][string]$ExpectedGate,
         [Parameter(Mandatory = $true)][string]$ExpectedCommit,
-        [Parameter(Mandatory = $true)][string]$ExpectedExecutableSha256,
-        [Parameter(Mandatory = $true)][string]$ExpectedMvid,
-        [Parameter(Mandatory = $true)][string]$ExpectedPdbSha256,
-        [Parameter(Mandatory = $true)][string]$ExpectedContractSha256
+        [Parameter(Mandatory = $true)][string]$ExpectedMvid
     )
 
     try {
@@ -40,7 +37,7 @@ function Assert-SharpProofStandaloneGateResult {
     Assert-ExactJsonProperties -Value $document -Description 'Gate envelope' `
         -Expected @(
             'SchemaVersion', 'Gate', 'Passed', 'SourceCommit',
-            'AcceptanceContractSha256', 'Executable', 'Result')
+            'Executable', 'Result')
     if ($document.SchemaVersion -isnot [long] -or
         [int]$document.SchemaVersion -ne 1) {
         throw 'The standalone gate result schema is unsupported.'
@@ -56,20 +53,12 @@ function Assert-SharpProofStandaloneGateResult {
         $document.SourceCommit -cne $ExpectedCommit) {
         throw 'The standalone gate result is bound to the wrong source commit.'
     }
-    if ($document.AcceptanceContractSha256 -isnot [string] -or
-        $document.AcceptanceContractSha256 -cne $ExpectedContractSha256) {
-        throw 'The standalone gate result is bound to the wrong acceptance contract.'
-    }
-
     Assert-ExactJsonProperties -Value $document.Executable `
         -Description 'Gate executable identity' `
-        -Expected @('Sha256', 'Mvid', 'PdbSha256')
-    if ($document.Executable.Sha256 -isnot [string] -or
-        $document.Executable.Sha256 -cne $ExpectedExecutableSha256 -or
-        $document.Executable.Mvid -isnot [string] -or
+        -Expected @('Mvid')
+    if ($document.Executable.Mvid -isnot [string] -or
         $document.Executable.Mvid -cne $ExpectedMvid -or
-        $document.Executable.PdbSha256 -isnot [string] -or
-        $document.Executable.PdbSha256 -cne $ExpectedPdbSha256) {
+        [string]::IsNullOrWhiteSpace($document.Executable.Mvid)) {
         throw 'The standalone gate result has the wrong executable identity.'
     }
 
@@ -142,11 +131,10 @@ function Assert-SharpProofStandaloneGateResult {
         }
     }
     else {
-        Assert-ExactJsonProperties -Value $document.Result.PackageBuildSdk `
-            -Description 'Performance SDK identity' `
-            -Expected @(
-                'ConfiguredVersion', 'RollForward', 'ResolvedVersion',
-                'GlobalJsonSha256')
+            Assert-ExactJsonProperties -Value $document.Result.PackageBuildSdk `
+                -Description 'Performance SDK identity' `
+                -Expected @(
+                'ConfiguredVersion', 'RollForward', 'ResolvedVersion')
         foreach ($sample in @($document.Result.PackageBuildSamples)) {
             Assert-ExactJsonProperties -Value $sample `
                 -Description 'Performance package-build sample' `

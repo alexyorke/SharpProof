@@ -25,8 +25,6 @@ $packages = @(Get-ChildItem -LiteralPath $resolvedSource -File |
         [ordered]@{
             fileName = $_.Name
             bytes = [int64]$_.Length
-            sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).
-                Hash.ToLowerInvariant()
         }
     })
 [IO.File]::WriteAllText(

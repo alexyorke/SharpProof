@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace SharpProof.Gates.Performance;
@@ -7,8 +6,7 @@ namespace SharpProof.Gates.Performance;
 internal sealed record PackageBuildSdkIdentity(
     string ConfiguredVersion,
     string RollForward,
-    string ResolvedVersion,
-    string GlobalJsonSha256);
+    string ResolvedVersion);
 
 internal static class PackageBuildSdkPin
 {
@@ -77,8 +75,7 @@ internal static class PackageBuildSdkPin
         return new PackageBuildSdkIdentity(
             configuredVersion,
             rollForward,
-            probeVersion,
-            Convert.ToHexString(SHA256.HashData(bytes)));
+            probeVersion);
     }
 
     private static async Task<string> ResolveSdkVersionAsync(

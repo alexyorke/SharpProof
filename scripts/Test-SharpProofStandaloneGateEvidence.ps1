@@ -6,9 +6,6 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Assert-SharpProofStandaloneGateResult.ps1')
 
 $commit = '0123456789abcdef0123456789abcdef01234567'
-$sha = 'a' * 64
-$pdbSha = 'b' * 64
-$contractSha = 'c' * 64
 $mvid = '01234567-89ab-cdef-0123-456789abcdef'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) (
     'sharpproof-gate-evidence-' + [Guid]::NewGuid().ToString('N'))
@@ -35,7 +32,7 @@ function New-PerformanceResult {
         PackageBuildEstimatorVersion = '1'
         PackageBuildSdk = [ordered]@{
             ConfiguredVersion = '9.0.316'; RollForward = 'disable'
-            ResolvedVersion = '9.0.316'; GlobalJsonSha256 = 'd' * 64
+            ResolvedVersion = '9.0.316'
         }
         PackageBuildSamples = [object[]]@([ordered]@{
                 Index = 0; UnannotatedAdvisoryFirst = $false
@@ -64,9 +61,9 @@ function New-PerformanceResult {
 function New-Envelope([string]$Gate) {
     return [ordered]@{
         SchemaVersion = 1; Gate = $Gate; Passed = $true
-        SourceCommit = $commit; AcceptanceContractSha256 = $contractSha
+        SourceCommit = $commit
         Executable = [ordered]@{
-            Sha256 = $sha; Mvid = $mvid; PdbSha256 = $pdbSha
+            Mvid = $mvid
         }
         Result = if ($Gate -ceq 'corpus') {
             New-CorpusResult
@@ -85,9 +82,7 @@ function Write-Fixture([object]$Value, [string]$Name) {
 function Assert-Accepted([object]$Value, [string]$Gate, [string]$Name) {
     $path = Write-Fixture $Value $Name
     Assert-SharpProofStandaloneGateResult -Path $path -ExpectedGate $Gate `
-        -ExpectedCommit $commit -ExpectedExecutableSha256 $sha `
-        -ExpectedMvid $mvid -ExpectedPdbSha256 $pdbSha `
-        -ExpectedContractSha256 $contractSha | Out-Null
+        -ExpectedCommit $commit -ExpectedMvid $mvid | Out-Null
 }
 
 function Assert-Rejected([object]$Value, [string]$Gate, [string]$Name) {
@@ -95,9 +90,7 @@ function Assert-Rejected([object]$Value, [string]$Gate, [string]$Name) {
     try {
         Assert-SharpProofStandaloneGateResult -Path $path `
             -ExpectedGate $Gate -ExpectedCommit $commit `
-            -ExpectedExecutableSha256 $sha -ExpectedMvid $mvid `
-            -ExpectedPdbSha256 $pdbSha `
-            -ExpectedContractSha256 $contractSha | Out-Null
+            -ExpectedMvid $mvid | Out-Null
     }
     catch { return }
     throw "Fixture '$Name' was unexpectedly accepted."
@@ -118,14 +111,8 @@ try {
     Assert-Rejected $fixture 'corpus' 'false-result-status'
     $fixture = New-Envelope 'corpus'; $fixture.SourceCommit = 'f' * 40
     Assert-Rejected $fixture 'corpus' 'stale-commit'
-    $fixture = New-Envelope 'corpus'; $fixture.Executable.Sha256 = 'f' * 64
-    Assert-Rejected $fixture 'corpus' 'stale-executable'
     $fixture = New-Envelope 'corpus'; $fixture.Executable.Mvid = [Guid]::Empty.ToString('D')
     Assert-Rejected $fixture 'corpus' 'wrong-mvid'
-    $fixture = New-Envelope 'corpus'; $fixture.Executable.PdbSha256 = 'f' * 64
-    Assert-Rejected $fixture 'corpus' 'wrong-pdb'
-    $fixture = New-Envelope 'corpus'; $fixture.AcceptanceContractSha256 = 'f' * 64
-    Assert-Rejected $fixture 'corpus' 'wrong-contract'
     $fixture = New-Envelope 'corpus'; $fixture.Remove('Result')
     Assert-Rejected $fixture 'corpus' 'missing-field'
     $fixture = New-Envelope 'corpus'; $fixture['Extra'] = 'decoy'

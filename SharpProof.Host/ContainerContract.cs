@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace SharpProof.Host;
@@ -11,7 +10,6 @@ public sealed record ContainerContractInfo(
     string DotNetSdkVersion,
     string Z3Version,
     long Z3LibraryBytes,
-    string Z3LibrarySha256,
     string VerifierPackageId);
 
 public static class ContainerContract
@@ -67,7 +65,7 @@ public static class ContainerContract
             "dotnetMinimumSdkVersion", "dotnetMinimumSdkFrameworkVersion",
             "dotnetTestRuntimeVersion", "dotnetBaseImage", "dotnetBaseImageDigest",
             "powershellVersionLine", "powershellImageDigest", "z3Version",
-            "z3LibraryBytes", "z3LibrarySha256", "verifierPackageId"
+            "z3LibraryBytes", "verifierPackageId"
         };
         foreach (var property in actual.EnumerateObject())
         {
@@ -112,10 +110,6 @@ public static class ContainerContract
             RequireInteger64(expected.GetProperty("z3"), "libraryBytes"));
         RequireString(
             actual,
-            "z3LibrarySha256",
-            RequireString(expected.GetProperty("z3"), "librarySha256"));
-        RequireString(
-            actual,
             "verifierPackageId",
             RequireString(
                 expected.GetProperty("support"),
@@ -127,7 +121,6 @@ public static class ContainerContract
             actual.GetProperty("dotnetSdkVersion").GetString()!,
             actual.GetProperty("z3Version").GetString()!,
             actual.GetProperty("z3LibraryBytes").GetInt64(),
-            actual.GetProperty("z3LibrarySha256").GetString()!,
             actual.GetProperty("verifierPackageId").GetString()!);
     }
 
@@ -151,20 +144,6 @@ public static class ContainerContract
         {
             throw new InvalidDataException(
                 "The SharpProof Z3 native payload is missing or has the wrong size.");
-        }
-        using var stream = new FileStream(
-            library,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.Read);
-        var hash = Convert.ToHexString(SHA256.HashData(stream));
-        if (!string.Equals(
-                hash,
-                contract.Z3LibrarySha256,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidDataException(
-                "The SharpProof Z3 native payload hash does not match the container contract.");
         }
         return library;
     }

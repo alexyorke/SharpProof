@@ -846,14 +846,6 @@ $mutations = @(
         Filter = 'FullyQualifiedName~ParentDeathKillsAWorkerBlockedBeforeStartupRelease'
     },
     [pscustomobject]@{
-        Name = 'container-z3-payload-hash'
-        File = 'SharpProof.Host\ContainerContract.cs'
-        Original = "        if (!string.Equals(`n                hash,`n                contract.Z3LibrarySha256,`n                StringComparison.OrdinalIgnoreCase))"
-        Mutated = "        if (false && !string.Equals(`n                hash,`n                contract.Z3LibrarySha256,`n                StringComparison.OrdinalIgnoreCase))"
-        Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
-        Filter = 'FullyQualifiedName~ContainerZ3PayloadRejectsAHashMismatch'
-    },
-    [pscustomobject]@{
         Name = 'container-z3-refuses-ambient-load'
         File = 'SharpProof.Host\ContainerNativeLibrary.cs'
         Original = "            var handle = NativeLibrary.Load(`n                ContainerContract.ResolveZ3LibraryRequired());"

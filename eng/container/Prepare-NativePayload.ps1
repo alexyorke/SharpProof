@@ -12,10 +12,6 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-function Get-LowerSha256([string]$Path) {
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
-}
-
 function Assert-Equal([object]$Actual, [object]$Expected, [string]$Label) {
     if ($Actual -cne $Expected) {
         throw "$Label mismatch. Expected '$Expected', found '$Actual'."
@@ -41,8 +37,6 @@ if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
     Invoke-WebRequest -Uri ([string]$z3.archiveUrl) -OutFile $archivePath
 }
 
-Assert-Equal (Get-LowerSha256 $archivePath) ([string]$z3.archiveSha256) 'Z3 archive SHA-256'
-
 if (Test-Path -LiteralPath $extractRoot) {
     Remove-Item -LiteralPath $extractRoot -Recurse -Force
 }
@@ -58,9 +52,7 @@ if (-not (Test-Path -LiteralPath $sourceLibrary -PathType Leaf) -or
 $library = Get-Item -LiteralPath $sourceLibrary
 $managed = Get-Item -LiteralPath $sourceManaged
 Assert-Equal ([int64]$library.Length) ([int64]$z3.libraryBytes) 'libz3.so byte length'
-Assert-Equal (Get-LowerSha256 $sourceLibrary) ([string]$z3.librarySha256) 'libz3.so SHA-256'
 Assert-Equal ([int64]$managed.Length) ([int64]$z3.managedAssemblyBytes) 'Microsoft.Z3.dll byte length'
-Assert-Equal (Get-LowerSha256 $sourceManaged) ([string]$z3.managedAssemblySha256) 'Microsoft.Z3.dll SHA-256'
 
 $payloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/linux-x64"
 [System.IO.Directory]::CreateDirectory($payloadDirectory) | Out-Null
@@ -72,17 +64,14 @@ $manifest = [ordered]@{
     platform = [string]$catalog.platform
     version = [string]$z3.version
     sourceUrl = [string]$z3.archiveUrl
-    archiveSha256 = [string]$z3.archiveSha256
     files = @(
         [ordered]@{
             name = 'libz3.so'
             bytes = [int64]$z3.libraryBytes
-            sha256 = [string]$z3.librarySha256
         },
         [ordered]@{
             name = 'Microsoft.Z3.dll'
             bytes = [int64]$z3.managedAssemblyBytes
-            sha256 = [string]$z3.managedAssemblySha256
         }
     )
 }

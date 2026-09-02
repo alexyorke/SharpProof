@@ -564,7 +564,6 @@
         "SharpProof.Worker/CallableVerificationPolicy.cs",
         "scripts/Get-SharpProofProductionInventory.ps1",
         "scripts/Get-SharpProofTcbPaths.ps1",
-        "scripts/Get-SharpProofReleaseDigests.ps1",
         "scripts/Test-SharpProofCoverage.ps1",
         "scripts/SharpProof.ContainerExecution.psm1",
         "SharpProof.Semantic.Tests.slnf",

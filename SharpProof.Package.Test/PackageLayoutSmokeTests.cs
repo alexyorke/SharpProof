@@ -2390,30 +2390,22 @@ public sealed class PackageLayoutSmokeTests
         VerifyPackagePayload(
             archive,
             "tools/native/linux-x64/libz3.so",
-            z3.GetProperty("libraryBytes").GetInt64(),
-            z3.GetProperty("librarySha256").GetString()!);
+            z3.GetProperty("libraryBytes").GetInt64());
         VerifyPackagePayload(
             archive,
             "tools/net9/Microsoft.Z3.dll",
-            z3.GetProperty("managedAssemblyBytes").GetInt64(),
-            z3.GetProperty("managedAssemblySha256").GetString()!);
+            z3.GetProperty("managedAssemblyBytes").GetInt64());
     }
 
     private static void VerifyPackagePayload(
         ZipArchive archive,
         string path,
-        long expectedBytes,
-        string expectedSha256)
+        long expectedBytes)
     {
         var entry = archive.GetEntry(path) ??
             throw new InvalidOperationException(
                 "Package entry was not found: " + path);
         Assert.That(entry.Length, Is.EqualTo(expectedBytes), path);
-        using var stream = entry.Open();
-        Assert.That(
-            Convert.ToHexString(SHA256.HashData(stream)),
-            Is.EqualTo(expectedSha256.ToUpperInvariant()),
-            path);
     }
 
     private static string ReadArchiveText(

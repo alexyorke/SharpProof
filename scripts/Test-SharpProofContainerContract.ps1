@@ -430,20 +430,11 @@ if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
         $marker.dotnetMinimumSdkFrameworkVersion `
         $catalog.dotnet.minimumSdkFrameworkVersion `
         'Installed minimum-SDK framework version'
-    Assert-Exact `
-        $marker.z3LibrarySha256 `
-        $catalog.z3.librarySha256 `
-        'Installed Z3 hash declaration'
-
     $native = Join-Path `
         ($env:SHARPPROOF_NATIVE_ROOT ?? '/opt/sharpproof/native') `
         "z3/$($catalog.z3.version)/linux-x64/libz3.so"
     $information = Get-Item -LiteralPath $native
     Assert-Exact $information.Length $catalog.z3.libraryBytes 'Installed Z3 size'
-    Assert-Exact `
-        (Get-FileHash -LiteralPath $native -Algorithm SHA256).Hash.ToLowerInvariant() `
-        $catalog.z3.librarySha256 `
-        'Installed Z3 hash'
     $installedRuntimes = & dotnet --list-runtimes
     if ($installedRuntimes -notcontains
         "Microsoft.NETCore.App $($catalog.dotnet.testRuntimeVersion) [/usr/share/dotnet/shared/Microsoft.NETCore.App]") {

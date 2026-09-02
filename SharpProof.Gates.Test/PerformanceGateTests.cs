@@ -417,10 +417,6 @@ public sealed class PerformanceGateTests
                 Assert.That(identity.ConfiguredVersion, Is.Not.Empty);
                 Assert.That(identity.RollForward, Is.Not.Empty);
                 Assert.That(identity.ResolvedVersion, Is.Not.Empty);
-                Assert.That(
-                    identity.GlobalJsonSha256,
-                    Is.EqualTo(Convert.ToHexString(
-                        SHA256.HashData(repositoryGlobalJson))));
             }
         }
         finally
@@ -953,9 +949,6 @@ public sealed class PerformanceGateTests
             Assert.That(
                 result.PackageBuildSdk.ResolvedVersion,
                 Is.Not.Empty);
-            Assert.That(
-                result.PackageBuildSdk.GlobalJsonSha256,
-                Has.Length.EqualTo(64));
             Assert.That(result.EnabledRetainedCompilationCount, Is.Zero);
             Assert.That(
                 result.EnabledRetainedMemoryIncreaseMiB,

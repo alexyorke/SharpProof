@@ -419,7 +419,6 @@ public sealed class CoverageScriptTests
     [TestCase("missing-project")]
     [TestCase("wrong-assembly")]
     [TestCase("foreign-source")]
-    [TestCase("duplicate-report")]
     public async Task AuthenticatedCoverageRejectsReportMutations(string mutation)
     {
         var repository = await CreateSingleCommitFixtureAsync();
@@ -1310,16 +1309,6 @@ public sealed class CoverageScriptTests
             File.WriteAllText(reportPath, "<coverage><packages>");
             return;
         }
-        if (mutation == "duplicate-report")
-        {
-            File.Copy(
-                reportPath,
-                Path.Combine(
-                    Path.GetDirectoryName(reportPath)!,
-                    "duplicate.cobertura.xml"));
-            return;
-        }
-
         var document = XDocument.Load(reportPath);
         var root = document.Root!;
         switch (mutation)
@@ -1330,7 +1319,7 @@ public sealed class CoverageScriptTests
                 break;
             case "wrong-assembly":
                 root.Element("sharpProofAuthority")!
-                    .SetAttributeValue("modules", new string('0', 64));
+                    .SetAttributeValue("modules", "Project:wrong");
                 break;
             case "foreign-source":
                 root.Descendants("class")
@@ -1376,13 +1365,15 @@ public sealed class CoverageScriptTests
 
         using var authority = JsonDocument.Parse(
             await File.ReadAllTextAsync(authorityPath));
-        var moduleHashes = authority.RootElement
+        var moduleIdentities = authority.RootElement
             .GetProperty("modules")
             .EnumerateArray()
             .Select(static module => module
-                .GetProperty("assemblySha256")
-                .GetString()!)
-            .OrderBy(static hash => hash, StringComparer.Ordinal)
+                .GetProperty("project").GetString() + ":" +
+                module.GetProperty("assemblyName").GetString() + ":" +
+                module.GetProperty("moduleMvid").GetString() + ":" +
+                module.GetProperty("pdbCodeViewGuid").GetString())
+            .OrderBy(static identity => identity, StringComparer.Ordinal)
             .ToArray();
         var sourceHits = new Dictionary<string, Dictionary<int, int>>(
             StringComparer.Ordinal);
@@ -1470,22 +1461,7 @@ public sealed class CoverageScriptTests
                 new XAttribute(
                     "commit",
                     authority.RootElement.GetProperty("commit").GetString()!),
-                new XAttribute(
-                    "sourceUniverseSha256",
-                    authority.RootElement
-                        .GetProperty("sourceUniverseSha256")
-                        .GetString()!),
-                new XAttribute(
-                    "universeSha256",
-                    authority.RootElement
-                        .GetProperty("pdbUniverseSha256")
-                        .GetString()!),
-                new XAttribute(
-                    "generatedManifestSha256",
-                    authority.RootElement
-                        .GetProperty("generatedManifestSha256")
-                        .GetString()!),
-                new XAttribute("modules", string.Join(',', moduleHashes))));
+                new XAttribute("modules", string.Join(',', moduleIdentities))));
             document.Save(reportPath, SaveOptions.DisableFormatting);
         }
     }

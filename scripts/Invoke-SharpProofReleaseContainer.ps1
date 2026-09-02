@@ -156,9 +156,6 @@ switch ($Mode) {
                 [ordered]@{
                     fileName = $_.Name
                     bytes = [int64]$_.Length
-                    sha256 = (Get-FileHash `
-                        -LiteralPath $_.FullName `
-                        -Algorithm SHA256).Hash.ToLowerInvariant()
                 }
             })
         $packageArtifactJson = $packageArtifacts | ConvertTo-Json -Compress
@@ -190,10 +187,7 @@ switch ($Mode) {
                 [string]$receipt.commit -cne $head -or
                 -not (Test-Path -LiteralPath $evidencePath -PathType Leaf) -or
                 [int64](Get-Item -LiteralPath $evidencePath).Length -ne
-                    [int64]$receipt.evidence.bytes -or
-                (Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).
-                    Hash.ToLowerInvariant() -cne
-                    [string]$receipt.evidence.sha256) {
+                    [int64]$receipt.evidence.bytes) {
                 throw "Qualification gate receipt is stale or failed: '$gate'."
             }
             if ($gate -in @(
@@ -204,9 +198,7 @@ switch ($Mode) {
                     ConvertTo-Json -Compress) -cne $packageArtifactJson) {
                 throw "Qualification gate receipt targets different packages: '$gate'."
             }
-            $gateReceipts[$gate] = (Get-FileHash `
-                -LiteralPath $receiptPath `
-                -Algorithm SHA256).Hash.ToLowerInvariant()
+            $gateReceipts[$gate] = [string]$receipt.status
         }
         $files = @($inputPaths) + @($matrixPath) + @($packages.FullName)
         $record = [ordered]@{
@@ -219,8 +211,7 @@ switch ($Mode) {
                 [ordered]@{
                     path = [IO.Path]::GetRelativePath(
                         $repositoryRoot, $_).Replace('\', '/')
-                    sha256 = (Get-FileHash `
-                        -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
+                    bytes = [int64](Get-Item -LiteralPath $_).Length
                 }
             })
         }

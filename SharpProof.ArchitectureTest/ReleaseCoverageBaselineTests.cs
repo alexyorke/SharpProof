@@ -156,7 +156,7 @@ public sealed class ReleaseCoverageBaselineTests
                 Does.Contain("releaseQualificationMatrix")
                     .And.Contain("requiredGates"));
             Assert.That(writer, Does.Contain("status -cne 'passed'"));
-            Assert.That(writer, Does.Contain("evidence.sha256"));
+            Assert.That(writer, Does.Not.Contain("sha256"));
             Assert.That(
                 writer,
                 Does.Contain("targets different packages"));
@@ -182,8 +182,7 @@ public sealed class ReleaseCoverageBaselineTests
                     .Select(index => new
                     {
                         fileName = $"package-{index}.nupkg",
-                        bytes = 1,
-                        sha256 = new string((char)('a' + index), 64)
+                        bytes = 1
                     })
                     .ToArray();
                 string Evidence(object packageArtifacts)
@@ -204,16 +203,14 @@ public sealed class ReleaseCoverageBaselineTests
                         ? new
                         {
                             fileName = packages[0].fileName,
-                            item.bytes,
-                            item.sha256
+                            item.bytes
                         }
                         : item).ToArray()), false),
                     (Evidence(packages.Select((item, index) => index == 5
                         ? new
                         {
                             item.fileName,
-                            item.bytes,
-                            sha256 = "not-a-digest"
+                            bytes = 0
                         }
                         : item).ToArray()), false)
                 ];
@@ -485,330 +482,6 @@ public sealed class ReleaseCoverageBaselineTests
             Does.Contain("checked-out HEAD"));
     }
 
-    [Test]
-    public void ReleaseDigestCanonicalStreamIncludesGitModeAndType()
-    {
-        var script = File.ReadAllText(Path.Combine(
-            TestRepository.FindRoot(),
-            "scripts",
-            "Get-SharpProofReleaseDigests.ps1"));
-        var digestStart = script.IndexOf(
-            "function Get-CanonicalDigest",
-            StringComparison.Ordinal);
-        var digestEnd = script.IndexOf(
-            "if ($null -eq (Get-Command git",
-            digestStart,
-            StringComparison.Ordinal);
-        Assert.That(digestStart, Is.GreaterThanOrEqualTo(0));
-        Assert.That(digestEnd, Is.GreaterThan(digestStart));
-        var digest = script[digestStart..digestEnd];
-        var mode = digest.IndexOf(
-            "[Text.Encoding]::ASCII.GetBytes([string]$entry.Mode)",
-            StringComparison.Ordinal);
-        var type = digest.IndexOf(
-            "[Text.Encoding]::ASCII.GetBytes([string]$entry.Type)",
-            StringComparison.Ordinal);
-        var path = digest.IndexOf(
-            "[Text.Encoding]::UTF8.GetBytes($path)",
-            StringComparison.Ordinal);
-        var content = digest.IndexOf(
-            "$hash.AppendData($contentDigest)",
-            StringComparison.Ordinal);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(script, Does.Contain("Get-GitTreeEntries"));
-            Assert.That(script, Does.Not.Contain("'--name-only'"));
-            Assert.That(mode, Is.GreaterThanOrEqualTo(0));
-            Assert.That(type, Is.GreaterThan(mode));
-            Assert.That(path, Is.GreaterThan(type));
-            Assert.That(content, Is.GreaterThan(path));
-        }
-    }
-
-    [Test]
-    public async Task ReleaseDigestsBindEntryModeAndRemainCultureStable()
-    {
-        var root = TestRepository.FindRoot();
-        var repository = Path.Combine(
-            Path.GetTempPath(),
-            "sharpproof-release-digest-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(repository);
-        try
-        {
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "init",
-                "--object-format=sha1"));
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "config",
-                "user.email",
-                "release-digest@example.invalid"));
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "config",
-                "user.name",
-                "Release Digest Test"));
-
-            var paths = new[]
-            {
-                "src/I-alpha.txt",
-                "src/i-beta.txt",
-                "src/\u0130-gamma.txt",
-                "src/\u0131-delta.txt",
-                "scripts/Get-SharpProofTcbPaths.ps1"
-            };
-            foreach (var path in paths)
-            {
-                var absolutePath = Path.Combine(
-                    repository,
-                    path.Replace('/', Path.DirectorySeparatorChar));
-                Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
-                await File.WriteAllTextAsync(
-                    absolutePath,
-                    "same blob\n");
-            }
-            File.Copy(
-                Path.Combine(
-                    root,
-                    "scripts",
-                    "Get-SharpProofTcbPaths.ps1"),
-                Path.Combine(
-                    repository,
-                    "scripts",
-                    "Get-SharpProofTcbPaths.ps1"),
-                overwrite: true);
-            File.Copy(
-                Path.Combine(
-                    root,
-                    "scripts",
-                    "Get-SharpProofProductionInventory.ps1"),
-                Path.Combine(
-                    repository,
-                    "scripts",
-                    "Get-SharpProofProductionInventory.ps1"),
-                overwrite: true);
-
-            var projectDirectory = Path.Combine(repository, "Fixture");
-            Directory.CreateDirectory(projectDirectory);
-            await File.WriteAllTextAsync(
-                Path.Combine(projectDirectory, "Fixture.csproj"),
-                """
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup>
-                    <TargetFramework>net8.0</TargetFramework>
-                    <SharpProofProductionProject>true</SharpProofProductionProject>
-                  </PropertyGroup>
-                </Project>
-                """);
-            await File.WriteAllTextAsync(
-                Path.Combine(projectDirectory, "Source.cs"),
-                "internal static class Source { internal static int Value => 1; }\n");
-            await File.WriteAllTextAsync(
-                Path.Combine(repository, "SharpProof.sln"),
-                "Microsoft Visual Studio Solution File, Format Version 12.00\n" +
-                "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Fixture\", \"Fixture/Fixture.csproj\", \"{11111111-1111-1111-1111-111111111111}\"\n" +
-                "EndProject\nGlobal\nEndGlobal\n");
-            var generatedDirectory = Path.Combine(repository, "eng", "generated");
-            Directory.CreateDirectory(generatedDirectory);
-            await File.WriteAllTextAsync(
-                Path.Combine(generatedDirectory, "approved-outputs.v1.json"),
-                "{\"schemaVersion\":1,\"outputs\":[]}\n");
-            var coverageDirectory = Path.Combine(repository, "eng", "coverage");
-            Directory.CreateDirectory(coverageDirectory);
-            await File.WriteAllTextAsync(
-                Path.Combine(coverageDirectory, "SharpProof.Gates.runsettings"),
-                "<RunSettings />\n");
-
-            var acceptancePath = Path.Combine(
-                repository,
-                "eng",
-                "acceptance",
-                "contract.json");
-            Directory.CreateDirectory(
-                Path.GetDirectoryName(acceptancePath)!);
-            await File.WriteAllTextAsync(
-                acceptancePath,
-                JsonSerializer.Serialize(new
-                {
-                    trustedKernel = new
-                    {
-                        paths = new[] { paths[0] }
-                    },
-                    trustedComputingBase = new
-                    {
-                        components = new[]
-                        {
-                            new
-                            {
-                                paths = paths.Skip(1).ToArray()
-                            }
-                        }
-                    }
-                }));
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "add",
-                "--",
-                "."));
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "commit",
-                "-m",
-                "regular files"));
-            var regularCommit = (await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "rev-parse",
-                "HEAD"))).Output.Trim();
-
-            var english = await RunReleaseDigestAsync(
-                root,
-                repository,
-                regularCommit,
-                "en-US");
-            var turkish = await RunReleaseDigestAsync(
-                root,
-                repository,
-                regularCommit,
-                "tr-TR");
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(turkish, Is.EqualTo(english));
-                Assert.That(
-                    english.TrustedComputingBaseFileCount,
-                    Is.EqualTo(paths.Length + 1));
-            }
-
-            var componentPath = Path.Combine(
-                repository,
-                paths[1].Replace('/', Path.DirectorySeparatorChar));
-            await File.WriteAllTextAsync(
-                componentPath,
-                "changed component\n");
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "add",
-                "--",
-                paths[1]));
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "commit",
-                "-m",
-                "component change"));
-            var componentCommit = (await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "rev-parse",
-                "HEAD"))).Output.Trim();
-            var component = await RunReleaseDigestAsync(
-                root,
-                repository,
-                componentCommit,
-                "en-US");
-
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "update-index",
-                "--chmod=+x",
-                "--",
-                paths[0]));
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "commit",
-                "-m",
-                "executable file"));
-            var executableCommit = (await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "rev-parse",
-                "HEAD"))).Output.Trim();
-            var executable = await RunReleaseDigestAsync(
-                root,
-                repository,
-                executableCommit,
-                "en-US");
-            var blobIdentity = (await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "rev-parse",
-                $"{executableCommit}:{paths[0]}"))).Output.Trim();
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "update-index",
-                "--cacheinfo",
-                "120000",
-                blobIdentity,
-                paths[0]));
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "commit",
-                "-m",
-                "symbolic link"));
-            var symbolicLinkCommit = (await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "rev-parse",
-                "HEAD"))).Output.Trim();
-            var symbolicLink = await RunReleaseDigestAsync(
-                root,
-                repository,
-                symbolicLinkCommit,
-                "en-US");
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    executable.ProductionDigest,
-                    Is.Not.EqualTo(english.ProductionDigest));
-                Assert.That(
-                    executable.TrustedComputingBaseDigest,
-                    Is.Not.EqualTo(english.TrustedComputingBaseDigest));
-                Assert.That(
-                    executable.ProductionFileCount,
-                    Is.EqualTo(english.ProductionFileCount));
-                Assert.That(
-                    executable.TrustedComputingBaseFileCount,
-                    Is.EqualTo(paths.Length + 1));
-                Assert.That(
-                    component.TrustedComputingBaseDigest,
-                    Is.Not.EqualTo(english.TrustedComputingBaseDigest));
-                Assert.That(
-                    component.TrustedComputingBaseFileCount,
-                    Is.EqualTo(paths.Length + 1));
-                Assert.That(
-                    symbolicLink.ProductionDigest,
-                    Is.Not.EqualTo(executable.ProductionDigest));
-                Assert.That(
-                    symbolicLink.TrustedComputingBaseDigest,
-                    Is.Not.EqualTo(
-                        executable.TrustedComputingBaseDigest));
-                Assert.That(
-                    symbolicLink.ProductionFileCount,
-                    Is.EqualTo(english.ProductionFileCount));
-                Assert.That(
-                    symbolicLink.TrustedComputingBaseFileCount,
-                    Is.EqualTo(paths.Length + 1));
-            }
-        }
-        finally
-        {
-            DeleteTemporaryRepository(repository);
-        }
-    }
-
     private static Task<ProcessResult> RunResolverAsync(
         string root,
         string tag,
@@ -868,82 +541,6 @@ public sealed class ReleaseCoverageBaselineTests
 
         Assert.That(result.ExitCode, Is.Not.Zero, path);
     }
-
-    private static async Task<ReleaseDigest> RunReleaseDigestAsync(
-        string root,
-        string repository,
-        string commit,
-        string culture)
-    {
-        const string command =
-            "$culture = [Globalization.CultureInfo]::GetCultureInfo(" +
-            "$env:SHARPPROOF_TEST_CULTURE); " +
-            "[Globalization.CultureInfo]::CurrentCulture = $culture; " +
-            "[Globalization.CultureInfo]::CurrentUICulture = $culture; " +
-            "& $env:SHARPPROOF_TEST_SCRIPT " +
-            "-RepositoryPath $env:SHARPPROOF_TEST_REPOSITORY " +
-            "-Commit $env:SHARPPROOF_TEST_COMMIT";
-        var result = await RunAsyncCore(
-            root,
-            "pwsh",
-            new Dictionary<string, string>
-            {
-                ["SHARPPROOF_TEST_CULTURE"] = culture,
-                ["SHARPPROOF_TEST_SCRIPT"] = Path.Combine(
-                    root,
-                    "scripts",
-                    "Get-SharpProofReleaseDigests.ps1"),
-                ["SHARPPROOF_TEST_REPOSITORY"] = repository,
-                ["SHARPPROOF_TEST_COMMIT"] = commit
-            },
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            command);
-        Assert.That(result.ExitCode, Is.Zero, result.Error);
-        using var document = JsonDocument.Parse(result.Output);
-        var evidence = document.RootElement;
-        return new ReleaseDigest(
-            evidence
-                .GetProperty("productionDigestSha256")
-                .GetString()!,
-            evidence
-                .GetProperty("trustedComputingBaseDigestSha256")
-                .GetString()!,
-            evidence
-                .GetProperty("productionFileCount")
-                .GetInt32(),
-            evidence
-                .GetProperty("trustedComputingBaseFileCount")
-                .GetInt32());
-    }
-
-    private static async Task<ProcessResult> AssertSuccessAsync(
-        Task<ProcessResult> operation)
-    {
-        var result = await operation;
-        Assert.That(result.ExitCode, Is.Zero, result.Error);
-        return result;
-    }
-
-    private static void DeleteTemporaryRepository(string repository)
-    {
-        if (!Directory.Exists(repository))
-        {
-            return;
-        }
-
-        foreach (var path in Directory.EnumerateFiles(
-            repository,
-            "*",
-            SearchOption.AllDirectories))
-        {
-            File.SetAttributes(path, FileAttributes.Normal);
-        }
-        Directory.Delete(repository, recursive: true);
-    }
-
     private static async Task<ProcessResult> RunAsync(
         string workingDirectory,
         string fileName,
@@ -1010,9 +607,4 @@ public sealed class ReleaseCoverageBaselineTests
         string Output,
         string Error);
 
-    private sealed record ReleaseDigest(
-        string ProductionDigest,
-        string TrustedComputingBaseDigest,
-        int ProductionFileCount,
-        int TrustedComputingBaseFileCount);
 }

@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text.Json;
 using SharpProof.Gates.Corpus;
 using SharpProof.Gates.Performance;
@@ -57,7 +56,7 @@ internal static class Program
                     _ => false
                 };
                 Console.WriteLine(JsonSerializer.Serialize(
-                    CreateStandaloneEnvelope(root, command, passed, result),
+                    CreateStandaloneEnvelope(command, passed, result),
                     JsonDefaults.Indented));
                 return passed ? 0 : 1;
             }
@@ -97,7 +96,6 @@ internal static class Program
     }
 
     private static object CreateStandaloneEnvelope(
-        string repositoryRoot,
         string gate,
         bool passed,
         object result)
@@ -125,38 +123,24 @@ internal static class Program
         }
 
         var executablePath = assembly.Location;
-        var pdbPath = Path.ChangeExtension(executablePath, ".pdb");
-        if (!File.Exists(executablePath) || !File.Exists(pdbPath))
+        if (!File.Exists(executablePath))
         {
             throw new InvalidOperationException(
                 "The standalone gate build identity is incomplete.");
         }
 
-        var contractPath = Path.Combine(
-            repositoryRoot,
-            "eng",
-            "acceptance",
-            "contract.json");
         return new
         {
             SchemaVersion = 1,
             Gate = gate,
             Passed = passed,
             SourceCommit = sourceCommit,
-            AcceptanceContractSha256 = Sha256(contractPath),
             Executable = new
             {
-                Sha256 = Sha256(executablePath),
                 Mvid = assembly.ManifestModule.ModuleVersionId.ToString("D"),
-                PdbSha256 = Sha256(pdbPath)
             },
             Result = result
         };
-    }
-
-    private static string Sha256(string path)
-    {
-        return HashEncoding.ComputeSha256Hex(File.ReadAllBytes(path));
     }
 }
 

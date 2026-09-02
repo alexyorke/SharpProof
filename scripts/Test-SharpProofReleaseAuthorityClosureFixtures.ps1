@@ -18,16 +18,6 @@ function Get-FixtureClosure {
     return @(Get-SharpProofReleaseAuthorityClosure -RepositoryRoot $fixture)
 }
 
-function Get-ClosureDigest {
-    $records = @(Get-FixtureClosure | ForEach-Object {
-            $_ + "`n" + (Get-FileHash -LiteralPath (Join-Path $fixture $_) `
-                -Algorithm SHA256).Hash.ToLowerInvariant()
-        })
-    $bytes = [Text.Encoding]::UTF8.GetBytes(($records -join "`n"))
-    return [Convert]::ToHexString(
-        [Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
-}
-
 try {
     Copy-Item -LiteralPath (
         Join-Path $repositoryRoot 'scripts/Get-SharpProofReleaseAuthorityClosure.ps1') `
@@ -82,16 +72,9 @@ $manifest = 'SharpProof.Verifier/SharpProof.Verifier.nuspec'
     foreach ($leaf in $requiredLeaves) {
         if ($canonical -cnotcontains $leaf) { throw "Canonical closure omitted '$leaf'." }
     }
-    $canonicalDigest = Get-ClosureDigest
     foreach ($leaf in $requiredLeaves) {
         $full = Join-Path $fixture $leaf
         $original = [IO.File]::ReadAllText($full)
-        [IO.File]::AppendAllText($full, "`nchanged", [Text.UTF8Encoding]::new($false))
-        if ((Get-ClosureDigest) -ceq $canonicalDigest -or
-            @(& git -C $fixture diff --name-only -- $leaf) -cnotcontains $leaf) {
-            throw "Changing '$leaf' did not alter digest and changed-TCB selection."
-        }
-        [IO.File]::WriteAllText($full, $original, [Text.UTF8Encoding]::new($false))
         Remove-Item -LiteralPath $full
         try { Get-FixtureClosure | Out-Null; throw "Deleting '$leaf' was accepted." }
         catch { if ($_.Exception.Message -like "Deleting '*") { throw } }

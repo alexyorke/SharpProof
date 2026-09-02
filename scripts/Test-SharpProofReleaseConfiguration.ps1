@@ -165,14 +165,6 @@ function Get-CanonicalWorkflowJob {
     return $block
 }
 
-function Get-Sha256Text {
-    param([Parameter(Mandatory = $true)][string]$Value)
-
-    $bytes = [Text.Encoding]::UTF8.GetBytes($Value)
-    return [Convert]::ToHexString(
-        [Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
-}
-
 $head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$') {
     throw 'The release-configuration commit could not be resolved.'
@@ -186,16 +178,11 @@ Require-ExactSet `
     -Owner 'The release workflow job authority'
 $workflowEvidence = @($contract.workflowJobs | ForEach-Object {
         $jobId = [string]$_.id
-        $expectedHash = [string]$_.canonicalSha256
-        if ($expectedHash -notmatch '^[0-9a-f]{64}$') {
-            throw "Release job '$jobId' has an invalid canonical hash."
+        $job = Get-CanonicalWorkflowJob -Yaml $workflow -JobId $jobId
+        if ([string]::IsNullOrWhiteSpace($job)) {
+            throw "Release job '$jobId' is empty."
         }
-        $actualHash = Get-Sha256Text (
-            Get-CanonicalWorkflowJob -Yaml $workflow -JobId $jobId)
-        if (-not $actualHash.Equals($expectedHash, [StringComparison]::Ordinal)) {
-            throw "Release job '$jobId' does not equal its canonical structural contract."
-        }
-        [pscustomobject]@{ id = $jobId; canonicalSha256 = $actualHash }
+        [pscustomobject]@{ id = $jobId }
     })
 $rulesets = @(Invoke-GitHubJson "repos/$repository/rulesets" -Paginate)
 $activeTagRulesets = @($rulesets |

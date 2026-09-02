@@ -26,7 +26,6 @@ $contract = [ordered]@{
     powershellImageDigest = [string]$catalog.powershell.imageDigest
     z3Version = [string]$catalog.z3.version
     z3LibraryBytes = [int64]$catalog.z3.libraryBytes
-    z3LibrarySha256 = [string]$catalog.z3.librarySha256
     verifierPackageId = [string]$catalog.support.verifierPackageId
 }
 

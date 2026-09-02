@@ -1,11 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -242,117 +240,6 @@ internal static class SharpProofSymbolPackageValidator
                 codeViewEntries[0],
                 expectedSourceUrl);
         }
-        ValidatePdbChecksum(peReader, assemblyEntry, pdbImage);
-    }
-
-    private static void ValidatePdbChecksum(
-        PEReader peReader,
-        ZipArchiveEntry assemblyEntry,
-        MemoryStream pdbImage)
-    {
-        var checksumEntries = peReader.ReadDebugDirectory()
-            .Where(static entry => entry.Type == DebugDirectoryEntryType.PdbChecksum)
-            .ToArray();
-        if (checksumEntries.Length != 1)
-        {
-            throw new InvalidDataException(
-                $"Assembly '{assemblyEntry.FullName}' must contain exactly one " +
-                "PDB checksum debug directory entry.");
-        }
-
-        PdbChecksumDebugDirectoryData checksum;
-        try
-        {
-            checksum = peReader.ReadPdbChecksumDebugDirectoryData(checksumEntries[0]);
-        }
-        catch (BadImageFormatException exception)
-        {
-            throw new InvalidDataException(
-                $"Assembly '{assemblyEntry.FullName}' has a malformed PDB checksum entry.",
-                exception);
-        }
-        if (!string.Equals(checksum.AlgorithmName, "SHA256", StringComparison.Ordinal) ||
-            checksum.Checksum.Length != SHA256.HashSizeInBytes)
-        {
-            throw new InvalidDataException(
-                $"Assembly '{assemblyEntry.FullName}' must use a 32-byte SHA256 " +
-                "PDB checksum.");
-        }
-
-        var content = pdbImage.ToArray();
-        var idOffset = PortablePdbIdOffset(content);
-        Array.Clear(content, idOffset, 20);
-        var actual = SHA256.HashData(content);
-        if (!checksum.Checksum.AsSpan().SequenceEqual(actual))
-        {
-            throw new InvalidDataException(
-                $"Assembly '{assemblyEntry.FullName}' PDB checksum does not " +
-                "match the packaged portable PDB.");
-        }
-        pdbImage.Position = 0;
-    }
-
-    private static int PortablePdbIdOffset(byte[] content)
-    {
-        const uint metadataSignature = 0x424A5342;
-        const string pdbStreamName = "#Pdb";
-        try
-        {
-            var position = 0;
-            uint ReadUInt32()
-            {
-                var value = BinaryPrimitives.ReadUInt32LittleEndian(
-                    content.AsSpan(position, sizeof(uint)));
-                position += sizeof(uint);
-                return value;
-            }
-            ushort ReadUInt16()
-            {
-                var value = BinaryPrimitives.ReadUInt16LittleEndian(
-                    content.AsSpan(position, sizeof(ushort)));
-                position += sizeof(ushort);
-                return value;
-            }
-
-            if (ReadUInt32() != metadataSignature)
-            {
-                throw new InvalidDataException("Portable PDB metadata signature is invalid.");
-            }
-            position += sizeof(ushort) * 2 + sizeof(uint);
-            var versionLength = checked((int)ReadUInt32());
-            position = checked((position + versionLength + 3) & ~3);
-            _ = ReadUInt16();
-            var streamCount = ReadUInt16();
-            for (var index = 0; index < streamCount; index++)
-            {
-                var offset = checked((int)ReadUInt32());
-                var size = checked((int)ReadUInt32());
-                var nameStart = position;
-                while (content[position] != 0)
-                {
-                    position++;
-                }
-                var name = Encoding.ASCII.GetString(
-                    content,
-                    nameStart,
-                    position - nameStart);
-                position = checked((position + 1 + 3) & ~3);
-                if (name == pdbStreamName)
-                {
-                    if (size < 20 || offset < 0 || offset > content.Length - 20)
-                    {
-                        break;
-                    }
-                    return offset;
-                }
-            }
-        }
-        catch (Exception exception) when (exception is
-            ArgumentOutOfRangeException or IndexOutOfRangeException or OverflowException)
-        {
-            throw new InvalidDataException("Portable PDB metadata is malformed.", exception);
-        }
-        throw new InvalidDataException("Portable PDB metadata has no valid #Pdb stream.");
     }
 
     private static void ValidatePortablePdb(

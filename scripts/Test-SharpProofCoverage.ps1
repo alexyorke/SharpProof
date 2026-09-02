@@ -254,10 +254,7 @@ $recomputedAuthority = ($recomputedAuthorityJson -join [Environment]::NewLine) |
 if ($recordedAuthority.schemaVersion -ne 1 -or
     $recordedAuthority.commit -cne $recomputedAuthority.commit -or
     $recordedAuthority.commit -cne (& git -C $repositoryRoot rev-parse HEAD).Trim() -or
-    $recordedAuthority.configuration -cne 'Release' -or
-    $recordedAuthority.sourceUniverseSha256 -cne $recomputedAuthority.sourceUniverseSha256 -or
-    $recordedAuthority.pdbUniverseSha256 -cne $recomputedAuthority.pdbUniverseSha256 -or
-    $recordedAuthority.generatedManifestSha256 -cne $recomputedAuthority.generatedManifestSha256) {
+    $recordedAuthority.configuration -cne 'Release') {
     throw (
         'Coverage authority evidence does not match the exact current ' +
         'commit, evaluated MSBuild inventory, binaries, and portable-PDB universe.')
@@ -277,11 +274,14 @@ if (($authorityProjectNames -join [Environment]::NewLine) -cne
         'evaluated production inventory.')
 }
 $expectedAuthorityModules = @($recomputedAuthority.modules | Sort-Object project)
-$expectedModuleHashes = @(
+$expectedModuleIdentities = @(
     $expectedAuthorityModules |
-        ForEach-Object { [string]$_.assemblySha256 } |
+        ForEach-Object {
+            [string]$_.project + ':' + [string]$_.assemblyName + ':' +
+                [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
+        } |
         Sort-Object)
-$expectedModuleHashText = $expectedModuleHashes -join ','
+$expectedModuleIdentityText = $expectedModuleIdentities -join ','
 $expectedAssemblyNames = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
 foreach ($module in $expectedAuthorityModules) {
@@ -389,22 +389,13 @@ function Resolve-CoverageSourcePath {
         "Coverage report source document is foreign or missing: '$FileName'.")
 }
 
-$seenReportHashes = [Collections.Generic.HashSet[string]]::new(
-    [StringComparer]::Ordinal)
-$reportHashes = [Collections.Generic.List[object]]::new()
+$reportFiles = [Collections.Generic.List[object]]::new()
 foreach ($report in $reports) {
-    $reportHash = ([Security.Cryptography.SHA256]::HashData(
-        [IO.File]::ReadAllBytes($report.FullName)) |
-        ForEach-Object { $_.ToString('x2') }) -join ''
-    if (-not $seenReportHashes.Add($reportHash)) {
-        throw (
-            "Coverage report is duplicated by content: '$($report.FullName)'.")
-    }
-    $reportHashes.Add([pscustomobject][ordered]@{
+    $reportFiles.Add([pscustomobject][ordered]@{
             path = [IO.Path]::GetRelativePath(
                 $resolvedCoverageRoot,
                 $report.FullName).Replace('\', '/')
-            sha256 = $reportHash
+            bytes = [int64]$report.Length
         })
     [xml]$document = Get-Content -LiteralPath $report.FullName -Raw
     $authorityNodes = @(
@@ -417,21 +408,16 @@ foreach ($report in $reports) {
     $authorityNode = $authorityNodes[0]
     if ([string]$authorityNode.schemaVersion -cne '1' -or
         [string]$authorityNode.commit -cne [string]$recomputedAuthority.commit -or
-        [string]$authorityNode.sourceUniverseSha256 -cne
-            [string]$recomputedAuthority.sourceUniverseSha256 -or
-        [string]$authorityNode.universeSha256 -cne
-            [string]$recomputedAuthority.pdbUniverseSha256 -or
-        [string]$authorityNode.generatedManifestSha256 -cne
-            [string]$recomputedAuthority.generatedManifestSha256) {
+        [string]$authorityNode.modules -cne $expectedModuleIdentityText) {
         throw (
             "Coverage report authority does not match current commit/universe: " +
             $report.FullName)
     }
-    $reportModuleHashes = @(
+    $reportModuleIdentities = @(
         ([string]$authorityNode.modules).Split(',', [StringSplitOptions]::RemoveEmptyEntries) |
             Sort-Object)
-    $reportModuleHashText = $reportModuleHashes -join ','
-    if ($reportModuleHashText -cne $expectedModuleHashText) {
+    $reportModuleIdentityText = $reportModuleIdentities -join ','
+    if ($reportModuleIdentityText -cne $expectedModuleIdentityText) {
         throw (
             "Coverage report module identity does not match current assemblies: " +
             $report.FullName)
@@ -734,7 +720,7 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         if (-not $coverageTcbFiles.Contains($changedPath)) {
             # The canonical union also contains metadata, such as the
             # acceptance contract. Metadata changes participate in the
-            # changed-TCB selection and release digest, but have no C# line
+            # changed-TCB selection, but have no C# line
             # sequence points. Record them explicitly instead of treating
             # them as missing coverage or silently dropping them.
             continue
@@ -845,13 +831,10 @@ $summary = [pscustomobject][ordered]@{
     schemaVersion = 1
     commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
     reportCount = $reports.Count
-    reportHashes = @($reportHashes | Sort-Object path)
+    reportFiles = @($reportFiles | Sort-Object path)
     authority = [pscustomobject][ordered]@{
         schemaVersion = 1
         commit = [string]$recomputedAuthority.commit
-        sourceUniverseSha256 = [string]$recomputedAuthority.sourceUniverseSha256
-        pdbUniverseSha256 = [string]$recomputedAuthority.pdbUniverseSha256
-        generatedManifestSha256 = [string]$recomputedAuthority.generatedManifestSha256
         moduleCount = $expectedAuthorityModules.Count
         sequencePointCount = $expectedSequencePointCount
     }

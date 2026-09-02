@@ -187,9 +187,12 @@ $coverageReports = @(
 $coverageAuthority = Get-Content `
     -LiteralPath $coverageAuthorityPath `
     -Raw | ConvertFrom-Json
-$coverageModuleHashes = @(
+$coverageModuleIdentities = @(
     $coverageAuthority.modules |
-        ForEach-Object { [string]$_.assemblySha256 } |
+        ForEach-Object {
+            [string]$_.project + ':' + [string]$_.assemblyName + ':' +
+                [string]$_.moduleMvid + ':' + [string]$_.pdbCodeViewGuid
+        } |
         Sort-Object)
 foreach ($coverageReport in $coverageReports) {
     [xml]$coverageDocument = Get-Content `
@@ -221,15 +224,10 @@ foreach ($coverageReport in $coverageReports) {
     }
     $authorityNode = $coverageDocument.CreateElement('sharpProofAuthority')
     $authorityNode.SetAttribute('schemaVersion', '1')
-    $authorityNode.SetAttribute('sourceUniverseSha256', [string]$coverageAuthority.sourceUniverseSha256)
-    $authorityNode.SetAttribute('generatedManifestSha256', [string]$coverageAuthority.generatedManifestSha256)
     $authorityNode.SetAttribute('commit', [string]$coverageAuthority.commit)
     $authorityNode.SetAttribute(
-        'universeSha256',
-        [string]$coverageAuthority.pdbUniverseSha256)
-    $authorityNode.SetAttribute(
         'modules',
-        ($coverageModuleHashes -join ','))
+        ($coverageModuleIdentities -join ','))
     [void]$coverageDocument.DocumentElement.AppendChild($authorityNode)
     $changed = $true
     if ($changed) {

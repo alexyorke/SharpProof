@@ -24,13 +24,10 @@
   "z3": {
     "version": "4.12.2",
     "archiveUrl": "https://github.com/Z3Prover/z3/releases/download/z3-4.12.2/z3-4.12.2-x64-glibc-2.31.zip",
-    "archiveSha256": "a198851a7403d8b25bab920bd4a4792efe1af5c28a5a932d840af0472d3a83eb",
     "archiveLibraryPath": "z3-4.12.2-x64-glibc-2.31/bin/libz3.so",
     "libraryBytes": 31553680,
-    "librarySha256": "b6cc142a234129de3e8aab68439d71751f16885e27aad4af962836b32d8b2980",
     "archiveManagedAssemblyPath": "z3-4.12.2-x64-glibc-2.31/bin/Microsoft.Z3.dll",
-    "managedAssemblyBytes": 247808,
-    "managedAssemblySha256": "8b3621ad5e57edb52302ff75d2cdc894a8e5a2e71a1d48d9f3ffbd8d49a7ebb3"
+    "managedAssemblyBytes": 247808
   },
   "support": {
     "verifierPackageId": "SharpProof.Verifier",

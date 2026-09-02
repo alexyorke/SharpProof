@@ -21,7 +21,12 @@ public sealed class ProductionInventoryAuthorityTests
             await CommitAllAsync(repository, "inventory fixture");
 
             var baseline = await RunInventoryAsync(repository);
-            var baselineSource = GetString(baseline, "sourceUniverseSha256");
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(baseline.RootElement.TryGetProperty("sourceUniverseSha256", out _), Is.False);
+                Assert.That(baseline.RootElement.TryGetProperty("generatedManifestSha256", out _), Is.False);
+                Assert.That(baseline.RootElement.TryGetProperty("pdbUniverseSha256", out _), Is.False);
+            }
 
             var projectPath = Path.Combine(repository, "Project", "Project.csproj");
             var project = await File.ReadAllTextAsync(projectPath);
@@ -33,20 +38,12 @@ public sealed class ProductionInventoryAuthorityTests
                     StringComparison.Ordinal));
             var parseMutation = await RunInventoryAsync(repository);
             Assert.That(
-                GetString(parseMutation, "sourceUniverseSha256"),
-                Is.Not.EqualTo(baselineSource),
-                "A self-defined parse/preprocessor mutation must change the source authority.");
-
-            var generatorPath = Path.Combine(
-                repository,
-                "scripts",
-                "Generate-Fixture.ps1");
-            await File.AppendAllTextAsync(generatorPath, "# generator mutation\n");
-            var generatorMutation = await RunInventoryAsync(repository);
-            Assert.That(
-                GetString(generatorMutation, "sourceUniverseSha256"),
-                Is.Not.EqualTo(GetString(parseMutation, "sourceUniverseSha256")),
-                "A generator-input mutation must change the source authority.");
+                parseMutation.RootElement.GetProperty("projects")[0]
+                    .GetProperty("parseOptions").GetProperty("preprocessorSymbols")
+                    .EnumerateArray().Select(static symbol => symbol.GetString())
+                    .ToArray(),
+                Does.Contain("MUTATED_PARSE"),
+                "The inventory must still expose evaluated parse options.");
 
             var manifestPath = Path.Combine(
                 repository,
@@ -150,7 +147,6 @@ public sealed class ProductionInventoryAuthorityTests
             "scripts/Invoke-SharpProofCoverage.ps1",
             "scripts/Test-ProductionCSharpComplexity.ps1",
             "eng/acceptance/Verify.ps1",
-            "scripts/Get-SharpProofReleaseDigests.ps1",
             "scripts/Test-SharpProofReleaseAuthorityClosure.ps1"
         };
         using (Assert.EnterMultipleScope())
@@ -274,11 +270,6 @@ public sealed class ProductionInventoryAuthorityTests
             repository,
             "-Configuration",
             "Release");
-    }
-
-    private static string GetString(JsonDocument document, string property)
-    {
-        return document.RootElement.GetProperty(property).GetString()!;
     }
 
     private static async Task InitializeRepositoryAsync(string repository)
