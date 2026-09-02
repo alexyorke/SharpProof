@@ -69,6 +69,35 @@ the smallest relevant containerized test target passes.
 | R192 | Remove unused `GhostProbe.TouchObject` | Specs.Test: 82 passed |
 | R199 | Remove the duplicate undefined-operation check | Frontend.Test: 108 passed |
 | R228 | Remove exception catches subsumed by `IOException` | Gates.Test: 63 passed |
+| R055 | Share analyzer diagnostic-ID assertions | Analyzer.Test: 476 passed |
+| R056 | Share Effects `Sample` method lookup and analysis | Effects.Test: 323 passed |
+| R059 | Share protocol error-code assertions | ProtocolJsonTests: 108 passed |
+| R062 | Merge the duplicate protocol scaling tests | ProtocolJsonTests: 108 passed |
+| R075 | Table-drive mutation shard timing fields; retain the uniqueness preflight because its helper is declared after the preflight executes | PowerShell parse; mutation Architecture tests: 12 passed |
+| R101 | Share lowercase SHA-256 encoding | Generator verification and affected project tests passed |
+| R148 | Table-drive repeated acceptance contract assertions | Architecture.Test: 516 passed |
+| R151, R153 | Share architecture project-graph helpers and validate the production catalog | Architecture.Test: 516 passed |
+| R152 | Share architecture workflow enumeration | Focused Architecture tests: 11 passed |
+| R154 | Share and compact qualification receipt fixtures | Focused qualification tests passed |
+| R164 | Share dictionary-backed analyzer configuration options | Analyzer.Test: 476; ContractForGenerator.Test: 121; Gates.Test: 63 |
+| R166-R168, R209 | Share neutral API-spec facet fixtures across Effects and Specs | Effects.Test: 323; Specs.Test: 82 |
+| R186-R190 | Table-drive contract witnesses, exact types, postconditions, and facet filtering | Specs.Test: 82 passed |
+| R191 | Unify runtime allocation and throw edges | Specs.Test: 82 passed |
+| R193 | Share Contracts test compilation and diagnostic validation | Contracts.Test: 142 passed |
+| R195 | Table-drive contract default-value exactness | ContractForGenerator.Test: 121 passed |
+| R196 | Remove unused protocol root metadata | Generator verification; Worker.Test: 695 passed |
+| R198 | Remove unread generator-run compilations | ContractForGenerator.Test: 121 passed |
+| R206 | Merge constant-loop completion fixtures | Focused Effects tests: 8 passed |
+| R207 | Share operation-completion test setup | Effects.Test: 323 passed |
+| R208 | Share exception-handler reachability fixtures | Focused Effects tests: 2 passed |
+| R210 | Table-drive array completion cases | Focused Effects tests: 2 passed |
+| R212 | Share specification-term parse context | Worker.Test: 695 passed |
+| R214 | Share replay-variable projection | Worker.Test: 695 passed |
+| R219 | Table-drive default and unary lowering cases | Frontend.Test: 121 passed |
+| R220 | Cache flattened lowered-program instructions | Frontend.Test: 121 passed |
+| R222 | Share generated-domain lattice and havoc property tests | Dataflow.Test: 50 passed |
+| R225 | Table-drive invalid oracle bindings | Testing.Test: 13 passed |
+| R226 | Table-drive undefined proof goals | Verify.Test: 14 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -94,6 +123,11 @@ status document.
 | R109 | Rejected in the original audit: positional generated records change constructor visibility and equality/API shape. |
 | R128 | Refuted against the current tree: `SharpProof.Frontend.csproj` invokes `Get-SharpProofModuleVersionId.ps1`. |
 | R223 | Refuted against the current tree: `ConfirmAncestorIdentity` is called after publication locks are acquired and protects a live TOCTOU boundary. |
+| R197 | Rejected after implementation and Contracts testing: the pairwise matcher adds 13 formatted lines and cannot safely index the two-argument predicate site. |
+| R213 | Rejected after implementation: the helper adds eight lines and an argument-array allocation on the summary path. |
+| R215 | Rejected after implementation and 695 Worker tests: the helper adds three formatted lines. |
+| R216 | Rejected after implementation: the all-unknown helper adds ten formatted lines. |
+| R057 | Refuted against the current tree: only three tests retain the single-invocation shape; the remaining flow tests select distinct operations or assert graph-specific state. |
 
 ## Deferred
 
@@ -109,11 +143,11 @@ status document.
 | R038-R039, R041 | These alter soundness-sensitive traversal, pattern, or replay-candidate ordering; defer to a dedicated semantic refactor. |
 | R007-R009 | Compiler-probe JSON bytes, artifact authority, and IL opcode admission are compatibility/soundness boundaries; defer to focused format work. |
 | R027-R031 | Generalizing process, temporary-directory, and package-test setup changes cleanup/lifetime semantics across many fixtures; defer after the shared root/default work already removed the exact duplication. |
-| R055-R060, R062, R073, R075, R087-R096, R104-R105 | These parameterize or abstract large test fixtures; keep named failure isolation and local arrange/assert evidence in this reduction pass. |
+| R057-R058, R060, R073, R087-R096, R104-R105 | These parameterize or abstract large test fixtures; keep named failure isolation and local arrange/assert evidence in this reduction pass. |
 | R066-R070 | These change sample/pilot inheritance, scheduled validation, packaged imports, workflow setup, or automatic production-project classification. |
 | R072, R074, R076 | Shared shard/coverage/timing orchestration would centralize timeout, process, and atomic-publication semantics; treat as dedicated infrastructure work. |
 | R078-R080, R082-R085 | Soundness-critical recursive traversal, dispatch, alias, and abstract-value changes are deferred as requested. |
-| R099-R103 | Cross-project metadata-reference and verification-algorithm helpers have ordering, filtering, identity, or performance differences that need dedicated design. |
+| R099-R100, R102-R103 | Cross-project metadata-reference and verification-algorithm helpers have ordering, filtering, identity, or performance differences that need dedicated design. |
 | R107 | Consolidating helpers across eleven generators is a broad generator-maintenance change; the output-compaction changes already provide the safe generated-code reduction. |
 | R110-R112, R114 | Release identity, Git byte capture, package IDs, and canonical JSON comparison are release-authority code and remain explicit. |
 | R118 | A new build-task base class changes the task hierarchy and cancellation surface used by packaged MSBuild tasks. |
@@ -121,12 +155,12 @@ status document.
 | R125-R127, R129 | Acceptance assertions, CPU budgeting, and container command execution are operational authority paths, not formatting helpers. |
 | R131, R133-R134 | Docker target aliases, CI environment scope, and permission declarations are user/CI behavior and security documentation. |
 | R136-R138, R141-R142, R144 | Gates proposals combine test-fixture churn with CLI envelope or model-shape changes; retain explicit gate boundaries. |
-| R148-R154 | Architecture tests intentionally spell out repository invariants; large table/helper rewrites would reduce review and failure locality. |
+| R149 | The remaining shared PowerShell fixture runner changes failure-envelope presentation across architecture fixtures. |
 | R156, R160 | Release-authority closure and transaction recovery are security/recovery behavior and are deferred. |
-| R164-R169, R171-R191, R193-R198 | Cross-suite fixture and parameterization proposals are test-only churn; retain individual named contracts and local source evidence. |
+| R165, R169, R171-R185, R194 | Cross-suite fixture and parameterization proposals still need current-tree validation. |
 | R202-R204 | Literal catalogs and NuGet metadata require an authority decision, not automatic replacement by another indirection. |
-| R206-R216 | Effects, Worker, and CompilerCollector traversal/state refactors are soundness- and ordering-sensitive. |
-| R217-R222, R225-R226 | Low-level parameterization/base-fixture proposals trade named semantic cases for tables with no production-code reduction. |
+| R211 | The CompilerCollector block-context carrier still needs current-tree validation. |
+| R217-R218, R221 | The remaining low-level parameterization and shared-host proposals still need current-tree validation. |
 | R081 | The unreachable conversion arm represents intended null-receiver behavior; deleting it would hide a latent soundness bug rather than simplify a working path. |
 | R095, R097, R098, R170 | Formatting-only line-count reductions do not improve maintenance. |
 | R120 | Stale build-output directories are not tracked code and do not belong in this branch. |
@@ -152,8 +186,13 @@ Merged IDs are not separate work items and must not be counted twice.
 
 ## Pending queue
 
-None. Every canonical item is applied, merged, refuted/rejected, or explicitly
-deferred above. Merged IDs inherit the status of their canonical item.
+The active follow-up queue is R058, R060, R073, R087-R094, R096, R104-R105,
+R107, R149, R165, R169, R171-R185, R194, R204, R211, R217-R218, and R221.
+Each still requires current-tree validation before implementation. The other
+items in the Deferred table are intentional behavior, public API, release
+authority, security, or soundness decisions and remain deferred under the
+original instruction not to remove important features merely for line count.
+Merged IDs inherit the status of their canonical item.
 
 ## Final gate
 
