@@ -194,6 +194,7 @@ the smallest relevant containerized test target passes.
 | R521 | Share IR factory nullable-type validation | `SharpProof.Ir.Test`: 114 passed |
 | R522 | Cache response hash validity during protocol validation | `SharpProof.Worker.Test`: protocol tests passed |
 | R523 | Reuse the cache filename hexadecimal-digit predicate | `SharpProof.Worker.Test`: 695 passed |
+| R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3178,9 +3179,9 @@ duplicated sentinel encoding.
 
 ### Status (part seventy-seven)
 
-R529-R530 are `pending` reduction candidates. R529 is a local generic-helper
-deduplication. R530 preserves the intentional canonical-wire check and targets
-only the repeated validation work around it.
+R530 remains `pending`; R529 is applied and validated by the worker tests as a
+local generic-helper deduplication. R530 preserves the intentional
+canonical-wire check and targets only the repeated validation work around it.
 
 ## Second survey, part seventy-eight: R531 - replay identity authority
 
@@ -3296,3 +3297,13 @@ semantics when consolidating the test-host helper.
 R546 is a `pending` reduction candidate. Preserve the special object-type
 identity checks, recursive sequence support, and unsupported-type behavior when
 centralizing the shared classification.
+
+## Second survey, part eighty-nine: R547 - conversion unwrapping
+
+| R547 | **`RoslynOperationLowerer` duplicates implicit-conversion unwrapping.** `UnwrapImplicitConversions` and `UnwrapImplicitReferenceConversions` both loop through implicit, operator-method-free `IConversionOperation` nodes and replace the current operation with its operand; the second adds only `Conversion.IsReference` to its predicate. A predicate-driven `UnwrapImplicitConversions` helper can preserve the reference-only comparison policy while removing the duplicated loop and making future conversion-shape changes happen in one place. | `SharpProof.Frontend/RoslynOperationLowerer.cs:236-263` |
+
+### Status (part eighty-nine)
+
+R547 is a `pending` reduction candidate. Keep the reference-conversion filter
+distinct from the general comparison path and retain the current stopping
+behavior for user-defined or non-reference conversions.

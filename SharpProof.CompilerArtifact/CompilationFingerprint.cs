@@ -394,11 +394,7 @@ internal static class CompilationFingerprint
 
     private static bool IsOrdered(string[]? values, bool unique)
     {
-        return values != null && values.Zip(values.Skip(1), (left, right) =>
-        {
-            var comparison = StringComparer.Ordinal.Compare(left, right);
-            return unique ? comparison < 0 : comparison <= 0;
-        }).All(static ordered => ordered);
+        return IsOrdered(values, static value => value, unique);
     }
 
     private static bool IsOrdered<T>(
