@@ -15,6 +15,7 @@ namespace SharpProof.Package.Test;
 public sealed class LauncherArgumentTests
 {
     private const string SarifProjectDirectory = "/source";
+    private const string ValidInputHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
     [Test]
     [NonParallelizable]
@@ -1275,8 +1276,7 @@ public sealed class LauncherArgumentTests
         };
         var manifest = new WorkerClaimManifest();
         WorkerProtocolJson.SealManifest(manifest);
-        const string inputHash =
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const string inputHash = ValidInputHash;
         var expectedVersions = new WorkerVersionSummary
         {
             WorkerVersion = "launcher-test",
@@ -1343,8 +1343,7 @@ public sealed class LauncherArgumentTests
         var request = CreateValidRequest();
         var manifest = new WorkerClaimManifest();
         WorkerProtocolJson.SealManifest(manifest);
-        const string inputHash =
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const string inputHash = ValidInputHash;
         var response = new WorkerVerifyResponse
         {
             RequestHash = WorkerProtocolJson.ComputeRequestHash(request),
@@ -1502,8 +1501,7 @@ public sealed class LauncherArgumentTests
                 Budgets = new WorkerBudgets()
             }
         };
-        const string inputHash =
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const string inputHash = ValidInputHash;
         var path = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             Guid.NewGuid().ToString("N") + ".json");

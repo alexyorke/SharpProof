@@ -135,6 +135,7 @@ the smallest relevant containerized test target passes.
 | R332 | Remove explicit `GeneratePackageOnBuild=false` declarations from the three package projects because the SDK default is already false | `SharpProof.Package.Test`: package/build integration tests passed; canonical MSBuild evaluation confirms `false` |
 | R333 | Reuse one class-level valid supervisor nonce fixture across the five BuildTaskTests methods that exercise it | `SharpProof.Package.Test`: 141 BuildTask, supervisor, and launcher tests passed |
 | R334 | Reuse one class-level schema-3 corpus snapshot header fixture across the corpus format tests | `SharpProof.Gates.Test`: 23 corpus gate tests passed |
+| R335 | Reuse one class-level valid input-hash fixture across the three LauncherArgumentTests methods that exercise it | `SharpProof.Package.Test`: LauncherArgumentTests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1423,7 +1424,6 @@ maintenance seams rather than style preferences.
 | ID | Finding | Evidence |
 |---|---|---|
 | R331 | **The two custom-nuspec project files copy the same packaging skeleton.** `SharpProof.Package.csproj` and `SharpProof.Verifier.csproj` each import `SharpProof.PackageMetadata.props` and repeat the same `Nullable=disable`, `ImplicitUsings=disable`, `TargetFramework=netstandard2.0`, `IncludeBuildOutput=false`, `GeneratePackageOnBuild=false`, `NuspecBasePath`, `NU5128` suppression, `Copyright`, and `NoPackageAnalysis` settings. Their `_SharpProofPrepareNuspecProperties` targets also share the same name, timing, and `version/configuration/repositorycommit` property prefix. A shared custom-nuspec props/target fragment could own this stable skeleton while leaving package IDs, nuspec filenames, native-root validation, and project references explicit. This refines R291's metadata duplication at the project-file layer. | `SharpProof.Package/SharpProof.Package.csproj:1-20,42-45`; `SharpProof.Verifier/SharpProof.Verifier.csproj:1-20,47-52` |
-| R335 | **Launcher argument tests repeat the same fixed input hash three times.** `LauncherArgumentTests` declares the exact 64-`a` hash as a local `inputHash` in three methods. The same file already uses `new('a', 64)` in adjacent cases, and `ProtocolJsonTests` has a class-level constant for the same fixture. Promoting the three same-file declarations to one constant would remove local noise; sharing it across test assemblies is optional and not required for this item. | `SharpProof.Package.Test/LauncherArgumentTests.cs:1278-1279,1346-1347,1505-1506`; `SharpProof.Worker.Test/ProtocolJsonTests.cs:18-19` |
 | R336 | **The cache filename suffix has a local authority that production does not reuse.** `VerificationCache.IsOwnedCacheEntry` defines `suffix = ".sharp-proof-cache.json"` for length and ownership checks, but `GetPath` types the same suffix as a separate literal. `WorkerTcbEdgeCaseTests` then repeats the suffix in its own local constant, globs, and path assertions. A class/internal cache-name constant or a test-facing pattern helper could make the writer, scanner, and edge-case fixtures consume one storage convention; this is complementary to R325's hash-format validation. | `SharpProof.Worker/VerificationCache.cs:522-528,548-556`; `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:30,33,49,1176-1189,1144-1145,1260-1262,1311-1312,1361-1364,1455` |
 | R337 | **The stable Roslyn additional-text implementation type name is repeated beside the duplicated guard from R323.** Both `CompilerCompilationCapture` and `CompilerProbeSnapshot` privately declare `CommandLineAdditionalTextTypeName = "Microsoft.CodeAnalysis.AdditionalTextFile"` and compare against it with ordinal equality. R323 already records the larger `GetStableAdditionalText` algorithm duplication; even if the methods remain separate because the probe has no collector project reference, the exact type-name value is a second independent drift point and should be included in that sharing decision. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:58-59,437-442`; `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:7-8,563-573`; R323 |
 | R338 | **Three analyzer components repeat the same `NoWarn` suppression bundle.** `SharpProof.Analyzer.Core`, `SharpProof.Analyzer`, and `SharpProof.CompilerCollector` each append exactly `RS2002;RS2003` to `NoWarn`. These projects share generated diagnostic-descriptor/analyzer infrastructure, while the other Roslyn components use different suppression sets (`RS2008`, `RS1035`, or none). A narrowly scoped analyzer-component property or shared props fragment could remove the three repeated lines, but the reason for suppressing each rule must be confirmed before centralization; this is not evidence that the warnings themselves are unnecessary. | `SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj:8`; `SharpProof.Analyzer/SharpProof.Analyzer.csproj:8`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:9` |
@@ -1441,6 +1441,8 @@ maintenance seams rather than style preferences.
   or combines the value.
 - R334 is now applied: `CorpusGateTests` uses one class-level
   `CorpusSnapshotHeader` fixture for all schema-3 format cases.
+- R335 is now applied: `LauncherArgumentTests` uses one class-level
+  `ValidInputHash` fixture for its repeated response-validation cases.
 - The repeated `SHARPPROOF_CONTRACTS` string spans the public conditional symbol,
   compilation fingerprinting, and synthetic source fixtures. The fixture copies
   are part of R309, while the fingerprint intentionally has a separate
@@ -1459,7 +1461,7 @@ maintenance seams rather than style preferences.
 
 ### Status (part twenty-six)
 
-R331, R335-R339 are `pending`. R331, R336, and R337 touch packaging or storage
+R331, R336-R339 are `pending`. R331, R336, and R337 touch packaging or storage
 authorities and need boundary-aware implementations. R333-R335 and R338-R339
 are smaller, mechanically testable build/test reductions.
 
@@ -2719,3 +2721,58 @@ R497 is `pending`. It removes no source lines and is the only finding in this
 survey whose payoff is CI wall-clock and cost rather than maintainability - but it
 is filed on the same evidence standard as the rest, and the mechanism it asks for
 is already built, documented, and test-pinned.
+
+
+## Second survey, part sixty-three: R498-R502 - resolver predicates and repeated analyzer work
+
+This pass continues through the frontend, analyzer, effects, and corpus gate
+implementations, keeping behavior-specific branches separate from shared plumbing.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R498 | **`StringConcatenationEffectResolver.Resolve(IBinaryOperation, ...)` reimplements a predicate already provided by `IsBuiltInStringConcatenation(IBinaryOperation)`.** The helper checks the operator, string result type, absence of a constant value, and absence of an operator method. The resolver repeats the first three as an early-return condition and then repeats the operator-method check in a second condition before doing the same allocation and formatted-operand work. Calling the existing helper would keep the binary and compound-assignment admission rules visibly aligned without changing the intentional constant-folding distinction. | `SharpProof.Effects/StringConcatenationEffectResolver.cs:30-37,47-88,90-118` |
+| R499 | **`RoslynOperationLowerer.DefaultVisit` and `VisitFieldReference` duplicate the unsupported-value fallback classification.** Both test whether a constant has a non-built-in value type and select `FrontendAbstention.UnsupportedType` versus `UnsupportedOperationKind`; `VisitFieldReference` reaches this exact fallback after its catalog-integer special case. A shared fallback helper can preserve `DefaultVisit`'s additional `TypeKind.Error` classification and the field-specific constant admission while removing the repeated value-type branch. | `SharpProof.Frontend/RoslynOperationLowerer.cs:518-532,546-563` |
+| R500 | **`CorpusGate.RunAsync` computes supported-Unknown cases twice.** It builds `casesById` and counts observations whose case is supported and whose verdict is `Unknown` or `SilentUnknown` at lines 192-205, then `ValidateSupportedOutcomes` rebuilds the same dictionary and evaluates the same predicate at lines 254-272. The first count is needed for the result metrics and the second only to format a failure; a shared private counter or an overload accepting the precomputed count can keep the public validation helper while removing duplicate dictionary construction and filtering. | `SharpProof.Gates/Corpus/CorpusGate.cs:192-205,254-272` |
+| R501 | **`SharpProofAnalyzerEngine` resolves the same three closed-contract attribute symbols inside every source-reference iteration.** `GetClosedContractAttributes(compilation)` depends only on the outer compilation, but `MayContainExternalClosedPreconditions` calls it inside the `CompilationReference` loop after the source compilation check and immediately uses the result for assembly/module namespace scans. Moving the lookup once before the loop preserves the fail-closed branches and recursive checks while avoiding three metadata-name queries per source reference. | `SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs:336-398,457-470` |
+| R502 | **`EffectContractDiagnostics.ValidateArguments` repeats attribute selection and argument decoding that `Evaluate` performs immediately afterward in the analyzer pipeline.** Both retrieve `ContractSelectionInventory.GetCallableAttributes(method)`, select `AllowedCapabilities` and `AllowedExceptions`, and call `DecodeCapabilities` plus `DecodeAllowedExceptions`; `AnalyzerFeaturePipeline` invokes `ValidateArguments` before `Analyze`, whose `Evaluate` path repeats the work. A per-method validation snapshot or a shared decoded-arguments result can let diagnostics and evaluation consume one selection/decode pass, while keeping `ValidateArguments`' effect-contract-only invalid-attribute reporting and `Evaluate`' semantic summary logic distinct. | `SharpProof.Analyzer.Core/EffectContractDiagnostics.cs:5-33,35-95`; `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:97-99,159-165,365-369,427-434` |
+
+### Status (part sixty-three)
+
+R498-R502 are `pending`. No implementation files were changed; these are
+review-only candidates, and the suggested sharing must retain fail-closed behavior
+and the analyzer's distinct diagnostic and semantic-evaluation responsibilities.
+
+
+## Second survey, part sixty-three-b: R503 - .gitignore negation rules
+
+Rejected R155 declined to trim generic `.gitignore` boilerplate, and that
+reasoning stands for the file's 203 ordinary patterns. Negations are a different
+case: they exist only to counteract an earlier rule, they are order-dependent, and
+a wrong one silently hides a file. There are five, and they were tested
+individually with `git check-ignore`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R503 | Of the five negation rules in `.gitignore`, **one is redundant and three are inert**. `!eng/release/` (line 20) is genuinely load-bearing: `[Rr]elease/` on line 18 would otherwise ignore all six tracked files under `eng/release/`. But `!eng/release/third-party-components.json` on line 21 adds nothing - `git check-ignore` confirms a hypothetical new file in that directory is already un-ignored by line 20 alone, and the other five files there are tracked without any negation of their own. The remaining three - `!.axoCover/settings.json` (line 123), `!**/[Pp]ackages/build/` (line 171), and `!?*.[Cc]ache/` (line 195) - match **zero tracked files** and are stock Visual Studio template negations for tooling this repository does not use. Unlike the ordinary patterns R155 declined to touch, these four are not merely unused: a negation that references a path no longer in the repository is actively misleading, because a reader reasonably infers that something under it is meant to be tracked. | `.gitignore:18-21,123,171,195`; `git check-ignore -v eng/release/newfile.json` |
+
+### Checked and not proposed (part sixty-three-b)
+
+- **No tracked file is matched by an ignore pattern.** Running every one of the
+  956 tracked paths through `git check-ignore --no-index` returns zero hits, so
+  there is no file that is tracked-but-ignored - the state that produces the
+  "why won't git see my change" class of confusion. The ignore file and the index
+  agree completely.
+- `!eng/release/` is correct and must stay. It is the only negation doing work,
+  and removing it would silently drop six release-authority files -
+  `environment-contract.json`, `first-party-assemblies.json`,
+  `package-dependency-contract.json`, `third-party-components.json`, and two
+  markdown documents - from version control.
+- The 203 non-negation patterns remain the R155 case: generic, unused in large
+  part, but harmless and not worth churning. This item is deliberately scoped to
+  the five negations only.
+
+### Status (part sixty-three-b)
+
+R503 is `pending` and is four lines. It is filed despite its size because
+negation rules are the part of an ignore file where being wrong is silent, and
+three of these four point at paths that do not exist in the repository.
