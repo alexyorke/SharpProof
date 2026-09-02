@@ -161,6 +161,7 @@ the smallest relevant containerized test target passes.
 | R338 | Centralize the shared RS2002/RS2003 analyzer suppression policy | CompilerCollector build passed with central policy |
 | R276 | Reuse exact duplicate raw-string fixtures across Worker and analyzer tests | Worker CompilerManifestArtifactTests: 91; WorkerTests: 148; GeneratedContractForAnalyzerTests: 22 passed |
 | R588 | Collapse the unreachable opaque receiver branch while preserving its exception contract | `SharpProof.Ir.Test`: ArgumentNullGuardBoundaryTests, 3 passed |
+| R589 | Share IR program condition evaluation and boolean validation | `SharpProof.Ir.Test`: IrProgramTests, 22 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3857,7 +3858,10 @@ passed (3 tests).
 
 ### Status (part one hundred thirty)
 
-R589 is a pending IR interpreter reduction candidate. Keep instruction-specific status and step/instruction reporting at the call sites; centralize only evaluation, failure propagation, and boolean validation.
+R589 is `applied`: assumptions, assertions, and branches now share one
+condition-evaluation helper, while instruction-specific statuses, step counts,
+and control transfer remain at their call sites. `IrProgramTests` passed (22
+tests).
 
 ## Second survey, part one hundred thirty-one: R590 - duplicate sequence-type lookup
 

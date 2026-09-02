@@ -71,15 +71,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
                         var testedCondition = instruction is IrAssumeInstruction assume
                             ? assume.Condition
                             : ((IrAssertInstruction)instruction).Condition;
-                        var tested = _terms.Evaluate(testedCondition, values, cancellationToken);
+                        var tested = EvaluateCondition(
+                            testedCondition,
+                            values,
+                            cancellationToken);
                         if (tested.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(tested, instruction, values, steps);
-                        }
-
-                        if (tested.Value!.Kind != IrValueKind.Boolean)
-                        {
-                            return InvalidCondition(instruction, values, steps);
                         }
 
                         if (!tested.Value!.Boolean)
@@ -91,15 +89,13 @@ public sealed class IrProgramInterpreter(IrFactory factory)
 
                         break;
                     case IrBranchInstruction branch:
-                        var condition = _terms.Evaluate(branch.Condition, values, cancellationToken);
+                        var condition = EvaluateCondition(
+                            branch.Condition,
+                            values,
+                            cancellationToken);
                         if (condition.Status != IrEvaluationStatus.Value)
                         {
                             return FromEvaluation(condition, branch, values, steps);
-                        }
-
-                        if (condition.Value!.Kind != IrValueKind.Boolean)
-                        {
-                            return InvalidCondition(branch, values, steps);
                         }
 
                         current = condition.Value!.Boolean ? branch.WhenTrue : branch.WhenFalse;
@@ -250,18 +246,22 @@ public sealed class IrProgramInterpreter(IrFactory factory)
             values.ToImmutable(), steps);
     }
 
-    private static IrProgramExecutionResult InvalidCondition(
-        IrInstruction instruction,
-        ImmutableDictionary<IrVarId, IrValue>.Builder values,
-        int steps)
+    private IrEvaluationResult EvaluateCondition(
+        IrTerm condition,
+        IReadOnlyDictionary<IrVarId, IrValue> values,
+        CancellationToken cancellationToken)
     {
-        return FromEvaluation(
-            IrEvaluationResult.FromUnsupported(
+        var result = _terms.Evaluate(condition, values, cancellationToken);
+        if (result.Status != IrEvaluationStatus.Value)
+        {
+            return result;
+        }
+
+        return result.Value!.Kind == IrValueKind.Boolean
+            ? result
+            : IrEvaluationResult.FromUnsupported(
                 IrUnsupportedReason.InvalidVariableValue,
-                "Program conditions require boolean values."),
-            instruction,
-            values,
-            steps);
+                "Program conditions require boolean values.");
     }
 
     private static IrProgramExecutionResult Unsupported(IrInstruction instruction,
