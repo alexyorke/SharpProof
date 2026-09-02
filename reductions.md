@@ -5989,3 +5989,23 @@ implementation or build file was changed.
 
 R788 is `pending` and limited to container-execution parallelism wrappers. No
 implementation or build file was changed.
+
+## Second survey, part three hundred: R789 - duplicated offline framework package allowlist
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R789 | **`Test-SharpProofPackageConsumers` declares the offline framework package set twice.** `New-FrameworkPackageSource` copies six package IDs and versions into `framework-packages`, including the two `Microsoft.NETFramework.ReferenceAssemblies*` packages and the toolchain-selected `Microsoft.NETCore.App.Ref`/`Microsoft.AspNetCore.App.Ref` versions. `Test-SharpProofFrameworkConsumers` then writes a separate `NuGet.Config` whose `FrameworkOffline` source mapping lists five package patterns, with a wildcard standing in for the two reference-assembly IDs. The two lists agree today, but adding or renaming an offline framework package requires editing both; a copy-only update can leave restore unable to map the package to the offline source, while a mapping-only update permits a package that was never copied. Deriving the mapping from the copied package descriptors, or validating that every copied ID matches exactly one explicit mapping pattern and that no mapping is orphaned, can retain the deliberate wildcard while removing the unguarded second authority. | `scripts/Test-SharpProofPackageConsumers.ps1:143-149,335-353` |
+
+### Checked and not proposed (part three hundred)
+
+- The wildcard for `Microsoft.NETFramework.ReferenceAssemblies*` is a
+  deliberate compact mapping of two package IDs, not an assertion that the
+  six copied packages must have six literal mapping rows.
+- The package-source isolation, framework matrix, and SharpProof package
+  mapping remain separate policies; only the copied-package-to-source mapping
+  correspondence is in scope.
+
+### Status (part three hundred)
+
+R789 is `pending` and limited to offline framework package consumer setup. No
+implementation or build file was changed.
