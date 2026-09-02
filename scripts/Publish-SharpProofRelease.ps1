@@ -250,6 +250,8 @@ function Get-ValidatedRelease {
         -Owner 'Publication release bundle'
     $seenFileNames = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::OrdinalIgnoreCase)
+    $artifactPaths = [Collections.Generic.Dictionary[string, string]]::new(
+        [StringComparer]::Ordinal)
     foreach ($artifact in $artifacts) {
         $fileName = [string](Get-RequiredProperty `
             $artifact `
@@ -278,6 +280,7 @@ function Get-ValidatedRelease {
         if ([int64]$file.Length -ne $bytes) {
             throw "Release artifact does not match its manifest: '$fileName'."
         }
+        $artifactPaths.Add($fileName, $path)
     }
 
     $packageArtifacts = @(
@@ -334,12 +337,8 @@ function Get-ValidatedRelease {
                 [StringComparison]::OrdinalIgnoreCase)) {
             throw "Release package extensions are invalid for '$packageId'."
         }
-        $mainPath = Get-ArtifactPath `
-            -Directory $Directory `
-            -FileName ([string]$main[0].fileName)
-        $symbolsPath = Get-ArtifactPath `
-            -Directory $Directory `
-            -FileName ([string]$symbols[0].fileName)
+        $mainPath = $artifactPaths[[string]$main[0].fileName]
+        $symbolsPath = $artifactPaths[[string]$symbols[0].fileName]
         $mainIdentity = Get-SharpProofPackageIdentity `
             -Path $mainPath -RequireRepository
         $symbolsIdentity = Get-SharpProofPackageIdentity `

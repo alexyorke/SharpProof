@@ -4233,14 +4233,6 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disposal resolver intentionally use different roots and reachability/unwinding rules. A shared walk could alter direct-witness recording, constructor entry selection, disposal order, or fail-closed effect joins; keep the independent passes until reusable per-operation facts can be proven equivalent.
 
-## Second survey, part two hundred eight: R669 - repeated release artifact path resolution
-
-| R669 | **`Publish-SharpProofRelease.Get-ValidatedRelease` resolves each package artifact path twice.** The first artifact loop calls `Get-ArtifactPath` for all six package/symbol files to check existence and manifest byte counts; the later package loop calls `Get-ArtifactPath` again for each package's main and symbol file before parsing identities and validating payloads. The first pass can retain a case-sensitive filename-to-path/size record and the second pass can consume it, preserving the path-safety, existence, and byte checks while removing repeated full-path construction and artifact lookup. | `scripts/Publish-SharpProofRelease.ps1:241-281,306-346` |
-
-### Status (part two hundred eight)
-
-R669 is a pending release-validation preparation reduction. Preserve filename safety, manifest byte matching, package/symbol pairing, and all package payload checks; share only the already-validated artifact path records.
-
 ## Second survey, part two hundred nine: R670-R671 - repeated package-test discovery
 
 | R670 | **`Invoke-SharpProofPackageTests.ps1.Get-TestMethodTimings` reparses every TRX file once per class.** The script calls the helper separately for `WorkerMsBuildIntegrationTests` and `PackageLayoutSmokeTests`; each invocation rereads every result file, recreates the XML namespace manager, rebuilds test-definition maps, and scans all results. A single parse can project timings for both class names (or return a class-keyed map), preserving method-name extraction, duration aggregation, and sorting while removing a full XML pass. | `scripts/Invoke-SharpProofPackageTests.ps1:108-167,709-715` |
@@ -4283,3 +4275,9 @@ R675 is a pending build-orchestration reduction candidate. Preserve `ValidateSet
 ### Status (part two hundred thirteen)
 
 R676-R677 are pending acceptance-preparation reductions. Preserve path containment and leaf checks, production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only validated paths and inventory data.
+
+### Status (part two hundred fourteen)
+
+| R678 | **`RunVerifier.ConvertTestOutputAsync` scans completed output twice for supervisor records.** After awaiting the same captured stdout, it calls `HasSupervisorProtocolRecord` once for the Armed message and once for the Cleanup message; each helper splits and scans the full text while matching the same nonce. One authenticated-record pass can return both flags, preserving nonce validation and the separate bounded streaming path used elsewhere. | `SharpProof.BuildTasks/RunVerifier.cs:647-665` |
+
+R678 is a pending output-parsing reduction candidate. Preserve exact nonce matching, both supervisor-state flags, and the existing streaming/bounded-output behavior.
