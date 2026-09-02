@@ -6528,6 +6528,30 @@ R810 is `deferred`: the repeated clause walk is target-invariant and can be
 ### Status (part three hundred twenty-two)
 
 R811 is `deferred`: the collections are normally small, and a fused result
-  object would add more setup to an already policy-heavy preparation method.
+object would add more setup to an already policy-heavy preparation method.
   It remains a clear cleanup if lowerer allocation or contract-heavy methods
   make the repeated passes measurable.
+
+## Second survey, part three hundred twenty-three: R812 - recounting already-indexed lowered calls
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R812 | **`CompilerCallableLowerer.PrepareBody` recounts call instructions from the completed IR after already visiting every selected call.** `RoslynProgramLowerer` records each emitted `IrCallInstruction` in `selected.Calls`; the lowerer then iterates that dictionary to classify every call as a prepared specification or summary call. Its final completeness guard walks every block and instruction in `lowering.Program` again, counting `IrCallInstruction` values only to compare that number with `specCalls.Count + summaryCalls.Count`. Comparing the classified count with the already-indexed `selected.Calls.Count` (or retaining a counter alongside the classification loop) removes the second whole-program traversal while preserving the guard that every lowered call received a supported preparation. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs:174-213`; `SharpProof.Frontend/RoslynProgramLowerer.cs:77,114,404-409,791-795` |
+
+### Checked and not proposed (part three hundred twenty-three)
+
+- The classification loop remains necessary because specification and summary
+  calls have different admission and evidence projections.
+- The `selected.Calls` dictionary is the lowerer's source of call bindings and
+  is populated at each call emission; the proposed comparison does not remove
+  the IR program or its call instructions.
+- Program validation and acyclic-body checks remain independent gates; this
+  finding targets only the final call-count recount.
+
+### Status (part three hundred twenty-three)
+
+R812 is `deferred`: the call set is already materialized and the replacement
+  comparison is mechanically simple, but the existing final IR walk is a clear
+  completeness assertion at a trust boundary. It should be changed only after
+  confirming that `selected.Calls` and emitted program calls have the same
+  intended scope.
