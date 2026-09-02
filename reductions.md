@@ -5275,8 +5275,10 @@ self-application lane that no automated pipeline runs should be wired into one.
 
 ### Status (part two hundred sixty-seven)
 
-R753 is `pending` and is limited to analyzer test infrastructure; no implementation
-code was changed while recording it.
+R753 is `partially applied`: the two string-keyed analyzer suites now share one
+recording session factory with optional outcome counts and session capture.
+The overload-sensitive `MethodIdentity` recorder and minimal create-count
+recorder remain local because their key and lifecycle contracts differ.
 
 ## Second survey, part two hundred sixty-eight: R754 - repeated constructed-generic test fixture
 
@@ -5296,8 +5298,9 @@ code was changed while recording it.
 
 ### Status (part two hundred sixty-eight)
 
-R754 is `pending` and is limited to test-fixture setup; no implementation code was
-changed while recording it.
+R754 is `complete`: the binding and clause-inventory cache tests share one
+constructed-generic compilation, target selection, and binder fixture while
+retaining separate entry-point and assertion coverage.
 
 ## Second survey, part two hundred seventy: R756 - local Worker temporary-directory wrapper
 
@@ -5524,8 +5527,9 @@ or build file was changed.
 
 ### Status (part two hundred seventy-six)
 
-R762 is `pending` and is limited to contracts test fixture setup. No
-implementation or build file was changed.
+R762 is `complete`: both foreign-callable tests share the owner/foreign
+compilation fixture while retaining separate symbol, body, operation, and
+builder-overload assertions.
 
 ## Second survey, part two hundred seventy-seven: R763 - duplicated qualification-test process setup
 
@@ -5544,8 +5548,9 @@ implementation or build file was changed.
 
 ### Status (part two hundred seventy-seven)
 
-R763 is `pending` and is limited to release-qualification test plumbing. No
-implementation or build file was changed.
+R763 is `complete`: release-qualification commands share one process runner
+that drains both streams, while success and expected-failure wrappers retain
+their distinct result contracts.
 
 ## Second survey, part two hundred seventy-eight: R764 - repeated effect-capability projection
 
@@ -5582,8 +5587,9 @@ unknown capabilities still produce the existing empty/unknown behavior.
 
 ### Status (part two hundred seventy-nine)
 
-R765 is `pending` and is limited to atomic-file test fixture plumbing. No implementation
-or build file was changed.
+R765 is `complete`: synchronous and asynchronous atomic-file tests share the
+replacement/long-name fixture harness and publication invariant while each
+implementation remains directly invoked.
 
 ## Second survey, part two hundred eighty: R766 - repeated unsupported-string SMT fixture
 
@@ -5871,8 +5877,8 @@ production complexity ratchet (members 5811/5808), unrelated to this helper.
 
 ### Status (part two hundred ninety-three)
 
-R782 is `pending` and limited to Testing.Test fixture plumbing. No implementation
-or build file was changed.
+R782 is `complete`: interpreter and differential object-unboxing tests share
+one six-case fixture while retaining their separate semantic assertions.
 
 ## Second survey, part two hundred ninety-four: R783 - duplicated portable PDB reader setup
 
@@ -5928,8 +5934,8 @@ No implementation or build file was changed.
 
 ### Status (part two hundred ninety-six)
 
-R785 is `pending` and limited to Package.Test archive/nuspec fixture plumbing.
-No implementation or build file was changed.
+R785 is `complete`: package-feed and package-layout tests share one archive/
+nuspec reader while retaining distinct identity and repository projections.
 
 ## Second survey, part two hundred ninety-seven: R786 - duplicated publication job plumbing
 
@@ -5967,8 +5973,9 @@ implementation or build file was changed.
 
 ### Status (part two hundred ninety-eight)
 
-R787 is `pending` and limited to the Gates CLI dispatch plumbing. No
-implementation or build file was changed.
+R787 is `complete`: named corpus/performance gate execution and pass-state
+projection share one dispatcher while combined and standalone JSON envelopes
+remain distinct.
 
 ## Second survey, part two hundred ninety-nine: R788 - repeated parallelism policy wrappers
 
@@ -5987,8 +5994,9 @@ implementation or build file was changed.
 
 ### Status (part two hundred ninety-nine)
 
-R788 is `pending` and limited to container-execution parallelism wrappers. No
-implementation or build file was changed.
+R788 is `complete`: the four public parallelism wrappers now use one explicit
+policy table and dispatcher, preserving override precedence, contract fields,
+and caller-specific validation messages.
 
 ## Second survey, part three hundred: R789 - duplicated offline framework package allowlist
 
