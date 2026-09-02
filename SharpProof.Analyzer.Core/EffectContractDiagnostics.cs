@@ -140,13 +140,55 @@ internal static class EffectContractDiagnostics
         var declaredComplete = entrySummaryReachable && projection.IsComplete &&
             contract.Kind is not (EffectContractResolutionKind.Incomplete or EffectContractResolutionKind.Missing);
         var incompleteReason = MapIncompleteReason(summary);
+        EffectDirectWitness? purityViolation = null;
+        EffectDirectWitness? allocationViolation = null;
+        EffectDirectWitness? capabilityViolation = null;
+        EffectDirectWitness? noThrowViolation = null;
+        EffectDirectWitness? exceptionViolation = null;
+        EffectDirectWitness? declaredViolation = null;
+        var declaredViolationApplicable = declaredValid && contract.Kind is not (
+            EffectContractResolutionKind.Incomplete or EffectContractResolutionKind.Missing);
+        foreach (var witness in direct)
+        {
+            if (purityViolation == null &&
+                EffectContractMappings.IsPurityViolation(witness))
+            {
+                purityViolation = witness;
+            }
+            if (allocationViolation == null &&
+                (witness.Effects & EffectContractKind.Allocates) != 0)
+            {
+                allocationViolation = witness;
+            }
+            if (capabilityViolation == null &&
+                (witness.Capabilities & ~capabilities.Value) != 0)
+            {
+                capabilityViolation = witness;
+            }
+            if (noThrowViolation == null &&
+                (witness.Effects & EffectContractKind.Throws) != 0)
+            {
+                noThrowViolation = witness;
+            }
+            if (exceptionViolation == null &&
+                witness.ExceptionType != null &&
+                !IsAllowed(witness.ExceptionType, exceptions.Types))
+            {
+                exceptionViolation = witness;
+            }
+            if (declaredViolationApplicable && declaredViolation == null &&
+                EffectContractMappings.Violates(witness, contract.Summary))
+            {
+                declaredViolation = witness;
+            }
+        }
 
         var evaluations = ImmutableArray.CreateBuilder<EffectClaimEvaluation>(6);
         Add(pure, EffectEvaluationContractKind.EnforcePure, purityComplete,
             EffectContractMappings.IsObservablePure(summary),
             GeneratedDiagnosticDescriptors.PurityNotVerifiedRule, [method.Name],
             "constraint=observable-pure",
-            direct.FirstOrDefault(EffectContractMappings.IsPurityViolation), EffectClaimConstraint.Empty);
+            purityViolation, EffectClaimConstraint.Empty);
         Add(zeroAllocations, EffectEvaluationContractKind.ZeroAllocations, allocationComplete,
             summary.Allocation == EffectAllocationKind.None,
             GeneratedDiagnosticDescriptors.ZeroAllocationsNotVerifiedRule,
@@ -154,8 +196,7 @@ internal static class EffectContractDiagnostics
                 ? "may-effect summary includes allocation: " + summary.Allocation
                 : FormatUnknown(summary, "AllocationUnknown")],
             "constraint=allocation:none",
-            direct.FirstOrDefault(static witness =>
-                (witness.Effects & EffectContractKind.Allocates) != 0),
+            allocationViolation,
             EffectClaimConstraint.Empty);
         Add(allowedCapabilities, EffectEvaluationContractKind.AllowedCapabilities, capabilityComplete,
             disallowedCapabilities == EffectContractCapabilityKind.None,
@@ -164,7 +205,7 @@ internal static class EffectContractDiagnostics
                 ? "may-effect summary includes disallowed capabilities: " + disallowedCapabilities
                 : FormatUnknown(summary, "CapabilitySetUnknown")],
             "allowed.capabilities=" + EffectContractMappings.EvidenceName(capabilities.Value),
-            direct.FirstOrDefault(witness => (witness.Capabilities & ~capabilities.Value) != 0),
+            capabilityViolation,
             new EffectClaimConstraint(EffectContractKind.None, capabilities.Value, []),
             capabilities.IsValid);
         Add(noThrow, EffectEvaluationContractKind.DoesNotThrow, exceptionComplete, summary.Throws.IsEmpty,
@@ -174,7 +215,7 @@ internal static class EffectContractDiagnostics
                   FormatDiagnosticTypes(summary.Throws.Types)
                 : FormatUnknown(summary, "ExceptionSetUnknown")],
             "allowed.exceptions=[]",
-            direct.FirstOrDefault(static witness => (witness.Effects & EffectContractKind.Throws) != 0),
+            noThrowViolation,
             EffectClaimConstraint.Empty);
         Add(allowedExceptions, EffectEvaluationContractKind.AllowedExceptions, exceptionComplete,
             disallowedExceptions.IsDefaultOrEmpty,
@@ -184,8 +225,7 @@ internal static class EffectContractDiagnostics
                   FormatDiagnosticTypes(disallowedExceptions)
                 : FormatUnknown(summary, "ExceptionSetUnknown")],
             "allowed.exceptions=[" + FormatTypes(exceptions.Types) + "]",
-            direct.FirstOrDefault(witness =>
-                witness.ExceptionType != null && !IsAllowed(witness.ExceptionType, exceptions.Types)),
+            exceptionViolation,
             new EffectClaimConstraint(
                 EffectContractKind.None, EffectContractCapabilityKind.None, exceptions.Types),
             exceptions.IsValid);
@@ -206,11 +246,7 @@ internal static class EffectContractDiagnostics
                       EffectContractMappings.EvidenceName(summary.AnalysisIncompleteReason)
                     : "EffectContractDoesNotCoverBodySummary"],
             summaryEvidence + ";declared=" + CreateSummaryEvidence(contract.Summary),
-            declaredValid && contract.Kind is not (
-                EffectContractResolutionKind.Incomplete or EffectContractResolutionKind.Missing)
-                ? direct.FirstOrDefault(witness =>
-                    EffectContractMappings.Violates(witness, contract.Summary))
-                : null,
+            declaredViolationApplicable ? declaredViolation : null,
             new EffectClaimConstraint(declaredProjection.Effects, declaredProjection.Capabilities,
                 contract.Summary.Throws.Types),
             declaredValid,
