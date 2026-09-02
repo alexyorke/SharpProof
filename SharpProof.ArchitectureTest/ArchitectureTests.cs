@@ -736,6 +736,12 @@ public sealed class ArchitectureTests
                     .Descendants("PropertyGroup")
                     .Elements()
                     .Select(static element => element.Name.LocalName)
+                    .Concat(XDocument.Parse(text)
+                        .Descendants("CompilerVisibleProperty")
+                        .Select(static element =>
+                            element.Attribute("Include")?.Value)
+                        .Where(static value => value != null)
+                        .Select(static value => value!))
                     .Concat(Regex.Matches(
                             text,
                             @"\$\((SharpProof[A-Za-z0-9_]+)\)",
@@ -795,7 +801,8 @@ public sealed class ArchitectureTests
                 Assert.That(
                     combinedBuildSurface,
                     Does.Contain("$(" + property + ")")
-                        .Or.Contain("<" + property),
+                        .Or.Contain("<" + property)
+                        .Or.Contain("Include=\"" + property + "\""),
                     property);
             }
             foreach (var property in retired)
