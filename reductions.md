@@ -184,7 +184,6 @@ the smallest relevant containerized test target passes.
 | R456 | Let the SDK derive `PackageVersion` from the authoritative `Version` property | `SharpProof.ArchitectureTest`: release/package tests 73 passed |
 | R460 | Combine equivalent unconstrained interval-format switch arms | `SharpProof.Dataflow.Test`: 50 passed |
 | R464 | Share assembly-metadata value extraction between contract identity readers | `SharpProof.Frontend.Test`: 121 passed |
-| R465 | Share descriptor-name lookup between contract methods and attributes | `SharpProof.Frontend.Test`: 121 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -237,6 +236,7 @@ status document.
 | R128 | Refuted against the current tree: `SharpProof.Frontend.csproj` invokes `Get-SharpProofModuleVersionId.ps1`. |
 | R223 | Refuted against the current tree: `ConfirmAncestorIdentity` is called after publication locks are acquired and protects a live TOCTOU boundary. |
 | R197 | Rejected after implementation and Contracts testing: the pairwise matcher adds 13 formatted lines and cannot safely index the two-argument predicate site. |
+| R465 | Rejected after implementation and Frontend testing: the generic descriptor helper adds four lines and delegate indirection to two small type-specific loops, so it is not a net reduction. |
 | R213 | Rejected after implementation: the helper adds eight lines and an argument-array allocation on the summary path. |
 | R215 | Rejected after implementation and 695 Worker tests: the helper adds three formatted lines. |
 | R216 | Rejected after implementation: the all-unknown helper adds ten formatted lines. |
@@ -2234,9 +2234,9 @@ This pass inspected contract-API identity, descriptor lookup, binding, and compi
 
 R466-R467 are `pending` review-only reduction candidates. R464 is applied: both
 contract identity readers now share one ordinal metadata-value query, while the
-SHA-256 and MVID decoding rules remain independent. R465 is applied: both
-descriptor collections use one ordinal generic lookup protocol while retaining
-their distinct selectors and output types.
+SHA-256 and MVID decoding rules remain independent. R465 is rejected: a generic
+descriptor helper adds lines and delegate indirection to two already-small,
+type-specific loops, so it is not a net reduction.
 
 
 ## Second survey, part forty-nine: verifying the ledger's own Applied table
