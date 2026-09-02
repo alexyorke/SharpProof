@@ -317,7 +317,7 @@ internal static class CompilationFingerprint
         !value.EffectivePreprocessorSymbols.Contains(
             RuntimeContractEvaluationSymbol,
             StringComparer.Ordinal) &&
-        CompilerCaptureAuthority.IsCanonicalEmptyTree(value) &&
+        CompilerCaptureAuthority.HasValidEmptyTreeRepresentation(value) &&
         All(value.Features, ValidFeature) &&
             IsOrdered(value.Features, static feature => feature.Key, unique: true);
     }

@@ -142,7 +142,7 @@ internal static class CompilerCaptureAuthority
         }
     }
 
-    internal static bool IsCanonicalEmptyTree(
+    internal static bool HasValidEmptyTreeRepresentation(
         CompilerSyntaxTreeSnapshot value)
     {
         return value.TextLength != 0 ||
