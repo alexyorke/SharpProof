@@ -188,6 +188,7 @@ the smallest relevant containerized test target passes.
 | R625 | Hash already-normalized corpus text without a second line-ending scan | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R623 | Share corpus observation collection between gate execution and snapshot rendering | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R869 | Validate IR sequence elements while taking the immutable snapshot | `SharpProof.Ir.Test`: 114 passed |
+| R870 | Remove the redundant IR location type-table lookup | `SharpProof.Ir.Test`: 114 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7892,8 +7893,10 @@ passed (114).
 
 ### Status (part three hundred eighty)
 
-R870 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R870 is `applied`: member and sequence location validation now rely on their
+branch-specific type comparisons after the shared location-kind check, removing
+one redundant factory lookup while preserving foreign-ID rejection. The full
+IR test project passed (114).
 
 ## Second survey, part three hundred eighty-one: R871 - repeated builder location validation
 

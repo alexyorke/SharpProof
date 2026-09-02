@@ -272,7 +272,6 @@ public sealed class IrProgramBuilder(IrFactory factory)
     {
         ArgumentNullGuard.NotNull(location, nameof(location));
 
-        _factory.GetTypeInfo(location.Type);
         switch (location)
         {
             case IrMemberLocation member:
