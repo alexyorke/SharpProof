@@ -38,7 +38,6 @@ function Invoke-Docker([string[]]$Arguments) {
 }
 
 function Build-ToolingImage {
-    Invoke-Docker @('compose', 'version', '--short')
     Invoke-Docker @('compose', 'build', 'tooling')
 }
 

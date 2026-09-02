@@ -199,6 +199,7 @@ the smallest relevant containerized test target passes.
 | R503 | Remove redundant and inert `.gitignore` negation rules | `git check-ignore`: 4 probes and 940 tracked paths passed |
 | R555 | Remove the unread release-authority path local | `SharpProof.ArchitectureTest`: ReleaseConfigurationScript 1 passed |
 | R556 | Remove the misleading release-configuration set-membership forwarder | `SharpProof.ArchitectureTest`: ReleaseConfigurationScript 1 passed |
+| R570 | Remove the unused Docker Compose version probe from the build entry point | `SharpProof.ArchitectureTest`: LocalProfilesMatchTheWorkflowCommands 1 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3567,7 +3568,8 @@ R569 is a pending small reduction candidate. It affects only the acceptance evid
 
 ### Status (part one hundred eleven)
 
-R570 is a pending small reduction candidate. Preserve the checked-command wrapper and the tooling-image build; only remove the unused version probe or make its diagnostic purpose explicit.
+R570 is applied: `build.ps1` now invokes the checked tooling-image build directly;
+the discarded Compose version probe and its extra failure point are gone.
 
 ## Second survey, part one hundred twelve: R571 - repeated collectible runtime fixture
 
