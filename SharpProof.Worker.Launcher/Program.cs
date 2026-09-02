@@ -503,7 +503,6 @@ internal static class Program
             return false;
         }
 
-        var total = assumptions.User + assumptions.Trusted;
         ReportDiagnostic(response.Manifest.Callables[0].Location,
             LauncherPresentation.Level(policy, "info"),
             VerifierDiagnosticCodes.AssumptionsDeclared,

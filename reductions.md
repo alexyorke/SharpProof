@@ -143,6 +143,7 @@ the smallest relevant containerized test target passes.
 | R825 | Rename the empty-tree validation predicate to describe its non-empty fast path and zero-length representation check | `SharpProof.Worker.Test`: CompilerManifestArtifactTests passed |
 | R826 | Share scoped identifier hash mixing between IR and specification identifiers | `SharpProof.Ir.Test`: 114; `SharpProof.Specs.Test`: identifier and API-spec suites passed |
 | R827 | Remove the internal callable-replay overload that re-filters clauses; pass prepared ensures lists from test fixtures | `SharpProof.Worker.Test`: CallableCounterexampleReplayerTests 15; WorkerTcbEdgeCaseTests 44 |
+| R830 | Remove the unused launcher assumption total local | `SharpProof.Package.Test`: launcher argument and validation tests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6932,9 +6933,9 @@ R827 is `applied`: the internal compatibility overload was removed and tests
 
 ### Status (part three hundred thirty-nine)
 
-R828 is `deferred`: the duplicate boolean check has no measurable runtime cost,
-  but it obscures which part of the equality is authoritative in the final
-  pass/fail contract.
+R828 is `refuted`: when a full-size campaign lacks expanded frontend coverage,
+  the equality can be `false == false`; the separate `CoverageSatisfied`
+  conjunct intentionally rejects that state.
 
 ## Second survey, part three hundred forty: R829 - defensive exception-hierarchy deduplication
 
@@ -6977,9 +6978,8 @@ R829 is `deferred`: it is a small, potentially redundant defensive pass, but
 
 ### Status (part three hundred forty-one)
 
-R830 is `deferred`: it is a zero-risk dead-local removal, pending the next
-  launcher validation pass so the surrounding reporting path can be checked
-  together.
+R830 is `applied`: the unused assumption total was removed while preserving
+  the zero-assumption guard, diagnostic, and policy result.
 
 ## Second survey, part three hundred forty-two: R831 - bitwise boolean launcher flags
 
