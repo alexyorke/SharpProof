@@ -142,6 +142,7 @@ the smallest relevant containerized test target passes.
 | R824 | Share probe JSON array framing between raw-row and string-array serialization | `SharpProof.Package.Test`: CompilerProbeSnapshotTests (5), CompilerProbeInputConsistencyTests (1) passed |
 | R825 | Rename the empty-tree validation predicate to describe its non-empty fast path and zero-length representation check | `SharpProof.Worker.Test`: CompilerManifestArtifactTests passed |
 | R826 | Share scoped identifier hash mixing between IR and specification identifiers | `SharpProof.Ir.Test`: 114; `SharpProof.Specs.Test`: identifier and API-spec suites passed |
+| R827 | Remove the internal callable-replay overload that re-filters clauses; pass prepared ensures lists from test fixtures | `SharpProof.Worker.Test`: CallableCounterexampleReplayerTests 15; WorkerTcbEdgeCaseTests 44 |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6908,9 +6909,9 @@ scoped hash primitive while retaining their distinct value and display types.
 
 ### Status (part three hundred thirty-eight)
 
-R827 is `deferred`: the extra scan is bounded by one callable's clause list,
-  but an internal compatibility shim adds API surface and a second caller path
-  without serving production code.
+R827 is `applied`: the internal compatibility overload was removed and tests
+  now pass their prepared ensures lists through the production replay entry
+  point.
 
 ## Second survey, part three hundred thirty-nine: R828 - implied fuzz coverage conjunct
 

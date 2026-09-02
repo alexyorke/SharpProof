@@ -911,7 +911,8 @@ public sealed class WorkerTcbEdgeCaseTests
         var reason = CallableCounterexampleReplayer.Replay(
             target,
             0,
-            ImmutableDictionary<IrVarId, IrValue>.Empty);
+            ImmutableDictionary<IrVarId, IrValue>.Empty,
+            target.Clauses);
 
         Assert.That(
             reason,
