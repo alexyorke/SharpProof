@@ -190,6 +190,7 @@ the smallest relevant containerized test target passes.
 | R425 | Centralize the diagnostic descriptor assertion test link | `SharpProof.Analyzer.Test`: 476; `SharpProof.ContractForGenerator.Test`: 121; `SharpProof.Meta.Analyzers.Test`: 163 |
 | R414 | Fuse model-variable validation and Z3 symbol construction | `SharpProof.Smt.Test`: 30 passed |
 | R418 | Reuse encoded arithmetic operands across SMT binary operators | `SharpProof.Smt.Test`: 30 passed |
+| R431 | Resolve the corpus license fixture from the repository root helper | `SharpProof.Gates.Test`: corpus tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -2008,8 +2009,9 @@ differential oracles, and gate compilation hosts across `SharpProof.Architecture
 
 ### Status (part forty)
 
-R427-R432 are `pending`. R427, R428, and R429 eliminate massive test boilerplate and subprocess duplication.
-R430, R431, and R432 clean up gate hosts, fixture paths, and oracle diagnostics.
+R427-R430 and R432 remain `pending`; R431 now uses the canonical repository
+root helper for the license fixture. R427-R429 eliminate test boilerplate and
+subprocess duplication; R430 and R432 clean up gate hosts and oracle diagnostics.
 
 ## Second survey, part forty-one: R433-R439
 
@@ -3270,3 +3272,13 @@ dependency direction as part of the proposed design constraint.
 R544 is a `pending` reduction candidate. The shared helper should retain the
 current cancellation and mutable-environment cleanup semantics; it should not
 collapse the definedness and satisfiability predicates into one policy.
+
+## Second survey, part eighty-seven: R545 - analyzer test host plumbing
+
+| R545 | **`AnalyzerTestHost` duplicates analyzer execution setup and diagnostic ordering.** The `AnalyzeAsync` overload that accepts a dictionary plus additional files and the overload that accepts an `AnalyzerConfigOptionsProvider` each perform the same compilation-error guard, analyzer selection, `CompilationWithAnalyzersOptions` construction, analyzer execution, source-span/ID ordering, and immutable-array materialization. A private core helper taking the prepared `AnalyzerOptions` and cancellation token could centralize that harness plumbing while leaving the two public overloads responsible for their distinct option-provider inputs. | `SharpProof.Analyzer.Test/AnalyzerTestHost.cs:144-195` |
+
+### Status (part eighty-seven)
+
+R545 is a `pending` reduction candidate. Preserve the current default analyzer,
+concurrent-analysis, suppressed-diagnostic, exception, and cancellation
+semantics when consolidating the test-host helper.

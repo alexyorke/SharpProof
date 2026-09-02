@@ -16,9 +16,9 @@ public sealed class CorpusGateTests
     [Test]
     public void OssImporterRejectsMitLicenseWithAppendedRestrictions()
     {
+        var repositoryRoot = RepositoryLayout.FindRoot();
         var license = File.ReadAllText(Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            "..", "..", "..", "..", "SharpProof.Gates", "Corpus",
+            repositoryRoot, "SharpProof.Gates", "Corpus",
             "third-party", "aalhour-C-Sharp-Algorithms-LICENSE.txt"));
 
         Assert.Throws<InvalidDataException>((Action)(() =>
