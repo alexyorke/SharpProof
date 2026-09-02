@@ -4243,13 +4243,7 @@ R677 is a pending acceptance-preparation reduction. Preserve production-inventor
 
 | R690 | **`DefaultApiSpecCatalogGenerationTests` implements two recursive term describers.** `Describe(JsonElement)` and `Describe(SpecTermDeclaration)` walk the same variable, literal, unary, binary, conditional, and length tree shapes and emit the same canonical shape string; they differ only in extracting fields from JSON versus generated objects and in their unknown-kind exception type. A small normalized-term adapter or shared kind/child formatter can keep the source-versus-generated comparison while removing the second recursive walker. | `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:575-649` |
 
-R690 is a pending API-spec generation-test reduction candidate. Preserve JSON field validation, generated-object typing, recursive ordering, and the current distinction between invalid catalog data and impossible generated term kinds.
-
-### Status (part two hundred twenty-five)
-
-| R691 | **`IrRelationalSummaryTests` duplicates identity-summary construction.** `BuildIdentitySummary` and the local `CreateCallee` function in `DependencyProvenanceIdentityComponentsAreDeduplicatedStructurally` each create a body variable, one-block return program, identity-style summary signature, variable environment, and `IrRelationalSummaryBuilder.Build` call; the local version adds only a caller-supplied member name/provenance and success assertion. A parameterized identity-summary helper can serve both tests while preserving their distinct fixture names and provenance scenarios. | `SharpProof.Summaries.Test/IrRelationalSummaryTests.cs:1000-1070,1099-1117` |
-
-R691 is a pending summary-test fixture reduction candidate. Preserve factory ownership, body-to-parameter binding, return-operation identity, and the separate success/error assertions at each call site.
+R690 is deferred: the JSON and generated-object walkers intentionally have different field-extraction and unknown-kind exception contracts. A shared adapter would duplicate those switches or change validation behavior; keep the separate recursive paths until a normalized representation already exists.
 
 ### Status (part two hundred twenty-six)
 

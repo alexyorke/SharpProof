@@ -1025,25 +1025,15 @@ public sealed class IrRelationalSummaryTests
             var calleeBodyParameter = fixture.Factory.CreateVariable(
                 name + ":body-parameter",
                 fixture.Factory.IntegerType);
-            var calleeBuilder = new IrProgramBuilder(fixture.Factory);
-            var calleeEntry = calleeBuilder.CreateBlock(name + ":entry");
-            calleeBuilder.Return(
-                calleeEntry,
-                fixture.Factory.CreateOperation(name + ":return"),
-                fixture.Factory.Variable(calleeBodyParameter));
-            var calleeSignature = new IrSummarySignature(
+            var summary = BuildIdentitySummary(
+                fixture,
                 member,
-                receiver: null,
-                [parameter],
+                parameter,
                 result,
+                calleeBodyParameter,
+                name + ":entry",
+                name + ":return",
                 provenance);
-            var summary = IrRelationalSummaryBuilder.Build(
-                calleeBuilder.Build(),
-                calleeSignature,
-                new Dictionary<IrVarId, IrTerm>
-                {
-                    [calleeBodyParameter] = fixture.Factory.Variable(parameter)
-                });
             Assert.That(summary.IsSuccess, Is.True, summary.Reason.ToString());
             return (member, summary.Summary!);
         }
@@ -1102,19 +1092,45 @@ public sealed class IrRelationalSummaryTests
         var bodyParameter = fixture.Factory.CreateVariable(
             "identity:body-value",
             fixture.Factory.IntegerType);
+        return BuildIdentitySummary(
+            fixture,
+            fixture.Member,
+            fixture.Parameter,
+            fixture.Result,
+            bodyParameter,
+            "identity:entry",
+            "identity:return",
+            fixture.Signature.Provenance).Summary!;
+    }
+
+    private static IrRelationalSummaryBuildResult BuildIdentitySummary(
+        SummaryFixture fixture,
+        IrMemberId member,
+        IrVarId parameter,
+        IrVarId result,
+        IrVarId bodyParameter,
+        string entryName,
+        string returnOperationName,
+        IrSummaryProvenance provenance)
+    {
         var builder = new IrProgramBuilder(fixture.Factory);
-        var entry = builder.CreateBlock("identity:entry");
+        var entry = builder.CreateBlock(entryName);
         builder.Return(
             entry,
-            fixture.Factory.CreateOperation("identity:return"),
+            fixture.Factory.CreateOperation(returnOperationName),
             fixture.Factory.Variable(bodyParameter));
         return IrRelationalSummaryBuilder.Build(
             builder.Build(),
-            fixture.Signature,
+            new IrSummarySignature(
+                member,
+                receiver: null,
+                [parameter],
+                result,
+                provenance),
             new Dictionary<IrVarId, IrTerm>
             {
-                [bodyParameter] = fixture.Factory.Variable(fixture.Parameter)
-            }).Summary!;
+                [bodyParameter] = fixture.Factory.Variable(parameter)
+            });
     }
 
     private static IrSummaryProvenance Provenance(char digit)
