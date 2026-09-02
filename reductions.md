@@ -195,6 +195,7 @@ the smallest relevant containerized test target passes.
 | R522 | Cache response hash validity during protocol validation | `SharpProof.Worker.Test`: protocol tests passed |
 | R523 | Reuse the cache filename hexadecimal-digit predicate | `SharpProof.Worker.Test`: 695 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
+| R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3264,8 +3265,9 @@ handled after the primary projection.
 
 ### Status (part eighty-five)
 
-R541-R543 are `pending` reduction candidates. R542 deliberately calls for a
-policy seam rather than a blind merge, and R543 preserves the current project
+R542-R543 remain `pending`; R541 shares only the canonical snapshot-data
+invariant between parsing and rendering. R542 deliberately calls for a policy
+seam rather than a blind merge, and R543 preserves the current project
 dependency direction as part of the proposed design constraint.
 
 ## Second survey, part eighty-six: R544 - finite-domain enumeration

@@ -17,11 +17,7 @@ internal static class CorpusSnapshotFormat
     internal static string Render(IEnumerable<string> dataLines)
     {
         var lines = dataLines.ToArray();
-        if (lines.Any(static line => !IsCanonicalData(line)) ||
-            !IsCanonicalOrder(lines))
-        {
-            throw Invalid();
-        }
+        ValidateCanonicalData(lines);
         return string.Join("\n", Header.Concat(lines)) + "\n";
     }
 
@@ -71,12 +67,17 @@ internal static class CorpusSnapshotFormat
             }
         }
         var data = lines.Skip(Header.Length).ToArray();
-        if (data.Any(static line => !IsCanonicalData(line)) ||
-            !IsCanonicalOrder(data))
+        ValidateCanonicalData(data);
+        return data;
+    }
+
+    private static void ValidateCanonicalData(string[] lines)
+    {
+        if (lines.Any(static line => !IsCanonicalData(line)) ||
+            !IsCanonicalOrder(lines))
         {
             throw Invalid();
         }
-        return data;
     }
 
     private static bool IsCanonicalData(string? line)
