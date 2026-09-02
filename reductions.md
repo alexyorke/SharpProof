@@ -136,6 +136,7 @@ the smallest relevant containerized test target passes.
 | R817 | Reuse the container restore for the final package-consumer test invocation | `SharpProof.ArchitectureTest`: ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed, 1 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
+| R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
 | R327 | Remove 22 project-local `TreatWarningsAsErrors` declarations now supplied by the central production policy, retaining the two excluded-project declarations | `test-changed`: 2,846 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
@@ -1777,11 +1778,12 @@ PowerShell Roslyn parse options parsing, and legacy assembly references across
 
 ### Status (part thirty-one)
 
-R370 and R372 are `pending`. R368 is applied: verification tests now use the
+R372 is `pending`. R368 is applied: verification tests now use the
 cacheability type pattern directly after removing the unused wrapper. R369 is
 applied: Boolean-term validation now lives in the owning `IrFactory`, preserving
 the existing error and factory-scope checks while removing `FactoryGuards`. R370
-is a simple code cleanup; R372
+is applied: source metrics now delegate standard version parsing to Roslyn while
+retaining the existing blank/unsupported diagnostics. R372
 streamline script language parsing and relational summary signature models.
 
 ## Second survey, part thirty-two: R373-R374

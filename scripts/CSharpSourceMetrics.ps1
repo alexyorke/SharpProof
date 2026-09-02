@@ -221,38 +221,10 @@ function New-SharpProofCSharpParseOptions {
     if ([string]::IsNullOrWhiteSpace($normalizedLanguageVersion)) {
         throw 'The evaluated C# language version is blank.'
     }
-    $enumName = switch ($normalizedLanguageVersion.ToLowerInvariant()) {
-        'latest' { 'Latest'; break }
-        'preview' { 'Preview'; break }
-        'default' { 'Default'; break }
-        default {
-            if ($normalizedLanguageVersion -notmatch
-                '^(?<major>\d+)(?:\.(?<minor>\d+))?$') {
-                throw "Unsupported C# language version '$LanguageVersion'."
-            }
-            $major = [int]$Matches['major']
-            $minor = if ($Matches.ContainsKey('minor') -and
-                -not [string]::IsNullOrEmpty($Matches['minor'])) {
-                [int]$Matches['minor']
-            }
-            else {
-                0
-            }
-            if ($minor -eq 0) {
-                'CSharp' + $major
-            }
-            else {
-                'CSharp' + $major + '_' + $minor
-            }
-        }
-    }
-    try {
-        $version = [Enum]::Parse(
-            [Microsoft.CodeAnalysis.CSharp.LanguageVersion],
-            $enumName,
-            $true)
-    }
-    catch {
+    $version = [Microsoft.CodeAnalysis.CSharp.LanguageVersion]::Default
+    if (-not [Microsoft.CodeAnalysis.CSharp.LanguageVersionFacts]::TryParse(
+            $normalizedLanguageVersion,
+            [ref]$version)) {
         throw "Unsupported C# language version '$LanguageVersion'."
     }
     $symbols = @(
