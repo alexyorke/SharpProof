@@ -163,6 +163,7 @@ the smallest relevant containerized test target passes.
 | R388 | Share captured-local region classification across conversion ownership paths | `SharpProof.Effects.Test`: focused effects tests passed |
 | R391 | Add non-allocating two- and three-summary overloads for high-frequency effect joins | `SharpProof.Effects.Test`: 323 passed |
 | R390 | Use foreach and one sort-boundary cancellation check in effect call-graph ordering | `SharpProof.Effects.Test`: EffectCallGraph cancellation tests 2 passed |
+| R387 | Share member-initializer syntax-to-operation extraction across effect scanning and completion checks | `SharpProof.Effects.Test`: 323 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1791,10 +1792,12 @@ ownership classification, call graph ordering, and summary operations in `SharpP
   allocations while retaining the params overload for general callers.
 - R390 is now applied: call-graph ordering uses foreach and the canonical symbol
   comparer with cancellation checked at the sort boundary.
+- R387 is now applied: member initializer operation extraction is centralized
+  while null-operation handling remains at each caller.
 
 ### Status (part thirty-four)
 
-R386-R387 are `pending`. R387 remains a clean local refactoring.
+R386 is `pending`.
 R386 eliminates major algorithmic duplication between exception reachability and using disposal.
 R391 removes AST-scanning allocation churn.
 
@@ -3152,3 +3155,13 @@ change ordinary location validity.
 R534-R535 are `pending` reduction candidates. R534 preserves the initial
 canonicalization boundary; R535 preserves the distinct bare-command lookup and
 explicit trusted-installation comparison.
+
+## Second survey, part eighty-one: R536 - duplicated shrinker engines
+
+| R536 | **The fuzz tool carries two near-duplicate structural shrinker engines.** `IrStructuralShrinker` and `CSharpStructuralShrinker` each validate the input and mismatch callback, repeatedly enumerate smaller candidates until no change remains, filter direct children by type, add domain-specific constants, recursively shrink every child, rebuild the parent, deduplicate candidates, and catch invalid rebuilds. Their expression models and child-replacement constructors must remain type-specific, and the IR callback is asynchronous, but a generic shrink loop/candidate traversal scaffold could own the shared termination, size, seen-set, and recursive mechanics. Keeping the model-specific child enumeration and replacement policy at the edges would remove a second implementation of the fuzzer's most complex minimization control flow. | `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs:420-626`; `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1846-2016` |
+
+### Status (part eighty-one)
+
+R536 is a `pending` candidate. The proposed abstraction targets the shrinker
+control flow only; it does not merge the IR and C# expression vocabularies or
+their different synchronous/asynchronous mismatch contracts.

@@ -264,23 +264,12 @@ internal sealed class EffectMethodNodeBuilder
         var result = EffectStep.Empty;
         var write = EffectSummaryOperations.Write(EffectRegionSet.Create(
             EffectRegionId.Static()));
-        foreach (var syntaxReference in GetMemberInitializerReferences(
+        foreach (var operation in GetMemberInitializerOperations(
                      _compilation,
                      method.ContainingType,
-                     staticInitializers: true))
+                     staticInitializers: true,
+                     cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var declaration = syntaxReference.GetSyntax(cancellationToken);
-            var expression = EffectProjections.GetInitializerExpression(
-                declaration);
-            if (expression == null)
-            {
-                continue;
-            }
-
-            var model = SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(_compilation, expression.SyntaxTree);
-            var operation = model.GetOperation(expression, cancellationToken);
             if (operation == null)
             {
                 result = result.Then(new EffectStep(
@@ -323,22 +312,12 @@ internal sealed class EffectMethodNodeBuilder
         var result = EffectStep.Empty;
         var write = EffectSummaryOperations.Write(EffectRegionSet.Create(
             staticInitializers ? EffectRegionId.Static() : EffectRegionId.Receiver));
-        foreach (var syntaxReference in GetMemberInitializerReferences(
+        foreach (var operation in GetMemberInitializerOperations(
                      _compilation,
                      method.ContainingType,
-                     staticInitializers))
+                     staticInitializers,
+                     cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var declaration = syntaxReference.GetSyntax(cancellationToken);
-            var expression = EffectProjections.GetInitializerExpression(declaration);
-            if (expression == null)
-            {
-                continue;
-            }
-
-            var model = SharpProof.Frontend.Host.CompilationModelProvider
-                .GetSemanticModel(_compilation, expression.SyntaxTree);
-            var operation = model.GetOperation(expression, cancellationToken);
             if (operation == null)
             {
                 result = result.Then(new EffectStep(
@@ -395,6 +374,31 @@ internal sealed class EffectMethodNodeBuilder
                 ? ordinal
                 : int.MaxValue)
             .ThenBy(static reference => reference.Span.Start);
+    }
+
+    internal static IEnumerable<IOperation?> GetMemberInitializerOperations(
+        Compilation compilation,
+        INamedTypeSymbol type,
+        bool staticInitializers,
+        CancellationToken cancellationToken)
+    {
+        foreach (var reference in GetMemberInitializerReferences(
+                     compilation,
+                     type,
+                     staticInitializers))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var expression = EffectProjections.GetInitializerExpression(
+                reference.GetSyntax(cancellationToken));
+            if (expression == null)
+            {
+                continue;
+            }
+
+            var model = SharpProof.Frontend.Host.CompilationModelProvider
+                .GetSemanticModel(compilation, expression.SyntaxTree);
+            yield return model.GetOperation(expression, cancellationToken);
+        }
     }
 
     internal static bool HasPotentialStaticInitialization(

@@ -2242,27 +2242,13 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 constructor.ContainingType.OriginalDefinition);
         if (!delegatesToThis)
         {
-            foreach (var reference in EffectMethodNodeBuilder
-                         .GetMemberInitializerReferences(
+            foreach (var operation in EffectMethodNodeBuilder
+                         .GetMemberInitializerOperations(
                              compilation,
                              constructor.ContainingType,
-                             staticInitializers: false))
+                             staticInitializers: false,
+                             cancellationToken))
             {
-                var declaration = reference.GetSyntax(cancellationToken);
-                var expression = EffectProjections.GetInitializerExpression(
-                    declaration);
-                if (expression == null)
-                {
-                    continue;
-                }
-
-                var model = SharpProof.Frontend.Host
-                    .CompilationModelProvider.GetSemanticModel(
-                        compilation,
-                        expression.SyntaxTree);
-                var operation = model.GetOperation(
-                    expression,
-                    cancellationToken);
                 if (operation != null && !MayCompleteNormally(operation))
                 {
                     return false;
