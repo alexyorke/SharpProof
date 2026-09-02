@@ -6841,16 +6841,10 @@ public sealed class WorkerTests
             .Clauses.First(static clause =>
                 clause.Kind == CompilerContractKind.Assume)
             .AssumptionId;
-        using var worker = new SharpProofWorker(
-            new CapturingBackend(BackendCheckResult.Unsatisfiable([0])));
-
-        var response = await worker.VerifyAsync(request);
-        var authority = CreateResponseAuthority(request);
-        Assert.That(
-            WorkerProtocolJson.Validate(response, response.InputHash,
-                response.Manifest, authority).IsValid,
-            Is.True,
-            FormatValidationErrors(response, authority));
+        var (response, authority) =
+            await VerifyAndValidateArtifactAuthorityAsync(
+                request,
+                new CapturingBackend(BackendCheckResult.Unsatisfiable([0])));
 
         var result = response.ClaimResults.Single();
         var originalCore = result.ProofCore.ToArray();
@@ -6889,15 +6883,10 @@ public sealed class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        using var worker = new SharpProofWorker(new SpuriousModelBackend());
-
-        var response = await worker.VerifyAsync(request);
-        var authority = CreateResponseAuthority(request);
-        Assert.That(
-            WorkerProtocolJson.Validate(response, response.InputHash,
-                response.Manifest, authority).IsValid,
-            Is.True,
-            FormatValidationErrors(response, authority));
+        var (response, authority) =
+            await VerifyAndValidateArtifactAuthorityAsync(
+                request,
+                new SpuriousModelBackend());
 
         var row = response.ClaimResults.Single().Model.Single();
         switch (mutation)
@@ -6928,16 +6917,10 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(AllocationSubjectSource);
         var request = project.CreateRequest(cacheEnabled: false);
-        using var worker = new SharpProofWorker(
-            new CountingBackend(BackendCheckResult.Unsatisfiable([])));
-
-        var response = await worker.VerifyAsync(request);
-        var authority = CreateResponseAuthority(request);
-        Assert.That(
-            WorkerProtocolJson.Validate(response, response.InputHash,
-                response.Manifest, authority).IsValid,
-            Is.True,
-            FormatValidationErrors(response, authority));
+        var (response, authority) =
+            await VerifyAndValidateArtifactAuthorityAsync(
+                request,
+                new CountingBackend(BackendCheckResult.Unsatisfiable([])));
 
         var witness = response.ClaimResults.Single().EffectWitness!;
         switch (mutation)
@@ -6976,16 +6959,10 @@ public sealed class WorkerTests
             }
             """);
         var request = project.CreateRequest(cacheEnabled: false);
-        using var worker = new SharpProofWorker(
-            new CountingBackend(BackendCheckResult.Unsatisfiable([])));
-
-        var response = await worker.VerifyAsync(request);
-        var authority = CreateResponseAuthority(request);
-        Assert.That(
-            WorkerProtocolJson.Validate(response, response.InputHash,
-                response.Manifest, authority).IsValid,
-            Is.True,
-            FormatValidationErrors(response, authority));
+        var (response, authority) =
+            await VerifyAndValidateArtifactAuthorityAsync(
+                request,
+                new CountingBackend(BackendCheckResult.Unsatisfiable([])));
 
         var result = response.ClaimResults.Single();
         result.Vacuity = WorkerVacuityKind.None;
@@ -7011,6 +6988,28 @@ public sealed class WorkerTests
             File.ReadAllText(request.CompilerManifest.Path));
         return new CompilerResponseEvidenceAuthority(
             CompilerManifestArtifactJson.DecodeCallables(artifact));
+    }
+
+    private static async Task<(
+        WorkerVerifyResponse Response,
+        CompilerResponseEvidenceAuthority Authority)>
+        VerifyAndValidateArtifactAuthorityAsync(
+            WorkerVerifyRequest request,
+            ISmtBackend backend)
+    {
+        using var worker = new SharpProofWorker(backend);
+        var response = await worker.VerifyAsync(request);
+        var authority = CreateResponseAuthority(request);
+        Assert.That(
+            WorkerProtocolJson.Validate(
+                    response,
+                    response.InputHash,
+                    response.Manifest,
+                    authority)
+                .IsValid,
+            Is.True,
+            FormatValidationErrors(response, authority));
+        return (response, authority);
     }
 
     private static string FormatValidationErrors(
