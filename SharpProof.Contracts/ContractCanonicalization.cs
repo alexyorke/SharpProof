@@ -41,15 +41,7 @@ internal sealed class ContractCanonicalization(
                     type.OriginalDefinition.TypeParameters,
                     type.TypeArguments);
             }
-            AddSignatureType(
-                source.OriginalDefinition.ReturnType,
-                source.ReturnType);
-            for (var index = 0; index < source.Parameters.Length; index++)
-            {
-                AddSignatureType(
-                    source.OriginalDefinition.Parameters[index].Type,
-                    source.Parameters[index].Type);
-            }
+            AddMethodSignature(source.OriginalDefinition, source);
             var partialCounterpart =
                 source.OriginalDefinition.PartialImplementationPart ??
                 source.OriginalDefinition.PartialDefinitionPart;
@@ -58,15 +50,20 @@ internal sealed class ContractCanonicalization(
                 AddParameters(
                     partialCounterpart.TypeParameters,
                     source.TypeArguments);
+                AddMethodSignature(partialCounterpart, source);
+            }
+        }
+
+        private void AddMethodSignature(
+            IMethodSymbol definition,
+            IMethodSymbol constructed)
+        {
+            AddSignatureType(definition.ReturnType, constructed.ReturnType);
+            for (var index = 0; index < constructed.Parameters.Length; index++)
+            {
                 AddSignatureType(
-                    partialCounterpart.ReturnType,
-                    source.ReturnType);
-                for (var index = 0; index < source.Parameters.Length; index++)
-                {
-                    AddSignatureType(
-                        partialCounterpart.Parameters[index].Type,
-                        source.Parameters[index].Type);
-                }
+                    definition.Parameters[index].Type,
+                    constructed.Parameters[index].Type);
             }
         }
 

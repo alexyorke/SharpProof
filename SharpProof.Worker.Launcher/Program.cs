@@ -246,8 +246,8 @@ internal static class Program
             WorkerExecutionEnvelope.MaximumElapsedMilliseconds(
             request,
             arguments.TerminationGraceMilliseconds));
-        var finalLimit = TimeSpan.FromMilliseconds(ComputeFinalLimit(
-            request.Budgets.ProjectWallTimeMilliseconds,
+        var finalLimit = TimeSpan.FromMilliseconds(checked(
+            request.Budgets.ProjectWallTimeMilliseconds +
             arguments.TerminationGraceMilliseconds));
         using var process = LinuxWorkerProcess.Start(
             ResolveDotNetHostPath(projectDirectory),
@@ -298,12 +298,6 @@ internal static class Program
     internal static string NormalizeAbsolutePath(string path)
     {
         return LinuxPathIdentity.Canonicalize(path);
-    }
-
-    internal static int ComputeFinalLimit(
-        int projectMilliseconds, int terminationGraceMilliseconds)
-    {
-        return checked(projectMilliseconds + terminationGraceMilliseconds);
     }
 
     internal static string ComputeExpectedInputHash(
@@ -404,13 +398,6 @@ internal static class Program
         if (!validation.IsValid)
         {
             WriteErrors(validation.Errors, "SharpProof ");
-            return 3;
-        }
-        if (workerExitCode is not (null or 0) &&
-            response?.RunStatus == WorkerRunStatus.Complete)
-        {
-            Console.Error.WriteLine(
-                "SharpProof worker result is inconsistent with its process exit code.");
             return 3;
         }
         if (workerExitCode is not (null or 0) &&

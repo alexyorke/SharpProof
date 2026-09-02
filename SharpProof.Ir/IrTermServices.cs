@@ -187,20 +187,15 @@ internal static class IrTermServices
                     nameof(right));
             }
 
-            return GetBuiltInType(factory, resultKind);
+            return IrOperatorCatalog.GetBuiltInType(factory, resultKind);
         }
 
         return RequireTypes(
             left,
             right,
-            GetBuiltInType(factory, operandKind.Value),
-            GetBuiltInType(factory, resultKind),
+            IrOperatorCatalog.GetBuiltInType(factory, operandKind.Value),
+            IrOperatorCatalog.GetBuiltInType(factory, resultKind),
             @operator);
-    }
-
-    internal static bool IsNullable(IrTypeKind kind)
-    {
-        return IrOperatorCatalog.IsNullable(kind);
     }
 
     private static IrTerm? FoldIntegerBinary(
@@ -274,10 +269,4 @@ internal static class IrTermServices
         return term is IrBooleanTerm or IrIntegerTerm or IrStringTerm;
     }
 
-    internal static IrTypeId GetBuiltInType(
-        IrFactory factory,
-        IrTypeKind kind)
-    {
-        return IrOperatorCatalog.GetBuiltInType(factory, kind);
-    }
 }

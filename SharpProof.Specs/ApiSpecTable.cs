@@ -320,7 +320,7 @@ public sealed partial class ApiSpecTable
                 SpecNullness.Unknown or
                 SpecNullness.NotApplicable) &&
             (!target.ResultType.HasValue ||
-             !IrTermServices.IsNullable(target.ResultType.Value)))
+             !IrOperatorCatalog.IsNullable(target.ResultType.Value)))
         {
             throw new ArgumentException(
                 "The nullness facet does not apply to the declared result type.",

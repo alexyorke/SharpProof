@@ -13,7 +13,7 @@ public sealed class IrProgramInterpreter(IrFactory factory)
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
     private readonly IrInterpreter _terms =
-        new(ArgumentNullGuard.NotNull(factory, nameof(factory)));
+        new(factory);
     public IrProgramExecutionResult Execute(
         IrProgram program, IReadOnlyDictionary<IrVarId, IrValue>? initialValues = null, int maximumSteps = 10000,
         CancellationToken cancellationToken = default)

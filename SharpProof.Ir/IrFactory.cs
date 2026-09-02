@@ -299,7 +299,7 @@ public sealed class IrFactory
     {
         lock (_gate)
         {
-            if (!IrTermServices.IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
+            if (!IrOperatorCatalog.IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
             {
                 throw new ArgumentException("Null requires a string, reference, or sequence type.", nameof(type));
             }
@@ -391,7 +391,7 @@ public sealed class IrFactory
     {
         lock (_gate)
         {
-            if (!IrTermServices.IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
+            if (!IrOperatorCatalog.IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
             {
                 throw new ArgumentException("Null requires a string, reference, or sequence type.", nameof(type));
             }
@@ -431,7 +431,7 @@ public sealed class IrFactory
         {
             EnsureTermCore(operand, nameof(operand));
             var semantics = IrOperatorCatalog.Get(@operator);
-            var expectedType = IrTermServices.GetBuiltInType(
+            var expectedType = IrOperatorCatalog.GetBuiltInType(
                 this,
                 semantics.Operand);
             if (operand.Type != expectedType)
@@ -533,14 +533,14 @@ public sealed class IrFactory
             var isUnboxing =
                 source.Kind == IrTypeKind.Reference &&
                 target.Kind is IrTypeKind.Boolean or IrTypeKind.Integer;
-            if (!IrTermServices.IsNullable(source.Kind))
+            if (!IrOperatorCatalog.IsNullable(source.Kind))
             {
                 throw new ArgumentException(
                     "Non-identity casts require a string, reference, or sequence operand.",
                     nameof(operand));
             }
 
-            if (!IrTermServices.IsNullable(target.Kind) && !isUnboxing)
+            if (!IrOperatorCatalog.IsNullable(target.Kind) && !isUnboxing)
             {
                 throw new ArgumentException(
                     "Non-identity casts require a reference-like target or " +
@@ -548,7 +548,7 @@ public sealed class IrFactory
                     nameof(targetType));
             }
 
-            if (operand is IrNullTerm && IrTermServices.IsNullable(target.Kind))
+            if (operand is IrNullTerm && IrOperatorCatalog.IsNullable(target.Kind))
             {
                 return Null(targetType);
             }

@@ -39,11 +39,6 @@ internal sealed class ContractExpressionBinder
 
     internal IrVarId? ResultVariable => _result;
 
-    internal ExpressionBindingResult Bind(IOperation operation)
-    {
-        return BindWithFrontend(operation);
-    }
-
     private (bool Handled, IrTerm? Term) BindIntrinsic(IOperation operation)
     {
         if (operation is not IInvocationOperation invocation)
@@ -100,7 +95,7 @@ internal sealed class ContractExpressionBinder
             substitutions));
     }
 
-    private ExpressionBindingResult BindWithFrontend(IOperation operation)
+    internal ExpressionBindingResult Bind(IOperation operation)
     {
         var result = _lowerer.Lower(operation);
         if (!result.IsExact)

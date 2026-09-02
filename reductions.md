@@ -164,6 +164,12 @@ the smallest relevant containerized test target passes.
 | R391 | Add non-allocating two- and three-summary overloads for high-frequency effect joins | `SharpProof.Effects.Test`: 323 passed |
 | R390 | Use foreach and one sort-boundary cancellation check in effect call-graph ordering | `SharpProof.Effects.Test`: EffectCallGraph cancellation tests 2 passed |
 | R387 | Share member-initializer syntax-to-operation extraction across effect scanning and completion checks | `SharpProof.Effects.Test`: 323 passed |
+| R400 | Call the generated IR operator catalog directly instead of pass-through service wrappers | `SharpProof.Ir.Test`: 114; `SharpProof.Contracts.Test`: 142 |
+| R403 | Remove the single-call contract expression binding forwarder | `SharpProof.Contracts.Test`: 142 passed |
+| R405 | Share method signature type registration in contract canonicalization | `SharpProof.Contracts.Test`: 142 passed |
+| R406 | Reuse the validated primary-constructor factory argument for IR term interpretation | `SharpProof.Ir.Test`: 114 passed |
+| R407 | Remove the duplicate launcher exit-code consistency check | `SharpProof.Package.Test`: LauncherArgumentTests 75 passed |
+| R411 | Inline the one-use launcher final-timeout arithmetic | `SharpProof.Package.Test`: LauncherArgumentTests 75 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1800,6 +1806,9 @@ ownership classification, call graph ordering, and summary operations in `SharpP
 R386 is `pending`.
 R386 eliminates major algorithmic duplication between exception reachability and using disposal.
 R391 removes AST-scanning allocation churn.
+R400, R403, R405, and R406 are now applied: IR catalog calls, contract binding,
+signature registration, and factory initialization no longer carry redundant
+forwarders or guards.
 
 ## Second survey, part thirty-five: R393-R399
 
@@ -1854,7 +1863,8 @@ and program builders across `SharpProof.Ir`, `SharpProof.Contracts`, and `SharpP
 
 ### Status (part thirty-six)
 
-R400-R406 are `pending`. R400, R403, R405, and R406 are direct, safe refactoring simplifications.
+R401, R402, and R404 are `pending`. R400, R403, R405, and R406 are applied direct
+refactoring simplifications.
 R401, R402, and R404 streamline contract resolution flow and IR validation.
 
 ## Second survey, part thirty-seven: R407-R412
@@ -1880,7 +1890,7 @@ and budget tracking across `SharpProof.Worker`, `SharpProof.Worker.Protocol`,
 
 ### Status (part thirty-seven)
 
-R407-R412 are `pending`. R407 and R411 are trivial launcher cleanups. R408 and R410 unify
+R408-R410 and R412 are `pending`. R407 and R411 are applied trivial launcher cleanups. R408 and R410 unify
 claim assembly and budget enforcement in the verification worker. R409 and R412 reduce protocol and projection boilerplate.
 
 ## Second survey, part thirty-eight: R413-R419
@@ -3165,3 +3175,13 @@ explicit trusted-installation comparison.
 R536 is a `pending` candidate. The proposed abstraction targets the shrinker
 control flow only; it does not merge the IR and C# expression vocabularies or
 their different synchronous/asynchronous mismatch contracts.
+
+## Second survey, part eighty-two: R537 - IR child enumeration authority
+
+| R537 | **`IrStructuralShrinker.Children` duplicates the canonical IR child switch.** The fuzz shrinker has a private switch covering opaque receivers and arguments, unary, binary, conditional, cast, length, and sequence-access terms; `SharpProof.Ir.IrTraversal.GetChildren` already owns the same complete child enumeration for traversal, substitution, and analysis. The only reason the shrinker cannot call it today is that the helper is internal and `SharpProof.Fuzz` is not a friend assembly. Exposing a narrow supported child-enumeration seam or granting the intended tooling friend access would remove a second list of IR node kinds, reducing drift when the IR grows. | `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs:570-591`; `SharpProof.Ir/IrTraversal.cs:4-18`; `SharpProof.Ir/SharpProof.Ir.csproj:17-34` |
+
+### Status (part eighty-two)
+
+R537 is a `pending` candidate. This is narrower than R536: it targets an
+exact duplicate of the IR traversal authority, while leaving the shrinker's
+model-specific rebuild and minimization policy intact.

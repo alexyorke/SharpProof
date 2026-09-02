@@ -98,7 +98,7 @@ internal static class ApiSpecTermValidator
 
                     return new(text.Type, true, true, null);
                 case SpecNullDeclaration nullValue:
-                    if (!IrTermServices.IsNullable(nullValue.Type))
+                    if (!IrOperatorCatalog.IsNullable(nullValue.Type))
                     {
                         throw new ArgumentException(
                             "Null requires a nullable spec type.",
