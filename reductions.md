@@ -4287,7 +4287,7 @@ R701 completed: worker identity tests now use scoped `TempDirectory` fixtures wh
 
 | R702 | **`CompilationModelProvider.FindOwningCompilation` performs linear visited checks inside its graph walk.** Every popped compilation scans the entire `visited` list with `Any(ReferenceEquals(...))`, so a large source-compilation-reference closure repeatedly traverses already-seen nodes. Replace the list membership check with a reference-identity hash set, retaining the separate owner detection and duplicate-tree rejection semantics. | `SharpProof.Frontend/CompilationModelProvider.cs:27-58` |
 
-R702 is a pending semantic-model provider traversal reduction candidate. Preserve reference identity rather than symbol/compilation value equality, source-tree ownership detection, cycle termination, and the multiple-owner exception.
+R702 completed: the compilation closure now uses a reference-identity hash set for cycle checks while preserving source-tree ownership detection, cycle termination, and the multiple-owner exception.
 
 ### Status (part two hundred thirty-six)
 
