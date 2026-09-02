@@ -14,12 +14,13 @@ internal sealed class ContractApiSymbols(
     internal static ContractApiSymbols? TryCreate(Compilation compilation)
     {
         var clauses = ContractClauseSymbols.TryCreate(compilation);
-        var selections =
-            ContractSelectionInventory.ForCompilation(compilation);
         if (clauses == null)
         {
             return null;
         }
+
+        var selections =
+            ContractSelectionInventory.ForCompilation(compilation);
 
         var result = FindGenericIntrinsic(
             clauses.ContractType,

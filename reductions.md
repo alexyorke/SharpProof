@@ -333,6 +333,7 @@ the smallest relevant containerized test target passes.
 | R801 | Merge incoming-environment completeness and difference checks into one forward scan | `SharpProof.Worker.Test`: `AcyclicBlockPredicateExecutorTests`, 14 passed with `-Fast` |
 | R802 | Let the shared release-bundle topology helper own the six-artifact/cardinality precondition | PowerShell parse; `ReleaseJsonAuthorityTests` fixture coverage |
 | R803 | Partition sorted manifest claims in one pass for postconditions and effects | `SharpProof.Package.Test`: focused compiler-manifest tests with `-Fast` |
+| R944 | Defer selection-inventory construction until the contract API is present | `SharpProof.Contracts.Test`: 142 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -8752,5 +8753,6 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred fifty-four)
 
-R944 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R944 is `applied`: `ContractApiSymbols.TryCreate` now returns immediately when
+the contract API is absent, avoiding an unused compilation-wide selection
+inventory while preserving successful binding and its cached selections.
