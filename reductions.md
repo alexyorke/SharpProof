@@ -192,6 +192,7 @@ the smallest relevant containerized test target passes.
 | R473 | Share method/property/type/assembly scope enumeration across analyzer, collector, and effects policies | `SharpProof.Analyzer.Test`: 476; `SharpProof.Effects.Test`: 323 |
 | R475 | Share direct by-value call admission checks between spec and summary lowering | `SharpProof.Worker.Test`: 23 focused compiler-call tests |
 | R478 | Share bounded JSON file opening between hashing and UTF-8 readers | `SharpProof.Worker.Test`: ProtocolJsonTests 108; full Worker.Test 695 |
+| R480 | Update the container contract gate to assert the environment-based marker path | `SharpProof.ArchitectureTest`: ContainerAuthorityScriptTests 15 |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2484,8 +2485,9 @@ orphaned assertions elsewhere, which is the gap this item exposes.
 
 ### Status (part fifty-five)
 
-R480 should leave this ledger and become a fix, like R299 before it. It is also
-the reason to run one more targeted pass: for each applied removal of a named
+R480 is fixed: the contract gate now checks the `SHARPPROOF_CONTAINER_CONTRACT`
+property reference rather than the removed hard-coded path. It is also the
+reason to run one more targeted pass: for each applied removal of a named
 literal, search the tree for surviving assertions that still name it. That search
 is cheap and would have caught both this and R299 at the time.
 

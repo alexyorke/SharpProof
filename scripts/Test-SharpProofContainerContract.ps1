@@ -375,8 +375,7 @@ if ($devInitializer -cmatch 'git bundle|repository\.bundle|SHARPPROOF_SEED_ROOT'
     throw 'The Dev Container initializer retains a host Git bootstrap.'
 }
 if ($directoryBuildTargets -cnotmatch '_RequireSharpProofCanonicalContainer' -or
-    $directoryBuildTargets -cnotmatch 'SHARPPROOF_CONTAINER' -or
-    $directoryBuildTargets -cnotmatch '/etc/sharpproof/container-contract\.json') {
+    $directoryBuildTargets -cnotmatch 'SHARPPROOF_CONTAINER_CONTRACT') {
     throw 'Repository MSBuild entry points must reject host execution.'
 }
 if ($compose -cnotmatch [regex]::Escape(
