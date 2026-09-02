@@ -27,12 +27,23 @@ internal static class EffectClaimResultAssembler
         }
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (evidence.Outcome == WorkerClaimOutcome.Unknown &&
-            evidence.Reason == WorkerClaimReason.UnsupportedContract)
+        WorkerClaimResult CreateResult(
+            WorkerClaimOutcome outcome,
+            WorkerClaimReason reason,
+            WorkerEffectEvidenceCertainty certainty)
         {
             return CallableClaimResultAssembler.Create(
                 target,
                 evidence.ClaimId,
+                outcome,
+                reason,
+                certainty);
+        }
+
+        if (evidence.Outcome == WorkerClaimOutcome.Unknown &&
+            evidence.Reason == WorkerClaimReason.UnsupportedContract)
+        {
+            return CreateResult(
                 evidence.Outcome,
                 evidence.Reason,
                 evidence.Certainty);
@@ -40,9 +51,7 @@ internal static class EffectClaimResultAssembler
 
         if (entryFeasibility.IsUnknown)
         {
-            return CallableClaimResultAssembler.Create(
-                target,
-                evidence.ClaimId,
+            return CreateResult(
                 WorkerClaimOutcome.Unknown,
                 entryFeasibility.Reason,
                 WorkerEffectEvidenceCertainty.Unavailable);
@@ -50,9 +59,7 @@ internal static class EffectClaimResultAssembler
 
         if (entryFeasibility.IsContradictory)
         {
-            var vacuous = CallableClaimResultAssembler.Create(
-                target,
-                evidence.ClaimId,
+            var vacuous = CreateResult(
                 WorkerClaimOutcome.Proven,
                 WorkerClaimReason.None,
                 WorkerEffectEvidenceCertainty.VacuousEntry);
@@ -74,17 +81,13 @@ internal static class EffectClaimResultAssembler
                 cancellationToken);
             if (replayed == null)
             {
-                return CallableClaimResultAssembler.Create(
-                    target,
-                    evidence.ClaimId,
+                return CreateResult(
                     WorkerClaimOutcome.Unknown,
                     WorkerClaimReason.CounterexampleReplayFailed,
                     WorkerEffectEvidenceCertainty.Unavailable);
             }
 
-            var refuted = CallableClaimResultAssembler.Create(
-                target,
-                evidence.ClaimId,
+            var refuted = CreateResult(
                 WorkerClaimOutcome.Refuted,
                 WorkerClaimReason.None,
                 WorkerEffectEvidenceCertainty.DefiniteViolation);
@@ -92,9 +95,7 @@ internal static class EffectClaimResultAssembler
             return refuted;
         }
 
-        var result = CallableClaimResultAssembler.Create(
-            target,
-            evidence.ClaimId,
+        var result = CreateResult(
             evidence.Outcome,
             evidence.Reason,
             evidence.Certainty);

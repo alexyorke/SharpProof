@@ -199,6 +199,7 @@ the smallest relevant containerized test target passes.
 | R894 | Validate specification-pack object property sets in one pass | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R677 | Reuse acceptance’s Release production inventory in the complexity gate | `SharpProof.ArchitectureTest`: ProductionConsumersUseOneInventoryAuthority passed |
 | R638 | Share trusted-boundary attribute traversal between features and assumptions | `SharpProof.Worker.Test`: ClaimManifestBuilderTests, 50 passed |
+| R367 | Share effect-claim result construction across outcome branches | `SharpProof.Worker.Test`: EffectCounterexampleReplayTests and CompilerManifestArtifactTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -1819,9 +1820,10 @@ domain bounds across `SharpProof.Worker.Protocol`, `SharpProof.Ir`, `SharpProof.
 
 ### Status (part thirty)
 
-R361-R367 are `pending`. R364 is a direct, safe code reduction.
-R361, R362, and R363 reduce cross-layer configuration drift between MSBuild properties,
-Roslyn analyzers, and verification workers.
+R361-R366 remain pending. R367 is `applied`: effect-claim result construction
+now uses one local factory for the shared target and claim identity while each
+outcome branch retains its distinct replay, vacuity, reason, and witness
+behavior. Relevant Worker tests passed.
 
 ## Second survey, part thirty-one: R368-R372
 
