@@ -194,6 +194,7 @@ the smallest relevant containerized test target passes.
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R575 | Reuse validated mutation-shard evidence between timing and aggregation | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
+| R573 | Validate persisted mutation-baseline invocation identities during shard preflight | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3749,7 +3750,10 @@ runtime assertions.
 
 ### Status (part one hundred fourteen)
 
-R573 is a pending release/evidence-pipeline reduction and validation candidate. Preserve the child-side check; the outer check should either validate the field it reads or stop constructing an unused identity object.
+R573 is `applied`: shard preflight compares each persisted baseline invocation
+identity with the canonical invocation derived from its project, filter, and
+configuration, while the child-side validation remains intact. The behavioral
+mutation-evidence fixtures passed.
 
 ## Second survey, part one hundred fifteen: R574 - repeated mutation-baseline parsing
 
