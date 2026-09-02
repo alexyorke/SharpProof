@@ -3980,7 +3980,10 @@ symbol-plumbing chains.
 
 ### Status (part one hundred fifty-one)
 
-R610 is a pending generator-infrastructure reduction candidate. Preserve ordinal duplicate detection, array/object recursion, and each generator's distinct schema validation; share only the common `JsonElement` property walk.
+R610 is applied: `Assert-UniqueJsonProperties` now lives in
+`GeneratedFileHelpers.ps1` and both generators reuse it, preserving ordinal
+duplicate detection, array/object recursion, and each generator's schema
+validation.
 
 ## Second survey, part one hundred fifty-two: R611 - duplicate pattern type projection
 
