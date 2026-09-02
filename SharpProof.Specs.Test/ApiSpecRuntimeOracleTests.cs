@@ -964,16 +964,14 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecNullness ObserveArrayEmptyNullness()
     {
-        return ObserveNullness(
-            static () => Array.Empty<object>(),
-            static () => Array.Empty<int>());
+        return ObserveEmptySequence(static () => Array.Empty<object>(),
+            static () => Array.Empty<int>(), ObserveNullness);
     }
 
     private static SpecNullness ObserveEnumerableEmptyNullness()
     {
-        return ObserveNullness(
-            static () => Enumerable.Empty<object>(),
-            static () => Enumerable.Empty<int>());
+        return ObserveEmptySequence(static () => Enumerable.Empty<object>(),
+            static () => Enumerable.Empty<int>(), ObserveNullness);
     }
 
     private static SpecNullness ObserveStringConcatNullness()
@@ -985,9 +983,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
     }
 
     private static SpecCardinality ObserveCardinality(
-        params Func<IEnumerable>[] edges)
+        params Func<object?>[] edges)
     {
-        var counts = edges.Select(static edge => Count(edge())).ToArray();
+        var counts = edges.Select(static edge =>
+                Count((IEnumerable)edge()!))
+            .ToArray();
         if (counts.All(static count => count == 0))
         {
             return SpecCardinality.Empty;
@@ -1003,16 +1003,22 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecCardinality ObserveArrayEmptyCardinality()
     {
-        return ObserveCardinality(
-            static () => Array.Empty<object>(),
-            static () => Array.Empty<int>());
+        return ObserveEmptySequence(static () => Array.Empty<object>(),
+            static () => Array.Empty<int>(), ObserveCardinality);
     }
 
     private static SpecCardinality ObserveEnumerableEmptyCardinality()
     {
-        return ObserveCardinality(
-            static () => Enumerable.Empty<object>(),
-            static () => Enumerable.Empty<int>());
+        return ObserveEmptySequence(static () => Enumerable.Empty<object>(),
+            static () => Enumerable.Empty<int>(), ObserveCardinality);
+    }
+
+    private static T ObserveEmptySequence<T>(
+        Func<object?> objectFactory,
+        Func<object?> valueFactory,
+        Func<Func<object?>[], T> observe)
+    {
+        return observe([objectFactory, valueFactory]);
     }
 
     private static int Count(IEnumerable sequence)

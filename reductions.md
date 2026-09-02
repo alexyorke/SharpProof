@@ -4177,14 +4177,6 @@ R632 is a pending fixture-infrastructure reduction candidate. Preserve cleanup i
 
 R633 is a pending fuzz-oracle infrastructure reduction candidate. Preserve collectible unloading, image ownership/disposal, runtime-type lookup failures, and distinct batch versus semantic-edge result handling; share only the assembly lifetime scaffold.
 
-## Second survey, part one hundred seventy-six: R635 - duplicate empty-sequence observation wrappers
-
-| R635 | **`ApiSpecRuntimeOracleTests` repeats the empty-sequence observation wrappers for arrays and `Enumerable.Empty`.** `ObserveArrayEmptyNullness` and `ObserveEnumerableEmptyNullness` both forward two object/value-type factories to `ObserveNullness`, while the corresponding cardinality methods repeat the same two-factory forwarding to `ObserveCardinality`; only the factory pair changes. A small pair-parameterized helper for nullness and cardinality can own these calls without merging the deliberately distinct array versus enumerable runtime witnesses or their allocation/throw edges. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:153-190,983-1034` |
-
-### Status (part one hundred seventy-six)
-
-R635 is a pending runtime-oracle test reduction candidate. Preserve both generic instantiation families and their independent witnesses; factor only the duplicated two-edge observation adapters.
-
 ## Second survey, part one hundred seventy-seven: R636 - repeated runtime method lookup
 
 | R636 | **`ScalarDifferentialMatrixTests` repeats the same emitted-subject reflection lookup.** The supported, widening, and arithmetic test paths each resolve `ScalarDifferentialSubject` with `GetType(..., throwOnError: true)`, and four loops then call `GetMethod` with `BindingFlags.Public | BindingFlags.Static` followed by the same missing-method exception. A private `RequireRuntimeMethod` helper (and, optionally, a subject-type accessor) can own this reflection contract while preserving each matrix's separate invocation arity, input enumeration, expected-result logic, and exception assertions. | `SharpProof.Worker.Test/ScalarDifferentialMatrixTests.cs:232-242,275-279,335-345,398-412` |
@@ -4192,3 +4184,27 @@ R635 is a pending runtime-oracle test reduction candidate. Preserve both generic
 ### Status (part one hundred seventy-seven)
 
 R636 is a pending differential-test fixture reduction candidate. Preserve the fixed generated type name, public-static binding flags, descriptive failures, and all matrix-specific runtime/IR comparisons; share only the repeated reflection lookup.
+
+## Second survey, part one hundred seventy-eight: R637 - Worker test temp-fixture boilerplate
+
+| R637 | **Nineteen Worker tests manually create and recursively delete temporary directories despite the linked `TempDirectory` helper.** Nine cache edge-case methods in `WorkerTcbEdgeCaseTests`, five process/launcher methods in `WorkerProgramTests`, and five runtime-closure methods in `WorkerBinaryIdentityTests` each assemble a temp path with `Path.GetTempPath()` or the test work directory, call `Directory.CreateDirectory`, and repeat `try/finally` cleanup with `Directory.Delete`; the binary tests also repeat this around fixture trees. Replacing these local lifetimes with `TempDirectory` (or a shared Worker-test wrapper where a specific root is required) removes fixture cleanup boilerplate and gives all three suites one failure-safe disposal policy. Preserve each suite's path-prefix assumptions, Linux/process cleanup, file fixture contents, and test-specific cleanup ordering. | `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:977-1421`; `SharpProof.Worker.Test/WorkerProgramTests.cs:34-357`; `SharpProof.Worker.Test/WorkerBinaryIdentityTests.cs:10-195,230-506`; `Directory.Build.props:68-81`; `eng/testing/TempDirectory.cs:1-19` |
+
+### Status (part one hundred seventy-eight)
+
+R637 is a pending Worker-test fixture-lifetime reduction candidate and extends the manually scoped cases listed in R428. Preserve process termination and mutation-specific cleanup before directory disposal; share only temporary-directory creation and safe recursive cleanup.
+
+## Second survey, part one hundred seventy-nine: R638 - repeated source-authority artifact pipeline
+
+| R638 | **`CompilerSourceLocationAuthorityTests` rebuilds the same compiler-artifact pipeline in three helpers.** `CreateArtifact`, `CreateNonSourceDiagnosticArtifact`, and `CreateContractArtifact` each call `CompilerManifestArtifactProducer.Create` with the test work directory, `net8.0`, `WorkerFeatureSet.All`, a fresh `ClaimManifestBuilder(compilation).Build()`, the default expression-depth limit, and `CancellationToken.None`. Only the source/reference choice and, for the non-source case, output kind differ. A private artifact-production core can accept the prepared compilation and preserve those fixture-specific seams while removing repeated producer arguments and claim-manifest construction. | `SharpProof.Worker.Test/CompilerSourceLocationAuthorityTests.cs:327-374` |
+
+### Status (part one hundred seventy-nine)
+
+R638 is a pending compiler-artifact test-fixture reduction candidate. Preserve the distinct contract-reference, output-kind, source-location, and diagnostic-classification scenarios; share only the common artifact production call.
+
+## Second survey, part one hundred eighty: R639 - duplicate replay rejection wrapper
+
+| R639 | **`CompilerEffectReplayArtifactCodecTests` duplicates its mutate/seal/validate rejection wrapper.** The two `AssertRejected` overloads both build an evidence fixture, apply a mutation, seal it, and assert `InvalidDataException`; the overload accepting `CompilerEffectReplayEventKind` changes only which `RefutedEvidence` factory is called. Delegating the simpler overload to the kind-aware core (or making the factory selection an optional seam) removes the duplicate assertion plumbing while keeping the event-kind fixture construction and malformed-codec assertion explicit. | `SharpProof.Worker.Test/CompilerEffectReplayArtifactCodecTests.cs:226-249` |
+
+### Status (part one hundred eighty)
+
+R639 is a pending replay-codec test helper cleanup. Preserve the seal-before-validate ordering, exception type, and distinct event-kind evidence; share only the repeated rejection harness.
