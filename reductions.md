@@ -186,6 +186,7 @@ the smallest relevant containerized test target passes.
 | R464 | Share assembly-metadata value extraction between contract identity readers | `SharpProof.Frontend.Test`: 121 passed |
 | R466 | Parameterize the uncached contract-binding wrapper while retaining separate caches | `SharpProof.Contracts.Test`: 142 passed |
 | R467 | Share symbol/type documentation-ID fallback handling | `SharpProof.Frontend.Test`: 121 passed |
+| R468 | Centralize the shared Roslyn runtime copy target for Gates projects | `SharpProof.Gates.Test`: 63; `SharpProof.ArchitectureTest`: 389 |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2340,7 +2341,9 @@ target *names* are each declared twice.
 
 ### Status (part fifty)
 
-R468 is `pending` and mechanical. R469 is `pending` and is primarily a naming fix,
+R468 is applied: the two identical Gates project targets now live once in
+`Directory.Build.targets`, guarded by the two project names. R469 is `pending`
+and is primarily a naming fix,
 with a small shared-value component that belongs with R291. R470 is `pending` and
 is a determinism-of-diagnostics question rather than a reduction - it removes no
 lines and may add a few, so it should be judged on whether deterministic error
@@ -3526,3 +3529,11 @@ R568 is a pending reduction candidate. Preserve the acceptance-specific timing p
 ### Status (part one hundred ten)
 
 R569 is a pending small reduction candidate. It affects only the acceptance evidence writer and must preserve its failed/incomplete phase semantics.
+
+## Second survey, part one hundred eleven: R570 - unused Compose version probe
+
+| R570 | **`build.ps1` probes the Docker Compose version and discards the result.** `Build-ToolingImage` invokes `docker compose version --short` only through `Invoke-Docker`, then immediately invokes `docker compose build tooling`; no value from the version command is consumed and the build command already provides the operational availability check. Unless the probe is intended as a separately documented diagnostic (in which case its output should be labeled and used), removing it eliminates one extra external process and one failure point from every profile invocation while preserving the actual tooling-image build. | `build.ps1:31-39` |
+
+### Status (part one hundred eleven)
+
+R570 is a pending small reduction candidate. Preserve the checked-command wrapper and the tooling-image build; only remove the unused version probe or make its diagnostic purpose explicit.

@@ -13,9 +13,4 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Gates\SharpProof.Gates.csproj" />
   </ItemGroup>
-  <Target Name="_CopySharpProofCompilerRuntime"
-          AfterTargets="Build">
-    <Copy SourceFiles="$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.dll;$(RoslynTargetsPath)\bincore\Microsoft.CodeAnalysis.CSharp.dll"
-          DestinationFolder="$(TargetDir)" />
-  </Target>
 </Project>
