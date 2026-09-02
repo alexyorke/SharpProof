@@ -8034,3 +8034,58 @@ build-file changes were made during this audit.
 
 R883 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred ninety-four: R884 - repeated path conflict canonicalization
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R884 | **`LinuxPathIdentity.PathsConflict` can canonicalize both paths three times.** It calls public `IsSameOrDescendant` in both directions, and each call canonicalizes both arguments before the private prefix comparison; if neither direction matches, `AreSameExistingFile` canonicalizes both again before checking file identity. One boundary pass that retains the two canonical strings can perform both containment checks and then the existing file-identity check through canonical-only helpers, preserving symlink rejection, missing-file behavior, and the public canonicalizing contracts while removing repeated Linux `lstat` walks. | `SharpProof.Host/LinuxPathIdentity.cs:315-337`; canonicalization at `SharpProof.Host/LinuxPathIdentity.cs:52-110` |
+
+### Status (part three hundred ninety-four)
+
+R884 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred ninety-five: R885 - quadratic descendant capture
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R885 | **`LinuxWorkerProcess.CaptureDescendants` rescans the complete `/proc` snapshot for every queued parent.** It first records every process as `processId -> (parentId, startTime)`, then the breadth-first loop scans all dictionary entries to find children of each queued parent. Building a parent-to-children adjacency map while reading the same snapshot reduces the traversal to the captured process/edge count without changing the descendant order, root exclusion, start-time snapshot used for PID-reuse protection, or later kill policy. | `SharpProof.Host/LinuxWorkerProcess.cs:224-252` |
+
+### Status (part three hundred ninety-five)
+
+R885 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred ninety-six: R886 - reread validated container fields
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R886 | **`ContainerContract.ValidateRequired` reads validated JSON fields again when constructing its result.** The actual contract version, platform, SDK version, Z3 version, Z3 byte count, and verifier package ID are each retrieved and type-checked by the preceding `RequireInteger`/`RequireString` calls, then retrieved again with `GetProperty(...).GetInt32/GetString/GetInt64` for `ContainerContractInfo`. The nested expected `dotnet`, `powershell`, `z3`, and `support` objects are also looked up repeatedly across those comparisons. Comparison helpers that return the validated actual value, or a single typed projection retained after the required-property-set check, can remove repeated JSON property access while preserving independent expected-value validation and the fail-closed schema gate. | `SharpProof.Host/ContainerContract.cs:62-124`; typed helpers at `SharpProof.Host/ContainerContract.cs:228-301` |
+
+### Status (part three hundred ninety-six)
+
+R886 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred ninety-seven: R887 - repeated publication UTF-8 encoder construction
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R887 | **`LinuxPathIdentity` constructs equivalent UTF-8 encoders inside repeated publication metadata operations.** `PublicationMetadataPath`, `PublicationSetId`, and `ValidatePublicationMarker` each create a new strict UTF-8 encoder, while `BindPublicationSet` creates another non-BOM encoder for the ASCII marker. The encoders are read-only after construction; static instances for strict path hashing/reading and marker writing can remove per-path/per-marker allocations while retaining strict malformed-UTF-8 rejection where it is currently required. | `SharpProof.Host/LinuxPathIdentity.cs:477-492,560-561,611-629,641-664` |
+
+### Status (part three hundred ninety-seven)
+
+R887 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred ninety-eight: R888 - repeated protected-file identity checks
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R888 | **`InvalidatePublishedResult.ExecuteCore` checks output/protected file identity once for a dedicated error and again through the broader path-conflict test.** `aliasesFileIdentity` calls `AreSameExistingFile` for every non-identical publication/protected pair; when it finds no alias, `aliasesInput` later calls `PathsConflict` for the same publication/protected pairs, whose final branch performs the same file-identity comparison after containment checks. A pairwise alias projection can compute containment and identity once and set both independently named error flags, preserving the current ability to report both protected-file and input-alias diagnostics rather than collapsing their policy categories. | `SharpProof.BuildTasks/InvalidatePublishedResult.cs:75-125`; `SharpProof.Host/LinuxPathIdentity.cs:315-337` |
+
+### Status (part three hundred ninety-eight)
+
+R888 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
