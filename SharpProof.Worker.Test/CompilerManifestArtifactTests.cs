@@ -20,6 +20,81 @@ public sealed class CompilerManifestArtifactTests
     private const string SourceMarker =
         "sharp-proof-source-must-not-be-embedded";
 
+    private const string DoesNotThrowIdentityWithEnsuresSource =
+        """
+        using SharpProof.Attributes;
+        internal static class Subject {
+            [DoesNotThrow]
+            internal static int Identity(int value) {
+                Contract.Ensures(Contract.Result<int>() == value);
+                return value;
+            }
+        }
+        """;
+
+    private const string DoesNotThrowIdentitySource =
+        """
+        using SharpProof.Attributes;
+        internal static class Subject {
+            [DoesNotThrow]
+            internal static int Identity(int value) => value;
+        }
+        """;
+
+    private const string UnknownAggregateExceptionSource =
+        """
+        using System;
+        using System.Collections.Generic;
+        using SharpProof.Attributes;
+        internal static class Subject {
+            [DoesNotThrow]
+            internal static AggregateException Create() =>
+                new AggregateException((IEnumerable<Exception>)null!);
+        }
+        """;
+
+    private const string ZeroAllocationInlineSource =
+        """
+        using SharpProof.Attributes;
+        internal static class Subject {
+            [ZeroAllocations]
+            internal static object Allocate() => new object();
+        }
+        """;
+
+    private const string ZeroAllocationSplitSource =
+        """
+        using SharpProof.Attributes;
+        internal static class Subject {
+            [ZeroAllocations]
+            internal static object Allocate() =>
+                new object();
+        }
+        """;
+
+    private const string NonNegativeIdentitySource =
+        """
+        using SharpProof.Attributes;
+        internal static class Subject {
+            internal static int Identity(int value) {
+                Contract.Ensures(Contract.Result<int>() == value);
+                Contract.Ensures(Contract.Result<int>() >= 0);
+                return value;
+            }
+        }
+        """;
+
+    private const string EmptyArraySource =
+        """
+        using SharpProof.Attributes;
+        internal static class Subject {
+            internal static int[] Empty() {
+                Contract.Ensures(Contract.Result<int[]>() != null);
+                return System.Array.Empty<int>();
+            }
+        }
+        """;
+
     [Test]
     public void CompilerManifestCasesUseBoundedParallelism()
     {
@@ -112,16 +187,7 @@ public sealed class CompilerManifestArtifactTests
     {
         var artifact = CreateFeatureArtifact(
             WorkerFeatureSet.Effects,
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [DoesNotThrow]
-                internal static int Identity(int value) {
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    return value;
-                }
-            }
-            """);
+            DoesNotThrowIdentityWithEnsuresSource);
 
         Assert.That(artifact.Features, Is.EqualTo(WorkerFeatureSet.Effects));
         Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind),
@@ -138,16 +204,7 @@ public sealed class CompilerManifestArtifactTests
     {
         var artifact = CreateFeatureArtifact(
             WorkerFeatureSet.All,
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [DoesNotThrow]
-                internal static int Identity(int value) {
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    return value;
-                }
-            }
-            """);
+            DoesNotThrowIdentityWithEnsuresSource);
 
         Assert.That(artifact.Manifest.Claims.Select(static claim => claim.Kind),
             Has.Some.EqualTo(WorkerClaimKind.Postcondition));
@@ -165,13 +222,7 @@ public sealed class CompilerManifestArtifactTests
     {
         var artifact = CreateFeatureArtifact(
             WorkerFeatureSet.Effects,
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [DoesNotThrow]
-                internal static int Identity(int value) => value;
-            }
-            """);
+            DoesNotThrowIdentitySource);
         var callable = artifact.Manifest.Callables.Single();
         callable.SelectedFeatures = [WorkerSelectedFeature.Contracts];
         WorkerProtocolJson.SealManifest(artifact.Manifest);
@@ -1045,32 +1096,12 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void EffectEvidenceMustMatchIndependentCompilerAuthority()
     {
-        const string refutedSource =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [ZeroAllocations]
-                internal static object Allocate() => new object();
-            }
-            """;
-        const string unknownSource =
-            """
-            using System;
-            using System.Collections.Generic;
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [DoesNotThrow]
-                internal static AggregateException Create() =>
-                    new AggregateException((IEnumerable<Exception>)null!);
-            }
-            """;
-
-        var refuted = CreateContractArtifact(refutedSource);
+        var refuted = CreateContractArtifact(ZeroAllocationInlineSource);
         var refutedEvidence = refuted.Callables.Single().EffectClaims.Single();
         Assert.That(refutedEvidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
         Assert.That(refutedEvidence.Replay, Is.Not.Null);
 
-        var unknown = CreateContractArtifact(unknownSource);
+        var unknown = CreateContractArtifact(UnknownAggregateExceptionSource);
         var unknownEvidence = unknown.Callables.Single().EffectClaims.Single();
         Assert.That(unknownEvidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(unknownEvidence.Reason, Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
@@ -1201,14 +1232,7 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void HonestEffectAuthorityPreservesWorkerResultClassification()
     {
-        var artifact = CreateContractArtifact(
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [ZeroAllocations]
-                internal static object Allocate() => new object();
-            }
-            """);
+        var artifact = CreateContractArtifact(ZeroAllocationInlineSource);
         var target = CompilerManifestArtifactJson.DecodeCallables(artifact).Single();
         var result = EffectClaimResultAssembler.Assemble(
             target, target.EffectClaims.Single());
@@ -1534,17 +1558,7 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void EnsuresRowsExactlyMatchManifestClaimIdentityAndEvidence()
     {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static int Identity(int value) {
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    Contract.Ensures(Contract.Result<int>() >= 0);
-                    return value;
-                }
-            }
-            """;
+        const string source = NonNegativeIdentitySource;
         var valid = CreateContractArtifact(source);
         var rows = valid.Callables[0].Clauses.Where(
             static row => row.Kind == CompilerContractKind.Ensures).ToArray();
@@ -1615,27 +1629,10 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void ResealedEffectVerdictsCannotChangeCompilerOutcome()
     {
-        const string refutedSource =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [ZeroAllocations]
-                internal static object Allocate() => new object();
-            }
-            """;
-        const string unknownSource =
-            """
-            using System;
-            using System.Collections.Generic;
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [DoesNotThrow]
-                internal static AggregateException Create() =>
-                    new AggregateException((IEnumerable<Exception>)null!);
-            }
-            """;
-
-        foreach (var source in new[] { refutedSource, unknownSource })
+        foreach (var source in new[] {
+                     ZeroAllocationInlineSource,
+                     UnknownAggregateExceptionSource
+                 })
         {
             var artifact = CreateContractArtifact(source);
             var evidence = artifact.Callables.Single().EffectClaims.Single();
@@ -1775,15 +1772,7 @@ public sealed class CompilerManifestArtifactTests
     public void AllocationEffectReplayRoundTripsCompilerEvidence()
     {
         const string expression = "new object()";
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [ZeroAllocations]
-                internal static object Allocate() =>
-                    new object();
-            }
-            """;
+        const string source = ZeroAllocationSplitSource;
         var artifact = CreateContractArtifact(source);
         var json = CompilerManifestArtifactJson.Serialize(artifact);
         var roundTrip =
@@ -1874,15 +1863,7 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void AllocationReplayRejectsResealedInvalidSourceSpans()
     {
-        var valid = CreateContractArtifact(
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [ZeroAllocations]
-                internal static object Allocate() =>
-                    new object();
-            }
-            """);
+        var valid = CreateContractArtifact(ZeroAllocationSplitSource);
         AssertRejected(valid, static (_, _) => 0);
         AssertRejected(valid, static (treeLength, start) =>
             treeLength - start + 1);
@@ -1917,15 +1898,7 @@ public sealed class CompilerManifestArtifactTests
     public void AllocationReplayRejectsCoordinatedResealedMappedGeometry(
         string mutation)
     {
-        var artifact = CreateContractArtifact(
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [ZeroAllocations]
-                internal static object Allocate() =>
-                    new object();
-            }
-            """);
+        var artifact = CreateContractArtifact(ZeroAllocationSplitSource);
         var callable = artifact.Callables.Single();
         var evidence = callable.EffectClaims.Single();
         var authority = callable.EffectAuthorities.Single();
@@ -1962,15 +1935,7 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void AllocationReplaySyntaxTreeLineMapIsRejectedAtWireAndHydrationBoundaries()
     {
-        var artifact = CreateContractArtifact(
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [ZeroAllocations]
-                internal static object Allocate() =>
-                    new object();
-            }
-            """);
+        var artifact = CreateContractArtifact(ZeroAllocationSplitSource);
         var callable = artifact.Callables.Single();
         var evidence = callable.EffectClaims.Single();
         var authority = callable.EffectAuthorities.Single();
@@ -2034,17 +1999,7 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void ContractPredicatesAreBoundToCompilerInventory()
     {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static int Identity(int value) {
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    Contract.Ensures(Contract.Result<int>() >= 0);
-                    return value;
-                }
-            }
-            """;
+        const string source = NonNegativeIdentitySource;
         var swapped = CreateContractArtifact(source);
         var graph = swapped.Callables[0].Graph!;
         var rows = swapped.Callables[0].Clauses;
@@ -2130,16 +2085,7 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public async Task SpecCallSetAndCompilerCallIdentityFailClosed()
     {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static int[] Empty() {
-                    Contract.Ensures(Contract.Result<int[]>() != null);
-                    return System.Array.Empty<int>();
-                }
-            }
-            """;
+        const string source = EmptyArraySource;
         var valid = CreateContractArtifact(source);
         var body = valid.Callables[0].Body!;
         using (Assert.EnterMultipleScope())
@@ -2481,16 +2427,7 @@ public sealed class CompilerManifestArtifactTests
     [Test]
     public void SameShapedMemberSubstitutionFailsClosed()
     {
-        const string source =
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                internal static int[] Empty() {
-                    Contract.Ensures(Contract.Result<int[]>() != null);
-                    return System.Array.Empty<int>();
-                }
-            }
-            """;
+        const string source = EmptyArraySource;
         var artifact = CreateContractArtifact(source);
         var graph = artifact.Callables[0].Graph!;
         var call = graph.Blocks.SelectMany(static block => block.Instructions)
@@ -2619,14 +2556,7 @@ public sealed class CompilerManifestArtifactTests
 
     private static CompilerManifestArtifact CreateEffectArtifact()
     {
-        return CreateContractArtifact(
-            """
-            using SharpProof.Attributes;
-            internal static class Subject {
-                [DoesNotThrow]
-                internal static int Identity(int value) => value;
-            }
-            """);
+        return CreateContractArtifact(DoesNotThrowIdentitySource);
     }
 
     private static CompilerManifestArtifact CreateUnsupportedLoopArtifact()

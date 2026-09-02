@@ -20,6 +20,57 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class WorkerTests
 {
+    private const string AllocationSubjectSource =
+        """
+        using SharpProof.Attributes;
+        public static class Subject {
+            [ZeroAllocations]
+            public static object Allocate() => new object();
+        }
+        """;
+
+    private const string BoundedIdentitySubjectSource =
+        """
+        using SharpProof.Attributes;
+        public static class Subject {
+            public static long Identity(long value) {
+                Contract.Assume(value >= 0);
+                Contract.Assume(value <= 10);
+                Contract.Ensures(Contract.Result<long>() >= 0);
+                return value;
+            }
+        }
+        """;
+
+    private const string MaximumSubjectSource =
+        """
+        using System;
+        using SharpProof.Attributes;
+        public static class Subject {
+            public static int Maximum(int left, int right) {
+                Contract.Ensures(
+                    Contract.Result<int>() ==
+                    (left >= right ? left : right));
+                return Math.Max(left, right);
+            }
+        }
+        """;
+
+    private const string ConcurrentSubjectsSource =
+        """
+        using SharpProof.Attributes;
+        public static class Subject {
+            public static long A(long value) {
+                Contract.Ensures(Contract.Result<long>() == value);
+                return value;
+            }
+            public static long B(long value) {
+                Contract.Ensures(Contract.Result<long>() == value);
+                return value;
+            }
+        }
+        """;
+
     private static readonly string[] InvalidBudgetErrorCodes = [
         "protocol.unsupported",
         "budgets.rlimit",
@@ -1261,14 +1312,7 @@ public sealed class WorkerTests
     [Test]
     public async Task CompilerEffectWitnessTamperingCannotBypassReplay()
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                [ZeroAllocations]
-                public static object Allocate() => new object();
-            }
-            """);
+        using var project = TestProject.Create(AllocationSubjectSource);
         var request = project.CreateRequest(cacheEnabled: false);
         var artifact = CompilerManifestArtifactJson.Deserialize(
             await File.ReadAllTextAsync(
@@ -2208,18 +2252,7 @@ public sealed class WorkerTests
     [Test]
     public async Task ProofCoreMarksOnlyTheUserAssumptionItUses()
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static long Identity(long value) {
-                    Contract.Assume(value >= 0);
-                    Contract.Assume(value <= 10);
-                    Contract.Ensures(Contract.Result<long>() >= 0);
-                    return value;
-                }
-            }
-            """);
+        using var project = TestProject.Create(BoundedIdentitySubjectSource);
         var request = project.CreateRequest(cacheEnabled: false);
         var snapshot = await WorkerInputSnapshot.LoadAsync(
             request,
@@ -3146,19 +3179,7 @@ public sealed class WorkerTests
             }
         }
 
-        using var packProject = TestProject.Create(
-            """
-            using System;
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static int Maximum(int left, int right) {
-                    Contract.Ensures(
-                        Contract.Result<int>() ==
-                        (left >= right ? left : right));
-                    return Math.Max(left, right);
-                }
-            }
-            """);
+        using var packProject = TestProject.Create(MaximumSubjectSource);
         packProject.UseNetCoreReferencePack();
         var packRequest = packProject.CreateRequest(
             cacheEnabled: false,
@@ -3821,19 +3842,7 @@ public sealed class WorkerTests
     [Test]
     public async Task AuditedSpecificationPackRequiresExplicitOptIn()
     {
-        using var project = TestProject.Create(
-            """
-            using System;
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static int Maximum(int left, int right) {
-                    Contract.Ensures(
-                        Contract.Result<int>() ==
-                        (left >= right ? left : right));
-                    return Math.Max(left, right);
-                }
-            }
-            """);
+        using var project = TestProject.Create(MaximumSubjectSource);
         project.UseNetCoreReferencePack();
         var withoutRequest = project.CreateRequest(cacheEnabled: false);
         using var withoutPackWorker = SharpProofWorker.Create(
@@ -4653,20 +4662,7 @@ public sealed class WorkerTests
     [Test]
     public async Task FatalClaimTakesPrecedenceOverAnotherCallableTimeout()
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static long A(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-                public static long B(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-            }
-            """);
+        using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 1;
         request.Budgets.MethodWallTimeMilliseconds = 30;
@@ -5291,16 +5287,7 @@ public sealed class WorkerTests
     [Test]
     public async Task ReplayValidatedRefutationIsCacheable()
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static long Broken(long value) {
-                    Contract.Ensures(Contract.Result<long>() > value);
-                    return value;
-                }
-            }
-            """);
+        using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request);
@@ -5475,20 +5462,7 @@ public sealed class WorkerTests
     [Test]
     public async Task BackendFactoryCreatesIsolatedConcurrentSolverLanes()
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static long A(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-                public static long B(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-            }
-            """);
+        using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 2;
         var coordination = new ConcurrentLaneState(expectedLanes: 2);
@@ -5650,20 +5624,7 @@ public sealed class WorkerTests
     [Test]
     public async Task MethodTimeoutRetiresAndRecreatesTheInterruptedSolverLane()
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static long A(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-                public static long B(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-            }
-            """);
+        using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 1;
         request.Budgets.MethodWallTimeMilliseconds = 30;
@@ -5699,20 +5660,7 @@ public sealed class WorkerTests
     public async Task RenewalFailurePreservesTimeoutAndClassifiesUnclaimedWork(
         bool backendUnavailable)
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static long A(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-                public static long B(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-            }
-            """);
+        using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 1;
         request.Budgets.MethodWallTimeMilliseconds = 30;
@@ -5787,20 +5735,7 @@ public sealed class WorkerTests
         WorkerClaimReason expectedClaimReason,
         int expectedFactoryCalls)
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static long A(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-                public static long B(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-            }
-            """);
+        using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 1;
         request.Budgets.MethodWallTimeMilliseconds = 30;
@@ -5846,20 +5781,7 @@ public sealed class WorkerTests
     [Test]
     public async Task FactorylessTimeoutClassifiesEveryUnclaimedTargetAsTimedOut()
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static long A(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-                public static long B(long value) {
-                    Contract.Ensures(Contract.Result<long>() == value);
-                    return value;
-                }
-            }
-            """);
+        using var project = TestProject.Create(ConcurrentSubjectsSource);
         var request = project.CreateRequest(cacheEnabled: false);
         request.Budgets.MaxParallelism = 1;
         request.Budgets.MethodWallTimeMilliseconds = 30;
@@ -6909,18 +6831,7 @@ public sealed class WorkerTests
     [Test]
     public async Task ArtifactAuthorityRejectsFabricatedProofCoreAndUsedFlag()
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                public static long Identity(long value) {
-                    Contract.Assume(value >= 0);
-                    Contract.Assume(value <= 10);
-                    Contract.Ensures(Contract.Result<long>() >= 0);
-                    return value;
-                }
-            }
-            """);
+        using var project = TestProject.Create(BoundedIdentitySubjectSource);
         var request = project.CreateRequest(cacheEnabled: false);
         var snapshot = await WorkerInputSnapshot.LoadAsync(
             request,
@@ -7015,14 +6926,7 @@ public sealed class WorkerTests
     [TestCase("throw-hierarchy")]
     public async Task ArtifactAuthorityBindsRefutedEffectWitness(string mutation)
     {
-        using var project = TestProject.Create(
-            """
-            using SharpProof.Attributes;
-            public static class Subject {
-                [ZeroAllocations]
-                public static object Allocate() => new object();
-            }
-            """);
+        using var project = TestProject.Create(AllocationSubjectSource);
         var request = project.CreateRequest(cacheEnabled: false);
         using var worker = new SharpProofWorker(
             new CountingBackend(BackendCheckResult.Unsatisfiable([])));

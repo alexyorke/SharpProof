@@ -18,6 +18,22 @@ public sealed class GeneratedContractForAnalyzerTests
         }
         """;
 
+    private const string EmptyServiceContractsSource = """
+        using SharpProof.Attributes;
+
+        [ContractFor(typeof(IService))]
+        public static class ServiceContracts
+        {
+        }
+        """;
+
+    private const string SealedServiceSource = """
+        public sealed class IService
+        {
+            public int Map(int value) => value;
+        }
+        """;
+
     [Test]
     public async Task GeneratedCompanionIsValidatedFromFinalCompilation()
     {
@@ -30,14 +46,7 @@ public sealed class GeneratedContractForAnalyzerTests
                 public static int Map(IService receiver, int value) => value;
             }
             """);
-        var malformed = await AnalyzeGeneratedAsync("""
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public static class ServiceContracts
-            {
-            }
-            """);
+        var malformed = await AnalyzeGeneratedAsync(EmptyServiceContractsSource);
 
         using (Assert.EnterMultipleScope())
         {
@@ -139,14 +148,7 @@ public sealed class GeneratedContractForAnalyzerTests
     public async Task MalformedPeerCompanionWithOrdinaryHintIsReconciled()
     {
         var diagnostics = await AnalyzeGeneratedAsync(
-            """
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public static class ServiceContracts
-            {
-            }
-            """,
+            EmptyServiceContractsSource,
             hintName: "PeerContracts.cs");
 
         AnalyzerTestHost.AssertIds(diagnostics, "SPCF0004");
@@ -155,14 +157,7 @@ public sealed class GeneratedContractForAnalyzerTests
     [Test]
     public async Task PeerGeneratorOrderDoesNotChangeFinalReconciliation()
     {
-        const string malformed = """
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public static class ServiceContracts
-            {
-            }
-            """;
+        const string malformed = EmptyServiceContractsSource;
         var forward = await AnalyzeGeneratedInOrderAsync(malformed, reverse: false);
         var reverse = await AnalyzeGeneratedInOrderAsync(malformed, reverse: true);
 
@@ -217,14 +212,7 @@ public sealed class GeneratedContractForAnalyzerTests
     public async Task ProfileOffSuppressesGeneratedCompanionValidation()
     {
         var diagnostics = await AnalyzeGeneratedAsync(
-            """
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public static class ServiceContracts
-            {
-            }
-            """,
+            EmptyServiceContractsSource,
             Target,
             profile: "off");
 
@@ -234,14 +222,7 @@ public sealed class GeneratedContractForAnalyzerTests
     [Test]
     public async Task GeneratedFinalValidationRejectsConflictingAliases()
     {
-        const string malformed = """
-            using SharpProof.Attributes;
-
-            [ContractFor(typeof(IService))]
-            public static class ServiceContracts
-            {
-            }
-            """;
+        const string malformed = EmptyServiceContractsSource;
         var conflicting = await AnalyzeGeneratedAsync(
             malformed,
             globalOptions: new Dictionary<string, string>(StringComparer.Ordinal)
@@ -293,12 +274,7 @@ public sealed class GeneratedContractForAnalyzerTests
                 }
             }
             """,
-            """
-            public sealed class IService
-            {
-                public int Map(int value) => value;
-            }
-            """,
+            SealedServiceSource,
             additionalDiagnosticIds: ["SP0047"]);
 
         Assert.That(diagnostics, Is.Empty);
@@ -387,12 +363,7 @@ public sealed class GeneratedContractForAnalyzerTests
                 }
             }
             """,
-            """
-            public sealed class IService
-            {
-                public int Map(int value) => value;
-            }
-            """,
+            SealedServiceSource,
             additionalDiagnosticIds: ["SP0047"]);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SPCF0003");

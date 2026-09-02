@@ -158,6 +158,7 @@ the smallest relevant containerized test target passes.
 | R849 | Project IR identifier aliases from the validated tag descriptor list | IR model generator `-Verify` passed |
 | R850 | Group compiler-artifact mappings once before owner-specific emission | compiler-artifact generator `-Verify` passed |
 | R851 | Resolve bound-contract assignments through a validated parameter map | bound-contract generator `-Verify` passed |
+| R276 | Reuse exact duplicate raw-string fixtures across Worker and analyzer tests | Worker CompilerManifestArtifactTests: 91; WorkerTests: 148; GeneratedContractForAnalyzerTests: 22 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -550,12 +551,14 @@ files. Same rules as part one: nothing implemented, nothing validated, all
 
 ### Status (part two)
 
-R263-R265 and R270, R272-R276 are `pending` and extend the same follow-up queue. R263, R265,
+R263-R265 and R270, R272-R275 remain `pending` and extend the same follow-up queue. R263, R265,
 R270, R272, R273, and R274 each carry a stated constraint - a security check that
 must survive, a possibly deliberate belt-and-braces item, release-evidence
 caution under R110-R112, a correctness inconsistency to settle first, a policy
 question about release-tracking scope, and a migration surface across nine
-consumers respectively - and none of them should be treated as mechanical.
+consumers respectively - and none of them should be treated as mechanical. R276 is
+`applied`: exact duplicate raw-string fixtures are now shared by named constants
+in the three cited test files; their focused suites passed (91, 148, and 22 tests).
 
 ### Survey conditions
 
