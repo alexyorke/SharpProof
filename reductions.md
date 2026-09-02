@@ -5447,8 +5447,9 @@ files, all 41 generated files, all 13 `eng/` subdirectories, and the corpus data
 
 ### Status (part two hundred seventy-two)
 
-R758 is `pending` and is limited to test fixture plumbing. No implementation or
-build file was changed.
+R758 is `complete`: the three replay-boundary tests share a one-claim program
+target factory while retaining distinct return values, canonical variables,
+postconditions, and assertions.
 
 ## Second survey, part two hundred seventy-five: R761 - duplicate analyzer test compilation
 
@@ -5464,8 +5465,9 @@ build file was changed.
 
 ### Status (part two hundred seventy-five)
 
-R761 is `pending` and is limited to analyzer test setup. No implementation or
-build file was changed.
+R761 is `complete`: the generated-definition test reuses one base compilation
+for parse options and added syntax trees; the source-defined preprocessor
+compilation remains separate.
 
 ## Second survey, part two hundred seventy-four: R760 - repeated constructor syntax-reference lookup
 
@@ -5484,8 +5486,9 @@ build file was changed.
 
 ### Status (part two hundred seventy-four)
 
-R760 is `pending` and is limited to local analyzer query plumbing. No
-implementation or build file was changed.
+R760 is `complete`: member-initializer constructor candidates now snapshot the
+first declaring syntax reference once for sorting and generated-code filtering;
+delegation checks still inspect the full symbol.
 
 ## Second survey, part two hundred seventy-three: R759 - duplicated call-argument normalization adapters
 
@@ -5658,8 +5661,9 @@ unchanged.
 
 ### Status (part two hundred eighty-three)
 
-R769 is `pending` and is limited to pilot claim-evidence projection sharing. No
-implementation or build file was changed.
+R769 is `complete`: producer and validator share the ordinal claim-evidence
+projection helper; producer mismatches throw with its pilot-specific message,
+while validator mismatches remain null-on-join and fail closed downstream.
 
 ## Second survey, part two hundred eighty-four: R770 - repeated TCB path membership scans
 
@@ -5844,5 +5848,28 @@ throws, allowed exceptions, and declared contracts.
 
 ### Status (part two hundred ninety-two)
 
-R781 is `pending` and limited to ArchitectureTest fixture plumbing. No
-implementation or build file was changed.
+R781 is `complete`: Acceptance, Coverage, and Production inventory fixtures
+share the checked Git bootstrap with scenario-specific settings preserved. The
+combined targeted run passed 51/52; the remaining failure is the pre-existing
+production complexity ratchet (members 5811/5808), unrelated to this helper.
+
+## Second survey, part two hundred ninety-three: R782 - repeated object-unboxing case matrix
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R782 | **`IrUnboxingDifferentialRegressionTests` rebuilds one six-case object-unboxing matrix for two execution paths.** `InterpreterUsesCSharpObjectUnboxingSemantics` and `DifferentialOracleAgreesWithCompiledCSharpObjectUnboxing` each create the same object-typed variable, integer and Boolean cast terms, and the same six inputs: null for each target, a Boolean boxed into the integer path, a `long` boxed into the Boolean path, and the correctly boxed `17L`/`true` values. The first path evaluates with `IrInterpreter` and asserts `NullReference`/`InvalidCast`/value results; the second constructs the same term/value pairs and asserts differential agreement. A shared case record or factory can own the term, input value, label, and expected direct outcome while each test keeps its distinct interpreter-versus-compiled-oracle assertion path. This is fixture sharing only: it should not merge the two tests or weaken the direct semantic assertions. | `SharpProof.Testing.Test/IrUnboxingDifferentialRegressionTests.cs:10-67,70-111` |
+
+### Checked and not proposed (part two hundred ninety-three)
+
+- The duplicated six cases are deliberate cross-check inputs, but their
+  construction does not need to be maintained twice.
+- The two assertion paths remain separate because one tests interpreter outcome
+  classification and the other tests agreement with compiled C#.
+- The broader generated and sequence differential suites are not counted: they
+  generate or compare different term/value families rather than this fixed
+  unboxing matrix.
+
+### Status (part two hundred ninety-three)
+
+R782 is `pending` and limited to Testing.Test fixture plumbing. No implementation
+or build file was changed.
