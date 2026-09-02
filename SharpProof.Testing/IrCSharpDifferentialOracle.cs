@@ -348,20 +348,37 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
 
     private bool TryGetCSharpType(IrTypeId type, out string name)
     {
+        return TryGetSupportedType(type, out name, out _);
+    }
+
+    private bool TryGetSupportedType(
+        IrTypeId type,
+        out string csharpName,
+        out Type? runtimeType)
+    {
         var info = _factory.GetTypeInfo(type);
-        name = info.Kind switch
+        if (info.Kind == IrTypeKind.Sequence &&
+            info.ElementType != null &&
+            TryGetSupportedType(
+                info.ElementType.Value,
+                out var elementName,
+                out var elementRuntimeType))
         {
-            IrTypeKind.Boolean => "bool",
-            IrTypeKind.Integer => "long",
-            IrTypeKind.String => "string",
-            IrTypeKind.Reference when type == _factory.ObjectType => "object",
-            IrTypeKind.Sequence when
-                info.ElementType != null &&
-                TryGetCSharpType(info.ElementType.Value, out var elementType) =>
-                elementType + "[]",
-            _ => ""
+            csharpName = elementName + "[]";
+            runtimeType = elementRuntimeType!.MakeArrayType();
+            return true;
+        }
+
+        (csharpName, runtimeType) = info.Kind switch
+        {
+            IrTypeKind.Boolean => ("bool", typeof(bool)),
+            IrTypeKind.Integer => ("long", typeof(long)),
+            IrTypeKind.String => ("string", typeof(string)),
+            IrTypeKind.Reference when type == _factory.ObjectType =>
+                ("object", typeof(object)),
+            _ => ("", null)
         };
-        return name.Length != 0;
+        return runtimeType != null;
     }
 
     private static string BinaryToken(IrBinaryOperator @operator)
@@ -450,23 +467,12 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
 
     private bool TryGetRuntimeType(IrTypeId type, out Type runtimeType)
     {
-        var info = _factory.GetTypeInfo(type);
-        if (info.Kind == IrTypeKind.Sequence &&
-            info.ElementType != null &&
-            TryGetRuntimeType(info.ElementType.Value, out var elementType))
-        {
-            runtimeType = elementType.MakeArrayType();
-            return true;
-        }
-        runtimeType = info.Kind switch
-        {
-            IrTypeKind.Boolean => typeof(bool),
-            IrTypeKind.Integer => typeof(long),
-            IrTypeKind.String => typeof(string),
-            IrTypeKind.Reference when type == _factory.ObjectType => typeof(object),
-            _ => null!
-        };
-        return runtimeType != null;
+        var supported = TryGetSupportedType(
+            type,
+            out _,
+            out var supportedRuntimeType);
+        runtimeType = supportedRuntimeType!;
+        return supported;
     }
 
     private static DifferentialResult CompareValue(

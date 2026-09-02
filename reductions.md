@@ -3402,9 +3402,10 @@ test suite passes (476 tests).
 
 ### Status (part eighty-eight)
 
-R546 is a `pending` reduction candidate. Preserve the special object-type
-identity checks, recursive sequence support, and unsupported-type behavior when
-centralizing the shared classification.
+R546 is applied: one recursive supported-type projection now produces both the
+generated C# name and runtime `System.Type`; the existing boundary helpers only
+select the requested projection. Object identity, nested sequence support, and
+unsupported-type abstention are unchanged. Testing tests pass (13 tests).
 
 ## Second survey, part eighty-nine: R547 - conversion unwrapping
 
@@ -4027,3 +4028,11 @@ R617 is a pending local Effects cleanup candidate. Preserve the fail-closed fall
 ### Status (part one hundred fifty-nine)
 
 R618 is a pending test-infrastructure reduction candidate. Preserve the generated source path and assembly identity where they are semantically relevant; consolidate only the shared compilation, error assertion, and analyzer execution sequence.
+
+## Second survey, part one hundred sixty: R619 - duplicate cancellation-filter prelude
+
+| R619 | **`CancellationBoundaryAnalyzer` prepares the same catch-filter evaluation twice.** `FilterIncludesAllCancellation` and `FilterExcludesCancellation` both extract the filter expression, fast-path a constant result, resolve the declared catch local, obtain the operation, and call `EvaluateCancellationFilter`; they differ only in the interpretation of the outcome and the intentionally opposite no-filter/constant polarity. A shared evaluation-prelude helper can return the normalized filter outcome (with an explicit no-filter state) while the two callers retain their distinct inclusion and exclusion policies. | `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs:88-162` |
+
+### Status (part one hundred sixty)
+
+R619 is a pending Meta-analyzer cleanup candidate. Preserve the current fail-closed behavior for missing catch locals and unknown outcomes, and preserve the opposite semantics for absent, constant-true, and constant-false filters; consolidate only the shared binding/evaluation setup.
