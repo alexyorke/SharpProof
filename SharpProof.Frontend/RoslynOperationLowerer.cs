@@ -233,28 +233,16 @@ public sealed class RoslynOperationLowerer
         return value != null;
     }
 
-    private static IOperation UnwrapImplicitConversions(IOperation operation)
+    private static IOperation UnwrapImplicitConversions(
+        IOperation operation,
+        bool referenceOnly = false)
     {
         while (operation is IConversionOperation
             {
                 IsImplicit: true,
                 OperatorMethod: null
-            } conversion)
-        {
-            operation = conversion.Operand;
-        }
-
-        return operation;
-    }
-
-    private static IOperation UnwrapImplicitReferenceConversions(
-        IOperation operation)
-    {
-        while (operation is IConversionOperation
-            {
-                IsImplicit: true,
-                OperatorMethod: null
-            } conversion && conversion.Conversion.IsReference)
+            } conversion &&
+            (!referenceOnly || conversion.Conversion.IsReference))
         {
             operation = conversion.Operand;
         }
@@ -779,8 +767,12 @@ public sealed class RoslynOperationLowerer
                 {
                     referenceComparisonType = leftOperand.Type;
                 }
-                leftOperand = UnwrapImplicitReferenceConversions(leftOperand);
-                rightOperand = UnwrapImplicitReferenceConversions(rightOperand);
+                leftOperand = UnwrapImplicitConversions(
+                    leftOperand,
+                    referenceOnly: true);
+                rightOperand = UnwrapImplicitConversions(
+                    rightOperand,
+                    referenceOnly: true);
                 if (ChangesReferenceEqualityToString(leftOperand) ||
                     ChangesReferenceEqualityToString(rightOperand))
                 {

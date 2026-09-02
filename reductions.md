@@ -203,6 +203,7 @@ the smallest relevant containerized test target passes.
 | R559 | Share the loop command's relative-path safety guard | `SharpProof.ArchitectureTest`: ContainerSourceCleanlinessTests 39 passed |
 | R554 | Remove the unreferenced package-license graph helper | `SharpProof.ArchitectureTest`: PackageDependencyAuthority 45 passed |
 | R548 | Share the deterministic differential integer boundary corpus | `SharpProof.Fuzz.Test`: FuzzRunnerTests 32 passed |
+| R547 | Parameterize implicit-conversion unwrapping for reference-only callers | `SharpProof.Frontend.Test`: 121 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3370,9 +3371,9 @@ centralizing the shared classification.
 
 ### Status (part eighty-nine)
 
-R547 is a `pending` reduction candidate. Keep the reference-conversion filter
-distinct from the general comparison path and retain the current stopping
-behavior for user-defined or non-reference conversions.
+R547 is applied: one conversion-unwrapping loop now accepts a reference-only
+filter, preserving the stopping behavior for user-defined and non-reference
+conversions at the specialized callers.
 
 ## Second survey, part ninety: R548 - shared fuzz boundary corpus
 
