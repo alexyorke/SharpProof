@@ -6435,3 +6435,28 @@ R807 is `deferred`: the method is a validation boundary and a large fused
 accumulator could become harder to audit than the current clear projections.
 The repeated scans are still a plausible local cleanup if profiling or a
 future validation refactor makes the allocation cost material.
+
+## Second survey, part three hundred nineteen: R808 - effect identity scans before indexed decoding
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R808 | **`CompilerLoweredArtifact.DecodeEffects` performs separate distinct-ID scans immediately before indexed identity checks.** After filtering the expected manifest effects and checking both array lengths, it projects `EffectClaims` to claim IDs and counts a distinct set, then repeats that pass for `EffectAuthorities`. The subsequent indexed loop compares every evidence ID and contract kind with the expected manifest row, and `CompilerEffectAuthority.Matches` compares the authority ID with both expected and evidence IDs again. Once the manifest's unique claim-ID invariant is trusted, a single indexed validation/identity accumulator can combine the needed shape checks and remove the two pre-loop scans; if this method must remain independently defensive, one shared set-building pass can at least retain both uniqueness checks without two separate LINQ pipelines. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:579-609`; `SharpProof.CompilerArtifact/CompilerEffectAuthority.cs:80-96`; `SharpProof.Worker.Protocol/ProtocolJson.cs:503-516` |
+
+### Checked and not proposed (part three hundred nineteen)
+
+- The evidence codec validation and authority matching remain independent
+  checks; R651 covers their repeated validation work and is not replaced by
+  this identity-scan observation.
+- The manifest-level unique-claim validation is an important precondition. A
+  cleanup must not silently remove the decoder's defense if `DecodeEffects`
+  can be called with an unvalidated manifest.
+- Error ordering and null handling should be preserved, especially because
+  the current distinct projections include null IDs and the indexed loop has
+  its own malformed-row behavior.
+
+### Status (part three hundred nineteen)
+
+R808 is `deferred`: the scans are cheap relative to effect evidence decoding,
+and retaining an independent decoder defense may be intentional. A future
+change should only fuse them after documenting the manifest-validation
+precondition or after introducing a shared identity accumulator.
