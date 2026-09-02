@@ -269,10 +269,11 @@ public sealed class ProductionInventoryAuthorityTests
 
     private static async Task InitializeRepositoryAsync(string repository)
     {
-        await AssertSuccessAsync(RunAsync(repository, "git", "init", "--object-format=sha1"));
-        await AssertSuccessAsync(RunAsync(repository, "git", "config", "user.email", "inventory@example.invalid"));
-        await AssertSuccessAsync(RunAsync(repository, "git", "config", "user.name", "Inventory Test"));
-        await AssertSuccessAsync(RunAsync(repository, "git", "config", "core.autocrlf", "false"));
+        await ArchitectureGitRepository.InitializeAsync(
+            repository,
+            "inventory@example.invalid",
+            "Inventory Test",
+            ("core.autocrlf", "false"));
     }
 
     private static async Task CommitAllAsync(string repository, string message)

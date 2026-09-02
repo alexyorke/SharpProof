@@ -220,23 +220,10 @@ public sealed class AcceptanceScriptTests
 
     private static async Task InitializeRepositoryAsync(string repository)
     {
-        await AssertSuccessAsync(RunAsync(
+        await ArchitectureGitRepository.InitializeAsync(
             repository,
-            "git",
-            "init",
-            "--object-format=sha1"));
-        await AssertSuccessAsync(RunAsync(
-            repository,
-            "git",
-            "config",
-            "user.email",
-            "acceptance-script@example.invalid"));
-        await AssertSuccessAsync(RunAsync(
-            repository,
-            "git",
-            "config",
-            "user.name",
-            "Acceptance Script Test"));
+            "acceptance-script@example.invalid",
+            "Acceptance Script Test");
         await File.WriteAllTextAsync(
             Path.Combine(repository, "fixture.txt"),
             "fixture\n");

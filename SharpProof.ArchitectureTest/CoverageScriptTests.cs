@@ -1065,35 +1065,12 @@ public sealed class CoverageScriptTests
 
     private static async Task InitializeRepositoryAsync(string repository)
     {
-        await AssertSuccessAsync(RunAsync(
+        await ArchitectureGitRepository.InitializeAsync(
             repository,
-            "git",
-            "init",
-            "--object-format=sha1"));
-        await AssertSuccessAsync(RunAsync(
-            repository,
-            "git",
-            "config",
-            "user.email",
-            "coverage-script@example.invalid"));
-        await AssertSuccessAsync(RunAsync(
-            repository,
-            "git",
-            "config",
-            "user.name",
-            "Coverage Script Test"));
-        await AssertSuccessAsync(RunAsync(
-            repository,
-            "git",
-            "config",
-            "core.autocrlf",
-            "false"));
-        await AssertSuccessAsync(RunAsync(
-            repository,
-            "git",
-            "config",
-            "core.quotePath",
-            "true"));
+            "coverage-script@example.invalid",
+            "Coverage Script Test",
+            ("core.autocrlf", "false"),
+            ("core.quotePath", "true"));
     }
 
     private static async Task<string> CreateSingleCommitFixtureAsync()
