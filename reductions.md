@@ -6265,3 +6265,27 @@ review risk outweighs the line-count saving.
 R800 is `deferred` pending a seam that reduces the repeated lane projection
 without obscuring the distinct initial-allocation and renewal ownership rules.
 No implementation or build file was changed.
+
+## Second survey, part three hundred twelve: R801 - repeated incoming-environment scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R801 | **`AcyclicBlockPredicateExecutor.Merge` rescans every incoming environment variable before merging it.** For each variable from the first incoming state, the method first calls `values.Any` to reject a missing binding, calls a second `values.Any` to detect a differing term ID, and then makes another reverse pass over `values` to build conditional terms when the IDs differ. A per-variable accumulator can combine the missing-binding and differing-value checks in one forward pass, retaining only the reverse construction pass when a conditional is actually required. This removes a full list scan on the common complete-and-equal path while preserving incoming-state ordering, omission of partially bound variables, conditional precedence, and the existing `Spend` accounting. This is a local merge-loop reduction, not a duplicate proposal for the broader shared flow-engine structure in R542. | `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:271-327`; `SharpProof.Worker.Test/AcyclicBlockPredicateExecutorTests.cs:1-860` |
+
+### Checked and not proposed (part three hundred twelve)
+
+- The predicate disjunction, sorted incoming-state order, and reverse
+  conditional construction remain separate because they encode different
+  semantics.
+- The candidate does not remove the reverse pass when differing values need
+  nested conditionals; it removes only the redundant second predicate scan and
+  keeps the existing resource-budget accounting explicit.
+- R542 covers duplicated control-flow machinery between the summary builder
+  and worker executor; R801 is limited to repeated scans inside this one
+  executor's environment merge.
+
+### Status (part three hundred twelve)
+
+R801 is `deferred` pending a small accumulator that preserves the current
+  fail-closed handling and ordering while eliminating the repeated merge-loop
+  scan. No implementation or build file was changed.
