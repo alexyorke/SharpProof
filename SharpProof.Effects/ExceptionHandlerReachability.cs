@@ -133,7 +133,7 @@ internal sealed class ExceptionHandlerReachability(
                 if (targetCase != null &&
                     scheduledSwitchBodies.Add(targetCase))
                 {
-                    PushSequential(targetCase.Body);
+                    PushSequentialCore(targetCase.Body, remaining);
                 }
                 if (targetCase != null)
                 {
@@ -149,7 +149,7 @@ internal sealed class ExceptionHandlerReachability(
                     }
                     if (scheduledGotoLabels.Add(branch.Target))
                     {
-                        PushSequential(continuation);
+                        PushSequentialCore(continuation, remaining);
                     }
                     continue;
                 }
@@ -929,7 +929,7 @@ internal sealed class ExceptionHandlerReachability(
                         continue;
                     }
                 }
-                PushSequential(recursivePattern.ChildOperations);
+                PushSequentialCore(recursivePattern.ChildOperations, remaining);
                 continue;
             }
             if (operation is IListPatternOperation listPattern)
@@ -947,7 +947,7 @@ internal sealed class ExceptionHandlerReachability(
                             : ResolveDispatch(member, activeMethods, depth),
                         listPattern);
                 }
-                PushSequential(listPattern.Patterns);
+                PushSequentialCore(listPattern.Patterns, remaining);
                 continue;
             }
             if (operation is IFieldReferenceOperation fieldReference)
@@ -1190,27 +1190,6 @@ internal sealed class ExceptionHandlerReachability(
                 switchCaseReachability);
         }
 
-        void PushSequential(IEnumerable<IOperation> children)
-        {
-            var reachable = new List<IOperation>();
-            foreach (var child in children)
-            {
-                reachable.Add(child);
-                if (!canCompleteNormally(child))
-                {
-                    break;
-                }
-            }
-            PushAll(reachable);
-        }
-
-        void PushAll(IEnumerable<IOperation> children)
-        {
-            foreach (var child in children.Reverse())
-            {
-                remaining.Push(child);
-            }
-        }
     }
 
     // Keep this large control-flow dispatcher out of the captured traversal

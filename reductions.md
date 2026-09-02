@@ -204,6 +204,7 @@ the smallest relevant containerized test target passes.
 | R532 | Reuse compiler source-location copy/equality helpers during replay | `SharpProof.Worker.Test`: 695 passed |
 | R533 | Share the zero source-location sentinel predicate | `SharpProof.Worker.Test`: 695 passed |
 | R534 | Derive reset marker paths from already-canonical publication paths | `SharpProof.Worker.Test`: 695 passed |
+| R538 | Reuse shared sequential/reverse reachability stack helpers | `SharpProof.Effects.Test`: 323 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3251,9 +3252,9 @@ model-specific rebuild and minimization policy intact.
 
 ### Status (part eighty-three)
 
-R538 remains `pending`; R539 keeps the two evidence flags distinct while
-avoiding repeated assumption-array scans. R538 removes duplicated traversal
-scaffolding without merging the reachability-specific dispatcher.
+R539 keeps the two evidence flags distinct while avoiding repeated
+assumption-array scans. R538 now reuses the shared sequential/reverse stack
+helpers without merging the reachability-specific dispatcher.
 
 ## Second survey, part eighty-four: R540 - callable projection scans
 
@@ -3386,3 +3387,13 @@ reduction is about reusing one archive snapshot, not dropping any validation.
 R554 is a `pending` reduction candidate. Confirm that callers outside this
 repository do not consume the dot-sourced function before deleting or reshaping
 it; the repository-local evidence shows no active consumer.
+
+## Second survey, part ninety-seven: R555 - unused release-authority local
+
+| R555 | **`Get-SharpProofReleaseVersionAuthority` computes an unused path.** After normalizing `$RepositoryRoot`, the function assigns `$path = Join-Path $root 'SharpProof.Release.props'`, but never reads it; the returned authority record uses the literal relative path and delegates version extraction to `Get-SharpProofReleaseVersion`. Removing the assignment makes the function's actual inputs and outputs clearer and avoids implying that the returned path was resolved or validated there. | `scripts/Get-SharpProofReleaseVersion.ps1:38-48` |
+
+### Status (part ninety-seven)
+
+R555 is a `pending` reduction candidate. Remove only the unread local; retain the
+root normalization and delegated version lookup because callers may pass a
+relative repository path.
