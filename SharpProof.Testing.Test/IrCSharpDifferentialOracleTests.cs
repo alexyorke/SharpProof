@@ -140,67 +140,28 @@ public sealed class IrCSharpDifferentialOracleTests
         Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Abstained));
     }
 
-    [Test]
-    public void NullVariableBindingAbstainsWithoutEscaping()
+    [TestCase(InvalidBindingKind.Null)]
+    [TestCase(InvalidBindingKind.Boolean)]
+    [TestCase(InvalidBindingKind.Text)]
+    public void InvalidVariableBindingAbstainsWithoutEscaping(
+        InvalidBindingKind kind)
     {
         var factory = new IrFactory();
-        var value = factory.CreateVariable("value", factory.IntegerType);
-
-        var result = new IrCSharpDifferentialOracle(factory).Compare(
-            factory.Variable(value),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [value] = null!
-            });
-
-        using (Assert.EnterMultipleScope())
+        var (type, binding) = kind switch
         {
-            Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Abstained));
-            Assert.That(
-                result.Interpreted.Status,
-                Is.EqualTo(IrEvaluationStatus.Unsupported));
-            Assert.That(
-                result.Interpreted.Unsupported!.Reason,
-                Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
-        }
-    }
-
-    [Test]
-    public void WrongTypeVariableBindingAbstainsWithoutEscaping()
-    {
-        var factory = new IrFactory();
-        var value = factory.CreateVariable("value", factory.IntegerType);
+            InvalidBindingKind.Null => (factory.IntegerType, (IrValue)null!),
+            InvalidBindingKind.Boolean => (
+                factory.IntegerType,
+                factory.CreateBooleanValue(true)),
+            _ => (factory.ObjectType, factory.CreateStringValue("text"))
+        };
+        var value = factory.CreateVariable("value", type);
 
         var result = new IrCSharpDifferentialOracle(factory).Compare(
             factory.Variable(value),
             new Dictionary<IrVarId, IrValue>
             {
-                [value] = factory.CreateBooleanValue(true)
-            });
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Status, Is.EqualTo(DifferentialStatus.Abstained));
-            Assert.That(
-                result.Interpreted.Status,
-                Is.EqualTo(IrEvaluationStatus.Unsupported));
-            Assert.That(
-                result.Interpreted.Unsupported!.Reason,
-                Is.EqualTo(IrUnsupportedReason.InvalidVariableValue));
-        }
-    }
-
-    [Test]
-    public void RuntimeCompatibleWrongTypeBindingAbstainsInsteadOfMismatching()
-    {
-        var factory = new IrFactory();
-        var value = factory.CreateVariable("value", factory.ObjectType);
-
-        var result = new IrCSharpDifferentialOracle(factory).Compare(
-            factory.Variable(value),
-            new Dictionary<IrVarId, IrValue>
-            {
-                [value] = factory.CreateStringValue("text")
+                [value] = binding
             });
 
         using (Assert.EnterMultipleScope())
@@ -371,6 +332,13 @@ public sealed class IrCSharpDifferentialOracleTests
             Assert.That(agrees, Is.True);
             Assert.That(allocated, Is.LessThan(1_000_000));
         }
+    }
+
+    public enum InvalidBindingKind
+    {
+        Null,
+        Boolean,
+        Text
     }
 
     private static int CountGeneratedOracleAssemblies()
