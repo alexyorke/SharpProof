@@ -178,15 +178,53 @@ function Get-SharpProofCpuBudget {
         1, [Math]::Floor($visibleProcessors * $percent / 100.0))
 }
 
+$script:SharpProofParallelismPolicies = @{
+    'test-project' = @{
+        OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
+        DivisorProperty = 'testProjectCpuDivisor'
+        InvalidMessage = 'The test-project CPU divisor must be positive.'
+    }
+    semantic = @{
+        OverrideVariables = @(
+            'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
+            'SHARPPROOF_TEST_PROJECT_PARALLELISM')
+        AllVisible = $true
+    }
+    package = @{
+        OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
+        PercentProperty = 'packageTestCpuPercent'
+        InvalidMessage =
+            'The package-test CPU percentage must be between 1 and 100.'
+    }
+    build = @{
+        OverrideVariables = @('SHARPPROOF_TEST_PROJECT_PARALLELISM')
+        PercentProperty = 'buildCpuPercent'
+        InvalidMessage =
+            'The build CPU percentage must be between 1 and 100.'
+    }
+}
+
+function Get-SharpProofConfiguredParallelism {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string]$Policy
+    )
+
+    $parameters = @{
+        RepositoryRoot = $RepositoryRoot
+    }
+    foreach ($entry in $script:SharpProofParallelismPolicies[$Policy].GetEnumerator()) {
+        $parameters[$entry.Key] = $entry.Value
+    }
+    return Get-SharpProofCpuBudget @parameters
+}
+
 function Get-SharpProofTestProjectParallelism {
     [CmdletBinding()]
     param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
 
-    return Get-SharpProofCpuBudget `
-        -RepositoryRoot $RepositoryRoot `
-        -OverrideVariables 'SHARPPROOF_TEST_PROJECT_PARALLELISM' `
-        -DivisorProperty 'testProjectCpuDivisor' `
-        -InvalidMessage 'The test-project CPU divisor must be positive.'
+    return Get-SharpProofConfiguredParallelism `
+        $RepositoryRoot 'test-project'
 }
 
 function Get-SharpProofSemanticTestParallelism {
@@ -196,12 +234,8 @@ function Get-SharpProofSemanticTestParallelism {
         [string]$RepositoryRoot
     )
 
-    return Get-SharpProofCpuBudget `
-        -RepositoryRoot $RepositoryRoot `
-        -OverrideVariables @(
-            'SHARPPROOF_SEMANTIC_TEST_PARALLELISM',
-            'SHARPPROOF_TEST_PROJECT_PARALLELISM') `
-        -AllVisible
+    return Get-SharpProofConfiguredParallelism `
+        $RepositoryRoot 'semantic'
 }
 
 function Get-SharpProofPackageTestParallelism {
@@ -211,12 +245,8 @@ function Get-SharpProofPackageTestParallelism {
         [string]$RepositoryRoot
     )
 
-    return Get-SharpProofCpuBudget `
-        -RepositoryRoot $RepositoryRoot `
-        -OverrideVariables 'SHARPPROOF_TEST_PROJECT_PARALLELISM' `
-        -PercentProperty 'packageTestCpuPercent' `
-        -InvalidMessage `
-            'The package-test CPU percentage must be between 1 and 100.'
+    return Get-SharpProofConfiguredParallelism `
+        $RepositoryRoot 'package'
 }
 
 function Get-SharpProofBuildParallelism {
@@ -226,12 +256,8 @@ function Get-SharpProofBuildParallelism {
         [string]$RepositoryRoot
     )
 
-    return Get-SharpProofCpuBudget `
-        -RepositoryRoot $RepositoryRoot `
-        -OverrideVariables 'SHARPPROOF_TEST_PROJECT_PARALLELISM' `
-        -PercentProperty 'buildCpuPercent' `
-        -InvalidMessage `
-            'The build CPU percentage must be between 1 and 100.'
+    return Get-SharpProofConfiguredParallelism `
+        $RepositoryRoot 'build'
 }
 
 function Get-SharpProofTestAssemblyPath {
