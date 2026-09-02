@@ -29,47 +29,39 @@ public sealed class AtomicFileTests
     [Test]
     public void WriteUtf8CreatesParentsWithoutPreambleAndReplacesDestination()
     {
-        var path = Path.Combine(_root, "nested", "result.txt");
-        AtomicFile.WriteUtf8(path, "first\n");
-        AtomicFile.WriteUtf8(path, "second\n");
-
-        Assert.That(File.ReadAllBytes(path), Is.EqualTo(Encoding.UTF8.GetBytes("second\n")));
-        Assert.That(TemporaryFiles(path), Is.Empty);
+        AssertWriteUtf8ReplacementAsync(static (path, content) =>
+        {
+            AtomicFile.WriteUtf8(path, content);
+            return Task.CompletedTask;
+        }).GetAwaiter().GetResult();
     }
 
     [Test]
     public async Task WriteUtf8AsyncCreatesParentsWithoutPreambleAndReplacesDestination()
     {
-        var path = Path.Combine(_root, "nested", "result.txt");
-        await AtomicFile.WriteUtf8Async(path, "first\n");
-        await AtomicFile.WriteUtf8Async(path, "second\n");
-
-        Assert.That(
-            await File.ReadAllBytesAsync(path),
-            Is.EqualTo(Encoding.UTF8.GetBytes("second\n")));
-        Assert.That(TemporaryFiles(path), Is.Empty);
+        await AssertWriteUtf8ReplacementAsync(
+            static (path, content) => AtomicFile.WriteUtf8Async(
+                path,
+                content));
     }
 
     [Test]
     public void WriteUtf8SupportsValidLongDestinationBasename()
     {
-        var path = LongDestinationPath();
-
-        AtomicFile.WriteUtf8(path, "content\n");
-
-        Assert.That(File.ReadAllText(path), Is.EqualTo("content\n"));
-        Assert.That(TemporaryFiles(path), Is.Empty);
+        AssertWriteUtf8LongDestinationAsync(static (path, content) =>
+        {
+            AtomicFile.WriteUtf8(path, content);
+            return Task.CompletedTask;
+        }).GetAwaiter().GetResult();
     }
 
     [Test]
     public async Task WriteUtf8AsyncSupportsValidLongDestinationBasename()
     {
-        var path = LongDestinationPath();
-
-        await AtomicFile.WriteUtf8Async(path, "content\n");
-
-        Assert.That(await File.ReadAllTextAsync(path), Is.EqualTo("content\n"));
-        Assert.That(TemporaryFiles(path), Is.Empty);
+        await AssertWriteUtf8LongDestinationAsync(
+            static (path, content) => AtomicFile.WriteUtf8Async(
+                path,
+                content));
     }
 
     [Test]
@@ -121,6 +113,33 @@ public sealed class AtomicFileTests
     private static string[] TemporaryFiles(string path)
     {
         return Directory.GetFiles(Path.GetDirectoryName(path)!, "*.tmp");
+    }
+
+    private async Task AssertWriteUtf8ReplacementAsync(
+        Func<string, string, Task> write)
+    {
+        var path = Path.Combine(_root, "nested", "result.txt");
+        await write(path, "first\n");
+        await write(path, "second\n");
+
+        AssertPublished(path, "second\n");
+    }
+
+    private async Task AssertWriteUtf8LongDestinationAsync(
+        Func<string, string, Task> write)
+    {
+        var path = LongDestinationPath();
+        await write(path, "content\n");
+
+        AssertPublished(path, "content\n");
+    }
+
+    private static void AssertPublished(string path, string expected)
+    {
+        Assert.That(
+            File.ReadAllBytes(path),
+            Is.EqualTo(Encoding.UTF8.GetBytes(expected)));
+        Assert.That(TemporaryFiles(path), Is.Empty);
     }
 
     private string LongDestinationPath()
