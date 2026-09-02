@@ -404,9 +404,10 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             ValidateDepth(query.Goal.Predicate, maximumDepths, meter, cancellationToken);
             Variables = query.ModelVariables;
             var integerVariables = ImmutableArray.CreateBuilder<IrVarId>();
-            foreach (var variable in Variables)
+            for (var index = 0; index < Variables.Length; index++)
             {
                 meter.Consume();
+                var variable = Variables[index];
                 var type = _factory.GetVariableInfo(variable).Type;
                 if (type != _factory.BooleanType &&
                     type != _factory.IntegerType)
@@ -418,31 +419,12 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 {
                     integerVariables.Add(variable);
                 }
+                var name = "v" + index.ToString(CultureInfo.InvariantCulture);
+                _variables.Add(variable, type == _factory.BooleanType
+                    ? _owner.Own(_context.MkBoolConst(name))
+                    : _owner.Own(_context.MkIntConst(name)));
             }
             IntegerVariables = integerVariables.ToImmutable();
-            for (var index = 0; index < Variables.Length; index++)
-            {
-                meter.Consume();
-                var variable = Variables[index];
-                var name = "v" + index.ToString(CultureInfo.InvariantCulture);
-                var type = _factory.GetVariableInfo(variable).Type;
-                Expr expression;
-                if (type == _factory.BooleanType)
-                {
-                    expression = _owner.Own(_context.MkBoolConst(name));
-                }
-                else if (type == _factory.IntegerType)
-                {
-                    expression = _owner.Own(_context.MkIntConst(name));
-                }
-                else
-                {
-                    throw new InvalidOperationException(
-                        "The model-variable type was not prevalidated.");
-                }
-
-                _variables.Add(variable, expression);
-            }
         }
 
         private static void ValidateDepth(
