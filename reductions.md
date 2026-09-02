@@ -174,6 +174,7 @@ the smallest relevant containerized test target passes.
 | R854 | Share generated-source argument augmentation in C# formatting | PowerShell parser validation passed |
 | R855 | Share release-JSON accepted/rejected fixture assertion plumbing | `SharpProof.ArchitectureTest`: ReleaseJsonAuthorityTests passed |
 | R592 | Merge duplicate differential type projection finding into R546 | `SharpProof.Testing.Test`: IrCSharpDifferentialOracleTests, 11 passed |
+| R591 | Replace recursive differential-oracle term collection with an explicit stack | `SharpProof.Testing.Test`: IrCSharpDifferentialOracleTests, 11 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3892,7 +3893,10 @@ optimization and type interning while removing the second dictionary probe.
 
 ### Status (part one hundred thirty-two)
 
-R591 is a pending differential-testing reduction candidate. Preserve the current fail-fast checks for unsupported terms and missing/ill-typed variables, and preserve child-before-parent declaration order; remove only the unbounded recursive walk.
+R591 is `applied`: differential-oracle term collection now uses an explicit
+postorder stack with reverse child scheduling to preserve recursive order,
+visited-term behavior, variable collection, and fail-fast diagnostics without
+an unbounded call stack.
 
 ## Second survey, part one hundred thirty-three: R592 - duplicate differential type projections
 
@@ -7608,3 +7612,20 @@ build-file changes were made during this audit.
 
 R858 is `applied`: the fuzz test now uses `IrTermAnalysis.CollectVariables`
 for variable membership, removing a test-only IR-kind traversal.
+
+## Second survey, part three hundred sixty-nine: R859 - repeated corpus containment predicate
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R859 | **`OpenSourceCorpusCatalog.EnsureContained` repeats the same relative-path containment predicate.** The method first computes a lexical relative path and then a symlink-resolved relative path; both branches independently reject a rooted relative result or any `..` segment. The two checks are intentionally separate trust-boundary passes and must not be collapsed, but a small predicate such as `IsContained(root, path)` can own the shared `Path.IsPathRooted`/separator-split test while the callers retain their distinct error messages and lexical-versus-resolved inputs. This removes local algorithm duplication without weakening the symlink escape check. | `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:386-412` |
+
+### Checked and not proposed (part three hundred sixty-nine)
+
+- R859 is narrower than R431 and R560: it does not concern a test fixture's root discovery or the PowerShell production-inventory path policy.
+- The lexical and resolved checks are both required. Replacing them with only the resolved check would remove the early lexical guard, while replacing them with only the lexical check would miss a path that escapes through a symlink.
+- `ResolvePath` and `ResolveLink` remain separate because they implement link resolution rather than the containment decision; the candidate is only the repeated relative-path predicate.
+
+### Status (part three hundred sixty-nine)
+
+R859 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
