@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Analyzer;
 using SharpProof.Analyzer.Configuration;
 using SharpProof.Attributes;
+using SharpProof.Testing;
 
 namespace SharpProof.Gates;
 
@@ -116,7 +117,7 @@ internal static class AnalyzerGateHost
 
         var options = new AnalyzerOptions(
             [],
-            new GateOptionsProvider(values));
+            new DictionaryAnalyzerConfigOptionsProvider(values));
         var withAnalyzers = compilation.WithAnalyzers(
             [analyzer],
             new CompilationWithAnalyzersOptions(
@@ -200,45 +201,6 @@ internal static class AnalyzerGateHost
         }
 
         return references.Add(MetadataReference.CreateFromImage(stream.ToArray()));
-    }
-
-    private sealed class GateOptionsProvider(
-        IReadOnlyDictionary<string, string> globalValues)
-        : AnalyzerConfigOptionsProvider
-    {
-        private static readonly AnalyzerConfigOptions Empty =
-            new GateOptions(new Dictionary<string, string>());
-        private readonly AnalyzerConfigOptions _global =
-            new GateOptions(globalValues);
-
-        public override AnalyzerConfigOptions GlobalOptions => _global;
-
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
-        {
-            return Empty;
-        }
-
-        public override AnalyzerConfigOptions GetOptions(
-            AdditionalText textFile)
-        {
-            return Empty;
-        }
-    }
-
-    private sealed class GateOptions(
-        IReadOnlyDictionary<string, string> values)
-        : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string value)
-        {
-            if (values.TryGetValue(key, out var found))
-            {
-                value = found;
-                return true;
-            }
-            value = string.Empty;
-            return false;
-        }
     }
 
     private sealed class RecordingAnalyzerSessionFactory(

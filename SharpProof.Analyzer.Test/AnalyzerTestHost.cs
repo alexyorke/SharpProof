@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
+using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -136,7 +137,7 @@ internal static class AnalyzerTestHost
         }
         var analyzerOptions = new AnalyzerOptions(
             additionalFiles.IsDefault ? [] : additionalFiles,
-            new TestOptionsProvider(values));
+            new DictionaryAnalyzerConfigOptionsProvider(values));
         var withAnalyzers = compilation.WithAnalyzers(
             [analyzer ?? new SharpProofAnalyzer()],
             new CompilationWithAnalyzersOptions(
@@ -249,40 +250,4 @@ internal static class AnalyzerTestHost
                     typeof(Contract).Assembly.Location))];
     }
 
-    private sealed class TestOptionsProvider(
-        IReadOnlyDictionary<string, string> globalValues)
-        : AnalyzerConfigOptionsProvider
-    {
-        private static readonly AnalyzerConfigOptions Empty =
-            new TestOptions(new Dictionary<string, string>());
-        private readonly AnalyzerConfigOptions _global =
-            new TestOptions(globalValues);
-
-        public override AnalyzerConfigOptions GlobalOptions => _global;
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
-        {
-            return Empty;
-        }
-
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
-        {
-            return Empty;
-        }
-    }
-
-    private sealed class TestOptions(
-        IReadOnlyDictionary<string, string> values)
-        : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string value)
-        {
-            if (values.TryGetValue(key, out var found))
-            {
-                value = found;
-                return true;
-            }
-            value = string.Empty;
-            return false;
-        }
-    }
 }

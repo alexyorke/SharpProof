@@ -86,6 +86,13 @@
              Link="TestMetadataReferences.cs" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Gates'">
+    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\DictionaryAnalyzerConfigOptions.cs"
+             Link="DictionaryAnalyzerConfigOptions.cs" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(SharpProofProductionProject)' == 'true'">
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
                       PrivateAssets="all" />

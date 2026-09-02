@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SharpProof.Analyzer;
+using SharpProof.Testing;
 
 namespace SharpProof.ContractForGenerator.Test;
 
@@ -137,7 +138,7 @@ internal static class GeneratorTestHost
     {
         var options = new AnalyzerOptions(
             [],
-            new TestAnalyzerConfigOptionsProvider(
+            new DictionaryAnalyzerConfigOptionsProvider(
                 globalOptions ??
                 new Dictionary<string, string>(StringComparer.Ordinal)));
         var withAnalyzers = compilation.WithAnalyzers(
@@ -185,7 +186,7 @@ internal static class GeneratorTestHost
             parseOptions: ParseOptions,
             optionsProvider: globalOptions == null
                 ? null
-                : new TestAnalyzerConfigOptionsProvider(globalOptions),
+                : new DictionaryAnalyzerConfigOptionsProvider(globalOptions),
             driverOptions: new GeneratorDriverOptions(
                 IncrementalGeneratorOutputKind.None,
                 trackIncrementalGeneratorSteps: true));
@@ -223,38 +224,6 @@ internal static class GeneratorTestHost
                 Environment.NewLine,
                 errors.Select(static diagnostic => diagnostic.ToString())));
         }
-    }
-}
-
-internal sealed class TestAnalyzerConfigOptionsProvider(
-    IReadOnlyDictionary<string, string> globalValues) :
-    AnalyzerConfigOptionsProvider
-{
-    private readonly AnalyzerConfigOptions _globalOptions =
-        new TestAnalyzerConfigOptions(globalValues);
-
-    public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
-
-    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
-    {
-        return TestAnalyzerConfigOptions.Empty;
-    }
-
-    public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
-    {
-        return TestAnalyzerConfigOptions.Empty;
-    }
-}
-
-internal sealed class TestAnalyzerConfigOptions(
-    IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
-{
-    internal static TestAnalyzerConfigOptions Empty { get; } =
-        new(ImmutableDictionary<string, string>.Empty);
-
-    public override bool TryGetValue(string key, out string value)
-    {
-        return values.TryGetValue(key, out value!);
     }
 }
 
