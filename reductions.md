@@ -6410,3 +6410,28 @@ R806 is `deferred`: the duplicated rule is a real maintenance risk, but the
 error/null-policy differences make a careless shared helper more complex than
 the duplicated projections. It is best addressed only with explicit policy
 parameters or a common validated correspondence result.
+
+## Second survey, part three hundred eighteen: R807 - repeated canonical-variable validation scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R807 | **`CompilerLoweredArtifact.ValidateVariables` makes several independent passes over the same canonical-variable array before and after its row loop.** It projects all variable IDs into a set, filters and sorts parameters, separately projects labels, counts receiver and result roles, filters receiver/parameter rows once for a set and again for a dictionary, and finally filters pre-state rows twice to compare distinct current-state IDs with their count. The per-row loop still needs the indexed variable/artifact-row pairing and factory lookups, but one validation accumulator could collect role counts, labels, current-variable membership/map, and pre-state injectivity while preserving the sorted-parameter check and all row-shape checks. This removes repeated bounded scans and makes the role invariants share one source of truth. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:622-692` |
+
+### Checked and not proposed (part three hundred eighteen)
+
+- The indexed row loop remains necessary: it validates each artifact row against
+  its canonical variable, derives type/interval facts, and must preserve the
+  artifact-row index relationship.
+- Parameter ordering is intentionally sorted and compared with a dense ordinal
+  range; a fused accumulator must retain that exact ordinal invariant rather
+  than merely count parameters.
+- The current/pre-state distinction and `CurrentStateVariable` type checks are
+  semantic validation rules, not redundant branches. Only their collection
+  plumbing is a candidate for sharing.
+
+### Status (part three hundred eighteen)
+
+R807 is `deferred`: the method is a validation boundary and a large fused
+accumulator could become harder to audit than the current clear projections.
+The repeated scans are still a plausible local cleanup if profiling or a
+future validation refactor makes the allocation cost material.
