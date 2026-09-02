@@ -4184,11 +4184,3 @@ R633 is a pending fuzz-oracle infrastructure reduction candidate. Preserve colle
 ### Status (part one hundred seventy-eight)
 
 R637 is a pending Worker-test fixture-lifetime reduction candidate and extends the manually scoped cases listed in R428. Preserve process termination and mutation-specific cleanup before directory disposal; share only temporary-directory creation and safe recursive cleanup.
-
-## Second survey, part one hundred seventy-nine: R638 - repeated source-authority artifact pipeline
-
-| R638 | **`CompilerSourceLocationAuthorityTests` rebuilds the same compiler-artifact pipeline in three helpers.** `CreateArtifact`, `CreateNonSourceDiagnosticArtifact`, and `CreateContractArtifact` each call `CompilerManifestArtifactProducer.Create` with the test work directory, `net8.0`, `WorkerFeatureSet.All`, a fresh `ClaimManifestBuilder(compilation).Build()`, the default expression-depth limit, and `CancellationToken.None`. Only the source/reference choice and, for the non-source case, output kind differ. A private artifact-production core can accept the prepared compilation and preserve those fixture-specific seams while removing repeated producer arguments and claim-manifest construction. | `SharpProof.Worker.Test/CompilerSourceLocationAuthorityTests.cs:327-374` |
-
-### Status (part one hundred seventy-nine)
-
-R638 is a pending compiler-artifact test-fixture reduction candidate. Preserve the distinct contract-reference, output-kind, source-location, and diagnostic-classification scenarios; share only the common artifact production call.

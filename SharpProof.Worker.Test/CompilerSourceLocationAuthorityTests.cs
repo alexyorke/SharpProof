@@ -326,7 +326,13 @@ public sealed class CompilerSourceLocationAuthorityTests
 
     private static CompilerManifestArtifact CreateArtifact(string source)
     {
-        var compilation = CreateCompilation(source, includeContractReference: false);
+        return CreateArtifact(
+            CreateCompilation(source, includeContractReference: false));
+    }
+
+    private static CompilerManifestArtifact CreateArtifact(
+        CSharpCompilation compilation)
+    {
         return CompilerManifestArtifactProducer.Create(
             compilation,
             TestContext.CurrentContext.WorkDirectory,
@@ -343,14 +349,7 @@ public sealed class CompilerSourceLocationAuthorityTests
             "internal sealed class Subject {}\n",
             includeContractReference: false).WithOptions(
                 new CSharpCompilationOptions(OutputKind.ConsoleApplication));
-        return CompilerManifestArtifactProducer.Create(
-            compilation,
-            TestContext.CurrentContext.WorkDirectory,
-            "net8.0",
-            WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(),
-            WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+        return CreateArtifact(compilation);
     }
 
     private static CompilerManifestArtifact CreateContractArtifact()
@@ -363,14 +362,7 @@ public sealed class CompilerSourceLocationAuthorityTests
             "  }\n" +
             "}\n";
         var compilation = CreateCompilation(source, includeContractReference: true);
-        return CompilerManifestArtifactProducer.Create(
-            compilation,
-            TestContext.CurrentContext.WorkDirectory,
-            "net8.0",
-            WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(),
-            WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+        return CreateArtifact(compilation);
     }
 
     private static CSharpCompilation CreateCompilation(
