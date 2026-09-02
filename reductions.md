@@ -6957,3 +6957,25 @@ R828 is `deferred`: the duplicate boolean check has no measurable runtime cost,
 R829 is `deferred`: it is a small, potentially redundant defensive pass, but
   the exception hierarchy is serialized evidence and should not lose a
   fail-closed guard without proving the symbol and encoding invariants.
+
+## Second survey, part three hundred forty-one: R830 - dead launcher assumption total
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R830 | **`ReportAssumptions` computes an unused total.** After the method has already tested `assumptions.User + assumptions.Trusted == 0`, it assigns the same sum to `total`, but no later expression reads that local; the diagnostic receives the original `WorkerAssumptionSummary`, and the return value depends only on the policy. Removing the assignment eliminates dead code without changing the zero-assumption guard, diagnostic text, or exit status. | `SharpProof.Worker.Launcher/Program.cs:497-511` |
+
+### Checked and not proposed (part three hundred forty-one)
+
+- The zero-total test remains necessary because it suppresses diagnostics and
+  does not turn an empty assumption summary into an error.
+- `LauncherPresentation.AssumptionsDeclaredMessage` remains the owner of the
+  displayed total and per-kind counts; the unused local does not duplicate a
+  required output value.
+- No launcher exit-code or response-validation behavior is part of this
+  cleanup.
+
+### Status (part three hundred forty-one)
+
+R830 is `deferred`: it is a zero-risk dead-local removal, pending the next
+  launcher validation pass so the surrounding reporting path can be checked
+  together.
