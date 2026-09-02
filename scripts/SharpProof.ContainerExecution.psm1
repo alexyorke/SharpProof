@@ -591,14 +591,6 @@ function Invoke-SharpProofParallelDotnetBuilds {
                     Write-Host $stderr.TrimEnd()
                 }
             }
-            else {
-                $elapsedSeconds = (
-                    $active.Process.ExitTime.ToUniversalTime() -
-                    $active.StartedUtc).TotalSeconds
-                Write-Host (
-                    "Build {0}: passed ({1:0.0}s)" -f
-                    $active.Name, $elapsedSeconds)
-            }
             if ($exitCode -ne 0) {
                 $failures.Add(
                     "$($active.Name) exited ${exitCode}: " +
