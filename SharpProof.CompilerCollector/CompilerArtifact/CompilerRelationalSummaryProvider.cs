@@ -20,6 +20,7 @@ internal sealed class CompilerRelationalSummaryProvider
 {
     private const int MaximumDependencyDepth = 64;
     private readonly CSharpCompilation _compilation;
+    private readonly CompilerSyntaxTreeSnapshot[]? _capturedTrees;
     private readonly IrFactory _factory;
     private readonly ResolvedApiSpecTable _apiSpecs;
     private readonly CompilerSpecificationPackProvider _specificationPacks;
@@ -50,12 +51,14 @@ internal sealed class CompilerRelationalSummaryProvider
         CSharpCompilation compilation,
         IrFactory factory,
         ResolvedApiSpecTable apiSpecs,
-        IEnumerable<string>? specificationPacks = null)
+        IEnumerable<string>? specificationPacks = null,
+        CompilerSyntaxTreeSnapshot[]? capturedTrees = null)
         : this(
             compilation,
             factory,
             apiSpecs,
-            CompilerSpecificationPackProvider.ResolveAuthority(specificationPacks))
+            CompilerSpecificationPackProvider.ResolveAuthority(specificationPacks),
+            capturedTrees)
     {
     }
 
@@ -63,11 +66,13 @@ internal sealed class CompilerRelationalSummaryProvider
         CSharpCompilation compilation,
         IrFactory factory,
         ResolvedApiSpecTable apiSpecs,
-        CompilerSpecificationPackAuthority specificationPackAuthority)
+        CompilerSpecificationPackAuthority specificationPackAuthority,
+        CompilerSyntaxTreeSnapshot[]? capturedTrees = null)
     {
         _compilation = ArgumentNullGuard.NotNull(
             compilation,
             nameof(compilation));
+        _capturedTrees = capturedTrees;
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         _apiSpecs = ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs));
         _specificationPacks = new CompilerSpecificationPackProvider(
@@ -348,7 +353,7 @@ internal sealed class CompilerRelationalSummaryProvider
         return HashEncoding.ComputeSha256Hex(Encoding.UTF8.GetBytes(text));
     }
 
-    private static CompilerSummaryEvidenceAuthority? CreateAuthority(
+    private CompilerSummaryEvidenceAuthority? CreateAuthority(
         IMethodSymbol method,
         IrRelationalSummary summary,
         CancellationToken cancellationToken)
@@ -373,15 +378,21 @@ internal sealed class CompilerRelationalSummaryProvider
                 return null;
             }
 
-            var sourceText = declaration.SyntaxTree.GetText(cancellationToken);
+            var capturedTree = FindCapturedTree(declaration.SyntaxTree);
+            var sourceTreeSha256 = capturedTree?.Sha256;
+            if (sourceTreeSha256 == null)
+            {
+                sourceTreeSha256 = CompilerCompilationCapture.ComputeTextSha256(
+                    declaration.SyntaxTree.GetText(cancellationToken));
+            }
             return new CompilerSummaryEvidenceAuthority(
                 CompilerSummaryOrigin.Source,
                 callIdentity,
                 provenance.EvidenceSha256,
                 provenance.EvidenceIdentity,
-                CompilerCaptureAuthority.NormalizePath(
+                capturedTree?.Path ?? CompilerCaptureAuthority.NormalizePath(
                     declaration.SyntaxTree.FilePath ?? string.Empty),
-                CompilerCompilationCapture.ComputeTextSha256(sourceText),
+                sourceTreeSha256,
                 declaration.FullSpan.Start,
                 declaration.FullSpan.Length,
                 string.Empty,
@@ -419,5 +430,25 @@ internal sealed class CompilerRelationalSummaryProvider
                 string.Empty,
                 -1)
             : null;
+    }
+
+    private CompilerSyntaxTreeSnapshot? FindCapturedTree(SyntaxTree syntaxTree)
+    {
+        if (_capturedTrees == null)
+        {
+            return null;
+        }
+
+        for (var index = 0; index < _compilation.SyntaxTrees.Length; index++)
+        {
+            if (ReferenceEquals(_compilation.SyntaxTrees[index], syntaxTree))
+            {
+                return index < _capturedTrees.Length
+                    ? _capturedTrees[index]
+                    : null;
+            }
+        }
+
+        return null;
     }
 }

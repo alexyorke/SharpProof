@@ -4193,10 +4193,50 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred eighty-two: R641 - repeated source-tree hashing
+## Second survey, part one hundred eighty-three: R642 - repeated assumption-shape validation
 
-| R641 | **`CompilerRelationalSummaryProvider.CreateAuthority` rehashes a source tree already captured for the same compilation.** `CompilerManifestArtifactProducer.Create` captures all syntax trees before lowering, and `CompilerCompilationCapture.CaptureTree` computes each tree's full-text SHA. Later, for every source summary authority, `CreateAuthority` calls `declaration.SyntaxTree.GetText` and `CompilerCompilationCapture.ComputeTextSha256` again for the same full tree, even though the authority only needs the captured tree hash. Passing the captured snapshot/tree-hash lookup into the provider, or reusing the capture cache, removes repeated text materialization and SHA-256 work while keeping the declaration-span evidence hash separate. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:14-18,45-58`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:204-215`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:351-389` |
+| R642 | **`CompilerResponseEvidenceAuthority` validates the same assumption declarations once per callable and once per claim.** `Validate` first calls `ValidateCallableAssumptions`, which runs `ValidateAssumptionShape` against the callable result, and `ValidateClaim` calls the same helper for every claim result. The expected used-set differs by result - callable-level assumptions must all be unused, while a claim may mark proof-core or trusted-boundary assumptions used - but `SameAssumptionDeclarations` and canonical ordering are invariant and are recomputed for every claim. Split declaration/order validation from used-flag validation so the per-callable shape check is shared and each claim retains only its result-specific usage check. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:43-59,65-75,101-134,220-241`; `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:575-590` |
 
-### Status (part one hundred eighty-two)
+### Status (part one hundred eighty-three)
 
-R641 is a pending compiler-summary evidence hashing reduction candidate. Preserve the full source-tree hash versus declaration-span evidence distinction, source-path normalization, and authority construction; reuse only the already-captured full-tree hash.
+R642 is a pending response-authority validation reduction candidate. Preserve the separate callable-versus-claim used-set policies, error codes, canonical assumption order, and declaration equality; share only the invariant shape comparison.
+
+## Second survey, part one hundred eighty-four: R643 - repeated manifest JSON preparse
+
+| R643 | **`CompilerManifestArtifactJson.Deserialize` parses the complete manifest JSON twice before deserialization.** `RequireSpecificationPackAuthorityProperties` creates one `JsonDocument`, and `RequireDiagnosticClassificationProperties` creates a second `JsonDocument` over the same input; both then inspect a small set of required properties before `JsonSerializer.Deserialize` parses the payload again. A single compatibility-property pass can retain both presence contracts and cancellation boundaries while removing one full preliminary parse; the typed deserialization and canonical reserialization checks remain separate concerns. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:372-395,705-736` |
+
+### Status (part one hundred eighty-four)
+
+R643 is a pending compiler-manifest input parsing reduction candidate. Preserve required-property compatibility checks, the optional diagnostic-array behavior, JSON depth limits, and the typed serializer validation; combine only the two preliminary document walks.
+
+## Second survey, part one hundred eighty-five: R644 - duplicate diagnostic-shape pass
+
+| R644 | **`CompilerManifestArtifactJson.Serialize` checks diagnostic shapes before canonicalization and then checks them again inside `Validate`.** The early `HasValidDiagnosticShapes` guard exists at lines 337-340, while `Validate` calls `HasValidDiagnostics`, whose first operation is the same per-item shape predicate before checking canonical ordering and source binding. Canonicalization only reorders the array and does not change item shape, so one shape pass can be retained at the validation boundary while preserving the early JSON-specific failure behavior through a narrower canonicalizer precondition or a shared validation result. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:330-356,429-457,750-772` |
+
+### Status (part one hundred eighty-five)
+
+R644 is a pending compiler-manifest diagnostic-validation reduction candidate. Preserve the early invalid-diagnostic exception, canonical diagnostic ordering, source-tree binding, and error semantics; remove only the duplicate shape predicate.
+
+## Second survey, part one hundred eighty-six: R645 - repeated claim partitioning
+
+| R645 | **`CompilerManifestArtifactJson.HasFeatureScopeParity` rescans and repartitions the full manifest claim array three times for every callable.** It independently builds `claims`, `postconditions`, and `effects` with three `Where(...).OrderBy(...).ToArray()` pipelines over `manifestClaims` inside the callable loop. A single grouping/partition pass keyed by `CallableId` can supply the three views and avoid O(callables x claims) repeated enumeration while keeping postcondition/effect ordering and all selected-feature checks unchanged. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:526-568` |
+
+### Status (part one hundred eighty-six)
+
+R645 is a pending feature-scope validation reduction candidate. Preserve claim ordinal ordering, null filtering, per-callable isolation, selected-feature policy, and effect/postcondition distinctions; share only the claim partitioning work.
+
+## Second survey, part one hundred eighty-seven: R646 - repeated source-location validity predicate
+
+| R646 | **`CompilerSourceLocationAuthority.IsBound` validates a non-sentinel location twice.** Its main path first calls `WorkerProtocolJson.HasValidLocation(location)` before the binding checks, then calls `HasValidLocationGeometry`, which invokes the same location predicate again before validating the line map and span. A geometry helper with an explicit already-validated path, or moving the common predicate to one boundary, removes the duplicate field scan while preserving the `allowNone` sentinel branch, source-tree hash checks, and geometry validation. | `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:79-103,145-185` |
+
+### Status (part one hundred eighty-seven)
+
+R646 is a pending source-location validation reduction candidate. Preserve sentinel handling, location-shape rejection, line-map validation, tree binding, and cancellation behavior; share only the repeated valid-location predicate.
+
+## Second survey, part one hundred eighty-eight: R647 - allocating portable-IR slot checks
+
+| R647 | **`PortableIrGraphCodec.RequireCanonicalSlots` allocates and boxes on every decoded row.** The helper is declared with `params object?[]`, so each term, instruction, and location validation call materializes an object array and boxes its integer/long slot values. For every slot marked `unused`, `IsCanonicalSlotDefault` allocates another `{ null, -1, 0L }` object array merely to call `Contains`. A typed/generated slot validator can preserve the schema-driven slot counts and defaults without per-row arrays, boxing, or repeated temporary collections on the portable-IR decode path. | `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:195-221,634-657,720-770` |
+
+### Status (part one hundred eighty-eight)
+
+R647 is a pending portable-IR codec allocation reduction candidate. Preserve schema catalog lookup, slot-count checks, default-value rules, and malformed-graph rejection; replace only the temporary object-array/boxing machinery.

@@ -29,7 +29,8 @@ internal sealed class CompilerCallableLowerer
     internal CompilerCallableLowerer(
         CSharpCompilation compilation,
         IrFactory factory,
-        CompilerSpecificationPackAuthority specificationPackAuthority)
+        CompilerSpecificationPackAuthority specificationPackAuthority,
+        CompilerSyntaxTreeSnapshot[]? capturedTrees = null)
     {
         compilation = ArgumentNullGuard.NotNull(compilation, nameof(compilation));
         _factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
@@ -39,7 +40,8 @@ internal sealed class CompilerCallableLowerer
             compilation,
             factory,
             _apiSpecs,
-            specificationPackAuthority);
+            specificationPackAuthority,
+            capturedTrees);
     }
 
     internal CompilerCallablePreparation Prepare(ManifestCallableTarget target, CancellationToken cancellationToken = default)

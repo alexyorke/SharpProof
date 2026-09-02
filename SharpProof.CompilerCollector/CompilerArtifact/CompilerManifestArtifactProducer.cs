@@ -47,7 +47,8 @@ internal static class CompilerManifestArtifactProducer
             var lowerer = new CompilerCallableLowerer(
                 compilation,
                 new IrFactory(),
-                specificationPackAuthority);
+                specificationPackAuthority,
+                snapshot.SyntaxTrees);
             callables = [.. targets.Select(item => {
                 var artifact = CompilerLoweredArtifact.Encode(
                     lowerer.Prepare(item, cancellationToken));
