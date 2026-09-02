@@ -213,19 +213,11 @@ public sealed class BuildTaskTests
             Assert.That(
                 RunVerifier.ShouldDeferSupervisorAuthentication(
                     authenticationRequired: true,
-                    interrupted: true,
                     outputCompleted: false),
                 Is.True);
             Assert.That(
                 RunVerifier.ShouldDeferSupervisorAuthentication(
                     authenticationRequired: true,
-                    interrupted: false,
-                    outputCompleted: false),
-                Is.True);
-            Assert.That(
-                RunVerifier.ShouldDeferSupervisorAuthentication(
-                    authenticationRequired: true,
-                    interrupted: true,
                     outputCompleted: true),
                 Is.False);
         }

@@ -308,7 +308,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 canceled ||
                 ShouldDeferSupervisorAuthentication(
                     authenticationRequired,
-                    interrupted,
                     outputCompleted);
             if (deferAuthentication)
             {
@@ -494,10 +493,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
     internal static bool ShouldDeferSupervisorAuthentication(
         bool authenticationRequired,
-        bool interrupted,
         bool outputCompleted)
     {
-        _ = interrupted;
         return authenticationRequired && !outputCompleted;
     }
 
