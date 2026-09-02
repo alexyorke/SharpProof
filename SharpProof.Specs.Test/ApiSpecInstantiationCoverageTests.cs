@@ -361,71 +361,34 @@ public sealed class ApiSpecInstantiationCoverageTests
         }
     }
 
-    [Test]
-    public void SequenceNullUsesTheExactSubstitutedOperandType()
+    [TestCase(IrTypeKind.Reference)]
+    [TestCase(IrTypeKind.Sequence)]
+    public void ExactTypesMustAgreeBeforeIrConstruction(IrTypeKind kind)
     {
-        var variable = Variable(
-            SpecVariableRole.Parameter,
-            0,
-            IrTypeKind.Sequence);
+        var left = Variable(SpecVariableRole.Parameter, 0, kind);
+        var right = Variable(SpecVariableRole.Parameter, 1, kind);
         var template = CreateTemplate(
             isStatic: true,
             receiverType: null,
-            parameterTypes: [IrTypeKind.Sequence],
-            resultType: null,
-            [Binary(
-                IrBinaryOperator.Equal,
-                new SpecNullDeclaration(IrTypeKind.Sequence),
-                variable,
-                IrTypeKind.Boolean)]);
-        var factory = new IrFactory();
-        var sequenceType = factory.GetOrCreateSequenceType(factory.IntegerType);
-        var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
-            template,
-            factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Parameters.Single()] = factory.Variable(
-                    factory.CreateVariable("sequence", sequenceType))
-            });
-
-        Assert.That(
-            instantiated.Status,
-            Is.EqualTo(SpecInstantiationStatus.Succeeded));
-        var binary = instantiated.Postconditions.Single() as IrBinaryTerm;
-        Assert.That(binary, Is.Not.Null);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(binary!.Left.Type, Is.EqualTo(sequenceType));
-            Assert.That(binary.Right.Type, Is.EqualTo(sequenceType));
-        }
-    }
-
-    [Test]
-    public void ExactReferenceAndSequenceTypesMustAgreeBeforeIrConstruction()
-    {
-        var left = Variable(SpecVariableRole.Parameter, 0, IrTypeKind.Reference);
-        var right = Variable(SpecVariableRole.Parameter, 1, IrTypeKind.Reference);
-        var template = CreateTemplate(
-            isStatic: true,
-            receiverType: null,
-            parameterTypes: [IrTypeKind.Reference, IrTypeKind.Reference],
+            parameterTypes: [kind, kind],
             resultType: null,
             [Equal(left, right)]);
         var factory = new IrFactory();
-        var widgetType = factory.GetOrCreateReferenceType(
-            factory.CreateIdentity(), "Widget");
-        var otherType = factory.GetOrCreateReferenceType(
-            factory.CreateIdentity(), "Other");
+        var compatibleType = kind == IrTypeKind.Reference
+            ? factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Widget")
+            : factory.GetOrCreateSequenceType(factory.IntegerType);
+        var incompatibleType = kind == IrTypeKind.Reference
+            ? factory.GetOrCreateReferenceType(factory.CreateIdentity(), "Other")
+            : factory.GetOrCreateSequenceType(factory.StringType);
         var compatible = ApiSpecInstantiator.InstantiatePostconditions(
             template,
             factory,
             new Dictionary<SpecVarId, IrTerm>
             {
                 [template.Parameters[0]] = factory.Variable(
-                    factory.CreateVariable("left", widgetType)),
+                    factory.CreateVariable("left", compatibleType)),
                 [template.Parameters[1]] = factory.Variable(
-                    factory.CreateVariable("right", widgetType))
+                    factory.CreateVariable("right", compatibleType))
             });
         var incompatible = ApiSpecInstantiator.InstantiatePostconditions(
             template,
@@ -433,9 +396,9 @@ public sealed class ApiSpecInstantiationCoverageTests
             new Dictionary<SpecVarId, IrTerm>
             {
                 [template.Parameters[0]] = factory.Variable(
-                    factory.CreateVariable("leftOther", widgetType)),
+                    factory.CreateVariable("leftOther", compatibleType)),
                 [template.Parameters[1]] = factory.Variable(
-                    factory.CreateVariable("rightOther", otherType))
+                    factory.CreateVariable("rightOther", incompatibleType))
             });
 
         Assert.That(compatible.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
@@ -444,8 +407,8 @@ public sealed class ApiSpecInstantiationCoverageTests
 
     [TestCase(IrTypeKind.String)]
     [TestCase(IrTypeKind.Reference)]
-    public void BuiltInNullableTypesRetainTheirExactType(
-        IrTypeKind declaredType)
+    [TestCase(IrTypeKind.Sequence)]
+    public void NullableTypesRetainTheirExactType(IrTypeKind declaredType)
     {
         var variable = Variable(
             SpecVariableRole.Parameter,
@@ -457,14 +420,19 @@ public sealed class ApiSpecInstantiationCoverageTests
             parameterTypes: [declaredType],
             resultType: null,
             [Binary(
-                IrBinaryOperator.NotEqual,
+                declaredType == IrTypeKind.Sequence
+                    ? IrBinaryOperator.Equal
+                    : IrBinaryOperator.NotEqual,
                 new SpecNullDeclaration(declaredType),
                 variable,
                 IrTypeKind.Boolean)]);
         var factory = new IrFactory();
-        var exactType = declaredType == IrTypeKind.String
-            ? factory.StringType
-            : factory.ObjectType;
+        var exactType = declaredType switch
+        {
+            IrTypeKind.String => factory.StringType,
+            IrTypeKind.Reference => factory.ObjectType,
+            _ => factory.GetOrCreateSequenceType(factory.IntegerType)
+        };
 
         var instantiated = ApiSpecInstantiator.InstantiatePostconditions(
             template,
@@ -483,45 +451,6 @@ public sealed class ApiSpecInstantiationCoverageTests
             Assert.That(binary!.Left.Type, Is.EqualTo(exactType));
             Assert.That(binary.Right.Type, Is.EqualTo(exactType));
         }
-    }
-
-    [Test]
-    public void ExactSequenceTypesMustAgreeBeforeIrConstruction()
-    {
-        var left = Variable(SpecVariableRole.Parameter, 0, IrTypeKind.Sequence);
-        var right = Variable(SpecVariableRole.Parameter, 1, IrTypeKind.Sequence);
-        var template = CreateTemplate(
-            isStatic: true,
-            receiverType: null,
-            parameterTypes: [IrTypeKind.Sequence, IrTypeKind.Sequence],
-            resultType: null,
-            [Equal(left, right)]);
-        var factory = new IrFactory();
-        var integers = factory.GetOrCreateSequenceType(factory.IntegerType);
-        var strings = factory.GetOrCreateSequenceType(factory.StringType);
-        var compatible = ApiSpecInstantiator.InstantiatePostconditions(
-            template,
-            factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Parameters[0]] = factory.Variable(
-                    factory.CreateVariable("integersLeft", integers)),
-                [template.Parameters[1]] = factory.Variable(
-                    factory.CreateVariable("integersRight", integers))
-            });
-        var incompatible = ApiSpecInstantiator.InstantiatePostconditions(
-            template,
-            factory,
-            new Dictionary<SpecVarId, IrTerm>
-            {
-                [template.Parameters[0]] = factory.Variable(
-                    factory.CreateVariable("integers", integers)),
-                [template.Parameters[1]] = factory.Variable(
-                    factory.CreateVariable("strings", strings))
-            });
-
-        Assert.That(compatible.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
-        AssertFailure(incompatible, SpecInstantiationFailureKind.TypeMismatch);
     }
 
     private static void AssertFailure(
