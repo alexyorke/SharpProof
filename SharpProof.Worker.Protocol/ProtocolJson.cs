@@ -327,15 +327,17 @@ public static partial class WorkerProtocolJson
             return errors.Fail("response.null");
         }
 
+        var requestHashValid = IsSha256(response.RequestHash);
         errors.Check(response.ProtocolVersion == WorkerProtocolVersions.Current, "response.protocol")
-            .Check(IsSha256(response.RequestHash), "response.request_hash");
-        if (IsSha256(response.RequestHash) && expectedRequestHash != null)
+            .Check(requestHashValid, "response.request_hash");
+        if (requestHashValid && expectedRequestHash != null)
         {
             errors.Check(response.RequestHash == expectedRequestHash, "response.request_mismatch");
         }
 
-        errors.Check(IsSha256(response.InputHash), "response.input_hash");
-        if (IsSha256(response.InputHash) && expectedInputHash != null)
+        var inputHashValid = IsSha256(response.InputHash);
+        errors.Check(inputHashValid, "response.input_hash");
+        if (inputHashValid && expectedInputHash != null)
         {
             errors.Check(response.InputHash == expectedInputHash, "response.input_mismatch");
         }

@@ -192,6 +192,7 @@ the smallest relevant containerized test target passes.
 | R418 | Reuse encoded arithmetic operands across SMT binary operators | `SharpProof.Smt.Test`: 30 passed |
 | R431 | Resolve the corpus license fixture from the repository root helper | `SharpProof.Gates.Test`: corpus tests passed |
 | R521 | Share IR factory nullable-type validation | `SharpProof.Ir.Test`: 114 passed |
+| R522 | Cache response hash validity during protocol validation | `SharpProof.Worker.Test`: protocol tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3123,8 +3124,9 @@ only common type validation; value and term construction remain distinct.
 
 ### Status (part seventy-two)
 
-R522 is a `pending` candidate. The proposed change is local memoization only;
-hash comparison and validation semantics remain unchanged.
+R522 is applied and validated by the worker protocol tests. The change is
+local memoization only; hash comparison and validation semantics remain
+unchanged.
 
 ## Second survey, part seventy-three: R523 - cache filename hex predicate
 
