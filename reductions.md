@@ -3832,7 +3832,11 @@ R592 is a pending differential-testing reduction candidate. Keep the factory-spe
 
 ### Status (part one hundred thirty-four)
 
-R593 is a pending differential-generator reduction candidate. Preserve the field initialization order and the existing sequence type identity; replace only the second equivalent interning request.
+R593 remains deferred: the direct field reuse is rejected by C# because primary-
+constructor field initializers cannot reference another instance field. Avoiding
+the second intern request would require reshaping initialization around a tuple
+or explicit constructor solely for one lookup, which adds more complexity than
+it removes; the original identity-preserving behavior is retained.
 
 ## Second survey, part one hundred thirty-five: R594 - duplicate unsupported-mutation result path
 
