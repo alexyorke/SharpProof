@@ -1247,15 +1247,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         {
             return trusted;
         }
-        if (!Path.IsPathRooted(executable) ||
-            !string.Equals(
-                Path.GetFileName(executable),
-                "dotnet",
-                StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                "SharpProof verifier host must name the direct dotnet muxer.");
-        }
         var configured = ValidateDotNetInstallation(executable);
         if (!LinuxPathIdentity.AreSameExistingFile(configured, trusted))
         {

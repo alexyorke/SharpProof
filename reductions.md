@@ -3298,9 +3298,9 @@ compatibility wrapper.
 
 ### Status (part eighty)
 
-R535 remains a `pending` reduction candidate; R534 preserves the initial
-canonicalization boundary while avoiding a second path walk. R535 preserves
-the distinct bare-command lookup and explicit trusted-installation comparison.
+R535 is applied: explicit verifier paths now go directly through
+`ValidateDotNetInstallation`, while the bare `dotnet` lookup remains separate
+and the trusted-installation comparison is unchanged.
 
 ## Second survey, part eighty-one: R536 - duplicated shrinker engines
 
