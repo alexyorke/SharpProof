@@ -6767,3 +6767,27 @@ R820 is `deferred`: the assertions are completely implied, but the cleanup is
 
 R821 is `deferred`: the duplicate join is deterministic and cheap in current
   domains, but it is unnecessary work in a property loop that may be expanded.
+
+## Second survey, part three hundred thirty-three: R822 - replay fixture resealing
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R822 | **`CompilerEffectReplayArtifactCodecTests` seals malformed replay fixtures twice.** `RefutedEvidence` seals the newly constructed evidence before returning, and `RefutedEvidence(kind)` seals the base fixture again after applying its kind-specific witness and event fields. Every `AssertRejected` call then mutates that already-sealed fixture and invokes `CompilerEffectClaimArtifactCodec.Seal` a third time before validation; the no-kind overload has the same base-seal-then-reseal pattern. The first seal in each rejection path cannot contribute to the assertion because the mutation invalidates its hashes, so a fixture-construction helper that leaves sealing to the final caller, or an explicit `Seal` option for the accepted-shape test, removes redundant hashing while preserving the required post-mutation seal and the accepted-shape validation. | `SharpProof.Worker.Test/CompilerEffectReplayArtifactCodecTests.cs:226-251,254-318,337-363` |
+
+### Checked and not proposed (part three hundred thirty-three)
+
+- The final seal after each mutation remains required: the rejection assertion
+  is intended to validate a structurally complete but tampered artifact rather
+  than an artifact with stale hashes.
+- The accepted capability/exception shapes still need one seal before their
+  direct `Validate` call; this finding does not remove that authentication
+  setup.
+- The event-kind switch and synchronization-witness setup are semantically
+  distinct fixtures; only their unconditional pre-mutation sealing is shared
+  work that cannot be observed by the rejection assertion.
+
+### Status (part three hundred thirty-three)
+
+R822 is `deferred`: the extra hashes are confined to a small test fixture, but
+  the helper's hidden sealing makes the setup order harder to reason about and
+  adds avoidable work to every malformed-shape case.
