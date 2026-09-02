@@ -7523,3 +7523,26 @@ implementation or build-file changes were made during this audit.
 
 R855 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred sixty-six: R856 - duplicated coverage authority derivation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R856 | **Coverage collection and coverage validation each run the full production inventory.** `Invoke-SharpProofCoverage.ps1` invokes `Get-SharpProofProductionInventory.ps1 -Configuration Release -RequirePdb` to create `coverage-authority.json` before collecting reports; `Test-SharpProofCoverage.ps1` later invokes the same inventory script again with the same arguments and reparses its complete project/MSBuild/PDB output before comparing the recorded authority. This repeats the most expensive coverage preflight in one pipeline. The second read is intentionally an independent fail-closed check, so the reduction needs an explicit trust-boundary decision: a validated immutable inventory snapshot could be passed through, or the validator could retain a cheaper independently recomputed digest/identity check, but simply deleting the second derivation would make the report self-authenticating. | `scripts/Invoke-SharpProofCoverage.ps1:49-62`; `scripts/Test-SharpProofCoverage.ps1:193-221`; `scripts/Get-SharpProofProductionInventory.ps1` |
+
+### Checked and not proposed (part three hundred sixty-six)
+
+- R856 is narrower than R677: R677 covers acceptance's separate complexity
+  inventory invocation, while R856 is the producer/validator boundary inside a
+  single coverage run.
+- The persisted authority file remains useful for binding every Cobertura
+  report to one commit and module universe; the finding does not propose
+  removing that envelope.
+- Any optimization must preserve the validator's independent protection
+  against a forged or stale coverage authority; sharing an unchecked object
+  would be a soundness regression, not a reduction.
+
+### Status (part three hundred sixty-six)
+
+R856 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
