@@ -2044,6 +2044,8 @@ and `SharpProof.Verifier`.
 R420 is merged into applied R328: the proposed shared item import was not needed;
 the self-application entry point now directly carries the grouped property list,
 so no dead item evaluation remains. R421, R424, and R426 remain `pending`;
+R424 is deferred after the compact form changed package asset behavior and
+introduced an `AD0001` analyzer failure, so the explicit asset boundary stays.
 R422 reuses each archive assembly-name extraction within a payload pass, and
 R425 centralizes the shared test link.
 
@@ -3842,3 +3844,11 @@ R597 is a pending fuzz-shrinker performance reduction candidate. Retain the exis
 ### Status (part one hundred thirty-nine)
 
 R598 is a pending frontend-fuzzing infrastructure reduction candidate. Preserve the generated-case slot mapping, arbitrary argument conversion, sequence-origin tracking, and parameter-containing-symbol check; centralize only the common binding traversal.
+
+## Second survey, part one hundred forty: R599 - duplicate architecture-test relative-path helper
+
+| R599 | **`ArchitectureTests` and `BoundaryEnforcementTests` define the same private `Relative` helper.** Both methods call `Path.GetRelativePath(TestRepository.FindRoot(), path)` and normalize backslashes to `/` with identical code. Moving this repository-relative formatting helper into shared architecture-test infrastructure would remove the exact duplicate while preserving the test paths' current root and separator semantics. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:2261-2264; SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:494-497` |
+
+### Status (part one hundred forty)
+
+R599 is a pending architecture-test maintenance candidate. Preserve the repository-root lookup and slash normalization; share only the identical formatting helper.
