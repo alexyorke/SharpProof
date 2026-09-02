@@ -1216,7 +1216,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             ControlFlowGraph graph,
             int after,
             ILocalReferenceOperation reference,
-            IDictionary<(
+            Dictionary<(
                 SyntaxTree Tree,
                 int Start,
                 int End,

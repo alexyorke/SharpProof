@@ -40,6 +40,10 @@ public static class OperationSubsetClassifier
                     FrontendAbstention.UnsupportedOperationKind);
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1024:Use properties where appropriate",
+        Justification = "The method is part of the existing snapshot API.")]
     public static ImmutableArray<OperationKind> GetKnownOperationKinds()
     {
         return s_knownOperationKinds;
