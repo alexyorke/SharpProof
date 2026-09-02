@@ -168,6 +168,7 @@ the smallest relevant containerized test target passes.
 | R606 | Share schema-file path resolution and JSON loading across conformance suites | `SharpProof.Ir.Test`: 3; `SharpProof.Worker.Test`: 9 schema tests passed |
 | R605 | Share canonical container admission checks across package integration suites | `SharpProof.Package.Test`: package-layout and Worker MSBuild guard paths passed |
 | R618 | Share Meta-analyzer test compilation and diagnostic setup | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests passed |
+| R617 | Share managed-effect walk-depth entry/exit bookkeeping | `SharpProof.Effects.Test`: ManagedAbstractFlowTests, 34 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4135,7 +4136,9 @@ static-only/non-const policy without a duplicate classification switch.
 
 ### Status (part one hundred fifty-eight)
 
-R617 is a pending local Effects cleanup candidate. Preserve the fail-closed fallback chosen by each caller and the `finally` decrement; consolidate only the duplicated depth guard and scope bookkeeping.
+R617 is `applied`: managed transfer and value evaluation now share the
+thread-local walk-depth entry/exit bookkeeping while retaining their distinct
+overflow fallbacks and `finally` cleanup.
 
 ## Second survey, part one hundred fifty-nine: R618 - duplicate Meta-analyzer test host
 

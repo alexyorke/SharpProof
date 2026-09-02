@@ -202,21 +202,20 @@ internal sealed class ManagedAbstractFlow
             return state;
         }
 
-        if (_walkDepth >= MaximumWalkDepth)
+        if (!TryEnterWalk())
         {
             // Abandoning the sub-tree means we no longer know what it wrote, so
             // every fact has to be dropped rather than carried forward stale.
             return state.Forget();
         }
 
-        _walkDepth++;
         try
         {
             return TransferCore(state, operation, result, cancellationToken);
         }
         finally
         {
-            _walkDepth--;
+            ExitWalk();
         }
     }
 
@@ -551,20 +550,35 @@ internal sealed class ManagedAbstractFlow
 
     private ManagedAbstractValue EvaluateCore(IOperation operation, ManagedFlowState state)
     {
-        if (_walkDepth >= MaximumWalkDepth)
+        if (!TryEnterWalk())
         {
             return ManagedAbstractValue.Unknown;
         }
 
-        _walkDepth++;
         try
         {
             return EvaluateBounded(operation, state);
         }
         finally
         {
-            _walkDepth--;
+            ExitWalk();
         }
+    }
+
+    private static bool TryEnterWalk()
+    {
+        if (_walkDepth >= MaximumWalkDepth)
+        {
+            return false;
+        }
+
+        _walkDepth++;
+        return true;
+    }
+
+    private static void ExitWalk()
+    {
+        _walkDepth--;
     }
 
     private ManagedAbstractValue EvaluateBounded(IOperation operation, ManagedFlowState state)
