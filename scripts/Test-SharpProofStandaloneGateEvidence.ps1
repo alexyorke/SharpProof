@@ -4,6 +4,7 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Assert-SharpProofStandaloneGateResult.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 
 $commit = '0123456789abcdef0123456789abcdef01234567'
 $mvid = '01234567-89ab-cdef-0123-456789abcdef'
@@ -80,20 +81,28 @@ function Write-Fixture([object]$Value, [string]$Name) {
 }
 
 function Assert-Accepted([object]$Value, [string]$Gate, [string]$Name) {
-    $path = Write-Fixture $Value $Name
-    Assert-SharpProofStandaloneGateResult -Path $path -ExpectedGate $Gate `
-        -ExpectedCommit $commit -ExpectedMvid $mvid | Out-Null
+    Invoke-SharpProofFixtureAssertion `
+        -Name $Name `
+        -Write { Write-Fixture $Value $Name } `
+        -Validate {
+            param($path)
+            Assert-SharpProofStandaloneGateResult `
+                -Path $path -ExpectedGate $Gate `
+                -ExpectedCommit $commit -ExpectedMvid $mvid | Out-Null
+        }
 }
 
 function Assert-Rejected([object]$Value, [string]$Gate, [string]$Name) {
-    $path = Write-Fixture $Value $Name
-    try {
-        Assert-SharpProofStandaloneGateResult -Path $path `
-            -ExpectedGate $Gate -ExpectedCommit $commit `
-            -ExpectedMvid $mvid | Out-Null
-    }
-    catch { return }
-    throw "Fixture '$Name' was unexpectedly accepted."
+    Invoke-SharpProofFixtureAssertion `
+        -Name $Name `
+        -Write { Write-Fixture $Value $Name } `
+        -Validate {
+            param($path)
+            Assert-SharpProofStandaloneGateResult `
+                -Path $path -ExpectedGate $Gate `
+                -ExpectedCommit $commit -ExpectedMvid $mvid | Out-Null
+        } `
+        -ExpectRejected
 }
 
 try {

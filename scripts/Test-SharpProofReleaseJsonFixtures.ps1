@@ -21,23 +21,30 @@ function Write-Fixture {
 function Assert-Accepted {
     param([string]$Name, [string]$Text, [string]$Type)
     $script:total++
-    $path = Write-Fixture "$Name.json" $Text
-    $null = Read-SharpProofCanonicalReleaseJson -Path $path -DocumentType $Type
+    Invoke-SharpProofFixtureAssertion `
+        -Name $Name `
+        -Write { Write-Fixture "$Name.json" $Text } `
+        -Validate {
+            param($path)
+            $null = Read-SharpProofCanonicalReleaseJson `
+                -Path $path -DocumentType $Type
+        }
     $script:passed++
 }
 
 function Assert-Rejected {
     param([string]$Name, [string]$Text, [string]$Type)
     $script:total++
-    $path = Write-Fixture "$Name.json" $Text
-    try {
-        $null = Read-SharpProofCanonicalReleaseJson -Path $path -DocumentType $Type
-    }
-    catch {
-        $script:passed++
-        return
-    }
-    throw "Fixture '$Name' was accepted."
+    Invoke-SharpProofFixtureAssertion `
+        -Name $Name `
+        -Write { Write-Fixture "$Name.json" $Text } `
+        -Validate {
+            param($path)
+            $null = Read-SharpProofCanonicalReleaseJson `
+                -Path $path -DocumentType $Type
+        } `
+        -ExpectRejected
+    $script:passed++
 }
 
 try {

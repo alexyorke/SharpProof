@@ -1,5 +1,28 @@
 Set-StrictMode -Version Latest
 
+function Invoke-SharpProofFixtureAssertion {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][scriptblock]$Write,
+        [Parameter(Mandatory = $true)][scriptblock]$Validate,
+        [Parameter()][switch]$ExpectRejected
+    )
+
+    $path = & $Write
+    try {
+        & $Validate $path | Out-Null
+    }
+    catch {
+        if ($ExpectRejected) {
+            return
+        }
+        throw
+    }
+    if ($ExpectRejected) {
+        throw "Fixture '$Name' was accepted."
+    }
+}
+
 function Assert-SharpProofCanonicalMatch {
     param(
         [Parameter(Mandatory = $true)]$Actual,
