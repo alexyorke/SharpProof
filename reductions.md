@@ -246,6 +246,7 @@ the smallest relevant containerized test target passes.
 | R789 | Derive offline framework source mappings from the copied package catalog | PowerShell parse; `ContainerConsumerMatrixUsesCatalogOwnedNet8ReferencePacks`: 1 passed |
 | R791 | Share timed phase execution between developer-check and package-test orchestrators | PowerShell parses; timing helper behavior; Architecture scheduling/plan tests: 28 passed |
 | R792 | Reuse the shared C# string encoder in the API-spec runtime-witness generator | Generator `-Verify`; `SharpProof.Specs.Test`: 12 passed |
+| R794 | Reuse shared package identity parsing in pilot qualification | Pilot authority fixtures; `PilotAuthorityTests`: 1 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -6118,5 +6119,7 @@ No implementation or build file was changed.
 
 ### Status (part three hundred five)
 
-R794 is `pending` and limited to pilot package identity parsing. No
-implementation or build file was changed.
+R794 is `applied`: pilot qualification now routes nuspec identity extraction
+through the shared package-identity module while retaining its candidate-set,
+version, commit, filename, and size checks. Pilot fixtures and the focused
+Architecture test passed.
