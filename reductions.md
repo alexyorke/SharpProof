@@ -205,6 +205,7 @@ the smallest relevant containerized test target passes.
 | R548 | Share the deterministic differential integer boundary corpus | `SharpProof.Fuzz.Test`: FuzzRunnerTests 32 passed |
 | R547 | Parameterize implicit-conversion unwrapping for reference-only callers | `SharpProof.Frontend.Test`: 121 passed |
 | R501 | Resolve closed-contract attribute symbols once per analyzer compilation | `SharpProof.Analyzer.Test`: 476 passed |
+| R499 | Share unsupported-value abstention classification in the Roslyn lowerer | `SharpProof.Frontend.Test`: 121 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2922,10 +2923,11 @@ implementations, keeping behavior-specific branches separate from shared plumbin
 
 ### Status (part sixty-three)
 
-R498 and R501 are applied: binary string-concatenation resolution now uses the
-existing admission predicate, and closed-contract attribute symbols are resolved
-once per analyzer compilation instead of once per source reference. R499,
-R500, and R502 remain pending review-only candidates; any sharing must retain
+R498, R499, and R501 are applied: binary string-concatenation resolution now
+uses the existing admission predicate, unsupported value-type classification is
+shared between default and field visits, and closed-contract attribute symbols
+are resolved once per analyzer compilation instead of once per source reference.
+R500 and R502 remain pending review-only candidates; any sharing must retain
 fail-closed behavior and the analyzer's distinct diagnostic and
 semantic-evaluation responsibilities.
 

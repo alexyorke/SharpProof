@@ -508,15 +508,21 @@ public sealed class RoslynOperationLowerer
         {
             var abstention = operation.Type?.TypeKind == TypeKind.Error
                 ? FrontendAbstention.ErrorOperation
-                : operation.ConstantValue.HasValue &&
-                    operation.Type is
-                    {
-                        IsValueType: true,
-                        SpecialType: SpecialType.None
-                    }
-                    ? FrontendAbstention.UnsupportedType
-                    : FrontendAbstention.UnsupportedOperationKind;
+                : GetUnsupportedValueAbstention(operation);
             return _owner.Opaque(operation, abstention, arguments: []);
+        }
+
+        private static FrontendAbstention GetUnsupportedValueAbstention(
+            IOperation operation)
+        {
+            return operation.ConstantValue.HasValue &&
+                operation.Type is
+                {
+                    IsValueType: true,
+                    SpecialType: SpecialType.None
+                }
+                ? FrontendAbstention.UnsupportedType
+                : FrontendAbstention.UnsupportedOperationKind;
         }
 
         public override LoweredExpression VisitInvalid(
@@ -539,14 +545,7 @@ public sealed class RoslynOperationLowerer
                 return _owner.LowerConstant(operation);
             }
 
-            var abstention = operation.ConstantValue.HasValue &&
-                operation.Type is
-                {
-                    IsValueType: true,
-                    SpecialType: SpecialType.None
-                }
-                ? FrontendAbstention.UnsupportedType
-                : FrontendAbstention.UnsupportedOperationKind;
+            var abstention = GetUnsupportedValueAbstention(operation);
             return _owner.Opaque(operation, abstention, operation.Field);
         }
 
