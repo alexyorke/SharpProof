@@ -208,13 +208,24 @@ public sealed class DefaultApiSpecCatalogGenerationTests
 
     [TestCase(
         "postcondition",
-        "missing required property")]
+        "missing required property",
+        "postconditions",
+        false)]
     [TestCase(
         null,
-        "postconditions must be a JSON array")]
+        "postconditions must be a JSON array",
+        "postconditions",
+        false)]
+    [TestCase(
+        "postcondition",
+        "contains unexpected property",
+        "postcondition",
+        true)]
     public async Task GeneratorRequiresPostconditionsArray(
         string? misspelledName,
-        string expectedError)
+        string expectedError,
+        string expectedProperty,
+        bool keepPostconditions)
     {
         using var workspace = GenerationWorkspace.Create();
         var root = JsonNode.Parse(
@@ -236,7 +247,14 @@ public sealed class DefaultApiSpecCatalogGenerationTests
             var postconditions = declaration["postconditions"] ??
                 throw new InvalidDataException(
                     "The API-spec declaration has no postconditions.");
-            Assert.That(declaration.Remove("postconditions"), Is.True);
+            if (keepPostconditions)
+            {
+                declaration["postconditions"] = new JsonArray();
+            }
+            else
+            {
+                Assert.That(declaration.Remove("postconditions"), Is.True);
+            }
             declaration[misspelledName] = postconditions;
         }
         await File.WriteAllTextAsync(
@@ -261,51 +279,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
         Assert.That(
             result.Output,
             Does.Contain(expectedError)
-                .And.Contain("postconditions"));
-    }
-
-    [Test]
-    public async Task GeneratorRejectsMisspelledPostconditionsSibling()
-    {
-        using var workspace = GenerationWorkspace.Create();
-        var root = JsonNode.Parse(
-                await File.ReadAllTextAsync(CatalogPath()))?.AsObject() ??
-            throw new InvalidDataException(
-                "The API-spec catalog root is not an object.");
-        var declaration = root["declarations"]?.AsArray()
-            .Select(static node => node?.AsObject())
-            .FirstOrDefault(static node =>
-                node?["postconditions"]?.AsArray().Count > 0) ??
-            throw new InvalidDataException(
-                "The API-spec catalog has no declaration with postconditions.");
-        var postconditions = declaration["postconditions"] ??
-            throw new InvalidDataException(
-                "The API-spec declaration has no postconditions.");
-        declaration["postconditions"] = new JsonArray();
-        declaration["postcondition"] = postconditions;
-        await File.WriteAllTextAsync(
-            workspace.CatalogInputPath,
-            root.ToJsonString(new JsonSerializerOptions
-            {
-                WriteIndented = true
-            }),
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-        var result = await RunGeneratorAsync(
-            "-CatalogPath",
-            workspace.CatalogInputPath,
-            "-SourceOutputPath",
-            workspace.FirstSourcePath,
-            "-DocumentationOutputPath",
-            workspace.FirstDocumentationPath,
-            "-RuntimeWitnessOutputPath",
-            workspace.FirstRuntimeWitnessPath);
-
-        Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
-        Assert.That(
-            result.Output,
-            Does.Contain("contains unexpected property")
-                .And.Contain("postcondition"));
+                .And.Contain(expectedProperty));
     }
 
     private static void AssertDeclaration(
