@@ -923,10 +923,9 @@ public sealed class CompilerArtifactModelSchemaTests
 
     private static JsonDocument ReadSchema()
     {
-        return JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            TestRepository.FindRoot(),
+        return TestRepository.ReadSchema(
             "SharpProof.CompilerArtifact",
-            "CompilerArtifactModel.schema.json")));
+            "CompilerArtifactModel.schema.json");
     }
 
 }

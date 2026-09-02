@@ -471,10 +471,9 @@ public sealed class IrModelSchemaTests
 
     private static JsonDocument ReadSchema()
     {
-        return JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            TestRepository.FindRoot(),
+        return TestRepository.ReadSchema(
             "SharpProof.Ir",
-            "IrModel.schema.json")));
+            "IrModel.schema.json");
     }
 
 }

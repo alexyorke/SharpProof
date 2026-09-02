@@ -644,10 +644,9 @@ public sealed class ProtocolModelSchemaTests
 
     private static JsonDocument ReadSchema()
     {
-        return JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            TestRepository.FindRoot(),
+        return TestRepository.ReadSchema(
             "SharpProof.Worker.Protocol",
-            "ProtocolModel.schema.json")));
+            "ProtocolModel.schema.json");
     }
 
 }

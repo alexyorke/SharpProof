@@ -164,6 +164,7 @@ the smallest relevant containerized test target passes.
 | R589 | Share IR program condition evaluation and boolean validation | `SharpProof.Ir.Test`: IrProgramTests, 22 passed |
 | R590 | Reuse the validated sequence-type key when adding an IR type | `SharpProof.Ir.Test`: IrFactoryInvariantRegressionTests, 9 passed |
 | R596 | Reuse one materialized child list across direct and recursive IR shrinker candidates | `SharpProof.Fuzz.Test`: IrShrinkerIsDeterministicAndPreservesMismatch, 1 passed |
+| R606 | Share schema-file path resolution and JSON loading across conformance suites | `SharpProof.Ir.Test`: 3; `SharpProof.Worker.Test`: 9 schema tests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4019,7 +4020,9 @@ R605 is a pending package-test infrastructure reduction candidate. Preserve all 
 
 ### Status (part one hundred forty-seven)
 
-R606 is a pending cross-assembly test utility reduction candidate. Preserve each schema's explicit project/file identity and the existing `JsonDocument` disposal at every call site; share only root resolution, path composition, file loading, and parsing.
+R606 is `applied`: the existing `TestRepository` helper now owns schema path
+resolution, UTF-8 text loading, and JSON parsing while each suite retains its
+explicit project and schema filename and disposal boundary.
 
 ## Second survey, part one hundred forty-eight: R607 - reuse the canonical Effects operation loader
 

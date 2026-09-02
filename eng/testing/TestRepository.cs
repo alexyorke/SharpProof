@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 internal static class TestRepository
 {
     internal static string Relative(string path)
@@ -23,6 +25,16 @@ internal static class TestRepository
 
         throw new DirectoryNotFoundException(
             "Could not locate the SharpProof repository root.");
+    }
+
+    internal static JsonDocument ReadSchema(
+        string projectDirectory,
+        string schemaFileName)
+    {
+        return JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            FindRoot(),
+            projectDirectory,
+            schemaFileName)));
     }
 
     internal static void DeleteOwnedTemporaryDirectory(
