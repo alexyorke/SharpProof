@@ -94,6 +94,26 @@ function Invoke-PipelineCommand(
         -Configuration $PipelineConfiguration @AdditionalArguments
 }
 
+function Invoke-TestProject([string]$ProjectPath) {
+    if (-not $NoBuild) {
+        Invoke-DotNet @('restore', $ProjectPath, '--locked-mode')
+        $buildArguments = @(
+            'build', $ProjectPath, '--configuration', $Configuration,
+            '--no-restore')
+        $buildArguments += $fastBuildArguments
+        Invoke-DotNet $buildArguments
+    }
+
+    $assembly = Get-SharpProofTestAssemblyPath `
+        -ProjectPath $ProjectPath `
+        -Configuration $Configuration
+    $arguments = @('vstest', $assembly)
+    if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
+        $arguments += '/TestCaseFilter:' + $TestFilter
+    }
+    Invoke-DotNet $arguments
+}
+
 $testProjectParallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
 
@@ -256,22 +276,7 @@ switch ($Command) {
             [IO.Path]::GetFileName($Target) -cne
                 'SharpProof.Package.Test.csproj'
         if ($directProjectTest) {
-            if (-not $NoBuild) {
-                Invoke-DotNet @('restore', $Target, '--locked-mode')
-                $directProjectBuildArguments = @(
-                    'build', $Target, '--configuration', $Configuration,
-                    '--no-restore')
-                $directProjectBuildArguments += $fastBuildArguments
-                Invoke-DotNet $directProjectBuildArguments
-            }
-            $assembly = Get-SharpProofTestAssemblyPath `
-                -ProjectPath $Target `
-                -Configuration $Configuration
-            $arguments = @('vstest', $assembly)
-            if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-                $arguments += '/TestCaseFilter:' + $TestFilter
-            }
-            Invoke-DotNet $arguments
+            Invoke-TestProject $Target
             break
         }
         if (-not $NoBuild) {
@@ -327,25 +332,7 @@ switch ($Command) {
     'worker-tests' {
         $workerTestProject =
             'SharpProof.Worker.Test/SharpProof.Worker.Test.csproj'
-        if (-not $NoBuild) {
-            Invoke-DotNet @(
-                'restore',
-                $workerTestProject,
-                '--locked-mode')
-            $directWorkerTestArguments = @(
-                'build', $workerTestProject,
-                '--configuration', $Configuration, '--no-restore')
-            $directWorkerTestArguments += $fastBuildArguments
-            Invoke-DotNet $directWorkerTestArguments
-        }
-        $assembly = Get-SharpProofTestAssemblyPath `
-            -ProjectPath $workerTestProject `
-            -Configuration $Configuration
-        $arguments = @('vstest', $assembly)
-        if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
-            $arguments += '/TestCaseFilter:' + $TestFilter
-        }
-        Invoke-DotNet $arguments
+        Invoke-TestProject $workerTestProject
     }
     'package-tests' {
         $packageArguments = New-TestInvocationArguments -Additional @{

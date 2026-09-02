@@ -4217,14 +4217,6 @@ R652 is deferred: envelope equality and compilation-shape validation are intenti
 
 R654 is deferred: replay validation and the separate operation/evidence digest domains are analyzer-integrity boundaries. Their independent event walks make the field ordering, null normalization, and fail-closed checks auditable; combine them only with a proof that cannot alter those semantics.
 
-## Second survey, part one hundred ninety-nine: R658 - duplicated vstest project lane
-
-| R658 | **`Invoke-SharpProofContainer.ps1` duplicates the build-and-`vstest` lane for direct project tests and worker tests.** The direct-project branch and the `worker-tests` branch each conditionally restore/build a project, append the shared fast-build arguments, resolve the test assembly, construct a `vstest` command, optionally add the same `/TestCaseFilter:...` argument, and invoke it. A parameterized private test-project runner can retain the direct-target/package exclusion and worker-specific project selection while removing the duplicated lifecycle and filter plumbing. | `scripts/Invoke-SharpProofContainer.ps1:253-275,328-349` |
-
-### Status (part one hundred ninety-nine)
-
-R658 is a pending container test-lane factoring candidate. Preserve `-NoBuild` and `-Fast` semantics, restore/build ordering, assembly resolution, filter syntax, direct-target exclusion, and command-specific control flow; share only the common project-to-`vstest` runner.
-
 ## Second survey, part two hundred: R659 - eager test parallelism discovery
 
 | R659 | **`Invoke-SharpProofContainer.ps1` computes test-project parallelism before dispatching every command.** The top-level assignment calls `Get-SharpProofTestProjectParallelism`, which reads and parses `eng/acceptance/contract.json` unless an override is set, but the value is consumed only by the solution/filter branch of `test` and by `portable-tests`. Restore, build, gates, packaging, release, corpus, and other commands pay the contract-read and CPU-budget work without using it. Resolve this value lazily in the two test paths while preserving override precedence and invalid-contract failures when those paths actually need the setting. | `scripts/Invoke-SharpProofContainer.ps1:98-99`; `scripts/Invoke-SharpProofContainer.ps1:253-349`; `scripts/SharpProof.ContainerExecution.psm1:106-162` |
@@ -4256,3 +4248,19 @@ R661 is a pending analyzer discovery traversal reduction candidate. Preserve the
 ### Status (part two hundred three)
 
 R662 is a pending effect-scanner initialization reduction candidate. Preserve all-operation array tracking, nested-callable filtering, reachability fixed-point behavior, cancellation/exception semantics, and the try-specific reachability choice; share only the immutable root-operation enumeration.
+
+## Second survey, part two hundred four: R663 - serial effect-body rescans
+
+| R663 | **`EffectMethodNodeBuilder.Build` rescans the same method body for three effect dimensions.** The CFG path visits reachable block operations through `AnalyzeControlFlowGraph` to build the ordinary body summary, then `Build` invokes `ScanLexicalControlEffects` over the lexical root and `ScanUsingDisposalEffects` over the full root. Those latter passes independently enumerate operations or disposal structures that the scanner has already visited, with only their effect-specific projections differing. A coordinated body walk or shared per-operation facts can preserve lexical versus reachable semantics, disposal ordering, and direct-witness behavior while avoiding repeated operation-tree work. | `SharpProof.Effects/EffectMethodNodeBuilder.cs:45-114,720-780`; `SharpProof.Effects/OperationEffectScanner.cs:135-220` |
+
+### Status (part two hundred four)
+
+R663 is a pending effect-method traversal reduction candidate. Preserve CFG reachability, lexical control-effect coverage, using-disposal unwinding, constructor-entry selection, summary join order, and scanner state; combine only safely reusable operation visits/facts.
+
+## Second survey, part two hundred five: R664 - duplicate local-function CFG walk
+
+| R664 | **`RequiresCallSiteTreeAnalyzer.TryCollectLocalReferences` walks each CFG twice for related facts.** It first enumerates `ReachableOperations(graph)` to find invocation and method-reference targets, then immediately calls `GetAnonymousFunctions(graph)`, which enumerates the same reachable operations again to find anonymous functions before recursively scanning their child CFGs. One traversal can collect both target references and eligible anonymous functions while preserving the recursive child-graph queue, expression-tree filtering, escape checks, and fallback-to-all-candidates behavior. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:443-509,1533-1587` |
+
+### Status (part two hundred five)
+
+R664 is a pending requires-tree CFG traversal reduction candidate. Preserve operation ordering, local-reference and anonymous-function classification, recursive child-CFG discovery, cancellation, exception fallback, and candidate-set semantics; share only the per-graph reachable-operation enumeration.

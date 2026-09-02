@@ -574,19 +574,24 @@ public sealed class BuildSchedulingTests
         var block = Regex.Match(
             container,
             @"(?s)'worker-tests'\s*\{(?<body>.*?)\r?\n\s*'package-tests'\s*\{");
+        var runner = Regex.Match(
+            container,
+            @"(?s)function Invoke-TestProject\(\[string\]\$ProjectPath\)\s*\{(?<body>.*?)\r?\n\}");
         var assignment = Regex.Match(
             block.Groups["body"].Value,
             @"\$workerTestProject\s*=\s*'([^']+)'");
 
         Assert.That(block.Success, Is.True,
-            "worker-tests must have an explicit project-scoped restore.");
+            "worker-tests must have an explicit project-scoped test invocation.");
+        Assert.That(runner.Success, Is.True,
+            "project test commands must share one project-scoped runner.");
         Assert.That(assignment.Success, Is.True);
         Assert.That(assignment.Groups[1].Value, Is.EqualTo(
             "SharpProof.Worker.Test/SharpProof.Worker.Test.csproj"));
         Assert.That(
             Regex.IsMatch(
-                block.Groups["body"].Value,
-                @"'restore',\s*\$workerTestProject"),
+                runner.Groups["body"].Value,
+                @"'restore',\s*\$ProjectPath"),
             Is.True);
         Assert.That(workerProject,
             Does.Contain("<RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation>"));
@@ -603,17 +608,21 @@ public sealed class BuildSchedulingTests
         var match = Regex.Match(
             container,
             @"(?s)'worker-tests'\s*\{(?<body>.*?)\r?\n\s*'package-tests'\s*\{");
+        var runner = Regex.Match(
+            container,
+            @"(?s)function Invoke-TestProject\(\[string\]\$ProjectPath\)\s*\{(?<body>.*?)\r?\n\}");
 
         Assert.That(container, Does.Contain("[switch]$NoBuild"));
         Assert.That(match.Success, Is.True,
             "worker-tests must remain a distinct command block.");
-        Assert.That(match.Groups["body"].Value,
+        Assert.That(runner.Success, Is.True);
+        Assert.That(runner.Groups["body"].Value,
             Does.Contain("if (-not $NoBuild)"));
         Assert.That(match.Groups["body"].Value,
-            Does.Contain("$directWorkerTestArguments"));
-        Assert.That(match.Groups["body"].Value,
+            Does.Contain("Invoke-TestProject $workerTestProject"));
+        Assert.That(runner.Groups["body"].Value,
             Does.Contain("Get-SharpProofTestAssemblyPath"));
-        Assert.That(match.Groups["body"].Value,
+        Assert.That(runner.Groups["body"].Value,
             Does.Contain("@('vstest', $assembly)"));
     }
 
@@ -726,19 +735,29 @@ public sealed class BuildSchedulingTests
             TestRepository.FindRoot(),
             "scripts",
             "Invoke-SharpProofContainer.ps1"));
+        var runner = Regex.Match(
+            container,
+            @"(?s)function Invoke-TestProject\(\[string\]\$ProjectPath\)\s*\{(?<body>.*?)\r?\n\}");
+        var directBranch = Regex.Match(
+            container,
+            @"(?s)if \(\$directProjectTest\)\s*\{(?<body>.*?)\r?\n\s*\}");
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(container, Does.Contain("$directProjectTest ="));
-            Assert.That(container, Does.Contain("'build', $Target"));
-            Assert.That(container, Does.Contain("$fastBuildArguments"));
-            Assert.That(container, Does.Contain("'vstest', $assembly"));
+            Assert.That(runner.Success, Is.True);
+            Assert.That(directBranch.Success, Is.True);
+            Assert.That(runner.Groups["body"].Value,
+                Does.Contain("'build', $ProjectPath"));
+            Assert.That(runner.Groups["body"].Value,
+                Does.Contain("$fastBuildArguments"));
+            Assert.That(runner.Groups["body"].Value,
+                Does.Contain("'vstest', $assembly"));
+            Assert.That(directBranch.Groups["body"].Value,
+                Does.Contain("Invoke-TestProject $Target"));
             Assert.That(
                 container,
                 Does.Contain("SharpProof.Package.Test.csproj"));
-            Assert.That(
-                container,
-                Does.Contain("$directWorkerTestArguments"));
         }
     }
 
