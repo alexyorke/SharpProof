@@ -92,22 +92,28 @@ internal static class FinalCompilationCollector
             return [];
         }
 
-        var packs = value.Split([';'], StringSplitOptions.None)
-            .Select(static pack => pack.Trim())
-            .ToArray();
-        if (packs.Any(static pack => pack.Length == 0))
+        var packs = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var valuePart in value.Split([';'], StringSplitOptions.None))
         {
-            throw new InvalidOperationException(
-                "SharpProofSpecificationPacks must contain a pack identifier.");
+            var pack = valuePart.Trim();
+            if (pack.Length == 0)
+            {
+                throw new InvalidOperationException(
+                    "SharpProofSpecificationPacks must contain a pack identifier.");
+            }
+
+            if (!seen.Add(pack))
+            {
+                throw new InvalidOperationException(
+                    "SharpProofSpecificationPacks must not contain duplicate identifiers.");
+            }
+
+            packs.Add(pack);
         }
 
-        if (packs.Distinct(StringComparer.Ordinal).Count() != packs.Length)
-        {
-            throw new InvalidOperationException(
-                "SharpProofSpecificationPacks must not contain duplicate identifiers.");
-        }
-
-        return [.. packs.OrderBy(static pack => pack, StringComparer.Ordinal)];
+        packs.Sort(StringComparer.Ordinal);
+        return [.. packs];
     }
 
     private static string Get(AnalyzerConfigOptions options, string key)
