@@ -10,7 +10,9 @@
         Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(DefineConstants)', '(^|[;,])\s*SHARPPROOF_CONTRACTS\s*($|[;,])'))">true</_SharpProofContractsRuntimeEnabled>
   </PropertyGroup>
 
-  <Target Name="_SharpProofValidateConsumerConfiguration">
+  <Target Name="_SharpProofValidateConsumerConfiguration"
+          BeforeTargets="CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true'">
     <Error Condition="'$(SharpProofMode)' != ''"
            Text="SharpProofMode was removed before preview.1. Use SharpProofProfile and SharpProofFeatures." />
     <Error Condition="'$(SharpProofPortableAnalyzerPath)' != ''"

@@ -1911,10 +1911,15 @@ public sealed class ArchitectureTests
                         "GeneratePackageOnBuild")
                     .SingleOrDefault();
                 Assert.That(
-                    generateOnBuild?.Value,
-                    Is.EqualTo("false").IgnoreCase,
+                    generateOnBuild == null ||
+                        string.Equals(
+                            generateOnBuild.Value,
+                            "false",
+                            StringComparison.OrdinalIgnoreCase),
+                    Is.True,
                     project + " must reserve package creation for the " +
-                    "explicit container pack command.");
+                    "explicit container pack command (the SDK default is " +
+                    "false).");
             }
         }
     }

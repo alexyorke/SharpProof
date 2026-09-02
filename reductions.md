@@ -143,6 +143,7 @@ the smallest relevant containerized test target passes.
 | R346 | Reuse the canonical linked `HashEncoding` implementation for protocol SHA-256 formatting while retaining `WorkerProtocolJson.ComputeSha256` | `SharpProof.Worker.Test`: ProtocolJsonTests 108 passed |
 | R347 | Merge the package-consumer, pilot, and release-plan switch arms in `build.ps1` while retaining package-source validation and dispatch | PowerShell parse; dependency/build scheduling tests passed |
 | R348 | Fold `performance-smoke` into the shared `SharpProof.Gates` restore/run switch arm | PowerShell parse; build scheduling tests passed |
+| R349 | Hook consumer configuration validation directly before `CoreCompile` and remove the empty analyzer-consumer shim target | `SharpProof.ArchitectureTest`: build scheduling and consumer configuration tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1466,6 +1467,8 @@ maintenance seams rather than style preferences.
   package consumers, pilots, and release plans.
 - R348 is now applied: `Invoke-SharpProofContainer.ps1` routes
   `performance-smoke` through the shared Gates restore/run arm.
+- R349 is now applied: consumer configuration validation itself hooks
+  `CoreCompile`, so the analyzer-consumer import no longer needs an empty shim.
 - The repeated `SHARPPROOF_CONTRACTS` string spans the public conditional symbol,
   compilation fingerprinting, and synthetic source fixtures. The fixture copies
   are part of R309, while the fingerprint intentionally has a separate
@@ -1501,7 +1504,6 @@ forwarders across `SharpProof.Testing`, `Tools/SharpProof.Fuzz`, `SharpProof.Bui
 | R342 | **`GeneratedFileHelpers.ps1` declares duplicate function pairs within itself and is bypassed by generator-local re-declarations.** Within `GeneratedFileHelpers.ps1`, `Get-RequiredMember` (lines 3-17) and `Required` (lines 119-127) are identical; `Assert-Identifier` (lines 99-107) and `Identifier` (lines 129-136) are identical regex guards; `Assert-TypeName` (lines 109-117) and `TypeName` (lines 138-145) are identical; `Assert-EnumName` (lines 74-77) is an alias for `Assert-EnumValue`; and `Assert-CSharpIdentifier` (lines 94-97) is an alias for `Assert-PascalCaseIdentifier`. Furthermore, `Generate-IrModel.ps1:23-70` dot-sources `GeneratedFileHelpers.ps1` but re-defines `Get-OptionalArray` (identical to `Get-MemberArray`), `Get-OptionalString`, and `Get-OptionalBoolean` locally. | `scripts/GeneratedFileHelpers.ps1:3-17,74-97,99-145`; `scripts/Generate-IrModel.ps1:23-70` |
 | R343 | **The 15 portable and 7 collector analyzer dependency DLL lists are duplicated in full across three MSBuild entry points.** `SharpProof.Package/buildTransitive/SharpProof.targets:22-56`, `SharpProof.AnalyzerConsumer.props:34-65`, and `eng/self-application/SharpProof.SelfApplication.props:49-67` each enumerate the identical 15 portable analyzer dependency assemblies (`SharpProof.Analyzer.Core.dll`, `SharpProof.Contracts.dll`, `SharpProof.Dataflow.dll`, `SharpProof.Effects.dll`, `SharpProof.Frontend.dll`, `SharpProof.Ir.dll`, `SharpProof.Specs.dll`, plus 8 `System.*` assemblies) and the identical 7 collector dependencies (`Microsoft.Bcl.AsyncInterfaces.dll`, `SharpProof.CompilerArtifact.dll`, `SharpProof.Summaries.dll`, `SharpProof.Worker.Protocol.dll`, `System.IO.Pipelines.dll`, `System.Text.Encodings.Web.dll`, `System.Text.Json.dll`). A shared item definition or props fragment would ensure all three entrypoints resolve the identical dependency closure without drifting when Roslyn dependencies are updated. | `SharpProof.Package/buildTransitive/SharpProof.targets:22-56`; `SharpProof.AnalyzerConsumer.props:34-65`; `eng/self-application/SharpProof.SelfApplication.props:49-67` |
 | R344 | **`CancelableBuildTask.ResolveProjectRelativePath` is re-implemented across sibling build tasks.** `CancelableBuildTask.cs:64-74` provides a protected static helper `ResolveProjectRelativePath(projectDirectory, path)` handling `CurrentDirectory` fallback and `LinuxPathIdentity.RequireLocalPath`. `ResetPublishedVerification` consumes it. However, `InvalidatePublishedResult` (inheriting `CancelableBuildTask`) re-declares a 10-line local closure `ResolveLexicalPath`/`ResolvePath` doing the exact same resolution; and `ValidatePublishedVerificationResult` (inheriting `Microsoft.Build.Utilities.Task` rather than `CancelableBuildTask`) inlines an identical 11-line `ResolvePath` function. Inheriting `CancelableBuildTask` or consuming the static helper removes 21 redundant lines across the two tasks. | `SharpProof.BuildTasks/CancelableBuildTask.cs:64-74`; `SharpProof.BuildTasks/InvalidatePublishedResult.cs:48-58`; `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs:29-39` |
-| R349 | **`SharpProof.AnalyzerConsumer.props` declares an empty hook target `_SharpProofValidateSourceTreeConfiguration`.** Lines 105-109 declare `_SharpProofValidateSourceTreeConfiguration` with `BeforeTargets="CoreCompile"` and `DependsOnTargets="_SharpProofValidateConsumerConfiguration"`, but the target contains no tasks or property sets. It exists solely to hook `_SharpProofValidateConsumerConfiguration` from `SharpProof.ConsumerContract.props` before compilation. Adding `BeforeTargets="CoreCompile"` directly to `_SharpProofValidateConsumerConfiguration` in `SharpProof.ConsumerContract.props` (guarded by `DesignTimeBuild != true`) removes the empty shim target and aligns consumer validation with package target conventions. | `SharpProof.AnalyzerConsumer.props:105-109`; `SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props:13-28` |
 
 ### Checked and not proposed (part twenty-seven)
 
@@ -1519,7 +1521,7 @@ forwarders across `SharpProof.Testing`, `Tools/SharpProof.Fuzz`, `SharpProof.Bui
 
 ### Status (part twenty-seven)
 
-R341-R345, R349 are `pending`. R349 is low-risk and mechanical;
+R341-R345 are `pending`.
 reductions. R341 and R343 reduce substantial build/test configuration duplication
 across multiple entrypoints. R344 harmonizes path resolution between build tasks.
 
@@ -2995,3 +2997,15 @@ R514-R517 are `pending` reduction candidates. The validation and traversal
 items deliberately preserve the security and resource-limit checks at their
 existing boundaries; the reductions target only repeated geometry, child
 enumeration, walk mechanics, and constructor validation.
+
+## Second survey, part seventy: R518-R520 - effect-scanner phases and native-loader cleanup
+
+| R518 | **`OperationEffectScanner` duplicates the null-check-to-throw helper for receivers and locks.** `PotentialNullReceiver` and `PotentialNullLock` both return an empty summary when `_nullnessEvaluator.IsProvenNonNull` succeeds and otherwise call `Throw` with a framework exception identity; only the input parameter name and exception (`NullReferenceException` versus `ArgumentNullException`) differ. A parameterized `PotentialNullAccess` helper can centralize the branch while preserving the distinct C# failure semantics at each call site. | `SharpProof.Effects/OperationEffectScanner.cs:1216-1235` |
+| R519 | **Deconstruction target descent is implemented twice for two phases with the same declaration/tuple recursion.** `ScanDeconstructionTargetEvaluations` and `ScanDeconstructionTargetWrites` both unwrap `IDeclarationExpressionOperation`, recurse through `ITupleOperation.Elements`, sequence child results with `EffectStep.Then`, and stop after a non-completing step. The phases must remain separate because C# evaluates all target locations before right-hand values and writes later, but a generic target-tree walker with a phase-specific leaf action can remove the duplicated structural recursion without changing that ordering. | `SharpProof.Effects/OperationEffectScanner.Expressions.cs:54-124` |
+| R520 | **`ContainerNativeLibrary.InstallZ3ResolverRequired` has a cancellation catch with no cancellation source and an unsafe cleanup asymmetry.** The method accepts no `CancellationToken` and its `NativeLibrary.Load`, field writes, and `SetDllImportResolver` sequence has no cancellable operation, yet it singles out `OperationCanceledException` and rethrows before the general catch resets `_z3Handle`, clears `_z3Assembly`, and frees the native handle. The branch is therefore accidental complexity today and, if an OCE ever emerges from the loader boundary, leaves partially installed state; one cleanup path in a `finally`/general catch is easier to reason about. | `SharpProof.Host/ContainerNativeLibrary.cs:19-50` |
+
+### Status (part seventy)
+
+R518-R520 are `pending` candidates. R519 keeps the two evaluation phases
+separate, and R520 is recorded as a cleanup/exception-path concern rather than
+an instruction to broaden the native-loading surface.

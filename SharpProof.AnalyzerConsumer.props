@@ -94,12 +94,6 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="_SharpProofValidateSourceTreeConfiguration"
-          BeforeTargets="CoreCompile"
-          DependsOnTargets="_SharpProofValidateConsumerConfiguration"
-          Condition="'$(DesignTimeBuild)' != 'true'">
-  </Target>
-
   <Target Name="_SharpProofRequireSourceTreeVerifierPackage"
           BeforeTargets="CoreCompile"
           DependsOnTargets="_SharpProofValidateConsumerConfiguration"
