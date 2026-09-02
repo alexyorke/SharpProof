@@ -444,25 +444,21 @@ public sealed class DependencyAuditScriptTests
 
         internal async Task<ProcessResult> RunAsync(JsonObject report)
         {
-            await File.WriteAllTextAsync(
-                ReportPath,
-                report.ToJsonString(
-                    new JsonSerializerOptions
-                    {
-                        WriteIndented = true
-                    }));
-            return await RunScriptAsync(OutputPath, createStaleOutput: true);
+            return await RunReportAsync(
+                report,
+                OutputPath,
+                writeIndented: true,
+                createStaleOutput: true);
         }
 
         internal async Task<ProcessResult> RunWithOutputAsync(
             JsonObject report,
             string outputPath)
         {
-            await File.WriteAllTextAsync(
-                ReportPath,
-                report.ToJsonString());
-            return await RunScriptAsync(
+            return await RunReportAsync(
+                report,
                 outputPath,
+                writeIndented: false,
                 createStaleOutput: false);
         }
 
@@ -470,7 +466,31 @@ public sealed class DependencyAuditScriptTests
             JsonObject report,
             string expectedMessage)
         {
-            var result = await RunAsync(report);
+            await AssertRejectedAsync(
+                () => RunAsync(report),
+                expectedMessage);
+        }
+
+        internal async Task AssertRawRejectedAsync(
+            string report,
+            string expectedMessage)
+        {
+            await AssertRejectedAsync(
+                async () =>
+                {
+                    await File.WriteAllTextAsync(ReportPath, report);
+                    return await RunScriptAsync(
+                        OutputPath,
+                        createStaleOutput: true);
+                },
+                expectedMessage);
+        }
+
+        private async Task AssertRejectedAsync(
+            Func<Task<ProcessResult>> run,
+            string expectedMessage)
+        {
+            var result = await run();
             Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
             Assert.That(
                 result.Output,
@@ -482,23 +502,19 @@ public sealed class DependencyAuditScriptTests
                 result.Output);
         }
 
-        internal async Task AssertRawRejectedAsync(
-            string report,
-            string expectedMessage)
+        private async Task<ProcessResult> RunReportAsync(
+            JsonObject report,
+            string outputPath,
+            bool writeIndented,
+            bool createStaleOutput)
         {
-            await File.WriteAllTextAsync(ReportPath, report);
-            var result = await RunScriptAsync(
-                OutputPath,
-                createStaleOutput: true);
-            Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
-            Assert.That(
-                result.Output,
-                Does.Contain(expectedMessage),
-                result.Output);
-            Assert.That(
-                File.Exists(OutputPath),
-                Is.False,
-                result.Output);
+            var options = writeIndented
+                ? new JsonSerializerOptions { WriteIndented = true }
+                : null;
+            await File.WriteAllTextAsync(
+                ReportPath,
+                report.ToJsonString(options));
+            return await RunScriptAsync(outputPath, createStaleOutput);
         }
 
         public void Dispose()

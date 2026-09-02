@@ -4247,7 +4247,5 @@ R690 is deferred: the JSON and generated-object walkers intentionally have diffe
 
 ### Status (part two hundred twenty-six)
 
-| R692 | **`DependencyAuditWorkspace.RunAsync` and `RunWithOutputAsync` duplicate report execution setup.** Both serialize a `JsonObject` to `ReportPath` and then call `RunScriptAsync`; they differ only in indentation and whether the output path is the workspace default or a caller-supplied path, and whether a stale output sentinel is created. A single execution helper with explicit formatting, output-path, and stale-output parameters can preserve those test distinctions while removing the duplicated write/dispatch wrapper. | `SharpProof.Package.Test/DependencyAuditScriptTests.cs:445-467` |
-| R693 | **`DependencyAuditWorkspace.AssertRejectedAsync` and `AssertRawRejectedAsync` duplicate rejection assertions.** Both run the audit script, require a nonzero exit, require an expected message, and assert that the evidence output is absent; only the report input write path differs (`JsonObject` serialization versus raw text). A shared rejection helper accepting a report-writing callback can retain the raw-JSON and object-report cases while centralizing the failure contract. | `SharpProof.Package.Test/DependencyAuditScriptTests.cs:469-503` |
+R692-R693 completed: report execution now shares one formatting/output helper, and rejection assertions share one callback-based failure contract while preserving serialization modes, stale-output setup, caller-selected output paths, diagnostics, and output non-publication.
 
-R692-R693 are pending dependency-audit test-fixture reductions. Preserve report serialization modes, stale-output setup, caller-selected output paths, nonzero exits, expected diagnostics, and output non-publication.
