@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using NUnit.Framework;
+using static SharpProof.ArchitectureTest.ArchitectureRepository;
 
 namespace SharpProof.ArchitectureTest;
 
@@ -9,18 +10,6 @@ namespace SharpProof.ArchitectureTest;
 [Parallelizable(ParallelScope.Children)]
 public sealed class BoundaryEnforcementTests
 {
-    private static readonly string[] BannedApiProjects = [
-        "SharpProof.Analyzer", "SharpProof.Analyzer.Core", "SharpProof.Attributes",
-        "SharpProof.BuildTasks", "SharpProof.CompilerArtifact",
-        "SharpProof.CompilerCollector", "SharpProof.ContractForGenerator",
-        "SharpProof.Contracts", "SharpProof.Dataflow", "SharpProof.Effects",
-        "SharpProof.Frontend", "SharpProof.Fuzz", "SharpProof.Gates",
-        "SharpProof.Host", "SharpProof.Ir", "SharpProof.Meta.Analyzers",
-        "SharpProof.Smt", "SharpProof.Specs", "SharpProof.Summaries",
-        "SharpProof.Verify", "SharpProof.Worker", "SharpProof.Worker.Launcher",
-        "SharpProof.Worker.Protocol"
-    ];
-
     private static readonly string[] SoundnessCriticalProjects = [
         "SharpProof.Analyzer",
         "SharpProof.Analyzer.Core",
@@ -115,7 +104,7 @@ public sealed class BoundaryEnforcementTests
 
         var actual = BannedApiProjects
             .SelectMany(project => Directory.GetFiles(
-                Path.Combine(root, ProjectDirectory(project)),
+                ProjectDirectory(project),
                 "*.cs",
                 SearchOption.AllDirectories))
             .Where(static path =>
@@ -186,7 +175,7 @@ public sealed class BoundaryEnforcementTests
 
         foreach (var project in BannedApiProjects)
         {
-            foreach (var file in SourceFiles(project))
+            foreach (var file in ProductionSourceFiles(project))
             {
                 var source = File.ReadAllText(file);
                 var compact = Regex.Replace(source, @"\s+", string.Empty)
@@ -242,7 +231,9 @@ public sealed class BoundaryEnforcementTests
             direct.OrderBy(static value => value, StringComparer.Ordinal),
             Is.EqualTo(expectedDirect));
 
-        var closure = TransitiveProjectClosure("SharpProof.Analyzer");
+        var closure = TransitiveProjectClosure(
+            "SharpProof.Analyzer",
+            includeRoot: false);
         Assert.That(
             closure,
             Does.Not.Contain("SharpProof.CompilerArtifact"));
@@ -324,7 +315,7 @@ public sealed class BoundaryEnforcementTests
         ];
         foreach (var project in descriptorProjects)
         {
-            foreach (var file in SourceFiles(project))
+            foreach (var file in ProductionSourceFiles(project))
             {
                 var source = File.ReadAllText(file);
                 Assert.That(
@@ -360,7 +351,7 @@ public sealed class BoundaryEnforcementTests
     public void CurrentProductionDoesNotParseContractStrings()
     {
         var parserCallers = BannedApiProjects
-            .SelectMany(SourceFiles)
+            .SelectMany(ProductionSourceFiles)
             .Where(file => Regex.IsMatch(
                 File.ReadAllText(file),
                 @"SyntaxFactory\s*\.\s*Parse" +
@@ -498,89 +489,6 @@ public sealed class BoundaryEnforcementTests
                 Does.Not.Contain(forbidden),
                 forbidden);
         }
-    }
-
-    private static HashSet<string> TransitiveProjectClosure(
-        string rootProject)
-    {
-        var result = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new Stack<string>();
-        pending.Push(rootProject);
-        while (pending.Count != 0)
-        {
-            var project = pending.Pop();
-            foreach (var dependency in ProjectReferences(project))
-            {
-                if (result.Add(dependency))
-                {
-                    pending.Push(dependency);
-                }
-            }
-        }
-        return result;
-    }
-
-    private static string[] ProjectReferences(string project)
-    {
-        return [.. XDocument.Load(ProjectFile(project))
-            .Descendants("ProjectReference")
-            .Where(static element =>
-                !string.Equals(
-                    (string?)element.Attribute("OutputItemType"),
-                    "Analyzer",
-                    StringComparison.OrdinalIgnoreCase))
-            .Select(static element =>
-                Path.GetFileNameWithoutExtension(
-                    ((string?)element.Attribute("Include") ?? string.Empty)
-                        .Replace('\\', '/')))
-            .Where(static value => !string.IsNullOrWhiteSpace(value))];
-    }
-
-    private static string[] ProjectPackages(string project)
-    {
-        return [.. XDocument.Load(ProjectFile(project))
-            .Descendants("PackageReference")
-            .Select(static element =>
-                (string?)element.Attribute("Include") ?? string.Empty)
-            .Where(static value => !string.IsNullOrWhiteSpace(value))];
-    }
-
-    private static IEnumerable<string> SourceFiles(string project)
-    {
-        return Directory.GetFiles(
-                Path.Combine(TestRepository.FindRoot(), ProjectDirectory(project)),
-                "*.cs",
-                SearchOption.AllDirectories)
-            .Where(static path =>
-                !path.Contains(
-                    Path.DirectorySeparatorChar + "obj" +
-                    Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal) &&
-                !path.Contains(
-                    Path.DirectorySeparatorChar + "bin" +
-                    Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal))
-            .OrderBy(static path => path, StringComparer.Ordinal);
-    }
-
-    private static string ReadProductionSources(string project)
-    {
-        return string.Join("\n", SourceFiles(project).Select(File.ReadAllText));
-    }
-
-    private static string ProjectFile(string project)
-    {
-        return Path.Combine(
-            TestRepository.FindRoot(),
-            ProjectDirectory(project),
-            project + ".csproj");
-    }
-
-    private static string ProjectDirectory(string project)
-    {
-        return project == "SharpProof.Fuzz"
-            ? Path.Combine("Tools", project)
-            : project;
     }
 
     private static string Relative(string path)
