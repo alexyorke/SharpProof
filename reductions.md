@@ -4263,9 +4263,7 @@ R696 completed: corpus token replacement now handles only the active helper/inpu
 
 ### Status (part two hundred thirty)
 
-| R697 | **`EffectCallSiteResolver.AlignActualArguments` repeatedly copies an immutable argument array.** The helper starts with an `ImmutableArray<IOperation?>` and uses `SetItem` for every in-range argument, so calls with many parameters can allocate/copy the full array once per argument before returning the final alignment. Fill a mutable array or immutable builder and freeze once, while retaining ordinal filtering, param-array skipping, and the normalized argument positions. | `SharpProof.Effects/EffectCallSiteResolver.cs:163-188` |
-
-R697 is a pending effect-call argument-alignment allocation reduction candidate. Preserve omitted-argument nulls, reduced/invalid ordinals, ref/param-array filtering, and the returned immutable snapshot.
+R697 completed: actual arguments are filled in one mutable array and frozen once, preserving omitted slots, ordinal filtering, param-array skipping, and the immutable result.
 
 ### Status (part two hundred thirty-one)
 

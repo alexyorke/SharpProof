@@ -164,9 +164,7 @@ internal sealed class EffectCallSiteResolver(
         ImmutableArray<IArgumentOperation> arguments,
         int parameterCount)
     {
-        var result = Enumerable.Repeat<IOperation?>(
-            null,
-            parameterCount).ToImmutableArray();
+        var result = new IOperation?[parameterCount];
         foreach (var argument in arguments)
         {
             if (argument.ArgumentKind ==
@@ -181,12 +179,10 @@ internal sealed class EffectCallSiteResolver(
                 continue;
             }
 
-            result = result.SetItem(
-                ordinal,
-                argument.Value);
+            result[ordinal] = argument.Value;
         }
 
-        return result;
+        return ImmutableArray.CreateRange(result);
     }
 
     internal static EffectSummary ExpandedParamsEvidence(
