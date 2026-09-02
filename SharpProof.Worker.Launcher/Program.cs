@@ -468,7 +468,7 @@ internal static class Program
                     $"Selected analysis is incomplete: callables={incomplete.Length}, unknown-claims={unknownClaims}."));
         }
 
-        var incompleteError = incomplete.Length != 0 &
+        var incompleteError = incomplete.Length != 0 &&
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
         Console.WriteLine("SharpProof summary " + JsonSerializer.Serialize(
@@ -492,7 +492,7 @@ internal static class Program
             return 3;
         }
 
-        return refuted ? 5 : incompleteError | assumptionError ? 6 : 0;
+        return refuted ? 5 : incompleteError || assumptionError ? 6 : 0;
     }
     private static bool ReportAssumptions(
         WorkerAssumptionPolicy policy, WorkerVerifyResponse response)

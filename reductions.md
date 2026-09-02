@@ -144,6 +144,7 @@ the smallest relevant containerized test target passes.
 | R826 | Share scoped identifier hash mixing between IR and specification identifiers | `SharpProof.Ir.Test`: 114; `SharpProof.Specs.Test`: identifier and API-spec suites passed |
 | R827 | Remove the internal callable-replay overload that re-filters clauses; pass prepared ensures lists from test fixtures | `SharpProof.Worker.Test`: CallableCounterexampleReplayerTests 15; WorkerTcbEdgeCaseTests 44 |
 | R830 | Remove the unused launcher assumption total local | `SharpProof.Package.Test`: launcher argument and validation tests passed |
+| R831 | Use logical boolean operators for launcher policy predicates | `SharpProof.Package.Test`: LauncherArgumentTests 75 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6999,9 +7000,8 @@ R830 is `applied`: the unused assumption total was removed while preserving
 
 ### Status (part three hundred forty-two)
 
-R831 is `deferred`: the current operators are behaviorally equivalent for
-  these operands, but their bitwise form is unexplained accidental complexity
-  in a user-facing exit-policy calculation.
+R831 is `applied`: launcher policy predicates now use logical operators while
+  preserving the already-evaluated assumption diagnostic and exit-code policy.
 
 ## Second survey, part three hundred forty-three: R832 - incomplete response array rematerialization
 
