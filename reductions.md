@@ -186,6 +186,7 @@ the smallest relevant containerized test target passes.
 | R620 | Share Meta-analyzer local-write candidate enumeration | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests, 162 passed |
 | R621 | Share Worker artifact-authority verification baseline | `SharpProof.Worker.Test`: WorkerTests, 148 passed |
 | R625 | Hash already-normalized corpus text without a second line-ending scan | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
+| R623 | Share corpus observation collection between gate execution and snapshot rendering | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4243,7 +4244,10 @@ R622 is a pending corpus-transaction cleanup candidate. Preserve create-new sema
 
 ### Status (part one hundred sixty-four)
 
-R623 is a pending corpus-gate orchestration cleanup candidate. Preserve the exact synthetic/OSS ordering, cancellation checks, and snapshot line ordering; share only observation collection and keep result accounting separate from rendering.
+R623 is `applied`: `ObserveAllAsync` now owns the shared synthetic/OSS
+observation ordering and cancellation checks used by both gate execution and
+snapshot rendering; result accounting and canonical-line rendering remain
+separate consumers. CorpusGateTests passed (23).
 
 ## Second survey, part one hundred sixty-five: R624 - duplicate corpus source-ID validation
 

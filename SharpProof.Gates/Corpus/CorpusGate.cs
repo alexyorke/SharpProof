@@ -59,20 +59,11 @@ internal static class CorpusGate
         var allowances = LoadAllowances(allowancePath);
         var unknownReasonRatchet = LoadUnknownReasonRatchet(
             unknownReasonRatchetPath);
-        var observations = ImmutableArray.CreateBuilder<CorpusObservation>();
-        foreach (var item in cases.Where(static item =>
-                     item.Origin == CorpusOrigin.SyntheticMetamorphic))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            observations.Add(
-                await ObserveCaseAsync(item, cancellationToken)
-                    .ConfigureAwait(false));
-        }
-        observations.AddRange(
-            await OpenSourceCorpusRunner.ObserveAsync(
-                    openSourceDocument,
-                    cancellationToken)
-                .ConfigureAwait(false));
+        var observations = await ObserveAllAsync(
+                cases,
+                openSourceDocument,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         var failures = ImmutableArray.CreateBuilder<string>();
         var usedAllowances = new HashSet<string>(StringComparer.Ordinal);
@@ -168,7 +159,7 @@ internal static class CorpusGate
             }
         }
 
-        var immutableObservations = observations.ToImmutable();
+        var immutableObservations = observations;
         failures.AddRange(
             ValidateMetamorphicConsistency(cases, immutableObservations));
         var cacheFailures = await VerifyCacheReplayAsync(
@@ -361,22 +352,15 @@ internal static class CorpusGate
         OpenSourceCorpusDocument openSourceDocument,
         CancellationToken cancellationToken)
     {
-        var lines = new List<string>();
-        foreach (var item in CorpusCatalog.CreateSyntheticCases())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            lines.Add(
-                (await ObserveCaseAsync(item, cancellationToken).ConfigureAwait(false))
-                .ToCanonicalLine());
-        }
-        lines.AddRange(
-            (await OpenSourceCorpusRunner.ObserveAsync(
-                    openSourceDocument,
-                    cancellationToken)
-                .ConfigureAwait(false))
-            .Select(static observation => observation.ToCanonicalLine()));
+        var observations = await ObserveAllAsync(
+                CorpusCatalog.CreateSyntheticCases(),
+                openSourceDocument,
+                cancellationToken)
+            .ConfigureAwait(false);
         return CorpusSnapshotFormat.Render(
-            lines.OrderBy(static line => line, StringComparer.Ordinal));
+            observations
+                .Select(static observation => observation.ToCanonicalLine())
+                .OrderBy(static line => line, StringComparer.Ordinal));
     }
 
     public static async Task WriteActualSnapshotAsync(
@@ -417,6 +401,29 @@ internal static class CorpusGate
                 cancellationToken)
             .ConfigureAwait(false);
         return Observe(item, analysis);
+    }
+
+    private static async Task<ImmutableArray<CorpusObservation>> ObserveAllAsync(
+        ImmutableArray<CorpusCase> cases,
+        OpenSourceCorpusDocument openSourceDocument,
+        CancellationToken cancellationToken)
+    {
+        var observations = ImmutableArray.CreateBuilder<CorpusObservation>();
+        foreach (var item in cases.Where(static item =>
+                     item.Origin == CorpusOrigin.SyntheticMetamorphic))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            observations.Add(
+                await ObserveCaseAsync(item, cancellationToken)
+                    .ConfigureAwait(false));
+        }
+
+        observations.AddRange(
+            await OpenSourceCorpusRunner.ObserveAsync(
+                    openSourceDocument,
+                    cancellationToken)
+                .ConfigureAwait(false));
+        return observations.ToImmutable();
     }
 
     private static CorpusObservation Observe(
