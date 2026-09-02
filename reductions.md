@@ -4293,7 +4293,7 @@ R702 completed: the compilation closure now uses a reference-identity hash set f
 
 | R703 | **`PackageDependencyAuthorityTests` repeats manual temporary-root lifetimes.** Four test methods build a unique path under `Path.GetTempPath`, call `Directory.CreateDirectory`, and repeat `try/finally { Directory.Delete(..., recursive: true); }`. `TempDirectory` is already linked into `SharpProof.ArchitectureTest` through `Directory.Build.props`; a `using` fixture or scoped helper can remove the lifecycle scaffolding while preserving each test's isolated prefix and cleanup behavior. | `SharpProof.ArchitectureTest/PackageDependencyAuthorityTests.cs:24-156`; `eng/testing/TempDirectory.cs:1-20`; `Directory.Build.props:76-81` |
 
-R703 is a pending package-authority test lifecycle reduction candidate. Preserve parallel test isolation, per-scenario mutation coverage, and recursive cleanup on assertion or process failure.
+R703 completed: package-authority tests now use scoped `TempDirectory` fixtures while preserving parallel isolation, per-scenario mutation coverage, and recursive cleanup on assertion or process failure.
 
 ### Status (part two hundred thirty-seven)
 

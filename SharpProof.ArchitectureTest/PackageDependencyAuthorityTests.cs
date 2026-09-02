@@ -25,29 +25,20 @@ public sealed class PackageDependencyAuthorityTests
         string mutation,
         bool expectedSuccess)
     {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "sharpproof-dependencies-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
+        using var workspace = new TempDirectory("sharpproof-dependencies-");
+        var root = workspace.FullName;
+        var paths = WritePackageGraph(root, mutation);
+        var result = await RunAuthorityAsync(paths);
+        Assert.That(
+            result.ExitCode == 0,
+            Is.EqualTo(expectedSuccess),
+            result.Output);
+        if (expectedSuccess)
         {
-            var paths = WritePackageGraph(root, mutation);
-            var result = await RunAuthorityAsync(paths);
             Assert.That(
-                result.ExitCode == 0,
-                Is.EqualTo(expectedSuccess),
-                result.Output);
-            if (expectedSuccess)
-            {
-                Assert.That(
-                    result.Output,
-                    Does.Contain("SharpProof.Attributes")
-                        .And.Contain(".NETStandard2.0"));
-            }
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
+                result.Output,
+                Does.Contain("SharpProof.Attributes")
+                    .And.Contain(".NETStandard2.0"));
         }
     }
 
@@ -62,23 +53,14 @@ public sealed class PackageDependencyAuthorityTests
         string mutation,
         bool expectedSuccess)
     {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "sharpproof-licenses-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            var paths = WritePackageGraph(root, mutation);
-            var result = await RunAuthorityAsync(paths);
-            Assert.That(
-                result.ExitCode == 0,
-                Is.EqualTo(expectedSuccess),
-                result.Output);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        using var workspace = new TempDirectory("sharpproof-licenses-");
+        var root = workspace.FullName;
+        var paths = WritePackageGraph(root, mutation);
+        var result = await RunAuthorityAsync(paths);
+        Assert.That(
+            result.ExitCode == 0,
+            Is.EqualTo(expectedSuccess),
+            result.Output);
     }
 
     [TestCase("canonical", true)]
@@ -107,23 +89,14 @@ public sealed class PackageDependencyAuthorityTests
         string mutation,
         bool expectedSuccess)
     {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "sharpproof-metadata-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            var paths = WritePackageGraph(root, mutation);
-            var result = await RunAuthorityAsync(paths);
-            Assert.That(
-                result.ExitCode == 0,
-                Is.EqualTo(expectedSuccess),
-                result.Output);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        using var workspace = new TempDirectory("sharpproof-metadata-");
+        var root = workspace.FullName;
+        var paths = WritePackageGraph(root, mutation);
+        var result = await RunAuthorityAsync(paths);
+        Assert.That(
+            result.ExitCode == 0,
+            Is.EqualTo(expectedSuccess),
+            result.Output);
     }
 
     [TestCase("canonical", true)]
@@ -137,22 +110,13 @@ public sealed class PackageDependencyAuthorityTests
         string mutation,
         bool expectedSuccess)
     {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "sharpproof-component-authority-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            var result = await RunComponentAuthorityAsync(root, mutation);
-            Assert.That(
-                result.ExitCode == 0,
-                Is.EqualTo(expectedSuccess),
-                result.Output);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        using var workspace = new TempDirectory("sharpproof-component-authority-");
+        var root = workspace.FullName;
+        var result = await RunComponentAuthorityAsync(root, mutation);
+        Assert.That(
+            result.ExitCode == 0,
+            Is.EqualTo(expectedSuccess),
+            result.Output);
     }
 
     private static string[] WritePackageGraph(string root, string mutation)
