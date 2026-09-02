@@ -116,6 +116,24 @@ function Get-SharpProofPackageDependencyGraph {
         throw 'Unsupported package dependency contract schema.'
     }
     $expectedPackages = @($contract.packages)
+    $expectedPackageIds = @($expectedPackages.id | Sort-Object)
+    $expectedPackagesById = [Collections.Generic.Dictionary[string, object]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    $expectedGroupsByPackageId =
+        [Collections.Generic.Dictionary[string, Collections.Generic.Dictionary[string, object]]]::new(
+            [StringComparer]::OrdinalIgnoreCase)
+    foreach ($expectedPackage in $expectedPackages) {
+        $packageId = [string]$expectedPackage.id
+        $expectedPackagesById.Add($packageId, $expectedPackage)
+        $groupsByFramework = [Collections.Generic.Dictionary[string, object]]::new(
+            [StringComparer]::OrdinalIgnoreCase)
+        foreach ($expectedGroup in @($expectedPackage.dependencyGroups)) {
+            $groupsByFramework.Add(
+                [string]$expectedGroup.targetFramework,
+                $expectedGroup)
+        }
+        $expectedGroupsByPackageId.Add($packageId, $groupsByFramework)
+    }
     $models = @($PackagePaths | ForEach-Object {
         [pscustomobject][ordered]@{
             Path = $_
@@ -128,9 +146,8 @@ function Get-SharpProofPackageDependencyGraph {
             $_.Extension -eq $extension
         })
         $actualIds = @($extensionModels.Nuspec.Id | Sort-Object)
-        $expectedIds = @($expectedPackages.id | Sort-Object)
         if ($extensionModels.Count -ne $expectedPackages.Count -or
-            ($actualIds -join '|') -ne ($expectedIds -join '|')) {
+            ($actualIds -join '|') -ne ($expectedPackageIds -join '|')) {
             throw "Package dependency authority requires the exact $extension graph."
         }
     }
@@ -141,25 +158,24 @@ function Get-SharpProofPackageDependencyGraph {
     }
     $version = [string]$versions[0]
     foreach ($model in $models) {
-        $expected = @($expectedPackages | Where-Object {
-            [string]$_.id -eq [string]$model.Nuspec.Id
-        })
-        if ($expected.Count -ne 1) {
+        $packageId = [string]$model.Nuspec.Id
+        if (-not $expectedPackagesById.ContainsKey($packageId)) {
             throw "Unexpected package dependency owner '$($model.Nuspec.Id)'."
         }
+        $expected = $expectedPackagesById[$packageId]
         $actualLicense = [string]$model.Nuspec.LicenseExpression
         if (($model.Extension -eq '.nupkg' -and
                 $actualLicense -cne
-                    [string]$expected[0].licenseExpression) -or
+                    [string]$expected.licenseExpression) -or
             ($model.Extension -eq '.snupkg' -and
                 -not [string]::IsNullOrEmpty($actualLicense) -and
                 $actualLicense -cne
-                    [string]$expected[0].licenseExpression)) {
+                    [string]$expected.licenseExpression)) {
             throw "Package '$($model.Nuspec.Id)' has an invalid license expression."
         }
         foreach ($name in @('authors', 'projectUrl', 'description', 'tags')) {
             $actual = [string]$model.Nuspec.PublicMetadata.$name
-            $wanted = [string]$expected[0].publicMetadata.$name
+            $wanted = [string]$expected.publicMetadata.$name
             if (($model.Extension -eq '.nupkg' -and
                     $actual -cne $wanted) -or
                 ($model.Extension -eq '.snupkg' -and
@@ -168,7 +184,7 @@ function Get-SharpProofPackageDependencyGraph {
                 throw "Package '$($model.Nuspec.Id)' has invalid '$name' metadata."
             }
         }
-        $expectedGroups = @($expected[0].dependencyGroups)
+        $expectedGroups = $expectedGroupsByPackageId[$packageId]
         $actualGroups = @($model.Nuspec.DependencyGroups)
         if ($actualGroups.Count -ne $expectedGroups.Count) {
             throw "Package '$($model.Nuspec.Id)' has an invalid dependency group count."
@@ -179,15 +195,13 @@ function Get-SharpProofPackageDependencyGraph {
             if (-not $seenFrameworks.Add([string]$group.TargetFramework)) {
                 throw "Package '$($model.Nuspec.Id)' has duplicate dependency groups."
             }
-            $expectedGroup = @($expectedGroups | Where-Object {
-                [string]$_.targetFramework -eq
-                    [string]$group.TargetFramework
-            })
-            if ($expectedGroup.Count -ne 1) {
+            $framework = [string]$group.TargetFramework
+            if (-not $expectedGroups.ContainsKey($framework)) {
                 throw "Package '$($model.Nuspec.Id)' has an unsupported dependency framework."
             }
+            $expectedGroup = $expectedGroups[$framework]
             $actualDependencies = @($group.Dependencies)
-            $expectedIds = @($expectedGroup[0].dependencies)
+            $expectedIds = @($expectedGroup.dependencies)
             if ($actualDependencies.Count -ne $expectedIds.Count) {
                 throw "Package '$($model.Nuspec.Id)' has an invalid dependency count."
             }
