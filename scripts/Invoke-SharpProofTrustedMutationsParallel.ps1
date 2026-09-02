@@ -198,9 +198,9 @@ function Test-CompleteShard([object]$Shard) {
 $baselinePath = Join-Path $shardRoot 'baseline.json'
 $baselineRelativePath = [IO.Path]::GetRelativePath(
     $repositoryRoot, $baselinePath)
-function Test-CompleteBaseline {
+function Get-CompleteBaseline {
     if (-not (Test-Path -LiteralPath $baselinePath -PathType Leaf)) {
-        return $false
+        return $null
     }
     try {
         $baseline = Get-Content -LiteralPath $baselinePath -Raw |
@@ -213,7 +213,7 @@ function Test-CompleteBaseline {
             [int]$baseline.catalogCount -ne $catalogCount -or
             [int]$baseline.testCount -le 0 -or
             [int]$baseline.testCount -ne $rows.Count) {
-            return $false
+            return $null
         }
         foreach ($row in $rows) {
             $invocation = Get-SharpProofMutationBaselineInvocation `
@@ -228,18 +228,19 @@ function Test-CompleteBaseline {
                     $shardRoot + [IO.Path]::DirectorySeparatorChar,
                     [StringComparison]::Ordinal) -or
                 -not [IO.File]::Exists($trx)) {
-                return $false
+                return $null
             }
         }
-        return $true
+        return $baseline
     }
     catch {
-        return $false
+        return $null
     }
 }
 
 $baselineTimer = [Diagnostics.Stopwatch]::StartNew()
-$baselineReused = Test-CompleteBaseline
+$baselineEvidence = Get-CompleteBaseline
+$baselineReused = $null -ne $baselineEvidence
 if (-not $baselineReused) {
     Remove-Item -LiteralPath $baselinePath `
         -Force -ErrorAction SilentlyContinue
@@ -252,7 +253,8 @@ if (-not $baselineReused) {
         -ExpectedCommit $ExpectedCommit `
         -BaselineEvidencePath $baselineRelativePath `
         -BaselineOnly
-    if ($LASTEXITCODE -ne 0 -or -not (Test-CompleteBaseline)) {
+    $baselineEvidence = Get-CompleteBaseline
+    if ($LASTEXITCODE -ne 0 -or $null -eq $baselineEvidence) {
         throw 'The shared mutation baseline campaign failed.'
     }
 }
@@ -260,8 +262,6 @@ else {
     Write-Host "Reusing exact mutation baselines: $baselinePath"
 }
 $baselineTimer.Stop()
-$baselineEvidence = Get-Content -LiteralPath $baselinePath -Raw |
-    ConvertFrom-Json
 
 function New-ShardTiming {
     param(

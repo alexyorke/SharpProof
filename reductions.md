@@ -192,6 +192,7 @@ the smallest relevant containerized test target passes.
 | R870 | Remove the redundant IR location type-table lookup | `SharpProof.Ir.Test`: 114 passed |
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
+| R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3755,7 +3756,10 @@ R573 is a pending release/evidence-pipeline reduction and validation candidate. 
 
 ### Status (part one hundred fifteen)
 
-R574 is a pending mutation-pipeline reduction candidate. Preserve validation after baseline generation; only reuse the already-parsed, successfully validated document for the subsequent timing projection.
+R574 is `applied`: the parallel mutation driver now returns the validated
+baseline document from its completeness check and reuses it after generation
+or reuse, retaining the post-generation validation boundary while removing a
+second baseline JSON read and parse.
 
 ## Second survey, part one hundred sixteen: R575 - repeated mutation-shard validation
 
