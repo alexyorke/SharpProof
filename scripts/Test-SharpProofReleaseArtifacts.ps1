@@ -118,25 +118,36 @@ $catalogComponents = @(Get-SharpProofThirdPartyComponentGraph)
 Test-SharpProofThirdPartyComponentProjection `
     -ActualComponents @($manifest.thirdPartyComponents) `
     -ExpectedComponents $catalogComponents
+$artifactsByKindAndPackage =
+    [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+foreach ($artifact in $artifacts) {
+    $key = '{0}|{1}' -f [string]$artifact.kind, [string]$artifact.packageId
+    $artifactsByKindAndPackage.Add($key, $artifact)
+}
+$payloadsByPackage = [Collections.Generic.Dictionary[string, object]]::new(
+    [StringComparer]::Ordinal)
+foreach ($payloadSet in $payloadSets) {
+    $payloadsByPackage.Add([string]$payloadSet.packageId, $payloadSet)
+}
+$componentsByPackage =
+    [Collections.Generic.Dictionary[string, Collections.Generic.List[object]]]::new(
+        [StringComparer]::Ordinal)
+foreach ($component in $catalogComponents) {
+    $packageId = [string]$component.packageId
+    if (-not $componentsByPackage.ContainsKey($packageId)) {
+        $componentsByPackage.Add($packageId, [Collections.Generic.List[object]]::new())
+    }
+    [void]$componentsByPackage[$packageId].Add($component)
+}
 foreach ($packageId in $expectedPackageIds) {
-    $mainArtifact = @(
-        $artifacts |
-            Where-Object {
-                [string]$_.kind -eq 'package' -and
-                [string]$_.packageId -eq $packageId
-            }
-    )[0]
-    $symbolArtifact = @(
-        $artifacts |
-            Where-Object {
-                [string]$_.kind -eq 'symbols' -and
-                [string]$_.packageId -eq $packageId
-            }
-    )[0]
+    $mainArtifact = $artifactsByKindAndPackage["package|$packageId"]
+    $symbolArtifact = $artifactsByKindAndPackage["symbols|$packageId"]
     $components = @(
-        $catalogComponents |
-            Where-Object { [string]$_.packageId -eq $packageId }
+        if ($componentsByPackage.ContainsKey($packageId)) {
+            $componentsByPackage[$packageId].ToArray()
+        }
     )
+    $payloadEntries = @($payloadsByPackage[$packageId].entries)
     $null = Test-SharpProofPackagePayload `
         -PackagePath (Join-Path `
             $resolvedSource `
@@ -144,11 +155,7 @@ foreach ($packageId in $expectedPackageIds) {
         -PackageId $packageId `
         -RepositoryRoot $repositoryRoot `
         -Components $components `
-        -ExpectedPayloads @(
-            $payloadSets |
-                Where-Object { [string]$_.packageId -eq $packageId } |
-                ForEach-Object { @($_.entries) }
-        )
+        -ExpectedPayloads $payloadEntries
     $null = Test-SharpProofSymbolPackagePair `
         -PackagePath (Join-Path `
             $resolvedSource `
