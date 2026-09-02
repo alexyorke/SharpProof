@@ -23,18 +23,16 @@ discovery without duplicating the implementation closure.
 
 ## Pinned Z3 closure
 
-`eng/container/toolchain.json` is the authority for the Z3 version, official
-archive URL, archive SHA-256, extracted `libz3.so` SHA-256 and size, and the
-managed `Microsoft.Z3.dll` SHA-256 and size. The Docker build downloads the
-official archive and fails unless every pin matches. The binary is not stored
-in Git.
+`eng/container/toolchain.json` is the authority for the Z3 version and official
+archive URL. The Docker build downloads that version and checks the extracted
+payload's expected files and byte sizes. The binary is not stored in Git.
 
 The verifier package places the native library at
 `runtimes/linux-x64/native/libz3.so` and the managed assembly under
-`tools/net9`. Before constructing a Z3 context, the worker resolves and hashes
-the canonical container library, installs a `NativeLibrary` resolver, and
-loads only that absolute file. `LD_LIBRARY_PATH` and ambient system libraries
-are not trust inputs.
+`tools/net9`. Before constructing a Z3 context, the worker resolves the
+canonical container library, installs a `NativeLibrary` resolver, and loads
+only that absolute file. `LD_LIBRARY_PATH` and ambient system libraries are
+not trust inputs.
 
 ## Container process boundary
 
@@ -53,14 +51,14 @@ solver, and semantic-work budgets.
 
 Package validation creates one isolated three-package feed and checks exact
 layouts, SourceLink symbol packages, repository commits, dependency ranges,
-native hashes, analyzer entry points, and packaged verification. Consumer
+native payload paths and sizes, analyzer entry points, and packaged verification. Consumer
 restore is isolated from public feeds except for explicitly prepared framework
 reference packages.
 
 Each `.nupkg` is PDB-free and has one matching `.snupkg`; together the release
 set is exactly three main packages and three symbol packages at one version.
-Release evidence includes SPDX 2.3, `SHA256SUMS`, the release manifest,
-container-toolchain identity, and exact source commit. Publication promotes
+Release evidence includes SPDX 2.3, the release manifest, container-toolchain
+identity, and exact source commit. Publication promotes
 the tested bytes in dependency order:
 `SharpProof.Attributes -> SharpProof -> SharpProof.Verifier`.
 Every main package must be absent before publication, and duplicate skipping is

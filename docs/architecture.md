@@ -36,8 +36,8 @@ Worker.Launcher       -> CompilerArtifact, Host, Ir, Specs, Worker.Protocol
 
 Build-only references to `SharpProof.Meta.Analyzers` are omitted. Frontend's
 Attributes edge has `ReferenceOutputAssembly=false`; it establishes build
-order so the exact Attributes DLL SHA-256 can be embedded without adding a
-runtime assembly dependency. The architecture suite compares every direct
+order so the exact Attributes assembly identity can be embedded without adding
+a runtime assembly dependency. The architecture suite compares every direct
 project reference against this graph. The ordinary live analyzer has no static dependency on the
 compiler-artifact model or worker protocol; those
 dependencies belong only to the build-only compiler collector.
@@ -388,7 +388,7 @@ path. The worker is isolated in
 `SharpProof.Verifier`; the portable `SharpProof` package contains only
 analyzer/generator assets and depends exactly on `SharpProof.Attributes`. Each
 package has a portable-PDB symbol package with SourceLink, and the package
-workflow records exact SHA-256 hashes, an SPDX SBOM, and GitHub
+workflow records exact package identities, an SPDX SBOM, and GitHub
 provenance/SBOM attestations. The corpus reports explicit, silent, and total
 semantic Unknown rates. A `Supported` case producing `Unknown` or
 `SilentUnknown` fails with zero tolerance. The supported-case and supported

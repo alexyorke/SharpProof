@@ -238,7 +238,7 @@ jobs:
           docker compose run --rm tooling release-plan
           -PackageSource nupkgs
 
-      - name: Bind qualification to container inputs and package hashes
+      - name: Bind qualification to container inputs and package artifacts
         run: >-
           docker compose run --rm
           -e GITHUB_REF_NAME -e GITHUB_SHA

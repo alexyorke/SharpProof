@@ -288,7 +288,7 @@ and content hash without embedding their raw contents. Analyzer configuration
 and reporting policies are represented by their observable effects on the
 final compilation and effective SharpProof options.
 
-The launcher binds the artifact path to its exact bytes with SHA-256. The
+The launcher binds the artifact path to the compiler-produced evidence. The
 worker reads those bytes once, validates the closed portable graph, requires
 the embedded maximum expression depth to match the request, and requires exact
 manifest/lowered-callable equality before any cache lookup or backend creation.
@@ -303,8 +303,8 @@ from compiler-produced IR, and candidate refutations receive independent
 whole-body replay. The three-package split is complete. Each package has a
 matching portable-PDB `.snupkg` with SourceLink bound to the package repository
 commit, and package builds run SDK package validation. The package workflow
-publishes the six NuGet artifacts with a deterministic SHA-256 manifest, an
-SPDX 2.3 package/component SBOM, and SLSA build-provenance and SBOM
+publishes the six NuGet artifacts with an SPDX 2.3 package/component SBOM and
+SLSA build-provenance and SBOM
 attestations for canonical `master` builds. Pull requests do not receive OIDC
 or attestation-write permission.
 
@@ -313,7 +313,7 @@ and the private/public NuGet environments, the first publications, and broader
 host qualification. Deterministic SARIF 2.1.0 is available as an opt-in
 projection of the validated worker response. The workflow already promotes
 only the tested bytes after revalidating tag, version, master ancestry,
-predecessor-tag order, hashes, SBOM, repository identity, and package
+predecessor-tag order, SBOM, repository identity, and package
 inventory. Before publication, each of the three target V3 main-package
 identities at the release version must be absent. Main and symbol packages are
 published separately in dependency order without duplicate skipping. The

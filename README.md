@@ -234,9 +234,10 @@ The most useful references are:
   concurrency, and trust assumptions.
 - [SEMANTICS.md](SEMANTICS.md) for the normative soundness rules.
 
-The package payload is unsigned. Release trust is based on exact package hashes,
-embedded payload hashes, assembly identity, pinned container inputs, and tested
-byte-promotion evidence. The preview is not production-ready; protected
+The package payload is unsigned. Release trust is based on exact package and
+assembly identity, pinned container inputs, and tested byte-promotion evidence.
+Semantic payload hashes remain inside the proof protocol where they bind
+compiler and worker evidence. The preview is not production-ready; protected
 release environments, package publication, pilot evidence, and the exact
 candidate release run remain owner-controlled work.
 

@@ -41,8 +41,8 @@ threat model. This includes a trusted host process deliberately swapping bind
 mounts, directories, symlinks, or files during a publication transaction.
 
 The package payload is unsigned. Its release trust boundary is the exact
-package hash, embedded payload SHA-256, assembly name/version identity, pinned
-container inputs, and the repository's tested-byte promotion evidence. A
+package and assembly name/version identity, pinned container inputs, semantic
+payload evidence, and the repository's tested-byte promotion evidence. A
 public-key token is not an authenticity claim.
 
 ## Unsupported in this preview

@@ -24,7 +24,7 @@ client; SharpProof never invokes that host client.
    that origin, then choose **Dev Containers: Reopen in Container** in VS Code.
 
 No initialization command runs on the host. The first start builds the
-checksum-pinned image and runs container Git to clone the configured origin
+pinned toolchain image and runs container Git to clone the configured origin
 and optional ref into the Compose-owned `sharpproof-workspace` volume. It then
 validates the installed container contract and performs a locked restore. All
 edits, Git operations, `bin`/`obj` trees, and local artifacts live in that

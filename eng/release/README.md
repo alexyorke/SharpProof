@@ -18,8 +18,8 @@ qualification to:
 - the annotated tag and exact repository commit;
 - `eng/container/Dockerfile`, `eng/container/toolchain.json`, and
   `compose.yaml`;
-- base image, SDK, PowerShell, Z3 archive, managed Z3, and `libz3.so` hashes;
-- the exact three-package graph and every package/symbol-package SHA-256;
+- base image, SDK, PowerShell, Z3 archive, managed Z3, and `libz3.so` inputs;
+- the exact three-package graph and package/symbol-package identities;
 - deterministic Debug/Release, acceptance, fuzz, corpus, performance,
   coverage, mutation, dependency, SBOM, and publication-plan evidence; and
 - five reviewed pilot reports from the same tested package bytes.
@@ -33,7 +33,7 @@ or MSBuild job serves as release qualification.
 The allowlisted preview tag publishes to the protected private environment
 first. Public promotion reuses the already-qualified package bytes; it does
 not rebuild them. Before any write, the publisher validates the release
-manifest and package hashes, queries the target V3 feed for conflicting main
+manifest and package layout, queries the target V3 feed for conflicting main
 packages, and publishes in dependency order:
 
 1. `SharpProof.Attributes`
