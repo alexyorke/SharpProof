@@ -6859,3 +6859,26 @@ R824 is `deferred`: the duplicated loop is small and probe-only, but it is an
 R825 is `deferred`: it has no material runtime cost, but the current positive
   method name makes a valid non-empty result look paradoxical and invites an
   incorrect future simplification of the empty-tree branch.
+
+## Second survey, part three hundred thirty-seven: R826 - duplicated scoped-identifier hashing
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R826 | **`SpecId` and `ScopedIrId<TTag>` duplicate the same scoped integer hash algorithm.** Both types mix the low and high halves of a `long` scope with the `int` value using the same `397` multiplier and XOR sequence, and both expose the same `Scope == 0` default test. `SpecVarId` then repeats the multiplier when extending the `SpecId` hash with its variable ordinal. The identifier types have intentionally different identity and display contracts (`SpecId` renders `specN`, while tagged IR IDs render their tag prefix), so they should not be collapsed into one public type; an internal shared `ScopedIdentifierHashCode(scope, value)` primitive can nevertheless remove the duplicated bit-mixing expression and keep the three hash implementations aligned. | `SharpProof.Specs/SpecIdentifiers.cs:3-39,51-81`; `SharpProof.Ir/ScopedIrId.cs:3-33` |
+
+### Checked and not proposed (part three hundred thirty-seven)
+
+- `SpecId`, `SpecVarId`, and `ScopedIrId<TTag>` remain separate types because
+  their construction visibility, equality scope, generic tags, and string
+  prefixes are different API contracts.
+- `SpecVarId` must continue to incorporate both its owning spec identity and
+  its variable value; sharing the primitive does not remove that composition.
+- The `IsDefault` properties are semantically local convenience checks; the
+  candidate concerns the repeated hash arithmetic rather than forcing a common
+  base type onto value types.
+
+### Status (part three hundred thirty-seven)
+
+R826 is `deferred`: the duplicated expression is only a few operations, but it
+  is part of identity semantics and a future change to one hash mix could make
+  otherwise analogous scoped IDs behave inconsistently in dictionaries.
