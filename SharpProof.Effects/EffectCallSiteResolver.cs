@@ -164,17 +164,18 @@ internal sealed class EffectCallSiteResolver(
         ImmutableArray<IArgumentOperation> arguments,
         int parameterCount)
     {
-        var result = new IOperation?[parameterCount];
+        var result = ImmutableArray.CreateBuilder<IOperation?>(parameterCount);
+        result.Count = parameterCount;
         foreach (var argument in arguments)
         {
             if (argument.ArgumentKind ==
-                    ArgumentKind.ParamArray ||
+                ArgumentKind.ParamArray ||
                 argument.Parameter is not
                 {
                     Ordinal: var ordinal
                 } ||
                 ordinal < 0 ||
-                ordinal >= result.Length)
+                ordinal >= parameterCount)
             {
                 continue;
             }
@@ -182,7 +183,7 @@ internal sealed class EffectCallSiteResolver(
             result[ordinal] = argument.Value;
         }
 
-        return ImmutableArray.CreateRange(result);
+        return result.MoveToImmutable();
     }
 
     internal static EffectSummary ExpandedParamsEvidence(

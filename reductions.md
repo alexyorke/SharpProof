@@ -334,6 +334,7 @@ the smallest relevant containerized test target passes.
 | R802 | Let the shared release-bundle topology helper own the six-artifact/cardinality precondition | PowerShell parse; `ReleaseJsonAuthorityTests` fixture coverage |
 | R803 | Partition sorted manifest claims in one pass for postconditions and effects | `SharpProof.Package.Test`: focused compiler-manifest tests with `-Fast` |
 | R944 | Defer selection-inventory construction until the contract API is present | `SharpProof.Contracts.Test`: 142 passed |
+| R942 | Build aligned effect-call arguments directly into an immutable array | `SharpProof.Effects.Test`: 323 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -8731,8 +8732,9 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred fifty-two)
 
-R942 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R942 is `applied`: `AlignActualArguments` now fills an immutable-array builder
+and moves it into the result, preserving ordinal overwrite and skipped-argument
+handling without a mutable-array copy.
 
 ## Second survey, part four hundred fifty-three: R943 - full preprocessor-symbol set for one membership query
 
