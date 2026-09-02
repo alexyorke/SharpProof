@@ -290,12 +290,10 @@ internal static class CorpusCatalog
         var prelude = CreatePrelude(variant, helperName, inputName);
         var body = ReplaceTokens(
             seed.Body,
-            methodName,
             helperName,
             inputName);
         var members = ReplaceTokens(
             seed.AdditionalMembers,
-            methodName,
             helperName,
             inputName);
         if (variant == CorpusVariant.AlphaRenameContractFormals)
@@ -412,12 +410,10 @@ internal static class CorpusCatalog
 
     private static string ReplaceTokens(
         string value,
-        string method,
         string helper,
         string input)
     {
-        return value.Replace("$METHOD$", method, StringComparison.Ordinal)
-            .Replace("$HELPER$", helper, StringComparison.Ordinal)
+        return value.Replace("$HELPER$", helper, StringComparison.Ordinal)
             .Replace("$INPUT$", input, StringComparison.Ordinal);
     }
 

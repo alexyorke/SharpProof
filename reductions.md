@@ -4259,9 +4259,7 @@ R695 completed: list and recursive pattern calls now share one resolver/completi
 
 ### Status (part two hundred twenty-nine)
 
-| R696 | **`CorpusCatalog.ReplaceTokens` carries an unreachable method-token substitution.** `CreateCase` computes `methodName` and passes it into `ReplaceTokens` for both the seed body and members, but the private `Seeds` data contains no `$METHOD$` token; the only active replacements are `$HELPER$` and `$INPUT$`. Remove the dead parameter/replacement or add an explicit seed-driven use if that extension point is required, while preserving all current corpus naming and active substitutions. | `SharpProof.Gates/Corpus/CorpusCatalog.cs:270-304,413-421` |
-
-R696 is a pending corpus-generator dead-path reduction candidate. Preserve renamed/escaped identifiers, helper/input substitutions, alpha-renaming, and generated case names.
+R696 completed: corpus token replacement now handles only the active helper/input tokens; generated method names and all variant naming/alpha-renaming remain unchanged.
 
 ### Status (part two hundred thirty)
 
