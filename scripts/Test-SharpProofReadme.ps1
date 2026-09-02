@@ -34,6 +34,8 @@ $repositoryDefaultBranch = 'master'
 $currentMaintainedDocuments = @(
     'README.md',
     'SEMANTICS.md',
+    'BUGS.md',
+    'eng\agent-notes\status.md',
     'docs\README.md',
     'docs\getting-started.md',
     'docs\architecture.md',

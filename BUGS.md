@@ -1,6 +1,6 @@
 # Bug backlog
 
-70 open bugs, reprioritized by impact, reachability, and affected scope.
+1 open bug, reprioritized by impact, reachability, and affected scope.
 
 Priority definitions:
 

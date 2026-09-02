@@ -124,6 +124,7 @@ the smallest relevant containerized test target passes.
 | R268 | Consolidate residual generator schema-reading helpers in `GeneratedFileHelpers.ps1`, retaining compatibility wrappers and schema-specific validators | Five generator `-Verify` checks; `test-changed`: ArchitectureTest 389 and 36 package shards passed |
 | R289 | Replace the private ordinal string-sequence helper with framework `SequenceEqual` | `Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R297 | Reuse the shared `DictionaryAnalyzerConfigOptions` in `FinalCompilationCollectorTests` and remove its duplicate private options class | `SharpProof.Analyzer.Test`: 476 passed |
+| R317 | Correct the active bug/status figures and include both documents in the maintained-document gate | `Test-SharpProofReadme.ps1` passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -1098,7 +1099,6 @@ Repository documents that make checkable claims nothing checks.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R317 | `BUGS.md` carries **three mutually inconsistent counts of itself** in twenty lines. Its opening line says "70 open bugs, reprioritized by impact, reachability, and affected scope." Its section headers declare `P0 - Critical (1)`, `P1 - High (25)`, `P2 - Medium (0)`, `P3 - Low (0)`, which sums to 26. The file actually contains **one** bug entry - BUG-146 under P0 - and the P1 section that claims 25 items is **empty**. So the prose says 70, the headers say 26, and the content says 1. Nothing validates the file: `BUGS.md` appears in no maintained-document list in `Generate-Readme.ps1`, in no acceptance-contract path list, and in no test. The only reference to it anywhere in the repository is the code-usefulness audit noting that *`eng/agent-notes/status.md`'s* references to it were stale and had been repaired - so this document's staleness has already been noticed once, from the outside, without the document itself being fixed. This is the same class as R300: a file asserting figures that no gate compares against reality. Either the P1 entries were removed without updating the headers, or the headers were written ahead of content that never landed; the file cannot currently be read as evidence of anything. | `BUGS.md`; `scripts/Generate-Readme.ps1:36-65`; `docs/code-usefulness-audit.md:875` |
 
 ### Checked and not proposed (part eighteen)
 
@@ -1123,14 +1123,9 @@ Repository documents that make checkable claims nothing checks.
 
 ### Status (part eighteen)
 
-R317 is `pending` and is trivially cheap to fix, but the useful part is the
-pattern it completes with R299 and R300: this repository has strong machine-checked
-authority over its *code* - generated version pins, TCB path lists, release
-configuration cross-validated against the workflow - and essentially none over its
-*prose*. Every stale figure found in this survey (the mutation catalog count, the
-TCB path count in `status.md`, all three counts in `BUGS.md`) sits in a document
-outside `$currentMaintainedDocuments`. Adding these two files to that list would
-close the category rather than the individual instances.
+R317 is applied: `BUGS.md` now reports its one actual open bug, and both it and
+`eng/agent-notes/status.md` are included in `$currentMaintainedDocuments` so the
+documentation gate checks their encoding, links, and stale-code claims.
 
 ## Second survey, part nineteen: R318
 
