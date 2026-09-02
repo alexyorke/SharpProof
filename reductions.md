@@ -7464,3 +7464,23 @@ R851 is `applied`: constructor parameters are indexed during validation and
 
 R852 is `deferred`: the candidate concerns trap lifetime and duplicated cleanup
   setup, with no shell-file change made during this audit.
+
+## Second survey, part three hundred sixty-four: R853-R854 - residual initializer and formatter plumbing
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R853 | **`EffectMethodNodeBuilder` still repeats member-initializer extraction in two static-initializer query paths after the operation helper was centralized.** `AllStaticInitializersSatisfy` walks initializable members, their syntax references, extracts each initializer expression, resolves its semantic model, and evaluates a predicate; `HasPotentialStaticInitialization` independently walks the same member/reference shape and extracts the same initializer expression just to test existence. `GetMemberInitializerReferences` and `GetMemberInitializerOperations` already own the shared member filtering and Roslyn projection used by the scanning paths. Routing the predicate path through the operation helper (treating null operations as the current path does) and the existence path through the reference helper plus one expression-existence predicate would remove two residual enumeration authorities while preserving the different needs for operation semantics versus expression presence. | `SharpProof.Effects/EffectMethodNodeBuilder.cs:379-402,414-440,443-500` |
+| R854 | **`Format-CSharp.ps1` duplicates the generated-source argument suffix and invocation for its whitespace and style passes.** The two format argument arrays intentionally differ in subcommand and severity, but when generated files exist each independently appends `--include-generated`, `--include`, and the same `$generatedPaths`, then calls `Invoke-DotnetFormat` through two parallel blocks. A small pass helper or shared argument augmenter can own that suffix and invocation while retaining both distinct formatting passes and the existing no-restore behavior. | `scripts/Format-CSharp.ps1:20-64` |
+
+### Checked and not proposed (part three hundred sixty-four)
+
+- R853 does not merge static-initializer existence detection with predicate
+  evaluation: the former must remain able to succeed when semantic operation
+  resolution is unavailable.
+- R854 does not remove either formatting pass or change the separate style
+  severity; it only targets repeated command plumbing.
+
+### Status (part three hundred sixty-four)
+
+R853 and R854 are `deferred`: both are ledger-only observations, and no
+implementation or build-file changes were made during this audit.
