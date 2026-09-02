@@ -6551,7 +6551,30 @@ object would add more setup to an already policy-heavy preparation method.
 ### Status (part three hundred twenty-three)
 
 R812 is `deferred`: the call set is already materialized and the replacement
-  comparison is mechanically simple, but the existing final IR walk is a clear
-  completeness assertion at a trust boundary. It should be changed only after
-  confirming that `selected.Calls` and emitted program calls have the same
-  intended scope.
+comparison is mechanically simple, but the existing final IR walk is a clear
+completeness assertion at a trust boundary. It should be changed only after
+confirming that `selected.Calls` and emitted program calls have the same
+intended scope.
+
+## Second survey, part three hundred twenty-four: R813 - repeated contract-statement inventory scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R813 | **`CompilerCallableLowerer.ContainsOnlyContractStatements` rescans one cached clause inventory for every expression statement.** The outer `All` walks the method body statements, while each nonempty expression calls `IsContractExpression`; that helper calls `_contracts.GetClauseInventory(target.Method)` and runs `Clauses.Any` over the complete inventory to match the expression's syntax tree and span. `ContractClauseInventoryBuilder` caches the no-body inventory, so repeated construction is avoided, but the normalization/lookup and linear clause scan still repeat for every statement. Passing one inventory or a precomputed syntax-site set into the whole-body check can preserve exact syntax-tree/span matching and the empty-statement rule while removing the per-statement projection. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs:122-125,614-635`; `SharpProof.Contracts/ContractBinder.cs:121-126`; `SharpProof.Contracts/ContractClauseInventoryBuilder.cs:42-53` |
+
+### Checked and not proposed (part three hundred twenty-four)
+
+- The clause inventory's placement and validity semantics remain authoritative;
+  the candidate only reuses its already-computed invocation sites.
+- Empty statements still pass directly, and expression statements must retain
+  the current syntax-tree and exact-span comparison rather than a text-only
+  or broad containment match.
+- `PrepareBody`'s separate invalid-clause-site projection is not merged here;
+  it serves body lowering's elision predicate and has a different consumer.
+
+### Status (part three hundred twenty-four)
+
+R813 is `deferred`: the inventory itself is cached and contract-only bodies are
+  usually short, so the runtime gain is bounded. A per-check site set is a
+  simple cleanup if large contract-only bodies or repeated lowerer preparation
+  make the repeated scans visible.
