@@ -92,10 +92,10 @@ public sealed class VerificationQuery
         Goal = goal;
         foreach (var assumption in Assumptions)
         {
-            FactoryGuards.RequireBooleanTerm(factory, assumption.Predicate, nameof(assumptions));
+            IrFactory.RequireBooleanTerm(factory, assumption.Predicate, nameof(assumptions));
         }
 
-        FactoryGuards.RequireBooleanTerm(factory, goal.Predicate, nameof(goal));
+        IrFactory.RequireBooleanTerm(factory, goal.Predicate, nameof(goal));
         if (modelVariables.IsDefault)
         {
             modelVariables = [];

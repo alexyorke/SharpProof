@@ -608,6 +608,24 @@ public sealed class IrFactory
         }
     }
 
+    internal static IrTerm RequireBooleanTerm(
+        IrFactory factory,
+        IrTerm term,
+        string parameterName)
+    {
+        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
+        term = ArgumentNullGuard.NotNull(term, parameterName);
+
+        factory.EnsureTerm(term, parameterName);
+        if (term.Type != factory.BooleanType)
+        {
+            throw new ArgumentException(
+                "A Boolean IR term is required.", parameterName);
+        }
+
+        return term;
+    }
+
     internal IrTypeId ValidateSequenceTerms(
         IrTerm sequence, IrTerm index, string sequenceMessage, string indexMessage,
         string sequenceParameter, string indexParameter)

@@ -72,7 +72,7 @@ public sealed class Assumption
         IrTerm predicate,
         ProofJustification justification)
     {
-        FactoryGuards.RequireBooleanTerm(factory, predicate, nameof(predicate));
+        IrFactory.RequireBooleanTerm(factory, predicate, nameof(predicate));
         Justification = ArgumentNullGuard.NotNull(justification, nameof(justification));
         Predicate = predicate;
     }
@@ -95,30 +95,10 @@ public sealed partial class Goal
         ProofDiagnosticKind diagnostic,
         SourceLocationId location)
         : this(
-            FactoryGuards.RequireBooleanTerm(factory, predicate, nameof(predicate)),
+            IrFactory.RequireBooleanTerm(factory, predicate, nameof(predicate)),
             diagnostic,
             location,
             default)
     {
-    }
-}
-
-internal static class FactoryGuards
-{
-    internal static IrTerm RequireBooleanTerm(
-        IrFactory factory,
-        IrTerm term,
-        string parameterName)
-    {
-        factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
-        term = ArgumentNullGuard.NotNull(term, parameterName);
-
-        factory.EnsureTerm(term, parameterName);
-        if (term.Type != factory.BooleanType)
-        {
-            throw new ArgumentException("A Boolean IR term is required.", parameterName);
-        }
-
-        return term;
     }
 }
