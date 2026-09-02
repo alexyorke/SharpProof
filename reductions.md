@@ -6166,3 +6166,23 @@ No implementation or build file was changed.
 
 R796 is `pending` and limited to PE metadata/MVID projection reuse.
 No implementation or build file was changed.
+
+## Second survey, part three hundred eight: R797 - repeated worker version metadata reads
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R797 | **Launcher startup reads the staged worker's version-resource metadata twice for one run.** `RunMain` computes `expectedInputHash` and then `expectedVersions` from the same `WorkerRuntimeClosureSnapshot`, but `ComputeExpectedInputHash(WorkerVerifyRequest, byte[], WorkerRuntimeClosureSnapshot)` and `ComputeExpectedVersions` each call `FileVersionInfo.GetVersionInfo(snapshot.ExecutionWorkerPath)` independently. The first projection needs product name and product version for the input digest; the second needs product version for the response provenance, so their final values remain different, but the file metadata load and required-version handling are repeated on every launch. A single worker-version projection returning the required product name/version can feed both computations, while retaining the existing standalone overload that builds a temporary snapshot for tests and preserving the digest/provenance fields as separate outputs. | `SharpProof.Worker.Launcher/Program.cs:62-67,303-341` |
+
+### Checked and not proposed (part three hundred eight)
+
+- The input-hash and response-version contracts remain separate; only the
+  shared read of the staged worker's version resource is in scope.
+- The snapshot must remain the source of the worker binary hash and closure
+  identity; the reduction should not add an independent uncaptured file read.
+- This is a per-launch repeated metadata read, not a claim that either output
+  field is redundant or that the public test helper overload should disappear.
+
+### Status (part three hundred eight)
+
+R797 is `pending` and limited to sharing one staged-worker version projection.
+No implementation or build file was changed.
