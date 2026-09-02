@@ -4233,14 +4233,6 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disposal resolver intentionally use different roots and reachability/unwinding rules. A shared walk could alter direct-witness recording, constructor entry selection, disposal order, or fail-closed effect joins; keep the independent passes until reusable per-operation facts can be proven equivalent.
 
-## Second survey, part two hundred twelve: R675 - eager tooling-image build
-
-| R675 | **`build.ps1` builds the tooling image before profile preflight.** `Build-ToolingImage` runs unconditionally before the switch that rejects missing `-ComparisonRef` for `coverage` or missing `-PackageSource` for package-consumer, pilot, and release-plan profiles. Those invalid invocations can therefore perform a full Docker build before reporting a local argument error; the same ordering also makes any future profile validation pay the image-build cost first. Move pure parameter/profile validation ahead of image setup, while retaining the image build immediately before the first container invocation. | `build.ps1:40-42,61,74-106` |
-
-### Status (part two hundred twelve)
-
-R675 is a pending build-orchestration reduction candidate. Preserve `ValidateSet`/configuration rules, exact comparison-ref resolution, package-source requirements, environment propagation, and the one required tooling-image build for valid profiles; defer only that build until preflight succeeds.
-
 ## Second survey, part two hundred thirteen: R676-R677 - repeated acceptance inventory preparation
 
 | R676 | **`Verify.ps1.Measure-RepositoryCSharpSyntax` discards validated full paths and rebuilds them.** The helper first calls `Assert-RepositoryPaths`, which canonicalizes each relative path, checks repository containment, and verifies the leaf exists; it then reconstructs the same source path with `Join-Path` before reading it. Returning the validated path records, or letting the measurement helper own the single validation/read pass, removes repeated path resolution while preserving duplicate checks, containment errors, and source parsing. | `eng/acceptance/Verify.ps1:370-401,416-437` |
@@ -4317,3 +4309,9 @@ R689 is a pending API-spec runtime-oracle reduction candidate. Preserve uninitia
 | R690 | **`DefaultApiSpecCatalogGenerationTests` implements two recursive term describers.** `Describe(JsonElement)` and `Describe(SpecTermDeclaration)` walk the same variable, literal, unary, binary, conditional, and length tree shapes and emit the same canonical shape string; they differ only in extracting fields from JSON versus generated objects and in their unknown-kind exception type. A small normalized-term adapter or shared kind/child formatter can keep the source-versus-generated comparison while removing the second recursive walker. | `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:575-649` |
 
 R690 is a pending API-spec generation-test reduction candidate. Preserve JSON field validation, generated-object typing, recursive ordering, and the current distinction between invalid catalog data and impossible generated term kinds.
+
+### Status (part two hundred twenty-five)
+
+| R691 | **`IrRelationalSummaryTests` duplicates identity-summary construction.** `BuildIdentitySummary` and the local `CreateCallee` function in `DependencyProvenanceIdentityComponentsAreDeduplicatedStructurally` each create a body variable, one-block return program, identity-style summary signature, variable environment, and `IrRelationalSummaryBuilder.Build` call; the local version adds only a caller-supplied member name/provenance and success assertion. A parameterized identity-summary helper can serve both tests while preserving their distinct fixture names and provenance scenarios. | `SharpProof.Summaries.Test/IrRelationalSummaryTests.cs:1000-1070,1099-1117` |
+
+R691 is a pending summary-test fixture reduction candidate. Preserve factory ownership, body-to-parameter binding, return-operation identity, and the separate success/error assertions at each call site.

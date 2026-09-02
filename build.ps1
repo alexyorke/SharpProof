@@ -52,13 +52,12 @@ function Invoke-Container(
         [Environment]::SetEnvironmentVariable($name, $value, 'Process')
         $arguments += @('-e', $name)
     }
+    Build-ToolingImage
     $arguments += @(
         'tooling', $Command, '-Configuration', $CommandConfiguration)
     $arguments += $AdditionalArguments
     Invoke-Docker $arguments
 }
-
-Build-ToolingImage
 
 $forcedConfigurations = @{
     quick = 'Debug'
