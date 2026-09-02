@@ -1844,8 +1844,9 @@ stream readers, and location authority helpers across `SharpProof.CompilerArtifa
 
 ### Status (part thirty-three)
 
-R380, R385 are `pending`.
-R380, R383, and R385 unify comparison, streaming I/O, and location hashing authorities.
+R380 is applied: canonical diagnostic sorting and canonical-order checks now
+share one comparer; R385 remains `pending` because location hashing is part of
+the artifact equality contract and needs a separate compatibility check.
 
 ## Second survey, part thirty-four: R386-R392
 

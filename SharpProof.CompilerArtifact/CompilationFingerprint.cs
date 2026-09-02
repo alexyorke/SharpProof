@@ -432,21 +432,14 @@ internal static class CompilationFingerprint
 
 internal static class CompilerDiagnosticArtifactOrdering
 {
+    private static readonly IComparer<CompilerDiagnosticArtifact> Comparer =
+        System.Collections.Generic.Comparer<CompilerDiagnosticArtifact>.Create(Compare);
+
     internal static CompilerDiagnosticArtifact[] Canonicalize(
         IEnumerable<CompilerDiagnosticArtifact> diagnostics)
     {
         return [.. diagnostics
-            .OrderBy(static item => item.Location.Path, StringComparer.Ordinal)
-            .ThenBy(static item => item.Location.Start)
-            .ThenBy(static item => item.Location.Length)
-            .ThenBy(static item => item.Code, StringComparer.Ordinal)
-            .ThenBy(static item => item.Message, StringComparer.Ordinal)
-            .ThenBy(static item => item.Location.Line)
-            .ThenBy(static item => item.Location.Column)
-            .ThenBy(static item => item.SourceTreeOrdinal)
-            .ThenBy(static item => item.SourceTreePath, StringComparer.Ordinal)
-            .ThenBy(static item => item.SourceTreeSha256, StringComparer.Ordinal)
-            .ThenBy(static item => item.SourceLineMapSha256, StringComparer.Ordinal)];
+            .OrderBy(static item => item, Comparer)];
     }
 
     internal static bool IsCanonical(CompilerDiagnosticArtifact[] diagnostics)
