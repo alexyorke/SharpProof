@@ -153,6 +153,7 @@ the smallest relevant containerized test target passes.
 | R843 | Hoist scalar-catalog key sorting out of per-row validation loops | generator `-Verify` checks passed |
 | R844 | Reuse shared generated-file exact-byte verification in the API-spec generator | generator `-Verify` checks passed |
 | R846 | Accumulate fuzz exception coverage from the already-validated counters | `scripts/Test-SharpProofFuzzRunnerResult.ps1`: 26 fixtures passed |
+| R847 | Centralize the canonical container resource claim used by documentation mutations | `DocumentationSupportContractTests`: 22 mutation cases passed; 1 pre-existing clean-fixture docs failure |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7349,5 +7350,28 @@ R846 is `applied`: the exception aggregate now uses the counters parsed during
 
 ### Status (part three hundred fifty-eight)
 
-R847 is `deferred`: the repeated literal is easy to centralize, but fixture
-  data can be intentionally explicit when each mutation is reviewed in place.
+R847 is `applied`: the six resource-claim mutations now reuse one canonical
+  fixture sentence while retaining their distinct replacement and insertion
+  behaviors. The clean-fixture test remains blocked by the pre-existing README
+  SP0047/SP0048 documentation failure.
+
+## Second survey, part three hundred fifty-nine: R848 - repeated diagnostic symbol projection in generator output
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R848 | **`Generate-DiagnosticDescriptors.ps1` rescans diagnostics to emit symbols it already processed.** The main diagnostic loop extracts and validates each `$symbol`, uses it to generate the descriptor, and records it in the per-output `$symbols` set. When `supportedDiagnosticsMember` is present, a second index loop walks `$diagnostics` again and reads each raw `.symbol` only to reproduce the same ordered list. Retaining an ordered validated symbol list during the first pass can remove that second projection while keeping the uniqueness set and source-order output. | `scripts/Generate-DiagnosticDescriptors.ps1:116-163,207-246,249-260` |
+
+### Checked and not proposed (part three hundred fifty-nine)
+
+- The uniqueness `HashSet` remains necessary; it answers a different question
+  from the ordered list used for generated output.
+- The supported list must preserve catalog order, so sorting or set-only output
+  would change the generated API shape and is not proposed.
+- Descriptor construction and validation of all diagnostic fields remain in
+  the first pass; only the repeated symbol projection is in scope.
+
+### Status (part three hundred fifty-nine)
+
+R848 is `deferred`: the second pass is small and runs only for outputs that
+  expose a supported-diagnostics member, but retaining the validated symbols
+  would remove a straightforward generator traversal.

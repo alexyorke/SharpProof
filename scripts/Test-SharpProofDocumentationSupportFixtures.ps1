@@ -63,6 +63,8 @@ $overridePath = Join-Path ([IO.Path]::GetTempPath()) (
     'sharpproof-documentation-' + [Guid]::NewGuid().ToString('N') + '.txt')
 try {
     $text = [Text.Encoding]::UTF8.GetString($sourceBytes)
+    $containerResourceClaim =
+        'Containers use all CPUs available to Docker and up to 40960 MiB by default.'
     switch ($Mutation) {
         'stale-win-x64' {
             $text += "`nSharpProof.Verifier.Win-x64 is supported.`n"
@@ -94,34 +96,34 @@ try {
         }
         'wrong-container-cpu' {
             $text = $text.Replace(
-                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                $containerResourceClaim,
                 'Containers use 12 CPUs and up to 40960 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'wrong-container-memory' {
             $text = $text.Replace(
-                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                $containerResourceClaim,
                 'Containers use all CPUs available to Docker and up to 32768 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'missing-resource-claim' {
             $text = $text.Replace(
-                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                $containerResourceClaim,
                 '',
                 [StringComparison]::Ordinal)
         }
         'duplicate-resource-claim' {
-            $text += "`nContainers use all CPUs available to Docker and up to 40960 MiB by default.`n"
+            $text += "`n$containerResourceClaim`n"
         }
         'resource-claim-case' {
             $text = $text.Replace(
-                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                $containerResourceClaim,
                 'Containers use all cpus available to Docker and up to 40960 MiB by default.',
                 [StringComparison]::Ordinal)
         }
         'resource-claim-spacing' {
             $text = $text.Replace(
-                'Containers use all CPUs available to Docker and up to 40960 MiB by default.',
+                $containerResourceClaim,
                 'Containers use all CPUs  available to Docker and up to 40960 MiB by default.',
                 [StringComparison]::Ordinal)
         }
