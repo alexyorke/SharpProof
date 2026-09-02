@@ -3965,7 +3965,10 @@ R608 refines R602 to the full five-suite overlap. Preserve each caller's assembl
 
 ### Status (part one hundred fifty)
 
-R609 is a pending Effects-test maintenance candidate. Preserve the `Subject`/`Exercise` identity and single-method expectation; replace only the repeated lookup chains with `EffectTestHost.RequireMethod`.
+R609 is applied: the three regression suites now use
+`EffectTestHost.RequireMethod(compilation, "Subject", "Exercise")`, preserving
+the subject/method identity and ordinary-method invariant without repeated
+symbol-plumbing chains.
 
 ## Second survey, part one hundred fifty-one: R610 - residual generator JSON uniqueness validator
 
@@ -4112,3 +4115,27 @@ R626 is a pending Effects-test infrastructure cleanup candidate. Preserve the co
 ### Status (part one hundred sixty-eight)
 
 R627 is a pending Effects-test harness cleanup candidate. Preserve each fixture's custom references, selected operation, entry state, convergence/budget parameters, and assertion-specific analysis; share only the repeated method/operation/CFG plumbing.
+
+## Second survey, part one hundred sixty-nine: R628 - duplicated bounded-stream overflow probes
+
+| R628 | **`BoundedReadStream` maintains the same over-limit protocol twice.** `ProbeForOverflow` and `ProbeForOverflowAsync` both perform one extra read only after the byte budget is exhausted, throw the same limit exception when data remains, and return zero at end-of-stream; only the underlying sync/async read API differs. A small shared limit-result seam or a single-byte probe abstraction can centralize the policy while retaining synchronous behavior, cancellation, and allocation choices for each adapter. | `SharpProof.Worker.Protocol/BoundedReadStream.cs:46-49,70-76,79-91,134-157` |
+
+### Status (part one hundred sixty-nine)
+
+R628 is a pending protocol-stream cleanup candidate. Preserve zero-count behavior, exact one-byte overflow detection, limit diagnostics, cancellation propagation, and disposal; share only the common exhausted-budget decision.
+
+## Second survey, part one hundred seventy: R629 - redundant root JSON kind check
+
+| R629 | **`WorkerProtocolJson.EnsureJsonShape` checks the root object kind twice.** The outer method rejects a non-object `RootElement` before calling `EnsureObjectShape`, and `EnsureObjectShape` immediately performs the same `ValueKind != Object` check for both root and nested objects. Let the recursive shape helper own the object-kind check and keep the root-type lookup/error handling outside it, removing the unreachable duplicate branch without changing the JSON exception contract. | `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:33-39,47-55,58-70` |
+
+### Status (part one hundred seventy)
+
+R629 is a pending protocol JSON validation cleanup candidate. Preserve the current invalid-root error, recursive nested-object validation, exact property-order checks, and UTF-16 error translation; remove only the redundant top-level kind test.
+
+## Second survey, part one hundred seventy-one: R630 - duplicated manifest canonical ordering policy
+
+| R630 | **Manifest canonical ordering is restated in both mutation and hashing paths.** `WorkerProtocolJson.Canonicalize` sorts callables, claims, enum arrays, claim IDs, and assumptions, while `CreateManifestPayload` repeats the corresponding callable/claim order and normalized child-array projections so hashing and equality remain stable for noncanonical objects. Reuse the existing sort/projection helpers or expose one canonical enumeration layer, but retain the payload's defensive normalization if callers may hash an uncanonicalized manifest. | `SharpProof.Worker.Protocol/ProtocolManifest.cs:10-41`; `SharpProof.Worker.Protocol/ProtocolManifestPayload.cs:7-44` |
+
+### Status (part one hundred seventy-one)
+
+R630 is a pending protocol-manifest complexity candidate, not a request to remove canonicalization defense. Preserve stable hashes/equality for both canonical and noncanonical manifests; consolidate only duplicated order/projection policy where the call graph proves the same normalization is safe.

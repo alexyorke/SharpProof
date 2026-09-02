@@ -56,10 +56,10 @@ public sealed class UsingInitializerUnwindRegressionTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireType(compilation, "Subject")
-            .GetMembers("Exercise")
-            .OfType<IMethodSymbol>()
-            .Single();
+        var method = EffectTestHost.RequireMethod(
+            compilation,
+            "Subject",
+            "Exercise");
 
         var summary = new EffectAnalysisSession(compilation)
             .Analyze(method)
