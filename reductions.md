@@ -215,6 +215,7 @@ the smallest relevant containerized test target passes.
 | R584 | Reuse protocol SHA-256 formatting in valid test fixtures | `SharpProof.Worker.Test`: 695; `SharpProof.Package.Test`: 75 passed, 1 expected skip |
 | R576 | Centralize package integration verification-target MSBuild arguments | `SharpProof.Package.Test`: WorkerMsBuildIntegrationTests 75 passed, 1 expected skip |
 | R509 | Share callable assumption-evidence projection | `SharpProof.Worker.Test`: 695 passed |
+| R515 | Reuse canonical IR child enumeration in charged summary walks | `SharpProof.Summaries.Test`: 14 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3175,10 +3176,10 @@ methods and operators, preserving the operator-only harmless-discard policy.
 
 ### Status (part sixty-nine)
 
-R514-R517 are `pending` reduction candidates. The validation and traversal
-items deliberately preserve the security and resource-limit checks at their
-existing boundaries; the reductions target only repeated geometry, child
-enumeration, walk mechanics, and constructor validation.
+R515 is applied: charged summary traversal now uses `IrTraversal.GetChildren`
+in reverse push order, preserving the prior visit/budget order. R514, R516, and
+R517 remain pending; validation and traversal changes must retain their security,
+resource-limit, and constructor semantics.
 
 ## Second survey, part seventy: R518-R520 - effect-scanner phases and native-loader cleanup
 

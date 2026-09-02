@@ -801,40 +801,9 @@ public static class IrRelationalSummaryBuilder
                 {
                     return false;
                 }
-                switch (term)
+                foreach (var child in IrTraversal.GetChildren(term).Reverse())
                 {
-                    case IrOpaqueTerm opaque:
-                        foreach (var argument in opaque.Arguments)
-                        {
-                            pending.Push(argument);
-                        }
-                        if (opaque.Receiver != null)
-                        {
-                            pending.Push(opaque.Receiver);
-                        }
-                        break;
-                    case IrUnaryTerm unary:
-                        pending.Push(unary.Operand);
-                        break;
-                    case IrBinaryTerm binary:
-                        pending.Push(binary.Left);
-                        pending.Push(binary.Right);
-                        break;
-                    case IrConditionalTerm conditional:
-                        pending.Push(conditional.Condition);
-                        pending.Push(conditional.WhenTrue);
-                        pending.Push(conditional.WhenFalse);
-                        break;
-                    case IrCastTerm cast:
-                        pending.Push(cast.Operand);
-                        break;
-                    case IrLengthTerm length:
-                        pending.Push(length.Value);
-                        break;
-                    case IrSequenceAccessTerm access:
-                        pending.Push(access.Sequence);
-                        pending.Push(access.Index);
-                        break;
+                    pending.Push(child);
                 }
             }
             return true;
