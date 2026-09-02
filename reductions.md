@@ -6670,3 +6670,26 @@ runs dependency audit and the Release build against those restored assets.
 
 R817 is `applied`: the final package-test invocation now uses the locked solution
 restore already owned by the container command.
+
+## Second survey, part three hundred twenty-nine: R818 - unreachable unsupported-host sample branch
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R818 | **`Test-SharpProofSamples.ps1` rejects every unsupported host before it reaches the only branch that handles unsupported hosts.** The script computes `$isSupportedWorkerHost` and immediately throws when it is false, so execution cannot reach the later `if ($isSupportedWorkerHost)` around the strict-library sample. Its `else` branch then repeats the same unsupported-host explanation and expected failure assertion that the earlier guard has made unreachable. The two-stage policy creates dead control flow and makes the script appear to support an explicit unsupported-host test path while actually requiring the canonical host for every invocation. Either keep the fail-fast host guard and remove the unreachable `else`, or defer the guard until after the advisory sample checks if the unsupported-host behavior is intended to remain an assertion. | `scripts/Test-SharpProofSamples.ps1:18-25,369-430` |
+
+### Checked and not proposed (part three hundred twenty-nine)
+
+- The canonical Linux amd64 restriction itself is intentional and should remain
+  fail-closed for package-backed sample execution.
+- The strict-library result-file assertions, diagnostic expectations, and
+  malformed-contract failure remain separate sample contracts; this finding is
+  only about the unreachable host split.
+- No behavior change is implied until the desired unsupported-host test mode is
+  clarified: removing the branch preserves the current fail-fast behavior,
+  while moving the guard would change which samples run on other hosts.
+
+### Status (part three hundred twenty-nine)
+
+R818 is `deferred`: the dead branch is a small clarity issue, but choosing
+between fail-fast enforcement and an actually exercised unsupported-host test
+changes the script's supported invocation contract.
