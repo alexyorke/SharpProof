@@ -122,6 +122,7 @@ the smallest relevant containerized test target passes.
 | R266 | Remove the undefined `SHARPPROOF_PORTABLE_ARGUMENT_GUARD` preprocessor term | Ir.Test: 114; Dataflow.Test: 50; Smt.Test: 30 |
 | R267 | Forward the duplicate `ArgumentNullGuard` `int` overloads to their `long` implementations | Ir.Test: 114; Dataflow.Test: 50; Smt.Test: 30 |
 | R268 | Consolidate residual generator schema-reading helpers in `GeneratedFileHelpers.ps1`, retaining compatibility wrappers and schema-specific validators | Five generator `-Verify` checks; `test-changed`: ArchitectureTest 389 and 36 package shards passed |
+| R297 | Reuse the shared `DictionaryAnalyzerConfigOptions` in `FinalCompilationCollectorTests` and remove its duplicate private options class | `SharpProof.Analyzer.Test`: 476 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -635,7 +636,6 @@ two findings that census surfaced.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R297 | `FinalCompilationCollectorTests.cs` declares a private `DictionaryOptions` class whose `TryGetValue` is byte-identical to `DictionaryAnalyzerConfigOptions.TryGetValue` in `eng/testing/DictionaryAnalyzerConfigOptions.cs`. `SharpProof.Analyzer.Test` already compiles that shared file - `Directory.Build.props` links it into exactly this project as part of applied R164 - yet the file references the shared type **zero** times. This is a call site the applied item missed rather than a new duplication. Note the neighbouring `FixedAnalyzerConfigProvider` in the same file is **not** a candidate: it throws from `GetOptions` where the shared `DictionaryAnalyzerConfigOptionsProvider` returns `Empty`, which is a deliberate strictness difference the test relies on. Only the options class is a clean swap. | `SharpProof.Analyzer.Test/FinalCompilationCollectorTests.cs:1445-1459`; `eng/testing/DictionaryAnalyzerConfigOptions.cs:6-31`; `Directory.Build.props:95-101` |
 
 ### Near-duplicates the exact census does not count
 
@@ -659,8 +659,8 @@ two findings that census surfaced.
 
 R296 is a measurement rather than a work item - it exists so that the itemized
 PowerShell findings are not double-counted and so that a future pass knows where
-duplication actually lives. R297 is mechanical and closes a gap in already-applied
-R164. R298 is deliberately filed below the mechanical tier because each merge
+duplication actually lives. Applied R297 closes a gap in already-applied R164.
+R298 is deliberately filed below the mechanical tier because each merge
 requires choosing between two behaviours.
 
 ## Second survey, part eight: R299-R300

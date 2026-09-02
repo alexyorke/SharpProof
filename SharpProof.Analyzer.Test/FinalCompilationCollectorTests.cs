@@ -12,6 +12,7 @@ using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using SharpProof.CompilerArtifact;
 using SharpProof.CompilerCollector;
+using SharpProof.Testing;
 using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Analyzer.Test;
@@ -1371,9 +1372,9 @@ public sealed class FinalCompilationCollectorTests
         : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =
-            new DictionaryOptions(globalValues);
+            new DictionaryAnalyzerConfigOptions(globalValues);
         private readonly AnalyzerConfigOptions _tree =
-            new DictionaryOptions(treeValues);
+            new DictionaryAnalyzerConfigOptions(treeValues);
 
         public override AnalyzerConfigOptions GlobalOptions => _global;
 
@@ -1393,7 +1394,7 @@ public sealed class FinalCompilationCollectorTests
         : AnalyzerConfigOptionsProvider
     {
         private readonly AnalyzerConfigOptions _global =
-            new DictionaryOptions(globalValues);
+            new DictionaryAnalyzerConfigOptions(globalValues);
 
         public override AnalyzerConfigOptions GlobalOptions => _global;
 
@@ -1439,22 +1440,6 @@ public sealed class FinalCompilationCollectorTests
             out ReportDiagnostic severity)
         {
             severity = ReportDiagnostic.Default;
-            return false;
-        }
-    }
-
-    private sealed class DictionaryOptions(
-        IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string value)
-        {
-            if (values.TryGetValue(key, out var found))
-            {
-                value = found;
-                return true;
-            }
-
-            value = string.Empty;
             return false;
         }
     }
