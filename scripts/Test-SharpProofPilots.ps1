@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofPilotPackageAuthority.ps1')
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 
@@ -88,12 +89,7 @@ function Get-OwnedWorkingSetBytes([int]$RootProcessId) {
 $pilotRoot = Join-Path $repositoryRoot 'eng\pilots'
 $catalog = Get-Content -LiteralPath (Join-Path $pilotRoot 'catalog.json') -Raw |
     ConvertFrom-Json
-$releaseProps = [xml](Get-Content -LiteralPath (
-    Join-Path $repositoryRoot 'SharpProof.Release.props') -Raw)
-$versionPrefix = [string]$releaseProps.Project.PropertyGroup.SharpProofVersionPrefix
-$version = ([string]$releaseProps.Project.PropertyGroup.SharpProofPackageVersion).Replace(
-    '$(SharpProofVersionPrefix)',
-    $versionPrefix)
+$version = Get-SharpProofReleaseVersion -RepositoryRoot $repositoryRoot
 $resolvedPackageSource = Resolve-RepositoryPath $PackageSource
 if (-not (Test-Path -LiteralPath $resolvedPackageSource -PathType Container)) {
     throw "Pilot package source is missing: '$resolvedPackageSource'."

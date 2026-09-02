@@ -26,6 +26,7 @@ Set-Location $repositoryRoot
 
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 
 if (-not $IsLinux -or [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [System.Runtime.InteropServices.Architecture]::X64) {
     throw 'SharpProof container commands require Linux x64.'
@@ -569,10 +570,7 @@ switch ($Command) {
             @{ PackageSource = $output; ValidatePackageSourceOnly = $true }
         Invoke-RequiredScript 'scripts/New-SharpProofReleaseEvidence.ps1' `
             'Release evidence generation failed.' @{ PackageSource = $output }
-        [xml]$release = Get-Content (Join-Path $repositoryRoot 'SharpProof.Release.props') -Raw
-        $prefix = [string]$release.Project.PropertyGroup.SharpProofVersionPrefix
-        $version = ([string]$release.Project.PropertyGroup.SharpProofPackageVersion).Replace(
-            '$(SharpProofVersionPrefix)', $prefix)
+        $version = Get-SharpProofReleaseVersion -RepositoryRoot $repositoryRoot
         Invoke-RequiredScript 'scripts/Test-SharpProofReleaseArtifacts.ps1' `
             'Release artifact validation failed.' `
             @{ PackageSource = $output; ExpectedTag = 'v' + $version }

@@ -9,6 +9,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 $hasTextOverrideRelativePath =
     -not [string]::IsNullOrWhiteSpace($TextOverrideRelativePath)
 $hasTextOverridePath = -not [string]::IsNullOrWhiteSpace($TextOverridePath)
@@ -373,15 +374,9 @@ foreach ($relativePath in @(
     Assert-RepositoryLinksInSource $relativePath
 }
 
-$versionPrefix = $releaseXml.SelectSingleNode(
-    '//SharpProofVersionPrefix').InnerText
-$versionExpression = $releaseXml.SelectSingleNode(
-    '//SharpProofPackageVersion').InnerText
-$packageVersion = $versionExpression.Replace(
-    '$(SharpProofVersionPrefix)',
-    $versionPrefix)
-if ($versionPrefix -notmatch '^(?<major>\d+)\.(?<minor>\d+)\.') {
-    throw "Could not derive the product series from '$versionPrefix'."
+$packageVersion = Get-SharpProofReleaseVersion -RepositoryRoot $repositoryRoot
+if ($packageVersion -notmatch '^(?<major>\d+)\.(?<minor>\d+)\.') {
+    throw "Could not derive the product series from '$packageVersion'."
 }
 $productSeries = $Matches['major'] + '.' + $Matches['minor']
 foreach ($productDocument in @(

@@ -172,6 +172,7 @@ the smallest relevant containerized test target passes.
 | R411 | Inline the one-use launcher final-timeout arithmetic | `SharpProof.Package.Test`: LauncherArgumentTests 75 passed |
 | R401 | Fold direct contract-clause fallback branches and inline the private resolution constructor wrapper | `SharpProof.Contracts.Test`: 142 passed |
 | R404 | Share partial-property accessor selection across contract inventory paths | `SharpProof.Contracts.Test`: 142 passed |
+| R423 | Reuse the release-version authority helper across container, pilot, and documentation scripts | Architecture release/documentation tests: 30 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1870,6 +1871,8 @@ and program builders across `SharpProof.Ir`, `SharpProof.Contracts`, and `SharpP
 R402 is `pending`. R400, R401, R403-R406 are applied direct refactoring
 simplifications.
 R401, R402, and R404 streamline contract resolution flow and IR validation.
+R423 is now applied: release scripts use `Get-SharpProofReleaseVersion` rather
+than parsing the props file independently.
 
 ## Second survey, part thirty-seven: R407-R412
 
@@ -1949,8 +1952,8 @@ and `SharpProof.Verifier`.
 
 R420 is merged into applied R328: the proposed shared item import was not needed;
 the self-application entry point now directly carries the grouped property list,
-so no dead item evaluation remains. R421-R426 are `pending` and streamline build
-props, test links, and package scripts.
+so no dead item evaluation remains. R421-R422 and R424-R426 are `pending` and
+streamline build props, test links, and package scripts.
 
 ## Second survey, part forty: R427-R432
 
@@ -3189,3 +3192,14 @@ their different synchronous/asynchronous mismatch contracts.
 R537 is a `pending` candidate. This is narrower than R536: it targets an
 exact duplicate of the IR traversal authority, while leaving the shrinker's
 model-specific rebuild and minimization policy intact.
+
+## Second survey, part eighty-three: R538-R539 - traversal and assumption scans
+
+| R538 | **`ExceptionHandlerReachability.GetPotentialExceptions` retains local copies of its stack-push helpers.** Its local `PushSequential` builds the reachable prefix, stops after the first child that cannot complete normally, and reverses it through `PushAll`; the class-level `PushSequentialCore` and `PushAllCore` immediately below implement the same list and stack protocol. The `PushChildren` local wrapper remains useful because it supplies the captured switch scheduling state, but the sequential/reverse helpers can call the existing core methods with `remaining`, removing likely refactor residue and a second maintenance point. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1193-1209,1434-1457` |
+| R539 | **`WorkerProtocolJson.ValidateClaimResult` scans the assumption array twice for one effect-evidence tuple.** It separately calls `Any` to detect a trusted-boundary assumption and to detect a used trusted-boundary assumption, rescanning the same nullable array and repeating its null/kind predicate. A single pass or compact summary helper can produce both flags while preserving `MatchesEffectEvidenceTuple` argument order and validation behavior. | `SharpProof.Worker.Protocol/ProtocolJson.cs:629-644` |
+
+### Status (part eighty-three)
+
+R538-R539 are `pending` reduction candidates. R538 removes duplicated traversal
+scaffolding without merging the reachability-specific dispatcher; R539 keeps
+the two evidence flags distinct while avoiding repeated array work.
