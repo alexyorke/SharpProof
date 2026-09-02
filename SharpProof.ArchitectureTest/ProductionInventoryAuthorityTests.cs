@@ -300,10 +300,19 @@ public sealed class ProductionInventoryAuthorityTests
 
     private static void DeleteTemporaryRepository(string repository)
     {
-        if (Directory.Exists(repository))
+        if (!Directory.Exists(repository))
         {
-            Directory.Delete(repository, recursive: true);
+            return;
         }
+
+        foreach (var path in Directory.EnumerateFiles(
+            repository,
+            "*",
+            SearchOption.AllDirectories))
+        {
+            File.SetAttributes(path, FileAttributes.Normal);
+        }
+        Directory.Delete(repository, recursive: true);
     }
 
 }

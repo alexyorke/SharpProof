@@ -4487,11 +4487,10 @@ three more, and again a shared implementation already exists and is almost unuse
 R726 and R727 are `pending` and are one piece of work: the naming convention
 is what blocks adoption of the guard, so choosing the nested form (or moving to
 `TempDirectory`, which needs no convention) is the enabling step and the delete
-consolidation follows from it. R728 is `pending`, is small, and is worth doing
-first regardless of the other two, because it is a divergence with a specific
-wrong copy rather than a general untidiness - and because collapsing the three
-helpers into one is precisely what R727 proposes, so fixing it in place would be
-wasted work.
+consolidation follows from it. R728 is completed: the production-inventory git
+fixture now clears read-only file attributes before recursive cleanup, matching
+the existing safe cleanup copies. The wider R726/R727 naming and ownership
+migration still needs to account for each fixture's lifetime and git behavior.
 
 ## Second survey, part two hundred forty-nine: R729-R730 - platform metadata references, and why the shared sources are not adopted
 
