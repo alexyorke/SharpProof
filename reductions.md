@@ -4169,14 +4169,6 @@ without a duplicate top-level branch.
 
 R630 is a pending protocol-manifest complexity candidate, not a request to remove canonicalization defense. Preserve stable hashes/equality for both canonical and noncanonical manifests; consolidate only duplicated order/projection policy where the call graph proves the same normalization is safe.
 
-## Second survey, part one hundred seventy-two: R631 - duplicated script MVID extraction
-
-| R631 | **Two PowerShell entry points duplicate the portable-executable MVID reader.** `Get-SharpProofModuleVersionId.ps1` and `Invoke-SharpProofGateEvidence.ps1` each open a `PEReader`, obtain a `MetadataReader` through `PEReaderExtensions`, read `GetModuleDefinition().Mvid`, format the GUID as `D`, and repeat nested `try/finally` disposal. The first is an MSBuild build-time value producer and the second binds standalone gate evidence, so their callers and error context remain distinct; a shared script helper/module for the common metadata extraction would remove the duplicated reader lifecycle and keep both boundaries on one MVID-format implementation. | `scripts/Get-SharpProofModuleVersionId.ps1:9-29`; `scripts/Invoke-SharpProofGateEvidence.ps1:57-72` |
-
-### Status (part one hundred seventy-two)
-
-R631 is a pending script-infrastructure reduction candidate. Preserve the build-time output contract, gate-evidence binding, no-metadata handling, canonical `D` formatting, and independent caller diagnostics while sharing only the PE metadata/MVID extraction.
-
 ## Second survey, part one hundred seventy-three: R632 - repeated PowerShell fixture cleanup
 
 | R632 | **Six PowerShell fixture drivers repeat the same temporary-tree cleanup guard.** `Test-SharpProofMutationEvidence`, `Test-SharpProofPublicationDestinationFixtures`, `Test-SharpProofPublicationPlanIdentityFixtures`, `Test-SharpProofPublicationPlanTopologyFixtures`, `Test-SharpProofReleaseConfigurationFixtures`, and `Test-SharpProofReleaseAuthorityClosureFixtures` each finish with `if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }`, differing only in the variable name. A shared fixture-lifetime helper can own the existence check and recursive removal (and, ideally, verify the generated temp-prefix ownership), while each script retains its own fixture creation, environment restoration, and failure behavior. | `scripts/Test-SharpProofMutationEvidence.ps1:1272-1275`; `scripts/Test-SharpProofPublicationDestinationFixtures.ps1:265-268`; `scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1:266-269`; `scripts/Test-SharpProofPublicationPlanTopologyFixtures.ps1:98-101`; `scripts/Test-SharpProofReleaseConfigurationFixtures.ps1:262-265`; `scripts/Test-SharpProofReleaseAuthorityClosureFixtures.ps1:130-133` |

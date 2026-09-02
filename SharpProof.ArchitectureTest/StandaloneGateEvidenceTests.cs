@@ -56,7 +56,9 @@ public sealed class StandaloneGateEvidenceTests
                 evidence,
                 Does.Contain("Assert-SharpProofStandaloneGateResult"));
             Assert.That(evidence, Does.Contain("SharpProofSourceCommit"));
-            Assert.That(evidence, Does.Contain("GetMetadataReader"));
+            Assert.That(
+                evidence,
+                Does.Contain("Get-SharpProofModuleVersionId"));
             Assert.That(producer, Does.Contain("CreateStandaloneEnvelope"));
             Assert.That(producer, Does.Contain("ModuleVersionId"));
             Assert.That(producer, Does.Not.Contain("SHA256"));

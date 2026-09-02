@@ -18,6 +18,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $PSScriptRoot 'Assert-SharpProofStandaloneGateResult.ps1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PEMetadata.psm1') -Force
 $sourceCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'Unable to bind gate evidence to the exact source commit.'
@@ -54,22 +55,7 @@ if (-not (Test-Path -LiteralPath $executable -PathType Leaf) -or
     -not (Test-Path -LiteralPath $pdb -PathType Leaf)) {
     throw 'The freshly built standalone gate identity is incomplete.'
 }
-$stream = [IO.File]::OpenRead($executable)
-try {
-    $peReader = [Reflection.PortableExecutable.PEReader]::new($stream)
-    try {
-        $metadata = [Reflection.Metadata.PEReaderExtensions]::GetMetadataReader(
-            $peReader)
-        $mvid = $metadata.GetGuid(
-            $metadata.GetModuleDefinition().Mvid).ToString('D')
-    }
-    finally {
-        $peReader.Dispose()
-    }
-}
-finally {
-    $stream.Dispose()
-}
+$mvid = Get-SharpProofModuleVersionId -Path $executable
 $dotnetArguments = @(
     $executable,
     $Gate
