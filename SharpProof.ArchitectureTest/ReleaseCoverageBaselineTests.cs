@@ -173,127 +173,125 @@ public sealed class ReleaseCoverageBaselineTests
     [Test]
     public async Task QualificationReceiptRejectsMalformedPackageIdentityEvidence()
     {
-        var root = TestRepository.FindRoot();
-        var parent = Path.Combine(root, "artifacts", "qualification-fixtures");
-        var workspace = Path.Combine(parent, Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(workspace);
-        try
-        {
-            var head = (await RunAsync(root, "git", "rev-parse", "HEAD"))
-                .Output.Trim();
-            var evidencePath = Path.Combine(workspace, "package-consumers.json");
-            var receiptDirectory = Path.Combine(workspace, "receipts");
-            var packages = Enumerable.Range(0, 6)
-                .Select(index => new
-                {
-                    fileName = $"package-{index}.nupkg",
-                    bytes = 1,
-                    sha256 = new string((char)('a' + index), 64)
-                })
-                .ToArray();
-            var fixtures = new[]
+        await RunReceiptFixturesAsync(
+            "package-consumers",
+            "package-consumers.json",
+            head =>
             {
-                (Packages: packages, Valid: true),
-                (Packages: packages.Take(5).ToArray(), Valid: false),
-                (Packages: packages.Select((item, index) => index == 5
+                var packages = Enumerable.Range(0, 6)
+                    .Select(index => new
+                    {
+                        fileName = $"package-{index}.nupkg",
+                        bytes = 1,
+                        sha256 = new string((char)('a' + index), 64)
+                    })
+                    .ToArray();
+                return
+                [
+                (JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    status = "passed",
+                    commit = head,
+                    packageArtifacts = packages
+                }), true),
+                (JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    status = "passed",
+                    commit = head,
+                    packageArtifacts = packages.Take(5).ToArray()
+                }), false),
+                (JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    status = "passed",
+                    commit = head,
+                    packageArtifacts = packages.Select((item, index) => index == 5
                     ? new
                     {
                         fileName = packages[0].fileName,
                         item.bytes,
                         item.sha256
                     }
-                    : item).ToArray(), Valid: false),
-                (Packages: packages.Select((item, index) => index == 5
+                    : item).ToArray()
+                }), false),
+                (JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    status = "passed",
+                    commit = head,
+                    packageArtifacts = packages.Select((item, index) => index == 5
                     ? new
                     {
                         item.fileName,
                         item.bytes,
                         sha256 = "not-a-digest"
                     }
-                    : item).ToArray(), Valid: false)
-            };
-            foreach (var fixture in fixtures)
-            {
-                await File.WriteAllTextAsync(
-                    evidencePath,
-                    JsonSerializer.Serialize(new
-                    {
-                        schemaVersion = 1,
-                        status = "passed",
-                        commit = head,
-                        packageArtifacts = fixture.Packages
-                    }));
-                var result = await RunAsync(
-                    root,
-                    "pwsh",
-                    "-NoLogo",
-                    "-NoProfile",
-                    "-File",
-                    Path.Combine(
-                        root,
-                        "scripts",
-                        "Write-SharpProofQualificationReceipt.ps1"),
-                    "-Gate",
-                    "package-consumers",
-                    "-EvidencePath",
-                    evidencePath,
-                    "-ReceiptDirectory",
-                    receiptDirectory);
-                Assert.That(
-                    result.ExitCode == 0,
-                    Is.EqualTo(fixture.Valid),
-                    result.Output + result.Error);
-            }
-        }
-        finally
-        {
-            if (Directory.Exists(workspace))
-            {
-                Directory.Delete(workspace, recursive: true);
-            }
-        }
+                    : item).ToArray()
+                }), false)
+                ];
+            });
     }
 
     [Test]
     public async Task QualificationReceiptRejectsMalformedFailedAndStaleEvidence()
     {
+        await RunReceiptFixturesAsync(
+            "acceptance-release",
+            "acceptance.json",
+            head =>
+            {
+                return
+                [
+                    ("not-json", false),
+                    (JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        status = "failed",
+                        commit = head
+                    }), false),
+                    (JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        status = "passed",
+                        commit = new string('0', 40)
+                    }), false),
+                    (JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        command = "acceptance",
+                        configuration = "release",
+                        status = "passed",
+                        commit = head
+                    }), true)
+                ];
+            },
+            expectedReceipt: "acceptance-release.json");
+    }
+
+    private static async Task RunReceiptFixturesAsync(
+        string gate,
+        string evidenceFileName,
+        Func<string, (string Content, bool Valid)[]> createFixtures,
+        string? expectedReceipt = null)
+    {
         var root = TestRepository.FindRoot();
-        var parent = Path.Combine(root, "artifacts", "qualification-fixtures");
-        var workspace = Path.Combine(parent, Guid.NewGuid().ToString("N"));
+        var workspace = Path.Combine(
+            root,
+            "artifacts",
+            "qualification-fixtures",
+            Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
         try
         {
             var head = (await RunAsync(root, "git", "rev-parse", "HEAD"))
                 .Output.Trim();
-            var evidencePath = Path.Combine(workspace, "acceptance.json");
+            var evidencePath = Path.Combine(workspace, evidenceFileName);
             var receiptDirectory = Path.Combine(workspace, "receipts");
-            var fixtures = new[]
+            foreach (var fixture in createFixtures(head))
             {
-                (Value: "not-json", Valid: false),
-                (Value: JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    status = "failed",
-                    commit = head
-                }), Valid: false),
-                (Value: JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    status = "passed",
-                    commit = new string('0', 40)
-                }), Valid: false),
-                (Value: JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    command = "acceptance",
-                    configuration = "release",
-                    status = "passed",
-                    commit = head
-                }), Valid: true)
-            };
-            foreach (var fixture in fixtures)
-            {
-                await File.WriteAllTextAsync(evidencePath, fixture.Value);
+                await File.WriteAllTextAsync(evidencePath, fixture.Content);
                 var result = await RunAsync(
                     root,
                     "pwsh",
@@ -305,7 +303,7 @@ public sealed class ReleaseCoverageBaselineTests
                         "scripts",
                         "Write-SharpProofQualificationReceipt.ps1"),
                     "-Gate",
-                    "acceptance-release",
+                    gate,
                     "-EvidencePath",
                     evidencePath,
                     "-ReceiptDirectory",
@@ -315,11 +313,13 @@ public sealed class ReleaseCoverageBaselineTests
                     Is.EqualTo(fixture.Valid),
                     result.Output + result.Error);
             }
-            Assert.That(
-                File.Exists(Path.Combine(
-                    receiptDirectory,
-                    "acceptance-release.json")),
-                Is.True);
+
+            if (expectedReceipt is not null)
+            {
+                Assert.That(
+                    File.Exists(Path.Combine(receiptDirectory, expectedReceipt)),
+                    Is.True);
+            }
         }
         finally
         {
