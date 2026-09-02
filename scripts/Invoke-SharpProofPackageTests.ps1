@@ -819,10 +819,12 @@ try {
     if ($failures.Count -ne 0) {
         throw "Package test shards failed:`n$($failures -join "`n")"
     }
-    Write-Host (
-        "Package tests passed in $($shards.Count) isolated shard(s) " +
-        "with parallelism $parallelism.")
-    Write-Host "Timing evidence: $timingOutput"
+    if (-not $Quiet) {
+        Write-Host (
+            "Package tests passed in $($shards.Count) isolated shard(s) " +
+            "with parallelism $parallelism.")
+        Write-Host "Timing evidence: $timingOutput"
+    }
 }
 finally {
     if ([IO.Directory]::Exists($root)) {

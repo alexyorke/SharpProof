@@ -212,15 +212,20 @@ $runPackageTests = $selected.Remove($packageProject)
 $selectedRelative = @($selected | ForEach-Object {
         [IO.Path]::GetRelativePath($repositoryRoot, $_).Replace('/', '\')
     } | Sort-Object)
-Write-Host "Changed paths relative to ${ComparisonRef}: $($changedPaths.Count)"
-Write-Host "Selected test projects: $($selectedRelative.Count)"
-$selectedRelative | ForEach-Object { Write-Host "  $_" }
-if ($runPackageTests) {
-    Write-Host '  SharpProof.Package.Test (duration-aware sharder)'
-}
 if ($PlanOnly) {
+    Write-Host "Changed paths relative to ${ComparisonRef}: $($changedPaths.Count)"
+    Write-Host "Selected test projects: $($selectedRelative.Count)"
+    $selectedRelative | ForEach-Object { Write-Host "  $_" }
+    if ($runPackageTests) {
+        Write-Host '  SharpProof.Package.Test (duration-aware sharder)'
+    }
     return
 }
+Write-Host (
+    "Running changed tests for {0} changed path(s), {1} project(s){2}." -f
+    $changedPaths.Count,
+    $selectedRelative.Count,
+    $(if ($runPackageTests) { ' plus package shards' } else { '' }))
 
 if ($selectedRelative.Count -gt 0) {
     $filterPath = Join-Path $repositoryRoot (
@@ -276,7 +281,6 @@ if ($selectedRelative.Count -gt 0) {
                 if ($LASTEXITCODE -ne 0) {
                     throw 'Changed architecture tests failed.'
                 }
-                Write-Host 'Changed architecture tests passed.'
                 $testArguments = @()
             }
             else {
@@ -306,7 +310,6 @@ if ($selectedRelative.Count -gt 0) {
                 -Arguments $testArguments `
                 -TimeoutSeconds $TimeoutSeconds `
                 -Quiet
-            Write-Host 'Changed project tests passed.'
         }
     }
     finally {
@@ -332,3 +335,5 @@ if ($runPackageTests) {
         throw 'Changed package tests failed.'
     }
 }
+
+Write-Host 'Changed tests passed.'

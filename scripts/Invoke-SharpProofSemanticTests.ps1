@@ -585,7 +585,9 @@ Move-Item -LiteralPath $temporaryTiming -Destination $timingOutput -Force
 if ($failures.Count -ne 0) {
     throw "Parallel semantic tests failed:`n$($failures -join "`n")"
 }
-Write-Host (
-    "Semantic tests passed in $($tasks.Count) isolated task(s) with " +
-    "$parallelism scheduler slot(s).")
-Write-Host "Timing evidence: $timingOutput"
+if (-not $Quiet) {
+    Write-Host (
+        "Semantic tests passed in $($tasks.Count) isolated task(s) with " +
+        "$parallelism scheduler slot(s).")
+    Write-Host "Timing evidence: $timingOutput"
+}
