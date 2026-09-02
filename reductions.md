@@ -163,7 +163,7 @@ the smallest relevant containerized test target passes.
 | R588 | Collapse the unreachable opaque receiver branch while preserving its exception contract | `SharpProof.Ir.Test`: ArgumentNullGuardBoundaryTests, 3 passed |
 | R589 | Share IR program condition evaluation and boolean validation | `SharpProof.Ir.Test`: IrProgramTests, 22 passed |
 | R590 | Reuse the validated sequence-type key when adding an IR type | `SharpProof.Ir.Test`: IrFactoryInvariantRegressionTests, 9 passed |
-| R596 | Reuse one materialized child list across direct and recursive IR shrinker candidates | `SharpProof.Fuzz` build |
+| R596 | Reuse one materialized child list across direct and recursive IR shrinker candidates | `SharpProof.Fuzz.Test`: IrShrinkerIsDeterministicAndPreservesMismatch, 1 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4001,7 +4001,9 @@ R603 is a pending Frontend-test harness reduction candidate. Preserve the two wr
 
 ### Status (part one hundred forty-five)
 
-R604 is a pending package-test maintenance candidate. Preserve XML escaping and each contextual exception message; share only the common null-result guard.
+R604 is `applied`: both package-test callers now use the shared
+`PackageTestXml.EscapeOrThrow` guard while retaining their contextual failure
+messages.
 
 ## Second survey, part one hundred forty-six: R605 - duplicate packaged-container test guard
 

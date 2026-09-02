@@ -1003,8 +1003,8 @@ public sealed class FinalCompilationProbeTests
 
         private static string Escape(string value)
         {
-            return SecurityElement.Escape(value) ??
-            throw new InvalidOperationException(
+            return PackageTestXml.EscapeOrThrow(
+                value,
                 "Failed to escape an MSBuild value.");
         }
     }
