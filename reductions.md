@@ -214,6 +214,7 @@ the smallest relevant containerized test target passes.
 | R583 | Remove unreachable contradictory-precondition branches after early return | `SharpProof.Worker.Test`: 695 passed |
 | R584 | Reuse protocol SHA-256 formatting in valid test fixtures | `SharpProof.Worker.Test`: 695; `SharpProof.Package.Test`: 75 passed, 1 expected skip |
 | R576 | Centralize package integration verification-target MSBuild arguments | `SharpProof.Package.Test`: WorkerMsBuildIntegrationTests 75 passed, 1 expected skip |
+| R509 | Share callable assumption-evidence projection | `SharpProof.Worker.Test`: 695 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3108,11 +3109,10 @@ tracking gap from the other direction.
 
 ### Status (part sixty-seven)
 
-R507-R511 are `pending` reduction candidates. They are intentionally framed as
-small shared cores or sequencing helpers: the metadata callers retain their
-different predicates, source-location callers retain their different fallback
-and binding policies, and the effect/lowering callers retain their
-operation-specific semantics.
+R509 is applied: callable result, creation, and assumption-marking paths now
+share one evidence projector with caller-specific used-state predicates. R507,
+R508, R510, and R511 remain pending; their callers retain distinct metadata,
+source-location, effect, and lowering semantics.
 
 
 ## Second survey, part sixty-seven: coverage configuration - no findings
@@ -3737,3 +3737,27 @@ R586 is a pending Worker test-infrastructure reduction candidate. Preserve the s
 ### Status (part one hundred twenty-eight)
 
 R587 is a pending cross-layer replay reduction candidate. Preserve the compiler artifact assembly's dependency direction and each caller's fail-closed/reason-specific boundary; share only the common model, program, state, domain, and condition replay mechanics.
+
+## Second survey, part one hundred twenty-nine: R588 - unreachable opaque receiver branch
+
+| R588 | **`IrTermServices.ValidateCallShape` contains a contradictory null-receiver branch for opaque calls.** When an instance member has `receiver == null`, the `opaque` path first calls `ArgumentNullGuard.NotNull(receiver, ...)`, which always throws; the following `ArgumentException` is therefore unreachable for opaque calls. Removing the nested throw or separating the intended exception policy makes the validation flow explicit without changing the static-member and non-opaque call checks. | `SharpProof.Ir/IrTermServices.cs:25-37` |
+
+### Status (part one hundred twenty-nine)
+
+R588 is a pending IR validation reduction candidate. Preserve whichever exception type and message the public/internal callers intentionally expose; simplify only the branch whose second throw cannot execute after the null guard.
+
+## Second survey, part one hundred thirty: R589 - duplicate program condition evaluation
+
+| R589 | **`IrProgramInterpreter.Execute` repeats the same condition-evaluation scaffold for assumptions/assertions and branches.** Both paths evaluate an IR condition, propagate a non-value result through `FromEvaluation`, and reject a non-boolean runtime value with `InvalidCondition`; only the final action differs (stop on a false assume/assert versus select the next block). A helper that returns the validated boolean or its evaluation failure can own this shared behavior while preserving the two distinct execution statuses and control-transfer paths. | `SharpProof.Ir/IrProgramInterpreter.cs:70-105,253-265` |
+
+### Status (part one hundred thirty)
+
+R589 is a pending IR interpreter reduction candidate. Keep instruction-specific status and step/instruction reporting at the call sites; centralize only evaluation, failure propagation, and boolean validation.
+
+## Second survey, part one hundred thirty-one: R590 - duplicate sequence-type lookup
+
+| R590 | **`IrFactory.GetOrCreateSequenceType(IrTypeId)` looks up the same type key twice.** The overload first probes `_typeIds` with `(IrTypeKind.Sequence, -1, elementType.Value)` so it can avoid building a display name for an existing type, then calls `GetOrCreateTypeCore`, which recomputes that exact key and probes the same dictionary again. A lazy-name or sequence-specific core path can retain the allocation avoidance while making one routine own the lookup and insertion. | `SharpProof.Ir/IrFactory.cs:153-165,723-735` |
+
+### Status (part one hundred thirty-one)
+
+R590 is a pending IR factory reduction candidate. Preserve the existing interning key and the optimization of not materializing a display name for an already-interned element type; remove only the duplicate dictionary probe.

@@ -60,13 +60,24 @@ internal static class CallableClaimResultAssembler
                     (WorkerClaimOutcome.Unknown, WorkerClaimReason.MalformedBackendResult);
                 break;
         }
-        record.Assumptions = [.. target.Entry.Assumptions.Select(evidence =>
-            new WorkerAssumptionEvidence {
-                Id = evidence.Id, Kind = evidence.Kind,
-                Used = evidence.Kind == WorkerAssumptionKind.UserAssume &&
-                       usedUserAssumptions.Contains(evidence.Id)
-            })];
+        record.Assumptions = ProjectAssumptions(
+            target,
+            evidence => evidence.Kind == WorkerAssumptionKind.UserAssume &&
+                usedUserAssumptions.Contains(evidence.Id));
         return record;
+    }
+
+    private static WorkerAssumptionEvidence[] ProjectAssumptions(
+        CompilerCallablePreparation target,
+        Func<WorkerAssumptionEvidence, bool> isUsed)
+    {
+        return [.. target.Entry.Assumptions.Select(evidence =>
+            new WorkerAssumptionEvidence
+            {
+                Id = evidence.Id,
+                Kind = evidence.Kind,
+                Used = isUsed(evidence)
+            })];
     }
 
     internal static WorkerClaimResult Unknown(
@@ -108,13 +119,9 @@ internal static class CallableClaimResultAssembler
             Outcome = outcome,
             Reason = reason,
             EffectCertainty = certainty,
-            Assumptions = [.. target.Entry.Assumptions.Select(static evidence =>
-                new WorkerAssumptionEvidence
-                {
-                    Id = evidence.Id,
-                    Kind = evidence.Kind,
-                    Used = evidence.Used
-                })]
+            Assumptions = ProjectAssumptions(
+                target,
+                static evidence => evidence.Used)
         };
     }
 
@@ -122,14 +129,9 @@ internal static class CallableClaimResultAssembler
         CompilerCallablePreparation target,
         IReadOnlySet<string> usedAssumptionIds)
     {
-        return [.. target.Entry.Assumptions.Select(evidence =>
-            new WorkerAssumptionEvidence
-            {
-                Id = evidence.Id,
-                Kind = evidence.Kind,
-                Used = evidence.Used ||
-                    usedAssumptionIds.Contains(evidence.Id)
-            })];
+        return ProjectAssumptions(
+            target,
+            evidence => evidence.Used || usedAssumptionIds.Contains(evidence.Id));
     }
 
     private static WorkerModelValue[] CreateModel(
