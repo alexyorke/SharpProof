@@ -106,6 +106,7 @@ public sealed class CompilerEffectReplayArtifactCodecTests
     public void CodecRequiresSealedUnconditionalAllocationReplayForRefutation()
     {
         var evidence = RefutedEvidence();
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
 
         Assert.DoesNotThrow(
             (Action)(() =>
@@ -168,6 +169,7 @@ public sealed class CompilerEffectReplayArtifactCodecTests
     {
         var kind = (CompilerEffectReplayEventKind)kindValue;
         var evidence = RefutedEvidence(kind);
+        CompilerEffectClaimArtifactCodec.Seal(evidence);
 
         Assert.DoesNotThrow((Action)(() =>
             CompilerEffectClaimArtifactCodec.Validate(evidence)));
@@ -312,8 +314,6 @@ public sealed class CompilerEffectReplayArtifactCodecTests
             default:
                 throw new ArgumentOutOfRangeException(nameof(kind));
         }
-
-        CompilerEffectClaimArtifactCodec.Seal(evidence);
         return evidence;
     }
 
@@ -359,7 +359,6 @@ public sealed class CompilerEffectReplayArtifactCodecTests
             },
             Evidence = "unconditional-allocation"
         };
-        CompilerEffectClaimArtifactCodec.Seal(evidence);
         return evidence;
     }
 

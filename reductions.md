@@ -137,6 +137,7 @@ the smallest relevant containerized test target passes.
 | R819 | Reuse the canonical pilot-project path set instead of rescanning relative paths for uniqueness | `SharpProof.ArchitectureTest`: PilotAuthorityTests passed |
 | R820 | Remove two outcome-family assertions implied by exact concrete outcome checks | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R821 | Reuse the already-computed generated-domain join in lattice-law assertions | `SharpProof.Dataflow.Test`: 50 passed |
+| R822 | Seal replay fixtures only at validation boundaries instead of during construction and again after mutation | `SharpProof.Worker.Test`: CompilerEffectReplayArtifactCodecTests, 8 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6792,9 +6793,9 @@ remaining upper-bound assertions, preserving all generated-domain laws.
 
 ### Status (part three hundred thirty-three)
 
-R822 is `deferred`: the extra hashes are confined to a small test fixture, but
-  the helper's hidden sealing makes the setup order harder to reason about and
-  adds avoidable work to every malformed-shape case.
+R822 is `applied`: replay fixture constructors now leave evidence unsealed;
+accepted and baseline validations seal explicitly, while malformed cases seal
+once after mutation.
 
 ## Second survey, part three hundred thirty-four: R823 - repeated specification-pack JSON invocation
 
