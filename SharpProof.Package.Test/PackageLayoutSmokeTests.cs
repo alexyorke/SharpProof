@@ -2,7 +2,6 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Runtime.Loader;
-using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text;
@@ -1054,7 +1053,7 @@ public sealed class PackageLayoutSmokeTests
     [Test]
     public async Task PackagedVerifierReplaysObjectAndArrayAllocationEffects()
     {
-        RequireContainerWorker();
+        TestRepository.RequireCanonicalContainer();
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteEffectReplayVerifierConsumer(feed.Version);
@@ -1201,7 +1200,7 @@ public sealed class PackageLayoutSmokeTests
     [Test]
     public async Task PackagedVerifierPreservesLinkedAndMappedLocationsInSarif()
     {
-        RequireContainerWorker();
+        TestRepository.RequireCanonicalContainer();
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PackageWorkspace.Create();
         workspace.WriteLinkedMappedVerifierConsumer(feed.Version);
@@ -1559,21 +1558,6 @@ public sealed class PackageLayoutSmokeTests
         return RunDotNetAsync(
             workspace.ConsumerDirectory,
             [.. arguments]);
-    }
-
-    private static void RequireContainerWorker()
-    {
-        if (!OperatingSystem.IsLinux() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
-            RuntimeInformation.OSArchitecture != Architecture.X64 ||
-            !string.Equals(
-                Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
-                "1",
-                StringComparison.Ordinal))
-        {
-            Assert.Ignore(
-                "The packaged worker is supported only in the canonical Linux amd64 container.");
-        }
     }
 
     private static Task<ProcessResult> BuildAnalyzerConsumerAsync(

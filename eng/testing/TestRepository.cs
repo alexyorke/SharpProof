@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices;
 using System.Text.Json;
+using NUnit.Framework;
 
 internal static class TestRepository
 {
@@ -35,6 +37,23 @@ internal static class TestRepository
             FindRoot(),
             projectDirectory,
             schemaFileName)));
+    }
+
+    internal static void RequireCanonicalContainer()
+    {
+        if (OperatingSystem.IsLinux() &&
+            RuntimeInformation.ProcessArchitecture == Architecture.X64 &&
+            RuntimeInformation.OSArchitecture == Architecture.X64 &&
+            string.Equals(
+                Environment.GetEnvironmentVariable("SHARPPROOF_CONTAINER"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Assert.Ignore(
+            "The packaged worker is supported only in the canonical Linux amd64 container.");
     }
 
     internal static void DeleteOwnedTemporaryDirectory(

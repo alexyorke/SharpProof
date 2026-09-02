@@ -166,6 +166,7 @@ the smallest relevant containerized test target passes.
 | R596 | Reuse one materialized child list across direct and recursive IR shrinker candidates | `SharpProof.Fuzz.Test`: IrShrinkerIsDeterministicAndPreservesMismatch, 1 passed |
 | R603 | Share Roslyn expression-operation wrapper recovery across frontend test suites | `SharpProof.Frontend.Test`: FrontendLoweringTests 37; UnaryAndDefaultLoweringCoverageTests 22 passed |
 | R606 | Share schema-file path resolution and JSON loading across conformance suites | `SharpProof.Ir.Test`: 3; `SharpProof.Worker.Test`: 9 schema tests passed |
+| R605 | Share canonical container admission checks across package integration suites | `SharpProof.Package.Test`: package-layout and Worker MSBuild guard paths passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4014,7 +4015,9 @@ messages.
 
 ### Status (part one hundred forty-six)
 
-R605 is a pending package-test infrastructure reduction candidate. Preserve all three platform checks, the environment marker, and the Worker MSBuild suite's post-guard contract validation; share only the common admission logic and message.
+R605 is `applied`: both package integration suites now reuse the shared
+canonical-container admission guard; Worker MSBuild validation still performs
+its additional container-contract check afterward.
 
 ## Second survey, part one hundred forty-seven: R606 - repeated schema-file loader
 
