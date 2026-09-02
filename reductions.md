@@ -249,6 +249,7 @@ the smallest relevant containerized test target passes.
 | R794 | Reuse shared package identity parsing in pilot qualification | Pilot authority fixtures; `PilotAuthorityTests`: 1 passed |
 | R793 | Share repository-scoped Git text execution between inventory and coverage scripts | PowerShell parses; Git helper behavior; authority tests: 36 passed (1 pre-existing complexity-cap failure) |
 | R790 | Drive package-consumer framework coverage from the acceptance contract | PowerShell parse; `ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed`: 1 passed |
+| R797 | Share the staged-worker version projection between launcher input-hash and response-version calculations | `SharpProof.Package.Test`: `LauncherArgumentTests`, 75 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -6143,8 +6144,11 @@ Architecture test passed.
 
 ### Status (part three hundred six)
 
-R795 is `pending` and limited to temporary Git setup in PowerShell fixtures.
-No implementation or build file was changed.
+R795 is `deferred`: the five fixtures differ in branch initialization,
+identity, seed/commit policy, and later remote/tag mutations. A new shared
+PowerShell helper would add another script/module and an option matrix for a
+small four-line bootstrap, increasing fixture coupling without reducing the
+overall build surface.
 
 ## Second survey, part three hundred seven: R796 - repeated PE module identity extraction
 
@@ -6164,8 +6168,11 @@ No implementation or build file was changed.
 
 ### Status (part three hundred seven)
 
-R796 is `pending` and limited to PE metadata/MVID projection reuse.
-No implementation or build file was changed.
+R796 is `deferred`: the production inventory and standalone gate intentionally
+own different PE/PDB reader lifetimes and module boundaries. Sharing the MVID
+projection would require a new cross-script module dependency (and duplicate
+fixture copies) for only one expression, adding coupling rather than reducing
+the repository's script surface.
 
 ## Second survey, part three hundred eight: R797 - repeated worker version metadata reads
 
@@ -6184,8 +6191,9 @@ No implementation or build file was changed.
 
 ### Status (part three hundred eight)
 
-R797 is `pending` and limited to sharing one staged-worker version projection.
-No implementation or build file was changed.
+R797 is `applied`: the launcher now reads and validates the staged worker's
+product name/version once per launch and feeds both projections. The existing
+standalone helper overloads and digest/provenance fields remain unchanged.
 
 ## Second survey, part three hundred nine: R798 - repeated launcher path-topology validation
 

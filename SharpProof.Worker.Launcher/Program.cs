@@ -59,11 +59,15 @@ internal static class Program
                 arguments.WorkerPath);
             request = arguments.CreateRequest(
                 runtimeSnapshot, out artifact, out artifactBytes);
+            var workerVersion = ReadWorkerVersion(runtimeSnapshot);
             expectedInputHash = ComputeExpectedInputHash(
                 request,
                 artifactBytes,
-                runtimeSnapshot);
-            expectedVersions = ComputeExpectedVersions(runtimeSnapshot);
+                runtimeSnapshot,
+                workerVersion);
+            expectedVersions = ComputeExpectedVersions(
+                runtimeSnapshot,
+                workerVersion.ProductVersion);
             responseAuthority = new CompilerResponseEvidenceAuthority(
                 CompilerManifestArtifactJson.DecodeCallables(artifact));
             var validation = WorkerProtocolJson.Validate(request);
@@ -313,13 +317,17 @@ internal static class Program
     internal static WorkerVersionSummary ComputeExpectedVersions(
         WorkerRuntimeClosureSnapshot snapshot)
     {
-        ArgumentNullException.ThrowIfNull(snapshot);
-        var version = FileVersionInfo.GetVersionInfo(snapshot.ExecutionWorkerPath);
+        var workerVersion = ReadWorkerVersion(snapshot);
+        return ComputeExpectedVersions(snapshot, workerVersion.ProductVersion);
+    }
+
+    private static WorkerVersionSummary ComputeExpectedVersions(
+        WorkerRuntimeClosureSnapshot snapshot,
+        string workerVersion)
+    {
         return new WorkerVersionSummary
         {
-            WorkerVersion = RequiredVersion(
-                version.ProductVersion,
-                "product version"),
+            WorkerVersion = workerVersion,
             ApiSpecVersion = ApiSpecTable.DefaultTableVersion,
             WorkerBinarySha256 = snapshot.Sha256,
             ApiSpecContentSha256 = ApiSpecTable.Default.ContentSha256
@@ -331,14 +339,36 @@ internal static class Program
         byte[] artifactBytes,
         WorkerRuntimeClosureSnapshot snapshot)
     {
-        ArgumentNullException.ThrowIfNull(snapshot);
-        var version = FileVersionInfo.GetVersionInfo(snapshot.ExecutionWorkerPath);
+        var workerVersion = ReadWorkerVersion(snapshot);
+        return ComputeExpectedInputHash(
+            request,
+            artifactBytes,
+            snapshot,
+            workerVersion);
+    }
+
+    private static string ComputeExpectedInputHash(
+        WorkerVerifyRequest request,
+        byte[] artifactBytes,
+        WorkerRuntimeClosureSnapshot snapshot,
+        (string ProductName, string ProductVersion) workerVersion)
+    {
         return CompilerArtifactInputHash.Compute(
-            request, artifactBytes, RequiredVersion(version.ProductName, "product name"),
-            RequiredVersion(version.ProductVersion, "product version"),
+            request, artifactBytes, workerVersion.ProductName,
+            workerVersion.ProductVersion,
             snapshot.Sha256,
             ApiSpecTable.DefaultTableIdentity, ApiSpecTable.DefaultTableVersion,
             ApiSpecTable.Default.ContentSha256);
+    }
+
+    private static (string ProductName, string ProductVersion) ReadWorkerVersion(
+        WorkerRuntimeClosureSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var version = FileVersionInfo.GetVersionInfo(snapshot.ExecutionWorkerPath);
+        return (
+            RequiredVersion(version.ProductName, "product name"),
+            RequiredVersion(version.ProductVersion, "product version"));
     }
 
     private static string RequiredVersion(string? value, string name)
