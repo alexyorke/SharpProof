@@ -25,34 +25,29 @@ public sealed class ProtocolJsonTests
         WorkerAssumptionKind.TrustedBoundary
     ];
 
-    [Test]
-    public void ValidResponseValidationDoesNotRescanManifestRows()
+    private static IEnumerable<TestCaseData> ProtocolScalingCases()
     {
-        const int smallSize = 1024;
-        const int largeSize = 8192;
-        _ = MeasureValidation(CreateValidationScalingResponse(4));
-        var small = MeasureValidation(
-            CreateValidationScalingResponse(smallSize));
-        var large = MeasureValidation(
-            CreateValidationScalingResponse(largeSize));
-        var maximumLarge = small * 16 + TimeSpan.FromMilliseconds(250);
-
-        Assert.That(
-            large,
-            Is.LessThanOrEqualTo(maximumLarge),
-            $"small={small.TotalMilliseconds:F0} ms, " +
-            $"large={large.TotalMilliseconds:F0} ms");
+        yield return new TestCaseData(
+            (Func<WorkerVerifyResponse, TimeSpan>)MeasureValidation,
+            1024,
+            8192).SetName("ValidResponseValidationDoesNotRescanManifestRows");
+        yield return new TestCaseData(
+            (Func<WorkerVerifyResponse, TimeSpan>)MeasureCanonicalization,
+            512,
+            4096).SetName("ProtocolCanonicalizationDoesNotRescanManifestRows");
     }
 
-    [Test]
-    public void ProtocolCanonicalizationDoesNotRescanManifestRows()
+    [TestCaseSource(nameof(ProtocolScalingCases))]
+    public void ProtocolOperationDoesNotRescanManifestRows(
+        Func<WorkerVerifyResponse, TimeSpan> measure,
+        int smallSize,
+        int largeSize)
     {
-        const int smallSize = 512;
-        const int largeSize = 4096;
-        _ = MeasureCanonicalization(CreateValidationScalingResponse(4));
-        var small = MeasureCanonicalization(
+        ArgumentNullException.ThrowIfNull(measure);
+        _ = measure(CreateValidationScalingResponse(4));
+        var small = measure(
             CreateValidationScalingResponse(smallSize));
-        var large = MeasureCanonicalization(
+        var large = measure(
             CreateValidationScalingResponse(largeSize));
         var maximumLarge = small * 16 + TimeSpan.FromMilliseconds(250);
 
