@@ -148,6 +148,7 @@ the smallest relevant containerized test target passes.
 | R833 | Reuse the result identity snapshot for protocol uniqueness and exact-set validation | `SharpProof.Worker.Test`: ProtocolJsonTests passed |
 | R834 | Reuse the manifest callable identity snapshot for membership validation | `SharpProof.Worker.Test`: ProtocolJsonTests passed |
 | R835 | Share the clean-response precondition in worker performance probes | `SharpProof.Gates.Test`: CooperativeTimeoutProbeRejectsPartialProtocolEvidence passed; broader PerformanceGateTests had 27 passed and 2 pre-existing package-policy failures |
+| R837 | Reuse the manifest claim-owner index for unknown-coverage validation | `SharpProof.Worker.Test`: ProtocolJsonTests 108 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7131,9 +7132,9 @@ R836 is `deferred`: response validation is a high-frequency boundary and the
 
 ### Status (part three hundred forty-eight)
 
-R837 is `deferred`: the extra owner map is linear and bounded, but it repeats
-  an identity projection at a response-validation boundary that already owns a
-  compatible index.
+R837 is `applied`: unknown-coverage validation now resolves owners through the
+  existing first-entry claim index while retaining blank-ID and incomplete
+  callable guards.
 
 ## Second survey, part three hundred forty-nine: R838 - duplicate expected-request validation
 

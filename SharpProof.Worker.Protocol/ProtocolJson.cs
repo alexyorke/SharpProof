@@ -362,7 +362,7 @@ public static partial class WorkerProtocolJson
             protocolErrors,
             manifestIndexes,
             errors);
-        ValidateUnknownCoverage(callables, claims, response.Manifest, errors);
+        ValidateUnknownCoverage(callables, claims, manifestIndexes, errors);
         ValidateSummary(response.Summary, callables, claims, errors);
         if (response.Summary != null)
         {
@@ -684,24 +684,17 @@ public static partial class WorkerProtocolJson
     }
 
     private static void ValidateUnknownCoverage(WorkerCallableResult[] callables,
-        WorkerClaimResult[] claims, WorkerClaimManifest? manifest, Validator errors)
+        WorkerClaimResult[] claims, ManifestIdentityIndexes manifestIndexes,
+        Validator errors)
     {
-        if (manifest?.Claims == null)
-        {
-            return;
-        }
-
-        var owners = manifest.Claims.Where(static value =>
-                value != null && !string.IsNullOrWhiteSpace(value.ClaimId))
-            .GroupBy(static value => value.ClaimId, s_ordinal)
-            .ToDictionary(static group => group.Key, static group => group.First().CallableId,
-                s_ordinal);
         var incomplete = new HashSet<string>(
             callables.Where(static value => value.Coverage == WorkerCallableCoverage.Incomplete)
                 .Select(static value => value.CallableId),
             s_ordinal);
         errors.Check(!claims.Any(value => value.Outcome == WorkerClaimOutcome.Unknown &&
-            owners.TryGetValue(value.ClaimId, out var owner) && !incomplete.Contains(owner)),
+            !string.IsNullOrWhiteSpace(value.ClaimId) &&
+            manifestIndexes.ClaimsById.Find(value.ClaimId) is { } claim &&
+            !incomplete.Contains(claim.CallableId)),
             "response.unknown_coverage");
     }
     private static void ValidateRun(
