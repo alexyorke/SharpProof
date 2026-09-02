@@ -6814,3 +6814,26 @@ R822 is `deferred`: the extra hashes are confined to a small test fixture, but
 R823 is `deferred`: the duplication is confined to test plumbing and the
   current three methods are short, but centralizing document lifetime would
   reduce copy/paste drift if another specification-pack parser is covered.
+
+## Second survey, part three hundred thirty-five: R824 - duplicated probe JSON array writer
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R824 | **`ProbeJsonObject` implements the same comma-delimited array loop twice.** `RawArray` appends an opening bracket, tracks the first row, inserts commas between rows, appends each raw row, and closes the bracket; `AppendStringArray` repeats the same state machine and delimiter handling, differing only in whether each element is appended raw or passed through `AppendString`. A small element-writer callback or generic append helper can own the array framing and separator policy while retaining the two public serialization modes. This removes a second copy of the JSON array protocol from the probe asset without introducing a runtime JSON dependency. | `SharpProof.CompilerProbe.TestAsset/ProbeJson.cs:45-92` |
+
+### Checked and not proposed (part three hundred thirty-five)
+
+- `RawArray` must continue to accept already-serialized JSON rows, while
+  `StringArray` must continue to quote and escape each string; only framing and
+  separator emission are shared.
+- The hand-rolled writer remains in place because this analyzer asset avoids a
+  `System.Text.Json` dependency and compiler-host assembly-load coupling, as
+  recorded in the earlier probe review.
+- Object-property comma handling in `PropertyName` is a different nesting
+  level and is not folded into the array helper.
+
+### Status (part three hundred thirty-five)
+
+R824 is `deferred`: the duplicated loop is small and probe-only, but it is an
+  exact maintenance seam in a hand-written serializer where delimiter changes
+  would otherwise need two updates.
