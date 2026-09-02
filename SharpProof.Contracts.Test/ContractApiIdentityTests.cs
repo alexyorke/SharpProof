@@ -13,7 +13,12 @@ public sealed class ContractApiIdentityTests
         LanguageVersion.CSharp12,
         preprocessorSymbols: [Contract.ConditionalSymbol]);
     private static readonly ImmutableArray<MetadataReference> PlatformReferences =
-        CreatePlatformReferences();
+        [.. TestMetadataReferences.Platform.Where(static reference =>
+            reference.Display is not { } display ||
+            !string.Equals(
+                Path.GetFileNameWithoutExtension(display),
+                "SharpProof.Attributes",
+                StringComparison.OrdinalIgnoreCase))];
 
     [Test]
     public void MatchingPackageReferenceIsAdmitted()
@@ -152,23 +157,6 @@ public sealed class ContractApiIdentityTests
                 result.Diagnostics.Select(static diagnostic =>
                     diagnostic.ToString())));
         return MetadataReference.CreateFromImage(stream.ToArray());
-    }
-
-    private static ImmutableArray<MetadataReference>
-        CreatePlatformReferences()
-    {
-        var trustedPlatformAssemblies =
-            (string?)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES") ??
-            throw new InvalidOperationException(
-                "Trusted platform assemblies are unavailable.");
-        return [.. trustedPlatformAssemblies
-            .Split(Path.PathSeparator)
-            .Where(static path => !string.Equals(
-                Path.GetFileNameWithoutExtension(path),
-                "SharpProof.Attributes",
-                StringComparison.OrdinalIgnoreCase))
-            .Select(static path => MetadataReference.CreateFromFile(path))];
     }
 
 }

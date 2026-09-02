@@ -4529,12 +4529,13 @@ the very projects that already compile it.
 
 ### Status (part two hundred forty-nine)
 
-R729 is `pending`. R730 is `pending` and is the item that matters: it is the
-first in this survey to name a *mechanism* gap behind a family of duplications
-rather than another instance of one, and it applies retroactively to R724-R728. If
-only one thing from parts two hundred forty-seven, forty-eight and this one is
-actioned, it should be the check described in R730, because the three
-duplications will otherwise regrow after being collapsed.
+R729 is partially completed: all five direct TPA readers in the two projects
+already linked to `TestMetadataReferences.cs` now use its shared platform or
+filtered-reference APIs; the remaining readers are in projects that do not link
+that source and remain outside this migration. R730 is completed for the linked
+projects: `SharedTestInfrastructureTests` now fails if either project reintroduces
+a direct `TRUSTED_PLATFORM_ASSEMBLIES` read, providing the missing anti-regression
+mechanism behind the helper adoption.
 
 ## Second survey, part two hundred fifty: R731 - IsPackable is a second, ungated statement of what ships
 

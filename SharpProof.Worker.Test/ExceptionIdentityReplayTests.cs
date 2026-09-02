@@ -55,7 +55,7 @@ public sealed class ExceptionIdentityReplayTests
         var compilation = CSharpCompilation.Create(
             "Collision.Consumer",
             [tree],
-            PlatformReferences
+            TestMetadataReferences.Platform
                 .Add(AttributeReference)
                 .Add(allowedReference)
                 .Add(thrownReference),
@@ -259,7 +259,7 @@ public sealed class ExceptionIdentityReplayTests
         var compilation = CSharpCompilation.Create(
             "Generic.Argument.Consumer",
             [tree],
-            PlatformReferences.Add(firstReference).Add(secondReference),
+            TestMetadataReferences.Platform.Add(firstReference).Add(secondReference),
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics()
@@ -314,7 +314,7 @@ public sealed class ExceptionIdentityReplayTests
         var compilation = CSharpCompilation.Create(
             "Constructed.Exception.Consumer",
             [tree],
-            PlatformReferences,
+            TestMetadataReferences.Platform,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary));
         var method = compilation.GetTypeByMetadataName("Subject")!
@@ -430,7 +430,7 @@ public sealed class ExceptionIdentityReplayTests
         var compilation = CSharpCompilation.Create(
             assemblyName,
             [tree],
-            PlatformReferences,
+            TestMetadataReferences.Platform,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 cryptoPublicKey: EcmaPublicKey,
@@ -451,15 +451,6 @@ public sealed class ExceptionIdentityReplayTests
                 MetadataImageKind.Assembly,
                 aliases: [alias]));
     }
-
-    private static ImmutableArray<MetadataReference> PlatformReferences
-    {
-        get;
-    } =
-        [.. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-        .Split(Path.PathSeparator)
-        .Select(static path =>
-            (MetadataReference)MetadataReference.CreateFromFile(path))];
 
     private static MetadataReference AttributeReference
     {

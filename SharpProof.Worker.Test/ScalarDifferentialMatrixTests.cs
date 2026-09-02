@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -974,8 +975,7 @@ public sealed class ScalarDifferentialMatrixTests
                     SourceHashAlgorithm.Sha256),
                 parseOptions,
                 _sourcePath);
-            var references = GetReferences().Select(
-                static path => MetadataReference.CreateFromFile(path));
+            var references = GetReferences();
             return CSharpCompilation.Create(
                 "ScalarDifferential",
                 [syntaxTree],
@@ -988,19 +988,12 @@ public sealed class ScalarDifferentialMatrixTests
                     concurrentBuild: false));
         }
 
-        private static string[] GetReferences()
+        private static ImmutableArray<MetadataReference> GetReferences()
         {
-            var trusted = ((string)AppContext.GetData(
-                    "TRUSTED_PLATFORM_ASSEMBLIES")!)
-                .Split(Path.PathSeparator);
-            var names = new HashSet<string>(
+            return TestMetadataReferences.ForFileNames(
                 RequiredReferenceFileNames,
-                StringComparer.OrdinalIgnoreCase);
-            return [.. trusted
-                .Where(path => names.Contains(Path.GetFileName(path)))
-                .Append(typeof(Contract).Assembly.Location)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(static path => path, StringComparer.Ordinal)];
+                includeSharpProof: true,
+                sort: true);
         }
 
         internal static Assembly? ResolveContractAssembly(

@@ -7318,18 +7318,10 @@ public sealed class WorkerTests
 
         private static ImmutableArray<MetadataReference> CreateReferences()
         {
-            var trusted = ((string)AppContext.GetData(
-                    "TRUSTED_PLATFORM_ASSEMBLIES")!)
-                .Split(Path.PathSeparator);
-            var names = new HashSet<string>(
+            return TestMetadataReferences.ForFileNames(
                 RequiredReferenceFileNames,
-                StringComparer.OrdinalIgnoreCase);
-            return [.. trusted
-                .Where(path => names.Contains(Path.GetFileName(path)))
-                .Append(typeof(Contract).Assembly.Location)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(static path => path, StringComparer.Ordinal)
-                .Select(static path => MetadataReference.CreateFromFile(path))];
+                includeSharpProof: true,
+                sort: true);
         }
 
         private static ImmutableArray<MetadataReference>

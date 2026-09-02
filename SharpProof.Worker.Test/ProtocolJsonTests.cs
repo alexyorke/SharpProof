@@ -2021,22 +2021,15 @@ public sealed class ProtocolJsonTests
             new CSharpParseOptions(
                 LanguageVersion.CSharp12),
             path);
-        var trusted = ((string)AppContext.GetData(
-                "TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator);
-        var required = new HashSet<string>(
+        var references = TestMetadataReferences.ForFileNames(
             [
                 "System.Private.CoreLib.dll",
                 "System.Linq.dll",
                 "System.Runtime.dll",
                 "netstandard.dll"
             ],
-            StringComparer.OrdinalIgnoreCase);
-        var references = trusted
-            .Where(item => required.Contains(Path.GetFileName(item)))
-            .Append(typeof(Contract).Assembly.Location)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(static item => MetadataReference.CreateFromFile(item));
+            includeSharpProof: true,
+            sort: false);
         return CSharpCompilation.Create(
             "ProtocolTest",
             [tree],
