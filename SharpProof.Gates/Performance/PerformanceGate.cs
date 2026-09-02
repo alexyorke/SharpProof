@@ -170,16 +170,20 @@ internal static class PerformanceGate
                 contract,
                 cancellationToken)
             .ConfigureAwait(false);
-        var editP95 = Percentile(editMeasurement.Latencies, 0.95);
+        var editP95 = PackageBuildEstimator.NearestRankPercentile(
+            editMeasurement.Latencies,
+            0.95,
+            requireFinitePositive: false);
         var editMaximum = editMeasurement.Latencies.Max();
         var workerMeasurements = await WorkerPerformanceProbe.MeasureAsync(
                 repositoryRoot,
                 contract,
                 cancellationToken)
             .ConfigureAwait(false);
-        var cancellationP95 = Percentile(
+        var cancellationP95 = PackageBuildEstimator.NearestRankPercentile(
             workerMeasurements.CancellationLatencies,
-            0.95);
+            0.95,
+            requireFinitePositive: false);
         var forcedTermination =
             workerMeasurements.ForcedTerminationMilliseconds;
 
@@ -1084,21 +1088,6 @@ internal static class PerformanceGate
             }
         }
         """;
-    }
-
-    private static double Percentile(IEnumerable<double> values, double rank)
-    {
-        var sorted = values.OrderBy(static value => value).ToArray();
-        if (sorted.Length == 0)
-        {
-            throw new ArgumentException("At least one sample is required.", nameof(values));
-        }
-
-        var index = Math.Clamp(
-            (int)Math.Ceiling(rank * sorted.Length) - 1,
-            0,
-            sorted.Length - 1);
-        return sorted[index];
     }
 
     private static double Ratio(double numerator, double denominator)

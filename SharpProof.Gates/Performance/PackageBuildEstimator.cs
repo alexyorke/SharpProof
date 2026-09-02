@@ -181,11 +181,27 @@ internal static class PackageBuildEstimator
         return lower + ((upper - lower) / 2);
     }
 
-    private static double NearestRankPercentile(
+    internal static double NearestRankPercentile(
         IEnumerable<double> values,
-        double rank)
+        double rank,
+        bool requireFinitePositive = true)
     {
-        var sorted = ValidateAndSort(values);
+        var sorted = values.OrderBy(static value => value).ToArray();
+        if (sorted.Length == 0)
+        {
+            throw new ArgumentException(
+                "At least one sample is required.",
+                nameof(values));
+        }
+
+        if (requireFinitePositive &&
+            sorted.Any(static value => !double.IsFinite(value) || value <= 0))
+        {
+            throw new ArgumentException(
+                "Every sample must be finite and positive.",
+                nameof(values));
+        }
+
         var index = Math.Clamp(
             (int)Math.Ceiling(rank * sorted.Length) - 1,
             0,

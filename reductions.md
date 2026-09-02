@@ -3580,7 +3580,10 @@ R565 is a pending reduction candidate. Its payoff is small for the current sampl
 
 ### Status (part one hundred seven)
 
-R566 is a pending reduction candidate. The two call sites currently use the same 95th-percentile rule, so the duplicated algorithm is maintenance surface even though the sampled arrays are small.
+R566 is applied: `PerformanceGate` now delegates nearest-rank selection to
+`PackageBuildEstimator` with validation disabled, while package-build statistics
+retain their finite-positive sample checks. The shared implementation preserves
+the existing empty-input and rank-clamping behavior.
 
 ## Second survey, part one hundred eight: R567 - duplicate mutation-ledger comparison
 
@@ -3905,3 +3908,11 @@ R604 is a pending package-test maintenance candidate. Preserve XML escaping and 
 ### Status (part one hundred forty-six)
 
 R605 is a pending package-test infrastructure reduction candidate. Preserve all three platform checks, the environment marker, and the Worker MSBuild suite's post-guard contract validation; share only the common admission logic and message.
+
+## Second survey, part one hundred forty-seven: R606 - repeated schema-file loader
+
+| R606 | **Three schema-conformance suites duplicate the same schema-file loader.** `IrModelSchemaTests.ReadSchema`, `ProtocolModelSchemaTests.ReadSchema`, and `CompilerArtifactModelSchemaTests.ReadSchema` all resolve `TestRepository.FindRoot()`, combine it with a project directory and schema filename, read the entire UTF-8 text file, and parse it into a `JsonDocument`; only the project/schema path pair differs. A parameterized test utility can centralize the path and parse boilerplate while keeping each suite's schema-specific assertions and disposal boundary unchanged. | `SharpProof.Ir.Test/IrModelSchemaTests.cs:472-478`; `SharpProof.Worker.Test/ProtocolModelSchemaTests.cs:645-651`; `SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs:924-930` |
+
+### Status (part one hundred forty-seven)
+
+R606 is a pending cross-assembly test utility reduction candidate. Preserve each schema's explicit project/file identity and the existing `JsonDocument` disposal at every call site; share only root resolution, path composition, file loading, and parsing.
