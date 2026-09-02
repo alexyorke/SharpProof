@@ -17,8 +17,8 @@ public sealed class LinuxPublicationSetTests
         bool descendantFirst,
         bool threeLevels)
     {
-        using var directory = TemporaryDirectory.Create();
-        var parent = Path.Combine(directory.Path, "result.json");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var parent = Path.Combine(directory.FullName, "result.json");
         var descendant = threeLevels
             ? Path.Combine(parent, "middle", "child.json")
             : Path.Combine(parent, "child.json");
@@ -38,7 +38,7 @@ public sealed class LinuxPublicationSetTests
             Assert.That(error!.Message, Does.Contain("ancestor"));
             Assert.That(
                 Directory.EnumerateFileSystemEntries(
-                    directory.Path,
+                    directory.FullName,
                     "*",
                     SearchOption.AllDirectories),
                 Is.Empty);
@@ -48,9 +48,9 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void DuplicatePublicationPathsFailBeforeAnyFilesystemMutation()
     {
-        using var directory = TemporaryDirectory.Create();
-        var output = Path.Combine(directory.Path, "result.json");
-        var alias = Path.Combine(directory.Path, ".", "result.json");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var output = Path.Combine(directory.FullName, "result.json");
+        var alias = Path.Combine(directory.FullName, ".", "result.json");
 
         var error = Assert.Throws<ArgumentException>((Action)(() =>
         {
@@ -64,7 +64,7 @@ public sealed class LinuxPublicationSetTests
             Assert.That(error!.Message, Does.Contain("duplicate"));
             Assert.That(
                 Directory.EnumerateFileSystemEntries(
-                    directory.Path,
+                    directory.FullName,
                     "*",
                     SearchOption.AllDirectories),
                 Is.Empty);
@@ -74,9 +74,9 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void NestedSetPreservesAPreExistingParentDirectoryWithoutMetadata()
     {
-        using var directory = TemporaryDirectory.Create();
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
         var parent = Directory.CreateDirectory(
-            Path.Combine(directory.Path, "result.json")).FullName;
+            Path.Combine(directory.FullName, "result.json")).FullName;
         var child = Path.Combine(parent, "child.json");
 
         Assert.Throws<ArgumentException>((Action)(() =>
@@ -93,7 +93,7 @@ public sealed class LinuxPublicationSetTests
                 Directory.EnumerateFileSystemEntries(parent),
                 Is.Empty);
             Assert.That(
-                Directory.EnumerateFileSystemEntries(directory.Path),
+            Directory.EnumerateFileSystemEntries(directory.FullName),
                 Is.EqualTo(new[] { parent }));
         }
     }
@@ -101,11 +101,11 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void DisjointPublicationPathsUnderExistingParentsRemainRetryable()
     {
-        using var directory = TemporaryDirectory.Create();
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
         var firstParent = Directory.CreateDirectory(
-            Path.Combine(directory.Path, "first-parent")).FullName;
+            Path.Combine(directory.FullName, "first-parent")).FullName;
         var secondParent = Directory.CreateDirectory(
-            Path.Combine(directory.Path, "second-parent", "nested")).FullName;
+            Path.Combine(directory.FullName, "second-parent", "nested")).FullName;
         var paths = new[]
         {
             Path.Combine(firstParent, "result.json"),
@@ -137,7 +137,7 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void InvalidAndNonRegularPublicationPathsFailClosed()
     {
-        using var directory = TemporaryDirectory.Create();
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
         Assert.Throws<ArgumentException>((Action)(() =>
             LinuxPathIdentity.Canonicalize(" ")));
         Assert.Throws<ArgumentException>((Action)(() =>
@@ -147,7 +147,7 @@ public sealed class LinuxPublicationSetTests
                 TimeSpan.FromSeconds(1));
         }));
 
-        var missing = Path.Combine(directory.Path, "missing.json");
+        var missing = Path.Combine(directory.FullName, "missing.json");
         Assert.That(
             LinuxPathIdentity.DeleteIfUnprotected(
                 missing,
@@ -155,7 +155,7 @@ public sealed class LinuxPublicationSetTests
             Is.False);
 
         var outputDirectory = Directory.CreateDirectory(
-            Path.Combine(directory.Path, "directory-output")).FullName;
+            Path.Combine(directory.FullName, "directory-output")).FullName;
         Assert.Throws<InvalidOperationException>((Action)(() =>
             LinuxPathIdentity.DeleteIfUnprotected(
                 outputDirectory,
@@ -165,8 +165,8 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void ResetPublicationSetRemovesOwnedMembersAndMarkers()
     {
-        using var directory = TemporaryDirectory.Create();
-        var paths = CreatePaths(directory.Path, "reset-sync");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var paths = CreatePaths(directory.FullName, "reset-sync");
         using (LinuxPathIdentity.AcquirePublicationSet(
                    paths, TimeSpan.FromSeconds(1)))
         {
@@ -181,8 +181,8 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void SameSetInDifferentOrdersSerializesWithoutDeadlock()
     {
-        using var directory = TemporaryDirectory.Create();
-        var paths = CreatePaths(directory.Path, "shared");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var paths = CreatePaths(directory.FullName, "shared");
         using var start = new Barrier(2);
         var entered = 0;
 
@@ -214,9 +214,9 @@ public sealed class LinuxPublicationSetTests
     [TestCase(3)]
     public void OverlapOnAnyPublicationMemberBlocks(int sharedIndex)
     {
-        using var directory = TemporaryDirectory.Create();
-        var firstPaths = CreatePaths(directory.Path, "first");
-        var secondPaths = CreatePaths(directory.Path, "second");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var firstPaths = CreatePaths(directory.FullName, "first");
+        var secondPaths = CreatePaths(directory.FullName, "second");
         secondPaths[sharedIndex] = firstPaths[sharedIndex];
 
         using var first = LinuxPathIdentity.AcquirePublicationSet(
@@ -237,11 +237,11 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void TimeoutReleasesLocksAcquiredEarlierInTheSet()
     {
-        using var directory = TemporaryDirectory.Create();
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
         var ordered = new[]
         {
-            Path.Combine(directory.Path, "first.json"),
-            Path.Combine(directory.Path, "second.json")
+            Path.Combine(directory.FullName, "first.json"),
+            Path.Combine(directory.FullName, "second.json")
         }.OrderBy(LinuxPathIdentity.PublicationLockName, StringComparer.Ordinal)
             .ToArray();
         using var blocked = LinuxPathIdentity.AcquirePublicationSet(
@@ -270,9 +270,9 @@ public sealed class LinuxPublicationSetTests
         {
             return;
         }
-        using var directory = TemporaryDirectory.Create();
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
         var ordered = Enumerable.Range(0, 3)
-            .Select(index => Path.Combine(directory.Path, $"output-{index}.json"))
+            .Select(index => Path.Combine(directory.FullName, $"output-{index}.json"))
             .OrderBy(LinuxPathIdentity.PublicationLockName, StringComparer.Ordinal)
             .ToArray();
         var lockPaths = ordered.Select(LinuxPathIdentity.PublicationLockName)
@@ -329,8 +329,8 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void PreCanceledAcquisitionPerformsNoPathIo()
     {
-        using var directory = TemporaryDirectory.Create();
-        var path = Path.Combine(directory.Path, "canceled.json");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var path = Path.Combine(directory.FullName, "canceled.json");
         var metadataDirectory = Path.GetDirectoryName(
             LinuxPathIdentity.PublicationLockName(path))!;
         using var cancellation = new CancellationTokenSource();
@@ -350,11 +350,11 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void MidAcquisitionCancellationReleasesEarlierLocks()
     {
-        using var directory = TemporaryDirectory.Create();
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
         var ordered = new[]
         {
-            Path.Combine(directory.Path, "first-canceled.json"),
-            Path.Combine(directory.Path, "second-canceled.json")
+            Path.Combine(directory.FullName, "first-canceled.json"),
+            Path.Combine(directory.FullName, "second-canceled.json")
         }.OrderBy(LinuxPathIdentity.PublicationLockName, StringComparer.Ordinal)
             .ToArray();
         using var blocked = LinuxPathIdentity.AcquirePublicationSet(
@@ -378,14 +378,14 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void PersistentMetadataRejectsSequentialPartialOverlap()
     {
-        using var directory = TemporaryDirectory.Create();
-        var firstPaths = CreatePaths(directory.Path, "first");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var firstPaths = CreatePaths(directory.FullName, "first");
         using (LinuxPathIdentity.AcquirePublicationSet(
                    firstPaths,
                    TimeSpan.FromSeconds(1)))
         {
         }
-        var secondPaths = CreatePaths(directory.Path, "second");
+        var secondPaths = CreatePaths(directory.FullName, "second");
         secondPaths[0] = firstPaths[0];
 
         var error = Assert.Throws<IOException>((Action)(() =>
@@ -401,9 +401,9 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void NewlineDelimitedSetCollisionIsRejectedAsPartialOverlap()
     {
-        using var directory = TemporaryDirectory.Create();
-        var prefix = directory.Path + Path.DirectorySeparatorChar;
-        var shared = Path.Combine(directory.Path, "z-shared.json");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var prefix = directory.FullName + Path.DirectorySeparatorChar;
+        var shared = Path.Combine(directory.FullName, "z-shared.json");
         var first = new[]
         {
             prefix + "a",
@@ -486,8 +486,8 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void PublicationMetadataNamespaceIsReserved()
     {
-        using var directory = TemporaryDirectory.Create();
-        var result = Path.Combine(directory.Path, "result.json");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var result = Path.Combine(directory.FullName, "result.json");
         var marker = LinuxPathIdentity.PublicationMarkerPath(result);
 
         var aliasError = Assert.Throws<ArgumentException>((Action)(() =>
@@ -500,7 +500,7 @@ public sealed class LinuxPublicationSetTests
         {
             using var publication = LinuxPathIdentity.AcquirePublicationSet(
                 [Path.Combine(
-                    directory.Path,
+                    directory.FullName,
                     "foreign.sharpproof-publication-lock")],
                 TimeSpan.FromSeconds(1));
         }));
@@ -508,7 +508,7 @@ public sealed class LinuxPublicationSetTests
         {
             using var publication = LinuxPathIdentity.AcquirePublicationSet(
                 [Path.Combine(
-                    directory.Path,
+                    directory.FullName,
                     ".sharpproof-publication",
                     "foreign.json")],
                 TimeSpan.FromSeconds(1));
@@ -526,8 +526,8 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void ExistingUnownedDestinationCannotBeAdopted()
     {
-        using var directory = TemporaryDirectory.Create();
-        var result = Path.Combine(directory.Path, "result.json");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var result = Path.Combine(directory.FullName, "result.json");
         const string sentinel = "user-owned source bytes";
         File.WriteAllText(result, sentinel);
 
@@ -551,8 +551,8 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void OwnershipMarkerSymlinkIsRejectedWithoutModifyingItsTarget()
     {
-        using var directory = TemporaryDirectory.Create();
-        var result = Path.Combine(directory.Path, "result.json");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var result = Path.Combine(directory.FullName, "result.json");
         using (LinuxPathIdentity.AcquirePublicationSet(
                    [result],
                    TimeSpan.FromSeconds(1)))
@@ -560,7 +560,7 @@ public sealed class LinuxPublicationSetTests
         }
 
         var marker = LinuxPathIdentity.PublicationMarkerPath(result);
-        var target = Path.Combine(directory.Path, "user-owned-marker.txt");
+        var target = Path.Combine(directory.FullName, "user-owned-marker.txt");
         File.Move(marker, target);
         var expected = File.ReadAllBytes(target);
         File.CreateSymbolicLink(marker, target);
@@ -584,14 +584,14 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void RejectedPartialOverlapLeavesNoNewOwnershipMarkers()
     {
-        using var directory = TemporaryDirectory.Create();
-        var shared = Path.Combine(directory.Path, "z-shared.json");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var shared = Path.Combine(directory.FullName, "z-shared.json");
         using (LinuxPathIdentity.AcquirePublicationSet(
-                   [shared, Path.Combine(directory.Path, "z-first.json")],
+                   [shared, Path.Combine(directory.FullName, "z-first.json")],
                    TimeSpan.FromSeconds(1)))
         {
         }
-        var disjoint = Path.Combine(directory.Path, "a-disjoint.json");
+        var disjoint = Path.Combine(directory.FullName, "a-disjoint.json");
 
         Assert.Throws<IOException>((Action)(() =>
         {
@@ -608,12 +608,12 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void SymbolicLinksAndNonDirectoryAncestorsAreRejected()
     {
-        using var directory = TemporaryDirectory.Create();
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
         var real = Directory.CreateDirectory(
-            Path.Combine(directory.Path, "real")).FullName;
-        var link = Path.Combine(directory.Path, "link");
+            Path.Combine(directory.FullName, "real")).FullName;
+        var link = Path.Combine(directory.FullName, "link");
         Directory.CreateSymbolicLink(link, real);
-        var file = Path.Combine(directory.Path, "file.txt");
+        var file = Path.Combine(directory.FullName, "file.txt");
         File.WriteAllText(file, "not a directory");
 
         var linkError = Assert.Throws<ArgumentException>((Action)(() =>
@@ -633,8 +633,8 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void LocalPathsSupportSpacesPercentUnicodeAndLongNames()
     {
-        using var directory = TemporaryDirectory.Create();
-        var current = Path.Combine(directory.Path, "space % 雪");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var current = Path.Combine(directory.FullName, "space % 雪");
         Directory.CreateDirectory(current);
         while (current.Length <= 300)
         {
@@ -665,10 +665,10 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void PublicationMetadataSupportsNameMaxBoundaryForEveryMember()
     {
-        using var directory = TemporaryDirectory.Create();
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
         var paths = Enumerable.Range(0, 4)
             .Select(index => Path.Combine(
-                directory.Path,
+                directory.FullName,
                 new string((char)('a' + index), 250) + ".json"))
             .ToArray();
         foreach (var path in paths)
@@ -697,15 +697,15 @@ public sealed class LinuxPublicationSetTests
         {
             return;
         }
-        using var directory = TemporaryDirectory.Create();
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
         var first = Path.Combine(
-            directory.Path,
+            directory.FullName,
             new string('\u96ea', 80) + "-first.json");
         var second = Path.Combine(
-            directory.Path,
+            directory.FullName,
             new string('\u96ea', 80) + "-second.json");
         var sibling = Directory.CreateDirectory(
-            Path.Combine(directory.Path, "sibling")).FullName;
+            Path.Combine(directory.FullName, "sibling")).FullName;
         var sameBasename = Path.Combine(sibling, Path.GetFileName(first));
         foreach (var path in new[] { first, second })
         {
@@ -753,8 +753,8 @@ public sealed class LinuxPublicationSetTests
         {
             return;
         }
-        using var directory = TemporaryDirectory.Create();
-        var result = Path.Combine(directory.Path, "result.json");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var result = Path.Combine(directory.FullName, "result.json");
         var metadataDirectory = Path.GetDirectoryName(
             LinuxPathIdentity.PublicationLockName(result))!;
         Directory.CreateDirectory(metadataDirectory);
@@ -785,9 +785,9 @@ public sealed class LinuxPublicationSetTests
     [Test]
     public void InvalidationPreservesProtectedFileIdentity()
     {
-        using var directory = TemporaryDirectory.Create();
-        var protectedPath = Path.Combine(directory.Path, "protected.json");
-        var alias = Path.Combine(directory.Path, "alias.json");
+        using var directory = new TempDirectory("SharpProof.PublicationSet.");
+        var protectedPath = Path.Combine(directory.FullName, "protected.json");
+        var alias = Path.Combine(directory.FullName, "alias.json");
         File.WriteAllText(protectedPath, "stable");
         var linkStart = new ProcessStartInfo
         {
@@ -825,27 +825,4 @@ public sealed class LinuxPublicationSetTests
         ];
     }
 
-    private sealed class TemporaryDirectory : IDisposable
-    {
-        private TemporaryDirectory(string path)
-        {
-            Path = path;
-        }
-
-        internal string Path { get; }
-
-        internal static TemporaryDirectory Create()
-        {
-            var path = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "SharpProof.PublicationSet." + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(path);
-            return new TemporaryDirectory(path);
-        }
-
-        public void Dispose()
-        {
-            Directory.Delete(Path, recursive: true);
-        }
-    }
 }
