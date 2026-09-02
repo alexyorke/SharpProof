@@ -75,29 +75,14 @@ $packageProductBuild = $packageProductBuildCommands.Count -eq 1
 $timings = [Collections.Generic.List[object]]::new()
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 
-function Invoke-TimedPhase {
-    param(
-        [Parameter(Mandatory = $true)][string]$Name,
-        [Parameter(Mandatory = $true)][scriptblock]$Action
-    )
-
-    $timer = [Diagnostics.Stopwatch]::StartNew()
-    & $Action
-    $timer.Stop()
-    $timings.Add([pscustomobject]@{
-        name = $Name
-        elapsedMilliseconds = [long]$timer.Elapsed.TotalMilliseconds
-    })
-}
-
-Invoke-TimedPhase -Name 'restore' -Action {
+Invoke-SharpProofTimedPhase -Name 'restore' -Timings $timings -Action {
     & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
         restore SharpProof.sln --locked-mode /nodeReuse:false
     if ($LASTEXITCODE -ne 0) {
         throw 'Developer-check restore failed.'
     }
 }
-Invoke-TimedPhase -Name 'build' -Action {
+Invoke-SharpProofTimedPhase -Name 'build' -Timings $timings -Action {
     $builds = [Collections.Generic.List[object]]::new()
     $builds.Add([pscustomobject]@{
         Name = 'solution-' +
@@ -124,13 +109,13 @@ Invoke-TimedPhase -Name 'build' -Action {
         -Parallelism $buildParallelism `
         -TimeoutSeconds $TimeoutSeconds
 }
-Invoke-TimedPhase -Name 'semantic-tests' -Action {
+Invoke-SharpProofTimedPhase -Name 'semantic-tests' -Timings $timings -Action {
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofSemanticTests.ps1') `
         -Configuration ([string]$semanticTestsCommand.configuration) `
         -NoBuild:([bool]$semanticTestsCommand.noBuild) `
         -TimeoutSeconds $TimeoutSeconds
 }
-Invoke-TimedPhase -Name 'package-tests' -Action {
+Invoke-SharpProofTimedPhase -Name 'package-tests' -Timings $timings -Action {
     $packageArguments = @{
         Configuration = $Configuration
         TimeoutSeconds = $TimeoutSeconds
@@ -142,7 +127,7 @@ Invoke-TimedPhase -Name 'package-tests' -Action {
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
         @packageArguments
 }
-Invoke-TimedPhase -Name 'performance-smoke' -Action {
+Invoke-SharpProofTimedPhase -Name 'performance-smoke' -Timings $timings -Action {
     & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
         run --project SharpProof.Gates/SharpProof.Gates.csproj `
         -c ([string]$performanceSmokeCommand.configuration) `

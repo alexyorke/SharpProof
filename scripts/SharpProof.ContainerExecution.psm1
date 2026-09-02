@@ -92,6 +92,38 @@ function Invoke-SharpProofCheckedCommand {
     }
 }
 
+function Invoke-SharpProofTimedPhase {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Action,
+
+        [Parameter(Mandatory = $true)]
+        [Collections.IList]$Timings,
+
+        [switch]$RecordOnFailure
+    )
+
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    $completed = $false
+    try {
+        & $Action
+        $completed = $true
+    }
+    finally {
+        $timer.Stop()
+        if ($completed -or $RecordOnFailure) {
+            $Timings.Add([pscustomobject]@{
+                name = $Name
+                elapsedMilliseconds = [long]$timer.Elapsed.TotalMilliseconds
+            })
+        }
+    }
+}
+
 function Add-SharpProofStaticGraphArgument {
     [CmdletBinding()]
     param(
@@ -704,6 +736,7 @@ Export-ModuleMember -Function @(
     'Get-SharpProofTestAssemblyPath',
     'Get-SharpProofDotnetWrapperPath',
     'Invoke-SharpProofCheckedCommand',
+    'Invoke-SharpProofTimedPhase',
     'Invoke-SharpProofParallelDotnetBuilds',
     'New-SharpProofParallelProcessStartInfo',
     'New-SharpProofCoverageContext',

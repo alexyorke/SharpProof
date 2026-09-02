@@ -225,24 +225,6 @@ if ([string]::IsNullOrWhiteSpace($PackageSource)) {
 [IO.Directory]::CreateDirectory($results) | Out-Null
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 $phaseTimings = [Collections.Generic.List[object]]::new()
-function Invoke-TimedPhase {
-    param(
-        [Parameter(Mandatory = $true)][string]$Name,
-        [Parameter(Mandatory = $true)][scriptblock]$Action
-    )
-
-    $timer = [Diagnostics.Stopwatch]::StartNew()
-    try {
-        & $Action
-    }
-    finally {
-        $timer.Stop()
-        $phaseTimings.Add([pscustomobject]@{
-            name = $Name
-            elapsedMilliseconds = [long]$timer.Elapsed.TotalMilliseconds
-        })
-    }
-}
 $timingDirectory = Join-Path $repositoryRoot 'artifacts/timings'
 [IO.Directory]::CreateDirectory($timingDirectory) | Out-Null
 $timingStem = 'package-tests-' + $Configuration.ToLowerInvariant()
@@ -318,7 +300,8 @@ foreach ($priorTimingPath in $(if ($Fast) {
 
 try {
     if (-not $NoBuild) {
-        Invoke-TimedPhase -Name 'restore' -Action {
+        Invoke-SharpProofTimedPhase -Name 'restore' `
+            -Timings $phaseTimings -RecordOnFailure -Action {
             Invoke-SharpProofRequiredDotnet `
                 -Arguments @(
                     'restore', 'SharpProof.sln', '--locked-mode',
@@ -358,7 +341,8 @@ try {
         })
     }
     if ($builds.Count -gt 0) {
-        Invoke-TimedPhase -Name 'build-prerequisites' -Action {
+        Invoke-SharpProofTimedPhase -Name 'build-prerequisites' `
+            -Timings $phaseTimings -RecordOnFailure -Action {
             Invoke-RequiredBuilds -Builds @($builds)
         }
     }
@@ -367,7 +351,8 @@ try {
         $packageManifest = Get-Content -LiteralPath (Join-Path `
             $repositoryRoot 'scripts/package-projects.json') -Raw |
             ConvertFrom-Json
-        Invoke-TimedPhase -Name 'pack' -Action {
+        Invoke-SharpProofTimedPhase -Name 'pack' `
+            -Timings $phaseTimings -RecordOnFailure -Action {
             foreach ($project in @($packageManifest.projects)) {
                 Invoke-SharpProofRequiredDotnet `
                     -Arguments @(
