@@ -6142,3 +6142,24 @@ Architecture test passed.
 
 R795 is `pending` and limited to temporary Git setup in PowerShell fixtures.
 No implementation or build file was changed.
+
+## Second survey, part three hundred seven: R796 - repeated PE module identity extraction
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R796 | **The standalone gate-evidence path and production inventory independently decode a PE module MVID.** `SharpProof.PEMetadata.Get-SharpProofModuleVersionId` opens a file, creates a `PEReader`, obtains a metadata reader, reads `GetModuleDefinition().Mvid`, formats the GUID, and disposes the reader/stream. `Get-SharpProofProductionInventory.Get-PortablePdbModule` repeats the PE/metadata setup and the same module-definition/MVID projection before continuing into its richer assembly, CodeView, PDB, and source-document inventory. A shared metadata-to-MVID projection, or a small reader-result abstraction that lets both callers reuse the already-open metadata reader, would remove the repeated identity extraction without making standalone gate evidence depend on the inventory path. This is narrower than R783: that finding covers the broader portable-PDB/CodeView reader lifecycle, while this one isolates the module identity projection that remains duplicated even when the surrounding inventories stay separate. | `scripts/SharpProof.PEMetadata.psm1:4-29`; `scripts/Get-SharpProofProductionInventory.ps1:221-240,295-299`; `scripts/Invoke-SharpProofGateEvidence.ps1:21,58` |
+
+### Checked and not proposed (part three hundred seven)
+
+- The standalone helper must keep its independent file validation and disposal
+  behavior; the inventory must retain its assembly, CodeView, PDB, and source
+  authority checks.
+- The reduction target is the common MVID decoding seam, not merging the two
+  callers or reopening an assembly through the standalone helper.
+- The current MVID output is not alleged to be incorrect; the concern is that
+  two identity authorities can drift in reader setup or GUID formatting.
+
+### Status (part three hundred seven)
+
+R796 is `pending` and limited to PE metadata/MVID projection reuse.
+No implementation or build file was changed.
