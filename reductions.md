@@ -4362,3 +4362,25 @@ R712 is a pending delegate-stability predicate reduction candidate. Preserve sam
 | R713 | **`RequiresCallSiteDiscovery.GetListPatternCalls` scans the same pattern list three times before its main loop.** `Count` computes non-slice items, `Any` detects a slice, and a separate indexed loop finds `sliceIndex`; the subsequent loop then traverses all patterns again to emit calls. Fuse the count/flag/index preparation into one indexed pass, retaining the known-length short-circuits, slice index arithmetic, and emitted-call order. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1421-1455` |
 
 R713 is a pending list-pattern preparation reduction candidate. Preserve empty/sliced pattern behavior, known-length rejection, and the distinction between indexer and slice members.
+
+### Status (part two hundred forty-four)
+
+| R714 | **`RequiresCallSiteTreeAnalyzer.IsNonExecutingObservation` resolves the same framework symbol for every local reference.** Each call performs `Compilation.GetTypeByMetadataName("System.Delegate")` before walking the reference's operation ancestors, although the symbol is invariant for the containing compilation and `TreeAnalysis`. Cache the nullable delegate symbol once per analysis (while retaining the existing null fallback and the shared metadata-name authority concern recorded elsewhere) so repeated observations do not repeat compilation lookup. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1276-1338` |
+
+R714 is a pending analyzer framework-symbol lookup reduction candidate. Preserve the null-compilation-symbol behavior, delegate property identity checks, and all ancestor-based non-execution rules.
+
+| R715 | **`TreeAnalysis.GetPatternDestinations` performs a linear duplicate search for every declared pattern local.** The pending pattern walk calls `result.Any` with `SymbolEqualityComparer.Default` before each append, producing quadratic work as a pattern tree declares more locals. Keep the ordered result list but pair it with a symbol-equality `HashSet` so membership and insertion remain separate without changing traversal order or duplicate suppression. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1341-1448` |
+
+R715 is a pending pattern-destination deduplication reduction candidate. Preserve symbol equality, depth-first pending-stack order, tuple-path propagation, and one result per local.
+
+| R716 | **`TreeAnalysis.GetReachableLocalFunctions` rescans the complete reachable set after each child graph.** It records only `reachable.Count` before `TryCollectLocalReferences`, but when the count changes it iterates every reachable local and may enqueue all currently unscanned methods again; repeated child discoveries therefore create duplicate queue entries and repeated set scans. Track the newly added locals (or maintain a pending/enqueued set) while preserving the current breadth-first discovery and conservative fallback behavior. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:381-441` |
+
+R716 is a pending local-function reachability queue reduction candidate. Preserve cycle termination, discovery order where observable, CFG-failure fallback to all candidates, and the existing anonymous-function recursion.
+
+| R717 | **`TreeAnalysis.CanReachConsumption` computes each local-reference ordering key twice.** The reference sequence is sorted with `OrderBy(GetReferenceOrder)`, then the loop immediately calls `GetReferenceOrder(reference)` again before applying the `after` boundary. Project each reference with its order once, sort the pair, and consume the cached key while keeping the assignment-end ordering rule unchanged. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:682-704,1234-1242` |
+
+R717 is a pending CFG-reference ordering reduction candidate. Preserve assignment-span ordering, declaration filtering, and the fail-closed treatment of references in every block.
+
+| R718 | **`BlockMayThrowBeforeAssignmentCommit` rescans the entire CFG for each qualifying assignment reference.** Once a tracked value is killed, the helper walks the reference's ancestors to find the owning simple assignment and then scans every block and descendant operation bounded by the same `after`/commit span; multiple qualifying references or repeated paths can repeat that full graph walk. Cache the bounded throw result by graph/assignment interval (or pre-index throwing operations) while retaining the current span bounds and `RoslynCfgThrowFacts` predicate. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1202-1232` |
+
+R718 is a pending assignment-commit exception-scan reduction candidate. Preserve multi-block RHS coverage, exceptional-successor semantics, and the current conservative result when no owning assignment is found.
