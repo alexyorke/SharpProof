@@ -243,6 +243,7 @@ the smallest relevant containerized test target passes.
 | R528 | Share the generated allocation-uncertainty marker predicate | `SharpProof.Effects.Test`: 323 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
+| R792 | Reuse the shared C# string encoder in the API-spec runtime-witness generator | Generator `-Verify`; `SharpProof.Specs.Test`: 12 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -6073,8 +6074,8 @@ implementation or build file was changed.
 
 ### Status (part three hundred three)
 
-R792 is `pending` and limited to the API-spec runtime-witness generator's
-string-encoding helper. No implementation or build file was changed.
+R792 is `applied`: the generator now uses the shared string-encoding helper.
+Generator verification and the focused Specs tests passed.
 
 ## Second survey, part three hundred four: R793 - divergent Git text wrappers
 
