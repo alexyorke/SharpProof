@@ -559,40 +559,6 @@ function Format-TermDocumentation {
     }
 }
 
-function Assert-ExactGeneratedFile {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Content,
-
-        [Parameter(Mandatory = $true)]
-        [string]$DisplayPath
-    )
-
-    $candidate = if ($Path.EndsWith(
-            '.cs',
-            [StringComparison]::OrdinalIgnoreCase)) {
-        Format-SharpProofGeneratedCSharp `
-            -Content $Content `
-            -DisplayPath $DisplayPath
-    }
-    else {
-        $Content
-    }
-    $normalized = ConvertTo-SharpProofGeneratedText -Text $candidate
-    $encoding = [Text.UTF8Encoding]::new($false)
-    $expected = $encoding.GetBytes($normalized)
-    $actual = [IO.File]::ReadAllBytes($Path)
-    if ([Convert]::ToBase64String($actual) -ne
-        [Convert]::ToBase64String($expected)) {
-        throw (
-            "$DisplayPath must use deterministic LF line endings and UTF-8 " +
-            'without a byte-order mark.')
-    }
-}
-
 $catalogText = [IO.File]::ReadAllText($CatalogPath)
 $catalog = $catalogText | ConvertFrom-Json -Depth 100
 $schemaVersion = Assert-JsonInt32 `
@@ -1255,14 +1221,6 @@ Update-SharpProofGeneratedFile `
     -DisplayPath $DocumentationOutputPath `
     -GeneratorCommand $generatorCommand `
     -Verify:$Verify
-Assert-ExactGeneratedFile `
-    -Path $SourceOutputPath `
-    -Content $sourceText `
-    -DisplayPath $SourceOutputPath
-Assert-ExactGeneratedFile `
-    -Path $DocumentationOutputPath `
-    -Content $documentationText `
-    -DisplayPath $DocumentationOutputPath
 
 & (Join-Path $repositoryRoot 'SharpProof.Specs.Test\Generate-ApiSpecRuntimeWitnesses.ps1') `
     -CatalogPath $CatalogPath `

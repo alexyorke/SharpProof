@@ -151,6 +151,7 @@ the smallest relevant containerized test target passes.
 | R837 | Reuse the manifest claim-owner index for unknown-coverage validation | `SharpProof.Worker.Test`: ProtocolJsonTests 108 passed |
 | R842 | Use a set for pilot-review expected identities that are only membership-tested | `SharpProof.ArchitectureTest`: PilotAuthorityTests passed |
 | R843 | Hoist scalar-catalog key sorting out of per-row validation loops | generator `-Verify` checks passed |
+| R844 | Reuse shared generated-file exact-byte verification in the API-spec generator | generator `-Verify` checks passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7286,8 +7287,8 @@ R843 is `applied`: each scalar catalog's keys are sorted once before its
 
 ### Status (part three hundred fifty-five)
 
-R844 is `deferred`: verification mode has an unambiguous duplicate comparison,
-  while generation mode may be using the private check as a post-write defense.
+R844 is `applied`: the API-spec generator now relies on the shared generated-file
+  helper for exact normalized-byte verification in both verify and write modes.
 
 ## Second survey, part three hundred fifty-six: R845 - duplicate API-spec term recursion for code and documentation
 
@@ -7309,3 +7310,43 @@ R844 is `deferred`: verification mode has an unambiguous duplicate comparison,
 
 R845 is `deferred`: the walkers are small and intentionally render different
   formats, but their duplicated term-kind coverage is a maintenance drift risk.
+
+## Second survey, part three hundred fifty-seven: R846 - repeated fuzz coverage property reads
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R846 | **`Assert-SharpProofFuzzRunnerResult.ps1` reads five coverage counters twice.** The loop over `coverageProperties` calls `Get-ExactJsonInt32` for every frontend-coverage field and keeps only the temporary `$count` for its nonnegative/nonzero check. The subsequent `$exceptionTotal` calculation calls the same accessor again for `DivideByZeroExceptions`, `OverflowExceptions`, `NullReferenceExceptions`, `IndexOutOfRangeExceptions`, and `InvalidCastExceptions`. Caching the validated counts, or retaining just the five values needed for the aggregate, removes repeated JSON property lookup and integer conversion without changing the individual coverage checks or aggregate limit. | `scripts/Assert-SharpProofFuzzRunnerResult.ps1:141-165` |
+
+### Checked and not proposed (part three hundred fifty-seven)
+
+- All named coverage fields must still be validated, including fields that do
+  not contribute to the exception aggregate.
+- The aggregate exception bound remains a distinct invariant and should not be
+  inferred from the agreement counts.
+- The JSON shape, strict integer-token checks, and expected invocation identity
+  remain independent validation responsibilities.
+
+### Status (part three hundred fifty-seven)
+
+R846 is `deferred`: the repeated reads are bounded by a small coverage object,
+  but the validated values can be retained locally with no policy change.
+
+## Second survey, part three hundred fifty-eight: R847 - repeated documentation mutation fixture literal
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R847 | **`Test-SharpProofDocumentationSupportFixtures.ps1` repeats one canonical documentation sentence across six mutation branches.** The CPU, memory, missing-claim, duplicate-claim, case, and spacing mutations each embed the same `Containers use all CPUs available to Docker and up to 40960 MiB by default.` text for replacement or insertion. A single fixture constant can own that baseline sentence while each mutation continues to alter the intended dimension, reducing literal drift when the documented resource claim changes. | `scripts/Test-SharpProofDocumentationSupportFixtures.ps1:89-126` |
+
+### Checked and not proposed (part three hundred fifty-eight)
+
+- The mutations remain separate because they test different failure modes:
+  changed value, omission, duplication, case, and whitespace.
+- The source document remains the authority; a fixture constant should mirror
+  its expected canonical sentence rather than generate or rewrite documentation.
+- Other mutation-specific text, such as the stale support and diagnostic
+  examples, is intentionally distinct and is not folded into this candidate.
+
+### Status (part three hundred fifty-eight)
+
+R847 is `deferred`: the repeated literal is easy to centralize, but fixture
+  data can be intentionally explicit when each mutation is reviewed in place.
