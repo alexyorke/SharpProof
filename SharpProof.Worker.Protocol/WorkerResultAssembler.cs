@@ -11,6 +11,7 @@ internal static class WorkerResultAssembler
     {
         var callables = callableResults.ToArray();
         var claims = claimResults.ToArray();
+        var summary = Summarize(callables, claims);
         var response = new WorkerVerifyResponse
         {
             RequestHash = requestHash ?? EmptyInputHash,
@@ -24,11 +25,9 @@ internal static class WorkerResultAssembler
             {
                 CallableCount = callables.Length,
                 ClaimCount = claims.Length,
-                OutcomeCounts = [.. claims.GroupBy(static claim => claim.Outcome)
-                    .Select(static group => new WorkerClaimOutcomeCount { Outcome = group.Key, Count = group.Count() })],
-                ReasonCounts = [.. claims.GroupBy(static claim => claim.Reason)
-                    .Select(static group => new WorkerClaimReasonCount { Reason = group.Key, Count = group.Count() })],
-                Assumptions = SummarizeAssumptions(callables, claims, out _),
+                OutcomeCounts = summary.OutcomeCounts,
+                ReasonCounts = summary.ReasonCounts,
+                Assumptions = summary.Assumptions,
                 CacheHit = cacheStatus == WorkerCacheStatus.Hit,
                 CacheStatus = cacheStatus,
                 Versions = versions ?? new WorkerVersionSummary { WorkerVersion = "unavailable", ApiSpecVersion = "unavailable" },
@@ -108,18 +107,117 @@ internal static class WorkerResultAssembler
     internal static WorkerAssumptionSummary SummarizeAssumptions(WorkerCallableResult[] callables, WorkerClaimResult[] claims,
         out bool conflictingKinds)
     {
-        var assumptions = callables.SelectMany(static callable => callable.Assumptions ?? [])
-            .Concat(claims.SelectMany(static claim => claim.Assumptions ?? []))
-            .Where(static value => value != null && !string.IsNullOrWhiteSpace(value.Id))
-            .GroupBy(static value => value.Id, StringComparer.Ordinal).ToArray();
-        conflictingKinds = assumptions.Any(static group => group.Select(static value => value.Kind).Distinct().Count() != 1);
-        return new WorkerAssumptionSummary
+        var summary = Summarize(callables, claims);
+        conflictingKinds = summary.ConflictingAssumptionKinds;
+        return summary.Assumptions;
+    }
+
+    private static SummarySnapshot Summarize(
+        WorkerCallableResult[] callables,
+        WorkerClaimResult[] claims)
+    {
+        var accumulator = new SummaryAccumulator();
+        foreach (var callable in callables)
         {
-            Total = assumptions.Length,
-            Used = assumptions.Count(static group => group.Any(static value => value.Used)),
-            User = assumptions.Count(static group => group.First().Kind == WorkerAssumptionKind.UserAssume),
-            Trusted = assumptions.Count(static group => group.First().Kind == WorkerAssumptionKind.TrustedBoundary)
-        };
+            accumulator.AddAssumptions(callable.Assumptions);
+        }
+
+        foreach (var claim in claims)
+        {
+            accumulator.AddClaim(claim);
+        }
+
+        return accumulator.CreateSnapshot();
+    }
+
+    private sealed class SummaryAccumulator
+    {
+        private readonly Dictionary<WorkerClaimOutcome, int> _outcomes = [];
+        private readonly Dictionary<WorkerClaimReason, int> _reasons = [];
+        private readonly Dictionary<string, AssumptionAggregate> _assumptions =
+            new(StringComparer.Ordinal);
+
+        internal void AddClaim(WorkerClaimResult claim)
+        {
+            Increment(_outcomes, claim.Outcome);
+            Increment(_reasons, claim.Reason);
+            AddAssumptions(claim.Assumptions);
+        }
+
+        internal void AddAssumptions(IEnumerable<WorkerAssumptionEvidence>? assumptions)
+        {
+            foreach (var value in assumptions ?? [])
+            {
+                if (value is null || string.IsNullOrWhiteSpace(value.Id))
+                {
+                    continue;
+                }
+
+                if (_assumptions.TryGetValue(value.Id, out var existing))
+                {
+                    existing.Used |= value.Used;
+                    existing.ConflictingKinds |= existing.FirstKind != value.Kind;
+                    _assumptions[value.Id] = existing;
+                }
+                else
+                {
+                    _assumptions.Add(value.Id, new AssumptionAggregate(value.Kind, value.Used));
+                }
+            }
+        }
+
+        internal SummarySnapshot CreateSnapshot()
+        {
+            var assumptions = new WorkerAssumptionSummary();
+            var conflictingAssumptionKinds = false;
+            foreach (var aggregate in _assumptions.Values)
+            {
+                assumptions.Total++;
+                assumptions.Used += aggregate.Used ? 1 : 0;
+                assumptions.User += aggregate.FirstKind == WorkerAssumptionKind.UserAssume ? 1 : 0;
+                assumptions.Trusted += aggregate.FirstKind == WorkerAssumptionKind.TrustedBoundary ? 1 : 0;
+                conflictingAssumptionKinds |= aggregate.ConflictingKinds;
+            }
+
+            return new SummarySnapshot(
+                [.. _outcomes.Select(static pair => new WorkerClaimOutcomeCount
+                {
+                    Outcome = pair.Key,
+                    Count = pair.Value
+                })],
+                [.. _reasons.Select(static pair => new WorkerClaimReasonCount
+                {
+                    Reason = pair.Key,
+                    Count = pair.Value
+                })],
+                assumptions,
+                conflictingAssumptionKinds);
+        }
+
+        private static void Increment<TKey>(Dictionary<TKey, int> counts, TKey key)
+            where TKey : notnull
+        {
+            counts[key] = counts.TryGetValue(key, out var count) ? count + 1 : 1;
+        }
+    }
+
+    private struct AssumptionAggregate(WorkerAssumptionKind firstKind, bool used)
+    {
+        internal WorkerAssumptionKind FirstKind = firstKind;
+        internal bool Used = used;
+        internal bool ConflictingKinds;
+    }
+
+    private sealed class SummarySnapshot(
+        WorkerClaimOutcomeCount[] outcomeCounts,
+        WorkerClaimReasonCount[] reasonCounts,
+        WorkerAssumptionSummary assumptions,
+        bool conflictingAssumptionKinds)
+    {
+        internal WorkerClaimOutcomeCount[] OutcomeCounts { get; } = outcomeCounts;
+        internal WorkerClaimReasonCount[] ReasonCounts { get; } = reasonCounts;
+        internal WorkerAssumptionSummary Assumptions { get; } = assumptions;
+        internal bool ConflictingAssumptionKinds { get; } = conflictingAssumptionKinds;
     }
 
     internal static WorkerClaimManifest EmptyManifest()
