@@ -4343,7 +4343,7 @@ R711 completed: delegate invalidations now accumulate in mutable per-local lists
 
 | R712 | **`RequiresCallSiteDiscovery.IsStableAtInvocation` recomputes invocation-invariant facts for every invalidation.** Inside the invalidation loop it repeatedly checks the invocation's syntax tree, `IsInsideLoop(invocation)`, `IsInsideNestedCallable(invocation)`, and `target.HasGoto`; only the invalidation's tree/position and ancestry are iteration-specific. Hoisting those invariant facts before the loop removes repeated parent walks and property checks without changing the fail-closed conditions or invalidation ordering. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1034-1053` |
 
-R712 is a pending delegate-stability predicate reduction candidate. Preserve same-tree ordering, loop/nested-callable rejection, goto conservatism, and the behavior for every invalidation.
+R712 completed: invocation tree, loop, and nested-callable facts are computed once per stability check while preserving same-tree ordering, loop/nested-callable rejection, goto conservatism, and every invalidation behavior.
 
 | R713 | **`RequiresCallSiteDiscovery.GetListPatternCalls` scans the same pattern list three times before its main loop.** `Count` computes non-slice items, `Any` detects a slice, and a separate indexed loop finds `sliceIndex`; the subsequent loop then traverses all patterns again to emit calls. Fuse the count/flag/index preparation into one indexed pass, retaining the known-length short-circuits, slice index arithmetic, and emitted-call order. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1421-1455` |
 

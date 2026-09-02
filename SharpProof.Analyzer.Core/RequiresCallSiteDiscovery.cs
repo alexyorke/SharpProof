@@ -1065,15 +1065,17 @@ internal sealed partial class RequiresCallSiteDiscovery(
         IInvocationOperation invocation,
         DirectDelegateTarget target)
     {
+        var invocationTree = invocation.Syntax.SyntaxTree;
+        var invocationInsideLoop = IsInsideLoop(invocation);
+        var invocationInsideNestedCallable = IsInsideNestedCallable(invocation);
         foreach (var invalidation in target.Invalidations)
         {
-            if (invalidation.Syntax.SyntaxTree !=
-                    invocation.Syntax.SyntaxTree ||
+            if (invalidation.Syntax.SyntaxTree != invocationTree ||
                 invalidation.Syntax.SpanStart <=
                     invocation.Syntax.SpanStart ||
-                IsInsideLoop(invocation) ||
+                invocationInsideLoop ||
                 IsInsideLoop(invalidation) ||
-                IsInsideNestedCallable(invocation) ||
+                invocationInsideNestedCallable ||
                 IsInsideNestedCallable(invalidation) ||
                 target.HasGoto)
             {
