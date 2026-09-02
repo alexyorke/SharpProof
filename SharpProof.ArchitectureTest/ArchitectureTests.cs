@@ -229,11 +229,56 @@ public sealed class ArchitectureTests
             "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.Contracts",
             "SharpProof.Effects", "SharpProof.Frontend"
         };
-        foreach (var root in new[] {
-                     "SharpProof.Worker", "SharpProof.Worker.Launcher"
-                 })
+        var roots = new[] { "SharpProof.Worker", "SharpProof.Worker.Launcher" };
+        var snapshots = new Dictionary<string, ProjectFileSnapshot>(
+            StringComparer.Ordinal);
+        var pending = new Stack<string>(roots);
+        while (pending.Count != 0)
         {
-            var closure = TransitiveProjectClosure(root).ToArray();
+            var project = pending.Pop();
+            if (snapshots.ContainsKey(project))
+            {
+                continue;
+            }
+
+            var snapshot = ArchitectureRepository.ReadProjectFileSnapshot(project);
+            snapshots.Add(project, snapshot);
+            foreach (var dependency in snapshot.References)
+            {
+                pending.Push(dependency);
+            }
+        }
+
+        var sources = snapshots.Keys.ToDictionary(
+            static project => project,
+            ArchitectureRepository.ReadProductionSources,
+            StringComparer.Ordinal);
+        var closures = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        foreach (var root in roots)
+        {
+            var closure = new HashSet<string>(StringComparer.Ordinal);
+            pending = new Stack<string>();
+            pending.Push(root);
+            while (pending.Count != 0)
+            {
+                var project = pending.Pop();
+                if (!closure.Add(project))
+                {
+                    continue;
+                }
+
+                foreach (var dependency in snapshots[project].References)
+                {
+                    pending.Push(dependency);
+                }
+            }
+
+            closures.Add(root, [.. closure]);
+        }
+
+        foreach (var root in roots)
+        {
+            var closure = closures[root];
             Assert.That(
                 closure.Intersect(forbiddenProjects, StringComparer.Ordinal),
                 Is.Empty,
@@ -241,15 +286,15 @@ public sealed class ArchitectureTests
             foreach (var project in closure)
             {
                 Assert.That(
-                    ProjectPackages(project),
+                    snapshots[project].Packages,
                     Has.None.StartsWith("Microsoft.CodeAnalysis"),
                     project);
                 Assert.That(
-                    ReadProductionSources(project),
+                    sources[project],
                     Does.Not.Contain("Microsoft.CodeAnalysis"),
                     project);
                 Assert.That(
-                    File.ReadAllText(ProjectFile(project)),
+                    snapshots[project].Text,
                     Does.Not.Contain("RoslynTargetsPath"),
                     project);
             }

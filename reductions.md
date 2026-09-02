@@ -4239,12 +4239,6 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
 
-### Status (part two hundred nineteen)
-
-| R685 | **`WorkerAndLauncherRuntimeClosuresAreCompilerNeutral` repeats project discovery and file reads across overlapping closures.** The test walks the Worker and Launcher dependency closures separately, and `TransitiveProjectClosure` reparses each project file while the per-project assertions then parse that same project file through `ProjectPackages` and read it again for `RoslynTargetsPath`; shared dependencies therefore incur the same graph and source/project-file I/O more than once. Materializing a shared closure and caching each project's parsed XML/source text would preserve the two root-specific closure assertions and all package/source/target checks while reducing repeated traversal and reads. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:232-255`; `SharpProof.ArchitectureTest/ArchitectureRepository.cs:27-78` |
-
-R685 is a pending architecture-test repository-cache reduction candidate. Preserve root-specific closure membership checks and the independent package, source, and project-file policy assertions.
-
 ### Status (part two hundred twenty)
 
 | R686 | **`ReleasePublicationScriptTests` duplicates archive-entry replacement scaffolding.** `RewriteRepositoryCommit` and `RewriteEntry` both delete an existing `ZipArchiveEntry`, create a replacement at a supplied name with `CompressionLevel.Optimal`, open its stream, and write replacement content; only the writer is text/document serialization versus raw bytes. A small replacement helper accepting a write callback can centralize the archive mutation protocol while preserving the two content encodings and their callers' distinct transformations. | `SharpProof.Package.Test/ReleasePublicationScriptTests.cs:927-970` |

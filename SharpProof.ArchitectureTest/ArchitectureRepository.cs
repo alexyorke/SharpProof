@@ -63,7 +63,12 @@ internal static class ArchitectureRepository
 
     internal static string[] ProjectReferences(string project)
     {
-        return [.. XDocument.Load(ProjectFile(project))
+        return ProjectReferences(XDocument.Load(ProjectFile(project)));
+    }
+
+    internal static string[] ProjectReferences(XDocument document)
+    {
+        return [.. document
             .Descendants("ProjectReference")
             .Where(static element =>
                 !string.Equals(
@@ -78,11 +83,26 @@ internal static class ArchitectureRepository
 
     internal static string[] ProjectPackages(string project)
     {
-        return [.. XDocument.Load(ProjectFile(project))
+        return ProjectPackages(XDocument.Load(ProjectFile(project)));
+    }
+
+    internal static string[] ProjectPackages(XDocument document)
+    {
+        return [.. document
             .Descendants("PackageReference")
             .Select(static element => (string?)element.Attribute("Include"))
             .Where(static value => !string.IsNullOrWhiteSpace(value))
             .Select(static value => value!)];
+    }
+
+    internal static ProjectFileSnapshot ReadProjectFileSnapshot(string project)
+    {
+        var text = File.ReadAllText(ProjectFile(project));
+        var document = XDocument.Parse(text);
+        return new(
+            ProjectReferences(document),
+            ProjectPackages(document),
+            text);
     }
 
     internal static string ProjectFile(string project)
@@ -128,4 +148,16 @@ internal static class ArchitectureRepository
                 Path.GetExtension(path) is ".yml" or ".yaml")
             .OrderBy(static path => path, StringComparer.Ordinal);
     }
+}
+
+internal sealed class ProjectFileSnapshot(
+    string[] references,
+    string[] packages,
+    string text)
+{
+    internal string[] References { get; } = references;
+
+    internal string[] Packages { get; } = packages;
+
+    internal string Text { get; } = text;
 }
