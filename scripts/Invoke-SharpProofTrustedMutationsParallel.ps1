@@ -79,23 +79,6 @@ for ($index = 0; $index -lt $parallelism; $index++) {
 $campaignTimer = [Diagnostics.Stopwatch]::StartNew()
 $shardTimings = [Collections.Generic.List[object]]::new()
 
-function Test-ExactStringSequence {
-    param(
-        [AllowEmptyCollection()][string[]]$Left,
-        [AllowEmptyCollection()][string[]]$Right
-    )
-
-    if (@($Left).Count -ne @($Right).Count) {
-        return $false
-    }
-    for ($index = 0; $index -lt @($Left).Count; $index++) {
-        if ([string]$Left[$index] -cne [string]$Right[$index]) {
-            return $false
-        }
-    }
-    return $true
-}
-
 function Resolve-ShardReceiptPath {
     param(
         [Parameter(Mandatory = $true)][object]$Shard,
@@ -172,7 +155,7 @@ function Test-CompleteShard([object]$Shard) {
                 [int]$row.failedCount -ne $mutation.failedCount -or
                 [int]$row.assertionFailureCount -ne
                     $mutation.assertionFailureCount -or
-                -not (Test-ExactStringSequence `
+                -not (Test-SharpProofOrdinalStringSequence `
                     -Left @($row.selectedTests) `
                     -Right @($mutation.testLedger))) {
                 return $false
@@ -198,7 +181,7 @@ function Test-CompleteShard([object]$Shard) {
                 -ProcessExitCode 0 `
                 -ExpectedMethodName $methods
             foreach ($expected in $entry.Value) {
-                if (-not (Test-ExactStringSequence `
+                if (-not (Test-SharpProofOrdinalStringSequence `
                         -Left @($expected.Ledger) `
                         -Right @($baseline.testLedgers[$expected.Method]))) {
                     return $false

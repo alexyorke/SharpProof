@@ -3597,7 +3597,10 @@ the existing empty-input and rank-clamping behavior.
 
 ### Status (part one hundred eight)
 
-R567 is a pending reduction candidate. The current implementations agree for the non-null string arrays produced by these evidence paths, but the local copy can drift from the shared ordinal contract.
+R567 is applied: `Test-SharpProofOrdinalStringSequence` now lives in
+`SharpProof.MutationEvidence.psm1` and is used by both the evidence parser and
+trusted-mutation shard checks, preserving ordinal case-sensitive comparison and
+the existing null/empty handling.
 
 ## Second survey, part one hundred nine: R568 - acceptance dotnet wrapper
 
@@ -4064,3 +4067,27 @@ R621 is a pending Worker test-harness reduction candidate. Preserve each test's 
 ### Status (part one hundred sixty-three)
 
 R622 is a pending corpus-transaction cleanup candidate. Preserve create-new semantics, write-through durability, backup restoration, and the separate async cancellation boundary; share only the common byte-write/flush protocol.
+
+## Second survey, part one hundred sixty-four: R623 - duplicate corpus observation orchestration
+
+| R623 | **`CorpusGate` repeats the full corpus observation orchestration.** `RunAsync` loops over synthetic cases, checks cancellation, awaits `ObserveCaseAsync`, and then appends OSS observations; `RenderActualSnapshotAsync` repeats the same synthetic loop and OSS runner call before projecting observations to canonical lines. A shared `ObserveAllAsync`/collection helper can centralize case selection, cancellation, and runner invocation, leaving execution metrics and snapshot rendering as separate consumers. | `SharpProof.Gates/Corpus/CorpusGate.cs:63-75,364-377` |
+
+### Status (part one hundred sixty-four)
+
+R623 is a pending corpus-gate orchestration cleanup candidate. Preserve the exact synthetic/OSS ordering, cancellation checks, and snapshot line ordering; share only observation collection and keep result accounting separate from rendering.
+
+## Second survey, part one hundred sixty-five: R624 - duplicate corpus source-ID validation
+
+| R624 | **`OpenSourceCorpusCatalog` validates source IDs twice on the load path.** `Validate` first calls `ValidateSourceIds`, which rejects blank IDs and duplicates, and then calls `ValidateSource` for every source; `ValidateSource` repeats the blank-ID check even though it is private and only reached after the first pass. Remove the unreachable second check or make one helper own both the reusable validation and uniqueness policy, while retaining the public `ValidateSourceIds` test contract. | `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:126,138-141,275-293,322-330` |
+
+### Status (part one hundred sixty-five)
+
+R624 is a pending corpus-manifest validation cleanup candidate. Preserve deterministic duplicate-ID errors and all per-source URL, commit, license, and containment checks; eliminate only the repeated blank-ID branch on the normal load path.
+
+## Second survey, part one hundred sixty-six: R625 - repeated corpus line-ending normalization
+
+| R625 | **Corpus hashing repeatedly normalizes already-normalized text.** `OpenSourceCorpusCatalog.Validate` normalizes each file's content before parsing and then passes that normalized string to `ComputeSha256`, which normalizes it again; `OpenSourceCorpusImporter.DiscoverSourcesAsync` has the same pattern, and declaration extraction similarly returns normalized text before hashing through the normalizing helper. Split the normalized-input hashing path or move normalization to one boundary so each content/declaration is scanned once, while keeping manifest hashes canonical across CRLF and LF input. | `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:64-75,97-101,164-168,224-229`; `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:294-307,323-326` |
+
+### Status (part one hundred sixty-six)
+
+R625 is a pending corpus hashing cleanup candidate. Preserve the current normalized-byte hash values and CRLF/CR compatibility; share or specialize only the normalization boundary so callers do not rescan canonical text.

@@ -232,6 +232,23 @@ function Get-OrdinalSortedUniqueStrings {
     return $sorted.ToArray()
 }
 
+function Test-SharpProofOrdinalStringSequence {
+    param(
+        [AllowNull()][AllowEmptyCollection()][string[]]$Left,
+        [AllowNull()][AllowEmptyCollection()][string[]]$Right
+    )
+
+    if (@($Left).Count -ne @($Right).Count) {
+        return $false
+    }
+    for ($index = 0; $index -lt @($Left).Count; $index++) {
+        if ([string]$Left[$index] -cne [string]$Right[$index]) {
+            return $false
+        }
+    }
+    return $true
+}
+
 function Read-SharpProofMutationTestEvidence {
     param(
         [Parameter(Mandatory = $true)]
@@ -537,10 +554,9 @@ function Read-SharpProofMutationTestEvidence {
             Get-OrdinalSortedUniqueStrings -Values $ExpectedLedger)
         if ($expected.Count -ne @($ExpectedLedger).Count -or
             $ledger.Count -ne $expected.Count -or
-            -not [Linq.Enumerable]::SequenceEqual(
-                [string[]]$expected,
-                [string[]]$ledger,
-                [StringComparer]::Ordinal)) {
+            -not (Test-SharpProofOrdinalStringSequence `
+                -Left $expected `
+                -Right $ledger)) {
             throw "TRX test ledger changed for '$EvidenceName'."
         }
     }
@@ -586,4 +602,6 @@ function Read-SharpProofMutationTestEvidence {
     }
 }
 
-Export-ModuleMember -Function 'Read-SharpProofMutationTestEvidence'
+Export-ModuleMember -Function @(
+    'Read-SharpProofMutationTestEvidence',
+    'Test-SharpProofOrdinalStringSequence')
