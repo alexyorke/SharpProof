@@ -5248,13 +5248,11 @@ file's contents? The answer is yes for 52 of 54. This part is about the exceptio
 
 ### Status (part two hundred sixty-six)
 
-R752 is `pending`. The cheap half is a test: `ArchitectureTests` already parses
-the five shipping build files and freezes their union, so asserting that this
-file's `CompilerVisibleProperty` list equals that union is a few lines in a place
-that already has the data loaded - and it is the same assertion R738 asks for on
-`SharpProof.AnalyzerConsumer.props`. The second half is a decision the ledger
-cannot make: whether a self-application lane that no automated pipeline runs should
-be wired into one.
+R752 is `partially applied`: `ArchitectureTests.PreviewConfigurationInterfaceMatchesFrozenSnapshot`
+now compares both `SharpProof.AnalyzerConsumer.props` and
+`SharpProof.SelfApplication.props` against the shipping compiler-visible union.
+The remaining decision is unchanged and intentionally deferred: whether a
+self-application lane that no automated pipeline runs should be wired into one.
 
 ## Second survey, part two hundred sixty-seven: R753 - repeated analyzer test session factories
 
@@ -5319,8 +5317,9 @@ changed while recording it.
 
 ### Status (part two hundred seventy)
 
-R756 is `pending` and is limited to test fixture plumbing; no implementation code
-was changed while recording it.
+R756 is `complete`: `LinuxPublicationSetTests` now uses the linked
+`eng/testing/TempDirectory` helper and its guarded cleanup instead of a private
+temporary-directory wrapper.
 
 ## Second survey, part two hundred sixty-nine: R755, a generator recount, and the enforced-axis pattern
 
@@ -5561,8 +5560,9 @@ implementation or build file was changed.
 
 ### Status (part two hundred seventy-eight)
 
-R764 is `pending` and is limited to effect-summary projection plumbing. No
-implementation or build file was changed.
+R764 is `complete`: effect capability flags are projected once into the paired
+contract effect/capability result and both fields reuse that projection, while
+unknown capabilities still produce the existing empty/unknown behavior.
 
 ## Second survey, part two hundred seventy-nine: R765 - duplicated sync/async atomic-file test fixtures
 
@@ -5597,8 +5597,9 @@ or build file was changed.
 
 ### Status (part two hundred eighty)
 
-R766 is `pending` and is limited to SMT test fixture plumbing. No implementation
-or build file was changed.
+R766 is `complete`: the three unsupported-string tests now share one
+query/backend/unknown-outcome assertion helper while keeping their distinct
+string expressions and diagnostic kinds.
 
 ## Second survey, part two hundred eighty-one: R767 - repeated effect-claim lookup for unknown batches
 
@@ -5616,8 +5617,9 @@ or build file was changed.
 
 ### Status (part two hundred eighty-one)
 
-R767 is `pending` and is limited to worker result-assembly lookup plumbing. No
-implementation or build file was changed.
+R767 is `complete`: `Unknowns` and `PostconditionUnknowns` build one ordinal
+effect-claim ID set per batch, while the single-claim `Unknown` path retains its
+direct membership check. Certainty mapping and claim ordering are unchanged.
 
 ## Second survey, part two hundred eighty-two: R768 - quadratic pilot claim matching
 
@@ -5635,8 +5637,10 @@ implementation or build file was changed.
 
 ### Status (part two hundred eighty-two)
 
-R768 is `pending` and is limited to pilot-report claim-index construction. No
-implementation or build file was changed.
+R768 is `complete`: the validator builds one ordinal claim-result index and a
+duplicate-ID set per result document, then performs one lookup per manifest
+claim. Missing and duplicate matches still fail closed, and report ordering is
+unchanged.
 
 ## Second survey, part two hundred eighty-three: R769 - duplicated pilot claim projection
 
@@ -5672,8 +5676,9 @@ implementation or build file was changed.
 
 ### Status (part two hundred eighty-four)
 
-R770 is `pending` and is limited to release-authority path membership indexing. No
-implementation or build file was changed.
+R770 is `complete`: the validator builds one ordinal TCB-path count map and
+checks each derived path against it, preserving the exact-once invariant and
+failure detail.
 
 ## Second survey, part two hundred eighty-five: R771-R773 - repeated release-model lookups
 
@@ -5693,8 +5698,13 @@ implementation or build file was changed.
 
 ### Status (part two hundred eighty-five)
 
-R771-R773 are `pending` and limited to release-model lookup sharing. No
-implementation or build file was changed.
+R771 is `complete`: release artifact validation now builds ordinal projections
+for package/symbol artifacts, payload sets, and third-party components once,
+while preserving the independent topology and licensing checks. R772 is
+`complete`: publication-plan validation builds one ordinal manifest file-name
+index and duplicate set, retaining exact-one-row and byte checks. R773 is
+`complete`: package dependency validation builds package and framework maps
+once, retaining exact graph, metadata, duplicate, and dependency-version gates.
 
 ## Second survey, part two hundred eighty-six: R774-R775 - repeated performance-gate fixture setup
 
@@ -5713,8 +5723,10 @@ implementation or build file was changed.
 
 ### Status (part two hundred eighty-six)
 
-R774-R775 are `pending` and limited to performance-gate fixture/orchestration
-sharing. No implementation or build file was changed.
+R774 is `complete`: call-bearing and call-free performance fixtures now share
+one class/index source builder while retaining their distinct method bodies.
+R775 remains pending because its shared setup/probe orchestration crosses
+distinct timing and threshold policies.
 
 ## Second survey, part two hundred eighty-seven: R776 - repeated direct-clause normalization
 
@@ -5732,8 +5744,9 @@ sharing. No implementation or build file was changed.
 
 ### Status (part two hundred eighty-seven)
 
-R776 is `pending` and limited to direct-clause predicate preparation. No
-implementation or build file was changed.
+R776 is `complete`: `Build` and `BuildEntry` share direct-clause substitution
+and depth validation, while retaining their separate provenance, clause-scope,
+and supported-domain policies.
 
 ## Second survey, part two hundred eighty-eight: R777 - duplicated effect-call propagation
 
@@ -5752,8 +5765,9 @@ implementation or build file was changed.
 
 ### Status (part two hundred eighty-eight)
 
-R777 is `pending` and limited to effect-call propagation helper extraction. No
-implementation or build file was changed.
+R777 is `complete`: `Compute` and `ComputeBody` share a local call propagation
+helper for remapping, escaping, and joining summaries; initialization wrapping
+and target-resolution policies remain caller-controlled.
 
 ## Second survey, part two hundred eighty-nine: R778 - repeated callable-attribute enumeration
 
@@ -5770,5 +5784,65 @@ implementation or build file was changed.
 
 ### Status (part two hundred eighty-nine)
 
-R778 is `pending` and limited to callable-attribute enumeration sharing. No
+R778 is `complete`: `Select` snapshots callable attributes once and passes them
+through the rejected-feature projection, while the independently callable
+rejection APIs retain their original lazy path.
+
+## Second survey, part two hundred ninety: R779 - repeated Worker API-spec template fixture
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R779 | **`SpecResultDomainProjectionTests` and `WorkerTcbEdgeCaseTests` duplicate the same one-declaration `ApiSpecTemplate` builder.** Each `CreateTemplate` creates documented evidence, a single method target with the same result-type slot and empty parameter/variable lists, and the same five facets: no effects, unknown allocation, no throws, caller-supplied nullness, and caller-supplied cardinality. Only the test identity strings, evidence label, and the first suite's optional postcondition projection differ. A shared Worker-test factory accepting the target/evidence identity and optional postconditions can own this fixture shape while preserving each suite's distinct inputs and assertions. The similar `ApiSpecContentDigestTests.CreateTable` is intentionally not folded in: it tests an exception-set digest and has materially different target and throw-facet semantics. | `SharpProof.Worker.Test/SpecResultDomainProjectionTests.cs:210-252`; `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:1675-1713`; `SharpProof.Specs.Test/ApiSpecContentDigestTests.cs:38-76` |
+### Checked and not proposed (part two hundred ninety)
+
+- This is limited to the shared Worker-test template arrangement; the
+  projection and TCB tests retain their separate result-domain and cache/error
+  scenarios.
+- The exception-set digest fixture is not a third copy of this helper because
+  its throw metadata and target identity are the behavior under test.
+
+### Status (part two hundred ninety)
+
+R779 is `complete`: Worker result-domain and TCB edge-case tests now share one
+API-spec template factory, with target/evidence identities and optional
+postconditions remaining explicit per suite.
+
+## Second survey, part two hundred ninety-one: R780 - repeated direct-witness scans per effect facet
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R780 | **`EffectContractDiagnostics.Evaluate` rescans the same direct-witness array for each effect facet.** After selecting the contracts and computing the summary, it calls `direct.FirstOrDefault(...)` separately for purity, allocation, allowed capabilities, no-throw, allowed exceptions, and (when applicable) the declared effect contract. These predicates intentionally select different first witnesses, but they all traverse the same `result.DirectWitnesses` snapshot, and the first five scans are evaluated even when their corresponding attribute selection is empty because they are passed as arguments to `Add`. A single pass can retain the first matching witness for each predicate, with the declared-contract check kept conditional, while `Add`, validity, diagnostics, evidence, and `EffectContractMappings.Violates` retain their separate semantics. | `SharpProof.Analyzer.Core/EffectContractDiagnostics.cs:118-218` |
+
+### Checked and not proposed (part two hundred ninety-one)
+
+- The predicates are not interchangeable: each facet needs its own first witness,
+  and the declared effect contract uses the full summary projection. The proposed
+  reduction is only one traversal that records those independent candidates.
+- Contract-attribute selection, summary computation, and diagnostic projection are
+  separate policies and are not folded into this finding.
+
+### Status (part two hundred ninety-one)
+
+R780 is `complete`: effect diagnostics now scan direct witnesses once while
+retaining independent first matches for purity, allocation, capabilities,
+throws, allowed exceptions, and declared contracts.
+
+## Second survey, part two hundred ninety-two: R781 - repeated temporary Git repository bootstrap
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R781 | **Three ArchitectureTest fixtures repeat temporary Git-repository bootstrap.** `AcceptanceScriptTests.InitializeRepositoryAsync`, `CoverageScriptTests.InitializeRepositoryAsync`, and `ProductionInventoryAuthorityTests.InitializeRepositoryAsync` each run `git init`, set a test user email and name, and wrap every child-process call in a local success assertion. The fixtures intentionally diverge after that common boundary: Acceptance creates and commits one seed file, Coverage sets additional Git display options before its caller creates commits, and Production uses its own commit helper. A shared architecture-test repository helper parameterized by identity, optional Git settings, and seed/commit policy can own the common bootstrap while preserving those scenario-specific differences. This is a higher-level fixture duplication than R259's process-runner overlap; it does not require merging the result contracts of the runners. | `SharpProof.ArchitectureTest/AcceptanceScriptTests.cs:221-257`; `SharpProof.ArchitectureTest/CoverageScriptTests.cs:1066-1101`; `SharpProof.ArchitectureTest/ProductionInventoryAuthorityTests.cs:270-299` |
+
+### Checked and not proposed (part two hundred ninety-two)
+
+- `ContainerSourceCleanlinessTests.InitializeRepositoryAsync` is not counted as
+  a fourth copy: it builds a different multi-file container-cleanliness topology,
+  uses a different command wrapper, and its repository contents are the behavior
+  under test.
+- The shared helper should not erase the Acceptance seed commit, Coverage's
+  canonical Git options, or Production's repeated-commit workflow.
+
+### Status (part two hundred ninety-two)
+
+R781 is `pending` and limited to ArchitectureTest fixture plumbing. No
 implementation or build file was changed.
