@@ -149,13 +149,29 @@ internal static class AnalyzerTestHost
         bool allowCompilationErrors = false,
         CancellationToken cancellationToken = default)
     {
+        var analyzerOptions = new AnalyzerOptions(
+            additionalFiles.IsDefault ? [] : additionalFiles,
+            new DictionaryAnalyzerConfigOptionsProvider(values));
+        return await AnalyzeAsync(
+                compilation,
+                analyzerOptions,
+                analyzer,
+                allowCompilationErrors,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
+        CSharpCompilation compilation,
+        AnalyzerOptions analyzerOptions,
+        DiagnosticAnalyzer? analyzer,
+        bool allowCompilationErrors,
+        CancellationToken cancellationToken)
+    {
         if (!allowCompilationErrors)
         {
             EnsureCompilationHasNoErrors(compilation);
         }
-        var analyzerOptions = new AnalyzerOptions(
-            additionalFiles.IsDefault ? [] : additionalFiles,
-            new DictionaryAnalyzerConfigOptionsProvider(values));
         var withAnalyzers = compilation.WithAnalyzers(
             [analyzer ?? new SharpProofAnalyzer()],
             new CompilationWithAnalyzersOptions(
@@ -176,22 +192,14 @@ internal static class AnalyzerTestHost
         DiagnosticAnalyzer? analyzer = null,
         bool allowCompilationErrors = false)
     {
-        if (!allowCompilationErrors)
-        {
-            EnsureCompilationHasNoErrors(compilation);
-        }
         var analyzerOptions = new AnalyzerOptions([], optionsProvider);
-        var withAnalyzers = compilation.WithAnalyzers(
-            [analyzer ?? new SharpProofAnalyzer()],
-            new CompilationWithAnalyzersOptions(
+        return await AnalyzeAsync(
+                compilation,
                 analyzerOptions,
-                onAnalyzerException: null,
-                concurrentAnalysis: true,
-                logAnalyzerExecutionTime: false,
-                reportSuppressedDiagnostics: false));
-        return [.. (await withAnalyzers.GetAnalyzerDiagnosticsAsync())
-            .OrderBy(static diagnostic => diagnostic.Location.SourceSpan.Start)
-            .ThenBy(static diagnostic => diagnostic.Id, StringComparer.Ordinal)];
+                analyzer,
+                allowCompilationErrors,
+                CancellationToken.None)
+            .ConfigureAwait(false);
     }
 
     private static void EnsureCompilationHasNoErrors(CSharpCompilation compilation)

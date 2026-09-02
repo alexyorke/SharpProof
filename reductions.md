@@ -3391,9 +3391,10 @@ collapse the definedness and satisfiability predicates into one policy.
 
 ### Status (part eighty-seven)
 
-R545 is a `pending` reduction candidate. Preserve the current default analyzer,
-concurrent-analysis, suppressed-diagnostic, exception, and cancellation
-semantics when consolidating the test-host helper.
+R545 is applied: the dictionary and options-provider overloads now prepare their
+own `AnalyzerOptions` and delegate execution, compilation-error checks, analyzer
+selection, ordering, and cancellation to one private core. The full analyzer
+test suite passes (476 tests).
 
 ## Second survey, part eighty-eight: R546 - differential type mapping
 
@@ -4010,3 +4011,19 @@ R615 is a pending local Effects infrastructure candidate. Preserve the null-term
 ### Status (part one hundred fifty-seven)
 
 R616 is a pending local Effects cleanup candidate. Preserve the existing static-only and non-const field policy; replace only the duplicated classification switch with the canonical helper.
+
+## Second survey, part one hundred fifty-eight: R617 - duplicate walk-depth scope guard
+
+| R617 | **`ManagedAbstractFlow` repeats its recursion-depth bookkeeping.** `Transfer` and `EvaluateCore` both check `_walkDepth` against `MaximumWalkDepth`, increment it, invoke a bounded body inside `try`, and decrement it in `finally`; only the overflow fallback differs (`state.Forget()` versus `ManagedAbstractValue.Unknown`). A small callback/fallback seam or shared scope helper can own the push/pop invariant while preserving those distinct fallback values and the separate transfer/evaluation bodies. | `SharpProof.Effects/ManagedAbstractFlow.cs:197-221,552-568` |
+
+### Status (part one hundred fifty-eight)
+
+R617 is a pending local Effects cleanup candidate. Preserve the fail-closed fallback chosen by each caller and the `finally` decrement; consolidate only the duplicated depth guard and scope bookkeeping.
+
+## Second survey, part one hundred fifty-nine: R618 - duplicate Meta-analyzer test host
+
+| R618 | **`SharpProofSoundnessAnalyzerTests` duplicates its analyzer-host setup.** `Analyze` and `AnalyzeGenerated` each create a C# 12 dynamic-library compilation, collect and reject compiler errors, attach `SharpProofSoundnessAnalyzer`, and return analyzer diagnostics. The generated variant changes only the assembly name and supplies `Generated.g.cs` as the syntax-tree path. A parameterized private host can preserve that path distinction while removing the parallel compilation and diagnostic plumbing. | `SharpProof.Meta.Analyzers.Test/SharpProofSoundnessAnalyzerTests.cs:3417-3452` |
+
+### Status (part one hundred fifty-nine)
+
+R618 is a pending test-infrastructure reduction candidate. Preserve the generated source path and assembly identity where they are semantically relevant; consolidate only the shared compilation, error assertion, and analyzer execution sequence.
