@@ -4235,13 +4235,12 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 ## Second survey, part two hundred six: R665-R667 - repeated cache/replay preparation
 
-| R665 | **`VerificationCache.TryReadAsync` duplicates capacity-maintenance commit cleanup on a normal miss and malformed-read catch.** The missing-file branch and the handled-exception branch both call `TryStageCapacity(path, staged, cancellationToken)`, set `committed = true`, and discard the staged entries when maintenance succeeds. A small helper can centralize only this successful maintenance transition while leaving the catch's `LastReadUnavailable` state and exception swallowing separate. | `SharpProof.Worker/VerificationCache.cs:50-57,123-145` |
 | R666 | **`VerificationCache.ReplayCachedClaims` rebuilds a callable's postcondition array for every cached claim.** The target dictionary is created once, but each claim then runs `target.Clauses.Where(...).ToArray()` followed by `Array.FindIndex` over the same declaration set. Precomputing a first-match claim-to-ordinal map (or the postcondition list) per callable removes repeated clause enumeration and allocation while preserving bounds checks, claim-id matching, and fail-closed replay behavior. | `SharpProof.Worker/VerificationCache.cs:604-626` |
 | R667 | **`CallableCounterexampleReplayer.Replay` re-filters all clauses for every postcondition replay.** `CallableVerifier` invokes the replayer from its per-postcondition loop, and each call allocates a fresh `ensures` array from `target.Clauses` before checking the requested ordinal. Passing a prepared postcondition list/ordinal map from the target verification, or caching it at the callable boundary, removes this repeated scan while preserving the current out-of-range and malformed-target failures. | `SharpProof.Worker/CallableCounterexampleReplayer.cs:4-20`; `SharpProof.Worker/CallableVerifier.cs:197-203,261-263` |
 
 ### Status (part two hundred six)
 
-R665-R667 are pending cache/replay preparation reduction candidates. Preserve cache transaction commit/rollback ownership, unavailable-read reporting, claim-id first-match semantics, cancellation, and fail-closed counterexample replay behavior; share only repeated declaration and capacity-maintenance preparation.
+R666-R667 are pending cache/replay preparation reduction candidates. Preserve claim-id first-match semantics, cancellation, and fail-closed counterexample replay behavior; share only repeated declaration preparation.
 
 ## Second survey, part two hundred seven: R668 - redundant MSBuild dependency edge
 

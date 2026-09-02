@@ -51,8 +51,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             {
                 if (TryStageCapacity(path, staged, cancellationToken))
                 {
-                    committed = true;
-                    DiscardStaged(staged);
+                    CommitStaged(staged, ref committed);
                 }
                 return null;
             }
@@ -132,8 +131,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             {
                 if (TryStageCapacity(path, staged, cancellationToken))
                 {
-                    committed = true;
-                    DiscardStaged(staged);
+                    CommitStaged(staged, ref committed);
                 }
             }
             catch (Exception maintenanceException) when (maintenanceException is
@@ -448,6 +446,14 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             TryDeleteRollbackFile(entry.StagedPath);
         }
         staged.Clear();
+    }
+
+    private static void CommitStaged(
+        List<StagedEntry> staged,
+        ref bool committed)
+    {
+        committed = true;
+        DiscardStaged(staged);
     }
 
     private static void RestoreStaged(List<StagedEntry> staged)
