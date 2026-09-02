@@ -269,14 +269,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 new RuntimeEdge(
                     PrepareExceptionConstructorReceiver,
                     InvokePreparedExceptionNullStringConstructor)
-            ],
-            [
-                new RuntimeEdge(
-                    PrepareExceptionConstructorReceiver,
-                    InvokePreparedExceptionStringConstructor),
-                new RuntimeEdge(
-                    PrepareExceptionConstructorReceiver,
-                    InvokePreparedExceptionNullStringConstructor)
             ]);
     }
 
@@ -296,14 +288,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
             "an already allocated InvalidOperationException receiver and null/non-null messages, excluding newobj",
             ObserveInvalidOperationExceptionStringConstructorEffect,
             SpecEffect.None,
-            [
-                new RuntimeEdge(
-                    PrepareInvalidOperationExceptionConstructorReceiver,
-                    InvokePreparedInvalidOperationExceptionStringConstructor),
-                new RuntimeEdge(
-                    PrepareInvalidOperationExceptionConstructorReceiver,
-                    InvokePreparedInvalidOperationExceptionNullStringConstructor)
-            ],
             [
                 new RuntimeEdge(
                     PrepareInvalidOperationExceptionConstructorReceiver,
@@ -523,7 +507,6 @@ public sealed partial class ApiSpecRuntimeOracleTests
             edgeInputs,
             observeEffect,
             effectMutation,
-            [new RuntimeEdge(prepare, invoke)],
             [new RuntimeEdge(prepare, invoke)]);
     }
 
@@ -557,8 +540,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         string edgeInputs,
         Func<SpecEffect> observeEffect,
         SpecEffect effectMutation,
-        ImmutableArray<RuntimeEdge> allocationEdges,
-        ImmutableArray<RuntimeEdge> throwEdges)
+        ImmutableArray<RuntimeEdge> edges)
     {
         return Row(
             effects: Effect(
@@ -567,15 +549,15 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 effectMutation),
             allocation: Allocation(
                 edgeInputs,
-                allocationEdges,
+                edges,
                 SpecAllocationBehavior.MayAllocate),
             throws: Throws(
                 edgeInputs,
-                throwEdges,
+                edges,
                 DoesNotThrowMutation),
             termination: Termination(
                 edgeInputs,
-                throwEdges,
+                edges,
                 SpecTerminationBehavior.Unknown));
     }
 

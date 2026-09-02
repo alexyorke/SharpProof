@@ -4177,14 +4177,6 @@ R632 is a pending fixture-infrastructure reduction candidate. Preserve cleanup i
 
 R633 is a pending fuzz-oracle infrastructure reduction candidate. Preserve collectible unloading, image ownership/disposal, runtime-type lookup failures, and distinct batch versus semantic-edge result handling; share only the assembly lifetime scaffold.
 
-## Second survey, part one hundred seventy-five: R634 - duplicate constructor witness edge sets
-
-| R634 | **`ApiSpecRuntimeOracleTests` builds the same constructor witness edge set twice per constructor family.** The scalar `ConstructorRow` overload creates separate one-item `ImmutableArray<RuntimeEdge>` instances for allocation and throws even though both contain the same prepare/invoke pair, and the string-constructor callers repeat the same two `RuntimeEdge` objects in their allocation and throw arguments. `ConstructorRow` then reuses the throw set for termination, so one immutable edge array is sufficient for all three facet observations. The Exception and InvalidOperationException builders differ in the receiver type, descriptions, and delegates and should remain explicit; a shared edge-array path removes only the duplicate fixture plumbing and object construction. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:249-315,515-580` |
-
-### Status (part one hundred seventy-five)
-
-R634 is a pending test-fixture simplification candidate. Preserve separate exception-type witnesses and the repeated observations over the same prepared calls; share only the immutable edge-set construction.
-
 ## Second survey, part one hundred seventy-six: R635 - duplicate empty-sequence observation wrappers
 
 | R635 | **`ApiSpecRuntimeOracleTests` repeats the empty-sequence observation wrappers for arrays and `Enumerable.Empty`.** `ObserveArrayEmptyNullness` and `ObserveEnumerableEmptyNullness` both forward two object/value-type factories to `ObserveNullness`, while the corresponding cardinality methods repeat the same two-factory forwarding to `ObserveCardinality`; only the factory pair changes. A small pair-parameterized helper for nullness and cardinality can own these calls without merging the deliberately distinct array versus enumerable runtime witnesses or their allocation/throw edges. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:153-190,983-1034` |
@@ -4192,3 +4184,11 @@ R634 is a pending test-fixture simplification candidate. Preserve separate excep
 ### Status (part one hundred seventy-six)
 
 R635 is a pending runtime-oracle test reduction candidate. Preserve both generic instantiation families and their independent witnesses; factor only the duplicated two-edge observation adapters.
+
+## Second survey, part one hundred seventy-seven: R636 - repeated runtime method lookup
+
+| R636 | **`ScalarDifferentialMatrixTests` repeats the same emitted-subject reflection lookup.** The supported, widening, and arithmetic test paths each resolve `ScalarDifferentialSubject` with `GetType(..., throwOnError: true)`, and four loops then call `GetMethod` with `BindingFlags.Public | BindingFlags.Static` followed by the same missing-method exception. A private `RequireRuntimeMethod` helper (and, optionally, a subject-type accessor) can own this reflection contract while preserving each matrix's separate invocation arity, input enumeration, expected-result logic, and exception assertions. | `SharpProof.Worker.Test/ScalarDifferentialMatrixTests.cs:232-242,275-279,335-345,398-412` |
+
+### Status (part one hundred seventy-seven)
+
+R636 is a pending differential-test fixture reduction candidate. Preserve the fixed generated type name, public-static binding flags, descriptive failures, and all matrix-specific runtime/IR comparisons; share only the repeated reflection lookup.
