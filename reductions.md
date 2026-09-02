@@ -150,6 +150,7 @@ the smallest relevant containerized test target passes.
 | R360 | Make `FrameworkTypeMetadataNames.Monitor` a compile-time constant like its sibling metadata identities | Canonical solution build succeeded |
 | R371 | Remove redundant PowerShell 7 compression assembly loads from pilot package authority scripts | Pilot authority fixtures passed |
 | R356 | Centralize the shared libc `close` and `syscall` imports for the verifier build tasks while retaining task-specific native calls | `SharpProof.Package.Test`: 141 build-task, supervisor, and launcher tests passed |
+| R373 | Share compiler-probe option and path normalization helpers between generator and snapshot implementations | `SharpProof.Package.Test`: six compiler-probe tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1666,7 +1667,6 @@ boundaries.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R373 | **The compiler-probe asset repeats two exact utility methods in its generator and snapshot implementations.** `CompilerProbeGenerator` and `CompilerProbeSnapshot` each define `GetOption(AnalyzerConfigOptions, string)` with the same `TryGetValue`-or-empty behavior and `NormalizePath(string)` with the same backslash-to-slash replacement. Both classes live in `SharpProof.CompilerProbe.TestAsset`, so a small internal helper or linked source file can remove the four duplicate method bodies without changing the generator/snapshot algorithms that consume them. | `SharpProof.CompilerProbe.TestAsset/CompilerProbeGenerator.cs:114-124`; `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:583-593` |
 | R374 | **The contract-runtime preprocessor symbol is independently authored at four boundaries.** `SharpProof.Attributes.Contract.ConditionalSymbol` defines `SHARPPROOF_CONTRACTS`; `SharpProof.Frontend/ContractApi.catalog.json` repeats it and generates `ContractApiCatalog.ConditionalSymbol`; `SharpProof.CompilerArtifact/CompilationFingerprint` repeats it to reject runtime-contract compilations; and `SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props` repeats it in both its detection regex and diagnostic text. R309 covers the intentionally synthetic test fixtures, but no check currently proves these production/build values remain equal. Directly importing one assembly constant is constrained by the analyzer and MSBuild boundaries; a generated shared value or a consistency gate could remove the independent literals and make symbol drift fail early. | `SharpProof.Attributes/Contract.cs:7`; `SharpProof.Frontend/ContractApi.catalog.json:5`; `SharpProof.Frontend/ContractApiMetadata.generated.cs:64-65,220-221`; `SharpProof.CompilerArtifact/CompilationFingerprint.cs:7-8`; `SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props:10,27`; R309 |
 
 ### Checked and not proposed (part thirty-two)
@@ -1679,11 +1679,12 @@ boundaries.
   catalog rather than independently edited. It is counted in R374 as a
   generated projection; the drift concern is the catalog/build/public split,
   not generated-file maintenance by itself.
+- R373 is now applied: compiler-probe generator and snapshot code use one
+  same-assembly helper for option lookup and path normalization.
 
 ### Status (part thirty-two)
 
-R373-R374 are `pending`. R373 is a low-risk same-assembly helper extraction.
-R374 needs a source-of-truth decision across C#, generated metadata, compiler
+R374 is `pending`. R374 needs a source-of-truth decision across C#, generated metadata, compiler
 fingerprinting, and MSBuild before any literal is removed.
 
 ## Second survey, part thirty-two (continued): R461-R462, R375-R379

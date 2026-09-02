@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using static SharpProof.CompilerProbe.TestAsset.CompilerProbeSourceHelpers;
 
 namespace SharpProof.CompilerProbe.TestAsset;
 
@@ -580,15 +581,4 @@ internal static class CompilerProbeSnapshot
                 "An additional file has no compiler text.");
     }
 
-    private static string GetOption(
-        AnalyzerConfigOptions options,
-        string key)
-    {
-        return options.TryGetValue(key, out var value) ? value : string.Empty;
-    }
-
-    private static string NormalizePath(string path)
-    {
-        return path.Replace('\\', '/');
-    }
 }

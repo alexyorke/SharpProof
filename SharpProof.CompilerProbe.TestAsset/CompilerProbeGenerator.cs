@@ -1,3 +1,5 @@
+using static SharpProof.CompilerProbe.TestAsset.CompilerProbeSourceHelpers;
+
 namespace SharpProof.CompilerProbe.TestAsset;
 
 [Generator(LanguageNames.CSharp)]
@@ -111,15 +113,4 @@ public sealed class CompilerProbeGenerator : IIncrementalGenerator
             quote: true);
     }
 
-    private static string GetOption(
-        AnalyzerConfigOptions options,
-        string key)
-    {
-        return options.TryGetValue(key, out var value) ? value : string.Empty;
-    }
-
-    private static string NormalizePath(string path)
-    {
-        return path.Replace('\\', '/');
-    }
 }
