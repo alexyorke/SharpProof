@@ -427,32 +427,19 @@ internal static class CompilerEffectReplayLowerer
         sourceTreePath = string.Empty;
         sourceTreeSha256 = string.Empty;
         sourceLineMapSha256 = string.Empty;
-        for (var index = 0; index < trees.Length; index++)
+        sourceTreeOrdinal = CompilerSourceLocationAuthority.FindUniqueTree(
+            location,
+            new CompilerCompilationSnapshot { SyntaxTrees = capturedTrees },
+            cancellationToken);
+        if (sourceTreeOrdinal < 0)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var candidate = capturedTrees[index];
-            if (!CompilerSourceLocationAuthority.HasValidLocationGeometry(
-                    location,
-                    candidate))
-            {
-                continue;
-            }
-
-            if (sourceTreeOrdinal >= 0)
-            {
-                sourceTreeOrdinal = -1;
-                sourceTreePath = string.Empty;
-                sourceTreeSha256 = string.Empty;
-                sourceLineMapSha256 = string.Empty;
-                return false;
-            }
-
-            sourceTreeOrdinal = index;
-            sourceTreePath = candidate.Path;
-            sourceTreeSha256 = candidate.Sha256;
-            sourceLineMapSha256 = candidate.LineMapSha256;
+            return false;
         }
 
-        return sourceTreeOrdinal >= 0;
+        var sourceTree = capturedTrees[sourceTreeOrdinal];
+        sourceTreePath = sourceTree.Path;
+        sourceTreeSha256 = sourceTree.Sha256;
+        sourceLineMapSha256 = sourceTree.LineMapSha256;
+        return true;
     }
 }
