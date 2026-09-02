@@ -11,6 +11,8 @@ namespace SharpProof.Gates.Test;
 [TestFixture]
 public sealed class CorpusGateTests
 {
+    private const string CorpusSnapshotHeader = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
+
     [Test]
     public void OssImporterRejectsMitLicenseWithAppendedRestrictions()
     {
@@ -368,26 +370,25 @@ public sealed class CorpusGateTests
     [Test]
     public void CorpusSnapshotFormatRequiresExactSchemaThreeBytes()
     {
-        const string header = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
         const string data = "case|Proven|Proven|";
-        var canonical = Encoding.UTF8.GetBytes(header + data + "\n");
+        var canonical = Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data + "\n");
         Assert.That(CorpusSnapshotFormat.Parse(canonical), Is.EqualTo(new[] { data }));
-        Assert.That(CorpusSnapshotFormat.Render(new[] { data }), Is.EqualTo(header + data + "\n"));
+        Assert.That(CorpusSnapshotFormat.Render(new[] { data }), Is.EqualTo(CorpusSnapshotHeader + data + "\n"));
         var invalid = new[]
         {
             Encoding.UTF8.GetBytes(data + "\n"),
-            Encoding.UTF8.GetBytes(header.Split('\n')[0] + "\n" + data + "\n"),
-            Encoding.UTF8.GetBytes(header + header + data + "\n"),
-            Encoding.UTF8.GetBytes((header + data + "\n").Replace("schema 3", "schema 2", StringComparison.Ordinal)),
-            Encoding.UTF8.GetBytes((header + data + "\n").Replace("schema 3", "schema 999", StringComparison.Ordinal)),
-            Encoding.UTF8.GetBytes((header + data + "\n").Replace("SharpProof", "sharpproof", StringComparison.Ordinal)),
-            Encoding.UTF8.GetBytes((header + data + "\n").Replace("schema 3", "schema  3", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes(CorpusSnapshotHeader.Split('\n')[0] + "\n" + data + "\n"),
+            Encoding.UTF8.GetBytes(CorpusSnapshotHeader + CorpusSnapshotHeader + data + "\n"),
+            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema 2", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema 999", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("SharpProof", "sharpproof", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("schema 3", "schema  3", StringComparison.Ordinal)),
             Encoding.UTF8.GetBytes("# case-id|verdict|semantic-outcome|sorted-diagnostics\n# SharpProof analyzer corpus snapshot schema 3\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n" + data + "\n"),
-            Encoding.UTF8.GetBytes(header + "# extra\n" + data + "\n"),
-            Encoding.UTF8.GetBytes(header + "\n" + data + "\n"),
-            Encoding.UTF8.GetBytes((header + data + "\n").Replace("\n", "\r\n", StringComparison.Ordinal)),
-            Encoding.UTF8.GetBytes(header + data),
-            Encoding.UTF8.GetBytes(header + data + "\n\n"),
+            Encoding.UTF8.GetBytes(CorpusSnapshotHeader + "# extra\n" + data + "\n"),
+            Encoding.UTF8.GetBytes(CorpusSnapshotHeader + "\n" + data + "\n"),
+            Encoding.UTF8.GetBytes((CorpusSnapshotHeader + data + "\n").Replace("\n", "\r\n", StringComparison.Ordinal)),
+            Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data),
+            Encoding.UTF8.GetBytes(CorpusSnapshotHeader + data + "\n\n"),
             new byte[] { 0xEF, 0xBB, 0xBF }.Concat(canonical).ToArray(),
             canonical[..^1].Concat(new byte[] { 0xFF, (byte)'\n' }).ToArray()
         };
@@ -400,17 +401,16 @@ public sealed class CorpusGateTests
     [Test]
     public void CorpusSnapshotFormatRequiresCanonicalRowOrdering()
     {
-        const string header = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
         const string first = "a|Proven|Proven|";
         const string second = "b|Proven|Proven|";
 
         Assert.That(
             CorpusSnapshotFormat.Parse(Encoding.UTF8.GetBytes(
-                header + first + "\n" + second + "\n")),
+                CorpusSnapshotHeader + first + "\n" + second + "\n")),
             Is.EqualTo(new[] { first, second }));
         Assert.Throws<InvalidDataException>((Action)(() =>
             CorpusSnapshotFormat.Parse(Encoding.UTF8.GetBytes(
-                header + second + "\n" + first + "\n"))));
+                CorpusSnapshotHeader + second + "\n" + first + "\n"))));
         Assert.Throws<InvalidDataException>((Action)(() =>
             CorpusSnapshotFormat.Render([second, first])));
     }
@@ -418,7 +418,6 @@ public sealed class CorpusGateTests
     [Test]
     public void CorpusSnapshotFormatRequiresCanonicalEnumNames()
     {
-        const string header = "# SharpProof analyzer corpus snapshot schema 3\n# case-id|verdict|semantic-outcome|sorted-diagnostics\n# diagnostic=id@effective-severity@normalized-location@base64-invariant-message\n";
         static byte[] Snapshot(string header, string data)
         {
             return Encoding.UTF8.GetBytes(header + data + "\n");
@@ -438,7 +437,7 @@ public sealed class CorpusGateTests
                      "Proven", "Refuted", "Unknown", "SilentUnknown"
                  })
         {
-            AssertAccepted(header, $"case|{verdict}|Proven|");
+            AssertAccepted(CorpusSnapshotHeader, $"case|{verdict}|Proven|");
         }
         foreach (var semanticOutcome in new[]
                  {
@@ -446,7 +445,7 @@ public sealed class CorpusGateTests
                      "Unknown", "Refuted"
                  })
         {
-            AssertAccepted(header, $"case|Proven|{semanticOutcome}|");
+            AssertAccepted(CorpusSnapshotHeader, $"case|Proven|{semanticOutcome}|");
         }
 
         foreach (var noncanonical in new[]
@@ -460,7 +459,7 @@ public sealed class CorpusGateTests
                  })
         {
             Assert.Throws<InvalidDataException>((Action)(() =>
-                CorpusSnapshotFormat.Parse(Snapshot(header, noncanonical))));
+                CorpusSnapshotFormat.Parse(Snapshot(CorpusSnapshotHeader, noncanonical))));
             Assert.Throws<InvalidDataException>((Action)(() =>
                 CorpusSnapshotFormat.Render([noncanonical])));
         }
