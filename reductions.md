@@ -4654,7 +4654,9 @@ repository. Its counterpart - which assemblies may see another's internals - has
 
 ### Status (part two hundred fifty-two)
 
-R734 is `pending` and is three line deletions. R735 is `pending` and is the
+R734 completed: the three unreachable `InternalsVisibleTo` grants to
+`SharpProof.CompilerArtifact` and `SharpProof.Worker` were removed; the
+boundary tests and affected builds retain their reachable grants. R735 is `pending` and is the
 reason to bother: it names a gap in a boundary this repository otherwise gates more
 carefully than almost anything else, and the fix reuses a pattern already present
 in the same test file. It belongs with R730 and R731 - a correct authority existing

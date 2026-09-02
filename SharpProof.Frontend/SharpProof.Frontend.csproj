@@ -18,7 +18,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Analyzer" />
     <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
-    <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
     <InternalsVisibleTo Include="SharpProof.Effects" />
     <InternalsVisibleTo Include="SharpProof.Contracts" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
