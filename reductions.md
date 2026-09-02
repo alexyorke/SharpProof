@@ -151,6 +151,8 @@ the smallest relevant containerized test target passes.
 | R371 | Remove redundant PowerShell 7 compression assembly loads from pilot package authority scripts | Pilot authority fixtures passed |
 | R356 | Centralize the shared libc `close` and `syscall` imports for the verifier build tasks while retaining task-specific native calls | `SharpProof.Package.Test`: 141 build-task, supervisor, and launcher tests passed |
 | R373 | Share compiler-probe option and path normalization helpers between generator and snapshot implementations | `SharpProof.Package.Test`: six compiler-probe tests passed |
+| R461 | Replace the interval modular-distance branch ladder with the existing `Normalize` helper | `SharpProof.Dataflow.Test`: 50 passed |
+| R462 | Remove the shadowed `modulus.IsOne` boundary normalization branch from `IntervalDomain.Create` | `SharpProof.Dataflow.Test`: 50 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1694,8 +1696,6 @@ lattice joins, graph representations, and fixpoint solvers in `SharpProof.Datafl
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R461 | **`IntervalDomain.TryCongruentBoundary` re-implements modular difference normalization with nested conditionals.** `SharpProof.Dataflow/IntervalDomain.cs:254-260` computes circular modular distance using a 7-line 4-way nested ternary (`atOrAbove ? remainder >= boundaryRemainder ? ... : ... : ...`). `IntervalDomain.Normalize(BigInteger value, BigInteger modulus)` at `IntervalDomain.cs:210-214` already normalizes signed differences into $[0, \text{modulus}-1]$. Replacing the nested ternary with `Normalize(atOrAbove ? remainder - boundaryRemainder : boundaryRemainder - remainder, modulus)` eliminates 7 lines of nested branches. | `SharpProof.Dataflow/IntervalDomain.cs:210-214, 254-260` |
-| R462 | **`IntervalDomain.Create` contains redundant extreme boundary normalization branches.** `SharpProof.Dataflow/IntervalDomain.cs:35-45` conditionally converts `lowerBound == long.MinValue` and `upperBound == long.MaxValue` to `null` when `modulus.IsOne`. Subsequently, lines 67-68 unconditionally convert `long.MinValue` and `long.MaxValue` to `null` for all moduli (`adjustedLower = lowerBound == long.MinValue ? null : lowerBound`). Lines 35-45 are completely shadowed by lines 67-68. | `SharpProof.Dataflow/IntervalDomain.cs:35-45, 67-68` |
 | R375 | **`ClosedAbstractDomain<T>` forces duplicate `Havoc` and `Widen` implementations across all derived domains.** `SharpProof.Dataflow/ClosedAbstractDomain.cs:18-19` defines `Havoc` and `Widen` as abstract methods. Every derived domain repeats identical logic: `NullnessDomain.cs:49-53`, `SequenceCardinalityDomain.cs:136-140`, and `IntervalDomain.cs:178-181` each implement `Havoc` as `value.IsBottom ? Bottom : Top`, and finite lattices implement `Widen` as `Join(previous, candidate)`. Providing virtual default implementations in `ClosedAbstractDomain<T>` eliminates boilerplate overrides in all subclasses. | `SharpProof.Dataflow/ClosedAbstractDomain.cs:18-19`; `SharpProof.Dataflow/NullnessDomain.cs:44-53`; `SharpProof.Dataflow/SequenceCardinalityDomain.cs:136-140`; `SharpProof.Dataflow/IntervalDomain.cs:178-181` |
 | R376 | **`DataflowGraph<T>` performs redundant multi-pass sorting on already-sorted adjacency lists.** `SharpProof.Dataflow/DataflowGraph.cs:77-88, 155-164` sorts `Edges` primarily by `SourceId` and secondarily by `TargetId` on line 77. Iterating `Edges` populates `successors[edge.SourceId]` in strictly sorted order. Calling `Freeze(successors)` on line 88 then re-sorts every list with `neighbors.Sort()`. Avoiding the second sort pass on pre-sorted successor lists simplifies graph construction. | `SharpProof.Dataflow/DataflowGraph.cs:77-88, 155-164` |
 | R377 | **4-point flat diamond lattice join and partial order logic is duplicated across enum domains.** `SharpProof.Dataflow/NullnessDomain.cs:17-42` and `SharpProof.Dataflow/SequenceCardinalityDomain.cs:142-169` implement identical 4-element flat diamond lattices ($\bot < \{A, B\} < \top$). Both duplicate identical branch cascades for identity, bottom absorption, and top collapse. Unifying diamond lattice operations reduces duplicated lattice decision trees across abstract domains. | `SharpProof.Dataflow/NullnessDomain.cs:17-42`; `SharpProof.Dataflow/SequenceCardinalityDomain.cs:142-169` |
@@ -1708,10 +1708,14 @@ lattice joins, graph representations, and fixpoint solvers in `SharpProof.Datafl
   symbolic interval evaluation on indeterminate bounds. Retained as-is.
 - Explicit non-negative interval constraints on sequence cardinality length domain prevent
   negative length inferences. Retained as-is.
+- R461 is now applied: `TryCongruentBoundary` uses `Normalize` for both modular
+  directions, preserving the same signed-distance result.
+- R462 is now applied: the earlier `modulus.IsOne` boundary rewrite was removed;
+  the later extreme-bound handling remains the sole normalization path.
 
 ### Status (part thirty-two continued)
 
-R461, R462, and R375-R379 are `pending`. R461, R462, R376, and R378 are direct, low-risk local simplifications.
+R375-R379 are `pending`. R376 and R378 are direct, low-risk local simplifications.
 R375 and R377 generalize abstract domain hierarchy contracts. R379 optimizes fixpoint solver throughput.
 
 ## Second survey, part thirty-three: R380-R385

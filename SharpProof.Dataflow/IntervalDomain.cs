@@ -31,19 +31,6 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
             throw new ArgumentOutOfRangeException(nameof(modulus));
         }
 
-        if (modulus.IsOne)
-        {
-            if (!lowerBound.HasValue || lowerBound == long.MinValue)
-            {
-                lowerBound = null;
-            }
-
-            if (!upperBound.HasValue || upperBound == long.MaxValue)
-            {
-                upperBound = null;
-            }
-        }
-
         if (lowerBound.HasValue && upperBound.HasValue &&
             lowerBound.Value > upperBound.Value)
         {
@@ -251,13 +238,11 @@ public sealed class IntervalDomain : ClosedAbstractDomain<IntervalValue>
         out long result)
     {
         var boundaryRemainder = Normalize(boundary, modulus);
-        var delta = atOrAbove
-            ? remainder >= boundaryRemainder
+        var delta = Normalize(
+            atOrAbove
                 ? remainder - boundaryRemainder
-                : modulus - (boundaryRemainder - remainder)
-            : boundaryRemainder >= remainder
-                ? boundaryRemainder - remainder
-                : modulus - (remainder - boundaryRemainder);
+                : boundaryRemainder - remainder,
+            modulus);
         var candidate = atOrAbove ? boundary + delta : boundary - delta;
         if (candidate < long.MinValue || candidate > long.MaxValue)
         {
