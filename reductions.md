@@ -6186,3 +6186,25 @@ No implementation or build file was changed.
 
 R797 is `pending` and limited to sharing one staged-worker version projection.
 No implementation or build file was changed.
+
+## Second survey, part three hundred nine: R798 - repeated launcher path-topology validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R798 | **Launcher request construction reruns the full path-topology validator around one manifest read.** `RunMain` first calls `LauncherArguments.ValidateDistinctPaths` before the worker snapshot exists, which is an intentional early check for the static worker/launcher runtime closure. `CreateRequest` then calls the same validator before reading the compiler manifest and again after projecting the manifest's project directory. The latter two passes repeat canonicalization of the worker/runtime roots, publication paths, request/result/manifest paths, runtime-directory containment checks, and pairwise conflict checks; only the cache argument differs because the default cache path cannot be derived until the manifest is read. A split validation result that caches the stable path set and adds only the newly knowable cache path after manifest projection, or a validator with an explicit stable-topology phase plus cache-only phase, can retain the pre-snapshot fail-closed check and the post-manifest default-cache check without replaying every filesystem identity walk. This is distinct from R494, which covers repeated path resolution inside the MSBuild invalidation task rather than repeated validation phases in the launcher request projection. | `SharpProof.Worker.Launcher/Program.cs:57-66,951-971,974-1043`; `SharpProof.Worker.Protocol/WorkerCachePath.cs:5-14` |
+
+### Checked and not proposed (part three hundred nine)
+
+- The early pre-snapshot validation remains necessary because it rejects
+  collisions before opening and staging the worker runtime.
+- The final cache check remains necessary because the default cache path is
+  derived from `artifact.Compilation.ProjectDirectory` after the manifest is
+  read; the proposal is to isolate that new input, not to remove the check.
+- Runtime snapshot component paths, publication-marker paths, symlink policy,
+  and pairwise conflict semantics must remain in the retained topology result.
+
+### Status (part three hundred nine)
+
+R798 is `pending` and limited to separating stable launcher topology validation
+from the manifest-dependent cache-path check. No implementation or build file
+was changed.
