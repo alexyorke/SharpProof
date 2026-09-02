@@ -143,8 +143,8 @@ public readonly struct IntervalValue : IEquatable<IntervalValue>
         var upper = UpperBound?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "+inf";
         return Modulus switch
         {
-            var value when value.IsZero => FormattableString.Invariant($"[{lower}, {upper}]"),
-            var value when value.IsOne => FormattableString.Invariant($"[{lower}, {upper}]"),
+            var value when value.IsZero || value.IsOne =>
+                FormattableString.Invariant($"[{lower}, {upper}]"),
             _ => FormattableString.Invariant($"[{lower}, {upper}] mod {Modulus} = {Remainder}")
         };
     }

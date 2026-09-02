@@ -182,6 +182,7 @@ the smallest relevant containerized test target passes.
 | R442 | Remove the unreachable second coverage-module identity check | `SharpProof.ArchitectureTest`: coverage tests passed |
 | R445 | Share XML writer settings and disposal through one coverage save helper | PowerShell parse; `SharpProof.ArchitectureTest`: coverage tests passed |
 | R456 | Let the SDK derive `PackageVersion` from the authoritative `Version` property | `SharpProof.ArchitectureTest`: release/package tests 73 passed |
+| R460 | Combine equivalent unconstrained interval-format switch arms | `SharpProof.Dataflow.Test`: 50 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1888,6 +1889,7 @@ R441, R442, and R445 are now applied: coverage/complexity scripts avoid redundan
 I/O, dead validation, and duplicated XML serialization setup.
 R456 is now applied: release props keep one package-version authority via
 `Version` and the SDK default.
+R460 is now applied: zero and unit-modulus interval formatting share one arm.
 
 ## Second survey, part thirty-seven: R407-R412
 
@@ -2113,7 +2115,8 @@ This pass inspected analyzer control-attribute validation and the small dataflow
 
 ### Status (part forty-six)
 
-R457-R460 are `pending`. They are review-only reduction candidates; no implementation or build files were edited.
+R457-R459 are `pending` review-only candidates. R460 is applied: equivalent
+interval-format switch arms are combined.
 
 ## Second survey, part forty-seven: R463, and two ledger repairs
 
