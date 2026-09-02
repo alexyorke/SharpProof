@@ -4656,11 +4656,10 @@ repository. Its counterpart - which assemblies may see another's internals - has
 
 R734 completed: the three unreachable `InternalsVisibleTo` grants to
 `SharpProof.CompilerArtifact` and `SharpProof.Worker` were removed; the
-boundary tests and affected builds retain their reachable grants. R735 is `pending` and is the
-reason to bother: it names a gap in a boundary this repository otherwise gates more
-carefully than almost anything else, and the fix reuses a pattern already present
-in the same test file. It belongs with R730 and R731 - a correct authority existing
-while a second, ungated declaration of the same fact drifts beside it.
+boundary tests and affected builds retain their reachable grants. R735 completed:
+`BoundaryEnforcementTests` now compares the complete approved grant set against
+the project files, so stale or newly added assembly access is visible; the
+boundary suite passes 13/13.
 
 ## Second survey, part two hundred fifty-three: R736-R737 - repeated fixture metadata work
 

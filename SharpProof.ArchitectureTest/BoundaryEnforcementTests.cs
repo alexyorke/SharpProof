@@ -29,6 +29,108 @@ public sealed class BoundaryEnforcementTests
         "SharpProof.Worker"
     ];
 
+    private static readonly (string Project, string[] Grantees)[] ExpectedInternalsVisibleTo = [
+        ("SharpProof.Analyzer.Core", [
+            "SharpProof.Analyzer",
+            "SharpProof.Analyzer.Test",
+            "SharpProof.CompilerCollector",
+            "SharpProof.ContractForGenerator",
+            "SharpProof.ContractForGenerator.Test",
+            "SharpProof.Gates",
+            "SharpProof.Worker.Test"
+        ]),
+        ("SharpProof.Analyzer", [
+            "SharpProof.Analyzer.Test",
+            "SharpProof.Gates"
+        ]),
+        ("SharpProof.BuildTasks", ["SharpProof.Package.Test"]),
+        ("SharpProof.CompilerArtifact", [
+            "SharpProof.Analyzer.Test",
+            "SharpProof.CompilerCollector",
+            "SharpProof.Gates",
+            "SharpProof.Package.Test",
+            "SharpProof.Worker",
+            "SharpProof.Worker.Launcher",
+            "SharpProof.Worker.Test"
+        ]),
+        ("SharpProof.CompilerCollector", [
+            "SharpProof.Analyzer.Test",
+            "SharpProof.Gates",
+            "SharpProof.Worker.Test"
+        ]),
+        ("SharpProof.Contracts", [
+            "SharpProof.Analyzer",
+            "SharpProof.Analyzer.Core",
+            "SharpProof.CompilerCollector",
+            "SharpProof.ContractForGenerator"
+        ]),
+        ("SharpProof.Dataflow", [
+            "SharpProof.Analyzer.Core",
+            "SharpProof.Dataflow.Test"
+        ]),
+        ("SharpProof.Effects", [
+            "SharpProof.Analyzer",
+            "SharpProof.Analyzer.Core",
+            "SharpProof.Analyzer.Test",
+            "SharpProof.CompilerCollector",
+            "SharpProof.Effects.Test"
+        ]),
+        ("SharpProof.Frontend", [
+            "SharpProof.Analyzer",
+            "SharpProof.Analyzer.Core",
+            "SharpProof.CompilerCollector",
+            "SharpProof.Contracts",
+            "SharpProof.Effects",
+            "SharpProof.Frontend.Test"
+        ]),
+        ("SharpProof.Fuzz", ["SharpProof.Fuzz.Test"]),
+        ("SharpProof.Gates", ["SharpProof.Gates.Test"]),
+        ("SharpProof.Host", [
+            "SharpProof.BuildTasks",
+            "SharpProof.Package.Test",
+            "SharpProof.Worker.Launcher",
+            "SharpProof.Worker.Test"
+        ]),
+        ("SharpProof.Ir", [
+            "SharpProof.Analyzer",
+            "SharpProof.Analyzer.Core",
+            "SharpProof.Analyzer.Test",
+            "SharpProof.CompilerArtifact",
+            "SharpProof.CompilerCollector",
+            "SharpProof.Contracts",
+            "SharpProof.Effects",
+            "SharpProof.Frontend",
+            "SharpProof.Gates",
+            "SharpProof.Ir.Test",
+            "SharpProof.Smt",
+            "SharpProof.Specs",
+            "SharpProof.Specs.Test",
+            "SharpProof.Summaries",
+            "SharpProof.Testing",
+            "SharpProof.Verify",
+            "SharpProof.Worker",
+            "SharpProof.Worker.Launcher"
+        ]),
+        ("SharpProof.Smt", ["SharpProof.Smt.Test"]),
+        ("SharpProof.Verify", [
+            "SharpProof.Fuzz",
+            "SharpProof.Smt.Test",
+            "SharpProof.Verify.Test",
+            "SharpProof.Worker"
+        ]),
+        ("SharpProof.Worker.Launcher", ["SharpProof.Package.Test"]),
+        ("SharpProof.Worker.Protocol", [
+            "SharpProof.BuildTasks",
+            "SharpProof.CompilerArtifact",
+            "SharpProof.Gates",
+            "SharpProof.Package.Test",
+            "SharpProof.Worker",
+            "SharpProof.Worker.Launcher",
+            "SharpProof.Worker.Test"
+        ]),
+        ("SharpProof.Worker", ["SharpProof.Worker.Test"])
+    ];
+
     [Test]
     public void BannedApiAnalyzerIsScopedToProductionProjects()
     {
@@ -280,6 +382,25 @@ public sealed class BoundaryEnforcementTests
                 Is.EqualTo("false"),
                 project);
         }
+    }
+
+    [Test]
+    public void InternalsVisibleToMatchesApprovedAssemblyBoundary()
+    {
+        var actual = BannedApiProjects
+            .SelectMany(project => XDocument.Load(ProjectFile(project))
+                .Descendants("InternalsVisibleTo")
+                .Select(element =>
+                    $"{project}|{(string?)element.Attribute("Include")}"))
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToArray();
+        var expected = ExpectedInternalsVisibleTo
+            .SelectMany(static entry => entry.Grantees.Select(grantee =>
+                $"{entry.Project}|{grantee}"))
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(actual, Is.EqualTo(expected));
     }
 
     [Test]
