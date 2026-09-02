@@ -21,4 +21,10 @@ internal static class HashEncoding
         using var hash = SHA256.Create();
         return ToLowerHex(hash.ComputeHash(bytes));
     }
+
+    internal static bool IsSha256(string? value)
+    {
+        return value is { Length: 64 } && value.All(
+            static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+    }
 }

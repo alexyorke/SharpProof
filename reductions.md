@@ -146,6 +146,7 @@ the smallest relevant containerized test target passes.
 | R349 | Hook consumer configuration validation directly before `CoreCompile` and remove the empty analyzer-consumer shim target | `SharpProof.ArchitectureTest`: build scheduling and consumer configuration tests passed |
 | R352 | Centralize tuple-aware C# type-name validation in `GeneratedFileHelpers.ps1` and remove three generator-local copies | Three generator `-Verify` checks; canonical `SharpProof.sln` build succeeded |
 | R358 | Reuse the linked IR UTF-16 well-formedness scan in protocol JSON validation while keeping protocol-specific error behavior | `SharpProof.Worker.Test`: ProtocolJsonTests 108 passed; canonical solution build succeeded |
+| R359 | Share lowercase SHA-256 validation through the canonical hash helper used by IR, summaries, and protocol serialization | `SharpProof.Worker.Test`: ProtocolJsonTests 108; `SharpProof.Summaries.Test`: 14 passed |
 | R360 | Make `FrameworkTypeMetadataNames.Monitor` a compile-time constant like its sibling metadata identities | Canonical solution build succeeded |
 | R371 | Remove redundant PowerShell 7 compression assembly loads from pilot package authority scripts | Pilot authority fixtures passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
@@ -1560,6 +1561,8 @@ and hashing abstractions across `Directory.Build.props`, `SharpProof.CompilerArt
   `JsonException` message and avoiding duplicate fully-qualified types.
 - R360 is now applied: `FrameworkTypeMetadataNames.Monitor` is a `const` like
   every other framework metadata identity.
+- R359 is now applied: IR's canonical hash helper owns lowercase SHA-256
+  validation, with summaries and protocol retaining their existing entrypoints.
 
 ### Status (part twenty-eight)
 
@@ -1604,7 +1607,6 @@ domain bounds across `SharpProof.Worker.Protocol`, `SharpProof.Ir`, `SharpProof.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R359 | **`IrSummaryProvenance.IsSha256` is an exact duplicate of `WorkerProtocolJson.IsSha256`.** `SharpProof.Summaries/IrRelationalSummary.cs:73-78` defines private static `bool IsSha256(string? value) => value != null && value.Length == 64 && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');`. `SharpProof.Worker.Protocol/ProtocolJson.cs:1056-1060` declares the identical predicate as `internal static bool IsSha256(string? value)`. Consolidating SHA-256 validation in a shared helper removes duplicate hex-validation routines across semantic summaries and protocol layers. | `SharpProof.Summaries/IrRelationalSummary.cs:73-78`; `SharpProof.Worker.Protocol/ProtocolJson.cs:1056-1060` |
 | R361 | **`NullableAttributes.cs` in `SharpProof.Specs/Polyfills/` is linked into only one downstream project while sibling polyfills are declared independently.** `SharpProof.Specs/Polyfills/NullableAttributes.cs` defines `NotNullWhenAttribute(bool returnValue)`. `SharpProof.Effects/SharpProof.Effects.csproj:14-15` links it with `<Compile Include="..\SharpProof.Specs\Polyfills\NullableAttributes.cs" Link="Polyfills\NullableAttributes.cs" />`. Meanwhile, `SharpProof.Ir/ArgumentNullGuard.cs:1-8` conditionally compiles its own `NotNullAttribute`. Consolidating BCL code-analysis attribute polyfills under `SharpProof.Specs/Polyfills/` or in `Directory.Build.props` for netstandard2.0 removes ad-hoc per-file linking. | `SharpProof.Specs/Polyfills/NullableAttributes.cs:1-8`; `SharpProof.Effects/SharpProof.Effects.csproj:14-15`; `SharpProof.Ir/ArgumentNullGuard.cs:1-8` |
 | R362 | **`ArchitectureRepository.ProductionProjects` hardcodes a 22-element project array duplicating the classification logic in `Directory.Build.props`.** `SharpProof.ArchitectureTest/ArchitectureRepository.cs:7-30` hardcodes an array of 22 production project names. `Directory.Build.props:33-36` classifies `SharpProofProductionProject` using regex exclusions. When new production projects are added, `ArchitectureRepository.ProductionProjects` must be manually updated in addition to build props and solution files. Deriving production project membership dynamically from project evaluation or solution structure avoids configuration drift. | `SharpProof.ArchitectureTest/ArchitectureRepository.cs:7-30`; `Directory.Build.props:33-36` |
 | R363 | **The default rlimit budget of 3,000,000 resource units is defined independently across three disconnected project layers.** `SharpProof.Smt/IrSmtBackendOptions.cs:5` hardcodes `public const uint DefaultQueryRlimit = 3_000_000;`. `SharpProof.Worker.Protocol/ProtocolModel.schema.json:520` generates `WorkerBudgets.DefaultQueryRlimit = 3000000U;`. `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:18` defines `<SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>`. If the default query rlimit is adjusted, all three independent declarations must be synchronized manually. | `SharpProof.Smt/IrSmtBackendOptions.cs:5`; `SharpProof.Worker.Protocol/ProtocolModel.schema.json:520`; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:18` |
@@ -1623,7 +1625,7 @@ domain bounds across `SharpProof.Worker.Protocol`, `SharpProof.Ir`, `SharpProof.
 
 ### Status (part thirty)
 
-R359, R361-R367 are `pending`. R359 and R364 are direct, safe code reductions.
+R361-R367 are `pending`. R364 is a direct, safe code reduction.
 R361, R362, and R363 reduce cross-layer configuration drift between MSBuild properties,
 Roslyn analyzers, and verification workers.
 

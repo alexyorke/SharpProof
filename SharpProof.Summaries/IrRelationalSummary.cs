@@ -38,7 +38,7 @@ public sealed class IrSummaryProvenance
             throw new ArgumentOutOfRangeException(nameof(origin));
         }
 
-        if (!IsSha256(evidenceSha256))
+        if (!HashEncoding.IsSha256(evidenceSha256))
         {
             throw new ArgumentException(
                 "Summary evidence must have a lowercase SHA-256 digest.",
@@ -70,12 +70,6 @@ public sealed class IrSummaryProvenance
 
     public string EvidenceCallIdentity { get; }
 
-    private static bool IsSha256(string? value)
-    {
-        return value != null && value.Length == 64 &&
-            value.All(static character =>
-                character is >= '0' and <= '9' or >= 'a' and <= 'f');
-    }
 }
 
 public sealed class IrSummarySignature(

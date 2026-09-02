@@ -1053,8 +1053,7 @@ public static partial class WorkerProtocolJson
 
     internal static bool IsSha256(string? value)
     {
-        return value is { Length: 64 } &&
-            value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+        return ProtocolHashEncoding.IsSha256(value);
     }
 
     internal static string ComputeSha256(byte[] bytes)
