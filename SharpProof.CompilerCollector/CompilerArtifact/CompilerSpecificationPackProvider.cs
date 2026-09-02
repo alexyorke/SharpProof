@@ -568,32 +568,39 @@ internal sealed class CompilerSpecificationPackProvider
         var type = ParseType(
             RequiredProperty(element, "type", "term"),
             "term.type");
+        var context = kind + " term";
+        JsonElement Get(string name)
+        {
+            return RequiredProperty(element, name, context);
+        }
+
+        string GetString(string name)
+        {
+            return RequiredString(element, name, context);
+        }
+
         switch (kind)
         {
             case "parameter":
-                RequireObject(element, "parameter term", "kind", "type", "ordinal");
+                RequireObject(element, context, "kind", "type", "ordinal");
                 return new ParameterTerm(
                     type,
-                    RequiredInt32(element, "ordinal", "parameter term"));
+                    RequiredInt32(element, "ordinal", context));
             case "boolean":
-                RequireObject(element, "boolean term", "kind", "type", "value");
+                RequireObject(element, context, "kind", "type", "value");
                 if (type != IrTypeKind.Boolean ||
-                    RequiredProperty(element, "value", "boolean term")
-                        .ValueKind is not JsonValueKind.True and
+                    Get("value").ValueKind is not JsonValueKind.True and
                         not JsonValueKind.False)
                 {
                     throw new InvalidDataException(
                         "A specification-pack Boolean literal is invalid.");
                 }
 
-                return new BooleanTerm(
-                    RequiredProperty(element, "value", "boolean term")
-                        .GetBoolean());
+                return new BooleanTerm(Get("value").GetBoolean());
             case "integer":
-                RequireObject(element, "integer term", "kind", "type", "value");
+                RequireObject(element, context, "kind", "type", "value");
                 if (type != IrTypeKind.Integer ||
-                    !RequiredProperty(element, "value", "integer term")
-                        .TryGetInt64(out var integer))
+                    !Get("value").TryGetInt64(out var integer))
                 {
                     throw new InvalidDataException(
                         "A specification-pack integer literal is invalid.");
@@ -601,32 +608,24 @@ internal sealed class CompilerSpecificationPackProvider
 
                 return new IntegerTerm(integer);
             case "unary":
-                RequireObject(element, "unary term", "kind", "type", "operator", "operand");
-                var unary = ParseUnaryOperator(
-                    RequiredString(element, "operator", "unary term"));
+                RequireObject(element, context, "kind", "type", "operator", "operand");
+                var unary = ParseUnaryOperator(GetString("operator"));
                 return new UnaryTerm(
                     type,
                     unary,
-                    ParseTerm(
-                        RequiredProperty(element, "operand", "unary term"),
-                        depth + 1));
+                    ParseTerm(Get("operand"), depth + 1));
             case "binary":
-                RequireObject(element, "binary term", "kind", "type", "operator", "left", "right");
-                var binary = ParseBinaryOperator(
-                    RequiredString(element, "operator", "binary term"));
+                RequireObject(element, context, "kind", "type", "operator", "left", "right");
+                var binary = ParseBinaryOperator(GetString("operator"));
                 return new BinaryTerm(
                     type,
                     binary,
-                    ParseTerm(
-                        RequiredProperty(element, "left", "binary term"),
-                        depth + 1),
-                    ParseTerm(
-                        RequiredProperty(element, "right", "binary term"),
-                        depth + 1));
+                    ParseTerm(Get("left"), depth + 1),
+                    ParseTerm(Get("right"), depth + 1));
             case "conditional":
                 RequireObject(
                     element,
-                    "conditional term",
+                    context,
                     "kind",
                     "type",
                     "condition",
@@ -634,24 +633,9 @@ internal sealed class CompilerSpecificationPackProvider
                     "whenFalse");
                 return new ConditionalTerm(
                     type,
-                    ParseTerm(
-                        RequiredProperty(
-                            element,
-                            "condition",
-                            "conditional term"),
-                        depth + 1),
-                    ParseTerm(
-                        RequiredProperty(
-                            element,
-                            "whenTrue",
-                            "conditional term"),
-                        depth + 1),
-                    ParseTerm(
-                        RequiredProperty(
-                            element,
-                            "whenFalse",
-                            "conditional term"),
-                        depth + 1));
+                    ParseTerm(Get("condition"), depth + 1),
+                    ParseTerm(Get("whenTrue"), depth + 1),
+                    ParseTerm(Get("whenFalse"), depth + 1));
             default:
                 throw new InvalidDataException(
                     "A specification-pack term kind is unsupported.");
