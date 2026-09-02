@@ -117,6 +117,12 @@
              Link="ApiSpecTestFacets.cs" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Effects.Test'">
+    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\RuntimeAssemblyTestHost.cs"
+             Link="RuntimeAssemblyTestHost.cs" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(SharpProofProductionProject)' == 'true'">
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
                       PrivateAssets="all" />

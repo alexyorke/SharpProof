@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Reflection;
-using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 
@@ -90,7 +89,10 @@ public sealed class RuntimeFlagshipOracleTests
             ("SP0046", "DisallowedException"));
 
         var image = AnalyzerTestHost.EmitImage(compilation);
-        WithRuntimeAssembly(image, assembly =>
+        RuntimeAssemblyTestHost.WithRuntimeAssembly(
+            "SharpProof.Analyzer.Test.RuntimeFlagship",
+            image,
+            assembly =>
         {
             var fixture = assembly.GetType(
                     "RuntimeFlagshipFixture",
@@ -226,34 +228,4 @@ public sealed class RuntimeFlagshipOracleTests
         .CreateDelegate<TDelegate>();
     }
 
-    private static void WithRuntimeAssembly(
-        byte[] image,
-        Action<Assembly> action)
-    {
-        var context = new AssemblyLoadContext(
-            "SharpProof.Analyzer.Test.RuntimeFlagship",
-            isCollectible: true);
-        context.Resolving += ResolveFromDefaultContext;
-        try
-        {
-            using var stream = new MemoryStream(image, writable: false);
-            action(context.LoadFromStream(stream));
-        }
-        finally
-        {
-            context.Resolving -= ResolveFromDefaultContext;
-            context.Unload();
-        }
-    }
-
-    private static Assembly? ResolveFromDefaultContext(
-        AssemblyLoadContext context,
-        AssemblyName requestedName)
-    {
-        return AppDomain.CurrentDomain.GetAssemblies()
-            .FirstOrDefault(candidate =>
-                AssemblyName.ReferenceMatchesDefinition(
-                    candidate.GetName(),
-                    requestedName));
-    }
 }

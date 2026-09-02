@@ -179,6 +179,7 @@ the smallest relevant containerized test target passes.
 | R598 | Share frontend fuzz parameter binding traversal | `SharpProof.Fuzz.Test`: FrontendSemanticEdgeCaseTests 7; FuzzRunnerTests 32 passed |
 | R602, R608 | Share Worker compiler-test compilation setup across five suites | `SharpProof.Worker.Test`: CompilerCallableLowererTests 20; CompilerRelationalSummaryProviderTests 3; CompilerCallableLowererWaveSixRegressionTests 3; ClaimManifestBuilderTests 50; CompilerRuntimeSymbolArtifactTests 2 passed |
 | R565 | Reuse sorted package-build statistic arrays for medians and P95 | `SharpProof.Gates.Test`: PackageBuildEstimator tests, 6 passed; 27 other PerformanceGateTests passed (2 pre-existing policy failures) |
+| R571 | Share collectible runtime assembly test lifetime and resolver setup | `SharpProof.Analyzer.Test`: RuntimeFlagshipOracleTests and RuntimeRequiresOracleTests passed; `SharpProof.Effects.Test`: RuntimeEffectOracleTests, 7 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3722,7 +3723,11 @@ the discarded Compose version probe and its extra failure point are gone.
 
 ### Status (part one hundred twelve)
 
-R571 is a pending test-infrastructure reduction candidate. Preserve collectible unloading and resolver detach in `finally`; the helper should not merge the distinct oracle behavior or hide failures from the callback.
+R571 is `applied`: the three runtime-oracle suites now use one linked
+`RuntimeAssemblyTestHost` for collectible context lifetime, default-context
+resolution, non-writable image streams, and guaranteed resolver detachment and
+unloading. Each suite retains its context name, image wrapper unwrapping, and
+runtime assertions.
 
 ## Second survey, part one hundred fourteen: R573 - incomplete baseline identity preflight
 

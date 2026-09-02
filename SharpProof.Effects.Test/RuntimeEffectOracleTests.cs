@@ -440,31 +440,10 @@ public sealed class RuntimeEffectOracleTests
         EmittedAssemblyImage image,
         Action<Assembly> action)
     {
-        var context = new AssemblyLoadContext(
+        RuntimeAssemblyTestHost.WithRuntimeAssembly(
             "SharpProof.Effects.Test.RuntimeOracle",
-            isCollectible: true);
-        context.Resolving += ResolveFromDefaultContext;
-        try
-        {
-            using var stream = new MemoryStream(image.Image, writable: false);
-            action(context.LoadFromStream(stream));
-        }
-        finally
-        {
-            context.Resolving -= ResolveFromDefaultContext;
-            context.Unload();
-        }
-    }
-
-    private static Assembly? ResolveFromDefaultContext(
-        AssemblyLoadContext context,
-        AssemblyName requestedName)
-    {
-        return AppDomain.CurrentDomain.GetAssemblies()
-            .FirstOrDefault(candidate =>
-                AssemblyName.ReferenceMatchesDefinition(
-                    candidate.GetName(),
-                    requestedName));
+            image.Image,
+            action);
     }
 
     private static MethodInfo RequireMethod(
