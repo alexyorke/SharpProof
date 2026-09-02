@@ -186,16 +186,26 @@ public static class CompilerIdentityBridge
 
     private static string SymbolReference(ISymbol symbol)
     {
-        return DocumentationCommentId.CreateDeclarationId(symbol) is { Length: > 0 } id
-            ? id
-            : FallbackReference(symbol);
+        return CreateReference(
+            symbol,
+            DocumentationCommentId.CreateDeclarationId);
     }
 
     private static string TypeReference(ITypeSymbol type)
     {
-        return DocumentationCommentId.CreateReferenceId(type) is { Length: > 0 } id
+        return CreateReference(
+            type,
+            DocumentationCommentId.CreateReferenceId);
+    }
+
+    private static string CreateReference<T>(
+        T symbol,
+        Func<T, string?> createId)
+        where T : ISymbol
+    {
+        return createId(symbol) is { Length: > 0 } id
             ? id
-            : FallbackReference(type);
+            : FallbackReference(symbol);
     }
 
     private static string FallbackReference(ISymbol symbol)
