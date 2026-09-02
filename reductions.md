@@ -6629,3 +6629,25 @@ R815 is `deferred`: one capture normally builds one cache entry and the
 preflight is bounded by source size. It is a plausible cleanup for repeated
 capture or large generated compilations, provided the unsupported-directive
 decision remains fail-closed.
+
+## Second survey, part three hundred twenty-seven: R816 - security pipeline restores the solution twice
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R816 | **The `security` container command restores the full solution twice in one pipeline.** Its first child command, `dependency-audit`, runs `dotnet restore SharpProof.sln --locked-mode` before invoking the audit script; after that child exits, `security` launches the `build` child, whose first operation is the same locked solution restore before compiling. The audit script consumes the restored project assets through `dotnet list package` and does not intentionally rewrite the solution, so the second restore is normally redundant work and a second failure point. A security-specific orchestration path can restore once, run the audit, and build with `--no-restore`, or let the child commands accept an explicit validated reuse flag while retaining the default standalone restore behavior. | `scripts/Invoke-SharpProofContainer.ps1:141-145,153-156,489-499`; `scripts/Test-SharpProofDependencyAudit.ps1:198-249` |
+
+### Checked and not proposed (part three hundred twenty-seven)
+
+- Locked mode, the audit's package graph query, and the subsequent solution
+  build remain required; this is not a proposal to skip restore entirely.
+- Standalone `dependency-audit` and `build` commands should keep restoring by
+  default because callers may invoke either without the other.
+- The fix must preserve the child-process failure propagation and not rely on
+  mutable host assets from a different configuration or target.
+
+### Status (part three hundred twenty-seven)
+
+R816 is `deferred`: the second locked restore is usually cheap when assets are
+  unchanged, but the pipeline still repeats a full restore invocation. It is a
+  low-risk orchestration cleanup if security runtime or restore diagnostics
+  show measurable cost.
