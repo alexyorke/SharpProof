@@ -45,16 +45,9 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
     protected override bool ExecuteCore(CancellationToken cancellationToken)
     {
         ContainerContract.ValidateRequired();
-        var lexicalProjectDirectory = Path.GetFullPath(ProjectDirectory);
-        string ResolveLexicalPath(string path)
-        {
-            return Path.GetFullPath(Path.IsPathRooted(path)
-                ? path
-                : Path.Combine(lexicalProjectDirectory, path));
-        }
         string ResolvePath(string path)
         {
-            return LinuxPathIdentity.RequireLocalPath(ResolveLexicalPath(path));
+            return ResolveProjectRelativePath(ProjectDirectory, path);
         }
 
         var outputPaths = Present(ResultPath, SarifPath)

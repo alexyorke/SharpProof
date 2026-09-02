@@ -26,24 +26,16 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
     {
         try
         {
-            var projectDirectory = Path.GetFullPath(
-                string.IsNullOrWhiteSpace(ProjectDirectory)
-                    ? Environment.CurrentDirectory
-                    : ProjectDirectory);
-            string ResolvePath(string path)
-            {
-                return LinuxPathIdentity.RequireLocalPath(
-                    Path.IsPathRooted(path)
-                        ? path
-                        : Path.Combine(projectDirectory, path));
-            }
-
-            var requestPath = ResolvePath(RequestPath);
-            var resultPath = ResolvePath(ResultPath);
-            var manifestPath = ResolvePath(ManifestPath);
+            var requestPath = CancelableBuildTask.ResolveProjectRelativePath(
+                ProjectDirectory, RequestPath);
+            var resultPath = CancelableBuildTask.ResolveProjectRelativePath(
+                ProjectDirectory, ResultPath);
+            var manifestPath = CancelableBuildTask.ResolveProjectRelativePath(
+                ProjectDirectory, ManifestPath);
             var sarifPath = string.IsNullOrWhiteSpace(SarifPath)
                 ? null
-                : ResolvePath(SarifPath!);
+                : CancelableBuildTask.ResolveProjectRelativePath(
+                    ProjectDirectory, SarifPath!);
             // The launcher publishes these files as one owned set. Hold the
             // same lease while reading them so a concurrent publisher cannot
             // interleave generations between the independent reads below.
@@ -61,7 +53,9 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
             WorkerVerifyResponse? invocationResponse = null;
             if (!string.IsNullOrWhiteSpace(InvocationResultPath))
             {
-                var invocationPath = ResolvePath(InvocationResultPath!);
+                var invocationPath =
+                    CancelableBuildTask.ResolveProjectRelativePath(
+                        ProjectDirectory, InvocationResultPath!);
                 invocationResponse = WorkerProtocolJson.DeserializeResponse(
                     WorkerProtocolJson.ReadUtf8File(invocationPath));
                 if (invocationResponse == null ||
@@ -99,7 +93,8 @@ public sealed class ValidatePublishedVerificationResult : Microsoft.Build.Utilit
             var manifestHash = WorkerProtocolJson.ComputeFileSha256(
                 manifestPath);
             if (!string.Equals(
-                    ResolvePath(request.CompilerManifest.Path),
+                    CancelableBuildTask.ResolveProjectRelativePath(
+                        ProjectDirectory, request.CompilerManifest.Path),
                     manifestPath,
                     StringComparison.Ordinal) ||
                 !string.Equals(

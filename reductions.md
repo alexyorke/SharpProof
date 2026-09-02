@@ -1624,7 +1624,9 @@ forwarders across `SharpProof.Testing`, `Tools/SharpProof.Fuzz`, `SharpProof.Bui
 
 ### Status (part twenty-seven)
 
-R341-R344 are `pending`.
+R341-R343 remain `pending`; R344 is applied: invalidation and published-result
+validation now use the shared project-relative path resolver, retaining the
+same current-directory fallback and Linux-local path enforcement.
 reductions. R341 and R343 reduce substantial build/test configuration duplication
 across multiple entrypoints. R344 harmonizes path resolution between build tasks.
 
@@ -3870,3 +3872,11 @@ R600 is a pending Effects-test maintenance candidate. Preserve single-declaratio
 ### Status (part one hundred forty-two)
 
 R601 refines R600's scope. Preserve the existing lookup and diagnostic semantics in all three suites; centralize only their byte-identical helper.
+
+## Second survey, part one hundred forty-three: R602 - duplicated Worker compiler-test setup
+
+| R602 | **The Worker compiler-focused tests repeat the same Roslyn compilation harness.** `CompilerCallableLowererTests.CreateCompilation` and `CompilerRelationalSummaryProviderTests.CreateCompilation` each construct C# 12 parse options with `Contract.ConditionalSymbol`, use `TestMetadataReferences.WithSharpProof`, enable nullable DLL compilation, collect error diagnostics, and assert an empty error set. `CompilerCallableLowererWaveSixRegressionTests.CreateCompilation` carries the same setup again, adding discovery and a distinct subject path. A shared compiler-test factory parameterized by assembly/source identity and optional discovery can remove the repeated setup while preserving each suite's compilation identity and return shape. | `SharpProof.Worker.Test/CompilerCallableLowererTests.cs:669-690`; `SharpProof.Worker.Test/CompilerRelationalSummaryProviderTests.cs:187-209`; `SharpProof.Worker.Test/CompilerCallableLowererWaveSixRegressionTests.cs:139-172` |
+
+### Status (part one hundred forty-three)
+
+R602 is a pending Worker-test harness reduction candidate. Preserve the contract preprocessor symbol, nullable context, metadata-reference set, diagnostic assertion, and suite-specific assembly/subject names; share only the common compilation setup.
