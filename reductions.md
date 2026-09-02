@@ -4207,7 +4207,7 @@ R651 is deferred: the apparent duplicate work crosses an intentional trust bound
 
 ### Status (part one hundred ninety-three)
 
-R652 is a pending compiler-manifest authority-validation reduction candidate. Preserve both authority equality and compilation-shape validation boundaries, catalog integrity, canonical pack ordering, and fail-closed behavior; share only the repeated compilation authority result.
+R652 is deferred: envelope equality and compilation-shape validation are intentional independent trust-boundary checks. Keep both catalog-integrity validations and their fail-closed behavior until a proof that shares results without weakening either boundary is available.
 
 ## Second survey, part one hundred ninety-four: R653 - quadratic syntax-tree path detection
 
@@ -4256,3 +4256,11 @@ R657 is a pending container-command argument-validation reduction candidate. Pre
 ### Status (part one hundred ninety-nine)
 
 R658 is a pending container test-lane factoring candidate. Preserve `-NoBuild` and `-Fast` semantics, restore/build ordering, assembly resolution, filter syntax, direct-target exclusion, and command-specific control flow; share only the common project-to-`vstest` runner.
+
+## Second survey, part two hundred: R659 - eager test parallelism discovery
+
+| R659 | **`Invoke-SharpProofContainer.ps1` computes test-project parallelism before dispatching every command.** The top-level assignment calls `Get-SharpProofTestProjectParallelism`, which reads and parses `eng/acceptance/contract.json` unless an override is set, but the value is consumed only by the solution/filter branch of `test` and by `portable-tests`. Restore, build, gates, packaging, release, corpus, and other commands pay the contract-read and CPU-budget work without using it. Resolve this value lazily in the two test paths while preserving override precedence and invalid-contract failures when those paths actually need the setting. | `scripts/Invoke-SharpProofContainer.ps1:98-99`; `scripts/Invoke-SharpProofContainer.ps1:253-349`; `scripts/SharpProof.ContainerExecution.psm1:106-162` |
+
+### Status (part two hundred)
+
+R659 is a pending container-dispatch laziness reduction candidate. Preserve the test parallelism override/divisor rules and error behavior for consumers, and defer only the unused computation for non-test commands.
