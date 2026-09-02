@@ -4193,14 +4193,6 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred ninety: R649 - duplicate lowered-program walks
-
-| R649 | **`CompilerLoweredArtifact.DecodeBody` walks the decoded program twice for separate checks.** It first calls `ValidateExecutableBody`, which recursively visits reachable blocks to enforce terminators, cycles, reachability limits, and return types, then calls `CollectProgramVariables`, which scans the program's blocks and instructions again to collect every referenced variable for parameter-binding and summary-free-variable checks. A shared program-analysis pass can return the required reachability/terminator state and variable set, or at least reuse one instruction traversal, while explicitly retaining the current all-block variable collection if unreachable blocks remain part of the malformed-input policy. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:647-657,928-1002,1004-1083` |
-
-### Status (part one hundred ninety)
-
-R649 is a pending lowered-artifact validation traversal reduction candidate. Preserve reachable-block cycle/return checks, all-block variable collection semantics, instruction bounds, and fail-closed errors; combine only traversal state that has identical scope and purpose.
-
 ## Second survey, part one hundred ninety-one: R650 - repeated summary-evidence scans
 
 | R650 | **`CompilerLoweredArtifact.DecodeBody` rescans the full compilation summary-evidence table for every summary and dependency row.** Each summary call invokes `ValidSummaryEvidence`, which filters `compilation.SummaryEvidence` and materializes a match array; `ValidDependencyEvidence` invokes the same lookup once per dependency entry. The evidence table is immutable for the decode, so a canonical key dictionary built once per body can replace repeated O(summary rows x evidence rows) scans while retaining the exact-one-match rule and the subsequent `ValidSummaryEvidenceRow` authority check. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:754-820,1111-1174` |
@@ -4224,3 +4216,35 @@ R651 is a pending compiler-effect authority validation reduction candidate. Pres
 ### Status (part one hundred ninety-three)
 
 R652 is a pending compiler-manifest authority-validation reduction candidate. Preserve both authority equality and compilation-shape validation boundaries, catalog integrity, canonical pack ordering, and fail-closed behavior; share only the repeated compilation authority result.
+
+## Second survey, part one hundred ninety-four: R653 - quadratic syntax-tree path detection
+
+| R653 | **`CompilerCompilationCapture.SyntaxTreeCache` rescans every prior syntax tree to detect duplicate paths.** The `Select` callback calls `compilation.SyntaxTrees.Take(index).Any(...)` for each tree, making duplicate-path detection quadratic in the number of syntax trees even though the result only needs an ordinal, path-keyed seen set. A single-pass `HashSet<string>` using the existing ordinal comparison can retain generated-tree identities, the current `#index` suffix convention, and capture order while removing the repeated prefix enumeration. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:16-43` |
+
+### Status (part one hundred ninety-four)
+
+R653 is a pending compiler-capture complexity reduction candidate. Preserve the exact generated-path sentinel, ordinal path comparison, absolute compilation index in duplicate suffixes, cancellation behavior, and stable tree ordering; change only the duplicate-path bookkeeping.
+
+## Second survey, part one hundred ninety-five: R654 - repeated replay-row hashing
+
+| R654 | **`CompilerEffectClaimArtifactCodec` walks replay events separately for validation and each digest.** `Validate` checks every event with `HasValidReplayEvent` and then calls `ComputeSha256`, whose `AddReplayEvent` loop traverses the same rows and fields again; `Seal` likewise computes each operation identity in one loop before the evidence digest walks the events again. A combined per-event validation/hash accumulator can retain the distinct operation-identity and whole-evidence hash domains, ordinal and nullable-field normalization, and fail-closed validation while removing the repeated replay-row traversal. | `SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs:12-40,138-184,229-280` |
+
+### Status (part one hundred ninety-five)
+
+R654 is a pending compiler effect-codec traversal reduction candidate. Preserve the separate constraint, operation, and evidence digest definitions, exact field order, null/empty canonicalization, event rejection rules, and optional compilation-geometry validation; share only the replay-row iteration and derived intermediate values.
+
+## Second survey, part one hundred ninety-six: R655 - repeated response manifest indexes
+
+| R655 | **`ProtocolJson.ValidateResponse` rebuilds the same manifest identity indexes in several validators.** For one response, `ValidateCallableResults` constructs a callable index, `ValidateClaimResults` constructs both claim and callable indexes, and `ValidateRun` constructs another callable index from the unchanged manifest. A response-scoped validation context can build the callable/claim indexes once after manifest admission and pass them through the result and projection checks, preserving first-entry behavior for duplicate or null IDs and all existing error ordering while removing repeated enumeration and dictionary construction. | `SharpProof.Worker.Protocol/ProtocolJson.cs:342-353,567-608,698-740,991-1025` |
+
+### Status (part one hundred ninety-six)
+
+R655 is a pending worker-response validation reduction candidate. Preserve manifest-invalid recovery behavior, null/duplicate identity handling, result-set validation, claim ownership lookup, and diagnostic ordering; share only indexes over the immutable response manifest.
+
+## Second survey, part one hundred ninety-seven: R656 - duplicated checked-dotnet branches
+
+| R656 | **`Invoke-SharpProofRequiredDotnet` duplicates the wrapper invocation and failure construction for streaming and quiet modes.** The non-quiet branch and the quiet branch both resolve and invoke `Invoke-SharpProofDotnet.ps1` with the same timeout and argument array, capture a nonzero exit code, and format the same command failure; the quiet branch only adds an output-file lifecycle and failure-output replay. A single invocation helper with an optional capture path can keep direct streaming, quiet success, captured failure output, and cleanup semantics while removing the parallel command/error paths. | `scripts/SharpProof.ContainerExecution.psm1:10-50` |
+
+### Status (part one hundred ninety-seven)
+
+R656 is a pending container-command helper reduction candidate. Preserve wrapper/static-graph behavior, timeout propagation, `$LASTEXITCODE` handling, quiet-mode failure diagnostics, temporary-log cleanup, and exception text; share only the common checked invocation.

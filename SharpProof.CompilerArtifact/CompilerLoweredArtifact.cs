@@ -644,7 +644,7 @@ internal static class CompilerLoweredArtifact
             throw new InvalidDataException("A lowered program body is invalid.");
         }
 
-        ValidateExecutableBody(graph.Program, variables);
+        var programVariables = ValidateExecutableBody(graph.Program, variables);
 
         var canonical = new HashSet<IrVarId>(variables.Select(static item => item.Variable));
         var parameters = variables
@@ -653,7 +653,6 @@ internal static class CompilerLoweredArtifact
         var bindings = ImmutableDictionary.CreateBuilder<IrVarId, IrVarId>();
         var targets = new HashSet<IrVarId>();
         var sourceOrdinals = new HashSet<int>();
-        var programVariables = CollectProgramVariables(graph.Program);
         foreach (var item in row.ParameterBindings)
         {
             if (item == null)
@@ -925,7 +924,7 @@ internal static class CompilerLoweredArtifact
             .Finish();
     }
 
-    private static void ValidateExecutableBody(
+    private static HashSet<IrVarId> ValidateExecutableBody(
         IrProgram program,
         ImmutableArray<CompilerCanonicalVariable> variables)
     {
@@ -933,6 +932,7 @@ internal static class CompilerLoweredArtifact
         var blocks = program.Blocks.ToDictionary(static block => block.Id);
         var colors = new Dictionary<IrBlockId, byte>();
         var reachable = 0;
+        var programVariables = new HashSet<IrVarId>();
         var resultType = variables
             .SingleOrDefault(static item =>
                 item.Role == CompilerVariableRole.Result) is { } result
@@ -944,6 +944,16 @@ internal static class CompilerLoweredArtifact
             throw new InvalidDataException(
                 "A lowered program body is cyclic or exceeds its reachable block limit.");
         }
+
+        foreach (var block in program.Blocks)
+        {
+            if (!colors.ContainsKey(block.Id))
+            {
+                CollectBlockVariables(block, programVariables);
+            }
+        }
+
+        return programVariables;
 
         bool Visit(IrBlockId blockId)
         {
@@ -960,6 +970,7 @@ internal static class CompilerLoweredArtifact
             }
 
             colors.Add(blockId, 1);
+            CollectBlockVariables(block, programVariables);
             var terminator = block.Instructions[block.Instructions.Length - 1];
             if (terminator is IrReturnInstruction returned)
             {
@@ -1001,85 +1012,95 @@ internal static class CompilerLoweredArtifact
         }
     }
 
-    internal static HashSet<IrVarId> CollectProgramVariables(
-        IrProgram program)
+    internal static HashSet<IrVarId> CollectProgramVariables(IrProgram program)
     {
         var variables = new HashSet<IrVarId>();
-
-        void AddTerm(IrTerm? term)
+        foreach (var block in program.Blocks)
         {
-            if (term != null)
-            {
-                variables.UnionWith(
-                    IrTermAnalysis.CollectVariables(term));
-            }
+            CollectBlockVariables(block, variables);
         }
 
-        void AddLocation(IrLocation location)
-        {
-            switch (location)
-            {
-                case IrMemberLocation member:
-                    AddTerm(member.Receiver);
-                    foreach (var argument in member.Arguments)
-                    {
-                        AddTerm(argument);
-                    }
-                    break;
-                case IrSequenceLocation sequence:
-                    AddTerm(sequence.Sequence);
-                    AddTerm(sequence.Index);
-                    break;
-            }
-        }
+        return variables;
+    }
 
-        foreach (var instruction in program.Blocks.SelectMany(
-                     static block => block.Instructions))
+    private static void CollectBlockVariables(
+        IrBasicBlock block,
+        HashSet<IrVarId> variables)
+    {
+        foreach (var instruction in block.Instructions)
         {
             switch (instruction)
             {
                 case IrAssignInstruction assign:
                     variables.Add(assign.Target);
-                    AddTerm(assign.Value);
+                    AddTermVariables(assign.Value, variables);
                     break;
                 case IrLoadInstruction load:
                     variables.Add(load.Target);
-                    AddLocation(load.Location);
+                    AddLocationVariables(load.Location, variables);
                     break;
                 case IrStoreInstruction store:
-                    AddLocation(store.Location);
-                    AddTerm(store.Value);
+                    AddLocationVariables(store.Location, variables);
+                    AddTermVariables(store.Value, variables);
                     break;
                 case IrCallInstruction call:
                     if (call.Target.HasValue)
                     {
                         variables.Add(call.Target.Value);
                     }
-                    AddTerm(call.Receiver);
+                    AddTermVariables(call.Receiver, variables);
                     foreach (var argument in call.Arguments)
                     {
-                        AddTerm(argument);
+                        AddTermVariables(argument, variables);
                     }
                     break;
                 case IrAssumeInstruction assume:
-                    AddTerm(assume.Condition);
+                    AddTermVariables(assume.Condition, variables);
                     break;
                 case IrAssertInstruction assert:
-                    AddTerm(assert.Condition);
+                    AddTermVariables(assert.Condition, variables);
                     break;
                 case IrHavocInstruction havoc:
                     variables.UnionWith(havoc.Variables);
                     break;
                 case IrBranchInstruction branch:
-                    AddTerm(branch.Condition);
+                    AddTermVariables(branch.Condition, variables);
                     break;
                 case IrReturnInstruction @return:
-                    AddTerm(@return.Value);
+                    AddTermVariables(@return.Value, variables);
                     break;
             }
         }
+    }
 
-        return variables;
+    private static void AddTermVariables(
+        IrTerm? term,
+        HashSet<IrVarId> variables)
+    {
+        if (term != null)
+        {
+            variables.UnionWith(IrTermAnalysis.CollectVariables(term));
+        }
+    }
+
+    private static void AddLocationVariables(
+        IrLocation location,
+        HashSet<IrVarId> variables)
+    {
+        switch (location)
+        {
+            case IrMemberLocation member:
+                AddTermVariables(member.Receiver, variables);
+                foreach (var argument in member.Arguments)
+                {
+                    AddTermVariables(argument, variables);
+                }
+                break;
+            case IrSequenceLocation sequence:
+                AddTermVariables(sequence.Sequence, variables);
+                AddTermVariables(sequence.Index, variables);
+                break;
+        }
     }
 
     private static bool ValidSummaryEvidenceIdentity(
