@@ -398,17 +398,18 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             {
                 return candidates;
             }
-            var pending = new Queue<IMethodSymbol>(reachable);
-            var scannedLocals = new HashSet<IMethodSymbol>(
+            var pending = new Queue<IMethodSymbol>();
+            var scheduledLocals = new HashSet<IMethodSymbol>(
                 SymbolEqualityComparer.Default);
+            foreach (var method in reachable)
+            {
+                pending.Enqueue(method);
+                scheduledLocals.Add(method);
+            }
             while (pending.Count != 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var method = pending.Dequeue();
-                if (!scannedLocals.Add(method))
-                {
-                    continue;
-                }
                 ControlFlowGraph child;
                 try
                 {
@@ -431,7 +432,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 {
                     foreach (var discovered in reachable)
                     {
-                        if (!scannedLocals.Contains(discovered))
+                        if (scheduledLocals.Add(discovered))
                         {
                             pending.Enqueue(discovered);
                         }

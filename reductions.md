@@ -4361,7 +4361,7 @@ R715 is deferred: replacing the equality scan with `HashSet<ILocalSymbol>` chang
 
 | R716 | **`TreeAnalysis.GetReachableLocalFunctions` rescans the complete reachable set after each child graph.** It records only `reachable.Count` before `TryCollectLocalReferences`, but when the count changes it iterates every reachable local and may enqueue all currently unscanned methods again; repeated child discoveries therefore create duplicate queue entries and repeated set scans. Track the newly added locals (or maintain a pending/enqueued set) while preserving the current breadth-first discovery and conservative fallback behavior. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:381-441` |
 
-R716 is a pending local-function reachability queue reduction candidate. Preserve cycle termination, discovery order where observable, CFG-failure fallback to all candidates, and the existing anonymous-function recursion.
+R716 completed: local-function reachability now tracks scheduled symbols to prevent duplicate queue entries while preserving cycle termination, breadth-first discovery order, CFG-failure fallback, and anonymous-function recursion.
 
 | R717 | **`TreeAnalysis.CanReachConsumption` computes each local-reference ordering key twice.** The reference sequence is sorted with `OrderBy(GetReferenceOrder)`, then the loop immediately calls `GetReferenceOrder(reference)` again before applying the `after` boundary. Project each reference with its order once, sort the pair, and consume the cached key while keeping the assignment-end ordering rule unchanged. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:682-704,1234-1242` |
 
