@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NUnit.Framework;
+using static SharpProof.ArchitectureTest.ArchitectureRepository;
 
 namespace SharpProof.ArchitectureTest;
 
@@ -155,22 +156,7 @@ public sealed class DependencyAutomationTests
     [Test]
     public void RepositorySecurityKeepsCodeQlDisabled()
     {
-        var workflowDirectory = Path.Combine(
-            TestRepository.FindRoot(),
-            ".github",
-            "workflows");
-        var workflows = Directory.EnumerateFiles(workflowDirectory)
-            .Where(static path =>
-                string.Equals(
-                    Path.GetExtension(path),
-                    ".yml",
-                    StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(
-                    Path.GetExtension(path),
-                    ".yaml",
-                    StringComparison.OrdinalIgnoreCase))
-            .OrderBy(static path => path, StringComparer.Ordinal)
-            .ToArray();
+        var workflows = WorkflowFiles().ToArray();
 
         Assert.That(workflows, Is.Not.Empty);
 
@@ -197,21 +183,7 @@ public sealed class DependencyAutomationTests
     [Test]
     public void RepositorySecurityPinsExternalWorkflowActionsToImmutableShas()
     {
-        var workflowDirectory = Path.Combine(
-            TestRepository.FindRoot(),
-            ".github",
-            "workflows");
-        var references = Directory.EnumerateFiles(workflowDirectory)
-            .Where(static path =>
-                string.Equals(
-                    Path.GetExtension(path),
-                    ".yml",
-                    StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(
-                    Path.GetExtension(path),
-                    ".yaml",
-                    StringComparison.OrdinalIgnoreCase))
-            .OrderBy(static path => path, StringComparer.Ordinal)
+        var references = WorkflowFiles()
             .SelectMany(path => File.ReadLines(path)
                 .Select((line, index) => new
                 {
@@ -259,12 +231,7 @@ public sealed class DependencyAutomationTests
     public void RepositoryWorkflowsUseOnlyThePinnedContainerSdk()
     {
         var root = TestRepository.FindRoot();
-        var workflowDirectory = Path.Combine(root, ".github", "workflows");
-        var workflows = string.Join("\n", Directory
-            .EnumerateFiles(workflowDirectory)
-            .Where(static path =>
-                Path.GetExtension(path) is ".yml" or ".yaml")
-            .OrderBy(static path => path, StringComparer.Ordinal)
+        var workflows = string.Join("\n", WorkflowFiles()
             .Select(File.ReadAllText));
         using var toolchain = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,

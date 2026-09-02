@@ -949,13 +949,7 @@ public sealed class ArchitectureTests
     [Test]
     public void WorkflowCommandsUsePowerShellSafeMsBuildSwitches()
     {
-        var workflowRoot = Path.Combine(TestRepository.FindRoot(), ".github", "workflows");
-        var violations = Directory
-            .EnumerateFiles(workflowRoot, "*.yml", SearchOption.TopDirectoryOnly)
-            .Concat(Directory.EnumerateFiles(
-                workflowRoot,
-                "*.yaml",
-                SearchOption.TopDirectoryOnly))
+        var violations = WorkflowFiles()
             .SelectMany(path => File.ReadLines(path)
                 .Select((line, index) => new
                 {
@@ -1499,13 +1493,7 @@ public sealed class ArchitectureTests
     [Test]
     public void RepositoryAutomationRunsProductToolingOnlyInDocker()
     {
-        var workflowRoot = Path.Combine(
-            TestRepository.FindRoot(),
-            ".github",
-            "workflows");
-        var workflows = Directory
-            .EnumerateFiles(workflowRoot, "*.yml")
-            .Concat(Directory.EnumerateFiles(workflowRoot, "*.yaml"))
+        var workflows = WorkflowFiles()
             .Select(File.ReadAllText)
             .ToArray();
         var productWorkflows = workflows
@@ -1527,13 +1515,7 @@ public sealed class ArchitectureTests
     [Test]
     public void DockerWorkflowsCapCpuUseToHostedRunnerCapacity()
     {
-        var workflowRoot = Path.Combine(
-            TestRepository.FindRoot(),
-            ".github",
-            "workflows");
-        var dockerWorkflows = Directory
-            .EnumerateFiles(workflowRoot, "*.yml")
-            .Concat(Directory.EnumerateFiles(workflowRoot, "*.yaml"))
+        var dockerWorkflows = WorkflowFiles()
             .Where(static path => File.ReadAllText(path).Contains(
                 "docker compose",
                 StringComparison.Ordinal))
@@ -2257,11 +2239,7 @@ public sealed class ArchitectureTests
             Assert.That(maximumCampaignCases, Is.GreaterThan(nightlyCases));
             Assert.That(workflow, Does.Contain("tooling fuzz-nightly"));
             Assert.That(
-                Directory.EnumerateFiles(
-                        Path.Combine(root, ".github", "workflows"))
-                    .Where(path =>
-                        path.EndsWith(".yml", StringComparison.Ordinal) ||
-                        path.EndsWith(".yaml", StringComparison.Ordinal))
+                WorkflowFiles()
                     .Where(path => !path.EndsWith(
                         "nightly.yml",
                         StringComparison.Ordinal))
