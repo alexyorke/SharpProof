@@ -543,39 +543,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
         IFacetWitness? termination = null,
         ImmutableArray<PostconditionWitness> postconditions = default)
     {
-        var facets = ImmutableArray.CreateBuilder<IFacetWitness>(6);
-        if (effects != null)
-        {
-            facets.Add(effects);
-        }
-
-        if (allocation != null)
-        {
-            facets.Add(allocation);
-        }
-
-        if (throws != null)
-        {
-            facets.Add(throws);
-        }
-
-        if (nullness != null)
-        {
-            facets.Add(nullness);
-        }
-
-        if (cardinality != null)
-        {
-            facets.Add(cardinality);
-        }
-
-        if (termination != null)
-        {
-            facets.Add(termination);
-        }
-
         return new RowWitness(
-            facets.ToImmutable(),
+            [.. new IFacetWitness?[] {
+                effects, allocation, throws, nullness, cardinality, termination
+            }.OfType<IFacetWitness>()],
             postconditions.IsDefault ? [] : postconditions);
     }
 
