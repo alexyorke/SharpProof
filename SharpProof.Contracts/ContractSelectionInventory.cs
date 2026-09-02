@@ -157,7 +157,8 @@ internal sealed class ContractSelectionInventory
             selected |= ContractSelectionFeatures.Contracts;
         }
 
-        if (GetCallableAttributes(method).Any(IsEffectContract))
+        var callableAttributes = GetCallableAttributes(method).ToImmutableArray();
+        if (callableAttributes.Any(IsEffectContract))
         {
             selected |= ContractSelectionFeatures.Effects;
         }
@@ -168,13 +169,30 @@ internal sealed class ContractSelectionInventory
                 ContractSelectionFeatures.Effects;
         }
 
-        return selected | GetRejectedSelectionFeatures(method);
+        return selected | GetRejectedSelectionFeatures(method, callableAttributes);
     }
 
     internal ContractSelectionFeatures GetRejectedSelectionFeatures(
         IMethodSymbol method)
     {
         var selected = GetRejectedCallableSelectionFeatures(method);
+        return selected | GetRejectedControlFeatures(method);
+    }
+
+    private ContractSelectionFeatures GetRejectedSelectionFeatures(
+        IMethodSymbol method,
+        ImmutableArray<AttributeData> callableAttributes)
+    {
+        var selected = GetRejectedCallableSelectionFeatures(
+            method,
+            callableAttributes);
+        return selected | GetRejectedControlFeatures(method);
+    }
+
+    private ContractSelectionFeatures GetRejectedControlFeatures(
+        IMethodSymbol method)
+    {
+        var selected = ContractSelectionFeatures.None;
         for (var type = method.ContainingType;
              type != null;
              type = type.ContainingType)
@@ -190,8 +208,17 @@ internal sealed class ContractSelectionInventory
     internal ContractSelectionFeatures GetRejectedCallableSelectionFeatures(
         IMethodSymbol method)
     {
+        return GetRejectedCallableSelectionFeatures(
+            method,
+            GetCallableAttributes(method));
+    }
+
+    private ContractSelectionFeatures GetRejectedCallableSelectionFeatures(
+        IMethodSymbol method,
+        IEnumerable<AttributeData> callableAttributes)
+    {
         var selected = ContractSelectionFeatures.None;
-        foreach (var attribute in GetCallableAttributes(method))
+        foreach (var attribute in callableAttributes)
         {
             selected |= GetRejectedFeature(attribute);
         }
