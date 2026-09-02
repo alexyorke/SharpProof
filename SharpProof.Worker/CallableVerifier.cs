@@ -259,7 +259,12 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             }
 
             var replayed = outcome is RefutedOutcome refuted
-                ? CallableCounterexampleReplayer.Replay(target, index, refuted.Model.Assignments, cancellationToken)
+                ? CallableCounterexampleReplayer.Replay(
+                    target,
+                    index,
+                    refuted.Model.Assignments,
+                    ensures,
+                    cancellationToken)
                 : WorkerClaimReason.None;
             cancellationToken.ThrowIfCancellationRequested();
             var vacuity = noModeledNormalReturn

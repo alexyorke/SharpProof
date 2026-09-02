@@ -2,7 +2,21 @@ namespace SharpProof.Worker;
 internal static class CallableCounterexampleReplayer
 {
     internal static WorkerClaimReason Replay(CompilerCallablePreparation target, int claimOrdinal,
-        ImmutableDictionary<IrVarId, IrValue> model, CancellationToken cancellationToken = default)
+        ImmutableDictionary<IrVarId, IrValue> model,
+        CancellationToken cancellationToken = default)
+    {
+        return Replay(
+            target,
+            claimOrdinal,
+            model,
+            default,
+            cancellationToken);
+    }
+
+    internal static WorkerClaimReason Replay(CompilerCallablePreparation target, int claimOrdinal,
+        ImmutableDictionary<IrVarId, IrValue> model,
+        ImmutableArray<CompilerPreparedClause> preparedEnsures,
+        CancellationToken cancellationToken = default)
     {
         if (target.Body is not { } body)
         {
@@ -12,8 +26,10 @@ internal static class CallableCounterexampleReplayer
         try
         {
             var factory = target.Factory;
-            var ensures = target.Clauses.Where(static clause =>
-                clause.Kind == CompilerContractKind.Ensures).ToArray();
+            var ensures = preparedEnsures.IsDefault
+                ? target.Clauses.Where(static clause =>
+                    clause.Kind == CompilerContractKind.Ensures).ToImmutableArray()
+                : preparedEnsures;
             if ((uint)claimOrdinal >= (uint)ensures.Length)
             {
                 return WorkerClaimReason.CounterexampleReplayFailed;

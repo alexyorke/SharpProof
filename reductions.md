@@ -4233,14 +4233,6 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disposal resolver intentionally use different roots and reachability/unwinding rules. A shared walk could alter direct-witness recording, constructor entry selection, disposal order, or fail-closed effect joins; keep the independent passes until reusable per-operation facts can be proven equivalent.
 
-## Second survey, part two hundred six: R665-R667 - repeated cache/replay preparation
-
-| R667 | **`CallableCounterexampleReplayer.Replay` re-filters all clauses for every postcondition replay.** `CallableVerifier` invokes the replayer from its per-postcondition loop, and each call allocates a fresh `ensures` array from `target.Clauses` before checking the requested ordinal. Passing a prepared postcondition list/ordinal map from the target verification, or caching it at the callable boundary, removes this repeated scan while preserving the current out-of-range and malformed-target failures. | `SharpProof.Worker/CallableCounterexampleReplayer.cs:4-20`; `SharpProof.Worker/CallableVerifier.cs:197-203,261-263` |
-
-### Status (part two hundred six)
-
-R667 is a pending cache/replay preparation reduction candidate. Preserve claim-id first-match semantics, cancellation, and fail-closed counterexample replay behavior; share only repeated declaration preparation.
-
 ## Second survey, part two hundred seven: R668 - redundant MSBuild dependency edge
 
 | R668 | **`SharpProof.Verifier.targets` declares `_SharpProofInitializeVerify` twice in the verification target graph.** `_SharpProofVerifyCore` already depends on `_SharpProofInitializeVerify;ResolveReferences`, while the public `SharpProofVerify` target repeats `_SharpProofInitializeVerify` alongside `_SharpProofVerifyCore`. MSBuild normally de-duplicates the executed target, so the extra edge adds no work but obscures the actual dependency graph and creates another place to edit when initialization changes. Removing the direct edge from `SharpProofVerify` preserves the `AfterTargets="CoreCompile"` hook because `_SharpProofVerifyCore` still brings initialization in first. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:158-160,249-253` |
@@ -4265,3 +4257,11 @@ R669 is a pending release-validation preparation reduction. Preserve filename sa
 ### Status (part two hundred nine)
 
 R670-R671 are pending package-test scheduler reductions. Preserve separate class minimums, method-name parsing, timing aggregation, filter semantics, and test-process diagnostics; share only the assembly discovery and TRX parsing work.
+
+## Second survey, part two hundred ten: R672 - repeated changed-project graph walks
+
+| R672 | **`Invoke-SharpProofChangedTests.ps1` walks the same project-reference graph once per test project.** After building one `$projects` table, the selector creates a new visited set and stack for every test project and searches toward its references until it reaches a changed project. With many test projects sharing the same dependency graph, this repeats the same edge traversal and bookkeeping; a reverse-dependency map can start from changed projects and mark all impacted test projects in one traversal. Preserve the current transitive reference semantics, global/script-impact overrides, cycle protection, and deterministic selected-project ordering while removing repeated per-test graph searches. | `scripts/Invoke-SharpProofChangedTests.ps1:74-106,144-176` |
+
+### Status (part two hundred ten)
+
+R672 is a pending changed-test selection reduction candidate. Preserve project-file parsing, props blind-spot behavior documented by R301, transitive impact, and the architecture/package fallback rules; share only the immutable project graph traversal.
