@@ -4215,7 +4215,7 @@ R652 is deferred: envelope equality and compilation-shape validation are intenti
 
 ### Status (part one hundred ninety-five)
 
-R654 is a pending compiler effect-codec traversal reduction candidate. Preserve the separate constraint, operation, and evidence digest definitions, exact field order, null/empty canonicalization, event rejection rules, and optional compilation-geometry validation; share only the replay-row iteration and derived intermediate values.
+R654 is deferred: replay validation and the separate operation/evidence digest domains are analyzer-integrity boundaries. Their independent event walks make the field ordering, null normalization, and fail-closed checks auditable; combine them only with a proof that cannot alter those semantics.
 
 ## Second survey, part one hundred ninety-six: R655 - repeated response manifest indexes
 
@@ -4256,3 +4256,11 @@ R658 is a pending container test-lane factoring candidate. Preserve `-NoBuild` a
 ### Status (part two hundred)
 
 R659 is a pending container-dispatch laziness reduction candidate. Preserve the test parallelism override/divisor rules and error behavior for consumers, and defer only the unused computation for non-test commands.
+
+## Second survey, part two hundred one: R660 - repeated solution prerequisite blocks
+
+| R660 | **`Invoke-SharpProofContainer.ps1` repeats the locked solution restore and Release build preamble across qualifying commands.** `pr-gates`, `performance`, `coverage`, and `fuzz-nightly` each open-code some or all of the same `restore SharpProof.sln --locked-mode` plus `build SharpProof.sln --configuration Release --no-restore` sequence, while `package` carries a near-identical build with only package-specific properties. A narrowly scoped prerequisite helper can accept the configuration and optional build properties, preserving each lane's follow-up command, Release enforcement, and output semantics while reducing drift in the shared restore/build contract. | `scripts/Invoke-SharpProofContainer.ps1:217-227,428-451,493-500,535-560` |
+
+### Status (part two hundred one)
+
+R660 is a pending container orchestration factoring candidate. Preserve locked restore, configuration selection, package-build properties, per-profile ordering, and error propagation; share only the common solution prerequisite construction.
