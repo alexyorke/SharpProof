@@ -6,7 +6,6 @@
     <SharpProofAssemblyVersion>$(SharpProofVersionPrefix).0</SharpProofAssemblyVersion>
     <SharpProofPackageVersion>$(SharpProofVersionPrefix)-preview.1</SharpProofPackageVersion>
     <Version>$(SharpProofPackageVersion)</Version>
-    <PackageVersion>$(SharpProofPackageVersion)</PackageVersion>
     <AssemblyVersion>$(SharpProofAssemblyVersion)</AssemblyVersion>
     <FileVersion>$(SharpProofAssemblyVersion)</FileVersion>
     <InformationalVersion>$(SharpProofPackageVersion)</InformationalVersion>

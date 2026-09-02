@@ -181,6 +181,7 @@ the smallest relevant containerized test target passes.
 | R441 | Skip generated files before reading them and derive complexity line counts from the loaded source | Architecture complexity gate tests passed |
 | R442 | Remove the unreachable second coverage-module identity check | `SharpProof.ArchitectureTest`: coverage tests passed |
 | R445 | Share XML writer settings and disposal through one coverage save helper | PowerShell parse; `SharpProof.ArchitectureTest`: coverage tests passed |
+| R456 | Let the SDK derive `PackageVersion` from the authoritative `Version` property | `SharpProof.ArchitectureTest`: release/package tests 73 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1885,6 +1886,8 @@ R433-R436 and R438 are now applied: dead/forwarding analyzer helpers and the
 duplicated namespace/operation plumbing were removed without changing diagnostics.
 R441, R442, and R445 are now applied: coverage/complexity scripts avoid redundant
 I/O, dead validation, and duplicated XML serialization setup.
+R456 is now applied: release props keep one package-version authority via
+`Version` and the SDK default.
 
 ## Second survey, part thirty-seven: R407-R412
 
@@ -2094,7 +2097,8 @@ This pass inspected the analyzer feature pipeline and verifier/release MSBuild p
 
 ### Status (part forty-five)
 
-R454-R456 are `pending`. They are review-only reduction candidates; no implementation or build files were edited.
+R454-R455 are `pending` review-only candidates. R456 is applied: the SDK derives
+PackageVersion from Version without a duplicate assignment.
 
 ## Second survey, part forty-six: R457-R460
 
@@ -3226,3 +3230,15 @@ the two evidence flags distinct while avoiding repeated array work.
 R540 is a `pending` reduction candidate. The proposed change is limited to
 classification aggregation; it does not alter the compatibility exceptions
 handled after the primary projection.
+
+## Second survey, part eighty-five: R541-R543 - snapshot, flow, and contract predicates
+
+| R541 | **`CorpusSnapshotFormat.Render` and `Parse` duplicate the canonical data validation.** Both paths run the same `Any(!IsCanonicalData)` check followed by the same ordinal line-order check, differing only in whether the input is the caller's data lines or the parsed data suffix. A private `ValidateCanonicalData` helper can centralize the snapshot invariant while keeping byte-level parsing and rendering responsibilities separate. | `SharpProof.Gates/Corpus/CorpusSnapshotFormat.cs:17-23,69-77` |
+| R542 | **The summary builder and worker executor carry two implementations of the acyclic IR flow engine.** `IrRelationalSummaryBuilder.Run` and `AcyclicBlockPredicateExecutor.Run` independently walk instructions, propagate environments, constrain branches, sort and merge incoming states, create an acyclic order, reject false incoming predicates, substitute terms, and enforce depth/resource support. Their call handling and side effects differ (summary dependencies/provenance and `mayThrow` versus worker specs/summaries and memory-havoc checks), so the whole classes should not be merged; a shared IR flow/merge engine with policy callbacks could own the control-flow scaffold and leave those semantic tails at the edges. R515 is the narrower child-enumeration instance inside this broader overlap. | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:294-384,647-771,843-856`; `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:91-205,225-329,531-618` |
+| R543 | **Closed-attribute recognition is duplicated across the contracts and effects layers.** `ContractSelectionInventory.IsClosedContract` checks the attribute's original definition against `NotNull`, `Positive`, and `InRange`; `ConservativeEffectCallPreconditionPolicy.IsClosedPrecondition` repeats the same three comparisons against its separately resolved symbols. Moving the small membership predicate to a lower-level shared metadata seam (or exposing it from the generated contract catalog) would remove a second authority without coupling `SharpProof.Effects` back to `SharpProof.Contracts`; the full validator must remain separate because it checks types, ref kinds, and range arguments. | `SharpProof.Contracts/ContractSelectionInventory.cs:103-108`; `SharpProof.Effects/EffectCallPreconditionPolicy.cs:125-144` |
+
+### Status (part eighty-five)
+
+R541-R543 are `pending` reduction candidates. R542 deliberately calls for a
+policy seam rather than a blind merge, and R543 preserves the current project
+dependency direction as part of the proposed design constraint.
