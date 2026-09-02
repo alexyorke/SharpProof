@@ -129,10 +129,10 @@ try {
     $members = 0
     $handwrittenFiles = 0
     foreach ($path in $files) {
-        $source = Get-Content -LiteralPath $path -Raw
         if ($path.Replace('\', '/') -in $approvedGeneratedFiles) {
             continue
         }
+        $source = Get-Content -LiteralPath $path -Raw
 
         $fileSyntaxTokens = 0
         $fileSyntaxNodes = 0
@@ -154,9 +154,17 @@ try {
             $fileMembers = [Math]::Max(
                 $fileMembers, [int]$metrics.members)
         }
-        $lines = @(Get-Content -LiteralPath $path)
-        $physicalLines += $lines.Count
-        $nonblankLines += @($lines | Where-Object {
+        $lineBreaks = [regex]::Matches($source, '\r\n|\r|\n').Count
+        $physicalLines += if ($source.Length -eq 0) {
+            0
+        }
+        elseif ($source -match '(?:\r\n|\r|\n)$') {
+            $lineBreaks
+        }
+        else {
+            $lineBreaks + 1
+        }
+        $nonblankLines += @([regex]::Split($source, '\r\n|\r|\n') | Where-Object {
             -not [string]::IsNullOrWhiteSpace($_)
         }).Count
         $syntaxTokens += $fileSyntaxTokens

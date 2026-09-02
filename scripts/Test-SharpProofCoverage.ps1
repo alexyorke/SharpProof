@@ -413,15 +413,6 @@ foreach ($report in $reports) {
             "Coverage report authority does not match current commit/universe: " +
             $report.FullName)
     }
-    $reportModuleIdentities = @(
-        ([string]$authorityNode.modules).Split(',', [StringSplitOptions]::RemoveEmptyEntries) |
-            Sort-Object)
-    $reportModuleIdentityText = $reportModuleIdentities -join ','
-    if ($reportModuleIdentityText -cne $expectedModuleIdentityText) {
-        throw (
-            "Coverage report module identity does not match current assemblies: " +
-            $report.FullName)
-    }
     $sourceRoots = @(
         $document.SelectNodes('/coverage/sources/source') |
             ForEach-Object { [string]$_.InnerText }

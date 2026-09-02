@@ -178,6 +178,9 @@ the smallest relevant containerized test target passes.
 | R435 | Share exact namespace matching between Meta analyzer rule families | `SharpProof.Meta.Analyzers.Test`: 163 passed |
 | R436 | Share operation unwrapping between Meta analyzer rule families | `SharpProof.Meta.Analyzers.Test`: 163 passed |
 | R438 | Inline the contract validation diagnostic factory wrapper | `SharpProof.Analyzer.Test`: 476 passed |
+| R441 | Skip generated files before reading them and derive complexity line counts from the loaded source | Architecture complexity gate tests passed |
+| R442 | Remove the unreachable second coverage-module identity check | `SharpProof.ArchitectureTest`: coverage tests passed |
+| R445 | Share XML writer settings and disposal through one coverage save helper | PowerShell parse; `SharpProof.ArchitectureTest`: coverage tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1880,6 +1883,8 @@ R423 is now applied: release scripts use `Get-SharpProofReleaseVersion` rather
 than parsing the props file independently.
 R433-R436 and R438 are now applied: dead/forwarding analyzer helpers and the
 duplicated namespace/operation plumbing were removed without changing diagnostics.
+R441, R442, and R445 are now applied: coverage/complexity scripts avoid redundant
+I/O, dead validation, and duplicated XML serialization setup.
 
 ## Second survey, part thirty-seven: R407-R412
 
@@ -2038,8 +2043,9 @@ reconciliation scripts across `scripts/CSharpSourceMetrics.ps1`, `scripts/Test-P
 
 ### Status (part forty-two)
 
-R440-R445 are `pending`. R441, R442, and R445 are direct I/O, dead check, and XML writer simplifications.
-R440, R443, and R444 optimize AST traversals, sequence point aggregation, and git diff process spawning.
+R440, R443, and R444 are `pending`. R441, R442, and R445 are applied direct I/O,
+dead-check, and XML-writer simplifications. R440, R443, and R444 optimize AST
+traversals, sequence-point aggregation, and git-diff process spawning.
 
 ## Second survey, part forty-three: R446-R450
 

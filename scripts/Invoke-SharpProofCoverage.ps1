@@ -66,6 +66,29 @@ $managedSettings = Join-Path `
     $repositoryRoot `
     'eng\coverage\SharpProof.Managed.runsettings'
 
+function Save-CoverageXml {
+    param(
+        [Parameter(Mandatory = $true)]
+        [Xml.XmlDocument]$Document,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $writerSettings = [Xml.XmlWriterSettings]::new()
+    $writerSettings.Encoding = [Text.UTF8Encoding]::new($false)
+    $writerSettings.Indent = $true
+    $writerSettings.NewLineChars = "`n"
+    $writerSettings.NewLineHandling = [Xml.NewLineHandling]::Replace
+    $writer = [Xml.XmlWriter]::Create($Path, $writerSettings)
+    try {
+        $Document.Save($writer)
+    }
+    finally {
+        $writer.Dispose()
+    }
+}
+
 function New-CoverageSettings {
     param(
         [Parameter(Mandatory = $true)]
@@ -104,18 +127,7 @@ function New-CoverageSettings {
     $path = Join-Path `
         $resolvedResultsDirectory `
         ("coverage-$Name.runsettings")
-    $writerSettings = [Xml.XmlWriterSettings]::new()
-    $writerSettings.Encoding = [Text.UTF8Encoding]::new($false)
-    $writerSettings.Indent = $true
-    $writerSettings.NewLineChars = "`n"
-    $writerSettings.NewLineHandling = [Xml.NewLineHandling]::Replace
-    $writer = [Xml.XmlWriter]::Create($path, $writerSettings)
-    try {
-        $settings.Save($writer)
-    }
-    finally {
-        $writer.Dispose()
-    }
+    Save-CoverageXml -Document $settings -Path $path
     return $path
 }
 
@@ -286,20 +298,8 @@ foreach ($coverageReport in $coverageReports) {
     [void]$coverageDocument.DocumentElement.AppendChild($authorityNode)
     $changed = $true
     if ($changed) {
-        $writerSettings = [Xml.XmlWriterSettings]::new()
-        $writerSettings.Encoding = [Text.UTF8Encoding]::new($false)
-        $writerSettings.Indent = $true
-        $writerSettings.NewLineChars = "`n"
-        $writerSettings.NewLineHandling =
-            [Xml.NewLineHandling]::Replace
-        $writer = [Xml.XmlWriter]::Create(
-            $coverageReport.FullName,
-            $writerSettings)
-        try {
-            $coverageDocument.Save($writer)
-        }
-        finally {
-            $writer.Dispose()
-        }
+        Save-CoverageXml `
+            -Document $coverageDocument `
+            -Path $coverageReport.FullName
     }
 }
