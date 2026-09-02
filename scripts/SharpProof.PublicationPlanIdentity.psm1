@@ -385,17 +385,30 @@ function Test-SharpProofPublicationPlanIdentity {
         throw 'Publication plan release manifest identity is stale.'
     }
     $manifestArtifacts = @($manifest.artifacts)
+    $manifestArtifactsByName =
+        [Collections.Generic.Dictionary[string, object]]::new(
+            [StringComparer]::Ordinal)
+    $duplicateManifestArtifactNames = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
     foreach ($artifact in $manifestArtifacts) {
         if ($artifact.fileName -isnot [string]) {
             throw 'Publication plan release manifest schema is invalid.'
         }
+        $fileName = [string]$artifact.fileName
+        if ($manifestArtifactsByName.ContainsKey($fileName)) {
+            [void]$duplicateManifestArtifactNames.Add($fileName)
+        } else {
+            $manifestArtifactsByName.Add($fileName, $artifact)
+        }
     }
     foreach ($artifact in $artifacts[0..5]) {
-        $row = @($manifestArtifacts | Where-Object {
-            [string]$_.fileName -ceq [string]$artifact.fileName })
-        if ($row.Count -ne 1 -or
-            $row[0].bytes -isnot [int64] -or
-            $row[0].bytes -ne $artifact.bytes) {
+        $fileName = [string]$artifact.fileName
+        if ($duplicateManifestArtifactNames.Contains($fileName) -or
+            -not $manifestArtifactsByName.ContainsKey($fileName)) {
+            throw 'Publication plan does not agree with the release manifest.'
+        }
+        $row = $manifestArtifactsByName[$fileName]
+        if ($row.bytes -isnot [int64] -or $row.bytes -ne $artifact.bytes) {
             throw 'Publication plan does not agree with the release manifest.'
         }
     }
