@@ -71,19 +71,18 @@ public sealed class ContainerAuthorityScriptTests
                 Does.Contain("/home/sharpproof/.local/share/NuGet")
                     .And.Contain("/home/sharpproof/.nuget/packages")
                     .And.Contain("useradd --uid \"${USER_UID}\""));
-            AssertStage(stages["dev"], "/workspace/SharpProof", "dev");
+            AssertStage(stages["toolchain"], "/workspace/SharpProof", "dev");
             Assert.That(stages.Keys, Is.EquivalentTo([
                 "powershell",
                 "test-runtime",
                 "minimum-sdk",
                 "minimum-framework",
-                "toolchain",
-                "dev"
+                "toolchain"
             ]));
             Assert.That(
                 compose,
                 Does.Contain("SHARPPROOF_REPO_ROOT: /workspace/SharpProof")
-                    .And.Contain("target: dev"));
+                    .And.Contain("target: toolchain"));
         }
     }
 

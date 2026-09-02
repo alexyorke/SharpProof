@@ -110,6 +110,7 @@ the smallest relevant containerized test target passes.
 | R241 | Remove ownership commands redundant with GNU `install -d -o -g` in the Linux container entrypoint | Container-local ownership check; bash syntax; ContainerSourceCleanlinessTests: 39 passed |
 | R242 | Remove the stale four-space indentation from the top-level container task-workspace block | bash syntax; ContainerSourceCleanlinessTests: 39 passed |
 | R243 | Resolve the installed container-contract marker through `SHARPPROOF_CONTAINER_CONTRACT` in runtime and build-entry checks | Compose config; bash and PowerShell parses; Architecture: 16; Worker ContainerContractTests: 5 |
+| R244 | Fold the single-consumer Dockerfile `dev` stage into the final `toolchain` stage | `docker compose config --quiet`; ContainerAuthorityScriptTests: 15 passed; tooling image rebuilt successfully |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -236,7 +237,6 @@ deferred entry say so explicitly and do not lift that deferral.
 | ID | Finding | Evidence |
 |---|---|---|
 | R240 | The command vocabulary is declared in four places that must agree: the `build.ps1` `ValidateSet` (21 profiles), the `Invoke-SharpProofContainer.ps1` `ValidateSet` (37 commands), and the `requires_clean_exact_commit_source` (11) and `requires_git_source` (8) case lists in `entrypoint.sh`. Adding a command means editing between two and four of them, and nothing checks that the sets remain consistent. | `build.ps1:4-10`; `scripts/Invoke-SharpProofContainer.ps1:3`; `eng/container/entrypoint.sh:53-76` |
-| R244 | The Dockerfile `dev` stage adds only `ENV`, `WORKDIR`, `USER`, and `ENTRYPOINT` on top of `toolchain`, and nothing in the repository targets `toolchain`. The split is a stage boundary with exactly one consumer. | `eng/container/Dockerfile:75-82`; `compose.yaml:6` |
 | R245 | `.devcontainer/devcontainer.json` re-declares `SHARPPROOF_REPO_ROOT` and `SHARPPROOF_DEV_CONTAINER` in `containerEnv`, both already set on the `dev` compose service it attaches to, and carries an empty `forwardPorts: []`. | `.devcontainer/devcontainer.json:11-15,31`; `compose.yaml:47-53` |
 | R246 | `.github/actions/prepare-qualified-packages` already supports `download-packages: "false"`, which reduces it to the build step alone, but `ci.yml`, `nightly.yml`, `coverage.yml`, and `security-reusable.yml` each open-code `docker compose build tooling` instead. Narrower and lower-risk than deferred R069/R132, which proposed collapsing the whole checkout prelude. | `.github/actions/prepare-qualified-packages/action.yml`; `.github/workflows/{ci,nightly,coverage,security-reusable}.yml` |
 | R247 | `.opencode/` contributes 438 tracked lines, of which 431 are an npm lockfile, to support a one-line plugin re-export for a third-party agent tool. It is not part of the product, its build, or its gates, and it is the only npm dependency graph in a repository whose supply-chain controls (`NuGetAudit`, `RestoreLockedMode`, exact-SHA action pinning, `Test-SharpProofDependencyAudit.ps1`) cover NuGet and GitHub Actions only. | `.opencode/package-lock.json`, `.opencode/package.json`, `.opencode/plugins/oh-my-goal.js` |
@@ -290,7 +290,7 @@ deferred entry say so explicitly and do not lift that deferral.
 
 ### Status
 
-R229, R233, R240, and R244 through R262 are `pending`, and the active follow-up queue above is
+R229, R233, R240, and R245 through R262 are `pending`, and the active follow-up queue above is
 extended by them; the existing entries in that queue are unchanged. Items that
 refine a deferred entry (R233 under R070, R246 under R069/R132, R259 under
 R027-R031 and R149, R262 under R066-R070) do not lift that deferral. R241, R255,

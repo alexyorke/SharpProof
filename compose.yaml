@@ -9,7 +9,7 @@ x-sharpproof-common: &sharpproof-common
   build:
     context: .
     dockerfile: eng/container/Dockerfile
-    target: dev
+    target: toolchain
     args:
       USER_UID: ${SHARPPROOF_USER_UID:-1000}
       USER_GID: ${SHARPPROOF_USER_GID:-1000}

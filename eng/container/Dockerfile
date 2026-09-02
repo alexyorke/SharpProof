@@ -73,8 +73,6 @@ RUN groupadd --gid "${USER_GID}" sharpproof \
         /workspace/SharpProof \
         /workspace/artifacts \
         /src
-
-FROM toolchain AS dev
 ENV SHARPPROOF_REPO_ROOT=/workspace/SharpProof
 WORKDIR /workspace/SharpProof
 USER sharpproof

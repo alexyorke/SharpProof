@@ -163,8 +163,7 @@ function Assert-DockerfileAuthority {
         'FROM ${DOTNET_TEST_RUNTIME_IMAGE} AS test-runtime',
         'FROM ${DOTNET_MINIMUM_SDK_IMAGE} AS minimum-sdk',
         'FROM ${DOTNET_MINIMUM_FRAMEWORK_IMAGE} AS minimum-framework',
-        'FROM ${DOTNET_SDK_IMAGE} AS toolchain',
-        'FROM toolchain AS dev')
+        'FROM ${DOTNET_SDK_IMAGE} AS toolchain')
     if ($actualStages.Count -cne $expectedStages.Count) {
         throw 'The Dockerfile must contain exactly the canonical build stages.'
     }
@@ -197,7 +196,7 @@ function Assert-DockerfileAuthority {
 
     $stageContracts = @(
         [pscustomobject]@{
-            From = 'FROM toolchain AS dev'
+            From = 'FROM ${DOTNET_SDK_IMAGE} AS toolchain'
             Root = '/workspace/SharpProof'
             Command = 'dev'
         })
@@ -286,7 +285,7 @@ function Assert-ComposeAuthority {
         '^    dockerfile:' `
         '    dockerfile: eng/container/Dockerfile' `
         'Compose Dockerfile'
-    Assert-SingleMatchingLine $buildLines '^    target:' '    target: dev' 'Compose build target'
+    Assert-SingleMatchingLine $buildLines '^    target:' '    target: toolchain' 'Compose build target'
 
     $serviceNames = @()
     for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
