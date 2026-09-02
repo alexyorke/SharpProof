@@ -201,6 +201,7 @@ function Test-SharpProofPackagePayload {
             if ($null -eq $entry) {
                 throw "Package '$PackageId' is missing payload '$($specification.Entry)'."
             }
+            $assemblyName = $null
             if ($useEvidence) {
                 $expected = $specification.Evidence
                 if ($entry.Length -ne [int64]$expected.bytes) {
@@ -221,6 +222,7 @@ function Test-SharpProofPackagePayload {
                     throw "Package '$PackageId' native payload size is invalid: '$($entry.FullName)'."
                 }
                 $actualThirdParty.Add($entry.FullName)
+                $assemblyName = Get-SharpProofArchiveAssemblyName -Entry $entry
             }
             elseif ($entry.FullName -eq 'tools/net9/Microsoft.Z3.dll') {
                 if ($entry.Length -ne [int64]$toolchain.z3.managedAssemblyBytes) {
@@ -234,9 +236,9 @@ function Test-SharpProofPackagePayload {
                     throw "Authoritative package output is missing: '$sourcePath'."
                 }
                 if ($entry.FullName.EndsWith('.dll', [StringComparison]::OrdinalIgnoreCase)) {
-                    $actualName = Get-SharpProofArchiveAssemblyName -Entry $entry
+                    $assemblyName = Get-SharpProofArchiveAssemblyName -Entry $entry
                     $expectedName = [Reflection.AssemblyName]::GetAssemblyName($sourcePath).Name
-                    if ($actualName -ne $expectedName) {
+                    if ($assemblyName -ne $expectedName) {
                         throw "Package '$PackageId' assembly identity is invalid for '$($entry.FullName)'."
                     }
                     if ($firstPartyNames -notcontains $expectedName) {
@@ -245,14 +247,6 @@ function Test-SharpProofPackagePayload {
                 }
             }
             if (-not $useEvidence) {
-                $assemblyName = if ($entry.FullName.EndsWith(
-                        '.dll',
-                        [StringComparison]::OrdinalIgnoreCase)) {
-                    Get-SharpProofArchiveAssemblyName -Entry $entry
-                }
-                else {
-                    $null
-                }
                 $payloadEvidence.Add([pscustomobject][ordered]@{
                     path = $entry.FullName
                     owner = if ($actualThirdParty.Contains($entry.FullName)) {

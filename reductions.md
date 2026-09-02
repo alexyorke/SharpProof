@@ -203,6 +203,7 @@ the smallest relevant containerized test target passes.
 | R513 | Share conditional truth operator return-expression extraction | `SharpProof.Effects.Test`: 323 passed |
 | R532 | Reuse compiler source-location copy/equality helpers during replay | `SharpProof.Worker.Test`: 695 passed |
 | R533 | Share the zero source-location sentinel predicate | `SharpProof.Worker.Test`: 695 passed |
+| R422 | Reuse package archive assembly-name extraction within each payload pass | PowerShell parse; package payload authority tests passed |
 | R534 | Derive reset marker paths from already-canonical publication paths | `SharpProof.Worker.Test`: 695 passed |
 | R538 | Reuse shared sequential/reverse reachability stack helpers | `SharpProof.Effects.Test`: 323 passed |
 | R528 | Share the generated allocation-uncertainty marker predicate | `SharpProof.Effects.Test`: 323 passed |
@@ -1998,7 +1999,8 @@ and `SharpProof.Verifier`.
 
 R420 is merged into applied R328: the proposed shared item import was not needed;
 the self-application entry point now directly carries the grouped property list,
-so no dead item evaluation remains. R421-R422, R424, and R426 remain `pending`;
+so no dead item evaluation remains. R421, R424, and R426 remain `pending`;
+R422 reuses each archive assembly-name extraction within a payload pass, and
 R425 centralizes the shared test link.
 
 ## Second survey, part forty: R427-R432
@@ -3408,3 +3410,24 @@ relative repository path.
 R556 is a `pending` reduction candidate. Preserve the expected-value string
 conversion and duplicate detection in `Require-ExactSet`; only remove the alias
 whose name does not describe the enforced comparison.
+
+## Second survey, part ninety-nine: R557 - publication-plan revalidation loop
+
+| R557 | **`Publish-SharpProofRelease` revalidates the entire publication plan around every artifact push.** Inside the six-package loop it calls `Test-SharpProofPublicationPlanIdentity` before each main push and again before the corresponding symbol push. That validator rereads and byte-checks all seven planned artifacts, rechecks all package decisions, and for fixture destinations rebuilds the current fixture snapshot. The plan and local artifact files are otherwise immutable during this loop, so the same full validation is repeated up to twelve times; a single pre-loop validation plus a narrow per-artifact freshness check, or an explicitly documented post-main-push boundary check, would retain tamper detection while removing repeated whole-plan traversal. | `scripts/Publish-SharpProofRelease.ps1:822-853`; `scripts/SharpProof.PublicationPlanIdentity.psm1:24-403` |
+
+### Status (part ninety-nine)
+
+R557 is a `pending` reduction candidate. Preserve any intended defense-in-depth
+against local artifact mutation during a network push; first establish which
+boundary must be revalidated, then avoid rerunning unrelated package and fixture
+identity checks for every package.
+
+## Second survey, part one hundred: R558 - release-bundle name-set duplication
+
+| R558 | **`Test-SharpProofReleaseBundleTopology` duplicates the expected-name validation already owned by `Test-SharpProofExactRegularFileSet`.** The topology wrapper creates ordinal and case-insensitive hash sets, checks every artifact filename for blank/path-like/duplicate values, and then passes that set to the exact-file-set helper, which rebuilds both hash sets and repeats the same filename validation before scanning the directory. Since the six-artifact count and package/symbol-kind checks already establish the expected cardinality, the helper can accept the manifest name plus artifact names directly and own the single duplicate/path validation pass. | `scripts/SharpProof.ReleaseBundle.ps1:3-50,52-92` |
+
+### Status (part one hundred)
+
+R558 is a `pending` reduction candidate. Keep the topology-specific artifact-kind
+and six-artifact checks; consolidate only the repeated filename-set construction
+and validation before the regular-file scan.
