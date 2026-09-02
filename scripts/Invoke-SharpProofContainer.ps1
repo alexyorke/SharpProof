@@ -30,8 +30,10 @@ Import-Module (Join-Path `
 if (-not $IsLinux -or [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [System.Runtime.InteropServices.Architecture]::X64) {
     throw 'SharpProof container commands require Linux x64.'
 }
+$containerContractPath = $env:SHARPPROOF_CONTAINER_CONTRACT
 if ($env:SHARPPROOF_CONTAINER -cne '1' -or
-    -not (Test-Path -LiteralPath '/etc/sharpproof/container-contract.json' -PathType Leaf)) {
+    [string]::IsNullOrWhiteSpace($containerContractPath) -or
+    -not (Test-Path -LiteralPath $containerContractPath -PathType Leaf)) {
     throw 'SharpProof container commands require the canonical container contract.'
 }
 

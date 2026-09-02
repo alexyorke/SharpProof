@@ -25,7 +25,8 @@ if [[ ! -d "${target}/.git" ]]; then
 fi
 
 cd "${target}"
-test -f /etc/sharpproof/container-contract.json
+contract_path="${SHARPPROOF_CONTAINER_CONTRACT:-}"
+test -n "${contract_path}" && test -f "${contract_path}"
 sp contract
 sp restore
 

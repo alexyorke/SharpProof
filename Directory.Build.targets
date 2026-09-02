@@ -4,7 +4,7 @@
 
   <Target Name="_RequireSharpProofCanonicalContainer"
           BeforeTargets="Restore;PrepareForBuild"
-          Condition="'$(SHARPPROOF_CONTAINER)' != '1' Or !Exists('/etc/sharpproof/container-contract.json')">
+          Condition="'$(SHARPPROOF_CONTAINER)' != '1' Or !Exists('$(SHARPPROOF_CONTAINER_CONTRACT)')">
     <Error Text="SharpProof repository restore, build, test, pack, and release commands must run through the canonical Docker Compose tooling container. See docs/container-development.md." />
   </Target>
 

@@ -22,7 +22,8 @@ if [[ "$(id -u)" = "0" ]] && id sharpproof >/dev/null 2>&1; then
     /usr/local/bin/sharpproof-container "${command_name}" "$@"
 fi
 
-if [[ ! -f /etc/sharpproof/container-contract.json ]]; then
+container_contract="${SHARPPROOF_CONTAINER_CONTRACT:-}"
+if [[ -z "${container_contract}" || ! -f "${container_contract}" ]]; then
   echo "SharpProof canonical container contract is missing." >&2
   exit 125
 fi

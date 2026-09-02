@@ -1427,7 +1427,7 @@ public sealed class ArchitectureTests
             Assert.That(targets, Does.Contain("'$(SHARPPROOF_CONTAINER)' != '1'"));
             Assert.That(
                 targets,
-                Does.Contain("/etc/sharpproof/container-contract.json"));
+                Does.Contain("$(SHARPPROOF_CONTAINER_CONTRACT)"));
             Assert.That(targets, Does.Contain("Docker Compose tooling container"));
         }
     }

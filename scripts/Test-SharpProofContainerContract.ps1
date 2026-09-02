@@ -406,11 +406,9 @@ Assert-Exact `
     'Verifier package ID'
 
 if ($IsLinux -and $env:SHARPPROOF_CONTAINER -ceq '1') {
-    $markerPath = if ([string]::IsNullOrWhiteSpace(
-            $env:SHARPPROOF_CONTAINER_CONTRACT)) {
-        '/etc/sharpproof/container-contract.json'
-    } else {
-        $env:SHARPPROOF_CONTAINER_CONTRACT
+    $markerPath = $env:SHARPPROOF_CONTAINER_CONTRACT
+    if ([string]::IsNullOrWhiteSpace($markerPath)) {
+        throw 'SHARPPROOF_CONTAINER_CONTRACT must identify the installed marker.'
     }
     $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
     Assert-Exact `

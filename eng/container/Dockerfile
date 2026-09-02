@@ -45,7 +45,7 @@ RUN pwsh -NoLogo -NoProfile -File /opt/sharpproof/Prepare-NativePayload.ps1 \
         -DestinationRoot /opt/sharpproof/native \
     && pwsh -NoLogo -NoProfile -File /opt/sharpproof/New-ContainerContract.ps1 \
         -CatalogPath /opt/sharpproof/toolchain.json \
-        -OutputPath /etc/sharpproof/container-contract.json
+        -OutputPath "${SHARPPROOF_CONTAINER_CONTRACT}"
 
 COPY eng/container/entrypoint.sh /usr/local/bin/sharpproof-container
 COPY eng/container/dev-command.sh /usr/local/bin/sp
