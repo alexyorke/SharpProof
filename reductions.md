@@ -7132,3 +7132,25 @@ R836 is `deferred`: response validation is a high-frequency boundary and the
 R837 is `deferred`: the extra owner map is linear and bounded, but it repeats
   an identity projection at a response-validation boundary that already owns a
   compatible index.
+
+## Second survey, part three hundred forty-nine: R838 - duplicate expected-request validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R838 | **Both request-bound `ValidateForRequest` overloads validate the expected request twice.** Each overload first evaluates `Validate(expectedRequest).IsValid` before checking its request hash, then calls `WorkerExecutionEnvelope.MaximumElapsedMilliseconds`; that helper independently calls `WorkerProtocolJson.Validate(request).IsValid` before performing the timeout arithmetic. The second validation result is discarded, so a prevalidated internal envelope path (or a shared validation result passed through the call) can preserve the envelope’s standalone guard for direct callers while removing duplicate rule evaluation from both request-bound paths. | `SharpProof.Worker.Protocol/ProtocolJson.cs:197-218,229-256`; `SharpProof.Worker.Protocol/WorkerExecutionEnvelope.cs:8-26` |
+
+### Checked and not proposed (part three hundred forty-nine)
+
+- The expected-request hash check remains independent: validation alone does
+  not prove that the supplied request matches `expectedRequestHash`.
+- Direct callers of `MaximumElapsedMilliseconds` may still need its own
+  validation boundary; the candidate is an internal prevalidated overload or
+  explicit validated-state seam, not unconditional removal of that guard.
+- The two `ValidateForRequest` overloads still differ in evidence-authority
+  and cancellation behavior even if they share request admission.
+
+### Status (part three hundred forty-nine)
+
+R838 is `deferred`: the duplicate request validation is deterministic boundary
+  work on every bound response check, but preserving the public envelope API's
+  fail-closed contract requires a deliberate internal split.
