@@ -164,8 +164,6 @@ function Read-SharpProofRetainedFuzzSeedManifest {
             SchemaVersion = $schemaVersion
             CasesPerSeed = $casesPerSeed
             Seeds = @($seeds)
-            Sha256 = [Convert]::ToHexString(
-                [Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
         }
     }
     finally {

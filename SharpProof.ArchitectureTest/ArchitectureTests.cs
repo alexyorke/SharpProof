@@ -2230,12 +2230,14 @@ public sealed class ArchitectureTests
                     .And.Contain("yyyyMMdd")
                     .And.Contain("schemaVersion = 4")
                     .And.Contain("commit = $sourceCommit")
-                    .And.Contain("rotatingCases = $effectiveRotatingCases")
-                    .And.Contain("retainedCasesPerSeed = $effectiveRetainedCases")
-                    .And.Contain("retainedSeeds = $retainedSeeds")
-                    .And.Contain("retainedSeedManifestSha256 = $retained.Sha256")
-                    .And.Contain("resultSha256")
-                    .And.Contain("status = if"));
+                     .And.Contain("rotatingCases = $effectiveRotatingCases")
+                     .And.Contain("retainedCasesPerSeed = $effectiveRetainedCases")
+                     .And.Contain("retainedSeeds = $retainedSeeds")
+                     .And.Not.Contain("retainedSeedManifestSha256")
+                     .And.Not.Contain("runnerSha256")
+                     .And.Not.Contain("resultSha256")
+                     .And.Not.Contain("Get-FileHash")
+                     .And.Contain("status = if"));
             Assert.That(acceptance,
                 Does.Contain("contract.fuzz.pullRequestCases")
                     .And.Not.Contain("contract.fuzz.nightlyCases"));

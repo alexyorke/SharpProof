@@ -66,16 +66,6 @@ function Assert-Rejected(
 try {
     $canonical = New-CanonicalResult 10 123
     Assert-Accepted $canonical 'canonical-rotating'
-    $hashPath = Write-Result $canonical 'canonical-hash'
-    $hashed = Assert-SharpProofFuzzRunnerResult `
-        -Path $hashPath -ExpectedCases 10 -ExpectedSeed 123 `
-        -ExpectedMaximumParallelism 4
-    $expectedHash = [Convert]::ToHexString(
-        [Security.Cryptography.SHA256]::HashData(
-            [IO.File]::ReadAllBytes($hashPath))).ToLowerInvariant()
-    if ($hashed.ResultSha256 -cne $expectedHash) {
-        throw 'The fuzz runner result hash did not bind the validated bytes.'
-    }
     $racePath = Write-Result $canonical 'canonical-race'
     $raceBytes = [IO.File]::ReadAllBytes($racePath)
     $replacement = New-CanonicalResult 10 456
@@ -89,17 +79,13 @@ try {
                 Set-Content -LiteralPath $replacementPath
             [IO.File]::Move($replacementPath, $validatedPath, $true)
         }
-    $expectedRaceHash = [Convert]::ToHexString(
-        [Security.Cryptography.SHA256]::HashData(
-            $raceBytes)).ToLowerInvariant()
-    if ($raced.Seed -ne 123 -or
-        $raced.ResultSha256 -cne $expectedRaceHash) {
+    if ($raced.Seed -ne 123) {
         throw 'The fuzz runner result changed after its validated read.'
     }
-    $resealedHash = [Convert]::ToHexString(
-        [Security.Cryptography.SHA256]::HashData(
-            [IO.File]::ReadAllBytes($racePath))).ToLowerInvariant()
-    if ($resealedHash -cne $expectedRaceHash) {
+    $resealedBytes = [IO.File]::ReadAllBytes($racePath)
+    if ($resealedBytes.Length -ne $raceBytes.Length -or
+        @(Compare-Object -ReferenceObject $raceBytes `
+            -DifferenceObject $resealedBytes).Count -ne 0) {
         throw 'The fuzz runner result path was not resealed from validated bytes.'
     }
     $encoding = [Text.UTF8Encoding]::new($false)

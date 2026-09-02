@@ -218,9 +218,5 @@ function Assert-SharpProofFuzzRunnerResult {
         }
     }
 
-    $result = $json | ConvertFrom-Json -ErrorAction Stop
-    $result | Add-Member -NotePropertyName ResultSha256 -NotePropertyValue (
-        [Convert]::ToHexString(
-            [Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant())
-    return $result
+    return $json | ConvertFrom-Json -ErrorAction Stop
 }

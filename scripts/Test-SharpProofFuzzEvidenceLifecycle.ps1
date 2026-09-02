@@ -114,12 +114,6 @@ try {
         @($parsed.Seeds).Count -ne 2 -or $parsed.Seeds[0] -ne -1) {
         throw 'A strict retained fuzz seed manifest was not preserved.'
     }
-    $expectedManifestHash = (Get-FileHash -LiteralPath $manifest `
-        -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($parsed.Sha256 -cne $expectedManifestHash) {
-        throw 'Retained fuzz seed parsing did not bind the exact input bytes.'
-    }
-    $manifestBytes = [IO.File]::ReadAllBytes($manifest)
     $raced = Read-SharpProofRetainedFuzzSeedManifest `
         -Path $manifest `
         -AfterValidation {
@@ -128,11 +122,9 @@ try {
                 $validatedPath,
                 '{"schemaVersion":1,"casesPerSeed":9,"seeds":[7]}')
         }
-    $expectedRacedHash = [Convert]::ToHexString(
-        [Security.Cryptography.SHA256]::HashData(
-            $manifestBytes)).ToLowerInvariant()
     if ($raced.CasesPerSeed -ne 5 -or
-        $raced.Sha256 -cne $expectedRacedHash) {
+        @($raced.Seeds).Count -ne 2 -or
+        $raced.Seeds[0] -ne -1) {
         throw 'Retained fuzz seed parsing changed after its validated read.'
     }
     foreach ($invalid in @(

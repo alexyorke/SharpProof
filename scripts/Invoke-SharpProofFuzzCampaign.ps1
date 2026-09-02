@@ -144,9 +144,6 @@ $runnerAssembly = Join-Path $repositoryRoot `
 if (-not (Test-Path -LiteralPath $runnerAssembly -PathType Leaf)) {
     throw 'The rebuilt fuzz runner assembly is missing.'
 }
-$runnerSha256 = (Get-FileHash `
-    -LiteralPath $runnerAssembly `
-    -Algorithm SHA256).Hash.ToLowerInvariant()
 
 function Invoke-FuzzRun {
     param(
@@ -187,7 +184,6 @@ function Invoke-FuzzRun {
     $abstentions = 0
     $runnerSchemaVersion = $null
     $runnerPassed = $false
-    $resultSha256 = $null
     try {
         if ($process.ExitCode -ne 0) {
             throw "runner exited with code $($process.ExitCode)"
@@ -205,7 +201,6 @@ function Invoke-FuzzRun {
         $agreements = [int]$result.Agreements
         $abstentions = [int]$result.Abstentions
         $runnerPassed = [bool]$result.Passed
-        $resultSha256 = [string]$result.ResultSha256
     }
     catch {
         $validationError = $_.Exception.Message
@@ -222,7 +217,6 @@ function Invoke-FuzzRun {
         runnerPassed = $runnerPassed
         validationPassed = $null -eq $validationError
         validationError = $validationError
-        resultSha256 = $resultSha256
         standardOutput = "$logicalOutput/$Name.stdout.json"
         standardError = "$logicalOutput/$Name.stderr.txt"
     }
@@ -241,25 +235,19 @@ foreach ($seed in $retainedRunSeeds) {
 }
 $completedCommit = Get-SharpProofCleanFuzzSourceCommit `
     -RepositoryRoot $repositoryRoot
-$completedRunnerSha256 = (Get-FileHash `
-    -LiteralPath $runnerAssembly `
-    -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($completedCommit -cne $sourceCommit -or
-    $completedRunnerSha256 -cne $runnerSha256) {
-    throw 'Fuzz source or runner identity changed during the campaign.'
+if ($completedCommit -cne $sourceCommit) {
+    throw 'Fuzz source changed during the campaign.'
 }
 $summary = [pscustomobject][ordered]@{
     schemaVersion = 4
     status = if (@($runs | Where-Object {
                 $_.exitCode -ne 0 -or -not $_.validationPassed
-            }).Count -eq 0) { 'passed' } else { 'failed' }
+    }).Count -eq 0) { 'passed' } else { 'failed' }
     commit = $sourceCommit
-    runnerSha256 = $runnerSha256
     rotatingSeed = $RotatingSeed
     rotatingCases = $effectiveRotatingCases
     retainedCasesPerSeed = $effectiveRetainedCases
     retainedSeeds = $retainedSeeds
-    retainedSeedManifestSha256 = $retained.Sha256
     requestedCases = $requestedCampaignCases
     totalCases = [int](@($runs |
         Measure-Object -Property observedCases -Sum).Sum)
