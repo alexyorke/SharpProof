@@ -63,27 +63,8 @@ function Test-SharpProofReleaseBundleTopology {
         @($Artifacts | Where-Object { [string]$_.kind -ceq 'symbols' }).Count -ne 3) {
         throw "$Owner must contain one exact six-artifact release bundle."
     }
-    $expected = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::Ordinal)
-    $expectedCaseInsensitive = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::OrdinalIgnoreCase)
-    foreach ($name in @('SharpProof.release.json')) {
-        $null = $expected.Add($name)
-        $null = $expectedCaseInsensitive.Add($name)
-    }
-    foreach ($artifact in $Artifacts) {
-        $name = [string]$artifact.fileName
-        if ([string]::IsNullOrWhiteSpace($name) -or
-            $name -in @('.', '..') -or
-            $name.Contains('/') -or $name.Contains('\') -or
-            -not $expected.Add($name) -or
-            -not $expectedCaseInsensitive.Add($name)) {
-            throw "$Owner contains a duplicate or invalid artifact name."
-        }
-    }
-    if ($expected.Count -ne 7) {
-        throw "$Owner does not describe exactly seven unique files."
-    }
+    $expected = @('SharpProof.release.json') + @(
+        $Artifacts | ForEach-Object { [string]$_.fileName })
 
     Test-SharpProofExactRegularFileSet `
         -Directory $Directory `

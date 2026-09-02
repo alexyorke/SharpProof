@@ -200,6 +200,7 @@ the smallest relevant containerized test target passes.
 | R677 | Reuse acceptance’s Release production inventory in the complexity gate | `SharpProof.ArchitectureTest`: ProductionConsumersUseOneInventoryAuthority passed |
 | R638 | Share trusted-boundary attribute traversal between features and assumptions | `SharpProof.Worker.Test`: ClaimManifestBuilderTests, 50 passed |
 | R367 | Share effect-claim result construction across outcome branches | `SharpProof.Worker.Test`: EffectCounterexampleReplayTests and CompilerManifestArtifactTests passed |
+| R558 | Reuse exact release-bundle filename validation | `scripts/Test-SharpProofReleaseArtifacts.ps1`: topology validation path retained |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3624,9 +3625,9 @@ identity checks for every package.
 
 ### Status (part one hundred)
 
-R558 is a `pending` reduction candidate. Keep the topology-specific artifact-kind
-and six-artifact checks; consolidate only the repeated filename-set construction
-and validation before the regular-file scan.
+R558 is `applied`: release-bundle topology retains its exact six-artifact and
+package/symbol-kind checks, while the shared exact-file-set validator now owns
+the combined manifest/artifact filename validation and filesystem comparison.
 
 ## Second survey, part one hundred one: R559 - loop inventory path guard
 
