@@ -7024,3 +7024,24 @@ R831 is `deferred`: the current operators are behaviorally equivalent for
 R832 is `deferred`: the duplicate copies occur only on incomplete/failure
   responses, but the ownership boundary is explicit and can be simplified
   without changing the wire model.
+
+## Second survey, part three hundred forty-four: R833 - duplicate protocol result-ID projection
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R833 | **`ProtocolJson.ValidateResultSet` projects the same result identities twice.** After `Present` has produced the non-null result array, the helper passes `present.Select(identity)` to `ValidateUniqueIds`, whose first operation materializes that sequence, and then constructs a second `present.Select(identity)` for `ValidateExactIds`. The callable and claim paths use the same helper with different identity/error-code arguments, so the duplicated projection is per result set rather than a semantic distinction. Materializing one identity array and passing it to both validators (or returning the uniqueness snapshot) removes one traversal while preserving separate uniqueness and exact-set diagnostics. | `SharpProof.Worker.Protocol/ProtocolJson.cs:920-939`; callers at `SharpProof.Worker.Protocol/ProtocolJson.cs:584-612` |
+
+### Checked and not proposed (part three hundred forty-four)
+
+- `ValidateUniqueIds` and `ValidateExactIds` should remain separate because
+  they report different protocol errors and enforce different invariants.
+- `Present` must continue to filter malformed null rows and report the
+  collection-level error before either identity check consumes the result.
+- Expected IDs remain independently enumerated and ordinal-sorted; only the
+  repeated projection of the already-present actual rows is in scope.
+
+### Status (part three hundred forty-four)
+
+R833 is `deferred`: the extra pass is bounded by one response collection, but
+  it is deterministic validation work with no policy benefit and has a simple
+  identity-array sharing seam.
