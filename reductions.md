@@ -212,6 +212,7 @@ the smallest relevant containerized test target passes.
 | R581 | Reject null non-pack summary evidence identities without dereferencing them | `SharpProof.Worker.Test`: CompilerManifestArtifactTests 91 passed |
 | R582 | Fold user-assumption collection into the proven-core validation pass | `SharpProof.Worker.Test`: WorkerTcbEdgeCaseTests 44 passed |
 | R583 | Remove unreachable contradictory-precondition branches after early return | `SharpProof.Worker.Test`: 695 passed |
+| R584 | Reuse protocol SHA-256 formatting in valid test fixtures | `SharpProof.Worker.Test`: 695; `SharpProof.Package.Test`: 75 passed, 1 expected skip |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3705,7 +3706,9 @@ branches or their proof/assumption plumbing. The full Worker suite passes.
 
 ### Status (part one hundred twenty-five)
 
-R584 is a pending test-infrastructure reduction candidate. Preserve intentionally uppercase or malformed protocol-hash fixtures; centralize only the repeated lowercase digest construction used to represent valid file and payload hashes.
+R584 is applied: valid fixture hashes now use `WorkerProtocolJson.ComputeSha256`,
+while intentionally synthetic, uppercase, and malformed hash values remain
+independent. Worker and package integration suites pass.
 
 ## Second survey, part one hundred twenty-six: R585 - repeated throwing backend fixture
 
@@ -3722,3 +3725,11 @@ R585 is a pending Worker test-infrastructure reduction candidate. Keep the messa
 ### Status (part one hundred twenty-seven)
 
 R586 is a pending Worker test-infrastructure reduction candidate. Preserve the separate malformed-capture and feature-selection scenarios; centralize only the repeated artifact-construction pipeline.
+
+## Second survey, part one hundred twenty-eight: R587 - duplicate bounded postcondition replay engines
+
+| R587 | **The compiler response authority and worker replayer implement the same bounded postcondition execution engine.** `CompilerResponseEvidenceAuthority.TryReplayPostcondition` and `CallableCounterexampleReplayer.Replay` both reconstruct a model, bind parameter variables, execute a prepared program under its instruction bound, project the return value, restore pre-state variables, enforce source integer intervals, and evaluate an `ensures` condition. They intentionally differ at the edges - the authority returns a fail-closed boolean and resolves the target clause by claim ID, while the worker reports `CounterexampleNotReplayable` for unsupported spec/summary calls and exposes reason-specific outcomes - but the shared state-transition core is still maintained twice. A lower-layer replay result/core can own the common execution and validation mechanics while adapters retain those distinct error and claim-selection policies. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:670-818`; `SharpProof.Worker/CallableCounterexampleReplayer.cs:7-125` |
+
+### Status (part one hundred twenty-eight)
+
+R587 is a pending cross-layer replay reduction candidate. Preserve the compiler artifact assembly's dependency direction and each caller's fail-closed/reason-specific boundary; share only the common model, program, state, domain, and condition replay mechanics.

@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml.Linq;
 using NUnit.Framework;
@@ -440,10 +439,7 @@ public sealed class WorkerMsBuildIntegrationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                string.Concat(SHA256.HashData(manifestBytes).Select(
-                    static value => value.ToString(
-                        "x2",
-                        CultureInfo.InvariantCulture))),
+                WorkerProtocolJson.ComputeSha256(manifestBytes),
                 Is.EqualTo(request.CompilerManifest.Sha256));
             Assert.That(
                 manifestDocument.RootElement.GetProperty("manifest")
@@ -3405,9 +3401,7 @@ public sealed class WorkerMsBuildIntegrationTests
     {
         var artifact = await CompilerManifestArtifact.ReadAsync(
             request.CompilerManifest.Path);
-        var digest = string.Concat(SHA256.HashData(artifact.Bytes).Select(
-            static value => value.ToString(
-                "x2", CultureInfo.InvariantCulture)));
+        var digest = WorkerProtocolJson.ComputeSha256(artifact.Bytes);
         workerPath ??= WorkerOutputPath();
         var workerBinarySha256 = WorkerBinaryIdentity.ComputeSha256(workerPath);
         var expectedInputHash = Program.ComputeExpectedInputHash(

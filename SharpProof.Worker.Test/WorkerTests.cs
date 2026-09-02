@@ -7260,12 +7260,7 @@ public sealed class WorkerTests
                 CompilerManifest = new WorkerFileReference
                 {
                     Path = Path.GetFullPath(path),
-                    Sha256 = string.Concat(
-                        System.Security.Cryptography.SHA256.HashData(bytes)
-                            .Select(static value => value.ToString(
-                                "x2",
-                                System.Globalization.CultureInfo
-                                    .InvariantCulture)))
+                    Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
                 },
                 Cache = new WorkerCacheOptions
                 {

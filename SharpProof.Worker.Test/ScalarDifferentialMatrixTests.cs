@@ -918,11 +918,7 @@ public sealed class ScalarDifferentialMatrixTests
                 CompilerManifest = new WorkerFileReference
                 {
                     Path = artifactPath,
-                    Sha256 = string.Concat(
-                        System.Security.Cryptography.SHA256.HashData(bytes)
-                            .Select(static value => value.ToString(
-                                "x2",
-                                CultureInfo.InvariantCulture)))
+                    Sha256 = WorkerProtocolJson.ComputeSha256(bytes)
                 },
                 Cache = new WorkerCacheOptions
                 {

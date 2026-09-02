@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using NUnit.Framework;
@@ -1437,11 +1436,8 @@ public sealed class WorkerTcbEdgeCaseTests
                 ClaimResults = claimResults
             },
             WorkerProtocolJson.Options);
-        var payloadHash = string.Concat(
-            SHA256.HashData(Encoding.UTF8.GetBytes(payload))
-                .Select(static value => value.ToString(
-                    "x2",
-                    CultureInfo.InvariantCulture)));
+        var payloadHash = WorkerProtocolJson.ComputeSha256(
+            Encoding.UTF8.GetBytes(payload));
         var envelope = JsonSerializer.Serialize(
             new
             {
