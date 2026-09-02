@@ -192,10 +192,10 @@ internal static partial class PortableIrGraphCodec
         }
     }
 
-    private static void RequireCanonicalSlots<TEnum>(
+    private static PortableIrSlotMapping RequireCanonicalSlotMapping<TEnum>(
         IReadOnlyList<PortableIrSlotMapping> catalog,
         TEnum kind,
-        params object?[] values)
+        int slotCount)
         where TEnum : struct, Enum
     {
         var mapping = catalog.FirstOrDefault(candidate =>
@@ -203,22 +203,107 @@ internal static partial class PortableIrGraphCodec
         Require(mapping.Kind != null, $"Portable IR {kind} slots are not declared.");
         Require(mapping.Slots != null, $"Portable IR {kind} slots are not declared.");
         Require(
-            mapping.Slots!.Length == values.Length,
+            mapping.Slots!.Length == slotCount,
             $"Portable IR {kind} slots have an invalid shape.");
+        return mapping;
+    }
+
+    private static void RequireCanonicalSlot(
+        string kind,
+        string role,
+        int value)
+    {
         Require(
-            Enumerable.Range(0, values.Length).All(index =>
-                IsCanonicalSlotDefault(mapping.Slots![index], values[index])),
+            role != "unused" || value == -1,
             $"Portable IR {kind} slots are not canonical.");
     }
 
-    private static bool IsCanonicalSlotDefault(string role, object? value)
+    private static void RequireCanonicalSlot(
+        string kind,
+        string role,
+        long value)
     {
-        return role switch
-        {
-            "unused" => new object?[] { null, -1, 0L }.Contains(value),
-            "empty" => value is int[] { Length: 0 },
-            _ => true
-        };
+        Require(
+            role != "unused" || value == 0L,
+            $"Portable IR {kind} slots are not canonical.");
+    }
+
+    private static void RequireCanonicalSlot(
+        string kind,
+        string role,
+        string? value)
+    {
+        Require(
+            role != "unused" || value == null,
+            $"Portable IR {kind} slots are not canonical.");
+    }
+
+    private static void RequireCanonicalSlot(
+        string kind,
+        string role,
+        int[] value)
+    {
+        Require(
+            role != "unused" &&
+            (role != "empty" || value.Length == 0),
+            $"Portable IR {kind} slots are not canonical.");
+    }
+
+    private static void RequireCanonicalSlot(
+        string kind,
+        string role,
+        PortableIrLocation? value)
+    {
+        Require(
+            role != "unused" || value == null,
+            $"Portable IR {kind} slots are not canonical.");
+    }
+
+    private static void RequireCanonicalTermSlots(PortableIrTerm row)
+    {
+        var mapping = RequireCanonicalSlotMapping(
+            PortableIrSlotCatalog.Terms,
+            row.Kind,
+            7);
+        var kind = row.Kind.ToString();
+        RequireCanonicalSlot(kind, mapping.Slots![0], row.A);
+        RequireCanonicalSlot(kind, mapping.Slots[1], row.B);
+        RequireCanonicalSlot(kind, mapping.Slots[2], row.C);
+        RequireCanonicalSlot(kind, mapping.Slots[3], row.D);
+        RequireCanonicalSlot(kind, mapping.Slots[4], row.Number);
+        RequireCanonicalSlot(kind, mapping.Slots[5], row.Text);
+        RequireCanonicalSlot(kind, mapping.Slots[6], row.Items);
+    }
+
+    private static void RequireCanonicalInstructionSlots(
+        PortableIrInstruction row)
+    {
+        var mapping = RequireCanonicalSlotMapping(
+            PortableIrSlotCatalog.Instructions,
+            row.Kind,
+            6);
+        var kind = row.Kind.ToString();
+        RequireCanonicalSlot(kind, mapping.Slots![0], row.A);
+        RequireCanonicalSlot(kind, mapping.Slots[1], row.B);
+        RequireCanonicalSlot(kind, mapping.Slots[2], row.C);
+        RequireCanonicalSlot(kind, mapping.Slots[3], -1);
+        RequireCanonicalSlot(kind, mapping.Slots[4], row.Items);
+        RequireCanonicalSlot(kind, mapping.Slots[5], row.Location);
+    }
+
+    private static void RequireCanonicalLocationSlots(
+        PortableIrLocation row)
+    {
+        var mapping = RequireCanonicalSlotMapping(
+            PortableIrSlotCatalog.Locations,
+            row.Kind,
+            5);
+        var kind = row.Kind.ToString();
+        RequireCanonicalSlot(kind, mapping.Slots![0], row.A);
+        RequireCanonicalSlot(kind, mapping.Slots[1], row.B);
+        RequireCanonicalSlot(kind, mapping.Slots[2], -1);
+        RequireCanonicalSlot(kind, mapping.Slots[3], -1);
+        RequireCanonicalSlot(kind, mapping.Slots[4], row.Items);
     }
 
     private static int Wire<T>(T value, T[] values) where T : struct, Enum
@@ -645,16 +730,7 @@ internal static partial class PortableIrGraphCodec
             _termState[index] = 1;
             var row = Required(_graph.Terms[index], "term row");
             Require(row.Items != null, "Portable IR term metadata is invalid.");
-            RequireCanonicalSlots(
-                PortableIrSlotCatalog.Terms,
-                row.Kind,
-                row.A,
-                row.B,
-                row.C,
-                row.D,
-                row.Number,
-                row.Text,
-                row.Items);
+            RequireCanonicalTermSlots(row);
             var term = PortableIrGraphCodecProjections.DecodeTerm(
                 row,
                 _factory,
@@ -724,15 +800,7 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             row = Required(row, "instruction row");
             Require(row.Items != null, "Portable IR instruction metadata is invalid.");
-            RequireCanonicalSlots(
-                PortableIrSlotCatalog.Instructions,
-                row.Kind,
-                row.A,
-                row.B,
-                row.C,
-                -1,
-                row.Items,
-                row.Location);
+            RequireCanonicalInstructionSlots(row);
             if (row.Kind == IrInstructionKind.Havoc)
             {
                 RequireCanonicalVariableIndices(row.Items!);
@@ -760,14 +828,7 @@ internal static partial class PortableIrGraphCodec
             _cancellationToken.ThrowIfCancellationRequested();
             row = Required(row, "location row");
             Require(row.Items != null, "Portable IR location metadata is invalid.");
-            RequireCanonicalSlots(
-                PortableIrSlotCatalog.Locations,
-                row.Kind,
-                row.A,
-                row.B,
-                -1,
-                -1,
-                row.Items);
+            RequireCanonicalLocationSlots(row);
             var location = PortableIrGraphCodecProjections.DecodeLocation(
                 builder,
                 row,

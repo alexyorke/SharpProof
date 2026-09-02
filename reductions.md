@@ -4193,14 +4193,6 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred eighty-eight: R647 - allocating portable-IR slot checks
-
-| R647 | **`PortableIrGraphCodec.RequireCanonicalSlots` allocates and boxes on every decoded row.** The helper is declared with `params object?[]`, so each term, instruction, and location validation call materializes an object array and boxes its integer/long slot values. For every slot marked `unused`, `IsCanonicalSlotDefault` allocates another `{ null, -1, 0L }` object array merely to call `Contains`. A typed/generated slot validator can preserve the schema-driven slot counts and defaults without per-row arrays, boxing, or repeated temporary collections on the portable-IR decode path. | `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:195-221,634-657,720-770` |
-
-### Status (part one hundred eighty-eight)
-
-R647 is a pending portable-IR codec allocation reduction candidate. Preserve schema catalog lookup, slot-count checks, default-value rules, and malformed-graph rejection; replace only the temporary object-array/boxing machinery.
-
 ## Second survey, part one hundred eighty-nine: R648 - recovered skeletal snapshot adapter
 
 | R648 | **`CompilerEffectReplayLowerer.TryResolveSource` allocates a skeletal compilation snapshot solely to call a syntax-tree lookup.** After obtaining the cached `CompilerSyntaxTreeSnapshot[]`, it creates `new CompilerCompilationSnapshot { SyntaxTrees = capturedTrees }` and passes that object to `CompilerSourceLocationAuthority.FindUniqueTree`; the authority reads no other snapshot field. A narrow overload accepting the captured tree collection, or a source-tree resolver that takes the collection directly, removes this per-replay adapter object while retaining the authority's remembered-ordinal fast path, geometry checks, and ambiguity rejection. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:418-433`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:108-142` |
