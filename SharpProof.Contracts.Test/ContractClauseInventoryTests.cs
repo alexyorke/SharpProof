@@ -361,19 +361,7 @@ public sealed class ContractClauseInventoryTests
     [Test]
     public void ForeignCallableReturnsRejectedInventoryWithoutRetainingBody()
     {
-        var ownerCompilation = CreateCompilation(
-            "public static class Owner { public static void Analyze() { } }",
-            includeSharpProofReference: true);
-        var foreignCompilation = CreateCompilation(
-            """
-            using SharpProof.Attributes;
-            public static class Foreign {
-                public static void Analyze(bool condition) {
-                    Contract.Requires(condition);
-                }
-            }
-            """,
-            includeSharpProofReference: true);
+        var (ownerCompilation, foreignCompilation) = CreateForeignFixture();
         var foreign = foreignCompilation.GetTypeByMetadataName("Foreign")!
             .GetMembers("Analyze")
             .OfType<IMethodSymbol>()
@@ -390,23 +378,11 @@ public sealed class ContractClauseInventoryTests
     [Test]
     public void ForeignImplementationBodyReturnsRejectedInventoryWithoutRetainingBody()
     {
-        var ownerCompilation = CreateCompilation(
-            "public static class Owner { public static void Analyze() { } }",
-            includeSharpProofReference: true);
+        var (ownerCompilation, foreignCompilation) = CreateForeignFixture();
         var owner = ownerCompilation.GetTypeByMetadataName("Owner")!
             .GetMembers("Analyze")
             .OfType<IMethodSymbol>()
             .Single();
-        var foreignCompilation = CreateCompilation(
-            """
-            using SharpProof.Attributes;
-            public static class Foreign {
-                public static void Analyze(bool condition) {
-                    Contract.Requires(condition);
-                }
-            }
-            """,
-            includeSharpProofReference: true);
         var foreignTree = foreignCompilation.SyntaxTrees.Single();
         var foreignBody = foreignTree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
@@ -421,6 +397,25 @@ public sealed class ContractClauseInventoryTests
         Assert.That(inventory.HasRejectedContractApiUsage, Is.True);
         Assert.That(inventory.ImplementationBody, Is.Null);
         Assert.That(inventory.Clauses, Is.Empty);
+    }
+
+    private static (CSharpCompilation Owner, CSharpCompilation Foreign)
+        CreateForeignFixture()
+    {
+        return (
+            CreateCompilation(
+                "public static class Owner { public static void Analyze() { } }",
+                includeSharpProofReference: true),
+            CreateCompilation(
+                """
+                using SharpProof.Attributes;
+                public static class Foreign {
+                    public static void Analyze(bool condition) {
+                        Contract.Requires(condition);
+                    }
+                }
+                """,
+                includeSharpProofReference: true));
     }
 
     private static ContractClauseInventory CreateInventory(
