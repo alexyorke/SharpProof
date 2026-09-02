@@ -210,6 +210,7 @@ the smallest relevant containerized test target passes.
 | R504 | Express container script modes with `COPY --chmod` | `SharpProof.ArchitectureTest`: ContainerAuthorityScriptTests 15; `docker compose build tooling` passed |
 | R505 | Keep ignored `nupkgs/` inputs in the persistent loop snapshot and workspace | `SharpProof.ArchitectureTest`: HostLoopSnapshotAvoidsBindMountGitDiffScanning 1 passed; shell/PowerShell parses passed |
 | R581 | Reject null non-pack summary evidence identities without dereferencing them | `SharpProof.Worker.Test`: CompilerManifestArtifactTests 91 passed |
+| R582 | Fold user-assumption collection into the proven-core validation pass | `SharpProof.Worker.Test`: WorkerTcbEdgeCaseTests 44 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3683,7 +3684,9 @@ summary ordering. The focused compiler-manifest suite passes.
 
 ### Status (part one hundred twenty-three)
 
-R582 is a pending worker-result reduction candidate. Keep the current fail-closed behavior when a justification has no label; only combine the independent per-justification work once that lookup succeeds.
+R582 is applied: proven-core labels and user-assumption IDs are collected in one
+validated traversal; malformed evidence clears the provisional IDs before the
+failure result is returned, preserving the prior fail-closed behavior.
 
 ## Second survey, part one hundred twenty-four: R583 - unreachable contradictory-vacuity branches
 

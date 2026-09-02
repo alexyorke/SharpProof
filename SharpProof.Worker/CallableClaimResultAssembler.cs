@@ -25,10 +25,15 @@ internal static class CallableClaimResultAssembler
                     }
 
                     proofCore.Add(label);
+                    if (userAssumptionIds.TryGetValue(justification, out var id))
+                    {
+                        usedUserAssumptions.Add(id);
+                    }
                 }
 
                 if (hasMalformedEvidence)
                 {
+                    usedUserAssumptions.Clear();
                     record.Reason = WorkerClaimReason.MalformedBackendResult;
                     break;
                 }
@@ -36,14 +41,6 @@ internal static class CallableClaimResultAssembler
                 (record.Outcome, record.Reason, record.Vacuity) =
                     (WorkerClaimOutcome.Proven, WorkerClaimReason.None, vacuity);
                 record.ProofCore = [.. proofCore];
-                foreach (var justification in proven.Core)
-                {
-                    if (userAssumptionIds.TryGetValue(justification, out var id))
-                    {
-                        usedUserAssumptions.Add(id);
-                    }
-                }
-
                 break;
             case RefutedOutcome when replayFailure != WorkerClaimReason.None:
                 record.Reason = replayFailure;
