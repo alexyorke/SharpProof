@@ -69,7 +69,7 @@ try {
         'eng/acceptance/Verify.ps1',
         'scripts/Generate-DiagnosticDescriptors.ps1',
         'scripts/Generate-ProjectionCatalog.ps1',
-        'scripts/Generate-Readme.ps1',
+        'scripts/Test-SharpProofReadme.ps1',
         'scripts/Invoke-SharpProofCoverage.ps1',
         'scripts/Invoke-SharpProofGateEvidence.ps1',
         'scripts/Invoke-SharpProofFuzzCampaign.ps1',

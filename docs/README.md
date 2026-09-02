@@ -171,7 +171,7 @@ stable 1.0 governance is separate. Current behavior and limits are recorded in
 
 ## Maintenance
 
-Markdown is hand-maintained. `scripts/Generate-Readme.ps1 -Verify` validates
+Markdown is hand-maintained. `scripts/Test-SharpProofReadme.ps1` validates
 code-derived versions, acceptance-contract versions, configuration values,
 diagnostics, API-spec IDs, worker properties, protocol enums, local links,
 anchors, XML and PowerShell fences, line endings, and BOM policy; the analyzer

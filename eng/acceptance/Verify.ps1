@@ -247,7 +247,7 @@ if ($LASTEXITCODE -ne 0) {
 $productionInventory = ($productionInventoryJson -join [Environment]::NewLine) | ConvertFrom-Json
 
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainerContract.ps1')
-& (Join-Path $repositoryRoot 'scripts\Generate-Readme.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Test-SharpProofReadme.ps1')
     & (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
     & (Join-Path $repositoryRoot 'scripts\Generate-ContractApiCatalog.ps1') -Verify

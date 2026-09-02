@@ -543,7 +543,7 @@ switch ($Command) {
                     $Configuration.ToLowerInvariant() + '.json'))
     }
     'pack' {
-        & (Join-Path $repositoryRoot 'scripts/Generate-Readme.ps1') -Verify
+        & (Join-Path $repositoryRoot 'scripts/Test-SharpProofReadme.ps1')
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         $output = Join-Path $repositoryRoot 'artifacts/container-packages'
         $artifactsRoot = [IO.Path]::GetFullPath(
@@ -632,7 +632,7 @@ switch ($Command) {
             -PlanOutputPath (Join-Path $planDirectory 'publication-plan.json')
     }
     'release-qualification' {
-        & (Join-Path $repositoryRoot 'scripts/Generate-Readme.ps1') -Verify
+        & (Join-Path $repositoryRoot 'scripts/Test-SharpProofReadme.ps1')
         & (Join-Path $repositoryRoot `
             'scripts/Invoke-SharpProofReleaseContainer.ps1') `
             -Mode WriteQualificationEvidence `

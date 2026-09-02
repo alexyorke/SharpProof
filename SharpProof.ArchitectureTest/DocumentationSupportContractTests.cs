@@ -74,17 +74,17 @@ public sealed class DocumentationSupportContractTests
         AssertOrdered(
             acceptance,
             "Start-AcceptanceTimingPhase -Name 'static-validation'",
-            "scripts\\Generate-Readme.ps1') -Verify",
+            "scripts\\Test-SharpProofReadme.ps1')",
             "Complete-AcceptanceTimingPhase");
         AssertCommandGatePrecedes(
             dispatcher,
             "'pack' {",
-            "scripts/Generate-Readme.ps1') -Verify",
+            "scripts/Test-SharpProofReadme.ps1')",
             "New-SharpProofReleaseEvidence.ps1");
         AssertCommandGatePrecedes(
             dispatcher,
             "'release-qualification' {",
-            "scripts/Generate-Readme.ps1') -Verify",
+            "scripts/Test-SharpProofReadme.ps1')",
             "-Mode WriteQualificationEvidence");
         Assert.That(workflow, Does.Contain("tooling acceptance"));
         Assert.That(workflow, Does.Contain("tooling release-qualification"));

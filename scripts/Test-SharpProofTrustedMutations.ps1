@@ -1886,14 +1886,14 @@ $mutations = @(
     [pscustomobject]@{
         Name = 'documentation-support-contract-disconnected'
         File = 'eng\acceptance\Verify.ps1'
-        Original = "& (Join-Path `$repositoryRoot 'scripts\Generate-Readme.ps1') -Verify"
+        Original = "& (Join-Path `$repositoryRoot 'scripts\Test-SharpProofReadme.ps1')"
         Mutated = '# documentation support-contract validation removed'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~DocumentationGatePrecedesPackagingAndReleaseEvidence'
     },
     [pscustomobject]@{
         Name = 'documentation-contract-api-silence-guard'
-        File = 'scripts\Generate-Readme.ps1'
+        File = 'scripts\Test-SharpProofReadme.ps1'
         Original = "    'disable contract analysis without a diagnostic',"
         Mutated = "    'unrelated stale claim',"
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
@@ -1901,7 +1901,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'documentation-resource-concurrency-claim-count'
-        File = 'scripts\Generate-Readme.ps1'
+        File = 'scripts\Test-SharpProofReadme.ps1'
         Original = "            `$resourceText,`n            [regex]::Escape(`$claim)).Count`n        if (`$claimCount -cne 1) {"
         Mutated = "            `$resourceText,`n            [regex]::Escape(`$claim)).Count`n        if (`$false) {"
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
@@ -1917,7 +1917,7 @@ $mutations = @(
     },
     [pscustomobject]@{
         Name = 'documentation-typed-effect-result-block'
-        File = 'scripts\Generate-Readme.ps1'
+        File = 'scripts\Test-SharpProofReadme.ps1'
         Original = '    $typedBlocks[0].Value -cne $expectedTypedResultBlock) {'
         Mutated = '    $false) {'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'

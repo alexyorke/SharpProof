@@ -141,7 +141,7 @@
       "scripts/Generate-LauncherArguments.ps1",
       "scripts/Generate-OperationSupportCatalog.ps1",
       "scripts/Generate-ProjectionCatalog.ps1",
-      "scripts/Generate-Readme.ps1",
+      "scripts/Test-SharpProofReadme.ps1",
       "scripts/Generate-ProtocolModel.ps1",
       "scripts/GeneratedFileHelpers.ps1",
       "scripts/Get-SharpProofDevCheckPlan.ps1",
@@ -764,7 +764,7 @@
         "name": "containedPathAuthority",
         "paths": [
           "eng/fuzz/retained-seeds.json",
-          "scripts/Generate-Readme.ps1",
+          "scripts/Test-SharpProofReadme.ps1",
           "scripts/Invoke-SharpProofFuzzCampaign.ps1",
           "scripts/Resolve-SharpProofContainedPath.ps1",
           "scripts/Test-SharpProofContainedPathFixtures.ps1"

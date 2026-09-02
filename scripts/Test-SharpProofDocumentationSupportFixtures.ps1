@@ -187,8 +187,7 @@ try {
         $overridePath,
         $text,
         [Text.UTF8Encoding]::new($false))
-    & (Join-Path $PSScriptRoot 'Generate-Readme.ps1') `
-        -Verify `
+    & (Join-Path $PSScriptRoot 'Test-SharpProofReadme.ps1') `
         -TextOverrideRelativePath $relativePath `
         -TextOverridePath $overridePath
 }

@@ -1,7 +1,5 @@
 [CmdletBinding()]
 param(
-    [switch]$Verify,
-
     [string]$TextOverrideRelativePath = '',
 
     [string]$TextOverridePath = ''
@@ -1056,14 +1054,9 @@ foreach ($relativePath in $currentMaintainedDocuments) {
     }
 }
 
-if ($Verify) {
-    Write-Host (
-        "SharpProof documentation matches code-derived package, protocol, " +
-        'cache, manifest, compiler-artifact, relational-summary, and ' +
-        'specification-pack versions, acceptance-contract ' +
-        'versions, configuration, diagnostics, API specs, worker options, ' +
-        'protocol enums, links, anchors, and parseable XML/PowerShell fences.')
-}
-else {
-    Write-Host 'SharpProof documentation validation passed.'
-}
+Write-Host (
+    "SharpProof documentation matches code-derived package, protocol, " +
+    'cache, manifest, compiler-artifact, relational-summary, and ' +
+    'specification-pack versions, acceptance-contract versions, ' +
+    'configuration, diagnostics, API specs, worker options, protocol enums, ' +
+    'links, anchors, and parseable XML/PowerShell fences.')
