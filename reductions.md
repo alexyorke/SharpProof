@@ -3697,7 +3697,10 @@ abstention behavior are unchanged.
 
 ### Status (part one hundred twenty)
 
-R579 is a pending compiler-collector reduction candidate. Preserve the diagnostic-failure and normal-lowering branches and their distinct failure metadata; centralize only the identical effect evidence/authority attachment.
+R579 is applied: both callable-construction branches now attach effect evidence
+and bind source-tree authorities through one helper. Their diagnostic-failure
+versus lowering artifacts remain separate, including their distinct failure
+metadata.
 
 ## Second survey, part one hundred twenty-one: R580 - discarded specification-pack evidence
 

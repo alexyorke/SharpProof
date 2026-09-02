@@ -31,19 +31,16 @@ internal static class CompilerManifestArtifactProducer
         CompilerCallableArtifact[] callables;
         if (diagnosticArtifacts.Length != 0)
         {
-            callables = [.. targets.Select(item => new CompilerCallableArtifact {
-                CallableId = item.Entry.CallableId,
-                FailureReason =
-                    CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason,
-                EffectClaims = [.. item.EffectClaims.Select(static claim => claim.Evidence)],
-                EffectAuthorities = [.. item.EffectClaims.Select(claim =>
+            callables = [.. targets.Select(item =>
+            {
+                var artifact = new CompilerCallableArtifact
                 {
-                    CompilerEffectAuthority.BindSourceTree(
-                        claim.Authority,
-                        snapshot);
-                    return claim.Authority;
-                })]
-                })];
+                    CallableId = item.Entry.CallableId,
+                    FailureReason =
+                        CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason
+                };
+                return artifact.AttachEffectEvidence(item, snapshot);
+            })];
         }
         else
         {
@@ -54,16 +51,7 @@ internal static class CompilerManifestArtifactProducer
             callables = [.. targets.Select(item => {
                 var artifact = CompilerLoweredArtifact.Encode(
                     lowerer.Prepare(item, cancellationToken));
-                artifact.EffectClaims = [.. item.EffectClaims.Select(
-                    static claim => claim.Evidence)];
-                artifact.EffectAuthorities = [.. item.EffectClaims.Select(claim =>
-                {
-                    CompilerEffectAuthority.BindSourceTree(
-                        claim.Authority,
-                        snapshot);
-                    return claim.Authority;
-                })];
-                return artifact;
+                return artifact.AttachEffectEvidence(item, snapshot);
             })];
             snapshot.SummaryEvidence = BuildSummaryEvidence(
                 snapshot,
@@ -91,6 +79,23 @@ internal static class CompilerManifestArtifactProducer
         artifact.FeatureScopeSha256 =
             CompilerFeatureScopeFingerprint.ComputeSha256(artifact);
         CompilerManifestArtifactJson.Validate(artifact);
+        return artifact;
+    }
+
+    private static CompilerCallableArtifact AttachEffectEvidence(
+        this CompilerCallableArtifact artifact,
+        ManifestCallableTarget target,
+        CompilerCompilationSnapshot snapshot)
+    {
+        artifact.EffectClaims = [.. target.EffectClaims.Select(
+            static claim => claim.Evidence)];
+        artifact.EffectAuthorities = [.. target.EffectClaims.Select(claim =>
+        {
+            CompilerEffectAuthority.BindSourceTree(
+                claim.Authority,
+                snapshot);
+            return claim.Authority;
+        })];
         return artifact;
     }
 
