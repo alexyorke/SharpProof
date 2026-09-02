@@ -93,6 +93,13 @@
              Link="DictionaryAnalyzerConfigOptions.cs" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Meta.Analyzers.Test'">
+    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\DiagnosticDescriptorCatalogAssertions.cs"
+             Link="DiagnosticDescriptorCatalogAssertions.cs" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Effects.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Specs.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\ApiSpecTestFacets.cs"

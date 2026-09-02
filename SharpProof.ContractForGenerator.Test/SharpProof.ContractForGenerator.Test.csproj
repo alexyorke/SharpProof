@@ -12,8 +12,4 @@
     <ProjectReference Include="..\SharpProof.Analyzer.Core\SharpProof.Analyzer.Core.csproj" />
     <ProjectReference Include="..\SharpProof.ContractForGenerator\SharpProof.ContractForGenerator.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\eng\testing\DiagnosticDescriptorCatalogAssertions.cs"
-             Link="DiagnosticDescriptorCatalogAssertions.cs" />
-  </ItemGroup>
 </Project>

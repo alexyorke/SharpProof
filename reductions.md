@@ -187,6 +187,7 @@ the smallest relevant containerized test target passes.
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R419 | Remove the redundant `BackendCheckResult` forwarding constructor | `SharpProof.Verify.Test`: 14 passed |
+| R425 | Centralize the diagnostic descriptor assertion test link | `SharpProof.Analyzer.Test`: 476; `SharpProof.ContractForGenerator.Test`: 121; `SharpProof.Meta.Analyzers.Test`: 163 |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1978,8 +1979,8 @@ and `SharpProof.Verifier`.
 
 R420 is merged into applied R328: the proposed shared item import was not needed;
 the self-application entry point now directly carries the grouped property list,
-so no dead item evaluation remains. R421-R422 and R424-R426 are `pending` and
-streamline build props, test links, and package scripts.
+so no dead item evaluation remains. R421-R422, R424, and R426 remain `pending`;
+R425 centralizes the shared test link.
 
 ## Second survey, part forty: R427-R432
 
