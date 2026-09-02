@@ -940,44 +940,33 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private static Dictionary<ILocalSymbol, DirectDelegateTarget>
         GetDirectDelegateTargets(IOperation operationRoot)
     {
-        var targets = new Dictionary<ILocalSymbol, DirectDelegateTarget>(
+        var declarations = new List<(
+            ILocalSymbol Symbol,
+            IMethodSymbol Method,
+            IOperation? Instance)>();
+        var invalidations = new Dictionary<ILocalSymbol, List<IOperation>>(
             SymbolEqualityComparer.Default);
-        var ambiguous = new HashSet<ILocalSymbol>(
-            SymbolEqualityComparer.Default);
-        var hasGoto = operationRoot.DescendantsAndSelf().Any(
-            static descendant => descendant is IBranchOperation
-            {
-                BranchKind: BranchKind.GoTo
-            });
-        foreach (var declarator in operationRoot.DescendantsAndSelf()
-                     .OfType<IVariableDeclaratorOperation>())
-        {
-            if (declarator.Initializer?.Value is not { } value ||
-                !TryGetMethodReference(value, out var reference) ||
-                ambiguous.Contains(declarator.Symbol))
-            {
-                continue;
-            }
-
-            if (targets.ContainsKey(declarator.Symbol))
-            {
-                targets.Remove(declarator.Symbol);
-                ambiguous.Add(declarator.Symbol);
-            }
-            else
-            {
-                targets.Add(
-                    declarator.Symbol,
-                    new DirectDelegateTarget(
-                        reference.Method,
-                        reference.Instance,
-                        [],
-                        hasGoto));
-            }
-        }
-
+        var hasGoto = false;
         foreach (var operation in operationRoot.DescendantsAndSelf())
         {
+            if (operation is IBranchOperation
+                {
+                    BranchKind: BranchKind.GoTo
+                })
+            {
+                hasGoto = true;
+            }
+
+            if (operation is IVariableDeclaratorOperation declarator &&
+                declarator.Initializer?.Value is { } value &&
+                TryGetMethodReference(value, out var reference))
+            {
+                declarations.Add((
+                    declarator.Symbol,
+                    reference.Method,
+                    reference.Instance));
+            }
+
             var target = operation switch
             {
                 IAssignmentOperation assignment => assignment.Target,
@@ -989,16 +978,57 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 IVariableDeclaratorOperation
                 {
                     Symbol.RefKind: not RefKind.None,
-                    Initializer.Value: { } value
-                } => value,
+                    Initializer.Value: { } initializerValue
+                } => initializerValue,
                 _ => null
             };
-            if (TryGetLocalReference(target, out var local) &&
-                targets.TryGetValue(local, out var known))
+            if (TryGetLocalReference(target, out var local))
             {
+                if (!invalidations.TryGetValue(local, out var operations))
+                {
+                    operations = [];
+                    invalidations.Add(local, operations);
+                }
+                operations.Add(operation);
+            }
+        }
+
+        var targets = new Dictionary<ILocalSymbol, DirectDelegateTarget>(
+            SymbolEqualityComparer.Default);
+        var ambiguous = new HashSet<ILocalSymbol>(
+            SymbolEqualityComparer.Default);
+        foreach (var declaration in declarations)
+        {
+            if (ambiguous.Contains(declaration.Symbol))
+            {
+                continue;
+            }
+
+            if (targets.ContainsKey(declaration.Symbol))
+            {
+                targets.Remove(declaration.Symbol);
+                ambiguous.Add(declaration.Symbol);
+            }
+            else
+            {
+                targets.Add(
+                    declaration.Symbol,
+                    new DirectDelegateTarget(
+                        declaration.Method,
+                        declaration.Instance,
+                        [],
+                        hasGoto));
+            }
+        }
+
+        foreach (var local in targets.Keys.ToArray())
+        {
+            if (invalidations.TryGetValue(local, out var operations))
+            {
+                var known = targets[local];
                 targets[local] = known with
                 {
-                    Invalidations = known.Invalidations.Add(operation)
+                    Invalidations = [.. operations]
                 };
             }
         }
