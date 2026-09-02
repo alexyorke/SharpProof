@@ -4329,7 +4329,7 @@ R708 completed: the developer check now resolves and validates every planned pha
 
 | R709 | **`ReferencedTypeSymbols.GetAll` rebuilds the complete type closure for separate companion consumers.** `ContractForSymbolMatcher.DiscoverCompanionRelationships` enumerates every source and referenced-assembly type to build companion descriptors, while `ConservativeEffectCallPreconditionPolicy.FindTypesWithCompanions` independently enumerates the same source-plus-reference closure and then filters `[ContractFor]` targets into a set. A compilation-scoped immutable type snapshot (or a shared raw companion inventory with adapters for the two policies) can remove the duplicate namespace/type traversal without forcing the effects assembly to depend on the contracts implementation. Do not cache partial results after cancellation, and retain the existing symbol comparer, traversal order, and each consumer's different validity/cycle policy. | `SharpProof.Frontend/ReferencedTypeSymbols.cs:5-59`; `SharpProof.Contracts/ContractForSymbolMatcher.cs:155-179`; `SharpProof.Effects/EffectCallPreconditionPolicy.cs:215-259` |
 
-R709 is a pending cross-layer referenced-symbol traversal reduction candidate. Preserve compilation isolation, cancellation behavior, source/reference coverage, symbol identity, and the separate companion acceptance rules.
+R709 is deferred: both consumers already share `ReferencedTypeSymbols.GetAll`; sharing a materialized compilation-scoped snapshot would add retention and cancellation-invalidation policy across analyzer phases without reducing the per-consumer symbol walks that carry different filters. Keep the lazy, cancellation-aware traversal until a shared snapshot lifetime is explicitly owned.
 
 ### Status (part two hundred forty-three)
 
