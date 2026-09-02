@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
@@ -900,28 +899,13 @@ public sealed class ReleasePublicationScriptTests
         string fileName,
         params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = fileName,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(startInfo)!;
-        var standardOutput = process.StandardOutput.ReadToEndAsync();
-        var standardError = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        var result = await ProcessRunner.RunCapturedAsync(
+            workingDirectory,
+            fileName,
+            arguments);
         return new ProcessResult(
-            process.ExitCode,
-            (await standardOutput) + Environment.NewLine +
-            (await standardError));
+            result.ExitCode,
+            result.Output + Environment.NewLine + result.Error);
     }
 
     private static void RewriteRepositoryCommit(

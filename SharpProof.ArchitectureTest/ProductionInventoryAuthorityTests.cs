@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using NUnit.Framework;
 
@@ -249,7 +248,7 @@ public sealed class ProductionInventoryAuthorityTests
         return JsonDocument.Parse(result.Output);
     }
 
-    private static Task<ProcessResult> RunInventoryProcessAsync(string repository)
+    private static Task<ProcessRunnerResult> RunInventoryProcessAsync(string repository)
     {
         return RunAsync(
             repository,
@@ -282,39 +281,21 @@ public sealed class ProductionInventoryAuthorityTests
         await AssertSuccessAsync(RunAsync(repository, "git", "commit", "-m", message));
     }
 
-    private static async Task AssertSuccessAsync(Task<ProcessResult> operation)
+    private static async Task AssertSuccessAsync(Task<ProcessRunnerResult> operation)
     {
         var result = await operation;
         Assert.That(result.ExitCode, Is.Zero, result.Error + result.Output);
     }
 
-    private static async Task<ProcessResult> RunAsync(
+    private static Task<ProcessRunnerResult> RunAsync(
         string workingDirectory,
         string fileName,
         params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = fileName,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(startInfo)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return new ProcessResult(
-            process.ExitCode,
-            await output,
-            await error);
+        return ProcessRunner.RunCapturedAsync(
+            workingDirectory,
+            fileName,
+            arguments);
     }
 
     private static void DeleteTemporaryRepository(string repository)
@@ -325,5 +306,4 @@ public sealed class ProductionInventoryAuthorityTests
         }
     }
 
-    private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO.Compression;
 using System.Reflection;
 using System.Reflection.Metadata;
@@ -2404,30 +2403,19 @@ public sealed class PackageLayoutSmokeTests
         string fileName,
         params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = fileName,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
+        var startInfo = ProcessRunner.CreateStartInfo(
+            workingDirectory,
+            fileName,
+            arguments);
         startInfo.Environment["SharedCompilationId"] =
             CreateSharedCompilationServerId();
 
-        using var process = Process.Start(startInfo)!;
-        var standardOutput = process.StandardOutput.ReadToEndAsync();
-        var standardError = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        var result = await ProcessRunner.RunCapturedAsync(
+            startInfo,
+            CancellationToken.None);
         return new ProcessResult(
-            process.ExitCode,
-            (await standardOutput) + Environment.NewLine +
-            (await standardError));
+            result.ExitCode,
+            result.Output + Environment.NewLine + result.Error);
     }
 
     private static string CreateSharedCompilationServerId()

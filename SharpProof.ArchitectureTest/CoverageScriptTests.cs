@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using System.Xml.Linq;
 using NUnit.Framework;
@@ -840,7 +839,7 @@ public sealed class CoverageScriptTests
         }
     }
 
-    private static async Task<ProcessResult> RunCoverageIdentityFixtureAsync(
+    private static async Task<ProcessRunnerResult> RunCoverageIdentityFixtureAsync(
         IReadOnlyList<CoverageEntry> entries)
     {
         var root = TestRepository.FindRoot();
@@ -1126,7 +1125,7 @@ public sealed class CoverageScriptTests
         return repository;
     }
 
-    private static async Task<ProcessResult> RunCoverageAsync(
+    private static async Task<ProcessRunnerResult> RunCoverageAsync(
         string repository,
         string? comparisonRef,
         bool reportOnly,
@@ -1140,7 +1139,7 @@ public sealed class CoverageScriptTests
             includeWorkingTree);
     }
 
-    private static Task<ProcessResult> RunCoverageScriptOnlyAsync(
+    private static Task<ProcessRunnerResult> RunCoverageScriptOnlyAsync(
         string repository,
         string? comparisonRef,
         bool reportOnly,
@@ -1604,41 +1603,23 @@ public sealed class CoverageScriptTests
             message));
     }
 
-    private static async Task<ProcessResult> AssertSuccessAsync(
-        Task<ProcessResult> operation)
+    private static async Task<ProcessRunnerResult> AssertSuccessAsync(
+        Task<ProcessRunnerResult> operation)
     {
         var result = await operation;
         Assert.That(result.ExitCode, Is.Zero, result.Error);
         return result;
     }
 
-    private static async Task<ProcessResult> RunAsync(
+    private static Task<ProcessRunnerResult> RunAsync(
         string workingDirectory,
         string fileName,
         params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = fileName,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(startInfo)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return new ProcessResult(
-            process.ExitCode,
-            await output,
-            await error);
+        return ProcessRunner.RunCapturedAsync(
+            workingDirectory,
+            fileName,
+            arguments);
     }
 
     private static void DeleteTemporaryRepository(string repository)
@@ -1658,11 +1639,6 @@ public sealed class CoverageScriptTests
         Directory.Delete(repository, recursive: true);
     }
 
-    private sealed record ProcessResult(
-        int ExitCode,
-        string Output,
-        string Error);
-
     private sealed record CoverageEntry(
         string SourcePath,
         string ReportPath,
@@ -1675,6 +1651,6 @@ public sealed class CoverageScriptTests
         int CoveredLine);
 
     private sealed record ChangedLineResult(
-        ProcessResult Process,
+        ProcessRunnerResult Process,
         int ChangedLine);
 }

@@ -71,6 +71,8 @@
     <PackageReference Include="NUnit3TestAdapter" />
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestRepository.cs"
              Link="TestRepository.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\ProcessRunner.cs"
+             Link="ProcessRunner.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR

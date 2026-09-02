@@ -4438,15 +4438,14 @@ what their result type means**.
 
 ### Status (part two hundred forty-seven)
 
-R724 is `pending` and is the largest remaining mechanical duplication in the
-repository by file count. R725 is `pending` and is the actionable half: it names
-an existing in-repository implementation that is already better than all 16 copies
-and an existing sharing mechanism that already reaches the affected projects, so
-the work is consolidation rather than design. They should be actioned together, and
-R724's semantic split - `Output` meaning two different things - should be
-resolved deliberately when they are, because collapsing the two families without
-choosing a meaning would silently change what a number of existing assertions
-inspect.
+R724 is partially completed but the remaining 55-site consolidation is deferred:
+the six exact private runners in the two named test assemblies now use the shared
+runner, while the broader set still has incompatible result shapes and stdout/
+stderr meanings that cannot be collapsed without changing assertions. R725 is
+completed: `eng/testing/ProcessRunner.cs` now owns the common start, capture,
+cancellation, and process-tree cleanup path and is linked to test projects through
+the existing test-source item group. The remaining R724 work should choose an
+explicit output contract before migrating the other shapes.
 
 ## Second survey, part two hundred forty-eight: R726-R728 - the unshared temporary directory
 
