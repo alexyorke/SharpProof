@@ -195,6 +195,7 @@ the smallest relevant containerized test target passes.
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R575 | Reuse validated mutation-shard evidence between timing and aggregation | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R573 | Validate persisted mutation-baseline invocation identities during shard preflight | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
+| R889 | Validate specification-pack options while collecting them, then sort once | `SharpProof.Analyzer.Test`: FinalCompilationCollectorTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -8122,8 +8123,9 @@ build-file changes were made during this audit.
 
 ### Status (part three hundred ninety-nine)
 
-R889 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R889 is `applied`: specification-pack option parsing now rejects blank and
+duplicate identifiers during one collection pass, then performs the required
+ordinal sort once before returning the immutable array. FinalCompilationCollectorTests passed.
 
 ## Second survey, part four hundred: R890 - duplicated pack-authority projection
 
@@ -8391,4 +8393,59 @@ build-file changes were made during this audit.
 ### Status (part four hundred twenty-three)
 
 R913 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twenty-four: R914 - repeated replay source-text fetch
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R914 | **`CompilerEffectReplayLowerer.TryResolveSource` fetches the operation tree text before entering the capture cache, and the capture path fetches it again.** The first `GetText` is used only for the operation-span bounds; `CaptureTrees` then reaches `CaptureTree`, which calls `GetText` to build the same snapshot, and later replay events still perform the first fetch even when the cache is warm. A cache entry carrying the text length, or a target-tree validation path that reuses the captured `TextLength` while retaining the current early-return behavior for an invalid operation, can remove the duplicate text materialization without weakening source bounds or fail-closed capture. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:374-429`; capture text read at `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:170-210` |
+
+### Status (part four hundred twenty-four)
+
+R914 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twenty-five: R915 - per-replay framework symbol lookups
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R915 | **`CompilerEffectReplayLowerer` resolves invariant framework symbols on each replay attempt.** `IsExactFrameworkException` looks up `System.Exception`, while `IsDefiniteMonitorCall` and the `EmptyLock` branch look up `System.Threading.Monitor`; these symbols depend only on the compilation and are reacquired as separate witnesses are converted. A compilation-scoped optional framework-symbol context can preserve the current null fallback and symbol-identity checks while removing repeated metadata-name resolution across replayed effect claims. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:185-220,309-335` |
+
+### Status (part four hundred twenty-five)
+
+R915 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twenty-six: R916 - duplicated callable-ID partial normalization
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R916 | **`SemanticClaimIdentity.CreateCallableId` and `CreateNestedCallableId` independently normalize a partial method to its original definition.** Both call `NormalizePartial(method).OriginalDefinition` before writing the identity, with no policy difference at that step. A shared normalized-method helper can remove the duplicate partial-definition operation while retaining the distinct declaration-ID fast path for ordinary callables and parent/rank hashing for nested callables. | `SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs:82-114,533-541` |
+
+### Status (part four hundred twenty-six)
+
+R916 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twenty-seven: R917 - duplicate array-operation type hashing
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R917 | **`SemanticClaimIdentity.WriteOperation` writes an array-creation operation's type twice.** Every operation first writes `operation.Type`; the `IArrayCreationOperation` case then writes `value.Type`, which is the same interface property for that operation. Removing the case-specific write, while retaining the operation kind, implicit/constant fields, and child traversal, preserves the canonical identity stream and avoids a redundant type projection. | `SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs:168-245` |
+
+### Status (part four hundred twenty-seven)
+
+R917 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twenty-eight: R918 - duplicate constant runtime-type lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R918 | **`SemanticClaimIdentity.WriteConstant` calls `value.GetType()` twice for every non-null constant.** The first call obtains `FullName`, and the fallback expression calls `GetType()` again for `Name`; the value is immutable for this operation. Caching the runtime type once preserves the canonical type label and all subsequent string/symbol/numeric formatting branches while removing the duplicate reflection lookup. | `SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs:493-520` |
+
+### Status (part four hundred twenty-eight)
+
+R918 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
