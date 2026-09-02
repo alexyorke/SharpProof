@@ -4249,3 +4249,116 @@ R690 is deferred: the JSON and generated-object walkers intentionally have diffe
 
 R692-R693 completed: report execution now shares one formatting/output helper, and rejection assertions share one callback-based failure contract while preserving serialization modes, stale-output setup, caller-selected output paths, diagnostics, and output non-publication.
 
+### Status (part two hundred twenty-seven)
+
+| R694 | **`ContainerSourceCleanlinessTests` repeats temporary repository/archive disposal.** Eight scenarios call `CreateRepositoryAsync` (and, for archive cases, `CreateArchiveSnapshotAsync`) and then hand-write `try/finally` cleanup with `Directory.Delete(..., recursive: true)`, including repeated multi-root deletion. A disposable test-workspace fixture or scoped cleanup helper can own repository/archive lifetime while preserving each test's distinct dirty-source, archive, owner, and package-input setup. | `SharpProof.ArchitectureTest/ContainerSourceCleanlinessTests.cs:35-226` |
+
+R694 is a pending container-source test lifecycle reduction candidate. Preserve cleanup on failures, repository/archive ownership, and all distinct scenario setup.
+
+### Status (part two hundred twenty-eight)
+
+| R695 | **`OperationEffectScanner` duplicates implicit pattern-call resolution.** `TryScanReachableListPatternMember` and `ScanRecursivePattern` independently allocate empty argument-region and actual-operation arrays, call `_callResolver.Resolve` with the same dispatch/instance shape, derive normal completion from abstract/virtual status plus `CanMethodCompleteNormally`, and wrap the result in an `EffectStep`; only the target method and pattern-specific receiver/continuation differ. A shared implicit-pattern-call helper can centralize this construction while leaving list-member reachability and recursive-pattern child scanning distinct. | `SharpProof.Effects/OperationEffectScanner.cs:1077-1126,1144-1180` |
+
+R695 is a pending effect-scanner duplication reduction candidate. Preserve compiler-intrinsic list-member filtering, receiver ownership, dispatch uncertainty, actual-argument emptiness, completion semantics, and recursive child traversal.
+
+### Status (part two hundred twenty-nine)
+
+| R696 | **`CorpusCatalog.ReplaceTokens` carries an unreachable method-token substitution.** `CreateCase` computes `methodName` and passes it into `ReplaceTokens` for both the seed body and members, but the private `Seeds` data contains no `$METHOD$` token; the only active replacements are `$HELPER$` and `$INPUT$`. Remove the dead parameter/replacement or add an explicit seed-driven use if that extension point is required, while preserving all current corpus naming and active substitutions. | `SharpProof.Gates/Corpus/CorpusCatalog.cs:270-304,413-421` |
+
+R696 is a pending corpus-generator dead-path reduction candidate. Preserve renamed/escaped identifiers, helper/input substitutions, alpha-renaming, and generated case names.
+
+### Status (part two hundred thirty)
+
+| R697 | **`EffectCallSiteResolver.AlignActualArguments` repeatedly copies an immutable argument array.** The helper starts with an `ImmutableArray<IOperation?>` and uses `SetItem` for every in-range argument, so calls with many parameters can allocate/copy the full array once per argument before returning the final alignment. Fill a mutable array or immutable builder and freeze once, while retaining ordinal filtering, param-array skipping, and the normalized argument positions. | `SharpProof.Effects/EffectCallSiteResolver.cs:163-188` |
+
+R697 is a pending effect-call argument-alignment allocation reduction candidate. Preserve omitted-argument nulls, reduced/invalid ordinals, ref/param-array filtering, and the returned immutable snapshot.
+
+### Status (part two hundred thirty-one)
+
+| R698 | **`ExpectedSmt` is a dead configuration surface in the sample/package-consumer runners.** `scripts/Test-SharpProofSamples.ps1` and `scripts/Test-SharpProofPackageConsumers.ps1` both declare `[ValidateSet('Required')] [string]$ExpectedSmt = 'Required'`; every repository call site supplies the same literal, and the value only appears in the final success message rather than selecting or checking an SMT backend. Remove the one-value parameter and its plumbing, or make it control a real policy, while preserving the existing host guard and verification behavior. | `scripts/Test-SharpProofSamples.ps1:1-10,435-436`; `scripts/Test-SharpProofPackageConsumers.ps1:1-11,566` |
+
+R698 is a pending build/test-runner dead-configuration reduction candidate. Preserve canonical-host enforcement, package/sample validation, and the actual SMT/worker behavior; do not weaken the required backend policy if it is intended to become explicit.
+
+### Status (part two hundred thirty-two)
+
+| R699 | **`Test-SharpProofFuzzRunnerResult.ps1` duplicates accepted/rejected fixture invocation.** `Assert-Accepted` and `Assert-Rejected` both serialize through `Write-Result`, call `Assert-SharpProofFuzzRunnerResult`, and pass the same expected case/seed/parallelism arguments; the second helper only changes exception handling and the optional parallelism value. A shared assertion wrapper with an explicit expected-success flag can remove the repeated validator call and argument plumbing while keeping the individual fixture names and malformed-result mutations. | `scripts/Test-SharpProofFuzzRunnerResult.ps1:33-64` |
+
+R699 is a pending fuzz-fixture helper reduction candidate. Preserve accepted-result return behavior, rejection diagnostics, expected-value overrides, and the final fixture coverage.
+
+### Status (part two hundred thirty-three)
+
+| R700 | **Release-JSON and standalone-gate fixture scripts duplicate the write/accept/reject harness.** `Test-SharpProofReleaseJsonFixtures.ps1` and `Test-SharpProofStandaloneGateEvidence.ps1` each create a named JSON file, increment/track a fixture assertion around a validator, treat any validator exception as rejection, and throw when a negative fixture is accepted; only the validator command and expected arguments differ. A shared test-harness helper accepting the validation action can remove this repeated scaffolding without merging the distinct release-document and gate-envelope validators. | `scripts/Test-SharpProofReleaseJsonFixtures.ps1:12-47`; `scripts/Test-SharpProofStandaloneGateEvidence.ps1:77-101` |
+
+R700 is a pending release/gate fixture-harness reduction candidate. Preserve UTF-8 fixture writing, validator-specific expected values, rejection handling, and each script's independent coverage/cleanup.
+
+### Status (part two hundred thirty-four)
+
+| R701 | **`WorkerBinaryIdentityTests` manually disposes `TempDirectory` in five tests.** The tests construct the shared disposable fixture, copy its `FullName`, execute assertions, and then use `finally { temporaryWorkspace.Dispose(); }`; a `using var` declaration preserves the same failure cleanup with less lifecycle scaffolding. Keep the separate conditional disposal in `RuntimeClosurePathsAreImmutable`, where the snapshot's ownership is deliberately dependent on an alias mutation. | `SharpProof.Worker.Test/WorkerBinaryIdentityTests.cs:11-38,42-65,108-151,216-243,260-439` |
+
+R701 is a pending worker-test lifecycle reduction candidate. Preserve temporary-root cleanup, staged-file assertions, malformed-manifest coverage, and the conditional snapshot ownership behavior.
+
+### Status (part two hundred thirty-five)
+
+| R702 | **`CompilationModelProvider.FindOwningCompilation` performs linear visited checks inside its graph walk.** Every popped compilation scans the entire `visited` list with `Any(ReferenceEquals(...))`, so a large source-compilation-reference closure repeatedly traverses already-seen nodes. Replace the list membership check with a reference-identity hash set, retaining the separate owner detection and duplicate-tree rejection semantics. | `SharpProof.Frontend/CompilationModelProvider.cs:27-58` |
+
+R702 is a pending semantic-model provider traversal reduction candidate. Preserve reference identity rather than symbol/compilation value equality, source-tree ownership detection, cycle termination, and the multiple-owner exception.
+
+### Status (part two hundred thirty-six)
+
+| R703 | **`PackageDependencyAuthorityTests` repeats manual temporary-root lifetimes.** Four test methods build a unique path under `Path.GetTempPath`, call `Directory.CreateDirectory`, and repeat `try/finally { Directory.Delete(..., recursive: true); }`. `TempDirectory` is already linked into `SharpProof.ArchitectureTest` through `Directory.Build.props`; a `using` fixture or scoped helper can remove the lifecycle scaffolding while preserving each test's isolated prefix and cleanup behavior. | `SharpProof.ArchitectureTest/PackageDependencyAuthorityTests.cs:24-156`; `eng/testing/TempDirectory.cs:1-20`; `Directory.Build.props:76-81` |
+
+R703 is a pending package-authority test lifecycle reduction candidate. Preserve parallel test isolation, per-scenario mutation coverage, and recursive cleanup on assertion or process failure.
+
+### Status (part two hundred thirty-seven)
+
+| R704 | **`PackageDependencyAuthorityTests.RunAuthorityAsync` duplicates the PowerShell process lifecycle already owned by `RunPowerShellAsync`.** The package-graph path reconstructs `ProcessStartInfo`, fixed `pwsh` arguments, redirected stream reads, exit waiting, and `ProcessResult` assembly, while the component-authority path uses the existing helper for the same runner shape. Route both paths through the common runner and parameterize only the script-specific arguments, retaining the helper script path, package-path forwarding, exit code, and combined output semantics. | `SharpProof.ArchitectureTest/PackageDependencyAuthorityTests.cs:371-416,418-482` |
+
+R704 is a pending architecture-test process-runner reduction candidate. Preserve the generated runner contents, argument ordering, stderr/stdout combination, and result status semantics.
+
+### Status (part two hundred thirty-eight)
+
+| R705 | **`UsingDisposalGraph.GetInternalGotoTargets` repeatedly scans operation and target collections while resolving one goto set.** For each label it searches `scope.Operations` for a span match, calls `IndexOf` on the matching operation (and may search again for the fallback), then materializes `allTargets` only to walk it again for active targets and lifetime escape, while `branches` is rescanned for unconditional-goto detection. A single indexed operation lookup plus one classification pass can remove the repeated enumeration and intermediate walks, preserving span-overlap precedence, fallback selection, target de-duplication, and active-lifetime flags. | `SharpProof.Effects/UsingDisposalGraph.cs:81-109` |
+
+R705 is a pending using-disposal control-flow traversal reduction candidate. Preserve goto target resolution for nested syntax spans, unconditional-label behavior, cancellation-independent ordering, and all three returned classifications.
+
+### Status (part two hundred thirty-nine)
+
+| R706 | **`EffectModuleInitialization.Discover` repeatedly linearly resolves syntax-tree ordinals.** Duplicate normalized initializers compare both syntax references through `syntaxTrees.IndexOf`, and the final ordering performs another `IndexOf` for every retained initializer. Caching the reference-to-ordinal map once per compilation removes repeated scans of the full syntax-tree list while retaining the `int.MaxValue` fallback and lexical tree/span/name tie-breakers. | `SharpProof.Effects/EffectModuleInitialization.cs:34-93,141-159` |
+
+R706 is a pending module-initializer ordering allocation/traversal reduction candidate. Preserve source-tree identity, deterministic Roslyn order, duplicate normalized-method handling, and unknown-tree fallback behavior.
+
+### Status (part two hundred forty)
+
+| R707 | **`ClosedContractAttributeValidator.GetKind` repeats the closed-attribute membership cascade already exposed by `ContractSelectionInventory.IsClosedContract`.** Both perform the same three symbol-identity comparisons for `NotNull`, `Positive`, and `InRange`; the validator then needs the selected kind for type, ref-kind, and bound validation, but it should consume one canonical classification rather than maintain a second recognition list. Exposing a kind-returning inventory helper can remove the duplicate comparisons while keeping rejected-metadata recognition and all validator-specific checks separate. | `SharpProof.Contracts/ClosedContractAttributeValidator.cs:29-71`; `SharpProof.Contracts/ContractSelectionInventory.cs:103-123` |
+
+R707 is a pending closed-contract identity reduction candidate. Preserve compiler-bound symbol identity, recognition precedence, rejected-attribute behavior, and the validator's type/ref-kind/range diagnostics.
+
+### Status (part two hundred forty-one)
+
+| R708 | **`Invoke-SharpProofDevCheck.ps1` does not execute the command plan it reads.** `Get-SharpProofDevCheckPlan.ps1` emits restore, solution-build, semantic-test, package-product-build, one package-pack row per manifest project, and performance-smoke commands, but the runner parses the JSON only to validate schema/configuration and test whether the package-product-build row exists; it then reconstructs the restore, build, semantic-test, package-test, and smoke invocations by hand. The plan's package-project enumeration and most command fields are therefore a second, non-authoritative description that can drift without changing the check. Either execute the planned rows or reduce the plan to the small decision data the runner actually needs, retaining the deliberate Debug-only Release package-product build and phase timing. | `scripts/Get-SharpProofDevCheckPlan.ps1:22-57`; `scripts/Invoke-SharpProofDevCheck.ps1:25-109` |
+
+R708 is a pending developer-check orchestration reduction candidate. Preserve configuration-specific package builds, no-build/restore relationships, parallel build behavior, timing evidence, and plan schema validation.
+
+### Status (part two hundred forty-two)
+
+| R709 | **`ReferencedTypeSymbols.GetAll` rebuilds the complete type closure for separate companion consumers.** `ContractForSymbolMatcher.DiscoverCompanionRelationships` enumerates every source and referenced-assembly type to build companion descriptors, while `ConservativeEffectCallPreconditionPolicy.FindTypesWithCompanions` independently enumerates the same source-plus-reference closure and then filters `[ContractFor]` targets into a set. A compilation-scoped immutable type snapshot (or a shared raw companion inventory with adapters for the two policies) can remove the duplicate namespace/type traversal without forcing the effects assembly to depend on the contracts implementation. Do not cache partial results after cancellation, and retain the existing symbol comparer, traversal order, and each consumer's different validity/cycle policy. | `SharpProof.Frontend/ReferencedTypeSymbols.cs:5-59`; `SharpProof.Contracts/ContractForSymbolMatcher.cs:155-179`; `SharpProof.Effects/EffectCallPreconditionPolicy.cs:215-259` |
+
+R709 is a pending cross-layer referenced-symbol traversal reduction candidate. Preserve compilation isolation, cancellation behavior, source/reference coverage, symbol identity, and the separate companion acceptance rules.
+
+### Status (part two hundred forty-three)
+
+| R710 | **`RequiresCallSiteDiscovery.GetDirectDelegateTargets` traverses the operation tree three times to prepare one target map.** It first scans `operationRoot.DescendantsAndSelf()` for any goto, then walks the same tree to collect direct delegate declarators, and then walks it again to record invalidating assignments/ref arguments. A seed pass that collects both the goto flag and delegate declarations, followed by one invalidation pass (or a deferred single-pass accumulator), can remove a full operation-tree traversal while preserving declaration order, ambiguity handling, nested-callable coverage, and the global goto conservatism. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:940-1005` |
+
+R710 is a pending delegate-discovery traversal reduction candidate. Preserve the existing conservative treatment of gotos, ambiguous locals, invalidation order, and all operation shapes that can write through a delegate local.
+
+| R711 | **`DirectDelegateTarget.Invalidations` grows an immutable array one operation at a time.** Each matching write updates the target with `known with { Invalidations = known.Invalidations.Add(operation) }`; `ImmutableArray.Add` copies the accumulated array for every invalidation, so a local with many writes pays quadratic copying and repeated record allocation. Collect invalidations in a mutable per-local list/builder and freeze once after discovery, retaining source traversal order, symbol equality, and the existing ambiguous-target removal policy. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:934-938,979-1004` |
+
+R711 is a pending delegate-invalidation allocation reduction candidate. Preserve invalidation ordering and the immutable snapshot exposed to `TryResolveDirectDelegateTarget`.
+
+| R712 | **`RequiresCallSiteDiscovery.IsStableAtInvocation` recomputes invocation-invariant facts for every invalidation.** Inside the invalidation loop it repeatedly checks the invocation's syntax tree, `IsInsideLoop(invocation)`, `IsInsideNestedCallable(invocation)`, and `target.HasGoto`; only the invalidation's tree/position and ancestry are iteration-specific. Hoisting those invariant facts before the loop removes repeated parent walks and property checks without changing the fail-closed conditions or invalidation ordering. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1034-1053` |
+
+R712 is a pending delegate-stability predicate reduction candidate. Preserve same-tree ordering, loop/nested-callable rejection, goto conservatism, and the behavior for every invalidation.
+
+| R713 | **`RequiresCallSiteDiscovery.GetListPatternCalls` scans the same pattern list three times before its main loop.** `Count` computes non-slice items, `Any` detects a slice, and a separate indexed loop finds `sliceIndex`; the subsequent loop then traverses all patterns again to emit calls. Fuse the count/flag/index preparation into one indexed pass, retaining the known-length short-circuits, slice index arithmetic, and emitted-call order. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1421-1455` |
+
+R713 is a pending list-pattern preparation reduction candidate. Preserve empty/sliced pattern behavior, known-length rejection, and the distinction between indexer and slice members.
