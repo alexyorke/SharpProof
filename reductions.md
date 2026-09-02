@@ -7982,3 +7982,47 @@ build-file changes were made during this audit.
 
 R879 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred ninety: R880 - hard-coded generator category count
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R880 | **`WellSortedIrGenerator.Next` hard-codes the current number of generated categories.** `_random.Next(7)` happens to cover the seven `GeneratedIrCategory` members, but adding a category requires remembering to update an unrelated numeric bound or the new case is never generated; the switch's default then hides that omission until coverage assertions fail. A single enum-derived count or static category table can retain the same uniform selection and explicit switch while making the category set self-maintaining. | `SharpProof.Testing/WellSortedIrGenerator.cs:11-24,65-84` |
+
+### Status (part three hundred ninety)
+
+R880 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred ninety-one: R881 - eager unused differential bindings
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R881 | **`WellSortedIrGenerator.CreateCase` constructs a full six-variable environment for every category, including values the generated term cannot reference.** It always creates random text and sequence values plus integer, Boolean, text, reference, and sequence bindings, while the only repository consumer passes the map to `IrCSharpDifferentialOracle`, whose `TryCreateProgram` first extracts the term's referenced variables and ignores extra entries. A category-aware or lazy environment builder can avoid unused value construction and make the fixture's dependencies explicit; if the seeded random stream is itself treated as a contract, preserve its draw sequence separately while still avoiding unnecessary object creation. | `SharpProof.Testing/WellSortedIrGenerator.cs:99-125`; `SharpProof.Testing/IrCSharpDifferentialOracle.cs:115-146`; consumer `SharpProof.Testing.Test/IrCSharpDifferentialOracleTests.cs:15-24` |
+
+### Status (part three hundred ninety-one)
+
+R881 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred ninety-two: R882 - repeated differential type admission
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R882 | **`IrCSharpDifferentialOracle.TryCreateProgram` revalidates the same term and variable type projections after discovery already admitted them.** `TryCollectTerms` calls `TryGetCSharpType` for every reachable term; the root is checked again after collection, and `TryAppendLazyDeclaration` checks every collected term again while generating code. The variable-validation loop retrieves each variable type and the parameter-generation loop retrieves and projects it again. A per-program supported-type/variable-binding snapshot can carry these results across admission, source generation, and runtime argument preparation while preserving every fail-closed unsupported-type and invalid-binding result. This is call-level reuse, distinct from R546's separate source-name versus runtime-type projection policy. | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:108-181,183-198,201-257,259-267,364-392` |
+
+### Status (part three hundred ninety-two)
+
+R882 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred ninety-three: R883 - per-comparison interpreter allocation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R883 | **`IrCSharpDifferentialOracle.Compare` allocates a new `IrInterpreter` for every comparison even though evaluation state is already per call.** The oracle stores only an `IrFactory`; `IrInterpreter` stores that same factory, while its mutable variables, cancellation token, recursion depth, and result memo are created in a fresh `EvaluationState` inside each `Evaluate` call. Keeping one interpreter instance on the oracle is therefore a safe allocation reduction for repeated differential runs, provided the factory remains immutable from the interpreter's perspective and evaluation state is not moved onto the shared object. | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:24-39`; `SharpProof.Ir/IrInterpreter.cs:104-123,139-174` |
+
+### Status (part three hundred ninety-three)
+
+R883 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
