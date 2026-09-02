@@ -205,43 +205,53 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         ICollection<IrTerm> terms,
         out string reason)
     {
-        if (!visited.Add(term.Id))
+        var pending = new Stack<(IrTerm Term, bool ChildrenReady)>();
+        pending.Push((term, ChildrenReady: false));
+        while (pending.Count != 0)
         {
-            reason = "";
-            return true;
-        }
-        if (!TryGetCSharpType(term.Type, out _))
-        {
-            reason = "The result type is outside the executable oracle subset.";
-            return false;
-        }
-
-        if (term is IrOpaqueTerm)
-        {
-            reason = "The term contains an opaque call.";
-            return false;
-        }
-        if (term is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or
-            IrNullTerm or IrVariableTerm or IrUnaryTerm or IrBinaryTerm or
-            IrConditionalTerm or IrCastTerm or IrLengthTerm or
-            IrSequenceAccessTerm))
-        {
-            reason = "The term kind is outside the executable oracle subset.";
-            return false;
-        }
-        if (term is IrVariableTerm variable)
-        {
-            variables[variable.Variable.Value] = variable.Variable;
-        }
-        foreach (var child in IrTraversal.GetChildren(term))
-        {
-            if (!TryCollectTerms(child, variables, visited, terms, out reason))
+            var (current, childrenReady) = pending.Pop();
+            if (childrenReady)
             {
+                terms.Add(current);
+                continue;
+            }
+
+            if (!visited.Add(current.Id))
+            {
+                continue;
+            }
+            if (!TryGetCSharpType(current.Type, out _))
+            {
+                reason = "The result type is outside the executable oracle subset.";
                 return false;
+            }
+
+            if (current is IrOpaqueTerm)
+            {
+                reason = "The term contains an opaque call.";
+                return false;
+            }
+            if (current is not (IrBooleanTerm or IrIntegerTerm or IrStringTerm or
+                IrNullTerm or IrVariableTerm or IrUnaryTerm or IrBinaryTerm or
+                IrConditionalTerm or IrCastTerm or IrLengthTerm or
+                IrSequenceAccessTerm))
+            {
+                reason = "The term kind is outside the executable oracle subset.";
+                return false;
+            }
+            if (current is IrVariableTerm variable)
+            {
+                variables[variable.Variable.Value] = variable.Variable;
+            }
+
+            pending.Push((current, ChildrenReady: true));
+            var children = IrTraversal.GetChildren(current);
+            for (var index = children.Length - 1; index >= 0; index--)
+            {
+                pending.Push((children[index], ChildrenReady: false));
             }
         }
 
-        terms.Add(term);
         reason = "";
         return true;
     }
