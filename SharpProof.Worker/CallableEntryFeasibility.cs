@@ -179,17 +179,19 @@ internal static class CallableProofCore
             result.Add(label);
         }
 
-        return [.. result
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static label => label, StringComparer.Ordinal)];
+        return [.. NormalizeLabels(result)];
     }
 
     internal static string[] Merge(
         IEnumerable<string> left,
         IEnumerable<string> right)
     {
-        return [.. left
-            .Concat(right)
+        return NormalizeLabels(left.Concat(right));
+    }
+
+    private static string[] NormalizeLabels(IEnumerable<string> labels)
+    {
+        return [.. labels
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static label => label, StringComparer.Ordinal)];
     }

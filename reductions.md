@@ -197,6 +197,7 @@ the smallest relevant containerized test target passes.
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
+| R524 | Share callable proof-label normalization | `SharpProof.Worker.Test`: 695 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3149,9 +3150,8 @@ reuse and does not alter the cache transaction or filename-shape policy.
 
 ### Status (part seventy-four)
 
-R524-R525 are `pending` candidates. The proposed helpers preserve the distinct
-label-failure and response-state policies around their common normalization and
-coverage mapping.
+R525 remains `pending`; R524 shares only proof-label deduplication and ordering
+while preserving the distinct label-failure and response-state policies.
 
 ## Second survey, part seventy-five: R526-R527 - protocol normalization and result classification
 
@@ -3311,3 +3311,12 @@ centralizing the shared classification.
 R547 is a `pending` reduction candidate. Keep the reference-conversion filter
 distinct from the general comparison path and retain the current stopping
 behavior for user-defined or non-reference conversions.
+
+## Second survey, part ninety: R548 - shared fuzz boundary corpus
+
+| R548 | **`WellSortedIrGenerator` and `SmallCSharpCaseGenerator` duplicate the same integer boundary corpus.** Both fuzz generators declare an `InterestingIntegers` array with the identical eight values (`long.MinValue`, `-3`, `-1`, `0`, `1`, `2`, `3`, and `long.MaxValue`). Since these generators feed related IR/C# differential cases, separate copies can silently drift and weaken cross-representation coverage. A shared testing corpus or common boundary-value provider could make the intended alignment explicit while keeping the C# generator's separate `LiteralIntegers` subset and each generator's random selection behavior local. | `SharpProof.Testing/WellSortedIrGenerator.cs:32-40`; `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:654-667` |
+
+### Status (part ninety)
+
+R548 is a `pending` reduction candidate. Preserve the exact boundary values and
+the intentionally smaller C# literal subset if the corpus is centralized.
