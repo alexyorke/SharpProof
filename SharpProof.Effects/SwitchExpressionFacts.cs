@@ -362,14 +362,7 @@ internal static class SwitchExpressionFacts
                      slicePattern.Pattern,
                      slicePattern.Pattern.InputType));
         }
-        var matchedType = pattern switch
-        {
-            ITypePatternOperation typePattern => typePattern.MatchedType,
-            IDeclarationPatternOperation declarationPattern =>
-                declarationPattern.MatchedType,
-            IRecursivePatternOperation recursive => recursive.MatchedType,
-            _ => null
-        };
+        var matchedType = GetMatchedType(pattern);
         if (inputType?.IsValueType != true && !inputDefinitelyNonNull ||
             !SymbolEqualityComparer.Default.Equals(matchedType, inputType))
         {
@@ -431,7 +424,14 @@ internal static class SwitchExpressionFacts
                     inputType,
                     inputDefinitelyNonNull);
         }
-        var matchedType = pattern switch
+        var matchedType = GetMatchedType(pattern);
+        return (inputType?.IsValueType == true || inputDefinitelyNonNull) &&
+            SymbolEqualityComparer.Default.Equals(matchedType, inputType);
+    }
+
+    private static ITypeSymbol? GetMatchedType(IPatternOperation pattern)
+    {
+        return pattern switch
         {
             ITypePatternOperation typePattern => typePattern.MatchedType,
             IDeclarationPatternOperation declarationPattern =>
@@ -439,8 +439,6 @@ internal static class SwitchExpressionFacts
             IRecursivePatternOperation recursive => recursive.MatchedType,
             _ => null
         };
-        return (inputType?.IsValueType == true || inputDefinitelyNonNull) &&
-            SymbolEqualityComparer.Default.Equals(matchedType, inputType);
     }
 
     private static SwitchExpressionSelection ApplyGuard(

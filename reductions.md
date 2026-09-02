@@ -3984,7 +3984,9 @@ R610 is a pending generator-infrastructure reduction candidate. Preserve ordinal
 
 ### Status (part one hundred fifty-two)
 
-R611 is a pending local Effects reduction candidate. Preserve each caller's separate input-nullability and recursive-pattern decisions; share only the three-kind matched-type projection.
+R611 is applied: `IsTotalPattern` and `IsPatternEvaluationUnavoidable` now
+share one private `GetMatchedType` projection, while retaining their separate
+input-nullability and recursive-pattern decisions.
 
 ## Second survey, part one hundred fifty-three: R612 - repeated relational operator table
 
