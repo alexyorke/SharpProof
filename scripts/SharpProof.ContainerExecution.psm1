@@ -7,6 +7,33 @@ function Get-SharpProofDotnetWrapperPath {
     return Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 }
 
+function Invoke-SharpProofDotnetInvocation {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [int]$TimeoutSeconds,
+
+        [AllowEmptyString()]
+        [string]$OutputPath,
+
+        [Parameter(Mandatory = $true)]
+        [ref]$ExitCode
+    )
+
+    if ([string]::IsNullOrEmpty($OutputPath)) {
+        & (Get-SharpProofDotnetWrapperPath) `
+            -TimeoutSeconds $TimeoutSeconds @Arguments
+    }
+    else {
+        & (Get-SharpProofDotnetWrapperPath) `
+            -TimeoutSeconds $TimeoutSeconds `
+            -OutputPath $OutputPath @Arguments
+    }
+    $ExitCode.Value = $LASTEXITCODE
+}
+
 function Invoke-SharpProofRequiredDotnet {
     param(
         [Parameter(Mandatory = $true)]
@@ -18,24 +45,22 @@ function Invoke-SharpProofRequiredDotnet {
         [switch]$Quiet
     )
 
-    if (-not $Quiet) {
-        & (Get-SharpProofDotnetWrapperPath) `
-            -TimeoutSeconds $TimeoutSeconds @Arguments
-        if ($LASTEXITCODE -ne 0) {
-            throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-        }
-        return
+    $outputPath = $null
+    if ($Quiet) {
+        $outputPath = Join-Path ([IO.Path]::GetTempPath()) (
+            'sharpproof-dotnet-' + [Guid]::NewGuid().ToString('N') + '.log')
     }
 
-    $outputPath = Join-Path ([IO.Path]::GetTempPath()) (
-        'sharpproof-dotnet-' + [Guid]::NewGuid().ToString('N') + '.log')
     try {
-        & (Get-SharpProofDotnetWrapperPath) `
+        $exitCode = 0
+        Invoke-SharpProofDotnetInvocation `
+            -Arguments $Arguments `
             -TimeoutSeconds $TimeoutSeconds `
-            -OutputPath $outputPath @Arguments
-        $exitCode = $LASTEXITCODE
+            -OutputPath $outputPath `
+            -ExitCode ([ref]$exitCode)
         if ($exitCode -ne 0) {
-            if (Test-Path -LiteralPath $outputPath -PathType Leaf) {
+            if ($Quiet -and
+                (Test-Path -LiteralPath $outputPath -PathType Leaf)) {
                 $output = Get-Content -LiteralPath $outputPath -Raw
                 if (-not [string]::IsNullOrWhiteSpace($output)) {
                     Write-Host $output.TrimEnd()
@@ -45,7 +70,10 @@ function Invoke-SharpProofRequiredDotnet {
         }
     }
     finally {
-        Remove-Item -LiteralPath $outputPath -Force -ErrorAction SilentlyContinue
+        if ($null -ne $outputPath) {
+            Remove-Item -LiteralPath $outputPath `
+                -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 

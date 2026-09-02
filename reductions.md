@@ -4217,14 +4217,6 @@ R652 is deferred: envelope equality and compilation-shape validation are intenti
 
 R654 is deferred: replay validation and the separate operation/evidence digest domains are analyzer-integrity boundaries. Their independent event walks make the field ordering, null normalization, and fail-closed checks auditable; combine them only with a proof that cannot alter those semantics.
 
-## Second survey, part one hundred ninety-seven: R656 - duplicated checked-dotnet branches
-
-| R656 | **`Invoke-SharpProofRequiredDotnet` duplicates the wrapper invocation and failure construction for streaming and quiet modes.** The non-quiet branch and the quiet branch both resolve and invoke `Invoke-SharpProofDotnet.ps1` with the same timeout and argument array, capture a nonzero exit code, and format the same command failure; the quiet branch only adds an output-file lifecycle and failure-output replay. A single invocation helper with an optional capture path can keep direct streaming, quiet success, captured failure output, and cleanup semantics while removing the parallel command/error paths. | `scripts/SharpProof.ContainerExecution.psm1:10-50` |
-
-### Status (part one hundred ninety-seven)
-
-R656 is a pending container-command helper reduction candidate. Preserve wrapper/static-graph behavior, timeout propagation, `$LASTEXITCODE` handling, quiet-mode failure diagnostics, temporary-log cleanup, and exception text; share only the common checked invocation.
-
 ## Second survey, part one hundred ninety-eight: R657 - duplicated test-command allowlist
 
 | R657 | **`Invoke-SharpProofContainer.ps1` repeats the same test-command allowlist for two independent switch validations.** The `-NoBuild` guard and the `-Fast` guard each spell out the identical six-command set (`test`, `test-changed`, `semantic-tests`, `portable-tests`, `worker-tests`, `package-tests`) on adjacent branches. Defining one immutable supported-test-command set and using it in both checks removes the drift surface while preserving the separate error messages and the existing mutual-exclusion rule. | `scripts/Invoke-SharpProofContainer.ps1:41-55` |
@@ -4264,3 +4256,11 @@ R660 is a pending container orchestration factoring candidate. Preserve locked r
 ### Status (part two hundred two)
 
 R661 is a pending analyzer discovery traversal reduction candidate. Preserve the screening short-circuit, graph/flow analysis boundaries, cancellation checks, call-target resolution, and special initializer/pattern handling; share only reusable operation/call discovery where the same declaration and semantic model are analyzed.
+
+## Second survey, part two hundred three: R662 - repeated effect-operation tree enumeration
+
+| R662 | **`OperationEffectScanner` enumerates its entire operation root repeatedly during construction.** It first walks `root.DescendantsAndSelf()` to detect `ITryOperation`, walks it again to populate `_freshArrayTypes`, and then `ConversionOwnershipClassifier.BuildLocalRegions` materializes another root walk before its fixed-point analysis. These passes use the same immutable operation tree, with only the nested-callable/reachability policy differing. A constructor-scoped operation snapshot, with the relevant filtered view passed into local-region setup, can preserve nested-callable exclusions and the scanner's all-tree array map while removing repeated tree enumeration. | `SharpProof.Effects/OperationEffectScanner.cs:97-114`; `SharpProof.Effects/ConversionOwnershipClassifier.cs:214-245` |
+
+### Status (part two hundred three)
+
+R662 is a pending effect-scanner initialization reduction candidate. Preserve all-operation array tracking, nested-callable filtering, reachability fixed-point behavior, cancellation/exception semantics, and the try-specific reachability choice; share only the immutable root-operation enumeration.
