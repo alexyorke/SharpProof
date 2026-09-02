@@ -2072,9 +2072,11 @@ differential oracles, and gate compilation hosts across `SharpProof.Architecture
 
 ### Status (part forty)
 
-R427-R430 and R432 remain `pending`; R431 now uses the canonical repository
-root helper for the license fixture. R427-R429 eliminate test boilerplate and
-subprocess duplication; R430 and R432 clean up gate hosts and oracle diagnostics.
+R427-R430 remain `pending`; R432 is applied for its redundant metadata-reference
+cast, while the intentionally separate gate/test parse-option fixtures remain
+unchanged. R431 now uses the canonical repository root helper for the license
+fixture. R427-R429 eliminate test boilerplate and subprocess duplication; R430
+cleans up gate-host and oracle diagnostics.
 
 ## Second survey, part forty-one: R433-R439
 
@@ -3852,3 +3854,19 @@ R598 is a pending frontend-fuzzing infrastructure reduction candidate. Preserve 
 ### Status (part one hundred forty)
 
 R599 is a pending architecture-test maintenance candidate. Preserve the repository-root lookup and slash normalization; share only the identical formatting helper.
+
+## Second survey, part one hundred forty-one: R600 - duplicate lifted-nullable operation lookup
+
+| R600 | **`LiftedNullableConversionRegressionTests` and `LiftedNullableOperatorRegressionTests` define the same private `Operation` helper.** Both select the method's single declaring syntax, obtain its semantic model, call `GetOperation`, and throw the same diagnostic when no operation is found. A shared Effects test-host helper can own this Roslyn lookup while the two suites retain their separate conversion/operator assertions and fixtures. | `SharpProof.Effects.Test/LiftedNullableConversionRegressionTests.cs:102-113; SharpProof.Effects.Test/LiftedNullableOperatorRegressionTests.cs:116-127` |
+
+### Status (part one hundred forty-one)
+
+R600 is a pending Effects-test maintenance candidate. Preserve single-declaration selection, semantic-model binding, and the existing failure message; share only the identical operation lookup.
+
+## Second survey, part one hundred forty-two: R601 - third copy of the Effects operation lookup
+
+| R601 | **The exact operation lookup recorded in R600 has a third copy.** `ReducedRefExtensionFlowRegressionTests.Operation` repeats the same declaring-syntax selection, semantic-model `GetOperation`, and missing-operation exception already present in the two lifted-nullable suites. Treating R600 as a three-suite shared helper opportunity removes the remaining duplicate without coupling the suites' distinct fixtures or assertions. | `SharpProof.Effects.Test/ReducedRefExtensionFlowRegressionTests.cs:62-73; R600` |
+
+### Status (part one hundred forty-two)
+
+R601 refines R600's scope. Preserve the existing lookup and diagnostic semantics in all three suites; centralize only their byte-identical helper.
