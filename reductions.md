@@ -213,6 +213,7 @@ the smallest relevant containerized test target passes.
 | R582 | Fold user-assumption collection into the proven-core validation pass | `SharpProof.Worker.Test`: WorkerTcbEdgeCaseTests 44 passed |
 | R583 | Remove unreachable contradictory-precondition branches after early return | `SharpProof.Worker.Test`: 695 passed |
 | R584 | Reuse protocol SHA-256 formatting in valid test fixtures | `SharpProof.Worker.Test`: 695; `SharpProof.Package.Test`: 75 passed, 1 expected skip |
+| R576 | Centralize package integration verification-target MSBuild arguments | `SharpProof.Package.Test`: WorkerMsBuildIntegrationTests 75 passed, 1 expected skip |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3636,7 +3637,10 @@ R575 is a pending mutation-pipeline reduction candidate. Keep the final catalog-
 
 ### Status (part one hundred seventeen)
 
-R576 is a pending package-integration-test reduction candidate. Preserve the explicit-ID path used by cleanup/recovery tests and the per-call cache/request/result locations; only centralize the duplicated MSBuild argument construction.
+R576 is applied: generated-ID and explicit-ID verification-target helpers now
+delegate to one argument builder, preserving per-call paths and explicit
+invocation IDs. The package integration suite passes with its expected
+unsupported-host skip.
 
 ## Second survey, part one hundred eighteen: R577 - duplicated package-project topology
 

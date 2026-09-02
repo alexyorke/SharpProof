@@ -4073,36 +4073,21 @@ public sealed class WorkerMsBuildIntegrationTests
         internal Task<BuildResult> RunVerificationTargetAsync(
             params (string Name, string Value)[] properties)
         {
-            var invocationId = Guid.NewGuid().ToString("N");
-            var arguments = new List<string> {
-                "msbuild",
-                ProjectPath,
-                "/t:_SharpProofVerifyCore",
-                "/nologo",
-                "/nodeReuse:false",
-                "-p:Configuration=Release",
-                "-p:TargetFramework=net8.0",
-                "-p:SharpProofVerify=true",
-                "-p:SharpProofVerifyRequestFile=" + RequestPath,
-                "-p:SharpProofVerifyResultFile=" + ResultPath,
-                "-p:SharpProofVerifyCacheDirectory=" +
-                    Path.Combine(
-                        _root,
-                        "obj",
-                        "Release",
-                        "net8.0",
-                        "SharpProof",
-                        "cache"),
-                "-p:_SharpProofInvocationId=" + invocationId
-            };
-            arguments.AddRange(properties.Select(static property =>
-                "-p:" + property.Name + "=" + property.Value));
-            return RunDotNetAsync(arguments);
+            return RunVerificationTargetCoreAsync(
+                Guid.NewGuid().ToString("N"),
+                properties);
         }
 
         internal Task<BuildResult> RunVerificationTargetWithInvocationIdAsync(
             string invocationId,
             params (string Name, string Value)[] properties)
+        {
+            return RunVerificationTargetCoreAsync(invocationId, properties);
+        }
+
+        private Task<BuildResult> RunVerificationTargetCoreAsync(
+            string invocationId,
+            (string Name, string Value)[] properties)
         {
             var arguments = new List<string> {
                 "msbuild",
