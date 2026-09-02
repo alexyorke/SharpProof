@@ -7773,3 +7773,45 @@ build-file changes were made during this audit.
 
 R865 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred seventy-six: R866 - repeated portable-IR slot catalog lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R866 | **`PortableIrGraphCodec` linearly searches static slot catalogs for every decoded row.** `RequireCanonicalTermSlots`, `RequireCanonicalInstructionSlots`, and `RequireCanonicalLocationSlots` each call `RequireCanonicalSlotMapping`, which converts the row kind to text and runs `FirstOrDefault` over the corresponding catalog before checking seven, six, or five slots. The catalogs are immutable generated metadata and the same kinds recur across the graph, so a validated kind-to-slot-map index built once per catalog can make row checks direct while retaining the catalog completeness/ordering gate and every per-slot canonical-value check. | `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:216-274`; generated catalogs consumed at `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:8-16` |
+
+### Checked and not proposed (part three hundred seventy-six)
+
+- The catalog completeness checks must remain independent; the proposed index
+  is derived from the already-authoritative static mappings, not a replacement
+  for their order and coverage validation.
+- Term, instruction, and location rows retain separate slot shapes and value
+  overloads; this candidate removes only repeated kind lookup.
+- A duplicate kind in malformed generated metadata must not be silently
+  overwritten while constructing the index; preserve the current missing or
+  ambiguous-mapping failure behavior.
+
+### Status (part three hundred seventy-six)
+
+R866 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred seventy-seven: R867 - repeated portable-IR type-depth walk
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R867 | **`PortableIrGraphCodec.Encoder.TypeIndex` re-walks nested sequence types before consulting its deduplication table.** Every type-bearing row calls `TypeIndex`; the method follows the complete `IrTypeId` element chain and checks `MaximumGraphDepth` before `_types.Add(id)`, while `EncodingTable.Add` then returns the existing index for repeated IDs. Shared built-in, variable, member, term, and operation types can therefore pay the same depth walk repeatedly. Checking `_types.Indices` first or caching the validated depth per `IrTypeId` preserves the depth limit for new types and the encoder's identity-index semantics while avoiding repeated traversal for an already indexed type. | `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:451-469,511-528`; `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:336-358` |
+
+### Checked and not proposed (part three hundred seventy-seven)
+
+- The fast path must remain keyed by `IrTypeId`, not by display name or
+  serialized text, because the encoding table is identity-based.
+- New types still require the full sequence-chain depth check before entering
+  the table; only repeated indexed types may reuse the validated result.
+- This is separate from R866's decoded-row catalog lookup and from graph-level
+  canonical re-encoding in `RequireCanonicalEncoderImage`.
+
+### Status (part three hundred seventy-seven)
+
+R867 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
