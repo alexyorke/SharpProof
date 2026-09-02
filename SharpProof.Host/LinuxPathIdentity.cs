@@ -186,7 +186,8 @@ public static partial class LinuxPathIdentity
         ValidatePublicationTopology(canonicalPaths);
         ValidatePublicationMetadataAliases(canonicalPaths);
         var markerPaths = canonicalPaths
-            .Select(PublicationMarkerPath)
+            .Select(static path => PublicationMetadataPath(
+                path, PublicationMarkerExtension))
             .ToArray();
         if (markerPaths.All(static path => !File.Exists(path)) &&
             canonicalPaths.All(static path =>

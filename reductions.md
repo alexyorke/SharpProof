@@ -203,6 +203,7 @@ the smallest relevant containerized test target passes.
 | R513 | Share conditional truth operator return-expression extraction | `SharpProof.Effects.Test`: 323 passed |
 | R532 | Reuse compiler source-location copy/equality helpers during replay | `SharpProof.Worker.Test`: 695 passed |
 | R533 | Share the zero source-location sentinel predicate | `SharpProof.Worker.Test`: 695 passed |
+| R534 | Derive reset marker paths from already-canonical publication paths | `SharpProof.Worker.Test`: 695 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3219,9 +3220,9 @@ compatibility wrapper.
 
 ### Status (part eighty)
 
-R534-R535 are `pending` reduction candidates. R534 preserves the initial
-canonicalization boundary; R535 preserves the distinct bare-command lookup and
-explicit trusted-installation comparison.
+R535 remains a `pending` reduction candidate; R534 preserves the initial
+canonicalization boundary while avoiding a second path walk. R535 preserves
+the distinct bare-command lookup and explicit trusted-installation comparison.
 
 ## Second survey, part eighty-one: R536 - duplicated shrinker engines
 
@@ -3365,3 +3366,23 @@ identity helper's repository requirements for fixture packages.
 R552 is a `pending` reduction candidate. Preserve the existing exact package and
 symbol-set checks and the public source/path behavior; only reuse the already
 validated identity/version data rather than weakening validation.
+
+## Second survey, part ninety-five: R553 - release package archive rescans
+
+| R553 | **`New-SharpProofReleaseEvidence` scans each package archive twice for third-party payloads.** The package-payload loop calls `Test-SharpProofPackagePayload`, which opens every `.nupkg` and enumerates its payload entries while collecting third-party paths. Later, the third-party inventory loop calls `Test-PackageThirdPartyInventory` for those same `.nupkg` files; that helper reopens each archive and rebuilds the actual third-party entry set before checking the same declared entries and reading notices. A shared archive-inspection result, or one combined validation/projection helper, could reuse the entry set and notice text without weakening the distinct payload-evidence and notice-validation rules. | `scripts/New-SharpProofReleaseEvidence.ps1:379-395,428-438`; `scripts/Test-SharpProofPackagePayloads.ps1:166-191`; `scripts/New-SharpProofReleaseEvidence.ps1:191-248` |
+
+### Status (part ninety-five)
+
+R553 is a `pending` reduction candidate. Keep payload closure, assembly identity,
+third-party notice, and manifest projection checks separately observable; the
+reduction is about reusing one archive snapshot, not dropping any validation.
+
+## Second survey, part ninety-six: R554 - unreferenced package-license helper
+
+| R554 | **`Get-SharpProofPackageLicenseGraph` appears to be dead script code.** The helper is defined in `Test-SharpProofPackageDependencies.ps1`, but a repository-wide search finds no call site; the architecture harness invokes `Get-SharpProofPackageDependencyGraph`, and release scripts use the third-party component graph instead. If this dot-sourced script is not intentionally exposing an external function contract, remove the unreferenced helper. If the license projection is still needed, fold it into the dependency-authority result so it does not reload the same contract after validation. | `scripts/Test-SharpProofPackageDependencies.ps1:224-246`; `SharpProof.ArchitectureTest/PackageDependencyAuthorityTests.cs:371-385` |
+
+### Status (part ninety-six)
+
+R554 is a `pending` reduction candidate. Confirm that callers outside this
+repository do not consume the dot-sourced function before deleting or reshaping
+it; the repository-local evidence shows no active consumer.
