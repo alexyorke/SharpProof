@@ -18,4 +18,6 @@ runs:
         path: nupkgs
     - name: Build the pinned Linux amd64 toolchain
       shell: bash
+      env:
+        COMPOSE_PROGRESS: quiet
       run: docker compose build tooling

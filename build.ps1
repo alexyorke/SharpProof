@@ -46,17 +46,29 @@ function Invoke-Container(
     [string]$CommandConfiguration = $Configuration,
     [string[]]$AdditionalArguments = @(),
     [hashtable]$Environment = @{}) {
-    $arguments = @('compose', 'run', '--rm')
-    foreach ($name in @($Environment.Keys | Sort-Object)) {
-        $value = [string]$Environment[$name]
-        [Environment]::SetEnvironmentVariable($name, $value, 'Process')
-        $arguments += @('-e', $name)
+    $previousComposeProgress = $env:COMPOSE_PROGRESS
+    try {
+        $env:COMPOSE_PROGRESS = 'quiet'
+        $arguments = @('compose', 'run', '--rm')
+        foreach ($name in @($Environment.Keys | Sort-Object)) {
+            $value = [string]$Environment[$name]
+            [Environment]::SetEnvironmentVariable($name, $value, 'Process')
+            $arguments += @('-e', $name)
+        }
+        Build-ToolingImage
+        $arguments += @(
+            'tooling', $Command, '-Configuration', $CommandConfiguration)
+        $arguments += $AdditionalArguments
+        Invoke-Docker $arguments
     }
-    Build-ToolingImage
-    $arguments += @(
-        'tooling', $Command, '-Configuration', $CommandConfiguration)
-    $arguments += $AdditionalArguments
-    Invoke-Docker $arguments
+    finally {
+        if ($null -eq $previousComposeProgress) {
+            Remove-Item Env:COMPOSE_PROGRESS -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:COMPOSE_PROGRESS = $previousComposeProgress
+        }
+    }
 }
 
 $forcedConfigurations = @{
