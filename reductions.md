@@ -7731,3 +7731,45 @@ build-file changes were made during this audit.
 
 R863 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred seventy-four: R864 - repeated compiler claim lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R864 | **`CompilerResponseEvidenceAuthority` linearly searches target claim arrays for every response claim.** `ValidateClaim` calls `target.EffectClaims.FirstOrDefault` and a separate `target.Clauses.FirstOrDefault` for each claim ID; the failed-target path repeats the effect-claim search. The outer validator already iterates the target's manifest claim IDs, so a target-scoped index for effect claims and ensures clauses can make the identity projection direct instead of rescanning the same arrays for every result. The index must retain first-entry behavior or an explicit duplicate marker so malformed artifact data remains fail-closed and the current "exactly one effect/postcondition match" check is not weakened. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:57-79,98-116,168-184`; target arrays in `SharpProof.CompilerArtifact/CompilerCompilationModel.generated.cs` |
+
+### Checked and not proposed (part three hundred seventy-four)
+
+- This is narrower than R465, which concerns generated metadata descriptor
+  lookups, and R837, which concerns protocol-manifest claim ownership.
+- The index is only an additional target-local projection; it must not replace
+  the artifact's independent claim-count, identity, or effect-authority checks.
+- A dictionary implementation must not silently overwrite duplicate IDs, since
+  the current two `FirstOrDefault` calls and the paired null/non-null test are
+  part of the fail-closed boundary.
+
+### Status (part three hundred seventy-four)
+
+R864 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred seventy-five: R865 - repeated literal-false target fact
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R865 | **`CompilerResponseEvidenceAuthority` recomputes one target-wide precondition fact for every proven postcondition.** Each proven postcondition enters `ValidatePostconditionClaim`, which independently calls `HasLiteralFalsePrecondition(target)`; that helper scans all target clauses for a literal-false `Requires` clause even though the target and its clause collection are unchanged across the outer target claim loop. Precomputing the boolean alongside the target's existing assumption/label snapshot, or carrying a target validation context into claim validation, can remove the repeated scan while leaving the per-claim proof-core, replay, vacuity, and model checks independent. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:57-79,355-411,620-626` |
+
+### Checked and not proposed (part three hundred seventy-five)
+
+- The fact must be computed from the target artifact, not inferred from any
+  untrusted response result; this is only a cache of immutable target data.
+- The candidate does not merge postcondition claims or alter the special
+  contradictory-precondition policy; it only carries one boolean across the
+  target's claim validations.
+- Targets with one or zero proven postconditions still have the same semantics;
+  the reduction matters when a target has multiple postcondition results.
+
+### Status (part three hundred seventy-five)
+
+R865 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
