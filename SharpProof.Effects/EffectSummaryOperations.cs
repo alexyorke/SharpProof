@@ -9,6 +9,19 @@ internal static class EffectSummaryOperations
         return JoinFrom(EffectSummary.Bottom, summaries);
     }
 
+    internal static EffectSummary Join(EffectSummary first, EffectSummary second)
+    {
+        return Domain.Join(first, second);
+    }
+
+    internal static EffectSummary Join(
+        EffectSummary first,
+        EffectSummary second,
+        EffectSummary third)
+    {
+        return Domain.Join(Domain.Join(first, second), third);
+    }
+
     internal static EffectSummary JoinFrom(EffectSummary result, IEnumerable<EffectSummary> summaries)
     {
         foreach (var summary in summaries)
