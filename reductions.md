@@ -4217,14 +4217,6 @@ R652 is deferred: envelope equality and compilation-shape validation are intenti
 
 R654 is deferred: replay validation and the separate operation/evidence digest domains are analyzer-integrity boundaries. Their independent event walks make the field ordering, null normalization, and fail-closed checks auditable; combine them only with a proof that cannot alter those semantics.
 
-## Second survey, part one hundred ninety-six: R655 - repeated response manifest indexes
-
-| R655 | **`ProtocolJson.ValidateResponse` rebuilds the same manifest identity indexes in several validators.** For one response, `ValidateCallableResults` constructs a callable index, `ValidateClaimResults` constructs both claim and callable indexes, and `ValidateRun` constructs another callable index from the unchanged manifest. A response-scoped validation context can build the callable/claim indexes once after manifest admission and pass them through the result and projection checks, preserving first-entry behavior for duplicate or null IDs and all existing error ordering while removing repeated enumeration and dictionary construction. | `SharpProof.Worker.Protocol/ProtocolJson.cs:342-353,567-608,698-740,991-1025` |
-
-### Status (part one hundred ninety-six)
-
-R655 is a pending worker-response validation reduction candidate. Preserve manifest-invalid recovery behavior, null/duplicate identity handling, result-set validation, claim ownership lookup, and diagnostic ordering; share only indexes over the immutable response manifest.
-
 ## Second survey, part one hundred ninety-seven: R656 - duplicated checked-dotnet branches
 
 | R656 | **`Invoke-SharpProofRequiredDotnet` duplicates the wrapper invocation and failure construction for streaming and quiet modes.** The non-quiet branch and the quiet branch both resolve and invoke `Invoke-SharpProofDotnet.ps1` with the same timeout and argument array, capture a nonzero exit code, and format the same command failure; the quiet branch only adds an output-file lifecycle and failure-output replay. A single invocation helper with an optional capture path can keep direct streaming, quiet success, captured failure output, and cleanup semantics while removing the parallel command/error paths. | `scripts/SharpProof.ContainerExecution.psm1:10-50` |
@@ -4264,3 +4256,11 @@ R659 is a pending container-dispatch laziness reduction candidate. Preserve the 
 ### Status (part two hundred one)
 
 R660 is a pending container orchestration factoring candidate. Preserve locked restore, configuration selection, package-build properties, per-profile ordering, and error propagation; share only the common solution prerequisite construction.
+
+## Second survey, part two hundred two: R661 - repeated requires call discovery
+
+| R661 | **The requires analyzer performs a full call-site screen and then repeats call extraction for the actual analysis.** `RequiresCallSiteAnalyzer.Analysis.Run` calls `HasPotentialCallSite` before binding contracts; that screen traverses executable operations and invokes `GetCalls` for each operation. When the screen succeeds, `RequiresCallSiteDiscovery.Get` builds flow state and walks the reachable CFG, invoking `GetCalls` again over the same declaration, with a further traversal for special constructs. Cache a declaration-scoped discovery result or make the screen consume the later candidate walk, while retaining the early not-applicable fast path, flow-sensitive filtering, ownership policy, and special-case handling. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:14-94,96-315`; `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:236-250` |
+
+### Status (part two hundred two)
+
+R661 is a pending analyzer discovery traversal reduction candidate. Preserve the screening short-circuit, graph/flow analysis boundaries, cancellation checks, call-target resolution, and special initializer/pattern handling; share only reusable operation/call discovery where the same declaration and semantic model are analyzed.

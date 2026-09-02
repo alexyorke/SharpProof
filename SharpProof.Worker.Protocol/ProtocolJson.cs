@@ -346,9 +346,22 @@ public static partial class WorkerProtocolJson
             errors.Count == manifestErrorCount,
             errors);
         var protocolErrors = ValidateProtocolErrors(response.Errors, errors);
-        var callables = ValidateCallableResults(response.CallableResults, response.Manifest, errors);
-        var claims = ValidateClaimResults(response.ClaimResults, response.Manifest, errors);
-        ValidateRun(response, callables, claims, protocolErrors, errors);
+        var manifestIndexes = new ManifestIdentityIndexes(response.Manifest);
+        var callables = ValidateCallableResults(
+            response.CallableResults,
+            manifestIndexes,
+            errors);
+        var claims = ValidateClaimResults(
+            response.ClaimResults,
+            manifestIndexes,
+            errors);
+        ValidateRun(
+            response,
+            callables,
+            claims,
+            protocolErrors,
+            manifestIndexes,
+            errors);
         ValidateUnknownCoverage(callables, claims, response.Manifest, errors);
         ValidateSummary(response.Summary, callables, claims, errors);
         if (response.Summary != null)
@@ -564,57 +577,48 @@ public static partial class WorkerProtocolJson
 
         return true;
     }
-    private static WorkerCallableResult[] ValidateCallableResults(WorkerCallableResult[]? values,
-        WorkerClaimManifest? manifest, Validator errors)
+    private static WorkerCallableResult[] ValidateCallableResults(
+        WorkerCallableResult[]? values,
+        ManifestIdentityIndexes manifestIndexes,
+        Validator errors)
     {
         var valid = ValidateResultSet(values,
-            manifest?.Callables?.OfType<WorkerCallableManifestEntry>()
-                .Select(static value => value.CallableId) ?? [],
+            manifestIndexes.Callables.Select(static value => value.CallableId),
             static value => value.CallableId, "response.callable_results",
             "response.callable_id", "response.callable_set", errors);
-        var declaredById = new OrdinalIdentityIndex<
-            WorkerCallableManifestEntry>(
-                manifest?.Callables?.OfType<WorkerCallableManifestEntry>() ?? [],
-                static item => item.CallableId);
         foreach (var value in valid)
         {
             errors.Rules(value, WorkerProtocolMetadata.CallableResultRules);
-            var declared = declaredById.Find(value.CallableId);
+            var declared = manifestIndexes.CallablesById.Find(value.CallableId);
             errors.Check(declared != null &&
                 SameAssumptionDeclarations(value.Assumptions, declared.Assumptions),
                 "response.callable_assumption_set");
         }
         return valid;
     }
-    private static WorkerClaimResult[] ValidateClaimResults(WorkerClaimResult[]? values, WorkerClaimManifest? manifest, Validator errors)
+    private static WorkerClaimResult[] ValidateClaimResults(
+        WorkerClaimResult[]? values,
+        ManifestIdentityIndexes manifestIndexes,
+        Validator errors)
     {
         var valid = ValidateResultSet(values,
-            manifest?.Claims?.OfType<WorkerClaimManifestEntry>()
-                .Select(static value => value.ClaimId) ?? [],
+            manifestIndexes.Claims.Select(static value => value.ClaimId),
             static value => value.ClaimId, "response.claim_results",
             "response.result_claim_id", "response.claim_set", errors);
-        var claimsById = new OrdinalIdentityIndex<WorkerClaimManifestEntry>(
-            manifest?.Claims?.OfType<WorkerClaimManifestEntry>() ?? [],
-            static item => item.ClaimId);
-        var callablesById = new OrdinalIdentityIndex<
-            WorkerCallableManifestEntry>(
-                manifest?.Callables?.OfType<WorkerCallableManifestEntry>() ?? [],
-                static item => item.CallableId);
         foreach (var value in valid)
         {
-            ValidateClaimResult(value, claimsById, callablesById, errors);
+            ValidateClaimResult(value, manifestIndexes, errors);
         }
 
         return valid;
     }
     private static void ValidateClaimResult(
         WorkerClaimResult value,
-        OrdinalIdentityIndex<WorkerClaimManifestEntry> claimsById,
-        OrdinalIdentityIndex<WorkerCallableManifestEntry> callablesById,
+        ManifestIdentityIndexes manifestIndexes,
         Validator errors)
     {
         errors.Rules(value, WorkerProtocolMetadata.ClaimResultRules);
-        var claim = claimsById.Find(value.ClaimId);
+        var claim = manifestIndexes.ClaimsById.Find(value.ClaimId);
         var effectClaim = claim?.Kind == WorkerClaimKind.Effect;
         var hasTrustedBoundary = false;
         var hasUsedTrustedBoundary = false;
@@ -659,7 +663,7 @@ public static partial class WorkerProtocolJson
         errors.Check(WorkerProtocolMetadata.MatchesVacuity(
             claim?.Kind ?? WorkerClaimKind.Unspecified, value.Outcome, value.Vacuity),
             "response.vacuity");
-        var owner = callablesById.Find(claim?.CallableId);
+        var owner = manifestIndexes.CallablesById.Find(claim?.CallableId);
         errors.Check(owner != null && SameAssumptionDeclarations(value.Assumptions, owner.Assumptions),
             "response.claim_assumption_set");
     }
@@ -700,6 +704,7 @@ public static partial class WorkerProtocolJson
         WorkerCallableResult[] callables,
         WorkerClaimResult[] claims,
         WorkerProtocolError[] protocolErrors,
+        ManifestIdentityIndexes manifestIndexes,
         Validator errors)
     {
         errors.Defined(response.RunStatus, WorkerRunStatus.Unspecified, "response.run_status")
@@ -718,17 +723,12 @@ public static partial class WorkerProtocolJson
             "response.run_projection");
         if (response.Manifest != null && projected)
         {
-            var callablesById = new OrdinalIdentityIndex<
-                WorkerCallableManifestEntry>(
-                    response.Manifest.Callables
-                        .OfType<WorkerCallableManifestEntry>(),
-                    static item => item.CallableId);
             var claimsById = claims.ToLookup(
                 static claim => (string?)claim.ClaimId,
                 s_ordinal);
             foreach (var callable in callables)
             {
-                var declared = callablesById.Find(callable.CallableId);
+                var declared = manifestIndexes.CallablesById.Find(callable.CallableId);
                 var owned = GetOwnedClaimResults(declared, claimsById);
                 errors.Check(WorkerResultAssembler.MatchesCallableProjection(
                         callable,
@@ -986,6 +986,29 @@ public static partial class WorkerProtocolJson
         }
 
         return Normalize(actual).SequenceEqual(Normalize(expected));
+    }
+
+    private sealed class ManifestIdentityIndexes
+    {
+        internal ManifestIdentityIndexes(WorkerClaimManifest? manifest)
+        {
+            Callables = [.. manifest?.Callables
+                ?.OfType<WorkerCallableManifestEntry>() ?? []];
+            Claims = [.. manifest?.Claims
+                ?.OfType<WorkerClaimManifestEntry>() ?? []];
+            CallablesById = new OrdinalIdentityIndex<
+                WorkerCallableManifestEntry>(
+                    Callables,
+                    static item => item.CallableId);
+            ClaimsById = new OrdinalIdentityIndex<WorkerClaimManifestEntry>(
+                Claims,
+                static item => item.ClaimId);
+        }
+
+        internal WorkerCallableManifestEntry[] Callables { get; }
+        internal WorkerClaimManifestEntry[] Claims { get; }
+        internal OrdinalIdentityIndex<WorkerCallableManifestEntry> CallablesById { get; }
+        internal OrdinalIdentityIndex<WorkerClaimManifestEntry> ClaimsById { get; }
     }
 
     private sealed class OrdinalIdentityIndex<T>
