@@ -7001,3 +7001,26 @@ R830 is `deferred`: it is a zero-risk dead-local removal, pending the next
 R831 is `deferred`: the current operators are behaviorally equivalent for
   these operands, but their bitwise form is unexplained accidental complexity
   in a user-facing exit-policy calculation.
+
+## Second survey, part three hundred forty-three: R832 - incomplete response array rematerialization
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R832 | **`WorkerResultAssembler.CreateIncomplete` materializes result arrays that `Create` copies again.** The failure-path helper converts `manifest.Callables` and `manifest.Claims` to arrays so it can build the assumption lookup and project incomplete results; it then passes those projected arrays to `Create`, whose first two statements call `callableResults.ToArray()` and `claimResults.ToArray()` again. The second materialization is unnecessary for the arrays produced locally and allocates/copies both result sets on every incomplete response. A private array-preserving core or an internal overload can keep `Create`'s general `IEnumerable` boundary while letting `CreateIncomplete` reuse its already-owned arrays. | `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:7-14,61-104` |
+
+### Checked and not proposed (part three hundred forty-three)
+
+- `Create` still needs a materialization boundary for its general enumerable
+  callers; only the locally materialized failure path needs an array-preserving
+  route.
+- The `ToLookup` in `CreateIncomplete` is not part of this finding: it joins
+  malformed claims to callable assumptions and has separate failure-path
+  semantics.
+- Summary accumulation, canonicalization, and cloning of budgets remain
+  necessary response-construction behavior.
+
+### Status (part three hundred forty-three)
+
+R832 is `deferred`: the duplicate copies occur only on incomplete/failure
+  responses, but the ownership boundary is explicit and can be simplified
+  without changing the wire model.
