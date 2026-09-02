@@ -6075,3 +6075,22 @@ implementation or build file was changed.
 
 R792 is `pending` and limited to the API-spec runtime-witness generator's
 string-encoding helper. No implementation or build file was changed.
+
+## Second survey, part three hundred four: R793 - divergent Git text wrappers
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R793 | **Two repository scripts duplicate a Git-text abstraction with materially different process semantics.** `Get-SharpProofProductionInventory.ps1` defines `Invoke-GitText` as a direct `git -C` call that merges output streams, joins lines, trims the result, and emits a fixed error prefix. `Test-SharpProofCoverage.ps1` defines the same-named helper with `ProcessStartInfo`, an argument list, separate asynchronous stdout/stderr draining, disposal in `finally`, caller-supplied failure text, and untrimmed stdout. Both are repository-scoped text queries used for commit/ref/diff authority. A shared Git runner with explicit options for error context and output normalization would remove the duplicate process contract and make the safer argument/stream behavior available to the inventory path, while preserving the coverage script's durable-ref checks and the inventory script's canonical commit validation. | `scripts/Get-SharpProofProductionInventory.ps1:27-31,310`; `scripts/Test-SharpProofCoverage.ps1:63-105,124-150,628-678` |
+
+### Checked and not proposed (part three hundred four)
+
+- The callers' Git queries and authority policies remain distinct; this
+  candidate concerns only process launch, stream capture, and text shaping.
+- The coverage helper's caller-specific failure messages and raw output needs
+  must remain configurable; the proposal is not to make all Git results use
+  one implicit trimming or error policy.
+
+### Status (part three hundred four)
+
+R793 is `pending` and limited to repository-scoped Git text execution helpers.
+No implementation or build file was changed.
