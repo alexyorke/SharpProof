@@ -1347,8 +1347,13 @@ public sealed class ArchitectureTests
                 configuration.GetProperty("containerUser").GetString(),
                 Is.EqualTo("sharpproof"));
             Assert.That(
-                configuration.GetProperty("forwardPorts").GetArrayLength(),
-                Is.Zero);
+                configuration.TryGetProperty("containerEnv", out _),
+                Is.False,
+                "Compose owns development environment variables.");
+            Assert.That(
+                configuration.TryGetProperty("forwardPorts", out _),
+                Is.False,
+                "No development ports are forwarded.");
             Assert.That(
                 configuration.GetProperty("postCreateCommand").GetString(),
                 Is.EqualTo("sharpproof-dev-init"));

@@ -9,10 +9,6 @@
   "shutdownAction": "stopCompose",
   "postCreateCommand": "sharpproof-dev-init",
   "postStartCommand": "sp contract",
-  "containerEnv": {
-    "SHARPPROOF_REPO_ROOT": "/workspace/SharpProof",
-    "SHARPPROOF_DEV_CONTAINER": "1"
-  },
   "customizations": {
     "vscode": {
       "settings": {
@@ -25,6 +21,5 @@
         "ms-azuretools.vscode-docker"
       ]
     }
-  },
-  "forwardPorts": []
+  }
 }
