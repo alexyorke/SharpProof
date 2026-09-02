@@ -7815,3 +7815,23 @@ build-file changes were made during this audit.
 
 R867 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred seventy-eight: R868 - duplicate sequence-length restriction
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R868 | **`SequenceCardinalityDomain.Create` reconstructs the same interval twice for NonEmpty values.** It first calls `_intervals.AssumeAtLeast(length, 0)` for every non-bottom kind, then, only for `SequenceCardinalityKind.NonEmpty`, calls `_intervals.AssumeAtLeast(restricted, 1)` and repeats interval canonicalization with the same congruence data. Selecting the lower bound once (`1` for NonEmpty, `0` otherwise) before the first restriction can preserve bottom handling, Empty/Top semantics, non-negative length admission, and canonical-kind derivation while removing one interval-domain pass on every NonEmpty construction. | `SharpProof.Dataflow/SequenceCardinalityDomain.cs:33-68`; `SharpProof.Dataflow/IntervalDomain.cs:170-181` |
+
+### Checked and not proposed (part three hundred seventy-eight)
+
+- The lower bound must remain `0` for Empty and Top so their existing
+  non-negative-length policy is unchanged.
+- The candidate does not remove the explicit Empty `Contains(0)` check or the
+  final canonical-kind projection; those encode different cardinality rules.
+- This is narrower than R857, which targets the duplicated public interval
+  assumption wrappers themselves.
+
+### Status (part three hundred seventy-eight)
+
+R868 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
