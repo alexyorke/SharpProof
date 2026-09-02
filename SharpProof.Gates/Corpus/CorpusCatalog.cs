@@ -263,14 +263,30 @@ internal static class CorpusCatalog
 
     private static IEnumerable<CorpusCase> CreateCases(CorpusSeed seed)
     {
-        var cases = Variants.Select(variant => CreateCase(seed, variant)).ToArray();
-        var baseline = cases.First(static item => item.Variant == CorpusVariant.Baseline);
+        var cases = ImmutableArray.CreateBuilder<CorpusCase>(Variants.Length);
+        var baseline = CreateCase(seed, CorpusVariant.Baseline);
+        cases.Add(baseline);
         // Alpha-renaming is meaningful only when the seed actually contains
         // contract formals. Do not spend a metamorphic slot on an identical
         // source (effect seeds otherwise produced duplicate cases).
-        return cases.Where(item =>
-            item.Variant != CorpusVariant.AlphaRenameContractFormals ||
-            !string.Equals(item.Source, baseline.Source, StringComparison.Ordinal));
+        foreach (var variant in Variants)
+        {
+            if (variant == CorpusVariant.Baseline)
+            {
+                continue;
+            }
+
+            var item = CreateCase(seed, variant);
+            if (variant == CorpusVariant.AlphaRenameContractFormals &&
+                string.Equals(item.Source, baseline.Source, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            cases.Add(item);
+        }
+
+        return cases.ToImmutable();
     }
 
     private static CorpusCase CreateCase(
