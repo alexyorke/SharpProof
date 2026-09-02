@@ -35,6 +35,7 @@
       !$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectFullPath)', '[/\\](samples|eng[/\\]pilots)[/\\]')) And
       !$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectName)', '^SharpProof\.(Testing|Package|Verifier|Smoke\.Net472|CompilerProbe\.TestAsset)$'))">true</SharpProofProductionProject>
     <NoWarn Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectName)', '^SharpProof\.(Analyzer\.Core|Analyzer|CompilerCollector)$'))">$(NoWarn);RS2002;RS2003</NoWarn>
+    <CopyLocalLockFileAssemblies Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(MSBuildProjectName)', '^SharpProof\.(Analyzer\.Core|Analyzer|CompilerCollector)$'))">true</CopyLocalLockFileAssemblies>
     <SharpProofUsesIrIdentifiers Condition="
       '$(MSBuildProjectName)' == 'SharpProof.Analyzer.Core' Or
       '$(MSBuildProjectName)' == 'SharpProof.CompilerArtifact' Or

@@ -227,6 +227,7 @@ the smallest relevant containerized test target passes.
 | R360 | Make `FrameworkTypeMetadataNames.Monitor` a compile-time constant like its sibling metadata identities | Canonical solution build succeeded |
 | R371 | Remove redundant PowerShell 7 compression assembly loads from pilot package authority scripts | Pilot authority fixtures passed |
 | R356 | Centralize the shared libc `close` and `syscall` imports for the verifier build tasks while retaining task-specific native calls | `SharpProof.Package.Test`: 141 build-task, supervisor, and launcher tests passed |
+| R357 | Centralize `CopyLocalLockFileAssemblies` for the three Roslyn dependency-producing projects while preserving their package layouts | `SharpProof.Package.Test`: PackageLayoutSmokeTests 21 passed; `SharpProof.ArchitectureTest`: BoundaryEnforcementTests 13 passed |
 | R373 | Share compiler-probe option and path normalization helpers between generator and snapshot implementations | `SharpProof.Package.Test`: six compiler-probe tests passed |
 | R461 | Replace the interval modular-distance branch ladder with the existing `Normalize` helper | `SharpProof.Dataflow.Test`: 50 passed |
 | R462 | Remove the shadowed `modulus.IsOne` boundary normalization branch from `IntervalDomain.Create` | `SharpProof.Dataflow.Test`: 50 passed |
@@ -1791,8 +1792,10 @@ smaller role-policy candidate that needs package-layout validation.
 
 ### Status (part twenty-nine)
 
-R357 is `pending`. R357 needs package-output
-tests because its three consumers do not have identical analyzer markers.
+R357 is `applied`: the existing central project policy now supplies
+`CopyLocalLockFileAssemblies` for the three Roslyn dependency-producing projects;
+their distinct analyzer markers and package layouts remain unchanged. Package
+layout smoke tests and the focused architecture boundary tests passed.
 
 ## Second survey, part thirty: R358-R367
 

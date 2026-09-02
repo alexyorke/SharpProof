@@ -4,7 +4,6 @@
     <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
     <AssemblyName>SharpProof.Analyzer.Core</AssemblyName>
     <RootNamespace>SharpProof</RootNamespace>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
