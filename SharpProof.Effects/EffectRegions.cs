@@ -81,7 +81,20 @@ public readonly struct EffectRegionSet : IEquatable<EffectRegionSet>
 
     public static EffectRegionSet Create(params EffectRegionId[] regions)
     {
-        return Create((IEnumerable<EffectRegionId>)regions);
+        regions = ArgumentNullGuard.NotNull(regions, nameof(regions));
+        return regions.Length switch
+        {
+            0 => Empty,
+            1 => Create(regions[0]),
+            _ => Create((IEnumerable<EffectRegionId>)regions)
+        };
+    }
+
+    public static EffectRegionSet Create(EffectRegionId region)
+    {
+        return region.Kind == EffectRegionKind.Unknown
+            ? Unknown
+            : new EffectRegionSet([region]);
     }
 
     public static EffectRegionSet Create(IEnumerable<EffectRegionId> regions)
