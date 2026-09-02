@@ -122,6 +122,7 @@ the smallest relevant containerized test target passes.
 | R266 | Remove the undefined `SHARPPROOF_PORTABLE_ARGUMENT_GUARD` preprocessor term | Ir.Test: 114; Dataflow.Test: 50; Smt.Test: 30 |
 | R267 | Forward the duplicate `ArgumentNullGuard` `int` overloads to their `long` implementations | Ir.Test: 114; Dataflow.Test: 50; Smt.Test: 30 |
 | R268 | Consolidate residual generator schema-reading helpers in `GeneratedFileHelpers.ps1`, retaining compatibility wrappers and schema-specific validators | Five generator `-Verify` checks; `test-changed`: ArchitectureTest 389 and 36 package shards passed |
+| R271 | Reuse `Test-SharpProofReleaseVersionSyntax` from the publication-plan identity module instead of carrying a duplicate SemVer predicate | Publication-plan identity fixtures (`version-syntax`); release/publication tests passed |
 | R289 | Replace the private ordinal string-sequence helper with framework `SequenceEqual` | `Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R297 | Reuse the shared `DictionaryAnalyzerConfigOptions` in `FinalCompilationCollectorTests` and remove its duplicate private options class | `SharpProof.Analyzer.Test`: 476 passed |
 | R317 | Correct the active bug/status figures and include both documents in the maintained-document gate | `Test-SharpProofReadme.ps1` passed |
@@ -334,7 +335,6 @@ files. Same rules as part one: nothing implemented, nothing validated, all
 |---|---|---|
 | R269 | `Invoke-RequiredDotnet` is byte-identical in three test-invocation scripts, and `$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'` is repeated in six. `SharpProof.ContainerExecution.psm1` already exports eleven shared functions to these same scripts and is the obvious home. `Invoke-DotNet` in the container dispatcher and `Invoke-Docker` in `build.ps1` are the same run-check-`$LASTEXITCODE`-throw shape again. | `Invoke-SharpProofChangedTests.ps1:32,44`; `Invoke-SharpProofPackageTests.ps1:39,96`; `Invoke-SharpProofSemanticTests.ps1:37,82`; `Invoke-SharpProofCoverage.ps1:64`; `Invoke-SharpProofDevCheck.ps1:19`; `Invoke-SharpProofFuzzCampaign.ps1:81` |
 | R270 | `Get-SpdxPackageId` is byte-identical, 18 lines, in `New-SharpProofReleaseEvidence.ps1` (which produces the SBOM package IDs) and `Test-SharpProofReleaseArtifacts.ps1` (which validates them). The validator re-implements the producer's rule instead of importing it, so a change made in both places in the same edit passes the check while changing the released identifiers. This is release-evidence code, so it belongs under the same caution as deferred R110-R112, but the duplication itself weakens the check rather than protecting it. | `scripts/New-SharpProofReleaseEvidence.ps1:55-72`; `scripts/Test-SharpProofReleaseArtifacts.ps1:19-36` |
-| R271 | The release version grammar is a byte-identical six-line semver regex under two names: `Test-SharpProofReleaseVersionSyntax` in the release-version authority and `Test-SharpProofPublicationVersionSyntax` in the publication-plan identity module. | `scripts/Get-SharpProofReleaseVersion.ps1:1-10`; `scripts/SharpProof.PublicationPlanIdentity.psm1:7-16` |
 | R272 | "Resolve HEAD and require an exact 40-hex commit" is open-coded in roughly seventeen places across scripts, `build.ps1`, and a workflow, most of them also repeating the `$LASTEXITCODE -ne 0 -or` guard. Fourteen use case-insensitive `-notmatch '^[0-9a-f]{40}$'` and three use case-sensitive `-cnotmatch`/`-cmatch`. The case-insensitive form accepts an uppercase SHA, which then will not compare `Ordinal`-equal to the lowercase form used elsewhere in the same evidence chain. Worth treating as a correctness inconsistency first and a duplication second: one `Get-SharpProofExactCommit` helper fixes both. | `scripts/Get-SharpProofProductionInventory.ps1:316`; `scripts/Invoke-SharpProofGateEvidence.ps1:22`; `scripts/New-SharpProofReleaseEvidence.ps1:550`; `scripts/Publish-SharpProofRelease.ps1:78,232`; `scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1:73`; `scripts/SharpProof.FuzzEvidenceLifecycle.ps1:27`; `scripts/Test-SharpProof*.ps1`; `build.ps1:82`; `.github/workflows/coverage.yml:40,51` |
 
 ### Diagnostic release tracking
@@ -388,7 +388,7 @@ files. Same rules as part one: nothing implemented, nothing validated, all
 
 ### Status (part two)
 
-R263-R265 and R269-R276 are `pending` and extend the same follow-up queue. R263, R265,
+R263-R265 and R269-R270, R272-R276 are `pending` and extend the same follow-up queue. R263, R265,
 R270, R272, R273, and R274 each carry a stated constraint - a security check that
 must survive, a possibly deliberate belt-and-braces item, release-evidence
 caution under R110-R112, a correctness inconsistency to settle first, a policy

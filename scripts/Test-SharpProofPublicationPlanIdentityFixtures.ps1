@@ -27,15 +27,15 @@ try {
         $module = Get-Module SharpProof.PublicationPlanIdentity
         $canonicalAccepted = & $module {
             param($Candidate)
-            Test-SharpProofPublicationVersionSyntax -Version $Candidate
+            Test-SharpProofReleaseVersionSyntax -Version $Candidate
         } $version
         $lineFeedAccepted = & $module {
             param($Candidate)
-            Test-SharpProofPublicationVersionSyntax -Version $Candidate
+            Test-SharpProofReleaseVersionSyntax -Version $Candidate
         } "$version`n"
         $unicodeAccepted = & $module {
             param($Candidate)
-            Test-SharpProofPublicationVersionSyntax -Version $Candidate
+            Test-SharpProofReleaseVersionSyntax -Version $Candidate
         } ('1.2.3-' + [char]0x212a)
         if (-not $canonicalAccepted -or $lineFeedAccepted -or
             $unicodeAccepted) {

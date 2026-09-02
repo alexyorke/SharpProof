@@ -1,19 +1,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanTopology.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationDestination.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
-
-function Test-SharpProofPublicationVersionSyntax {
-    param([Parameter(Mandatory = $true)][string]$Version)
-
-    return $Version -cmatch (
-        '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.' +
-        '(0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|' +
-        '(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))' +
-        '(?:\.(?:(?:0|[1-9][0-9]*)|' +
-        '(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?\z')
-}
 
 function Test-SharpProofPublicationCommitSyntax {
     param([Parameter(Mandatory = $true)][string]$Commit)
@@ -55,7 +45,7 @@ function Test-SharpProofPublicationPlanIdentity {
     }
     $version = [string]$Plan.packageVersion
     $commit = [string]$Plan.repositoryCommit
-    if (-not (Test-SharpProofPublicationVersionSyntax -Version $version) -or
+    if (-not (Test-SharpProofReleaseVersionSyntax -Version $version) -or
         -not (Test-SharpProofPublicationCommitSyntax -Commit $commit)) {
         throw 'Publication plan version or commit identity is invalid.'
     }
@@ -185,7 +175,7 @@ function Test-SharpProofPublicationPlanIdentity {
                     $archive.packageId -cnotmatch
                         '^[A-Za-z0-9][A-Za-z0-9._-]*\z' -or
                     $archive.version -isnot [string] -or
-                    -not (Test-SharpProofPublicationVersionSyntax `
+                    -not (Test-SharpProofReleaseVersionSyntax `
                         -Version $archive.version) -or
                     $archive.role -isnot [string] -or
                     $archive.role -cnotin @('main','symbols') -or
