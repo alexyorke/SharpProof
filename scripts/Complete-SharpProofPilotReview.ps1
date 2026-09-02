@@ -68,13 +68,12 @@ for ($index = 0; $index -lt 6; $index++) {
     }
 }
 
-$expected = @{}
+$expected = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 foreach ($pilot in @($source.pilots)) {
     $pilotId = [string]$pilot.id
     foreach ($claim in @($pilot.claimEvidence | Where-Object { $null -ne $_ })) {
         $key = "$pilotId|Claim|$([string]$claim.claimId)"
-        if ($expected.ContainsKey($key)) { throw 'Duplicate source claim identity.' }
-        $expected[$key] = $pilotId
+        if (-not $expected.Add($key)) { throw 'Duplicate source claim identity.' }
     }
     $diagnostics = @((Get-Property $pilot 'diagnostics') |
         Where-Object { $null -ne $_ })
@@ -82,8 +81,7 @@ foreach ($pilot in @($source.pilots)) {
         $id = [string](Get-Property $diagnostic 'id')
         if ($id -cnotmatch '^SP[0-9]{4}$') { throw 'Invalid source diagnostic identity.' }
         $key = "$pilotId|Diagnostic|$id"
-        if ($expected.ContainsKey($key)) { throw 'Duplicate source diagnostic identity.' }
-        $expected[$key] = $pilotId
+        if (-not $expected.Add($key)) { throw 'Duplicate source diagnostic identity.' }
     }
 }
 
@@ -97,7 +95,7 @@ foreach ($review in $reviews) {
     $id = [string](Get-Property $review 'id')
     $disposition = [string](Get-Property $review 'disposition')
     $key = "$pilotId|$kind|$id"
-    if (-not $expected.ContainsKey($key) -or -not $seen.Add($key) -or
+    if (-not $expected.Contains($key) -or -not $seen.Add($key) -or
         @('TruePositive','FalsePositive') -cnotcontains $disposition) {
         throw 'The review ledger contains an unknown, duplicate, or contradictory row.'
     }
