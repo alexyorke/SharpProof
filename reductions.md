@@ -244,6 +244,7 @@ the smallest relevant containerized test target passes.
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 | R789 | Derive offline framework source mappings from the copied package catalog | PowerShell parse; `ContainerConsumerMatrixUsesCatalogOwnedNet8ReferencePacks`: 1 passed |
+| R791 | Share timed phase execution between developer-check and package-test orchestrators | PowerShell parses; timing helper behavior; Architecture scheduling/plan tests: 28 passed |
 | R792 | Reuse the shared C# string encoder in the API-spec runtime-witness generator | Generator `-Verify`; `SharpProof.Specs.Test`: 12 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
@@ -6058,8 +6059,9 @@ matrix. No implementation or build file was changed.
 
 ### Status (part three hundred two)
 
-R791 is `pending` and limited to timed-phase orchestration helpers. No
-implementation or build file was changed.
+R791 is `applied`: both orchestrators use the shared timed-phase helper while
+retaining their distinct failure-recording policies. PowerShell parsing,
+helper behavior, and focused Architecture tests passed.
 
 ## Second survey, part three hundred three: R792 - shadowed generator string helper
 
@@ -6098,3 +6100,23 @@ Generator verification and the focused Specs tests passed.
 
 R793 is `pending` and limited to repository-scoped Git text execution helpers.
 No implementation or build file was changed.
+
+## Second survey, part three hundred five: R794 - pilot package identity reparse
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R794 | **Pilot qualification reimplements the shared package identity parser.** `Get-SharpProofPilotPackageAuthority` enumerates the six candidate archives, opens each ZIP, selects its single nuspec, reads XML metadata, and extracts package ID, version, and repository commit before projecting the file name and byte count. `SharpProof.PackageIdentity.psm1` already owns the archive/single-nuspec/metadata lifecycle and exposes `Get-SharpProofPackageIdentity`, including an optional repository-aware validation path. Routing the common identity fields through that module would remove the duplicated archive and XML-query plumbing while leaving the pilot-specific exact-six-file set, expected-version/name policy, byte-size projection, and any intentionally weaker repository policy explicit. This is distinct from R551, which identifies the same kind of reuse in a publication-destination fixture rather than the pilot qualification authority. | `scripts/Get-SharpProofPilotPackageAuthority.ps1:1-49`; `scripts/SharpProof.PackageIdentity.psm1:16-104`; `scripts/Test-SharpProofPilotAuthorityFixtures.ps1:6,41-57` |
+
+### Checked and not proposed (part three hundred five)
+
+- The pilot authority's file-count, package-order, filename, and byte-size
+  checks remain separate; only common archive and identity extraction is in
+  scope.
+- The shared `-RequireRepository` option validates repository type and URL as
+  well as commit syntax, so adopting it must be an explicit policy choice
+  rather than an accidental tightening of the pilot contract.
+
+### Status (part three hundred five)
+
+R794 is `pending` and limited to pilot package identity parsing. No
+implementation or build file was changed.
