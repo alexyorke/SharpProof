@@ -4150,7 +4150,10 @@ R628 is a pending protocol-stream cleanup candidate. Preserve zero-count behavio
 
 ### Status (part one hundred seventy)
 
-R629 is a pending protocol JSON validation cleanup candidate. Preserve the current invalid-root error, recursive nested-object validation, exact property-order checks, and UTF-16 error translation; remove only the redundant top-level kind test.
+R629 is applied: typed deserialization now lets the recursive
+`EnsureObjectShape` own the object-kind check, preserving the invalid-root
+error, nested-object validation, property ordering, and UTF-16 translation
+without a duplicate top-level branch.
 
 ## Second survey, part one hundred seventy-one: R630 - duplicated manifest canonical ordering policy
 
@@ -4167,3 +4170,11 @@ R630 is a pending protocol-manifest complexity candidate, not a request to remov
 ### Status (part one hundred seventy-two)
 
 R631 is a pending script-infrastructure reduction candidate. Preserve the build-time output contract, gate-evidence binding, no-metadata handling, canonical `D` formatting, and independent caller diagnostics while sharing only the PE metadata/MVID extraction.
+
+## Second survey, part one hundred seventy-three: R632 - repeated PowerShell fixture cleanup
+
+| R632 | **Six PowerShell fixture drivers repeat the same temporary-tree cleanup guard.** `Test-SharpProofMutationEvidence`, `Test-SharpProofPublicationDestinationFixtures`, `Test-SharpProofPublicationPlanIdentityFixtures`, `Test-SharpProofPublicationPlanTopologyFixtures`, `Test-SharpProofReleaseConfigurationFixtures`, and `Test-SharpProofReleaseAuthorityClosureFixtures` each finish with `if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }`, differing only in the variable name. A shared fixture-lifetime helper can own the existence check and recursive removal (and, ideally, verify the generated temp-prefix ownership), while each script retains its own fixture creation, environment restoration, and failure behavior. | `scripts/Test-SharpProofMutationEvidence.ps1:1272-1275`; `scripts/Test-SharpProofPublicationDestinationFixtures.ps1:265-268`; `scripts/Test-SharpProofPublicationPlanIdentityFixtures.ps1:266-269`; `scripts/Test-SharpProofPublicationPlanTopologyFixtures.ps1:98-101`; `scripts/Test-SharpProofReleaseConfigurationFixtures.ps1:262-265`; `scripts/Test-SharpProofReleaseAuthorityClosureFixtures.ps1:130-133` |
+
+### Status (part one hundred seventy-three)
+
+R632 is a pending fixture-infrastructure reduction candidate. Preserve cleanup in `finally`, per-script environment restoration, recursive deletion, and ownership safety; share only the common temporary-directory disposal protocol.

@@ -33,11 +33,6 @@ public static partial class WorkerProtocolJson
         using var document = JsonDocument.Parse(
             json,
             new JsonDocumentOptions { MaxDepth = MaximumJsonDepth });
-        if (document.RootElement.ValueKind != JsonValueKind.Object)
-        {
-            throw new JsonException("A JSON object is required.");
-        }
-
         if (!WorkerProtocolMetadata.JsonObjectShapes.TryGetValue(
                 rootType,
                 out var shape))
