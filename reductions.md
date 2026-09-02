@@ -248,6 +248,7 @@ the smallest relevant containerized test target passes.
 | R792 | Reuse the shared C# string encoder in the API-spec runtime-witness generator | Generator `-Verify`; `SharpProof.Specs.Test`: 12 passed |
 | R794 | Reuse shared package identity parsing in pilot qualification | Pilot authority fixtures; `PilotAuthorityTests`: 1 passed |
 | R793 | Share repository-scoped Git text execution between inventory and coverage scripts | PowerShell parses; Git helper behavior; authority tests: 36 passed (1 pre-existing complexity-cap failure) |
+| R790 | Drive package-consumer framework coverage from the acceptance contract | PowerShell parse; `ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed`: 1 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -6042,8 +6043,9 @@ commit mismatch.
 
 ### Status (part three hundred one)
 
-R790 is `pending` and limited to the acceptance/package-consumer framework
-matrix. No implementation or build file was changed.
+R790 is `applied`: package-consumer framework creation now reads the ordered
+`supportedTargetFrameworks` contract field and rejects an empty matrix. The
+script parser and focused consumer architecture test passed.
 
 ## Second survey, part three hundred two: R791 - duplicated timed phase wrappers
 
