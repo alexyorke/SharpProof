@@ -207,6 +207,7 @@ the smallest relevant containerized test target passes.
 | R501 | Resolve closed-contract attribute symbols once per analyzer compilation | `SharpProof.Analyzer.Test`: 476 passed |
 | R499 | Share unsupported-value abstention classification in the Roslyn lowerer | `SharpProof.Frontend.Test`: 121 passed |
 | R500 | Reuse the supported-unknown count during corpus outcome validation | `SharpProof.Gates.Test`: CorpusGateTests 23 passed |
+| R504 | Express container script modes with `COPY --chmod` | `SharpProof.ArchitectureTest`: ContainerAuthorityScriptTests 15; `docker compose build tooling` passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3005,10 +3006,11 @@ they need to.
 
 ### Status (part sixty-four)
 
-R504 is `pending`. Like R497 its payoff is build time rather than
-maintainability, and the two should be considered together - caching the image
-addresses the repetition, while splitting the layer addresses why a cache miss
-costs more than it should.
+R504 is partially applied: the four script copies now set their executable mode
+inline with `COPY --chmod=0755`, removing the separate chmod layer and six lines;
+the independent payload/contract cache split remains deferred because it adds a
+layer and does not simplify the build graph. The authority tests and a real
+tooling-image build pass.
 
 
 ## Second survey, part sixty-five: R505 - two source-materialization paths that disagree
