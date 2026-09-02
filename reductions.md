@@ -6720,3 +6720,25 @@ changes the script's supported invocation contract.
 
 R819 is `deferred`: the duplicate scan is cheap for five rows, but the canonical
   path set is the stronger invariant and is the clearer single authority.
+
+## Second survey, part three hundred thirty-one: R820 - implied proof-outcome assertions
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R820 | **Two `ProofKernelTests` assertions restate a type assertion in a weaker form.** `UnsatCreatesAProvenOutcomeWithOnlyRequestedEvidence` first requires `outcome` to be exactly `ProvenOutcome`, and `SatBecomesRefutedOnlyAfterConcreteReplay` first requires exactly `RefutedOutcome`. Each test then asserts `outcome is ProvenOutcome or RefutedOutcome`, which is logically implied by the preceding `Is.TypeOf<T>()` assertion and cannot detect a distinct failure. Removing those two boolean assertions leaves the core-selection, model-replay, and outcome-type checks intact while eliminating test noise that looks like an independent cacheability or outcome-family contract. | `SharpProof.Verify.Test/ProofKernelTests.cs:30-35,49-53` |
+
+### Checked and not proposed (part three hundred thirty-one)
+
+- The exact `Is.TypeOf<ProvenOutcome>()` and `Is.TypeOf<RefutedOutcome>()`
+  assertions remain necessary because the later casts and payload assertions
+  depend on the concrete result type.
+- The other `is ProvenOutcome or RefutedOutcome` assertions in this fixture are
+  attached to paths that are expected to return `UnknownOutcome`; those are not
+  implied by a preceding exact success-type assertion and remain informative.
+- This is a test reduction only; no production outcome behavior is being
+  changed.
+
+### Status (part three hundred thirty-one)
+
+R820 is `deferred`: the assertions are completely implied, but the cleanup is
+  limited to two low-cost test lines.
