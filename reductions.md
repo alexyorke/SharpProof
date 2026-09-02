@@ -228,6 +228,7 @@ the smallest relevant containerized test target passes.
 | R371 | Remove redundant PowerShell 7 compression assembly loads from pilot package authority scripts | Pilot authority fixtures passed |
 | R356 | Centralize the shared libc `close` and `syscall` imports for the verifier build tasks while retaining task-specific native calls | `SharpProof.Package.Test`: 141 build-task, supervisor, and launcher tests passed |
 | R357 | Centralize `CopyLocalLockFileAssemblies` for the three Roslyn dependency-producing projects while preserving their package layouts | `SharpProof.Package.Test`: PackageLayoutSmokeTests 21 passed; `SharpProof.ArchitectureTest`: BoundaryEnforcementTests 13 passed |
+| R483 | Remove the second publication-metadata directory ensure after the first pass has queued the same paths | `SharpProof.Package.Test`: 4 publication BuildTaskTests passed |
 | R373 | Share compiler-probe option and path normalization helpers between generator and snapshot implementations | `SharpProof.Package.Test`: six compiler-probe tests passed |
 | R461 | Replace the interval modular-distance branch ladder with the existing `Normalize` helper | `SharpProof.Dataflow.Test`: 50 passed |
 | R462 | Remove the shadowed `modulus.IsOne` boundary normalization branch from `IntervalDomain.Create` | `SharpProof.Dataflow.Test`: 50 passed |
@@ -2745,10 +2746,12 @@ reference or vocabulary solely for line reduction.
 
 ### Status (part fifty-seven)
 
-R483 remains `pending` because its repeated filesystem validation is part of
-publication ownership and lock sequencing. R485 is applied: reset and acquire
-share initial filtering, canonicalization, topology, and metadata-alias checks,
-while Acquire still revalidates the captured paths after locking.
+R483 is `applied`: each pending marker directory is ensured during the initial
+ownership scan, so the later loop added no new validation or state transition;
+publication locks and all post-lock ownership checks remain unchanged. Four
+publication BuildTaskTests passed. R485 is applied: reset and acquire share
+initial filtering, canonicalization, topology, and metadata-alias checks, while
+Acquire still revalidates the captured paths after locking.
 R484 is applied: public path canonicalization and private mount parsing now
 share one already-canonical equality/prefix predicate.
 

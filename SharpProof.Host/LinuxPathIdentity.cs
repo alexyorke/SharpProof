@@ -548,11 +548,6 @@ public static partial class LinuxPathIdentity
             pending.Add((path, markerPath));
         }
 
-        foreach (var item in pending)
-        {
-            EnsurePublicationMetadataDirectory(item.MarkerPath);
-        }
-
         var created = new List<string>();
         var completed = false;
         try
