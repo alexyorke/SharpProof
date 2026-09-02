@@ -3111,10 +3111,13 @@ tracking gap from the other direction.
 
 ### Status (part sixty-seven)
 
-R509 is applied: callable result, creation, and assumption-marking paths now
-share one evidence projector with caller-specific used-state predicates. R507,
-R508, R510, and R511 remain pending; their callers retain distinct metadata,
-source-location, effect, and lowering semantics.
+R509 and R511 are applied: callable result, creation, and assumption-marking
+paths share one evidence projector with caller-specific used-state predicates;
+local, parameter, flow-capture, and instance references share one
+supported-domain/opaque fallback helper while local mutation rejection and
+distinct lookups remain explicit. R507, R508, and R510 remain pending because
+their metadata, source-location, and effect semantics differ at more
+boundaries.
 
 
 ## Second survey, part sixty-seven: coverage configuration - no findings

@@ -559,23 +559,17 @@ public sealed class RoslynOperationLowerer
                     FrontendAbstention.UnsupportedMutation);
             }
 
-            return _owner.IsSupportedValueDomain(operation.Type)
-                ? LoweredExpression.Exact(
-                    _owner.GetVariable(operation.Local, operation.Type))
-                : _owner.Opaque(
-                    operation,
-                    FrontendAbstention.UnsupportedType);
+            return LowerSupportedReference(
+                operation,
+                () => _owner.GetVariable(operation.Local, operation.Type));
         }
 
         public override LoweredExpression VisitParameterReference(
             IParameterReferenceOperation operation, LoweringContext argument)
         {
-            return _owner.IsSupportedValueDomain(operation.Type)
-                ? LoweredExpression.Exact(
-                    _owner.GetVariable(operation.Parameter, operation.Type))
-                : _owner.Opaque(
-                    operation,
-                    FrontendAbstention.UnsupportedType);
+            return LowerSupportedReference(
+                operation,
+                () => _owner.GetVariable(operation.Parameter, operation.Type));
         }
 
         public override LoweredExpression VisitFlowCapture(
@@ -588,22 +582,17 @@ public sealed class RoslynOperationLowerer
         public override LoweredExpression VisitFlowCaptureReference(
             IFlowCaptureReferenceOperation operation, LoweringContext argument)
         {
-            return _owner.IsSupportedValueDomain(operation.Type)
-                ? LoweredExpression.Exact(
-                    _owner.GetCapture(operation.Id, operation.Type))
-                : _owner.Opaque(
-                    operation,
-                    FrontendAbstention.UnsupportedType);
+            return LowerSupportedReference(
+                operation,
+                () => _owner.GetCapture(operation.Id, operation.Type));
         }
 
         public override LoweredExpression VisitInstanceReference(
             IInstanceReferenceOperation operation, LoweringContext argument)
         {
-            return _owner.IsSupportedValueDomain(operation.Type)
-                ? LoweredExpression.Exact(_owner.GetInstance(operation))
-                : _owner.Opaque(
-                    operation,
-                    FrontendAbstention.UnsupportedType);
+            return LowerSupportedReference(
+                operation,
+                () => _owner.GetInstance(operation));
         }
 
         public override LoweredExpression VisitDefaultValue(
@@ -1067,6 +1056,14 @@ public sealed class RoslynOperationLowerer
                 .First(static expression =>
                     expression.Classification.Abstention != FrontendAbstention.None)
                 .Classification.Abstention;
+        }
+
+        private LoweredExpression LowerSupportedReference(
+            IOperation operation, Func<IrTerm> exact)
+        {
+            return _owner.IsSupportedValueDomain(operation.Type)
+                ? LoweredExpression.Exact(exact())
+                : _owner.Opaque(operation, FrontendAbstention.UnsupportedType);
         }
 
         private LoweredExpression OpaqueOperand(
