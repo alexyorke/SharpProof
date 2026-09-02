@@ -1193,14 +1193,17 @@ foreach ($mapping in $collectorMappings) {
     }
 }
 
-$collectorOwners = @(
-    $collectorMappings |
-        ForEach-Object { [string]$_.owner } |
-        Select-Object -Unique)
-foreach ($owner in $collectorOwners) {
-    $ownerMappings = @(
-        $collectorMappings |
-            Where-Object { [string]$_.owner -eq $owner })
+$collectorMappingsByOwner = [ordered]@{}
+foreach ($mapping in $collectorMappings) {
+    $owner = [string]$mapping.owner
+    if (-not $collectorMappingsByOwner.Contains($owner)) {
+        $collectorMappingsByOwner[$owner] =
+            [Collections.Generic.List[object]]::new()
+    }
+    $collectorMappingsByOwner[$owner].Add($mapping)
+}
+foreach ($owner in $collectorMappingsByOwner.Keys) {
+    $ownerMappings = $collectorMappingsByOwner[$owner]
     $collectorLines.Add('')
     $declaration = if ($owner -eq 'ClaimManifestBuilder') {
         'internal sealed partial class'

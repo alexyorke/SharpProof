@@ -155,6 +155,8 @@ the smallest relevant containerized test target passes.
 | R846 | Accumulate fuzz exception coverage from the already-validated counters | `scripts/Test-SharpProofFuzzRunnerResult.ps1`: 26 fixtures passed |
 | R847 | Centralize the canonical container resource claim used by documentation mutations | `DocumentationSupportContractTests`: 22 mutation cases passed; 1 pre-existing clean-fixture docs failure |
 | R848 | Reuse the ordered validated diagnostic symbols for supported-list emission | diagnostic generator `-Verify` passed |
+| R849 | Project IR identifier aliases from the validated tag descriptor list | IR model generator `-Verify` passed |
+| R850 | Group compiler-artifact mappings once before owner-specific emission | compiler-artifact generator `-Verify` passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7395,5 +7397,25 @@ R848 is `applied`: supported-diagnostics lists now use the ordered symbols
 
 ### Status (part three hundred sixty)
 
-R849 is `deferred`: the mapping is stable and small, but deriving aliases from
-  the tag descriptors would remove a same-generator drift surface.
+R849 is `applied`: the generator now owns one tag/alias descriptor list and
+  projects both the IR tags and identifier aliases from it, preserving output.
+
+## Second survey, part three hundred sixty-one: R850 - repeated collector-mapping grouping scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R850 | **`Generate-CompilerArtifactModel.ps1` rescans all collector mappings once per owner.** After validating the complete mapping list, the generator projects owner names and applies `Select-Object -Unique`, then filters `$collectorMappings` with `Where-Object` for every owner before emitting each class. The same mapping rows are therefore traversed once to discover owners and again for each owner; an ordered grouping dictionary can preserve first-seen owner order and provide each owner mapping list directly. | `scripts/Generate-CompilerArtifactModel.ps1:1074-1083,1196-1217` |
+
+### Checked and not proposed (part three hundred sixty-one)
+
+- Mapping validation remains separate from output emission because it enforces
+  source/target uniqueness, owner-specific shapes, and alias policy.
+- Owner order should remain first-seen order if grouping is introduced; a
+  sorted grouping would change generated file order and is not proposed.
+- The mapping-kind-specific emitters remain distinct because enum,
+  reference-identity, and flags projections have different generated code.
+
+### Status (part three hundred sixty-one)
+
+R850 is `applied`: validated collector mappings are grouped once in first-seen
+  owner order, so emission no longer filters the full catalog for each owner.
