@@ -1,8 +1,14 @@
 using System.Security.Cryptography;
 
+#if SHARPPROOF_WORKER_PROTOCOL
+namespace SharpProof.Worker.Protocol;
+
+internal static class ProtocolHashEncoding
+#else
 namespace SharpProof.Ir;
 
 internal static class HashEncoding
+#endif
 {
     internal static string ToLowerHex(IEnumerable<byte> bytes)
     {

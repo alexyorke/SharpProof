@@ -14,13 +14,6 @@ $CatalogPath = Resolve-SharpProofPath $CatalogPath (
     Join-Path $repositoryRoot 'SharpProof.Projection.catalog.json')
 $catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json -Depth 100
 
-function TypeName([string]$Value, [string]$Context) {
-    if ($Value -notmatch '^[A-Za-z_(][A-Za-z0-9_?.<>, \[\]()]*$') {
-        throw "$Context is not an approved C# type: '$Value'."
-    }
-    return $Value
-}
-
 function Snippet([string]$Value, [string]$Context) {
     if ([string]::IsNullOrWhiteSpace($Value) -or $Value -match '[\r\n]') {
         throw "$Context must be a nonblank single-line C# snippet."

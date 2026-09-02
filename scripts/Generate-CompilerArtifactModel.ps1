@@ -34,14 +34,6 @@ if (-not [IO.File]::Exists($ProtocolSchemaPath)) {
     throw "Protocol schema not found: $ProtocolSchemaPath"
 }
 
-function Assert-TypeName {
-    param([string]$Value, [string]$Context)
-
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_?.<>, \[\]]*$') {
-        throw "$Context is not a supported C# type: '$Value'."
-    }
-}
-
 function Get-MetadataRowExpression {
     param([string]$Role, [string]$Member)
 

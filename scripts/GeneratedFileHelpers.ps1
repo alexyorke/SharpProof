@@ -110,7 +110,7 @@ function Assert-TypeName
 {
     param([string]$Value, [string]$Context)
 
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_?.<>, \[\]]*$')
+    if ($Value -notmatch '^[A-Za-z_(][A-Za-z0-9_?.<>, \[\]()]*$')
     {
         throw "$Context is not an approved C# type: '$Value'."
     }
@@ -137,7 +137,7 @@ function Identifier([string]$Value, [string]$Context)
 
 function TypeName([string]$Value, [string]$Context)
 {
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_?.<>, \[\]]*$')
+    if ($Value -notmatch '^[A-Za-z_(][A-Za-z0-9_?.<>, \[\]()]*$')
     {
         throw "$Context is not an approved C# type: '$Value'."
     }

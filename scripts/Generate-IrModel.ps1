@@ -69,19 +69,6 @@ function Get-OptionalBoolean
     return [bool]$member.Value
 }
 
-function Assert-TypeName
-{
-    param(
-        [Parameter(Mandatory = $true)][string]$Value,
-        [Parameter(Mandatory = $true)][string]$Context
-    )
-
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_?.<>, ]*$')
-    {
-        throw "$Context is not an approved C# type: '$Value'."
-    }
-}
-
 $cSharpKeywords = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::Ordinal)
 @(
