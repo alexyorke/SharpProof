@@ -2116,7 +2116,7 @@ reconciliation scripts across `scripts/CSharpSourceMetrics.ps1`, `scripts/Test-P
 | ID | Finding | Evidence |
 |---|---|---|
 | R440 | **`CSharpSourceMetricsEngine.Measure` executes dual full-tree AST traversals and uses reflection-based syntax kind conversions.** `scripts/CSharpSourceMetrics.ps1:69-152` iterates over `root.DescendantTokens()` on lines 72-78 and subsequently iterates over `root.DescendantNodes()` on lines 84-142, performing two separate full-tree traversals per file. In addition, `Get-CSharpSyntaxKindName` (`lines 48-57`) and `scripts/GeneratedFileHelpers.ps1:231, 245` convert tokens and node types to strings via `[Enum]::GetName` and reflection rather than comparing integer raw kinds directly. Combining node/token counting into a single traversal and using integer kind checks eliminates repetitive tree walks and string allocations. | `scripts/CSharpSourceMetrics.ps1:48-57, 69-152`; `scripts/GeneratedFileHelpers.ps1:228-261` |
-| R441 | **`Test-ProductionCSharpComplexity.ps1` reads files before checking exclusions and performs redundant second disk reads for line counts.** In `scripts/Test-ProductionCSharpComplexity.ps1:131-168`, line 132 loads every file from disk with `Get-Content -Raw` prior to checking `if ($path.Replace('\', '/') -in $approvedGeneratedFiles)` on line 133, discarding generated files after I/O. Then on line 157, line count measurement invokes `$lines = @(Get-Content -LiteralPath $path)`-a second disk read of the same file. Checking exclusions upfront and deriving line counts from the in-memory string eliminates a redundant disk read per file. | `scripts/Test-ProductionCSharpComplexity.ps1:131-168` |
+| R441 | **`Test-ProductionCSharpComplexity.ps1` reads files before checking exclusions and performs redundant second disk reads for line counts.** In `scripts/Test-ProductionCSharpComplexity.ps1:131-168`, line 132 loads every file from disk with `Get-Content -Raw` prior to checking `if ($path.Replace('\', '/') -in $approvedGeneratedFiles)` on line 133, discarding generated files after I/O. Then on line 157, line count measurement invokes `$lines = @(Get-Content -LiteralPath $path)`—a second disk read of the same file. Checking exclusions upfront and deriving line counts from the in-memory string eliminates a redundant disk read per file. | `scripts/Test-ProductionCSharpComplexity.ps1:131-168` |
 | R442 | **`Test-SharpProofCoverage.ps1` performs redundant string splitting, sorting, and unreachable verification of module identities.** In `scripts/Test-SharpProofCoverage.ps1:408-424`, lines 409-415 verify exact string equality `[string]$authorityNode.modules -cne $expectedModuleIdentityText` (which is already sorted). Lines 416-424 immediately follow by splitting `$authorityNode.modules` by comma, executing `Sort-Object`, rejoining into a string, and asserting inequality again. Because the first condition guaranteed exact match, lines 416-424 are dead defensive array allocations and sorts. | `scripts/Test-SharpProofCoverage.ps1:408-424` |
 | R443 | **`Test-SharpProofCoverage.ps1` executes a redundant second-pass sequence-point traversal for aggregate coverage.** `Measure-Coverage` (`scripts/Test-SharpProofCoverage.ps1:515-542`) is called per-project in lines 547-588 to calculate project metrics. On line 592, the script calls `Measure-Coverage -Paths $productionPaths`, re-traversing every sequence point in all files a second time. Because production projects partition the source file universe without overlap, aggregate covered/coverable lines can be accumulated directly during the first loop, eliminating repository-wide second-pass traversal. | `scripts/Test-SharpProofCoverage.ps1:515-542, 544-596` |
 | R444 | **Per-file Git diff subprocess spawning in changed-TCB coverage calculation.** In `scripts/Test-SharpProofCoverage.ps1:670-727`, lines 673-708 spawn an individual `git diff` process for each changed file in a loop. In addition, `$changedMetadataFiles` is filtered with `Where-Object` on line 711 while lines 719-727 repeat the exclusion check. Spawning a single `git diff` with all changed paths and recording metadata inline eliminates multi-process invocation latency and duplicate set filtering. | `scripts/Test-SharpProofCoverage.ps1:670-727` |
@@ -4692,3 +4692,1064 @@ while removing the repeated Roslyn lookup. R737 completed: synthetic corpus
 construction now creates the baseline once and appends each variant to a builder,
 preserving variant order and alpha-rename suppression without the temporary array
 or repeated whole-array scans.
+
+## Second survey, part two hundred fifty-four: R738, and four dead-code searches that found nothing
+
+Two dead-code sweeps and a compiler-visible-property census. The sweeps are
+negative results worth recording; the census produces one finding.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R738 | **The analyzer's compiler-visible property vocabulary is declared four times in three groupings, and the two copies that are not gated are the repository's own consumer configurations.** The nine properties forwarded to the analyzer are partitioned **disjointly and exactly** between the two shipping packages - `SharpProof.Package/buildTransitive/SharpProof.props:14` declares three (`SharpProofProfile`, `SharpProofFeatures`, `SharpProofSpecificationPacks`) and `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:31` declares the other six, with empty intersection. `SharpProof.AnalyzerConsumer.props:12` and `eng/self-application/SharpProof.SelfApplication.props:33` each restate **all nine, byte-identically to each other**. `ArchitectureTests:743-901` freezes the union across the five shipping build files against `eng/acceptance/preview-interface.v1.json`, and that scoping is deliberate and correct - but it means the two internal files are outside the gate entirely. So the invariant "the repo's own consumer configuration sees exactly what a real consumer sees" is stated twice, in full, and checked nowhere. Adding a tenth property to the shipping partition updates the frozen contract and passes; the smoke consumer (`SharpProof.Smoke.Net472`, which imports `SharpProof.AnalyzerConsumer.props`) and the self-application build would silently not see it, so the repository would stop dogfooding the property it just shipped. **There is no divergence today** - both retired properties are absent from both files, and the nine match - which is the right moment to note it. The fix is not a fourth declaration: it is deriving the two internal lists from the two shipping ones, or extending the existing test to assert equality between the union of the shipping partition and each internal file. | `SharpProof.Package/buildTransitive/SharpProof.props:14`; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:31`; `SharpProof.AnalyzerConsumer.props:12`; `eng/self-application/SharpProof.SelfApplication.props:33`; `SharpProof.ArchitectureTest/ArchitectureTests.cs:766-901`; `SharpProof.Smoke.Net472/SharpProof.Smoke.Net472.csproj:10`; `eng/acceptance/preview-interface.v1.json` (26 active, 2 retired) |
+
+### Checked and not proposed (part two hundred fifty-four)
+
+- **There is no dead code in production C# by an unreferenced-method measure.** A
+  scan of every method declaration in the 23 production assemblies against a
+  repository-wide identifier index found 27 names occurring exactly once - and all
+  27 are framework dispatch targets, not dead code: 12 `public override Visit*`
+  overrides of Roslyn's `OperationVisitor` in `RoslynOperationLowerer`, 14
+  `ISignatureTypeProvider<ScalarType,...>` implementation methods in
+  `CompilerImplementationIlSummaryLowerer`, and `BoundedReadStream.Seek`. **Nothing
+  else is unreferenced.** This is worth recording next to R310: the production
+  complexity ratchet has no slack of this kind to reclaim, so a future attempt to
+  lower the measured figures must come from restructuring, not deletion.
+- **There are no dead `SharpProof*` MSBuild properties.** Three candidates survived
+  a `$(...)`-and-condition search and all three are read by mechanisms that search
+  does not cover: `SharpProofAnalyzerRole` is `<Analyzer>` item metadata consumed by
+  `PerformanceGate.cs:1398,1768` and `Test-SharpProofPackageConsumers.ps1:245,258`;
+  `_SharpProofCompilationTargetFramework` and `_SharpProofProjectDirectory` are
+  `CompilerVisibleProperty` entries read by `FinalCompilationCollector.cs:8-9` as
+  `build_property.*` options. Recorded so none of the three is later filed as
+  unused.
+- **The three-key option probe is deliberate alias tolerance, not dead code.**
+  `AnalyzerConfiguration.TryGet:199-221` probes `option.Key`,
+  `"build_property." + option.Key`, and `"build_property." + option.BuildPropertyName`
+  for every option. Only the first and third can come from MSBuild, but the second
+  is reachable from a hand-written `.editorconfig` line, so it is a tolerated
+  spelling rather than an unreachable branch. The same applies to
+  `TryGetRetiredMode:178-197`.
+- **The retired `SharpProofMode` option is defended three independent ways** and
+  none of the three should be removed as redundant:
+  `SharpProof.ConsumerContract.props:16-17` raises an MSBuild `<Error>`
+  `BeforeTargets="CoreCompile"`; the name is absent from every
+  `CompilerVisibleProperty` list, which `ArchitectureTests:861` asserts positively
+  for each retired property; and `AnalyzerConfiguration` reports it as a removed
+  option for the analyzer-config spelling that survives both. The layers cover
+  different entry points, and `ArchitectureTests:862-865` additionally requires the
+  string `"<name> was removed"` to appear in the shipping build surface. This is the
+  strongest retirement mechanism found in the survey.
+- The `ArchitectureTests` frozen-surface check should **not** be widened to include
+  `SharpProof.AnalyzerConsumer.props` or `SharpProof.SelfApplication.props`. Its
+  correctness depends on covering exactly what ships; R738 asks for a second,
+  separate assertion, not a longer file list.
+
+### Status (part two hundred fifty-four)
+
+R738 is `pending` and is small. Its interest is that it is the fourth
+independent instance this session of the shape named in R730 - an authority that is
+correct and gated, with an ungated second declaration of the same fact beside it -
+and the first where the ungated copy is the repository's own dogfooding
+configuration, so a drift would degrade the evidence the project produces about
+itself rather than break a build.
+
+## Second survey, part two hundred fifty-five: R739 - duplicate substitution snapshots
+
+The IR utility pass found one more local allocation that its own comment makes
+especially easy to overlook: the code correctly snapshots a mutable view, but
+then builds a second container from that snapshot.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R739 | **`IrSubstitution.Substitute` materializes the replacement map twice.** The `IReadOnlyDictionary` input is first copied to `replacementSnapshot` with `ToArray()`, then copied again into `replacementMap` with `ToDictionary()`, and the array is retained only for validation and the empty check. A single `ToDictionary` enumeration is already the required one-time snapshot: validate that dictionary's entries and use its `Count`, preserving duplicate-key failure, caller-mutation isolation, type checks, and the empty-map fast path. This removes one array allocation and one full copy for every substitution call without changing the explicit non-immutable-view boundary documented immediately above the code. | `SharpProof.Ir/IrSubstitution.cs:31-53` |
+
+### Checked and not proposed (part two hundred fifty-five)
+
+- This does not remove the replacement dictionary. `Rewrite` performs keyed
+  variable lookup throughout the IR DAG, so the dictionary remains the correct
+  representation after validation.
+- The one-variable overload's one-entry dictionary is a separate API convenience;
+  R739 concerns the avoidable snapshot array inside the general overload.
+- `IrSubstitution` still needs to validate the replacement values against the
+  factory before rewriting. Removing that validation would change the fail-closed
+  type boundary and is not a reduction candidate.
+
+### Status (part two hundred fifty-five)
+
+R739 completed: `IrSubstitution` now materializes the caller's replacement map
+once, validates and counts that snapshot directly, and preserves the existing
+duplicate-key, type-check, empty-map, and caller-mutation behavior.
+
+## Second survey, part two hundred fifty-six: R740-R741 - the PowerShell twin of R724
+
+Re-measuring PowerShell duplication across all 100 tracked `.ps1`/`.psm1` files.
+Both findings are the same shape as R724 and R730 in the other language, and the
+first one has a correlation that identifies the cause exactly.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R740 | **Nine raw `ProcessStartInfo` constructions across eight PowerShell files repeat the same preamble, and the three that drop `CreateNoWindow` are precisely the three the shared module cannot serve.** All nine set `UseShellExecute = $false`; eight set `RedirectStandardOutput`; **six set `CreateNoWindow = $true` and three do not** - and the three are `Invoke-SharpProofPackageTests.ps1:617`, `Invoke-SharpProofSemanticTests.ps1:430`, and `Invoke-SharpProofTrustedMutationsParallel.ps1:313`, the repository's three parallel *test* schedulers. The correlation is not coincidence. `SharpProof.ContainerExecution.psm1` exports `Invoke-SharpProofDotnetInvocation`, which is **synchronous** - it shells to `Invoke-SharpProofDotnet.ps1` and waits - so a scheduler that needs concurrent `Process` handles cannot use it and writes its own. Yet the module **already contains the asynchronous form**: `Invoke-SharpProofParallelDotnetBuilds:361-420` builds the identical preamble at line 412, correctly including `CreateNoWindow = $true`, for parallel *builds*. The capability exists, is right, and is not reachable for tests, so it was rewritten three times and each rewrite lost the same option. `Test-SharpProofPilots.ps1:146-151` is a fourth variant that sets `CreateNoWindow` but redirects neither stream. Together with R724's 55 C# sites this is roughly 64 process-start sites across the repository, in two languages, each with a shared helper covering only the synchronous case. | `scripts/SharpProof.ContainerExecution.psm1:322,361-420` (async form, `CreateNoWindow` at 415); `scripts/Invoke-SharpProofPackageTests.ps1:617-622`; `scripts/Invoke-SharpProofSemanticTests.ps1:430-435`; `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1:313-318`; `scripts/Test-SharpProofPilots.ps1:146-151`; `scripts/Invoke-SharpProofDotnet.ps1`; `scripts/Invoke-SharpProofLoop.ps1:27-33`; `scripts/Test-SharpProofCoverage.ps1:73-79` |
+| R741 | **`Invoke-SharpProofPackageTests.ps1` and `Invoke-SharpProofSemanticTests.ps1` share 107 lines in blocks of six or more, and the shared part is the scaffolding around a core they already share correctly.** Both import `SharpProof.ContainerExecution.psm1` and both call `New-SharpProofIsolatedTestOutput` for the hard part - the hard-linked, per-shard instrumented output tree. What is duplicated is everything surrounding it: the coverage argument validation (`:59-67` / `:47-55`, "CoverageSettings and CoverageResultsDirectory must be supplied together", nine lines byte-identical), the resolution of both paths (`:68-80` / `:59-71`, thirteen lines), the `.sharpproof-coverage-output-<guid>` root construction and its deletion in `finally` (`:88-96` / `:74-82`), the prior-timing-file loop over `@($canonicalTimingOutput, $timingOutput)` under `-Fast` (`:279-288` / `:138-147`), the parameter block and `Set-StrictMode`/`$repositoryRoot` preamble (eleven lines), and the `bin/<Configuration>/net9.0` output-layout convention spelled out in both. That is 107 of 838 and 593 lines. The two schedulers genuinely differ - one dequeues shards with an exclusivity rule, the other picks slot-weighted tasks - and **that difference should be preserved**; the finding is that the coverage plumbing wrapped around both is not scheduler-specific and is the natural next export from a module both files already import. | `scripts/Invoke-SharpProofPackageTests.ps1:18-96,279-288,617-660`; `scripts/Invoke-SharpProofSemanticTests.ps1:18-82,138-147,430-473`; `scripts/SharpProof.ContainerExecution.psm1:499-553` |
+
+### Checked and not proposed (part two hundred fifty-six)
+
+- **PowerShell duplication is now concentrated, not diffuse.** Across 100 files
+  there are only 36 eight-line windows appearing in two or more files, and they
+  cluster into four pairs: the R741 pair (17 windows),
+  `Invoke-SharpProofGateEvidence.ps1` / `Test-SharpProofDependencyAudit.ps1` (7),
+  `Assert-SharpProofFuzzRunnerResult.ps1` / `SharpProof.FuzzEvidenceLifecycle.ps1`
+  (5), and `Invoke-SharpProofSemanticTests.ps1` /
+  `Invoke-SharpProofTrustedMutationsParallel.ps1` (3). Everything else is one or
+  two windows. The generator family, which earlier parts measured as the largest
+  source of PowerShell repetition, no longer appears above threshold except for a
+  single window shared by `Generate-CompilerArtifactModel.ps1` and
+  `Generate-ProtocolModel.ps1` - the schema-preamble validation already described
+  by R459.
+- The `Assert-SharpProofFuzzRunnerResult.ps1` / `SharpProof.FuzzEvidenceLifecycle.ps1`
+  pair shares a ~30-line bounded JSON reader - a `FileStream` opened
+  `Open`/`Read`/`Read`, a length check against 1 MiB, a manual read loop to fill
+  the buffer, strict UTF-8 decoding, and `JsonDocument.Parse`. It is worth folding
+  into one helper, but it is **not** proposed separately here: it is the same item
+  as the fuzz-evidence duplication already filed, and splitting it across two IDs
+  would double-count.
+- `Invoke-SharpProofDotnetInvocation` is **not** at fault and should not be
+  reshaped. It is correct for the synchronous case, which is the majority of
+  callers. R740 asks for an additional exported async form, extracted from
+  `Invoke-SharpProofParallelDotnetBuilds`, not for a change to the existing one.
+
+### Status (part two hundred fifty-six)
+
+R740 is `complete`: `New-SharpProofParallelProcessStartInfo` now owns the
+parallel-process preamble, argument population, environment propagation, and
+hidden-window/stream-redirection defaults for the build, package-test,
+semantic-test, and trusted-mutation schedulers. The scheduling policies remain
+local, and the architecture scheduler roster was brought back into sync with
+the fixture set while validating the change. R741 is `partially applied`: the
+two schedulers now share coverage validation/path resolution, isolated-root
+creation and cleanup, and collector argument construction. Their parameter
+blocks, scheduler-specific timing histories, and output-layout choices remain
+local because those parts carry different contracts.
+
+## Second survey, part two hundred fifty-seven: R742 - repeated primary-constructor syntax tests
+
+The effects layer has one small duplicated Roslyn-shape predicate in a shared
+ownership helper. The two callers ask the same question at different semantic
+entry points.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R742 | **`PrimaryConstructorParameterOwnership` repeats the declaring-syntax walk for the same primary-constructor parameter shape.** `IsReceiverBacked` enumerates `parameter.DeclaringSyntaxReferences`, parses each reference, and accepts a `ParameterSyntax` whose grandparent is a `TypeDeclarationSyntax`; `IsPositionalRecordProperty` repeats the enumeration, parse, and grandparent test with the narrower `RecordDeclarationSyntax`. `RecordDeclarationSyntax` derives from `TypeDeclarationSyntax`, and the second method already requires `property.ContainingType.IsRecord`, so a shared `IsPrimaryConstructorParameter` predicate can own the one syntax walk while the public methods retain their separate receiver/property semantics. This removes duplicated Roslyn traversal and prevents the two tests from drifting as primary-constructor syntax evolves. | `SharpProof.Effects/PrimaryConstructorParameterOwnership.cs:5-42` |
+
+### Checked and not proposed (part two hundred fifty-seven)
+
+- The containing-type checks must remain separate. Receiver-backed ownership
+  rejects static methods, same-constructor calls, and cross-type calls; positional
+  record-property ownership additionally requires an implicitly declared getter.
+- The shared predicate should return only the syntax-shape fact. It should not
+  infer ownership or replace the existing symbol-equality guards.
+- This is distinct from R388's captured-local classification overlap; neither
+  finding proposes a broader symbol-cache that could cross compilation sessions.
+
+### Status (part two hundred fifty-seven)
+
+R742 completed: receiver and positional-record ownership now share one
+primary-constructor syntax-shape helper while retaining their separate symbol,
+record, getter, and ownership guards.
+
+## Second survey, part two hundred fifty-eight: R743-R744, and a refinement to R733
+
+The repository has **two** diagnostic-identifier vocabularies. One is generated
+from a catalog and gated four ways. The other is raw string literals.
+
+### Refinement to R733
+
+R733 recorded that `SharpProof.Analyzer` suppresses `RS2002;RS2003` while being
+the only project carrying `AnalyzerReleases.Shipped.md` and
+`AnalyzerReleases.Unshipped.md`. That observation stands, but it needs a
+correction that changes its weight: **a hand-written replacement gate exists and is
+stronger than the suppressed rules.**
+`SharpProof.Analyzer.Test/AnalyzerArchitectureTests.cs:231-280` parses both release
+files, requires `Shipped` to be empty, asserts `unshipped.Keys` is equivalent to
+the runtime `SupportedDiagnostics` ids, pins the count at 13, and then compares
+category, severity, and notes per descriptor. Verified independently here: the
+release file's 13 ids and the `analyzer` catalog's 13 ids match exactly in both
+directions. So the suppression is deliberate and covered. R733's release-tracking
+half should be read as "three projects take three positions with nothing recording
+why", not as "the check is missing" - and any action on it must not remove this
+test.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R743 | **The launcher diagnostic vocabulary is raw string literals in four production assemblies, with no shared constant, while the analyzer's thirteen ids are generated from a catalog.** `SP0047` and `SP0048` are user-visible diagnostics emitted by the verifier launcher rather than by Roslyn - `docs/diagnostic-examples.md:222` states this deliberately - so their absence from the descriptor catalog is correct and is **not** the finding. The finding is that the pair is then written out by hand at every site that produces, validates, parses, or documents it: `SharpProof.Worker.Launcher/Program.cs:474` emits `"SP0048"`; `SharpProof.Worker.Launcher/SarifProjection.cs:41` emits `"SP0048"` again for the SARIF channel; `SharpProof.Host/VerifierDiagnosticTransport.cs:93` validates `diagnostic.Code is not ("SP0047" or "SP0048")`; `SharpProof.BuildTasks/RunVerifier.cs:1170-1176` parses both, spelling **each id twice per row** - once as `Code` and once inside the marker string - for eight literals in one four-row table; and `scripts/Test-SharpProofReadme.ps1:414,522` hard-codes the pair a fifth time. A search for a `const string` bound to either id finds nothing. Adding a third launcher diagnostic means finding all five sites unaided, and `BoundaryEnforcementTests.DiagnosticDescriptorsComeOnlyFromTheGeneratedCatalog:303-347` cannot help: it is scoped to `SharpProof.Analyzer.Core` and `SharpProof.Meta.Analyzers`, so `SharpProof.BuildTasks`, `SharpProof.Host`, and `SharpProof.Worker.Launcher` are outside it entirely. | `SharpProof.Worker.Launcher/Program.cs:474`; `SharpProof.Worker.Launcher/SarifProjection.cs:41`; `SharpProof.Host/VerifierDiagnosticTransport.cs:93`; `SharpProof.BuildTasks/RunVerifier.cs:1170-1176`; `scripts/Test-SharpProofReadme.ps1:414,522`; `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:303-347`; `eng/diagnostics/diagnostic-descriptors.v1.json` (13 analyzer ids, no SP0048) |
+| R744 | **One SP0048 message is rendered twice, by two different mechanisms, into two machine-read output channels.** `Program.cs:472-476` builds it with `FormattableString.Invariant` over an interpolated string for the MSBuild channel. `SarifProjection.cs:41-46` rebuilds the identical text by string concatenation for the SARIF channel, and both recompute `User + Trusted` independently. The two agree today, character for character, so a consumer diffing MSBuild output against the SARIF report sees one message; nothing keeps that true. The renderings are also not equivalent in kind: one is **explicitly culture-invariant** and the other relies on ambient `int.ToString()`, so the invariance guarantee that was thought worth stating in one channel is simply absent in the other. For a product whose output is evidence, two hand-maintained spellings of one diagnostic message in two machine-read channels is the wrong number. | `SharpProof.Worker.Launcher/Program.cs:470-478`; `SharpProof.Worker.Launcher/SarifProjection.cs:36-46` |
+
+### Checked and not proposed (part two hundred fifty-eight)
+
+- **`SP0048`'s absence from the analyzer descriptor catalog is correct**, documented
+  at `docs/diagnostic-examples.md:220-222` ("a verifier-launcher diagnostic, not a
+  Roslyn analyzer descriptor"), and gated on the documentation side by
+  `Test-SharpProofReadme.ps1:522`, which requires a help anchor for each launcher
+  diagnostic. Do not propose adding it to `diagnostic-descriptors.v1.json`; R743
+  asks for a shared constant, not a catalog entry.
+- **`SP0047` legitimately exists in both worlds.** It is an analyzer descriptor id
+  at `GeneratedDiagnosticDescriptors.generated.cs:124` *and* a launcher diagnostic
+  parsed by `RunVerifier`. That is by design - the same condition is reported by
+  the in-process analyzer and by the out-of-process verifier - and the two are not
+  duplicate definitions of one thing. Only the literal spelling of the id at the
+  launcher sites is at issue.
+- **The analyzer id vocabulary itself is exemplary and needs nothing.** Thirteen
+  ids, one catalog, one generated descriptor file, and four independent gates:
+  generation staleness via `-Verify`, `DiagnosticDescriptorsComeOnlyFromTheGeneratedCatalog`
+  forbidding hand-written `DiagnosticDescriptor` construction outside the generated
+  file, `DiagnosticDescriptorCatalogAssertions` comparing runtime descriptors to the
+  catalog from three test projects, and `AnalyzerArchitectureTests` comparing the
+  release file. Cite this as the target shape for R743.
+
+### Status (part two hundred fifty-eight)
+
+R743 is `complete` for the production C# and README-validation paths: the two
+launcher ids now have one shared vocabulary, including the verifier marker
+parser, transport validation, launcher/SARIF projections, and README checks.
+Analyzer descriptor literals and the independent analyzer-authority check remain
+separate intentionally because they belong to the Roslyn descriptor/catalog
+boundary. R744 is `complete`: MSBuild and SARIF now call one invariant shared
+renderer for the SP0048 message, so the two machine-read channels cannot drift.
+
+## Second survey, part two hundred fifty-nine: R745 - repeated response-summary scans
+
+The protocol response assembler has a separate local form of the same repeated
+enumeration pattern already seen in its classification helpers: summary fields
+are derived independently from arrays that are already materialized.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R745 | **`WorkerResultAssembler.Create` scans the same result arrays separately for each summary component.** After materializing `callables` and `claims`, it groups `claims` once for `OutcomeCounts`, groups the same `claims` again for `ReasonCounts`, and passes both arrays to `SummarizeAssumptions`, which performs another concatenation/filter/grouping traversal. A single response-summary accumulator can count outcomes, reasons, and assumption identities while visiting each materialized result once, then retain the existing canonical sort in `WorkerProtocolJson.Canonicalize`. This is distinct from R527/R540, which concern classification and callable-projection scans; it targets construction of the response's summary and removes repeated work on every assembled worker response. | `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:8-40,108-127` |
+
+### Checked and not proposed (part two hundred fifty-nine)
+
+- The validation-side `WorkerProtocolJson.ValidateSummary` recomputation should
+  remain. It independently derives expected counts from untrusted response data;
+  reusing the producer's accumulator there would weaken the validation boundary.
+- Canonical sorting must remain after aggregation. Stable wire ordering is a
+  separate protocol requirement from efficient summary construction.
+- `CreateIncomplete`'s `ToLookup` is not included: it joins malformed claims to
+  manifest callables and has a different purpose from the summary aggregation.
+
+### Status (part two hundred fifty-nine)
+
+R745 is `complete`: `WorkerResultAssembler.Create` now builds outcome counts,
+reason counts, and assumption totals/conflict state with one accumulator pass
+over the materialized callable and claim arrays. Validation still recomputes its
+own summary independently at the trust boundary, and canonical sorting remains
+unchanged.
+
+## Second survey, part two hundred sixty: R746 - duplicate cache-path normalization
+
+The protocol path helper has a smaller form of repeated canonicalization. Its
+result is normalized after composition, so normalizing the project root first
+does not add a distinct boundary.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R746 | **`WorkerCachePath.Resolve` normalizes `projectDirectory` and then normalizes the composed path again.** The method first computes `root = Path.GetFullPath(projectDirectory)`, uses that only as the first operand of `Path.Combine`, and immediately wraps the result in a second `Path.GetFullPath`. For both the default `obj/SharpProof/cache` path and a configured path (including the rooted-path override behavior of `Path.Combine`), the final full-path call is the consumed canonicalization; composing from `projectDirectory` directly removes one normalization and one local variable. This is a narrow path-helper cleanup, not a proposal to drop the final absolute-path boundary. | `SharpProof.Worker.Protocol/WorkerCachePath.cs:5-14` |
+
+### Checked and not proposed (part two hundred sixty)
+
+- The final `Path.GetFullPath` must remain. It converts relative configured cache
+  paths to absolute paths and canonicalizes the default path.
+- Rooted configured paths still need `Path.Combine`'s existing override behavior;
+  the candidate changes only where the single final normalization occurs.
+- This is separate from R494 and R534, which concern repeated normalization in
+  publication invalidation and marker derivation, respectively.
+
+### Status (part two hundred sixty)
+
+R746 is `complete`: `WorkerCachePath.Resolve` now composes from the supplied
+project directory and performs only the final full-path normalization. The
+default and configured cache paths retain their existing rooted-path behavior.
+
+## Second survey, part two hundred sixty-two: R747, and R505 is fixed
+
+### Correction: R505 is resolved
+
+R505 recorded that `eng/container/entrypoint.sh` preserved ignored package inputs
+with a third `ls-files --others --ignored --exclude-standard -- nupkgs/` pass while
+`eng/container/loop-command.sh` had no `nupkgs` handling at all, despite ending in
+an unrestricted `sp "$@"` that accepts `package-consumers -PackageSource nupkgs`.
+**That is fixed.** `loop-command.sh:126-129` now captures the ignored package
+inputs into the source manifest and `:178-181` does the same for the target
+manifest, so the loop workspace and a container run now materialize the same
+source. The commit is `d08d1d8be`, "Align loop package inputs with container runs".
+Move R505 to the applied table. The finding below is what the fix left behind.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R747 | **The source-snapshot policy is implemented twice in two shell scripts, and only one of the two has a test that executes it.** "What constitutes the source" is four decisions - the tracked tree at `HEAD`, the working-tree diff captured with `--binary --full-index --no-ext-diff`, untracked-but-not-ignored paths from `ls-files --others --exclude-standard -z`, and ignored paths under `nupkgs/` from `ls-files --others --ignored --exclude-standard -z -- nupkgs/`. `entrypoint.sh:104-140` implements it inline for a disposable task clone; `loop-command.sh:126-129,178-207` implements it again through manifest files for the private loop workspace. Both also repeat `git clone --quiet --shared --no-checkout`, `git apply --binary --whitespace=nowarn`, `git config --global --add safe.directory`, and `printf '/artifacts\n' >> .git/info/exclude`. **The test coverage is asymmetric in kind, not just in amount.** `ContainerSourceCleanlinessTests` has four tests that *run* `entrypoint.sh` against real Git fixtures - `CleanAndDevelopmentInputsRemainAdmissible`, `GitBoundCommandAcceptsRepositoryWithDifferentOwner`, `GitBoundCommandPreservesIgnoredPackageInputs`, and `DevelopmentSnapshotPreservesDirtyDeletedAndUntrackedFiles`. `loop-command.sh` - 213 lines, the largest shell script in the repository, holding a PID lock protocol, a snapshot-root containment check, and stale-file reconciliation against two manifests - is **never executed by any test**. Its only coverage is substring matching on its own source text in `BuildSchedulingTests:186-196,289-320`: `Does.Contain("source_files_root")`, `Does.Contain("SHARPPROOF_LOOP_SNAPSHOT_ROOT")`, and an `IndexOf` ordering check on two literals. That kind of assertion passes whether or not the matched line is reachable. It is exactly why R505's gap could exist: `GitBoundCommandPreservesIgnoredPackageInputs` is the test for the very behaviour that was missing, and it only ever ran the other script. | `eng/container/entrypoint.sh:104-140`; `eng/container/loop-command.sh:126-129,178-207`; `SharpProof.ArchitectureTest/ContainerSourceCleanlinessTests.cs:70,108,127,187`; `SharpProof.ArchitectureTest/BuildSchedulingTests.cs:186-196,289-320`; commit `d08d1d8be` |
+
+### Checked and not proposed (part two hundred sixty-two)
+
+- **The two scripts should not be merged.** They materialize source for different
+  purposes - a disposable per-task clone under `/tmp` versus a persistent private
+  volume reconciled across runs - and `loop-command.sh` carries a lock protocol and
+  a snapshot mode that `entrypoint.sh` has no use for. R747 asks for the shared
+  *policy* to be expressed once (a sourced helper defining the three `ls-files`
+  passes and the diff flags) and for `loop-command.sh` to gain executable coverage,
+  not for the scripts to become one.
+- **`compose.yaml` is well factored and needs nothing.** It already uses YAML
+  anchors for the two cache volumes and for the common service body. The `dev` and
+  `loop` services do repeat eight lines - the `user:` override,
+  `DOTNET_CLI_USE_MSBUILD_SERVER`, `SHARPPROOF_ORIGIN_URL`, the two anchored volume
+  references, and an identical `command: ["dev", "-lc", "while sleep 1000; do :;
+  done"]` - which a third anchor would remove. This is **not** proposed: the two
+  services differ in their workspace volume and in three environment variables, a
+  further anchor would obscure that, and `BuildSchedulingTests:315-318` asserts
+  `SHARPPROOF_ORIGIN_URL` appears exactly twice, which is a deliberate pin on the
+  current shape.
+- `ContainerSourceCleanlinessTests.cs:372-411` is a **seventh** variant of the
+  process runner described in R724, adding an `environment` dictionary parameter to
+  the `(int ExitCode, string Output, string Error)` family. Already counted there;
+  noted because it is the variant a shared helper would need to support.
+
+### Status (part two hundred sixty-two)
+
+R747 is `pending`. The executable-coverage half is the valuable one and is
+independent of the deduplication half: `loop-command.sh` can be given the same
+fixture treatment `entrypoint.sh` already has without touching either script. Doing
+that first would also make the shared-policy extraction safe to attempt.
+
+## Second survey, part two hundred sixty-one: standing-defect re-verification, and CI is clean
+
+No new finding. This part re-verifies every defect this survey has left standing
+and closes two of them, then records two areas measured as having nothing to
+reduce.
+
+### Standing defects re-verified against HEAD
+
+- **R480 is fixed.** The container-contract gate no longer requires the literal
+  that applied R243 removed. `Test-SharpProofContainerContract.ps1:377-379` now
+  tests two patterns - `_RequireSharpProofCanonicalContainer` and
+  `SHARPPROOF_CONTAINER_CONTRACT` - and the third,
+  `/etc/sharpproof/container-contract\.json`, is gone.
+  `Directory.Build.targets:7` contains `SHARPPROOF_CONTAINER_CONTRACT`, so both
+  patterns match and the script no longer throws at HEAD. The fix is exactly what
+  R480 proposed: assert the property reference rather than the resolved value.
+  Move R480 to applied.
+- **R505 is fixed**, by commit `d08d1d8be`. See part two hundred sixty-two for
+  the detail and for R747, which is what the fix left behind.
+- **R301 stands, and is confirmed in more detail than when filed.**
+  `Invoke-SharpProofChangedTests.ps1:88-97` still builds each project's compiled
+  file set from `$xml.SelectNodes("//*[local-name()='Compile']")` over the
+  `.csproj` alone, so the six sources injected by `Directory.Build.props:64-108`
+  are invisible to it. The consequence is now traceable exactly: a change to
+  `eng/testing/TestRepository.cs` matches the `eng/` prefix at `:127`, which sets
+  `$scriptOrDocumentationImpact`, and `:196-198` translates that into
+  **`SharpProof.ArchitectureTest` alone**. It does *not* set `$globalImpact`, which
+  is the flag at `:146` that selects everything. `TestRepository.cs` is compiled
+  into every project matching `SharpProofTestProject`, so editing it changes the
+  source of nineteen test projects and reruns one.
+- **R310 stands.** `Test-ProductionCSharpComplexity.ps1:178-181` is still
+  `$expressionNodes -le $maximum... -and $decisionPoints -le ... -and $members -le
+  ...`, with no lower bound anywhere. Every reduction this ledger produces lowers
+  the measured values while the ceilings stay where they are, so the ratchet
+  loosens monotonically as the ledger is worked. Note this is now sharper than when
+  filed, because R738 established there is no dead code to reclaim: the measured
+  figures can only fall through deliberate restructuring, which is precisely the
+  kind of change a ratchet should re-pin after.
+- **R315 stands.** `impureState` still appears in exactly two files -
+  `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs` and
+  `SharpProof.Worker/EffectCounterexampleReplayer.cs` - and nowhere else. The
+  third occurrence of `WorkerEffectSet.ReadsCapturedState`, in
+  `CompilerWireMappings.generated.cs`, is the generated enum mapping, not a third
+  copy of the mask.
+
+Standing defects after this part: **R301**, **R310**, **R315**.
+
+### Checked and not proposed (part two hundred sixty-one)
+
+- **The GitHub Actions configuration has nothing to reduce.** Across seven
+  workflows and two composite actions - 567 lines - there are only three five-line
+  blocks appearing in two or more files, and all three are irreducible Actions
+  boilerplate: the `checkout` step with `fetch-depth: 0`, and two trigger blocks.
+  The composite-action mechanism is already carrying the real weight:
+  `./.github/actions/prepare-qualified-packages` is used **nine** times and
+  `security-reusable.yml` is called twice as a reusable workflow.
+- **Every third-party action is pinned to exactly one commit SHA, repository-wide,
+  with a version comment.** `actions/checkout` at eleven uses,
+  `actions/upload-artifact` at eight, `actions/download-artifact` at three, plus
+  `actions/stale`, `actions/dependency-review-action`, and `NuGet/login`. A search
+  for any action name bound to two different SHAs returns nothing. Do not propose
+  consolidating these pins; the repetition is the mechanism.
+- **The `SharpProof.Effects` traversal duplication needs no new item.** The
+  repository-wide duplicate-window scan run for R724 ranks
+  `ExceptionHandlerReachability.cs` / `UsingDisposalEffectResolver.cs` as the
+  single most duplicated pair in the C# tree, at thirteen shared twelve-line
+  windows. That pair is already the most thoroughly analysed in this ledger -
+  R285, R287, R306, R307, R313, and R386 - and R287 explicitly records that
+  merging the four `IsDefinitelyNull` implementations would change verdicts.
+  Nothing further should be filed against it; an eighth item would be
+  double-counting.
+
+### Status (part two hundred sixty-one)
+
+No new ID. Two standing defects closed, three re-verified with sharper evidence
+than when filed, and two areas measured as exhausted.
+
+## Second survey, part two hundred sixty-three: R748 - correcting R310, and the second ratchet
+
+### Correction: R310 overstates the problem
+
+R310 has been restated several times in this survey, including twice today, as
+"the ratchet loosens monotonically". **That is too strong and should not stand.**
+The `ceilingRationale` history in `eng/acceptance/contract.json` shows an active
+maintenance practice: ceilings are raised deliberately, each raise appends a dated
+sentence naming the logic that justified it, and the field records at least one
+explicit downward re-pin - *"2026-08-31 validation: the ratchet was refreshed to
+the audited canonical inventory after the accumulated analyzer, effect-flow,
+worker-protocol, corpus-publication, and manifest-bound timeout-promotion fixes;
+ceilings:218226/12839/5799."* Two later commits raised it to 218637/12874/5808 and
+then 218647/12875/5808, each with its own rationale sentence. So a human re-pinning
+discipline exists and is documented in-band. R310's mechanical observation - the
+comparison at `Test-ProductionCSharpComplexity.ps1:178-181` is `-le` only - is
+correct, but the conclusion drawn from it was not.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R748 | **Both ratchets are one-sided, refresh is manual and milestone-driven, and neither reports the headroom that would prompt a refresh - which is measurable right now.** The repository has two independent complexity ratchets and they share the shape. The repo-wide one compares `-le` against three ceilings in `contract.json`. The per-file one, `ArchitectureTests:2072-2110` over `eng/acceptance/algorithm-size-ratchets.json`, tests `if (fileExpressionNodes > entry.MaximumFileExpressionNodes)` across **16 files with 4 caps each**, and its only well-formedness assertion on those 64 numbers is `Is.Positive` (`:552-555`). Neither mechanism emits measured-versus-cap, so slack accumulates invisibly between hand-driven refreshes. **The current slack is demonstrable without running either gate.** The size-ratchet manifest was last touched by `8a4c836db` on 2026-09-01. Since that commit, **9 of its 16 files have changed, for a net of +117/-330 = -213 lines**, through commits whose titles are this ledger's own application work - `Remove unused abstract-domain operations`, `Simplify interval domain normalization`, `Share Roslyn reference lowering fallback`, `Share frontend unsupported value classification`, `Apply audited code reductions`. `IntervalDomain.cs` alone is +4/-79 and `SequenceCardinalityDomain.cs` is +0/-72; a 79-line deletion cannot leave a file's expression-node count unchanged, though the exact figure needs the Roslyn count the gate performs rather than the line delta measured here. Meanwhile the repo-wide ceilings moved **upward** twice after that date and were not refreshed. So the loop closes on itself: **applying this ledger is what creates the unreclaimed headroom, and nothing surfaces it.** The useful change is not a lower bound - that would fight the deliberate-raise workflow the rationale field documents - but reporting: have both gates emit measured values beside their caps, so a refresh is prompted by data instead of by remembering. `Test-ProductionCSharpComplexity.ps1` already builds a `-Json` result object carrying the measured counts, so the repo-wide half is nearly free. | `scripts/Test-ProductionCSharpComplexity.ps1:178-181,182-206`; `SharpProof.ArchitectureTest/ArchitectureTests.cs:508-560,2072-2110`; `eng/acceptance/algorithm-size-ratchets.json`; `eng/acceptance/contract.json` `productionComplexity` and 13 `productionCoordinatorComplexity.layers` entries; commits `8a4c836db`, `7293f09e0`, `e7aae6430`, `5c7189e9c`, `a070fc530` |
+
+### Checked and not proposed (part two hundred sixty-three)
+
+- **The `ceilingRationale` field is not bloat and must not be trimmed.** It is a
+  single very long string, which reads like an obvious consolidation target, but it
+  is the only in-band record of *why* each ceiling has its value, it is appended to
+  rather than rewritten, and `ArchitectureTests:530` asserts it is non-empty. A
+  later pass measuring line or character counts should leave it alone.
+- **The 13 `productionCoordinatorComplexity.layers` entries are a deliberate
+  per-layer subdivision**, not duplication of the three repo-wide ceilings. The
+  rationale explains it: *"each new semantic layer has its own narrow ratchet
+  below"*, and *"Assignment evaluation is separated from the core effect scanner so
+  both layers retain independent reviewable ceilings."* Their existence is the
+  answer to a problem, not an instance of one.
+- **The 16-path list in `AlgorithmLayerSizeRatchetManifestIsWellFormed:511-527` is
+  a second declaration of the manifest's own contents**, asserted by set equality
+  against it. That is the two-person rule already recorded as an anti-finding for
+  `eng/acceptance/Verify.ps1`, applied correctly: the test would catch a file
+  silently dropped from the manifest to dodge its cap. Do not propose deriving the
+  list from the file it checks.
+
+### Status (part two hundred sixty-three)
+
+R748 is `pending` and **supersedes R310**, which should be read through it
+rather than on its own; R310's mechanical observation stands and its
+"loosens monotonically" conclusion does not. The reporting change is small,
+touches no ceiling value, and would make the next refresh a response to evidence.
+Standing defects after this part: **R301**, **R315**, and R748 in place of R310.
+
+## Second survey, part two hundred sixty-four: R749-R750 - the consumer-fixture directories
+
+`samples/` and `eng/pilots/` are the two consumer-fixture trees. They are near
+twins in configuration and complete opposites in supply-chain posture, and neither
+fact is recorded anywhere.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R749 | **`samples/Directory.Build.props` and `eng/pilots/Directory.Build.props` share 17 of their 22 and 27 non-blank lines, and the five differences include two names for one concept.** Identical in both: `TargetFramework net8.0`, `LangVersion 12.0`, `Nullable enable`, `ImplicitUsings enable`, `Deterministic true`, `TreatWarningsAsErrors true`, `EnableNETAnalyzers false`, `NuGetAudit false`, `SharpProofFeatures all`, `OutputType Library`, and a `PackageReference Include="SharpProof" ... PrivateAssets="all"`. Both also import the same `SharpProof.Release.props` - **spelled with forward slashes in one and backslashes in the other**. The version property is the same value under two names: `SharpProofSamplePackageVersion` and `SharpProofPilotVersion`, both defaulting to `$(SharpProofPackageVersion)`, and only the pilot one is overridable. `SharpProofProfile` is `advisory` in both but conditional only in pilots, so a caller can retarget a pilot's profile and cannot retarget a sample's. **The sharpest split is invisible from either file**: "consumer fixtures do not use central package management" is achieved two entirely different ways - `eng/pilots/` gets a three-line `Directory.Packages.props` whose only purpose is to shadow the root's fourteen `PackageVersion` entries, while `samples/` has no such file and instead relies on the root `Directory.Packages.props` conditioning `ManagePackageVersionsCentrally` on `'$(SharpProofSamplePackageVersion)' == ''`, a hook that exists in the shared file solely for that one directory. Pilots additionally set the same property a second time in their own `Directory.Build.props:11`. One policy, three declarations, two mechanisms. Neither fixture tree imports the root `Directory.Build.props` - MSBuild discovery stops at the first file found walking up - which is correct and is why they restate the ten shared properties, but it is also why nothing keeps the two restatements in step. | `samples/Directory.Build.props`; `eng/pilots/Directory.Build.props`; `eng/pilots/Directory.Packages.props`; `Directory.Packages.props:4-7` |
+| R750 | **The five pilots are the only projects in the repository that reference third-party packages, and they are the only projects exempt from every supply-chain control the rest of the tree treats as fatal.** `Directory.Build.props:9-11,21` sets the strictest available posture - `NuGetAudit true`, `NuGetAuditMode all`, `NuGetAuditLevel low` - and promotes `NU1901;NU1902;NU1903;NU1904` to errors, so a single low-severity advisory fails the build. That posture covers a tree whose non-Microsoft dependencies are essentially nil. Meanwhile `eng/pilots/*` reference `Ardalis.GuardClauses 5.0.0`, `FluentValidation 12.1.1`, `OneOf 3.0.271`, `Polly 8.7.0`, and `Serilog 4.4.0` - the repository's entire third-party surface - under **five independent opt-outs**: `NuGetAudit false`; no `packages.lock.json`, so `RestorePackagesWithLockFile` and CI `RestoreLockedMode` do not apply; `ManagePackageVersionsCentrally false`, so each version is pinned inline in its own csproj rather than centrally; absence from `eng/release/third-party-components.json`, which covers only what ships inside the packages; and exclusion from `SharpProofProductionProject` by the `(samples|eng/pilots)` path regex. A search for any of the five package names outside `eng/pilots/` returns nothing - no audit list, no dependency contract, no script. The exemption is defensible, because pilots are adoption fixtures that do not ship, and `eng/pilots/README.md` does say they are "not product projects" that "pin real public libraries". **What is missing is any statement that they are therefore exempt, or from what.** The five opt-outs are five absences and negations in four files, and `samples/` carries the same `NuGetAudit false` without needing it, having no third-party references at all - so the one directory that could safely audit does not, and the one that cannot is silent about why. | `Directory.Build.props:9-11,21,35`; `eng/pilots/Directory.Build.props:11`; `eng/pilots/{ArdalisContracts,FluentValidationContracts,OneOfMixedStrict,PollyEffects,SerilogEffects}/*.csproj:3-8`; `eng/release/third-party-components.json`; `eng/pilots/README.md:1-6`; 47 `packages.lock.json` files against 60 projects |
+
+### Checked and not proposed (part two hundred sixty-four)
+
+- **The thirteen projects without a `packages.lock.json` are exactly the five
+  pilots and eight samples**, and no product or test project is missing one. The
+  gap is precisely the fixture set, not a leak. Recorded so the count 47-of-60 is
+  not later filed as incomplete lock coverage.
+- **Central package management itself is correctly configured and needs nothing.**
+  Fourteen `PackageVersion` entries, one file, `CentralPackageTransitivePinningEnabled`
+  conditioned on it, and `Microsoft.Z3 4.12.2` cross-checked against
+  `toolchain.json` by `Test-SharpProofContainerContract.ps1:396`. The only
+  duplication of a version string between the two is that Z3 pin, and it is gated.
+- **Samples referencing only SharpProof's own packages is correct**, not an
+  oversight: `samples/Library` references `SharpProof.Attributes` and
+  `SharpProof.Verifier`, `samples/Outcomes` references `SharpProof.Verifier`, and
+  the rest take only the `SharpProof` reference injected by their shared props. The
+  `MSBuildProjectName != 'Outcomes'` condition on that injection is deliberate.
+- The two fixture trees should **not** be merged into one directory or one props
+  file. They test different things - samples are analyzer-only smoke over
+  first-party packages, pilots run `SharpProofVerify true` against real third-party
+  libraries - and `SharpProofVerify` being pilots-only is the substantive difference
+  the shared lines obscure. R749 asks for the shared ten properties to have one
+  home and for the two version-property names to become one, not for the trees to
+  converge.
+
+### Status (part two hundred sixty-four)
+
+R749 is `pending` and is ordinary tidying with one real hazard inside it: the
+two mechanisms for disabling central package management mean a change to either
+`Directory.Packages.props` can affect one fixture tree and not the other, silently.
+R750 is `pending` and asks for a written policy rather than a code change; it is
+filed because a supply-chain exemption that exists only as five absences is the
+kind of thing that is re-discovered rather than remembered, and because the
+inversion - strictest audit where there is nothing to audit, none where the
+third-party surface actually is - reads as accident rather than decision.
+
+## Second survey, part two hundred sixty-five: R751 - duplicated portable IR call fixture
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R751 | **Two portable-IR codec tests construct the same call graph before exercising different identity cases.** `DecoderRejectsDocumentationOnlyCallIdentitySpoof` and `DecoderPreservesSuffixBoundCallIdentityRoundTrip` each create an `IrFactory`, the same static `Transform(System.Int32)` member, argument/result variables, one entry block, one call, one return, and the same encoded root list. The first test then replaces the member documentation id with an unrelated fully qualified id and expects decode to reject it; the second replaces it with the suffix-bound id, serializes/deserializes, and expects the round trip to preserve it. A private fixture builder returning `EncodedPortableIrGraph` can own only the common graph construction, leaving those intentionally different mutations, serialization boundary, and assertions in the tests. This removes a roughly 25-line drift surface without weakening either identity rule. | `SharpProof.Worker.Test/PortableIrGraphCodecTests.cs:375-403,412-442` |
+
+### Checked and not proposed (part two hundred sixty-five)
+
+- The two tests should remain separate. One proves that a documentation id cannot
+  spoof the call identity; the other proves that the permitted suffix-bound form
+  survives the JSON wire boundary. Sharing the graph fixture does not merge those
+  distinct validation assertions.
+- The encoded graph should remain mutable in each test. The mutation is the point
+  of both cases, so a helper that returned a fully decoded or sealed object would
+  hide the boundary under test rather than reduce meaningful setup.
+
+### Status (part two hundred sixty-five)
+
+R751 is `pending` and is a test-fixture reduction candidate; no implementation
+code was changed while recording it.
+
+## Second survey, part two hundred sixty-six: R752 - the one ungated authority file
+
+A census of every configuration and authority file in the repository against the
+test and script corpus, asking one decidable question: does anything read this
+file's contents? The answer is yes for 52 of 54. This part is about the exception.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R752 | **`eng/self-application/SharpProof.SelfApplication.props` is the only substantive authority file in the repository whose contents no test asserts, it is a third parallel copy of the consumer analyzer configuration, and the command that exercises it runs in no workflow.** Of 54 tracked `.props`, `.targets`, `.json`, `.editorconfig`, `.globalconfig`, `compose.yaml`, `global.json`, `NuGet.Config`, `.sln`, and `BannedSymbols.txt` files, **52 are named by a test under `*Test*.cs`, a script under `scripts/`, or `eng/acceptance/`**. The two that are not are `.gitattributes` - one line, `* text=auto eol=lf`, self-enforcing because its loss would make every generator's byte-exact `-Verify` fail loudly - and this file. **What it contains is the problem.** At `:33` it restates the nine-entry `CompilerVisibleProperty` list verbatim, which R738 records as needing to track the disjoint partition shipped by `SharpProof.props` (three) and `SharpProof.Verifier.props` (six); at `:36-40` it restates the `SharpProofAnalyzerRole` EntryPoint/Generator/Dependency vocabulary from R733; and it wires the source-built analyzer and generator the way `SharpProof.Package/buildTransitive/SharpProof.targets` wires the shipped ones. It is therefore the third copy of the configuration, alongside `SharpProof.AnalyzerConsumer.props` and the shipping pair - and the only copy outside `ArchitectureTests`' frozen-surface check, which is deliberately scoped to the five shipping build files. **Nothing runs it in CI either.** `self-apply` appears in no `.github/workflows/*.yml`; the commands the workflows invoke are `acceptance`, `coverage`, `mutation`, `nightly`, `pack`, `package-consumers`, `pilots`, `pr`, `release-*`, and `security`. `pr` expands to `pr-gates`, which does not include it, and `nightly` expands to mutation, dependency-audit, acceptance, and fuzz-nightly, which do not either. It runs only when a person types `sp self-apply`. So the least-verified copy of the most-duplicated configuration in the repository is the one whose entire purpose is to prove the project analyzes itself - and if it drifts from the shipping partition, the dogfooding silently stops covering whatever was added. | `eng/self-application/SharpProof.SelfApplication.props:33,36-40,62`; `scripts/Invoke-SharpProofContainer.ps1:4,132-145,157,244-266`; `.github/workflows/*.yml`; `SharpProof.ArchitectureTest/ArchitectureTests.cs:766-901`; `Directory.Build.targets:2-3` |
+
+### Checked and not proposed (part two hundred sixty-six)
+
+- **The file is not dead.** `Invoke-SharpProofContainer.ps1:203` passes
+  `-p:SharpProofSelfApplication=true` for the `self-apply` command and `:189`
+  passes `false` elsewhere, and `Directory.Build.targets:2-3` imports it under that
+  condition. It also carries its own `_SharpProofValidateSelfApplication` target at
+  `:62`, which is a partial in-band substitute for the missing test. R752 is
+  about verification and drift, not about removal.
+- **The `.editorconfig` per-file suppressions have no dead entries.** Nine file
+  globs carry eleven `dotnet_diagnostic.*.severity = none` rules, naming fifteen
+  files once the brace expansions are resolved, and **all fifteen files exist**. A
+  rename or deletion would have left a silently inert section; none has.
+- **Diagnostic severity is configured in five places and that is correct scoping,
+  not duplication.** `.globalconfig` sets repository-wide severities,
+  `Directory.Build.props:21` promotes four NuGet-audit codes and four style codes
+  to errors, `Directory.Build.targets:22` relaxes three for test projects,
+  `.editorconfig` scopes eleven suppressions to individual files, and ten `.csproj`
+  files carry a narrow `NoWarn`. Each mechanism has a scope none of the others can
+  express. Do not propose consolidating them.
+- `samples/Diagnostics/.globalconfig` sets `global_level = 100` and downgrades
+  SP0045 and SP0047 to warning for one sample. That is a fixture deliberately
+  demonstrating diagnostics, and the `global_level` is the documented way to
+  outrank the root `.globalconfig`. Correct as written.
+
+### Status (part two hundred sixty-six)
+
+R752 is `pending`. The cheap half is a test: `ArchitectureTests` already parses
+the five shipping build files and freezes their union, so asserting that this
+file's `CompilerVisibleProperty` list equals that union is a few lines in a place
+that already has the data loaded - and it is the same assertion R738 asks for on
+`SharpProof.AnalyzerConsumer.props`. The second half is a decision the ledger
+cannot make: whether a self-application lane that no automated pipeline runs should
+be wired into one.
+
+## Second survey, part two hundred sixty-seven: R753 - repeated analyzer test session factories
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R753 | **Analyzer tests carry several local `IAnalyzerSessionFactory` implementations for the same recording pattern.** `AnalyzerModeAndEffectTests.RecordingSessionFactory` and `RequiresReplaySoundnessTests.RecordingSessionFactory` both own a `ConcurrentDictionary<string, AnalyzerSemanticOutcome>`, create an `AnalyzerSession` with a callback that `AddOrUpdate`s by method name, and combine repeated outcomes through `AnalyzerSemanticOutcomes.Combine`; the former additionally records per-method counts and the created session. `NestedRequiresCallSiteTests.RecordingSessionFactory` repeats the same session-construction and outcome-combination protocol with a `MethodIdentity` key because that suite needs overload-safe lookup, while `AdvisoryActivationTests.RecordingSessionFactory` repeats the create-count-only factory shape. A shared test factory parameterized by the key projection and optional count/session recording can centralize the callback plumbing while leaving each suite's deliberately different query surface intact. This is test-only maintenance duplication, but it is a real drift surface: changes to outcome combination or factory lifecycle semantics currently need review in four files. | `SharpProof.Analyzer.Test/AnalyzerModeAndEffectTests.cs:3719-3780`; `SharpProof.Analyzer.Test/RequiresReplaySoundnessTests.cs:577-604`; `SharpProof.Analyzer.Test/NestedRequiresCallSiteTests.cs:1812-1863`; `SharpProof.Analyzer.Test/AdvisoryActivationTests.cs:475-492` |
+
+### Checked and not proposed (part two hundred sixty-seven)
+
+- The suites should not be forced onto one public production abstraction. Their
+  keys are intentionally different: method names are sufficient for the replay
+  tests, while nested-call tests need method kind and source span to distinguish
+  overloads. The reduction is about shared test plumbing or a common base helper,
+  not about weakening those identities.
+- `AdvisoryActivationTests`'s minimal create-count factory and the richer recording
+  factories need not be merged if optional state makes the helper harder to read.
+  The strongest mechanical target is the two string-keyed factories, with the
+  MethodIdentity variant an adjacent extension only if it remains smaller than its
+  local implementation.
+
+### Status (part two hundred sixty-seven)
+
+R753 is `pending` and is limited to analyzer test infrastructure; no implementation
+code was changed while recording it.
+
+## Second survey, part two hundred sixty-eight: R754 - repeated constructed-generic test fixture
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R754 | **Two constructed-generic binder tests duplicate the entire compilation and target-selection fixture.** `BindingCachePreservesConstructedMethodNullability` and `ClauseInventoryCachePreservesConstructedMethodNullability` each embed the same `Target.Echo<T>` source, the same two nullable call sites, call `CreateCompilation`, select `Target.Echo` with `GetConstructedTargets`, create a `ContractBinder`, and bind the two resulting symbols. Only the operation under test differs (`Bind` versus `GetClauseInventory`) and the result projection changes accordingly. A private fixture helper returning the compilation, constructed targets, and binder can own that setup while preserving the separate assertions about binding and clause-inventory caches. The companion-resolution test below has the same shape but intentionally uses a different interface/companion source, so it is an optional extension rather than part of the exact duplicate. | `SharpProof.Contracts.Test/ConstructedGenericContractTests.cs:328-405` |
+
+### Checked and not proposed (part two hundred sixty-eight)
+
+- The two cache tests should remain separate because they exercise different
+  `ContractBinder` entry points and therefore different cache layers. Sharing
+  their source/target fixture does not collapse those behavioral assertions.
+- The `SharedCompanionResolutionCachePreservesMethodNullability` test should not
+  be forced into the same source fixture: its interface and `[ContractFor]`
+  companion are the behavior under test. It is evidence of a related pattern,
+  not a reason to erase the distinction between direct and companion binding.
+
+### Status (part two hundred sixty-eight)
+
+R754 is `pending` and is limited to test-fixture setup; no implementation code was
+changed while recording it.
+
+## Second survey, part two hundred seventy: R756 - local Worker temporary-directory wrapper
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R756 | **`LinuxPublicationSetTests` reimplements the shared temporary-directory fixture already linked into `SharpProof.Worker.Test`.** The file's private `TemporaryDirectory` stores a path, creates `Path.Combine(Path.GetTempPath(), "SharpProof.PublicationSet." + Guid...)`, calls `Directory.CreateDirectory`, and deletes recursively in `Dispose`. `Directory.Build.props` already compiles `eng/testing/TempDirectory.cs` into `SharpProof.Worker.Test`; that helper uses the safer atomic `Directory.CreateTempSubdirectory(prefix)`, exposes the equivalent full path, and deletes only when the directory still exists. Replacing the local wrapper with the linked helper removes the duplicate lifecycle implementation and gives this Linux-only suite the same failure-safe cleanup used by the other Worker tests. | `SharpProof.Worker.Test/LinuxPublicationSetTests.cs:20-27,49-52,75-78,817-850`; `eng/testing/TempDirectory.cs:1-19`; `Directory.Build.props:76-82` |
+
+### Checked and not proposed (part two hundred seventy)
+
+- The publication-set tests' filesystem assertions remain distinct. R756 only
+  changes the temporary-root fixture and its path property (`Path` to `FullName`);
+  it does not alter publication locking, marker ownership, or Linux-only cases.
+- This is narrower than R726-R728. Those entries measure repository-wide naming
+  and recursive-delete divergence; this file is a direct local duplicate in a
+  project that already receives the canonical helper, so it can be removed without
+  first choosing a new naming convention.
+
+### Status (part two hundred seventy)
+
+R756 is `pending` and is limited to test fixture plumbing; no implementation code
+was changed while recording it.
+
+## Second survey, part two hundred sixty-nine: R755, a generator recount, and the enforced-axis pattern
+
+Every tracked generated file, compared header by header. The result is a clean
+demonstration of the pattern R735 and R747 describe: the one axis that is gated is
+uniform across all 41 files, and both ungated axes have drifted.
+
+### Correction: there are fifteen generators, not fourteen
+
+Earlier parts, including R327 and R459, state that the repository has **14**
+generators, all under `scripts/`, and describe
+`SharpProof.Specs.Test/ApiSpecRuntimeWitnesses.generated.cs` as emitted by
+`Generate-ApiSpecCatalog.ps1` through a `$RuntimeWitnessOutputPath` parameter.
+**That is wrong in a way worth recording.** There are fifteen:
+`scripts/Generate-*.ps1` is 14 files, and `SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1`
+is a fifteenth, living outside `scripts/`. `Generate-ApiSpecCatalog.ps1:1267`
+*invokes* it rather than containing it. The delegation is governed - the fifteenth
+script is pinned twice in `eng/acceptance/contract.json` (`:109`, `:694`) and the
+`-Verify` path reaches it through the chain - so this changes no conclusion in
+R327 or R459, but their generator counts and the claim that all generators live in
+`scripts/` should be read with this correction.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R755 | **The generated-file header has three conventions; the one a test enforces is uniform across all 41 files and both unenforced ones have drifted.** All **41** tracked generated files open with `// <auto-generated>` - **41 of 41, no exceptions** - and that is precisely the marker `BoundaryEnforcementTests.GeneratedProductionFilesAreExplicitlyApproved` scans for when it discovers generated files by content rather than by filename. The two conventions no test checks have both broken. **The "do not edit" line**: 38 files say *"Do not edit this file directly."*, one says *"Do not edit by hand."* (`SharpProof.Frontend/ContractApiMetadata.generated.cs`), and **two have no such line at all** (`SharpProof.Frontend/CSharpScalarSemantics.generated.cs`, `SharpProof.Ir/IrOperatorCatalog.generated.cs`). **The `#nullable enable` directive**: 39 files carry it and two do not (`ContractApiMetadata.generated.cs`, `SharpProof.Specs.Test/ApiSpecRuntimeWitnesses.generated.cs`). The two deviation sets barely overlap - four distinct files deviate, only one of them on both axes - which is what independent drift looks like rather than one bad generator. The `#nullable` directive is currently redundant in every case: `Directory.Build.props:15` sets `<Nullable Condition="'$(Nullable)' == ''">enable</Nullable>`, and **no generated file lives in either of the two `Nullable=disable` projects**, `SharpProof.Package` and `SharpProof.Verifier`, so the directive changes nothing today. That is why the drift was invisible - but it also means the header carries a promise the build does not depend on, in 39 files, inconsistently. The cheap fix is to extend the check that already discovers these files by their `// <auto-generated>` marker to assert the other two lines while it is there. | 41 generated files; `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:84-139`; `Directory.Build.props:15`; `SharpProof.Package/SharpProof.Package.csproj:4`; `SharpProof.Verifier/SharpProof.Verifier.csproj:4`; `SharpProof.Frontend/ContractApiMetadata.generated.cs:1-4`; `SharpProof.Frontend/CSharpScalarSemantics.generated.cs:1-5`; `SharpProof.Ir/IrOperatorCatalog.generated.cs:1-5`; `SharpProof.Specs.Test/ApiSpecRuntimeWitnesses.generated.cs:1-5` |
+
+### Checked and not proposed (part two hundred sixty-nine)
+
+- **Non-PowerShell scripting is four files and is already covered.** The repository
+  tracks five non-`.ps1` scripts: `eng/container/loop-command.sh` (213),
+  `entrypoint.sh` (170), `dev-init.sh` (36), `dev-command.sh` (13), and
+  `.opencode/plugins/oh-my-goal.js` (1 line). The two substantial ones are R747.
+  There is no Python, and the only JavaScript is a one-line plugin stub. Nothing to
+  reduce.
+- **Preprocessor use is minimal and deliberate.** Across the whole C# tree: 92
+  `#nullable`, 24 `#pragma`, 9 `#if`/`#endif` pairs, 7 `#undef`, 6 `#define`, 4
+  `#else`, 1 `#elif`. For a 286k-line codebase with a `netstandard2.0` /
+  `net8.0` / `net9.0` / `net472` spread, nine conditional-compilation regions is
+  low. There is no forest of `#if` variants to collapse.
+- **`SharpProof.CompilerProbe.TestAsset.csproj:4` sets `<Nullable>enable</Nullable>`
+  redundantly** with the conditional default at `Directory.Build.props:15`. One
+  line, no behavioural difference, and the project is a deliberately odd test asset
+  that states several things explicitly. Not worth an item; noted so it is not
+  filed as a finding later.
+- `samples/Directory.Build.props:6` and `eng/pilots/Directory.Build.props:6` also
+  set `<Nullable>enable</Nullable>`, and there it is **required**, not redundant:
+  neither tree imports the root `Directory.Build.props`, as R749 records.
+
+### Status (part two hundred sixty-nine)
+
+R755 is `pending` and small. Its value is corroborative as much as direct: this
+is the third independent instance in this survey - after R735 on
+`InternalsVisibleTo` and R747 on `loop-command.sh` - where the gated half of a
+convention held perfectly and the ungated half drifted, with no other difference
+between them. Three instances is enough to treat "which half is asserted" as the
+predictor of where drift will be found next.
+
+## Second survey, part two hundred seventy-one: R757 - the repository already has a two-sided ratchet
+
+Closing the remaining unsurveyed areas: markdown documentation, the `eng/`
+subdirectories not yet visited, and test data. One finding, from the last of those.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R757 | **Three ratchet mechanisms exist; one is enforced in both directions and the other two are ceiling-only, and the two-sided one is the model the other two need.** `SharpProof.Gates/Corpus/unknown-reason-ratchet.json` declares `minimumSupportedCases: 163` and `minimumSupportedOpenSourceMethods: 1` alongside `maximumTotalUnknown: 299` and seven per-reason ceilings, and `CorpusGate.cs` enforces **both** directions - `:671` fails when `supportedCaseCount < ratchet.MinimumSupportedCases`, `:688` fails when `totalUnknownCount > ratchet.MaximumTotalUnknown`. That is a floor and a ceiling in one JSON file, validated on load at `:738-775`. Against it, both complexity ratchets are ceiling-only: `Test-ProductionCSharpComplexity.ps1:178-181` and `ArchitectureTests:2099-2110` each test one direction. **This changes what R748 should ask for.** R748 proposed reporting measured-versus-cap so a human refresh is prompted by data; that is still the cheaper half, but it is now clear the repository does not need a new idea - it needs the shape it already ships in `CorpusGate` applied to the other two files. The asymmetry is also not obviously deliberate. It reads as "capability may only rise, cost may only fall", which would be coherent - except the cost ratchets have no mechanism to make cost actually fall, so a reduction campaign like the one this ledger drives lowers the measured value and leaves the cap, exactly as R748 measured at -213 lines across 16 ratcheted files in one day. The corpus gate would have caught the equivalent drift on its own axis. | `SharpProof.Gates/Corpus/unknown-reason-ratchet.json:3-14`; `SharpProof.Gates/Corpus/CorpusGate.cs:671-692,738-775`; `scripts/Test-ProductionCSharpComplexity.ps1:178-181`; `SharpProof.ArchitectureTest/ArchitectureTests.cs:2099-2110`; `eng/acceptance/algorithm-size-ratchets.json` |
+
+### Checked and not proposed (part two hundred seventy-one)
+
+- **Markdown documentation has one duplicated pair and it is correctly gated.**
+  Across 47 tracked `.md` files, only **7** six-line blocks appear in two or more
+  files, and every one of them is in the same pair: `README.md` and
+  `docs/getting-started.md` share **45 lines** - the install `PackageReference`
+  snippets, the `SharpProofProfile`/`SharpProofFeatures` property block, the
+  `.editorconfig` example, and the worked `Calculator` example. Both files are in
+  `Test-SharpProofReadme.ps1`'s maintained list (`:41`), and the shared content is
+  a front-door snippet plus a tutorial repeat, which is ordinary technical writing.
+  No other markdown pair shares a single six-line block.
+- **The package version in documentation is gated *and* mutation-tested.**
+  `Test-SharpProofReadme.ps1:377,406` derives the real version through
+  `Get-SharpProofReleaseVersion` from `SharpProof.Release.props:5,7`, and
+  `Test-SharpProofDocumentationSupportFixtures.ps1` carries a
+  **`package-version-drift`** mutation that rewrites the real version to
+  `99.99.99-stale` and asserts the gate fails. That harness holds **22 named
+  documentation mutations**. An earlier hypothesis in this survey - that the six
+  schema-version rules at `Test-SharpProofReadme.ps1:1006-1044` cover schema
+  versions but not the package version a user copies - is **wrong**, and is
+  recorded here so it is not filed later.
+- **Every `eng/` subdirectory has now been examined.** `pilots` (R749, R750),
+  `container` (R747), `testing` (R724-R730), `release` (R750), `acceptance` (R748,
+  and the `Verify.ps1` two-person-rule anti-finding), `agent-notes` (R300, R321),
+  `coverage`, `self-application` (R752), `generated` (R459), `diagnostics` (R743),
+  plus the two single-file directories not previously visited: `eng/fuzz`
+  (`retained-seeds.json`) and `eng/test`
+  (`architecture-parallel.runsettings`). Neither singleton duplicates anything.
+- **The corpus test data is large but not duplicated.**
+  `SharpProof.Gates/Corpus/oss-methods.json` is 3,017 lines and
+  `expected.canonical.snapshot` is 465, but both are generated evidence with an
+  importer (`Import-OssCorpus.ps1`, `OpenSourceCorpusImporter.cs`) and a canonical
+  snapshot format (`CorpusSnapshotFormat.cs`). Large generated data with a producer
+  and a format is not accidental complexity.
+
+### Status (part two hundred seventy-one)
+
+R757 is `pending` and **refines R748** rather than replacing it: R748's
+reporting proposal remains the cheap first step, and this names the in-repository
+implementation to copy for the durable one. With this part the survey has reached
+every tracked directory: all 60 projects, all 100 PowerShell scripts, all 5 shell
+and JavaScript files, all 47 markdown files, all 54 configuration and authority
+files, all 41 generated files, all 13 `eng/` subdirectories, and the corpus data.
+
+## Second survey, part two hundred seventy-two: R758 - repeated callable replay target envelopes
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R758 | **Three replay-boundary tests hand-build the same `CompilerCallablePreparation` and `ProgramBody` envelope.** `ReplayRejectsAnArbitraryReturnValueFromAVoidCallable`, `ReplayFailsClosedForMalformedCanonicalResultIdentity`, and `ReplayAndAuthorityRejectResultOutsideSourceIntegerInterval` each create a factory and entry block, construct a manifest with one `claim`, a single `Ensures` clause, `WorkerClaimReason.None`, and a program body with the same three empty IR preparation maps. The tests intentionally vary the return expression, canonical-variable metadata, and postcondition - void-return rejection, malformed result identity, and an out-of-source-interval result - but the target-envelope plumbing is repeated at `:71-88`, `:211-246`, and `:261-297`. A private `CreateProgramTarget` fixture helper accepting the varying manifest, clause, variables, and program could own the common envelope while preserving each boundary test's distinct assertion. This is separate from R754's duplicated constructed-generic compilation fixture and from R587's production replay-engine overlap; it is local test scaffolding drift. | `SharpProof.Worker.Test/CallableCounterexampleReplayerTests.cs:67-88,203-246,253-297` |
+
+### Checked and not proposed (part two hundred seventy-two)
+
+- The two incrementing-branch tests already share `CreateIncrementingBranch`, and
+  the obstacle cases already share `CreateObstacle`; R758 does not propose another
+  abstraction over those intentionally varied programs.
+- The effect replay suite's large `CreateFixture` is a different artifact shape
+  with effect evidence, source snapshots, and replay witnesses. It is not a safe
+  replacement for the callable replay target helper.
+
+### Status (part two hundred seventy-two)
+
+R758 is `pending` and is limited to test fixture plumbing. No implementation or
+build file was changed.
+
+## Second survey, part two hundred seventy-five: R761 - duplicate analyzer test compilation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R761 | **`ContractRuntimePolicyTests.SourceAndGeneratedDefinitionsDisableAnalysis` compiles the same `SelectedSource` twice for one fixture.** The first `CreateCompilation(SelectedSource)` exists only to obtain its `CSharpParseOptions` for the generated syntax tree, while the second identical call is the compilation that receives `AddSyntaxTrees(generatedDefinition)`. A single `baseCompilation` can supply both the parse options and the generated-defined compilation, preserving the separate `sourceDefined` compilation, the parse configuration, and the two-policy comparison while removing one Roslyn compilation and its reference setup. | `SharpProof.Analyzer.Test/ContractRuntimePolicyTests.cs:40-59` |
+
+### Checked and not proposed (part two hundred seventy-five)
+
+- The `sourceDefined` compilation intentionally remains separate because it
+  carries the source-level `#define`; only the two identical `SelectedSource`
+  compilations can be shared.
+
+### Status (part two hundred seventy-five)
+
+R761 is `pending` and is limited to analyzer test setup. No implementation or
+build file was changed.
+
+## Second survey, part two hundred seventy-four: R760 - repeated constructor syntax-reference lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R760 | **`AnalyzerFeaturePipeline.AnalyzeMemberInitializer` resolves each constructor's first declaring syntax reference three times while building its candidate list.** The `OrderBy` key reads `DeclaringSyntaxReferences.FirstOrDefault()` for the file path, `ThenBy` reads it again for the span, and the `Where` predicate reads it a third time to choose the generated-code tree, falling back to the initializer tree when no reference exists. These values are stable for the candidate during this local query. Projecting each constructor once to `(candidate, firstReference)`, sorting by the projected metadata, applying the existing generated/delegating filters, and unwrapping afterward removes repeated Roslyn reference enumeration while preserving null-path ordering, `int.MaxValue` span ordering, the initializer fallback, and cancellation behavior. This is a sibling instance of the narrower two-key lookup in R736, not a request to cache syntax references across the compilation. | `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:543-559`; `SharpProof.Analyzer.Core/AnalyzerSession.cs:262-278` |
+
+### Checked and not proposed (part two hundred seventy-four)
+
+- The separate `IsGenerated(symbol, initializer.SyntaxTree, ...)` check is for
+  the member being initialized, not for the constructor candidates, and should
+  remain separate.
+- `IsThisDelegatingConstructor` still needs the complete declaration set for its
+  own syntax predicate; R760 only projects the first reference used by the sort
+  and generated-code filter.
+
+### Status (part two hundred seventy-four)
+
+R760 is `pending` and is limited to local analyzer query plumbing. No
+implementation or build file was changed.
+
+## Second survey, part two hundred seventy-three: R759 - duplicated call-argument normalization adapters
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R759 | **The requires-call-site and effect-call precondition paths duplicate the same reduced-extension and argument-alias normalization protocol around the shared classifier.** `RequiresCallSiteAnalyzer.GetAliasEvaluation` first handles non-parameters, explicit arguments, reduced-extension receivers, ordinary argument lookup, and extension-method synthetic receivers before calling `CallArgumentAliasPolicy.Classify`; `AnalyzerEffectCallPreconditionPolicy.GetArgumentEvaluation` repeats the non-parameter and reduced-receiver cases, resolves the corresponding `IArgumentOperation`, computes the same synthetic-receiver condition, and calls the same classifier. The two adapters also carry subtly different edge rules: the call-site path has `ExplicitArguments` and rejects ambiguous `ParamArray`/duplicate argument matches, while the effect path validates against the target parameter range and supports invocation or object-creation origins. A normalized call-site/argument view or a policy helper with explicit strategy callbacks could centralize the shared decision table without erasing those distinctions. Keeping the current two methods means changes to reduced-extension or synthetic-receiver semantics must be synchronized manually. | `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:616-668`; `SharpProof.Analyzer.Core/EffectCallPreconditionPolicy.cs:162-238`; `SharpProof.Analyzer.Core/CallArgumentAliasPolicy.cs:12-52` |
+
+### Checked and not proposed (part two hundred seventy-three)
+
+- R759 does not propose replacing `CallArgumentAliasPolicy.Classify`; both paths
+  already use that lower-level shared implementation.
+- The explicit-argument, param-array ambiguity, invocation/object-creation, and
+  reduced-extension rules are not interchangeable. Any reduction must preserve
+  those input-model-specific guards rather than force a single generic lookup.
+
+### Status (part two hundred seventy-three)
+
+R759 is `pending` and is limited to analyzer adapter plumbing. No implementation
+or build file was changed.
+
+## Second survey, part two hundred seventy-six: R762 - duplicated foreign inventory fixtures
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R762 | **The two foreign-callable tests in `ContractClauseInventoryTests` recreate the same owner and foreign compilations.** `ForeignCallableReturnsRejectedInventoryWithoutRetainingBody` and `ForeignImplementationBodyReturnsRejectedInventoryWithoutRetainingBody` each compile `Owner` with SharpProof references and the identical `Foreign.Analyze(bool)` method containing `Contract.Requires(condition)`. The second test then additionally selects the owner symbol, foreign syntax tree, body, and operation because it exercises the overload that supplies an implementation body; the first selects only the foreign method for the overload without a body. A private fixture or shared source constants can own the identical compilation setup while leaving those intentionally different symbol/operation selections and assertions explicit. This removes duplicated Roslyn fixture construction without conflating the two foreign-ownership API paths. | `SharpProof.Contracts.Test/ContractClauseInventoryTests.cs:362-420` |
+
+### Checked and not proposed (part two hundred seventy-six)
+
+- The owner and foreign compilations are intentionally separate compilation
+  objects because the test verifies rejection across compilation ownership.
+- R762 shares only the identical source/setup; it does not merge the two
+  `ContractClauseInventoryBuilder.Create` overload scenarios.
+
+### Status (part two hundred seventy-six)
+
+R762 is `pending` and is limited to contracts test fixture setup. No
+implementation or build file was changed.
+
+## Second survey, part two hundred seventy-seven: R763 - duplicated qualification-test process setup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R763 | **`ReleaseQualificationMatrixTests` duplicates its child-process setup in two helpers with different result contracts.** `RunAsync` and `RunExitCodeAsync` each construct `ProcessStartInfo` with the same working directory and redirected streams, append every argument with the same loop, start the process, and await termination. The first drains stdout/stderr and asserts a zero exit code before returning stdout; the second returns only the exit code so the receipt tests can assert both accepted and rejected evidence. A local runner returning an explicit process result, or a shared start/argument helper used by two narrowly scoped completion paths, can remove the repeated launch preamble while preserving the success assertion, output capture, and negative-test behavior. The shared path should drain both streams even for exit-code-only calls so a noisy script cannot deadlock the negative case. This is a local refinement of the broader R724 process-runner cluster, not a proposal to force the two result meanings into one ambiguous `Output` property. | `SharpProof.ArchitectureTest/ReleaseQualificationMatrixTests.cs:82-97,116-122,193-214,218-255`; R724 |
+
+### Checked and not proposed (part two hundred seventy-seven)
+
+- The two helpers intentionally expose different caller semantics: setup commands
+  require a successful command and its stdout, while receipt cases must accept a
+  nonzero exit code as an expected result.
+- R763 does not propose changing the six-assembly process-runner boundary in
+  R724; it records the additional same-file duplicate and its stream-drain
+  requirement.
+
+### Status (part two hundred seventy-seven)
+
+R763 is `pending` and is limited to release-qualification test plumbing. No
+implementation or build file was changed.
+
+## Second survey, part two hundred seventy-eight: R764 - repeated effect-capability projection
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R764 | **`EffectSummaryProjector.Project` traverses the same known capability flags twice.** For a summary whose capabilities are known, the method first calls `EffectContractMappings.ToContractEffects(summary.Capabilities.Kinds)` and later calls `ToContractCapabilities(summary.Capabilities.Kinds)`. Each wrapper invokes the same private `ProjectCapabilities` routine, which repeats the source-domain validation and scans every generated capability mapping to build a pair containing both outputs. A single internal projection returning both contract flag sets can be evaluated once, then its `Effects` and `Capabilities` fields can remain separate in the final `EffectProjection`. This preserves the existing unknown-capability branch, invalid-value rejection, and distinct output semantics while removing one mapping pass and one repeated validation per projected summary. | `SharpProof.Effects/EffectProjection.cs:20-43`; `SharpProof.Effects/EffectContractMappings.cs:35-70` |
+
+### Checked and not proposed (part two hundred seventy-eight)
+
+- The effects and capabilities fields are intentionally separate contract
+  projections; R764 proposes sharing their intermediate mapping, not merging
+  their wire types or changing the generated catalog.
+- Unknown capabilities must continue to suppress both the effect projection and
+  completeness calculation exactly as the current branch does.
+
+### Status (part two hundred seventy-eight)
+
+R764 is `pending` and is limited to effect-summary projection plumbing. No
+implementation or build file was changed.
+
+## Second survey, part two hundred seventy-nine: R765 - duplicated sync/async atomic-file test fixtures
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R765 | **`AtomicFileTests` duplicates the same publication fixture and invariants for synchronous and asynchronous APIs.** `WriteUtf8CreatesParentsWithoutPreambleAndReplacesDestination` and `WriteUtf8AsyncCreatesParentsWithoutPreambleAndReplacesDestination` perform the same two writes to the same nested path and assert the same UTF-8 bytes and temporary-file cleanup; `WriteUtf8SupportsValidLongDestinationBasename` and its async counterpart likewise repeat the long-name setup, content, and cleanup assertions. A shared test-data/invariant helper, or a small API-parameterized harness, can reduce the duplicated arrangement while retaining separate sync and async calls so each implementation remains directly covered. | `SharpProof.Ir.Test/AtomicFileTests.cs:30-63` |
+
+### Checked and not proposed (part two hundred seventy-nine)
+
+- The synchronous and asynchronous methods should remain separately exercised;
+  this finding is limited to their identical fixture and assertion plumbing.
+- The production atomic-publication implementation is a separate concern
+  already tracked by R281; R765 concerns only the test duplication.
+
+### Status (part two hundred seventy-nine)
+
+R765 is `pending` and is limited to atomic-file test fixture plumbing. No implementation
+or build file was changed.
+
+## Second survey, part two hundred eighty: R766 - repeated unsupported-string SMT fixture
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R766 | **Three `IrSmtBackendTests` repeat the same unsupported-string query harness.** `StringVariablesFailClosedWithoutNullTagEncoding`, `EmbeddedNullStringFailsClosedWithoutTruncation`, and `NullableStringConcatCannotProduceAFalseProof` each create an `IrFactory`, a string variable, a `VerificationQuery` with no assumptions, a fresh `IrSmtBackend`, and a `ProofKernel` execution, then assert an `UnknownOutcome` with `UnsupportedEncoding`; only the goal expression and precondition/postcondition diagnostic kind differ. A private helper accepting the goal and diagnostic kind can own the common query/backend/result plumbing while retaining each distinct string-boundary expression and its targeted test name. | `SharpProof.Smt.Test/IrSmtBackendTests.cs:310-387` |
+
+### Checked and not proposed (part two hundred eighty)
+
+- `OpaqueTermsFailClosed` is adjacent but exercises a different unsupported
+  IR category, so it is not folded into this string-specific fixture candidate.
+- The helper should preserve the explicit unsupported-encoding assertion and
+  the distinct diagnostic kind supplied by each test.
+
+### Status (part two hundred eighty)
+
+R766 is `pending` and is limited to SMT test fixture plumbing. No implementation
+or build file was changed.
+
+## Second survey, part two hundred eighty-one: R767 - repeated effect-claim lookup for unknown batches
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R767 | **`CallableClaimResultAssembler` rescans effect claims once per unknown result in batch helpers.** `Unknowns` and `PostconditionUnknowns` create one record per claim by calling `Unknown`, while `Unknown` runs `target.EffectClaims.Any(evidence => evidence.ClaimId == claimId)` to choose `Unavailable` versus `Unspecified` certainty. A batch with many claim IDs therefore traverses the same effect-claim array repeatedly. Build a claim-id lookup once for each batch and pass membership into the record factory (or add a batch-specific overload), preserving each claim's certainty, current ordering, and the single-record `Unknown` behavior. | `SharpProof.Worker/CallableClaimResultAssembler.cs:83-108` |
+
+### Checked and not proposed (part two hundred eighty-one)
+
+- The lookup must remain claim-specific: a target can have effect evidence for some
+  claim IDs but not others, so replacing the test with one batch-wide boolean would
+  change the protocol result.
+- `Unknown` is also used for isolated failure paths, so the reduction should not
+  force those callers through a materialized batch lookup.
+
+### Status (part two hundred eighty-one)
+
+R767 is `pending` and is limited to worker result-assembly lookup plumbing. No
+implementation or build file was changed.
+
+## Second survey, part two hundred eighty-two: R768 - quadratic pilot claim matching
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R768 | **`Test-SharpProofPilotReport` rescans every pilot result set for each manifest claim.** For each item in `manifestClaims`, the validator runs `Where-Object` across the complete `claimResults` array, then counts the matches to reject missing or duplicate identities. This is quadratic in the number of claims and repeats the same claim-id comparisons during every report validation. Build a single ordinal claim-id index while detecting duplicate result IDs, then look up each manifest claim once; retain the current null-on-mismatch behavior, claim-kind/outcome projection, and final ordinal sort. | `scripts/Test-SharpProofPilotReport.ps1:116-128` |
+
+### Checked and not proposed (part two hundred eighty-two)
+
+- The index must reject duplicate result IDs rather than silently keeping one;
+  the current per-claim match count is part of the validator's fail-closed contract.
+- This is separate from R562, which concerns package-artifact validation repeated
+  by the qualification receipt; R768 is the claim-result join inside the pilot
+  report validator.
+
+### Status (part two hundred eighty-two)
+
+R768 is `pending` and is limited to pilot-report claim-index construction. No
+implementation or build file was changed.
+
+## Second survey, part two hundred eighty-three: R769 - duplicated pilot claim projection
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R769 | **The pilot runner and its report validator independently join manifest claims to claim results.** `Test-SharpProofPilots` builds `claimEvidence` by filtering the full `$claims` array for every manifest claim, while the immediately following `Test-SharpProofPilotReport` call reconstructs the same claim-id/kind/outcome projection from the report's manifest and result arrays. The producer already has the normalized projection needed by the validator, but emits only the report and makes the validator repeat the join. Return or pass a validated claim projection (with duplicate/missing-ID checks) into report validation, or centralize the join helper, preserving fail-closed behavior and ordinal sorting. | `scripts/Test-SharpProofPilots.ps1:242-257,368-373`; `scripts/Test-SharpProofPilotReport.ps1:116-128` |
+
+### Checked and not proposed (part two hundred eighty-three)
+
+- The validator must remain independently callable for reviewed or externally
+  supplied reports; the shared helper should preserve that boundary rather than
+  trusting only the producer's in-memory result.
+- R768 records the validator's repeated-array scan; R769 records the separate
+  producer/validator recomputation of the same claim projection.
+
+### Status (part two hundred eighty-three)
+
+R769 is `pending` and is limited to pilot claim-evidence projection sharing. No
+implementation or build file was changed.
+
+## Second survey, part two hundred eighty-four: R770 - repeated TCB path membership scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R770 | **`Test-SharpProofReleaseAuthorityClosure` scans the complete TCB list once per derived path.** After comparing the declared and derived closures, it loops over every `$derived` path and runs `Where-Object { $_ -ceq $path }` across `$tcb` to enforce exactly-once membership. Materializing an ordinal count/set index for `$tcb` once makes the same invariant linear rather than repeatedly traversing the full list, while retaining the existing per-path failure message and the independent declared/derived closure comparison. | `scripts/Test-SharpProofReleaseAuthorityClosure.ps1:17-37` |
+
+### Checked and not proposed (part two hundred eighty-four)
+
+- The declared/derived `missing` and `extra` arrays serve the failure detail and
+  should remain separate from the exact-once index.
+- This is a local validation optimization, not a proposal to remove the
+  independently derived release-authority closure.
+
+### Status (part two hundred eighty-four)
+
+R770 is `pending` and is limited to release-authority path membership indexing. No
+implementation or build file was changed.
+
+## Second survey, part two hundred eighty-five: R771-R773 - repeated release-model lookups
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R771 | **`Test-SharpProofReleaseArtifacts` repeatedly filters the same release evidence by package identity.** It first traverses `$artifacts` once per kind to compare package-ID sets, then, for each of the three package IDs, filters `$artifacts` independently for the main and symbol rows, filters `$catalogComponents` for the package, and filters `$payloadSets` again for the payload evidence. These are small fixed collections, but a single package-keyed projection containing the main/symbol artifact, components, and payload entries would remove the repeated selection plumbing while retaining the separate package/symbol cardinality checks and package-specific validation. | `scripts/Test-SharpProofReleaseArtifacts.ps1:63-88,111-151` |
+| R772 | **`Test-SharpProofPublicationPlanIdentity` linearly rescans the release manifest artifact list for every planned artifact.** The first loop checks that every manifest artifact has a string file name; the second loop runs `Where-Object` over the complete `$manifestArtifacts` array once for each of the six planned package and symbol artifacts to find its row and compare bytes. Building an ordinal file-name lookup during the shape pass would preserve the current exactly-one-row and byte checks without repeating the full scan. | `scripts/SharpProof.PublicationPlanIdentity.psm1:387-400` |
+| R773 | **`Get-SharpProofPackageDependencyGraph` repeats contract lookups at several nested levels.** The expected package ID list is sorted again for both `.nupkg` and `.snupkg` passes; each package model scans `$expectedPackages` to find its owner; and each actual dependency group scans that owner's expected groups to find a matching target framework. A validated package-ID map with per-package framework maps can own those immutable lookups once, while leaving the extension-specific license/metadata rules, duplicate detection, and dependency-version checks explicit. | `scripts/Test-SharpProofPackageDependencies.ps1:126-203` |
+
+### Checked and not proposed (part two hundred eighty-five)
+
+- These are local release-validation projections, not a proposal to merge the
+  distinct package, symbol, payload, or dependency policies.
+- The fixed collection sizes make this primarily a clarity and accidental-
+  complexity cleanup; the lookup change must retain current failure detail and
+  exact ordinal/case-sensitive comparisons.
+
+### Status (part two hundred eighty-five)
+
+R771-R773 are `pending` and limited to release-model lookup sharing. No
+implementation or build file was changed.
+
+## Second survey, part two hundred eighty-six: R774-R775 - repeated performance-gate fixture setup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R774 | **`PerformanceGate` duplicates the source-builder skeleton for its call-bearing and call-free advisory fixtures.** `CreateCallBearingUnannotatedAdvisorySource` and `CreateCallFreeUnannotatedAdvisorySource` each create the same `StringBuilder`, append the same class declaration and closing brace, format the same indexed method names, and loop over the requested method count. Only the generated method body differs: one calls `System.Math.Max(Normalize(value), index)` and the other emits `value + index`. A parameterized fixture builder can own the shared class/index plumbing while retaining the intentional call-bearing versus call-free distinction used by the performance measurements. | `SharpProof.Gates/Performance/PerformanceGate.cs:1038-1077` |
+| R775 | **`PerformanceGate.RunValidatedAsync` and `RunSmokeAsync` repeat the performance-gate admission and probe pipeline.** Both paths load and validate the acceptance contract at their public entry points, generate a call-bearing advisory source, call `ValidateAdvisoryPackagePolicy`, run a one-iteration analyzer configuration probe, measure unannotated-advisory package builds, and measure launcher forced termination. The metrics and thresholds intentionally differ, so the whole methods should not be merged; a shared setup/probe result carrying the source, configuration counts, package timing, and forced-termination measurement could remove the duplicated orchestration while leaving each result shape and threshold policy independent. | `SharpProof.Gates/Performance/PerformanceGate.cs:68-95,97-137,275-327` |
+
+### Checked and not proposed (part two hundred eighty-six)
+
+- The two fixture bodies are deliberately different experimental controls; only
+  their builder mechanics are candidates for sharing.
+- Smoke and full performance gates retain separate contracts, result records,
+  statistical calculations, and failure thresholds; R775 concerns only their
+  common setup and measurements.
+
+### Status (part two hundred eighty-six)
+
+R774-R775 are `pending` and limited to performance-gate fixture/orchestration
+sharing. No implementation or build file was changed.
+
+## Second survey, part two hundred eighty-seven: R776 - repeated direct-clause normalization
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R776 | **`CallableEvidenceBuilder` normalizes direct contract clauses twice for different evidence paths.** `Build` and `BuildEntry` each walk `target.Clauses`, skip `Ensures`, call `ApplyBodySubstitutions` with the same target variables and empty current-state map, and apply the same maximum-depth rejection. The full path intentionally retains `Assume`/`Requires` provenance and later spec, summary, domain, and completion evidence, while the entry path intentionally considers only `Requires` and additionally checks the supported proof domain. A small clause-predicate helper can own the shared substitution and depth check without merging those evidence sets or their distinct duplicate/literal-true policies. | `SharpProof.Worker/CallableEvidenceBuilder.cs:26-48,264-289`; `SharpProof.Worker/PostconditionObligationBuilder.cs:205-250` |
+
+### Checked and not proposed (part two hundred eighty-seven)
+
+- The helper should not combine `Build` and `BuildEntry`: their clause scopes,
+  labels, proof-domain checks, and provenance dictionaries are intentionally
+  different.
+- `ApplyBodySubstitutions` remains the existing substitution authority; R776
+  records the repeated caller-side normalization and depth guard only.
+
+### Status (part two hundred eighty-seven)
+
+R776 is `pending` and limited to direct-clause predicate preparation. No
+implementation or build file was changed.
+
+## Second survey, part two hundred eighty-eight: R777 - duplicated effect-call propagation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R777 | **`EffectAnalysisSession.ComputeSummaries` repeats the effect-call propagation pipeline in `Compute` and `ComputeBody`.** Both nested functions order `EffectCallSite` values, select a recursively computed or body-only target summary based on containing-type relationships, remap receiver/write-receiver/argument regions, and pass the result through `EffectExceptionFlow.KeepEscaping` before joining it into the running summary. The paths intentionally differ in call collection, before-field-init handling, depth/caching, and the extra `WrapTypeInitializationFailures` used for initialization calls. A private join/propagation helper with an explicit target resolver and optional initialization wrapper can centralize the shared remap/escape mechanics while preserving those distinct policies. | `SharpProof.Effects/EffectAnalysisSession.cs:459-501,506-553,560-570` |
+
+### Checked and not proposed (part two hundred eighty-eight)
+
+- This is not a proposal to merge `Compute` and `ComputeBody`: their cache
+  dictionaries, recursion guards, depth accounting, and call roots have
+  different semantics.
+- The initialization-specific exception wrapping and target-selection rule
+  must remain caller-controlled; R777 covers only the repeated call-site
+  propagation scaffold.
+
+### Status (part two hundred eighty-eight)
+
+R777 is `pending` and limited to effect-call propagation helper extraction. No
+implementation or build file was changed.
