@@ -13,7 +13,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$global:LASTEXITCODE = 0
 $resolvedRepositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 $pathSeparator = [IO.Path]::DirectorySeparatorChar
 $repositoryPrefix = [IO.Path]::GetFullPath($resolvedRepositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + $pathSeparator)
 
@@ -22,13 +24,6 @@ function Get-PropertyValue {
     $property = $Properties.PSObject.Properties[$Name]
     if ($null -eq $property -or $null -eq $property.Value) { return '' }
     return [string]$property.Value
-}
-
-function Invoke-GitText {
-    param([Parameter(Mandatory = $true)] [string[]]$Arguments)
-    $output = @(& git -C $resolvedRepositoryRoot @Arguments 2>&1)
-    if ($LASTEXITCODE -ne 0) { throw ('Production inventory Git query failed: ' + ($output -join [Environment]::NewLine)) }
-    return ($output -join [Environment]::NewLine).Trim()
 }
 
 function Resolve-RepositoryPath {
@@ -51,16 +46,25 @@ function Get-CanonicalFileRecord {
 
 function Get-InventoryParallelism {
     $executionModule = Join-Path $resolvedRepositoryRoot 'scripts/SharpProof.ContainerExecution.psm1'
-    if (-not (Test-Path -LiteralPath $executionModule -PathType Leaf)) {
+    $contractPath = Join-Path $resolvedRepositoryRoot 'eng/acceptance/contract.json'
+    if (-not (Test-Path -LiteralPath $executionModule -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $contractPath -PathType Leaf)) {
+        return 1
+    }
+
+    $contract = Get-Content -LiteralPath $contractPath -Raw |
+        ConvertFrom-Json
+    $automation = $contract.PSObject.Properties['automation']
+    if ($null -eq $automation -or
+        $null -eq $automation.Value -or
+        $null -eq $automation.Value.PSObject.Properties[
+            'productionInventoryMaxParallelism']) {
         return 1
     }
 
     Import-Module $executionModule -Force
     $available = Get-SharpProofTestProjectParallelism `
         -RepositoryRoot $resolvedRepositoryRoot
-    $contractPath = Join-Path $resolvedRepositoryRoot 'eng/acceptance/contract.json'
-    $contract = Get-Content -LiteralPath $contractPath -Raw |
-        ConvertFrom-Json
     $maximum = [int]$contract.automation.productionInventoryMaxParallelism
     if ($maximum -lt 1) {
         throw 'The production-inventory parallelism cap must be positive.'
@@ -307,7 +311,12 @@ function Get-PortablePdbModule {
     }
 }
 
-$commit = Invoke-GitText -Arguments @('rev-parse', 'HEAD')
+$commit = Invoke-SharpProofGitText `
+    -RepositoryRoot $resolvedRepositoryRoot `
+    -Arguments @('rev-parse', 'HEAD') `
+    -FailureMessage 'Production inventory Git query failed:' `
+    -MergeErrorOutput `
+    -TrimOutput
 if ($commit -notmatch '^[0-9a-f]{40}$') { throw "Production inventory commit is not an exact SHA-1: '$commit'." }
 $manifest = Get-GeneratedManifest
 $generatorSourceRecords = Get-GeneratorSourceRecords

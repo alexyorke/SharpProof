@@ -27,6 +27,7 @@ $repositoryPrefix = $repositoryRoot.TrimEnd(
     [IO.Path]::DirectorySeparatorChar,
     [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 . (Join-Path $PSScriptRoot 'Get-SharpProofTcbPaths.ps1')
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 
 function ConvertTo-OrdinalSortedArray {
     param(
@@ -60,53 +61,6 @@ function Test-ClearlyNonSemanticSourceLine {
         $trimmed.EndsWith('*/', [StringComparison]::Ordinal)
 }
 
-function Invoke-GitText {
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyCollection()]
-        [string[]]$Arguments,
-
-        [Parameter(Mandatory = $true)]
-        [string]$FailureMessage
-    )
-
-    $startInfo = [Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = 'git'
-    $startInfo.WorkingDirectory = $repositoryRoot
-    $startInfo.UseShellExecute = $false
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $startInfo.CreateNoWindow = $true
-    $startInfo.ArgumentList.Add('-C')
-    $startInfo.ArgumentList.Add($repositoryRoot)
-    foreach ($argument in $Arguments) {
-        $startInfo.ArgumentList.Add($argument)
-    }
-
-    $process = [Diagnostics.Process]::new()
-    $process.StartInfo = $startInfo
-    try {
-        if (-not $process.Start()) {
-            throw $FailureMessage
-        }
-        $output = $process.StandardOutput.ReadToEndAsync()
-        $errorOutput = $process.StandardError.ReadToEndAsync()
-        $process.WaitForExit()
-        $text = $output.GetAwaiter().GetResult()
-        $errorText = $errorOutput.GetAwaiter().GetResult()
-        if ($process.ExitCode -ne 0) {
-            if ([string]::IsNullOrWhiteSpace($errorText)) {
-                throw $FailureMessage
-            }
-            throw "$FailureMessage $($errorText.Trim())"
-        }
-        return $text
-    }
-    finally {
-        $process.Dispose()
-    }
-}
-
 function Resolve-DurableComparisonCommit {
     param(
         [Parameter(Mandatory = $true)]
@@ -121,7 +75,8 @@ function Resolve-DurableComparisonCommit {
                 'comparison authority.')
         }
 
-        $symbolic = Invoke-GitText `
+        $symbolic = Invoke-SharpProofGitText `
+            -RepositoryRoot $repositoryRoot `
             -Arguments @(
                 'rev-parse',
                 '--symbolic-full-name',
@@ -143,7 +98,8 @@ function Resolve-DurableComparisonCommit {
         }
     }
 
-    $commit = (Invoke-GitText `
+    $commit = (Invoke-SharpProofGitText `
+        -RepositoryRoot $repositoryRoot `
         -Arguments @('rev-parse', '--verify', "$authority^{commit}") `
         -FailureMessage (
             "ComparisonRef '$Reference' is not a durable explicit " +
@@ -245,6 +201,7 @@ $recordedAuthority = Get-Content `
     -LiteralPath $coverageAuthorityPath `
     -Raw | ConvertFrom-Json
 $authorityScript = Join-Path $PSScriptRoot 'Get-SharpProofProductionInventory.ps1'
+$LASTEXITCODE = 0
 $recomputedAuthorityJson = & $authorityScript -RepositoryRoot $repositoryRoot -Configuration Release -RequirePdb
 if ($LASTEXITCODE -ne 0) {
     throw 'Production inventory authority could not be recomputed from current MSBuild/PDB inputs.'
@@ -253,7 +210,11 @@ $recomputedAuthority = ($recomputedAuthorityJson -join [Environment]::NewLine) |
     ConvertFrom-Json
 if ($recordedAuthority.schemaVersion -ne 1 -or
     $recordedAuthority.commit -cne $recomputedAuthority.commit -or
-    $recordedAuthority.commit -cne (& git -C $repositoryRoot rev-parse HEAD).Trim() -or
+    $recordedAuthority.commit -cne (Invoke-SharpProofGitText `
+        -RepositoryRoot $repositoryRoot `
+        -Arguments @('rev-parse', 'HEAD') `
+        -FailureMessage 'Could not resolve the current repository commit.' `
+        -TrimOutput) -or
     $recordedAuthority.configuration -cne 'Release') {
     throw (
         'Coverage authority evidence does not match the exact current ' +
@@ -625,7 +586,8 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
     }
     $diffTarget = "$comparisonCommit...HEAD"
     if ($IncludeWorkingTree) {
-        $mergeBaseOutput = Invoke-GitText `
+        $mergeBaseOutput = Invoke-SharpProofGitText `
+            -RepositoryRoot $repositoryRoot `
             -Arguments @('merge-base', $comparisonCommit, 'HEAD') `
             -FailureMessage (
                 "Could not resolve the merge base for comparison ref '$ComparisonRef'.")
@@ -647,7 +609,8 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         $diffTarget,
         '--'
     ) + @($canonicalTcbPaths)
-    $changedFileOutput = Invoke-GitText `
+    $changedFileOutput = Invoke-SharpProofGitText `
+        -RepositoryRoot $repositoryRoot `
         -Arguments $changedFileArguments `
         -FailureMessage (
             "git changed-file enumeration failed for comparison ref '$ComparisonRef'.")
@@ -662,7 +625,8 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
         Collections.Generic.HashSet[int]]]::new(
             [StringComparer]::Ordinal)
     foreach ($changedPath in $changedTcbFiles) {
-        $patch = Invoke-GitText `
+        $patch = Invoke-SharpProofGitText `
+            -RepositoryRoot $repositoryRoot `
             -Arguments @(
                 'diff',
                 '--unified=0',
@@ -820,7 +784,11 @@ if (-not [string]::IsNullOrWhiteSpace($comparisonCommit)) {
 
 $summary = [pscustomobject][ordered]@{
     schemaVersion = 1
-    commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    commit = Invoke-SharpProofGitText `
+        -RepositoryRoot $repositoryRoot `
+        -Arguments @('rev-parse', 'HEAD') `
+        -FailureMessage 'Could not resolve the current repository commit.' `
+        -TrimOutput
     reportCount = $reports.Count
     reportFiles = @($reportFiles | Sort-Object path)
     authority = [pscustomobject][ordered]@{

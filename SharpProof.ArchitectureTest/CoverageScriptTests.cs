@@ -1537,6 +1537,9 @@ public sealed class CoverageScriptTests
             Path.Combine(root, "scripts", "Get-SharpProofTcbPaths.ps1"),
             Path.Combine(scripts, "Get-SharpProofTcbPaths.ps1"));
         File.Copy(
+            Path.Combine(root, "scripts", "SharpProof.ContainerExecution.psm1"),
+            Path.Combine(scripts, "SharpProof.ContainerExecution.psm1"));
+        File.Copy(
             Path.Combine(root, "scripts", "Get-SharpProofProductionInventory.ps1"),
             Path.Combine(scripts, "Get-SharpProofProductionInventory.ps1"));
     }

@@ -74,6 +74,7 @@ foreach ($metric in @('expressionNodes', 'decisionPoints', 'members')) {
 }
 
 $inventoryScript = Join-Path $repositoryRoot 'scripts/Get-SharpProofProductionInventory.ps1'
+$LASTEXITCODE = 0
 $inventoryJson = & $inventoryScript -RepositoryRoot $repositoryRoot -Configuration Release
 if ($LASTEXITCODE -ne 0) {
     throw 'Production inventory authority could not be derived for complexity.'

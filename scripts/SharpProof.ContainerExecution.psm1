@@ -92,6 +92,73 @@ function Invoke-SharpProofCheckedCommand {
     }
 }
 
+function Invoke-SharpProofGitText {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$FailureMessage,
+
+        [switch]$MergeErrorOutput,
+
+        [switch]$TrimOutput
+    )
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = 'git'
+    $startInfo.WorkingDirectory = $RepositoryRoot
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.CreateNoWindow = $true
+    $startInfo.ArgumentList.Add('-C')
+    $startInfo.ArgumentList.Add($RepositoryRoot)
+    foreach ($argument in $Arguments) {
+        $startInfo.ArgumentList.Add($argument)
+    }
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw $FailureMessage
+        }
+        $outputTask = $process.StandardOutput.ReadToEndAsync()
+        $errorTask = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $output = $outputTask.GetAwaiter().GetResult()
+        $errorOutput = $errorTask.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            $details = (@($output, $errorOutput) |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+                ForEach-Object { $_.Trim() }) -join [Environment]::NewLine
+            if ([string]::IsNullOrWhiteSpace($details)) {
+                throw $FailureMessage
+            }
+            throw "$FailureMessage $details"
+        }
+        $text = if ($MergeErrorOutput) {
+            [string]$output + [string]$errorOutput
+        }
+        else {
+            [string]$output
+        }
+        if ($TrimOutput) {
+            return $text.Trim()
+        }
+        return $text
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
 function Invoke-SharpProofTimedPhase {
     [CmdletBinding()]
     param(
@@ -736,6 +803,7 @@ Export-ModuleMember -Function @(
     'Get-SharpProofTestAssemblyPath',
     'Get-SharpProofDotnetWrapperPath',
     'Invoke-SharpProofCheckedCommand',
+    'Invoke-SharpProofGitText',
     'Invoke-SharpProofTimedPhase',
     'Invoke-SharpProofParallelDotnetBuilds',
     'New-SharpProofParallelProcessStartInfo',

@@ -239,6 +239,9 @@ public sealed class ProductionInventoryAuthorityTests
         File.Copy(
             Path.Combine(TestRepository.FindRoot(), "scripts", "Get-SharpProofTcbPaths.ps1"),
             Path.Combine(repository, "scripts", "Get-SharpProofTcbPaths.ps1"));
+        File.Copy(
+            Path.Combine(TestRepository.FindRoot(), "scripts", "SharpProof.ContainerExecution.psm1"),
+            Path.Combine(repository, "scripts", "SharpProof.ContainerExecution.psm1"));
     }
 
     private static async Task<JsonDocument> RunInventoryAsync(string repository)
