@@ -194,6 +194,7 @@ the smallest relevant containerized test target passes.
 | R478 | Share bounded JSON file opening between hashing and UTF-8 readers | `SharpProof.Worker.Test`: ProtocolJsonTests 108; full Worker.Test 695 |
 | R480 | Update the container contract gate to assert the environment-based marker path | `SharpProof.ArchitectureTest`: ContainerAuthorityScriptTests 15 |
 | R484 | Share the canonical path-within-directory comparison used by publication and mount checks | `SharpProof.Worker.Test`: LinuxPublicationSetTests 34 |
+| R485 | Share initial publication-path filtering and topology validation | `SharpProof.Worker.Test`: LinuxPublicationSetTests 34 |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2600,8 +2601,10 @@ decided with it, not separately. The `Monitor` declaration is a one-word change.
 
 ### Status (part fifty-seven)
 
-R483 and R485 remain `pending` review-only candidates because their repeated
-filesystem validation is part of publication ownership and lock sequencing.
+R483 remains `pending` because its repeated filesystem validation is part of
+publication ownership and lock sequencing. R485 is applied: reset and acquire
+share initial filtering, canonicalization, topology, and metadata-alias checks,
+while Acquire still revalidates the captured paths after locking.
 R484 is applied: public path canonicalization and private mount parsing now
 share one already-canonical equality/prefix predicate.
 

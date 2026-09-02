@@ -173,18 +173,37 @@ public static partial class LinuxPathIdentity
         }
     }
 
+    private static string[] PreparePublicationPaths(
+        IEnumerable<string> publicationPaths,
+        bool requireNonEmpty,
+        out string[] requestedPaths)
+    {
+        ArgumentNullException.ThrowIfNull(publicationPaths);
+        requestedPaths = publicationPaths
+            .Where(static path => !string.IsNullOrWhiteSpace(path))
+            .ToArray();
+        if (requireNonEmpty && requestedPaths.Length == 0)
+        {
+            throw new ArgumentException(
+                "At least one publication path is required.",
+                nameof(publicationPaths));
+        }
+
+        var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
+        ValidatePublicationTopology(canonicalPaths);
+        ValidatePublicationMetadataAliases(canonicalPaths);
+        return canonicalPaths;
+    }
+
     public static void ResetPublicationSet(
         IEnumerable<string> publicationPaths,
         TimeSpan timeout,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(publicationPaths);
-        var requestedPaths = publicationPaths
-            .Where(static path => !string.IsNullOrWhiteSpace(path))
-            .ToArray();
-        var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
-        ValidatePublicationTopology(canonicalPaths);
-        ValidatePublicationMetadataAliases(canonicalPaths);
+        var canonicalPaths = PreparePublicationPaths(
+            publicationPaths,
+            requireNonEmpty: false,
+            out _);
         var markerPaths = canonicalPaths
             .Select(static path => PublicationMetadataPath(
                 path, PublicationMarkerExtension))
@@ -235,25 +254,15 @@ public static partial class LinuxPathIdentity
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(publicationPaths);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
             timeout,
             TimeSpan.Zero);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var requestedPaths = publicationPaths
-            .Where(static path => !string.IsNullOrWhiteSpace(path))
-            .ToArray();
-        if (requestedPaths.Length == 0)
-        {
-            throw new ArgumentException(
-                "At least one publication path is required.",
-                nameof(publicationPaths));
-        }
-
-        var canonicalPaths = CanonicalPublicationPaths(requestedPaths);
-        ValidatePublicationTopology(canonicalPaths);
-        ValidatePublicationMetadataAliases(canonicalPaths);
+        var canonicalPaths = PreparePublicationPaths(
+            publicationPaths,
+            requireNonEmpty: true,
+            out var requestedPaths);
         var ancestorIdentity = CaptureAncestorIdentity(canonicalPaths);
         var lockPaths = canonicalPaths
             .Select(PublicationLockNameForCanonicalPath)
