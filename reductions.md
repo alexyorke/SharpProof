@@ -7268,3 +7268,44 @@ R842 is `applied`: expected pilot-review identities are now stored in an
 
 R843 is `applied`: each scalar catalog's keys are sorted once before its
   contiguous-key validation loop, preserving source-order-independent checks.
+
+## Second survey, part three hundred fifty-five: R844 - duplicate generated-file verification path
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R844 | **`Generate-ApiSpecCatalog.ps1` duplicates the shared generated-file updater's exact-byte verification.** Its private `Assert-ExactGeneratedFile` formats C# candidates, normalizes generated text, encodes expected bytes, reads the actual file, and compares the two byte sequences. `Update-SharpProofGeneratedFile` already performs the same formatting, normalization, read, and byte comparison in `-Verify` mode, and the API-spec generator invokes the private assertion immediately after each of its two updater calls. This causes two exact comparisons per output in verification mode; the private path can be folded into the shared helper or retained only as an explicit post-write check if that mode is required. | `scripts/GeneratedFileHelpers.ps1:332-371`; `scripts/Generate-ApiSpecCatalog.ps1:562-590,1241-1265` |
+
+### Checked and not proposed (part three hundred fifty-five)
+
+- The C# formatting parse remains important because both paths must reject
+  malformed generated syntax before comparing bytes.
+- The candidate does not remove the atomic write or the `-Verify` stale-file
+  failure; it only removes the second implementation of the same comparison.
+- A post-write readback can remain deliberately enabled for generation mode if
+  the project wants an end-to-end filesystem assertion.
+
+### Status (part three hundred fifty-five)
+
+R844 is `deferred`: verification mode has an unambiguous duplicate comparison,
+  while generation mode may be using the private check as a post-write defense.
+
+## Second survey, part three hundred fifty-six: R845 - duplicate API-spec term recursion for code and documentation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R845 | **`Generate-ApiSpecCatalog.ps1` maintains two recursive walkers over the same term algebra.** `Format-Term` and `Format-TermDocumentation` each switch over `variable`, `boolean`, `integer`, `string`, `null`, `unary`, `binary`, `conditional`, and `length`, recursively visiting the same child fields for the compound cases. One validates and emits C# declarations while the other emits documentation text, so their final formatting differs, but the duplicated kind/child traversal can drift when the catalog adds or changes a term shape. A normalized term visitor or shared child-dispatch seam can keep the two output renderers separate while centralizing the algebra's structural coverage. | `scripts/Generate-ApiSpecCatalog.ps1:374-489,513-560` |
+
+### Checked and not proposed (part three hundred fifty-six)
+
+- The two renderings should remain separate: C# output performs type and value
+  validation, while documentation output preserves a human-readable shape.
+- The candidate does not replace the declarative catalog or bypass recursive
+  validation; it only shares structural dispatch or a normalized intermediate
+  representation.
+- Existing generated runtime witnesses and documentation remain independent
+  outputs and are not assumed to have identical formatting contracts.
+
+### Status (part three hundred fifty-six)
+
+R845 is `deferred`: the walkers are small and intentionally render different
+  formats, but their duplicated term-kind coverage is a maintenance drift risk.
