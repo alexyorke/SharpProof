@@ -343,6 +343,8 @@ internal sealed partial class SharpProofAnalyzerEngine
             return false;
         }
 
+        var closedContractAttributes = GetClosedContractAttributes(compilation);
+
         foreach (var reference in compilation.References)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -371,8 +373,6 @@ internal sealed partial class SharpProofAnalyzerEngine
                     return true;
                 }
 
-                var closedContractAttributes = GetClosedContractAttributes(
-                    compilation);
                 if (symbol is IAssemblySymbol assembly &&
                     NamespaceContainsClosedPrecondition(
                         assembly.GlobalNamespace,

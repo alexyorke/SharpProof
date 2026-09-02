@@ -204,6 +204,7 @@ the smallest relevant containerized test target passes.
 | R554 | Remove the unreferenced package-license graph helper | `SharpProof.ArchitectureTest`: PackageDependencyAuthority 45 passed |
 | R548 | Share the deterministic differential integer boundary corpus | `SharpProof.Fuzz.Test`: FuzzRunnerTests 32 passed |
 | R547 | Parameterize implicit-conversion unwrapping for reference-only callers | `SharpProof.Frontend.Test`: 121 passed |
+| R501 | Resolve closed-contract attribute symbols once per analyzer compilation | `SharpProof.Analyzer.Test`: 476 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2921,10 +2922,11 @@ implementations, keeping behavior-specific branches separate from shared plumbin
 
 ### Status (part sixty-three)
 
-R498 is applied: binary string-concatenation resolution now uses the existing
-admission predicate, retaining the constant-folding and user-defined-operator
-exclusions. R499-R502 remain pending review-only candidates; any sharing must
-retain fail-closed behavior and the analyzer's distinct diagnostic and
+R498 and R501 are applied: binary string-concatenation resolution now uses the
+existing admission predicate, and closed-contract attribute symbols are resolved
+once per analyzer compilation instead of once per source reference. R499,
+R500, and R502 remain pending review-only candidates; any sharing must retain
+fail-closed behavior and the analyzer's distinct diagnostic and
 semantic-evaluation responsibilities.
 
 
