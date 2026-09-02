@@ -173,6 +173,7 @@ the smallest relevant containerized test target passes.
 | R858 | Reuse the canonical IR variable collector in fuzz tests | `SharpProof.Fuzz.Test`: FuzzRunnerTests passed |
 | R854 | Share generated-source argument augmentation in C# formatting | PowerShell parser validation passed |
 | R855 | Share release-JSON accepted/rejected fixture assertion plumbing | `SharpProof.ArchitectureTest`: ReleaseJsonAuthorityTests passed |
+| R592 | Merge duplicate differential type projection finding into R546 | `SharpProof.Testing.Test`: IrCSharpDifferentialOracleTests, 11 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3899,7 +3900,9 @@ R591 is a pending differential-testing reduction candidate. Preserve the current
 
 ### Status (part one hundred thirty-three)
 
-R592 is a pending differential-testing reduction candidate. Keep the factory-specific object-type check and recursive array behavior identical; centralize only the shared supported-type policy, not the final projection format.
+R592 is `merged` into R546: the existing shared supported-type projection
+already owns recursive sequence admission, object identity, and the paired
+C#-name/runtime-type outputs; differential-oracle tests pass (11 tests).
 
 ## Second survey, part one hundred thirty-four: R593 - repeated generator sequence interning
 
