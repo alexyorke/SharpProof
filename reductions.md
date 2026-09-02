@@ -158,6 +158,7 @@ the smallest relevant containerized test target passes.
 | R849 | Project IR identifier aliases from the validated tag descriptor list | IR model generator `-Verify` passed |
 | R850 | Group compiler-artifact mappings once before owner-specific emission | compiler-artifact generator `-Verify` passed |
 | R851 | Resolve bound-contract assignments through a validated parameter map | bound-contract generator `-Verify` passed |
+| R338 | Centralize the shared RS2002/RS2003 analyzer suppression policy | CompilerCollector build passed with central policy |
 | R276 | Reuse exact duplicate raw-string fixtures across Worker and analyzer tests | Worker CompilerManifestArtifactTests: 91; WorkerTests: 148; GeneratedContractForAnalyzerTests: 22 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
@@ -1642,9 +1643,11 @@ maintenance seams rather than style preferences.
 
 ### Status (part twenty-six)
 
-R331, R337-R338 are `pending`. R331 and R337 touch packaging or cross-assembly
-authorities and need boundary-aware implementations. R338 is a smaller,
-mechanically testable build reduction.
+R331 and R337 remain `pending` because they touch packaging or cross-assembly
+authorities and need boundary-aware implementations. R338 is `applied`: the
+three analyzer projects now receive the exact RS2002/RS2003 suppression from
+`Directory.Build.props`, while their project-local duplicates are removed; the
+CompilerCollector build passed with zero warnings and errors.
 
 ## Second survey, part twenty-seven: R340-R349
 
