@@ -8539,3 +8539,146 @@ build-file changes were made during this audit.
 
 R925 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part four hundred thirty-six: R926 - repeated reference-module traversal
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R926 | **`CompilationFingerprint.ValidReferences` traverses every reference module twice.** It first calls `All(references, ValidReference)`, whose per-reference validation already visits each module for shape, name, path, and ordering checks; after that succeeds, `ValidReferences` loops through every module again to enforce the aggregate module-count and closure-byte limits. A validation pass carrying the aggregate counters, or a per-reference result that includes its validated module facts, can retain the local and global fail-closed limits without rereading the same module rows. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:241-264,337-369` |
+
+### Status (part four hundred thirty-six)
+
+R926 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred thirty-seven: R927 - repeated reference-module shape scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R927 | **`CompilationFingerprint.ValidReference` makes several independent passes over one module array.** It validates every module, projects names for distinctness, checks name ordering, and projects paths for distinctness in separate LINQ traversals. One bounded loop can preserve the assembly-versus-module shape rules, null rejection, strict name order, and duplicate-name/path rejection while removing the repeated enumeration and temporary projections. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:337-369` |
+
+### Status (part four hundred thirty-seven)
+
+R927 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred thirty-eight: R928 - repeated diagnostic-option validation scan
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R928 | **`CompilationFingerprint.ValidDiagnosticOptions` scans the same option array once for row validity and again for ordering.** The first `All` checks non-null IDs, nonblank text, and the diagnostic enum; the following `Zip` checks adjacent ordinal ordering. A single loop can retain both checks and fail closed on malformed rows without a second traversal. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:286-296` |
+
+### Status (part four hundred thirty-eight)
+
+R928 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred thirty-nine: R929 - repeated additional-file validation scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R929 | **`CompilationFingerprint.ValidAdditionalFiles` makes three passes over the additional-file array.** It validates each row, projects all paths for distinctness, and then performs an adjacent path/SHA ordering comparison. One loop with the previous path/SHA pair and a path set can preserve canonical ordering, duplicate-path rejection, and per-row path/digest validation while avoiding the repeated scans. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:381-393` |
+
+### Status (part four hundred thirty-nine)
+
+R929 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred forty: R930 - duplicated summary-evidence row validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R930 | **`CompilationFingerprint.ValidSummaryEvidence` validates common row fields before calling a row validator that checks them again.** The outer loop checks nullability, origin, call identity, evidence digest, and pack/non-pack identity shape, builds the ordering key, and then calls `ValidSummaryEvidenceRow`, which rechecks the common nullable fields and digest/identity conditions before its origin-specific tree/module checks. A row-validation result carrying the canonical key can preserve the null-safe malformed-JSON boundary and ordered uniqueness rule without duplicating the common predicates. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:110-150,154-230` |
+
+### Status (part four hundred forty)
+
+R930 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred forty-one: R931 - remembered source-tree revalidation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R931 | **`CompilerSourceLocationAuthority.FindUniqueTree` revalidates a remembered tree during its full uniqueness scan.** When a `ConditionalWeakTable` binding is present, the fast path calls `HasValidLocationGeometry` for the remembered ordinal, then the following loop starts at zero and calls the same geometry predicate for that ordinal again before checking whether any other tree also matches. The remembered result can be used as the initial match while the loop skips that index, preserving the required scan for competing mapped trees and the fail-closed ambiguity result. | `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:120-153` |
+
+### Status (part four hundred forty-one)
+
+R931 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred forty-two: R932 - repeated line-map traversal per location
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R932 | **`CompilerSourceLocationAuthority.HasValidLocationGeometry` walks the line map twice for one location.** `HasValidLineMap` recomputes the full line-map digest and scans every entry for structural validity; after that succeeds, `TryMap` scans the entries again to select the mapping for the location. A validated line-map context can carry its digest/geometry result and an indexed lookup cursor while preserving cancellation, malformed-entry rejection, source bounds, and the exact mapped line/column calculation. | `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:26-77,79-104,305-344` |
+
+### Status (part four hundred forty-two)
+
+R932 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred forty-three: R933 - redundant fixed catalog-digest format check
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R933 | **`CompilerSpecificationPackAuthorityValidation.IsValid` checks the catalog digest format after checking exact equality with the fixed catalog digest.** Once `catalogSha256 == CompilerSpecificationPackCatalogVersions.Sha256` succeeds, the value is already the trusted fixed 64-character hexadecimal digest; `WorkerProtocolJson.IsSha256(catalogSha256)` cannot add a new accepted case or reject a different value. Removing that second predicate, or centralizing the fixed-catalog assertion in one helper, preserves the catalog version/hash authority and pack-ID checks while shortening the validation chain. | `SharpProof.CompilerArtifact/CompilerSpecificationPackAuthority.cs:18-37` |
+
+### Status (part four hundred forty-three)
+
+R933 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred forty-four: R934 - eager unused effect-policy calculations
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R934 | **`CompilerEffectViolationAuthority.IsViolation` computes all constraint-derived facts before selecting the contract rule.** Every call calculates unexpected effects, unexpected capabilities, and `HasForbiddenException`, although `EnforcePure`, `ZeroAllocations`, `AllowedCapabilities`, and `DoesNotThrow` each use only a subset; the exception-hierarchy scan is therefore paid even when the selected contract kind cannot inspect it. Moving each calculation into its switch arm, or using rule metadata to request only the needed facts, preserves the same bit tests and forbidden-exception semantics while removing work from the common non-exception policies. | `SharpProof.CompilerArtifact/CompilerEffectViolationAuthority.cs:15-49,52-61` |
+
+### Status (part four hundred forty-four)
+
+R934 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred forty-five: R935 - dependency-file parse/read duplication
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R935 | **`WorkerBinaryIdentity.CreateSnapshot` reads the dependency file once to discover components and then resets the same stream to read all bytes again.** `RuntimeComponents` parses the stream and uses its raw JSON text to find DLL names; `CreateSnapshot` sets `dependency.Position = 0` and calls `ReadSnapshotBytes` before staging and hashing that same file. Reading the bounded bytes once and parsing a memory-backed document can remove the second full-file I/O, provided the implementation retains the current length/EOF and change-detection semantics before accepting the dependency snapshot. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:58-68,205-217,219-263` |
+
+### Status (part four hundred forty-five)
+
+R935 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred forty-six: R936 - duplicate component-path materialization
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R936 | **`WorkerBinaryIdentity.CreateSnapshot` materializes component paths twice.** It passes `components.Values.ToArray()` into `WorkerRuntimeClosureSnapshot`, whose constructor immediately copies that sequence into an immutable array with `ImmutableArray.CreateRange`. Passing the dictionary values directly, or constructing the immutable array once at the producer boundary, can remove one array allocation while preserving sorted component order and the snapshot's immutable public view. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:110-118,303-314` |
+
+### Status (part four hundred forty-six)
+
+R936 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred forty-seven: R937 - separate diagnostic shape, order, and binding passes
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R937 | **`CompilerManifestArtifactJson.HasValidDiagnostics` performs independent shape, ordering, and binding scans over the diagnostics array.** When shape validation is enabled, `HasValidDiagnosticShapes` traverses every row; `CompilerDiagnosticArtifactOrdering.IsCanonical` traverses adjacent rows; and `HasValidDiagnosticBinding` then walks the rows again, including source-tree geometry through `IsBound`. A single validation accumulator can perform the shape/null checks, adjacent ordering, and binding in one row pass while retaining the serializer's intentional `validateDiagnosticShapes: false` path after its pre-canonicalization shape check. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:779-827,459-477` |
+
+### Status (part four hundred forty-seven)
+
+R937 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred forty-eight: R938 - prepasses before location-authority comparison
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R938 | **`CompilerManifestArtifactJson.HasValidLocationAuthorities` scans the authority array before its indexed comparison.** It first checks for null entries with `Any`, then checks adjacent ordering with `Zip`, builds and sorts the expected owner rows, checks expected locations with another `Any`, and finally loops over both arrays to compare identity, location, and binding. Building the expected rows once and folding null/order/location checks into the final indexed loop can preserve canonical owner order, ambiguity rejection, and source binding while removing the separate prepasses. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:838-907` |
+
+### Status (part four hundred forty-eight)
+
+R938 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
