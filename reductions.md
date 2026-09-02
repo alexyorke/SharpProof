@@ -5950,3 +5950,22 @@ No implementation or build file was changed.
 
 R786 is `pending` and limited to GitHub Actions publication plumbing. No
 implementation or build file was changed.
+
+## Second survey, part two hundred ninety-eight: R787 - repeated gate dispatch projection
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R787 | **`SharpProof.Gates.Program.Main` repeats named-gate invocation and pass projection across the `all` and single-gate paths.** The `all` branch independently calls `CorpusGate.RunAsync(root)` and `PerformanceGate.RunAsync(root)` and combines their `Passed` values; the `corpus`/`performance` branch repeats the same conditional gate invocation, then repeats type-specific `Passed` extraction through a switch before building its standalone envelope and exit code. The output shapes are intentionally different - `all` emits a combined `{ corpus, performance }` object, while a named command emits the source-bound standalone envelope when metadata is present - so serialization should remain separate. A small named-gate dispatcher returning the result and its pass state, or a table of gate delegates plus a typed pass projection, can own the repeated invocation/`Passed` plumbing while preserving the distinct `all`, standalone, `corpus-print`, `corpus-update`, and `performance-smoke` command contracts. | `SharpProof.Gates/Program.cs:29-69,99-150` |
+
+### Checked and not proposed (part two hundred ninety-eight)
+
+- The combined and standalone commands must retain their different JSON
+  contracts; this candidate concerns only selecting a named gate and reading
+  its pass state.
+- `corpus-print`, `corpus-update`, and `performance-smoke` have distinct
+  side effects or output shapes and are not counted as duplicate branches.
+
+### Status (part two hundred ninety-eight)
+
+R787 is `pending` and limited to the Gates CLI dispatch plumbing. No
+implementation or build file was changed.
