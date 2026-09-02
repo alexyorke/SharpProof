@@ -6384,3 +6384,29 @@ it does not justify editing the implementation solely to remove a few scans.
 R805 is `deferred`: the arrays are small per callable and the cleanup is local,
 but the current LINQ expressions are readable and no implementation edits are
 authorized in this audit.
+
+## Second survey, part three hundred seventeen: R806 - duplicated lowered-claim correspondence checks
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R806 | **The compiler-artifact validation paths duplicate the manifest-to-lowered claim correspondence rule.** `CompilerLoweredArtifact` validates the lowered artifact by filtering manifest claims and lowered clauses to postconditions, comparing count, ordinal claim IDs, and projected manifest evidence, then separately normalizing and ordinal-sorting declared versus lowered assumptions before `SequenceEqual`. `CompilerManifestArtifactJson.HasFeatureScopeParity` performs the same postcondition identity/evidence comparison and the same declared-versus-lowered assumption normalization for each callable during feature-scope validation. Their outer contracts should remain different - one throws while decoding a lowered artifact, the other returns a fail-closed parity result and has different null-tolerance - but small helpers parameterized by null/error policy can give both paths one correspondence definition and remove a drift surface. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:458-477`; `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:701-729` |
+
+### Checked and not proposed (part three hundred seventeen)
+
+- R526 concerns generic assumption comparison duplicated between the compiler
+  response authority and worker protocol JSON; R806 is the narrower
+  manifest-versus-lowered correspondence duplicated inside compiler-artifact
+  validation.
+- Lowered effect claims, effect authorities, clause predicate hashes, and IR
+  structure have distinct validation responsibilities and are not included in
+  this proposed seam.
+- Any shared helper must preserve the throwing `InvalidDataException` path,
+  the boolean fail-closed path, and their existing null/malformed-row rules;
+  no implementation change is made here.
+
+### Status (part three hundred seventeen)
+
+R806 is `deferred`: the duplicated rule is a real maintenance risk, but the
+error/null-policy differences make a careless shared helper more complex than
+the duplicated projections. It is best addressed only with explicit policy
+parameters or a common validated correspondence result.
