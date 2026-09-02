@@ -51,9 +51,7 @@ public sealed class ProgramLoweringTests
                 return Next(current);
             }
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
 
         Assert.That(lowered.Result.IsExact, Is.True);
         Assert.That(
@@ -90,9 +88,7 @@ public sealed class ProgramLoweringTests
                 return value;
             }
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
         Assert.That(
             instructions.OfType<IrStoreInstruction>(),
             Has.Exactly(1).Items);
@@ -148,9 +144,7 @@ public sealed class ProgramLoweringTests
                 return value;
             }
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
         var parameter = lowered.Result.Variables.Single(
             static binding =>
                 binding.Symbol is IParameterSymbol
@@ -183,9 +177,7 @@ public sealed class ProgramLoweringTests
                 return captured;
             }
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
         var call = instructions
             .OfType<IrCallInstruction>()
             .Single();
@@ -250,8 +242,7 @@ public sealed class ProgramLoweringTests
             """);
 
         Assert.That(lowered.Result.Captures, Is.Not.Empty);
-        var assigned = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
+        var assigned = lowered.Instructions
             .OfType<IrAssignInstruction>()
             .Select(static instruction => instruction.Target)
             .ToArray();
@@ -259,8 +250,7 @@ public sealed class ProgramLoweringTests
             assigned.Intersect(lowered.Result.Captures),
             Is.Not.Empty);
         Assert.That(
-            lowered.Result.Program.Blocks
-                .SelectMany(static block => block.Instructions)
+            lowered.Instructions
                 .OfType<IrBranchInstruction>(),
             Is.Not.Empty);
     }
@@ -284,8 +274,7 @@ public sealed class ProgramLoweringTests
             .Select(static binding => binding.Variable)
             .OrderBy(static variable => variable.Value)
             .ToArray();
-        var havoced = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
+        var havoced = lowered.Instructions
             .OfType<IrHavocInstruction>()
             .SelectMany(static havoc => havoc.Variables)
             .Distinct()
@@ -359,8 +348,7 @@ public sealed class ProgramLoweringTests
                 lowered.Result.Abstentions.Select(static value => value.Reason),
                 Does.Contain(FrontendAbstention.UnsupportedControlFlow));
             Assert.That(
-                lowered.Result.Program.Blocks
-                    .SelectMany(static block => block.Instructions)
+                lowered.Instructions
                     .OfType<IrHavocInstruction>()
                     .SelectMany(static havoc => havoc.Variables),
                 Does.Contain(parameter));
@@ -410,8 +398,7 @@ public sealed class ProgramLoweringTests
                     second: GetReceiver().Ext(Probe(2L, value)),
                     first: Optional(Ext(GetReceiver(), Probe(1L, value))));
             """);
-        var calls = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
+        var calls = lowered.Instructions
             .OfType<IrCallInstruction>()
             .ToArray();
         var names = calls
@@ -476,8 +463,7 @@ public sealed class ProgramLoweringTests
                 return values[1];
             }
             """);
-        var calls = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
+        var calls = lowered.Instructions
             .OfType<IrCallInstruction>()
             .ToArray();
         long[] expectedMarkers = [1L, 2L];
@@ -499,9 +485,7 @@ public sealed class ProgramLoweringTests
                 return checked(values[0] + 1L);
             }
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
         var store = instructions.OfType<IrStoreInstruction>().Single();
         var load = instructions.OfType<IrLoadInstruction>().Single();
         var returned = instructions.OfType<IrReturnInstruction>()
@@ -540,8 +524,7 @@ public sealed class ProgramLoweringTests
                 return cell;
             }
             """);
-        var calls = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
+        var calls = lowered.Instructions
             .OfType<IrCallInstruction>()
             .Select(call => lowered.Factory.GetString(
                 lowered.Factory.GetMemberInfo(call.Member).Name))
@@ -572,9 +555,7 @@ public sealed class ProgramLoweringTests
                 return box.Value;
             }
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
 
         using (Assert.EnterMultipleScope())
         {
@@ -601,9 +582,7 @@ public sealed class ProgramLoweringTests
                 return value;
             }
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
         var calls = instructions.OfType<IrCallInstruction>()
             .Select(call => lowered.Factory.GetString(
                 lowered.Factory.GetMemberInfo(call.Member).Name))
@@ -628,8 +607,7 @@ public sealed class ProgramLoweringTests
                 return values[0];
             }
             """);
-        var calls = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
+        var calls = lowered.Instructions
             .OfType<IrCallInstruction>()
             .ToArray();
         long[] expectedMarkers = [1L, 2L];
@@ -654,9 +632,7 @@ public sealed class ProgramLoweringTests
                 return value;
             }
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
 
         Assert.That(lowered.Result.IsExact, Is.False);
         Assert.That(
@@ -677,8 +653,7 @@ public sealed class ProgramLoweringTests
             public static long Target(long first, long second) =>
                 Select(second: second, first: first);
             """);
-        var call = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
+        var call = lowered.Instructions
             .OfType<IrCallInstruction>()
             .Single();
 
@@ -716,9 +691,7 @@ public sealed class ProgramLoweringTests
             private static Token value;
             private static Token Target() => value;
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
 
         Assert.That(lowered.Result.IsExact, Is.False);
         Assert.That(
@@ -779,9 +752,7 @@ public sealed class ProgramLoweringTests
                 return value.Read();
             }
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
         var storedMemberReceivers = instructions
             .OfType<IrStoreInstruction>()
             .Select(static instruction =>
@@ -823,9 +794,7 @@ public sealed class ProgramLoweringTests
                 return baseValue.Value;
             }
             """);
-        var instructions = lowered.Result.Program.Blocks
-            .SelectMany(static block => block.Instructions)
-            .ToArray();
+        var instructions = lowered.Instructions;
         var members = instructions
             .OfType<IrStoreInstruction>()
             .Select(static instruction => (IrMemberLocation)instruction.Location)
@@ -908,6 +877,9 @@ public sealed class ProgramLoweringTests
         FrontendProgramLoweringResult result)
     {
         internal IrFactory Factory { get; } = factory;
+        internal IrInstruction[] Instructions { get; } =
+            [.. result.Program.Blocks.SelectMany(
+                static block => block.Instructions)];
         internal FrontendProgramLoweringResult Result { get; } = result;
     }
 
