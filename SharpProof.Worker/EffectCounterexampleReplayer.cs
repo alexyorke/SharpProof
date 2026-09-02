@@ -212,7 +212,7 @@ internal static class EffectCounterexampleReplayer
                 ExactExceptionTypeHierarchy = exceptions == null
                     ? []
                     : [.. exceptions],
-                Location = Copy(effectEvent.Location)
+                Location = CompilerSourceLocationAuthority.CopyLocation(effectEvent.Location)
             };
     }
 
@@ -288,28 +288,9 @@ internal static class EffectCounterexampleReplayer
                actual.ExactExceptionTypeHierarchy.SequenceEqual(
                 claimed.ExactExceptionTypeHierarchy,
                 StringComparer.Ordinal) &&
-               LocationsEqual(actual.Location, claimed.Location);
-    }
-
-    private static bool LocationsEqual(
-        WorkerSourceLocation left,
-        WorkerSourceLocation right)
-    {
-        return (left.Path, left.Start, left.Length, left.Line, left.Column) ==
-               (right.Path, right.Start, right.Length, right.Line, right.Column);
-    }
-
-    private static WorkerSourceLocation Copy(
-        WorkerSourceLocation source)
-    {
-        return new WorkerSourceLocation
-        {
-            Path = source.Path,
-            Start = source.Start,
-            Length = source.Length,
-            Line = source.Line,
-            Column = source.Column
-        };
+               CompilerSourceLocationAuthority.LocationsEqual(
+                   actual.Location,
+                   claimed.Location);
     }
 
     private static string? FirstNonblank(

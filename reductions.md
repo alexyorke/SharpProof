@@ -201,6 +201,7 @@ the smallest relevant containerized test target passes.
 | R526 | Share order-insensitive assumption comparison across protocol layers | `SharpProof.Worker.Test`: 695 passed |
 | R539 | Aggregate trusted-boundary assumption flags in one protocol pass | `SharpProof.Worker.Test`: 695 passed |
 | R513 | Share conditional truth operator return-expression extraction | `SharpProof.Effects.Test`: 323 passed |
+| R532 | Reuse compiler source-location copy/equality helpers during replay | `SharpProof.Worker.Test`: 695 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3205,9 +3206,9 @@ interpretation policy while centralizing only the digest construction.
 
 ### Status (part seventy-nine)
 
-R532-R533 are `pending` reduction candidates. R532 is a cross-layer helper
-reuse; R533 centralizes only the zero-location representation and does not
-change ordinary location validity.
+R533 remains `pending`; R532 reuses the compiler source-location copy/equality
+helpers without changing ordinary location validity. R533 centralizes only the
+zero-location representation.
 
 ## Second survey, part eighty: R534-R535 - host path and tool resolution reuse
 
