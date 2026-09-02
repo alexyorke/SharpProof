@@ -8685,3 +8685,47 @@ build-file changes were made during this audit.
 
 R938 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part four hundred forty-nine: R939 - repeated compiler-option reflection lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R939 | **`CompilerOptionWireMappings.ReadInternalBoolean` rediscovers the same reflected property on every read.** The two public overloads pass one of two stable declaring types and a string name into a common helper, which calls `GetProperty` with the same binding flags before checking the Boolean/indexer shape. `CompilerCompilationCapture` reads one option once and the recursive-alias option once per reference, so the latter can repeat identical metadata discovery across the reference closure. A cache keyed by declaring type and property name, including a cached unavailable/invalid result, can preserve the explicit upgrade failure while removing repeated reflection lookup. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerOptionWireMappings.cs:6-42`; calls at `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:109-112,357-360` |
+
+### Status (part four hundred forty-nine)
+
+R939 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred fifty: R940 - repeated analyzer descriptor-array creation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R940 | **Two diagnostic analyzers construct a fresh one-element `ImmutableArray` whenever `SupportedDiagnostics` is queried.** `FinalCompilationCollectorAnalyzer` and the compiler-probe test asset both use collection expressions directly in the override, while `SharpProofAnalyzer` returns a stable engine-owned array and the generated descriptor catalogs use static readonly arrays. A static readonly descriptor array can keep the same analyzer contract without repeatedly allocating the backing storage during analyzer discovery or host inspection. | `SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs:4-8`; `SharpProof.CompilerProbe.TestAsset/CompilerProbeAnalyzer.cs:4-17`; stable comparison at `SharpProof.Analyzer/SharpProofAnalyzer.cs:22-24` |
+
+### Status (part four hundred fifty)
+
+R940 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred fifty-one: R941 - quadratic local-alias membership checks
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R941 | **`OperationNullnessEvaluator.IsSourceDefinitelyNull` stores aliases in a list but performs a linear symbol-equality search for every candidate alias.** Each ref-local alias is appended to `aliases`, and every later alias initializer or assignment calls `aliases.Any` with `SymbolEqualityComparer.Default`; a chain of `n` aliases can therefore perform O(n^2) membership comparisons. A symbol-equality `HashSet` preserves the append/membership semantics and fail-closed assignment detection while making alias admission constant-time. | `SharpProof.Effects/OperationNullnessEvaluator.cs:73-101` |
+
+### Status (part four hundred fifty-one)
+
+R941 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred fifty-two: R942 - double argument-alignment materialization
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R942 | **`EffectCallSiteResolver.AlignActualArguments` builds a mutable array and then copies it into an immutable array.** The method allocates `new IOperation?[parameterCount]`, fills it by parameter ordinal, and returns `ImmutableArray.CreateRange(result)`, which materializes a second backing representation before callers potentially apply `SetItem` again. An immutable-array builder can fill and freeze one representation while preserving skipped/invalid argument handling, ordinal overwrite behavior, and the returned default-free array. | `SharpProof.Effects/EffectCallSiteResolver.cs:163-186` |
+
+### Status (part four hundred fifty-two)
+
+R942 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
