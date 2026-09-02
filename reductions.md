@@ -155,6 +155,7 @@ the smallest relevant containerized test target passes.
 | R462 | Remove the shadowed `modulus.IsOne` boundary normalization branch from `IntervalDomain.Create` | `SharpProof.Dataflow.Test`: 50 passed |
 | R376 | Avoid re-sorting adjacency lists that are already ordered by the graph's canonical edge sort | `SharpProof.Dataflow.Test`: 50 passed |
 | R381 | Reuse `CompilerCallableArtifactReasonCatalog` from the collector instead of emitting a duplicate generated catalog | `SharpProof.Analyzer.Test`: FinalCompilationCollectorTests 55 passed; generator verification passed |
+| R384 | Reuse `HashEncoding.ToLowerHex` for compiler checksum bytes instead of manual nibble formatting | `SharpProof.Worker.Test`: CompilerManifestArtifactTests 91 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1733,7 +1734,6 @@ stream readers, and location authority helpers across `SharpProof.CompilerArtifa
 | R380 | **`CompilerDiagnosticArtifactOrdering` duplicates an 11-stage comparison ladder between LINQ `Canonicalize` and imperative `Compare`.** `SharpProof.CompilerArtifact/CompilationFingerprint.cs:438-453` applies an 11-level chained LINQ sort (`OrderBy(Code).ThenBy(Message)...ThenBy(SourceLineMapSha256)`). Lines 463-521 re-implement the identical 11-stage comparison ladder across 58 lines of manual `StringComparer.Ordinal.Compare` and field-by-field branching in `Compare`. Unifying both paths on a single `IComparer<CompilerDiagnosticArtifact>` eliminates 58 lines of redundant ladder code and prevents ordering divergence. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:438-453, 463-521` |
 | R382 | **`CompilerEffectReplayLowerer.TryResolveSource` duplicates the syntax tree loop from `CompilerSourceLocationAuthority.FindUniqueTree`.** `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:426-455` manually loops over `capturedTrees`, checks `CompilerSourceLocationAuthority.HasValidLocationGeometry`, and verifies single-match uniqueness across 30 lines. `CompilerSourceLocationAuthority.FindUniqueTree` (`CompilerSourceLocationAuthority.cs:115-150`) already implements this exact tree-resolution and ambiguity-checking loop. Delegating `TryResolveSource` to `FindUniqueTree` removes 30 lines of duplicate loop logic. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:426-455`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:115-150` |
 | R383 | **`CompilerManifestArtifact.cs` implements duplicate chunked stream-to-byte-array readers.** `WorkerBinaryIdentity.ReadSnapshotBytes` (`SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:205-231`) and `CompilerManifestArtifactFile.ReadAllBytes` (`SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:980-1009`) implement near-identical bounded buffer-filling loops with EOF checks (`throw new InvalidDataException("... changed while it was read.")`) and trailing-byte verification. Extracting a single bounded stream reader helper eliminates 25+ lines of duplicate buffer-reading boilerplate. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:205-231, 980-1009` |
-| R384 | **`CompilerCompilationCapture.LowerHex` re-implements lowercase hex byte formatting.** `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:230-241` defines a private `LowerHex` method performing manual character array allocation and bit-shift arithmetic to format Roslyn checksums. `SharpProof.Ir/HashEncoding.cs:33-46` already provides `HashEncoding.ToLowerHex(ReadOnlySpan<byte>)`, which `CompilerCompilationCapture.cs` already references elsewhere. Replacing `LowerHex` with `HashEncoding.ToLowerHex` eliminates 12 lines of manual nibble arithmetic. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:213, 230-241`; `SharpProof.Ir/HashEncoding.cs:33-46` |
 | R385 | **`ReplayEventComparer` manually inlines location hashing and comparison instead of reusing `CompilerSourceLocationAuthority`.** `SharpProof.CompilerArtifact/CompilerEffectAuthority.cs:365-371` manually hashes all five fields of `WorkerSourceLocation` (`Path`, `Start`, `Length`, `Line`, `Column`) with bespoke null checks instead of using `CompilerSourceLocationAuthority.GetLocationHashCode` (`CompilerSourceLocationAuthority.cs:228-241`). Reusing the authority keeps location equality and hash distribution centralized. | `SharpProof.CompilerArtifact/CompilerEffectAuthority.cs:365-371`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:228-241` |
 
 ### Checked and not proposed (part thirty-three)
@@ -1745,10 +1745,12 @@ stream readers, and location authority helpers across `SharpProof.CompilerArtifa
 - R381 is now applied: the compiler collector uses the artifact assembly's
   generated callable-reason catalog, so the wire-mapping output no longer emits
   a duplicate catalog.
+- R384 is now applied: compiler capture formats Roslyn checksum bytes through
+  the shared `HashEncoding` implementation.
 
 ### Status (part thirty-three)
 
-R380, R382-R385 are `pending`. R382 and R384 are immediate code and script generator cleanups.
+R380, R382-R383, R385 are `pending`. R382 is an immediate code cleanup.
 R380, R383, and R385 unify comparison, streaming I/O, and location hashing authorities.
 
 ## Second survey, part thirty-four: R386-R392
