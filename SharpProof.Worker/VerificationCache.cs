@@ -642,7 +642,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                     preparedTarget.Target,
                     ordinal,
                     model,
-                    cancellationToken) != WorkerClaimReason.None)
+                    preparedTarget.Postconditions,
+                    cancellationToken: cancellationToken) != WorkerClaimReason.None)
             {
                 return false;
             }
