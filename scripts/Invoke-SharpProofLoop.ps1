@@ -99,6 +99,29 @@ function Get-RequiredHead {
     return $value
 }
 
+function Test-ExactFileBytes {
+    param(
+        [Parameter(Mandatory = $true)][string]$LeftPath,
+        [Parameter(Mandatory = $true)][string]$RightPath
+    )
+
+    if (-not [IO.File]::Exists($LeftPath) -or
+        -not [IO.File]::Exists($RightPath)) {
+        return $false
+    }
+    $left = [IO.File]::ReadAllBytes($LeftPath)
+    $right = [IO.File]::ReadAllBytes($RightPath)
+    if ($left.Length -ne $right.Length) {
+        return $false
+    }
+    for ($index = 0; $index -lt $left.Length; $index++) {
+        if ($left[$index] -ne $right[$index]) {
+            return $false
+        }
+    }
+    return $true
+}
+
 $artifactsRoot = Join-Path $repositoryRoot 'artifacts'
 [IO.Directory]::CreateDirectory($artifactsRoot) | Out-Null
 $snapshotName = '.sharpproof-loop-input-' + [Guid]::NewGuid().ToString('N')
@@ -200,17 +223,15 @@ try {
             -ReferenceObject $untrackedPaths `
             -DifferenceObject $verificationUntracked `
             -SyncWindow 0).Count -ne 0 -or
-        (Get-FileHash -LiteralPath $sourcePatch -Algorithm SHA256).Hash -cne
-        (Get-FileHash -LiteralPath $verificationPatch -Algorithm SHA256).Hash) {
+        -not (Test-ExactFileBytes `
+            -LeftPath $sourcePatch `
+            -RightPath $verificationPatch)) {
         throw 'The host source changed while its loop snapshot was captured.'
     }
     foreach ($relativePath in $untrackedPaths) {
-        if ((Get-FileHash `
-                -LiteralPath (Join-Path $repositoryRoot $relativePath) `
-                -Algorithm SHA256).Hash -cne
-            (Get-FileHash `
-                -LiteralPath (Join-Path $snapshotFiles $relativePath) `
-                -Algorithm SHA256).Hash) {
+        if (-not (Test-ExactFileBytes `
+                -LeftPath (Join-Path $repositoryRoot $relativePath) `
+                -RightPath (Join-Path $snapshotFiles $relativePath))) {
             throw (
                 'An untracked source file changed while its loop snapshot ' +
                 "was captured: '$relativePath'.")

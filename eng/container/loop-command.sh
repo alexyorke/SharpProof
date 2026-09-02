@@ -82,13 +82,11 @@ source_manifest_temp="$(mktemp /tmp/sharpproof-loop-source-files.XXXXXXXX)"
 source_patch="${source_patch_temp}"
 source_manifest="${source_manifest_temp}"
 source_files_root="${source_root}"
-target_patch="$(mktemp /tmp/sharpproof-loop-target-patch.XXXXXXXX)"
 target_manifest="$(mktemp /tmp/sharpproof-loop-target-files.XXXXXXXX)"
 cleanup() {
   rm -f -- \
     "${source_patch_temp}" \
     "${source_manifest_temp}" \
-    "${target_patch}" \
     "${target_manifest}"
   release_lock
 }
@@ -96,60 +94,6 @@ trap cleanup EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-
-get_source_fingerprint() {
-  local root="$1"
-  local head="$2"
-  local patch_path="$3"
-  local manifest_path="$4"
-
-  git -C "${root}" diff \
-    --binary --full-index --no-ext-diff HEAD -- . > "${patch_path}"
-  git -C "${root}" ls-files -z \
-    --others --exclude-standard -- > "${manifest_path}"
-  calculate_source_fingerprint \
-    "${root}" \
-    "${head}" \
-    "${patch_path}" \
-    "${manifest_path}"
-}
-
-calculate_source_fingerprint() {
-  local root="$1"
-  local head="$2"
-  local patch_path="$3"
-  local manifest_path="$4"
-  local patch_hash
-  local untracked_hash
-  patch_hash="$(sha256sum "${patch_path}" | cut -d ' ' -f 1)"
-  untracked_hash="$(
-    while IFS= read -r -d '' relative_path; do
-      case "${relative_path}" in
-        ""|/*|../*|*/../*|*/..)
-          echo "Invalid path in the SharpProof loop source inventory." >&2
-          exit 125
-          ;;
-      esac
-      if [[ ! -f "${root}/${relative_path}" &&
-        ! -L "${root}/${relative_path}" ]]; then
-        echo "Missing file in the SharpProof loop source inventory." >&2
-        exit 125
-      fi
-      printf '%s\0' "${relative_path}"
-      if [[ -L "${root}/${relative_path}" ]]; then
-        printf '120000\0'
-      elif [[ -x "${root}/${relative_path}" ]]; then
-        printf '100755\0'
-      else
-        printf '100644\0'
-      fi
-      git hash-object --no-filters "${root}/${relative_path}"
-    done < "${manifest_path}" |
-      sha256sum | cut -d ' ' -f 1
-  )"
-  printf '%s\n%s\n%s\n' "${head}" "${patch_hash}" "${untracked_hash}" |
-    sha256sum | cut -d ' ' -f 1
-}
 
 snapshot_root="${SHARPPROOF_LOOP_SNAPSHOT_ROOT:-}"
 if [[ -n "${snapshot_root}" ]]; then
@@ -175,17 +119,11 @@ if [[ -n "${snapshot_root}" ]]; then
     echo "SharpProof loop snapshot is incomplete." >&2
     exit 125
   fi
-  source_fingerprint="$(calculate_source_fingerprint \
-    "${source_files_root}" \
-    "${source_head}" \
-    "${source_patch}" \
-    "${source_manifest}")"
 else
-  source_fingerprint="$(get_source_fingerprint \
-    "${source_root}" \
-    "${source_head}" \
-    "${source_patch}" \
-    "${source_manifest}")"
+  git -C "${source_root}" diff \
+    --binary --full-index --no-ext-diff HEAD -- . > "${source_patch}"
+  git -C "${source_root}" ls-files -z \
+    --others --exclude-standard -- > "${source_manifest}"
 fi
 
 if [[ ! -d "${target_root}/.git" ]]; then
@@ -226,49 +164,43 @@ if ! grep -Fxq '/artifacts' "${target_root}/.git/info/exclude"; then
   printf '/artifacts\n' >> "${target_root}/.git/info/exclude"
 fi
 
-target_head="$(git -C "${target_root}" rev-parse HEAD)"
-target_fingerprint="$(get_source_fingerprint \
-  "${target_root}" \
-  "${target_head}" \
-  "${target_patch}" \
-  "${target_manifest}")"
-if [[ "${target_fingerprint}" != "${source_fingerprint}" ]]; then
-  git -C "${target_root}" reset --hard --quiet
-  while IFS= read -r -d '' relative_path; do
-    case "${relative_path}" in
-      ""|/*|../*|*/../*)
-        echo "Invalid path in the SharpProof loop target inventory." >&2
-        exit 125
-        ;;
-    esac
-    if ! grep -Fzxq -- "${relative_path}" "${source_manifest}"; then
-      rm -f -- "${target_root}/${relative_path}"
-    fi
-  done < "${target_manifest}"
-
-  git -C "${target_root}" checkout --quiet --detach "${source_head}"
-  git -C "${target_root}" reset --hard --quiet "${source_head}"
-
-  if [[ -s "${source_patch}" ]]; then
-    git -C "${target_root}" apply \
-      --binary --whitespace=nowarn "${source_patch}"
+git -C "${target_root}" ls-files -z \
+  --others --exclude-standard -- > "${target_manifest}"
+git -C "${target_root}" reset --hard --quiet
+while IFS= read -r -d '' relative_path; do
+  case "${relative_path}" in
+    ""|/*|../*|*/../*)
+      echo "Invalid path in the SharpProof loop target inventory." >&2
+      exit 125
+      ;;
+  esac
+  if ! grep -Fzxq -- "${relative_path}" "${source_manifest}"; then
+    rm -f -- "${target_root}/${relative_path}"
   fi
-  while IFS= read -r -d '' relative_path; do
-    case "${relative_path}" in
-      ""|/*|../*|*/../*)
-        echo "Invalid path in the SharpProof loop source inventory." >&2
-        exit 125
-        ;;
-    esac
-    source_path="${source_files_root}/${relative_path}"
-    target_path="${target_root}/${relative_path}"
-    mkdir -p -- "$(dirname "${target_path}")"
-    if [[ -d "${target_path}" && ! -L "${target_path}" ]]; then
-      rm -rf -- "${target_path}"
-    fi
-    cp -a -- "${source_path}" "${target_path}"
-  done < "${source_manifest}"
+done < "${target_manifest}"
+
+git -C "${target_root}" checkout --quiet --detach "${source_head}"
+git -C "${target_root}" reset --hard --quiet "${source_head}"
+
+if [[ -s "${source_patch}" ]]; then
+  git -C "${target_root}" apply \
+    --binary --whitespace=nowarn "${source_patch}"
 fi
+while IFS= read -r -d '' relative_path; do
+  case "${relative_path}" in
+    ""|/*|../*|*/../*)
+      echo "Invalid path in the SharpProof loop source inventory." >&2
+      exit 125
+      ;;
+  esac
+  source_path="${source_files_root}/${relative_path}"
+  target_path="${target_root}/${relative_path}"
+  mkdir -p -- "$(dirname "${target_path}")"
+  if [[ -d "${target_path}" && ! -L "${target_path}" ]]; then
+    rm -rf -- "${target_path}"
+  fi
+  cp -a -- "${source_path}" "${target_path}"
+done < "${source_manifest}"
 rm -f -- "${target_root}/.git/sharpproof-loop-source-files"
 
 export SHARPPROOF_REPO_ROOT="${target_root}"
