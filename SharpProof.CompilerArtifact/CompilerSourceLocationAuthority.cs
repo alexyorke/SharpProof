@@ -20,14 +20,7 @@ internal static class CompilerSourceLocationAuthority
     }
     internal static bool IsNone(WorkerSourceLocation? value)
     {
-        return value is
-        {
-            Path.Length: 0,
-            Start: 0,
-            Length: 0,
-            Line: 0,
-            Column: 0
-        };
+        return WorkerProtocolJson.IsNoneLocation(value);
     }
 
     internal static bool HasValidLineMap(

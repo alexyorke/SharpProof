@@ -844,11 +844,19 @@ public static partial class WorkerProtocolJson
     {
         return value != null &&
             (WorkerProtocolMetadata.IsSourceLocationValid(value) ||
-             (value.Path.Length == 0 &&
-              value.Start == 0 &&
-              value.Length == 0 &&
-              value.Line == 0 &&
-              value.Column == 0));
+             IsNoneLocation(value));
+    }
+
+    internal static bool IsNoneLocation(WorkerSourceLocation? value)
+    {
+        return value is
+        {
+            Path.Length: 0,
+            Start: 0,
+            Length: 0,
+            Line: 0,
+            Column: 0
+        };
     }
 
     internal static bool HasKnownEffects(WorkerEffectSet effects, WorkerEffectCapabilitySet capabilities)

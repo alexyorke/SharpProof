@@ -202,6 +202,7 @@ the smallest relevant containerized test target passes.
 | R539 | Aggregate trusted-boundary assumption flags in one protocol pass | `SharpProof.Worker.Test`: 695 passed |
 | R513 | Share conditional truth operator return-expression extraction | `SharpProof.Effects.Test`: 323 passed |
 | R532 | Reuse compiler source-location copy/equality helpers during replay | `SharpProof.Worker.Test`: 695 passed |
+| R533 | Share the zero source-location sentinel predicate | `SharpProof.Worker.Test`: 695 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3206,9 +3207,10 @@ interpretation policy while centralizing only the digest construction.
 
 ### Status (part seventy-nine)
 
-R533 remains `pending`; R532 reuses the compiler source-location copy/equality
-helpers without changing ordinary location validity. R533 centralizes only the
-zero-location representation.
+R532 reuses the compiler source-location copy/equality helpers without changing
+ordinary location validity. R533 now centralizes only the zero-location
+representation in the protocol layer while preserving the artifact-layer
+compatibility wrapper.
 
 ## Second survey, part eighty: R534-R535 - host path and tool resolution reuse
 
@@ -3353,3 +3355,13 @@ when reusing the shared HTTPS predicate.
 R551 is a `pending` reduction candidate. Keep the fixture archive's exact-one
 identity-node and release-version checks, and do not broaden the shared package
 identity helper's repository requirements for fixture packages.
+
+## Second survey, part ninety-four: R552 - package-consumer identity reuse
+
+| R552 | **`Test-SharpProofPackageConsumers` reparses the package source after resolving it.** `Resolve-SharpProofPackageSource` already opens every `.nupkg` and `.snupkg`, obtains each `SharpProofPackageIdentity`, and validates that all package and symbol versions agree. After that function returns only the directory path, `Get-SharpProofPortablePackageVersion` enumerates the `.nupkg` files and calls `Get-SharpProofPackageIdentity` again to find the `SharpProof` version. Returning a small validation result containing the canonical identities/version, or caching that result behind a private helper, would avoid repeating archive/nuspec parsing while preserving the source-validation-only and framework-consumer call paths. | `scripts/Test-SharpProofPackageConsumers.ps1:40-76,97-111,479-499` |
+
+### Status (part ninety-four)
+
+R552 is a `pending` reduction candidate. Preserve the existing exact package and
+symbol-set checks and the public source/path behavior; only reuse the already
+validated identity/version data rather than weakening validation.
