@@ -315,19 +315,9 @@ public static partial class LinuxPathIdentity
 
     public static bool IsSameOrDescendant(string path, string directory)
     {
-        var canonicalPath = Canonicalize(path);
-        var canonicalDirectory = Canonicalize(directory);
-        if (string.Equals(
-                canonicalPath,
-                canonicalDirectory,
-                StringComparison.Ordinal))
-        {
-            return true;
-        }
-        var prefix = canonicalDirectory.EndsWith('/')
-            ? canonicalDirectory
-            : canonicalDirectory + '/';
-        return canonicalPath.StartsWith(prefix, StringComparison.Ordinal);
+        return IsCanonicalPathWithin(
+            Canonicalize(path),
+            Canonicalize(directory));
     }
 
     public static bool PathsConflict(string firstPath, string secondPath)
@@ -835,6 +825,11 @@ public static partial class LinuxPathIdentity
     }
 
     private static bool IsPathWithin(string path, string directory)
+    {
+        return IsCanonicalPathWithin(path, directory);
+    }
+
+    private static bool IsCanonicalPathWithin(string path, string directory)
     {
         if (string.Equals(path, directory, StringComparison.Ordinal))
         {

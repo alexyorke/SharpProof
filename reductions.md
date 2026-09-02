@@ -193,6 +193,7 @@ the smallest relevant containerized test target passes.
 | R475 | Share direct by-value call admission checks between spec and summary lowering | `SharpProof.Worker.Test`: 23 focused compiler-call tests |
 | R478 | Share bounded JSON file opening between hashing and UTF-8 readers | `SharpProof.Worker.Test`: ProtocolJsonTests 108; full Worker.Test 695 |
 | R480 | Update the container contract gate to assert the environment-based marker path | `SharpProof.ArchitectureTest`: ContainerAuthorityScriptTests 15 |
+| R484 | Share the canonical path-within-directory comparison used by publication and mount checks | `SharpProof.Worker.Test`: LinuxPublicationSetTests 34 |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2599,8 +2600,10 @@ decided with it, not separately. The `Monitor` declaration is a one-word change.
 
 ### Status (part fifty-seven)
 
-R483-R485 are `pending` review-only candidates. No implementation or build files
-were edited.
+R483 and R485 remain `pending` review-only candidates because their repeated
+filesystem validation is part of publication ownership and lock sequencing.
+R484 is applied: public path canonicalization and private mount parsing now
+share one already-canonical equality/prefix predicate.
 
 ## Second survey, part fifty-eight: R486-R487 - verifier wait-loop constants
 
@@ -3579,3 +3582,19 @@ R572 is a pending test-infrastructure reduction candidate. Preserve the root-spe
 ### Status (part one hundred fourteen)
 
 R573 is a pending release/evidence-pipeline reduction and validation candidate. Preserve the child-side check; the outer check should either validate the field it reads or stop constructing an unused identity object.
+
+## Second survey, part one hundred fifteen: R574 - repeated mutation-baseline parsing
+
+| R574 | **`Invoke-SharpProofTrustedMutationsParallel` reparses its baseline JSON across one decision path.** `Test-CompleteBaseline` reads and converts `baseline.json` to decide whether it is reusable; after that decision the script reads and converts the same file again to obtain the timing and test-count fields. When a fresh baseline is generated, the post-write `Test-CompleteBaseline` call adds a third full read/parse before the unconditional read at the timing projection. Returning the validated object from the helper, or caching the post-write result while preserving the second validation boundary, can remove redundant disk I/O and JSON parsing without weakening stale-baseline rejection. | `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1:218-281` |
+
+### Status (part one hundred fifteen)
+
+R574 is a pending mutation-pipeline reduction candidate. Preserve validation after baseline generation; only reuse the already-parsed, successfully validated document for the subsequent timing projection.
+
+## Second survey, part one hundred sixteen: R575 - repeated mutation-shard validation
+
+| R575 | **`Invoke-SharpProofTrustedMutationsParallel` reparses and revalidates each shard before consuming it.** `Test-CompleteShard` reads the shard and all referenced TRX evidence; a reused shard is then read and converted to JSON again for `New-ShardTiming`, a newly finished shard is validated and immediately read again for timing, and the final aggregation validates every shard once more before reading it again to collect mutations. A helper that returns the validated evidence object (or a per-shard cache keyed by the immutable receipt path) can preserve the post-process and final catalog-coverage checks while removing repeated JSON reads and TRX parsing. | `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1:118-213,318-326,382-397,411-425` |
+
+### Status (part one hundred sixteen)
+
+R575 is a pending mutation-pipeline reduction candidate. Keep the final catalog-count and uniqueness assertions and the validation boundary after each child process; only avoid reparsing evidence that has already passed the same checks.
