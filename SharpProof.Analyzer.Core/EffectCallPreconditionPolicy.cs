@@ -111,7 +111,7 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
             }
 
             variables.Add(variable.Variable, value);
-            if (IsDefinitelyString(actual))
+            if (DefiniteOperationFacts.IsDefinitelyString(actual))
             {
                 definitelyStrings.Add(
                     variable.Variable);
@@ -296,10 +296,4 @@ internal sealed class AnalyzerEffectCallPreconditionPolicy(
                 !clause.IsValid);
     }
 
-    private static bool IsDefinitelyString(
-        IOperation operation)
-    {
-        return DefiniteOperationFacts
-            .IsDefinitelyString(operation);
-    }
 }

@@ -404,7 +404,7 @@ internal static partial class RequiresCallSiteAnalyzer
                 }
 
                 variables.Add(variable.Variable, value);
-                if (IsDefinitelyString(actual))
+                if (DefiniteOperationFacts.IsDefinitelyString(actual))
                 {
                     definitelyStrings.Add(variable.Variable);
                 }
@@ -687,11 +687,6 @@ internal static partial class RequiresCallSiteAnalyzer
         }
 
         return result;
-    }
-
-    private static bool IsDefinitelyString(IOperation operation)
-    {
-        return DefiniteOperationFacts.IsDefinitelyString(operation);
     }
 
 }
