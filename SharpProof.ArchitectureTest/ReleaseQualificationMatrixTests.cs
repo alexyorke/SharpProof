@@ -220,25 +220,26 @@ public sealed partial class ReleaseQualificationMatrixTests
         string executable,
         params string[] arguments)
     {
-        var start = new ProcessStartInfo(executable)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        foreach (var argument in arguments)
-        {
-            start.ArgumentList.Add(argument);
-        }
-        using var process = Process.Start(start)!;
-        var output = await process.StandardOutput.ReadToEndAsync();
-        var error = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        Assert.That(process.ExitCode, Is.Zero, output + error);
-        return output;
+        var result = await RunProcessAsync(
+            workingDirectory,
+            executable,
+            arguments);
+        Assert.That(result.ExitCode, Is.Zero, result.Output);
+        return result.Output;
     }
 
     private static async Task<int> RunExitCodeAsync(
+        string workingDirectory,
+        string executable,
+        params string[] arguments)
+    {
+        return (await RunProcessAsync(
+            workingDirectory,
+            executable,
+            arguments)).ExitCode;
+    }
+
+    private static async Task<ProcessResult> RunProcessAsync(
         string workingDirectory,
         string executable,
         params string[] arguments)
@@ -254,12 +255,20 @@ public sealed partial class ReleaseQualificationMatrixTests
             start.ArgumentList.Add(argument);
         }
         using var process = Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
-        return process.ExitCode;
+        return new(
+            process.ExitCode,
+            (await output) + Environment.NewLine + await error);
     }
 
     [GeneratedRegex(
         @"tooling\s+acceptance\s+-Configuration\s+Debug",
         RegexOptions.CultureInvariant)]
     private static partial Regex FoldedCommand();
+
+    private readonly record struct ProcessResult(
+        int ExitCode,
+        string Output);
 }
