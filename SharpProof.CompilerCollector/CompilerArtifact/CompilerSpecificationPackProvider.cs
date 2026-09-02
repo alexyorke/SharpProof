@@ -591,15 +591,16 @@ internal sealed class CompilerSpecificationPackProvider
                     RequiredInt32(element, "ordinal", context));
             case "boolean":
                 RequireObject(element, context, "kind", "type", "value");
+                var booleanValue = Get("value");
                 if (type != IrTypeKind.Boolean ||
-                    Get("value").ValueKind is not JsonValueKind.True and
+                    booleanValue.ValueKind is not JsonValueKind.True and
                         not JsonValueKind.False)
                 {
                     throw new InvalidDataException(
                         "A specification-pack Boolean literal is invalid.");
                 }
 
-                return new BooleanTerm(Get("value").GetBoolean());
+                return new BooleanTerm(booleanValue.GetBoolean());
             case "integer":
                 RequireObject(element, context, "kind", "type", "value");
                 if (type != IrTypeKind.Integer ||

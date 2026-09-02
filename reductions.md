@@ -190,6 +190,7 @@ the smallest relevant containerized test target passes.
 | R623 | Share corpus observation collection between gate execution and snapshot rendering | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R869 | Validate IR sequence elements while taking the immutable snapshot | `SharpProof.Ir.Test`: 114 passed |
 | R870 | Remove the redundant IR location type-table lookup | `SharpProof.Ir.Test`: 114 passed |
+| R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -8196,8 +8197,10 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred seven)
 
-R897 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R897 is `applied`: Boolean specification terms now cache the required `value`
+property before validating its JSON kind and constructing the term, preserving
+strict malformed-input rejection while removing the repeated property lookup.
+CompilerSpecificationPackProviderTests passed.
 
 ## Second survey, part four hundred eight: R898 - repeated specification result-type proof
 
