@@ -39,7 +39,6 @@ function Get-SharpProofReleaseVersionAuthority {
     param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
 
     $root = [IO.Path]::GetFullPath($RepositoryRoot)
-    $path = Join-Path $root 'SharpProof.Release.props'
     return [pscustomobject][ordered]@{
         schemaVersion = 1
         path = 'SharpProof.Release.props'

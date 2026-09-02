@@ -197,6 +197,7 @@ the smallest relevant containerized test target passes.
 | R485 | Share initial publication-path filtering and topology validation | `SharpProof.Worker.Test`: LinuxPublicationSetTests 34 |
 | R498 | Reuse the built-in string-concatenation predicate in the binary effect resolver | `SharpProof.Effects.Test`: StringConcatenation tests 3 passed |
 | R503 | Remove redundant and inert `.gitignore` negation rules | `git check-ignore`: 4 probes and 940 tracked paths passed |
+| R555 | Remove the unread release-authority path local | `SharpProof.ArchitectureTest`: ReleaseConfigurationScript 1 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3443,9 +3444,8 @@ it; the repository-local evidence shows no active consumer.
 
 ### Status (part ninety-seven)
 
-R555 is a `pending` reduction candidate. Remove only the unread local; retain the
-root normalization and delegated version lookup because callers may pass a
-relative repository path.
+R555 is applied: the authority projection no longer computes an unread absolute
+props path; root normalization and delegated version lookup remain unchanged.
 
 ## Second survey, part ninety-eight: R556 - release-config forwarding wrapper
 
