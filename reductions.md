@@ -6934,3 +6934,26 @@ R827 is `deferred`: the extra scan is bounded by one callable's clause list,
 R828 is `deferred`: the duplicate boolean check has no measurable runtime cost,
   but it obscures which part of the equality is authoritative in the final
   pass/fail contract.
+
+## Second survey, part three hundred forty: R829 - defensive exception-hierarchy deduplication
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R829 | **`CompilerExceptionTypeIdentity.EncodeHierarchy` deduplicates a traversal that is already a linear base-type chain.** The method appends one encoded identity for `type`, then repeatedly follows `BaseType` until null; for a valid Roslyn class symbol, that inheritance chain cannot revisit a base node. The final `Distinct(StringComparer.Ordinal)` therefore appears to be defensive normalization rather than a reachable duplicate-removal step, and it allocates another enumerable pass before sorting. If compiler symbols are guaranteed to be acyclic and the encoded identity is injective for the chain, removing `Distinct` would leave the same hierarchy and make the method's linear behavior explicit. | `SharpProof.Analyzer.Core/CompilerArtifact/CompilerExceptionTypeIdentity.cs:29-39` |
+
+### Checked and not proposed (part three hundred forty)
+
+- The base-type walk must remain null-safe and must preserve the existing
+  ordinal sort and encoded generic-argument assembly identities.
+- The deduplication may be an intentional guard for malformed metadata or
+  future identity-format collisions; those boundary assumptions need tests
+  before changing the output contract used by replay evidence.
+- `CompilerExceptionTypeIdentity.Encode` itself is not proposed for removal:
+  its documentation-ID preflight and generic-argument assembly suffix carry
+  identity semantics that the hierarchy projection consumes.
+
+### Status (part three hundred forty)
+
+R829 is `deferred`: it is a small, potentially redundant defensive pass, but
+  the exception hierarchy is serialized evidence and should not lose a
+  fail-closed guard without proving the symbol and encoding invariants.
