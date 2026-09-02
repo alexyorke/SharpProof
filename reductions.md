@@ -205,6 +205,7 @@ the smallest relevant containerized test target passes.
 | R533 | Share the zero source-location sentinel predicate | `SharpProof.Worker.Test`: 695 passed |
 | R534 | Derive reset marker paths from already-canonical publication paths | `SharpProof.Worker.Test`: 695 passed |
 | R538 | Reuse shared sequential/reverse reachability stack helpers | `SharpProof.Effects.Test`: 323 passed |
+| R528 | Share the generated allocation-uncertainty marker predicate | `SharpProof.Effects.Test`: 323 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3177,8 +3178,8 @@ deliberate failure and status precedence.
 
 ### Status (part seventy-six)
 
-R528 is a `pending` reduction candidate. The suggested reuse keeps the
-allocation lattice and projection policy unchanged; it removes only the
+R528 is applied and validated by the Effects suite. The shared predicate keeps
+the allocation lattice and projection policy unchanged; it removes only the
 duplicated sentinel encoding.
 
 ## Second survey, part seventy-seven: R529-R530 - compiler ordering and wire validation
@@ -3397,3 +3398,13 @@ it; the repository-local evidence shows no active consumer.
 R555 is a `pending` reduction candidate. Remove only the unread local; retain the
 root normalization and delegated version lookup because callers may pass a
 relative repository path.
+
+## Second survey, part ninety-eight: R556 - release-config forwarding wrapper
+
+| R556 | **`Require-SetMembers` is a misleading pure forwarding wrapper.** In `Test-SharpProofReleaseConfiguration.ps1` the helper accepts an actual string set and an expected object set, then immediately calls `Require-ExactSet` with the same values. Both of its call sites therefore enforce exact equality, not subset membership; removing the wrapper and calling the canonical helper directly eliminates an extra name and avoids suggesting a weaker policy than the code actually applies. | `scripts/Test-SharpProofReleaseConfiguration.ps1:59-67,281-295` |
+
+### Status (part ninety-eight)
+
+R556 is a `pending` reduction candidate. Preserve the expected-value string
+conversion and duplicate detection in `Require-ExactSet`; only remove the alias
+whose name does not describe the enforced comparison.

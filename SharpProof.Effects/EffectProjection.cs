@@ -13,8 +13,7 @@ public static class EffectSummaryProjector
 
         var effects = ProjectRegions(summary.Reads, isWrite: false) |
                       ProjectRegions(summary.Writes, isWrite: true);
-        var allocationUnknown =
-            (summary.Allocation & (EffectAllocationKind)(1 << 2)) != 0;
+        var allocationUnknown = EffectSummary.IsUnknownAllocation(summary.Allocation);
         if (summary.Allocation != EffectAllocationKind.None && !allocationUnknown)
         {
             effects |= EffectContractKind.Allocates;

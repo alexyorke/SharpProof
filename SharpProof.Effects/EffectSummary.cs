@@ -138,12 +138,17 @@ public sealed record EffectSummary
             throw new ArgumentOutOfRangeException(nameof(allocation));
         }
 
-        var unknownMarker = (EffectAllocationKind)(1 << 2);
-        if ((allocation & unknownMarker) != 0 &&
+        if (IsUnknownAllocation(allocation) &&
             allocation != EffectAllocationKind.Unknown)
         {
             throw new ArgumentOutOfRangeException(nameof(allocation));
         }
+    }
+
+    internal static bool IsUnknownAllocation(EffectAllocationKind allocation)
+    {
+        return (allocation &
+            (EffectAllocationKind.Unknown & ~EffectAllocationKind.ManagedAndNative)) != 0;
     }
 }
 
