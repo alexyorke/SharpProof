@@ -309,17 +309,8 @@ internal sealed class ContractApiIdentityResolver
     private static ImmutableArray<byte>
         ReadExpectedPayloadSha256()
     {
-        var values = typeof(ContractApiIdentityResolver)
-            .Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Where(static attribute => string.Equals(
-                attribute.Key,
-                ContractApiMetadata
-                    .AttributesPayloadSha256MetadataKey,
-                StringComparison.Ordinal))
-            .Select(static attribute => attribute.Value)
-            .Distinct(StringComparer.Ordinal)
-            .ToImmutableArray();
+        var values = ReadAssemblyMetadataValues(
+            ContractApiMetadata.AttributesPayloadSha256MetadataKey);
         if (values.Length != 1 ||
             values[0] is not
             {
@@ -349,20 +340,27 @@ internal sealed class ContractApiIdentityResolver
 
     private static Guid ReadExpectedModuleVersionId()
     {
-        var values = typeof(ContractApiIdentityResolver)
-            .Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Where(static attribute => string.Equals(
-                attribute.Key,
-                AttributesAssemblyMvidMetadataKey,
-                StringComparison.Ordinal))
-            .Select(static attribute => attribute.Value)
-            .Distinct(StringComparer.Ordinal)
-            .ToImmutableArray();
+        var values = ReadAssemblyMetadataValues(
+            AttributesAssemblyMvidMetadataKey);
         return values.Length == 1 &&
             Guid.TryParseExact(values[0], "D", out var result)
                 ? result
                 : Guid.Empty;
+    }
+
+    private static ImmutableArray<string> ReadAssemblyMetadataValues(
+        string key)
+    {
+        return typeof(ContractApiIdentityResolver)
+            .Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .Where(attribute => string.Equals(
+                attribute.Key,
+                key,
+                StringComparison.Ordinal))
+            .Select(static attribute => attribute.Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableArray();
     }
 
     private bool IsAttribute(INamedTypeSymbol candidate)
