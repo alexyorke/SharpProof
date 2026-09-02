@@ -543,20 +543,25 @@ internal static partial class AnalyzerFeaturePipeline
         var constructors = (isStatic
                 ? type.StaticConstructors
                 : type.InstanceConstructors)
-            .OrderBy(static candidate => candidate.DeclaringSyntaxReferences
-                .FirstOrDefault()?.SyntaxTree.FilePath, StringComparer.Ordinal)
-            .ThenBy(static candidate => candidate.DeclaringSyntaxReferences
-                .FirstOrDefault()?.Span.Start ?? int.MaxValue)
-            .Where(candidate =>
+            .Select(static candidate =>
+            {
+                var reference = candidate.DeclaringSyntaxReferences.FirstOrDefault();
+                return (Candidate: candidate, Reference: reference);
+            })
+            .OrderBy(static item => item.Reference?.SyntaxTree.FilePath,
+                StringComparer.Ordinal)
+            .ThenBy(static item => item.Reference?.Span.Start ?? int.MaxValue)
+            .Where(item =>
                 !AnalyzerGeneratedCodePolicy.IsGenerated(
-                    candidate,
-                    candidate.DeclaringSyntaxReferences.FirstOrDefault()?.SyntaxTree ??
+                    item.Candidate,
+                    item.Reference?.SyntaxTree ??
                         initializer.SyntaxTree,
                     context.Compilation,
                     context.CancellationToken) &&
                 !IsThisDelegatingConstructor(
-                    candidate,
+                    item.Candidate,
                     context.CancellationToken))
+            .Select(static item => item.Candidate)
             .ToArray();
         var root = context.SemanticModel.GetOperation(
             initializer.Value, context.CancellationToken);
