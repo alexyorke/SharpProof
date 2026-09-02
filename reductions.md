@@ -4005,7 +4005,9 @@ input-nullability and recursive-pattern decisions.
 
 ### Status (part one hundred fifty-three)
 
-R612 is a pending local Effects reduction candidate. Preserve floating-point NaN behavior and the distinction between an unsupported comparison and a definite non-match; consolidate only the repeated relational operator mapping.
+R612 is applied: relational patterns and floating-point constant matching now
+share the comparison-result selector, while explicit NaN handling and the
+unsupported-comparison boundary remain unchanged.
 
 ## Second survey, part one hundred fifty-four: R613 - repeated total-pattern query
 
@@ -4190,3 +4192,11 @@ R632 is a pending fixture-infrastructure reduction candidate. Preserve cleanup i
 ### Status (part one hundred seventy-four)
 
 R633 is a pending fuzz-oracle infrastructure reduction candidate. Preserve collectible unloading, image ownership/disposal, runtime-type lookup failures, and distinct batch versus semantic-edge result handling; share only the assembly lifetime scaffold.
+
+## Second survey, part one hundred seventy-five: R634 - unused authentication wait parameter
+
+| R634 | **`RunVerifier.ShouldDeferSupervisorAuthentication` carries an ignored `interrupted` parameter.** The method assigns `_ = interrupted` and returns only `authenticationRequired && !outputCompleted`; its sole production caller passes the already-computed interruption state, but that state cannot affect the decision. The three-way test in `BuildTaskTests.InterruptedAuthenticationWaitDefersIncompleteProtocolDrain` confirms identical behavior for both values. Removing the parameter and the discard assignment would make the helper's actual policy explicit and remove an accidental API seam; preserve the existing authentication/output-completion rule and the caller's separate cancellation handling. | `SharpProof.BuildTasks/RunVerifier.cs:305-312,495-502`; `SharpProof.Package.Test/BuildTaskTests.cs:209-232` |
+
+### Status (part one hundred seventy-five)
+
+R634 is a pending build-task simplification candidate. Preserve the separate interruption/cancellation handling at the call site; only remove the unused parameter from the pure authentication predicate.

@@ -629,14 +629,7 @@ internal static class SwitchExpressionFacts
             return SwitchExpressionSelection.Maybe;
         }
 
-        var matches = pattern.OperatorKind switch
-        {
-            BinaryOperatorKind.LessThan => comparison < 0,
-            BinaryOperatorKind.LessThanOrEqual => comparison <= 0,
-            BinaryOperatorKind.GreaterThan => comparison > 0,
-            BinaryOperatorKind.GreaterThanOrEqual => comparison >= 0,
-            _ => false
-        };
+        var matches = Matches(pattern.OperatorKind, comparison);
         return matches
             ? SwitchExpressionSelection.Always
             : SwitchExpressionSelection.Never;
@@ -721,14 +714,9 @@ internal static class SwitchExpressionFacts
         double left,
         double right)
     {
-        return operatorKind switch
-        {
-            BinaryOperatorKind.LessThan => left < right,
-            BinaryOperatorKind.LessThanOrEqual => left <= right,
-            BinaryOperatorKind.GreaterThan => left > right,
-            BinaryOperatorKind.GreaterThanOrEqual => left >= right,
-            _ => false
-        };
+        return double.IsNaN(left) || double.IsNaN(right)
+            ? false
+            : Matches(operatorKind, left.CompareTo(right));
     }
 
     private static bool Matches(BinaryOperatorKind operatorKind, int comparison)
