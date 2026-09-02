@@ -176,8 +176,15 @@ public sealed class ProofKernelTests
         Assert.That(OutcomeCachePolicy.IsCacheable(incomplete), Is.False);
     }
 
-    [Test]
-    public async Task UndefinedPostconditionIsTypedSeparatelyFromReplayFailure()
+    [TestCase(
+        ProofDiagnosticKind.Postcondition,
+        AbstentionReason.PostconditionMayBeUndefined)]
+    [TestCase(
+        ProofDiagnosticKind.InternalConsistency,
+        AbstentionReason.InternalConsistencyMayBeUndefined)]
+    public async Task UndefinedGoalIsTypedSeparatelyFromReplayFailure(
+        ProofDiagnosticKind diagnosticKind,
+        AbstentionReason expectedReason)
     {
         var factory = new IrFactory();
         var divisor = factory.CreateVariable("divisor", factory.IntegerType);
@@ -186,7 +193,7 @@ public sealed class ProofKernelTests
                 factory.Integer(0), factory.Variable(divisor)),
             factory.Integer(0));
         var query = new VerificationQuery(factory, [],
-            new Goal(factory, predicate, ProofDiagnosticKind.Postcondition, new SourceLocationId(0)),
+            new Goal(factory, predicate, diagnosticKind, new SourceLocationId(0)),
             [divisor]);
         var model = new BackendModel([
             KeyValuePair.Create(divisor, factory.CreateIntegerValue(0))
@@ -197,33 +204,8 @@ public sealed class ProofKernelTests
 
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.PostconditionMayBeUndefined));
+            Is.EqualTo(expectedReason));
         Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.False);
-    }
-
-    [Test]
-    public async Task UndefinedInternalConsistencyIsTypedSeparatelyFromReplayFailure()
-    {
-        var factory = new IrFactory();
-        var divisor = factory.CreateVariable("divisor", factory.IntegerType);
-        var predicate = factory.Binary(IrBinaryOperator.Equal,
-            factory.Binary(IrBinaryOperator.Divide,
-                factory.Integer(0), factory.Variable(divisor)),
-            factory.Integer(0));
-        var query = new VerificationQuery(factory, [],
-            new Goal(factory, predicate, ProofDiagnosticKind.InternalConsistency,
-                new SourceLocationId(0)),
-            [divisor]);
-        var model = new BackendModel([
-            KeyValuePair.Create(divisor, factory.CreateIntegerValue(0))
-        ]);
-
-        var outcome = await new ProofKernel(
-            new StubBackend(BackendCheckResult.Satisfiable(model))).VerifyAsync(query);
-
-        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
-        Assert.That(((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.InternalConsistencyMayBeUndefined));
     }
 
     [Test]
