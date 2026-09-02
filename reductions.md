@@ -4299,7 +4299,7 @@ R703 completed: package-authority tests now use scoped `TempDirectory` fixtures 
 
 | R704 | **`PackageDependencyAuthorityTests.RunAuthorityAsync` duplicates the PowerShell process lifecycle already owned by `RunPowerShellAsync`.** The package-graph path reconstructs `ProcessStartInfo`, fixed `pwsh` arguments, redirected stream reads, exit waiting, and `ProcessResult` assembly, while the component-authority path uses the existing helper for the same runner shape. Route both paths through the common runner and parameterize only the script-specific arguments, retaining the helper script path, package-path forwarding, exit code, and combined output semantics. | `SharpProof.ArchitectureTest/PackageDependencyAuthorityTests.cs:371-416,418-482` |
 
-R704 is a pending architecture-test process-runner reduction candidate. Preserve the generated runner contents, argument ordering, stderr/stdout combination, and result status semantics.
+R704 completed: package-graph authority now routes through the shared PowerShell runner, preserving generated runner contents, argument ordering, stderr/stdout combination, and result status semantics.
 
 ### Status (part two hundred thirty-eight)
 

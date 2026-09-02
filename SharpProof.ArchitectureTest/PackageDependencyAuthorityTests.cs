@@ -348,35 +348,7 @@ public sealed class PackageDependencyAuthorityTests
             "-PackagePaths $PackagePaths\n" +
             "$graph | ConvertTo-Json -Compress\n",
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "pwsh",
-            WorkingDirectory = repositoryRoot,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        startInfo.ArgumentList.Add("-NoLogo");
-        startInfo.ArgumentList.Add("-NoProfile");
-        startInfo.ArgumentList.Add("-File");
-        startInfo.ArgumentList.Add(runner);
-        startInfo.ArgumentList.Add(Path.Combine(
-            repositoryRoot,
-            "scripts",
-            "Test-SharpProofPackageDependencies.ps1"));
-        foreach (var path in paths)
-        {
-            startInfo.ArgumentList.Add(path);
-        }
-
-        using var process = Process.Start(startInfo)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return new ProcessResult(
-            process.ExitCode,
-            (await output) + Environment.NewLine + (await error));
+        return await RunPowerShellAsync(repositoryRoot, runner, paths);
     }
 
     private static async Task<ProcessResult> RunComponentAuthorityAsync(
