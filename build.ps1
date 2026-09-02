@@ -49,7 +49,8 @@ function Invoke-Container(
     $previousComposeProgress = $env:COMPOSE_PROGRESS
     try {
         $env:COMPOSE_PROGRESS = 'quiet'
-        $arguments = @('compose', 'run', '--rm')
+        $arguments = @(
+            'compose', 'run', '--rm', '--no-TTY', '--quiet-pull')
         foreach ($name in @($Environment.Keys | Sort-Object)) {
             $value = [string]$Environment[$name]
             [Environment]::SetEnvironmentVariable($name, $value, 'Process')

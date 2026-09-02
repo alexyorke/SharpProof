@@ -120,6 +120,8 @@ Finite `build.ps1` profiles and their equivalent
 snapshot in a private temporary workspace and pay a cold build; use them for
 qualification, not for every edit. `contract`, `build`, and ordinary test
 commands work when the source directory came from an archive without `.git`.
+For direct Compose runs, add `--no-TTY --quiet-pull` for the same concise
+terminal behavior that `build.ps1` uses by default.
 
 For a host-edited Git checkout, the separate `loop` service provides the same
 warm-build behavior without writing Linux outputs into the host tree:
