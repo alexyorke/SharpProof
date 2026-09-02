@@ -1038,38 +1038,37 @@ internal static class PerformanceGate
     internal static string CreateCallBearingUnannotatedAdvisorySource(
         int methodCount)
     {
-        var builder = new StringBuilder();
-        builder.AppendLine(
-            "public static class UnannotatedAdvisoryFixture {");
-        builder.AppendLine(
-            "    private static int Normalize(int value) => value;");
-        for (var index = 0; index < methodCount; index++)
-        {
-            builder.Append("    public static int M")
-                .Append(index.ToString(CultureInfo.InvariantCulture))
-                .Append(
-                    "(int value) => System.Math.Max(Normalize(value), ")
-                .Append(index.ToString(CultureInfo.InvariantCulture))
-                .AppendLine(");");
-        }
-
-        builder.AppendLine("}");
-        return builder.ToString();
+        return CreateUnannotatedAdvisorySource(methodCount, callsMath: true);
     }
 
     private static string CreateCallFreeUnannotatedAdvisorySource(
         int methodCount)
     {
+        return CreateUnannotatedAdvisorySource(methodCount, callsMath: false);
+    }
+
+    private static string CreateUnannotatedAdvisorySource(
+        int methodCount,
+        bool callsMath)
+    {
         var builder = new StringBuilder();
         builder.AppendLine(
             "public static class UnannotatedAdvisoryFixture {");
+        if (callsMath)
+        {
+            builder.AppendLine(
+                "    private static int Normalize(int value) => value;");
+        }
         for (var index = 0; index < methodCount; index++)
         {
+            var indexText = index.ToString(CultureInfo.InvariantCulture);
             builder.Append("    public static int M")
-                .Append(index.ToString(CultureInfo.InvariantCulture))
-                .Append("(int value) => value + ")
-                .Append(index.ToString(CultureInfo.InvariantCulture))
-                .AppendLine(";");
+                .Append(indexText)
+                .Append(callsMath
+                    ? "(int value) => System.Math.Max(Normalize(value), "
+                    : "(int value) => value + ")
+                .Append(indexText)
+                .AppendLine(callsMath ? ");" : ";");
         }
 
         builder.AppendLine("}");
