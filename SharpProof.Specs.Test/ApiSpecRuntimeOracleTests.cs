@@ -156,8 +156,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
             throws: Throws(
                 "reference-type and value-type generic instantiations",
                 [
-                    ThrowEdge.For(InvokeEmptyObjectArray),
-                    ThrowEdge.For(InvokeEmptyIntegerArray)
+                    RuntimeEdge.For(InvokeEmptyObjectArray),
+                    RuntimeEdge.For(InvokeEmptyIntegerArray)
                 ],
                 DoesNotThrowMutation),
             nullness: Nullness(
@@ -176,8 +176,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
             throws: Throws(
                 "reference-type and value-type generic instantiations",
                 [
-                    ThrowEdge.For(EnumerateEmptyObjects),
-                    ThrowEdge.For(EnumerateEmptyIntegers)
+                    RuntimeEdge.For(EnumerateEmptyObjects),
+                    RuntimeEdge.For(EnumerateEmptyIntegers)
                 ],
                 DoesNotThrowMutation),
             nullness: Nullness(
@@ -200,10 +200,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "first add of null and non-null values",
                 [
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareEmptyList,
                         AddNullToPreparedList),
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareEmptyList,
                         AddItemToPreparedList)
                 ],
@@ -220,18 +220,18 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "negative, zero, and maximum inputs",
                 [
-                    AllocationEdge.For(AbsNegative),
-                    AllocationEdge.For(AbsZero),
-                    AllocationEdge.For(AbsMaximum)
+                    RuntimeEdge.For(AbsNegative),
+                    RuntimeEdge.For(AbsZero),
+                    RuntimeEdge.For(AbsMaximum)
                 ],
                 SpecAllocationBehavior.MayAllocate),
             throws: Throws(
                 "negative, zero, maximum, and minimum inputs",
                 [
-                    ThrowEdge.For(AbsNegative),
-                    ThrowEdge.For(AbsZero),
-                    ThrowEdge.For(AbsMaximum),
-                    ThrowEdge.For(AbsMinimum)
+                    RuntimeEdge.For(AbsNegative),
+                    RuntimeEdge.For(AbsZero),
+                    RuntimeEdge.For(AbsMaximum),
+                    RuntimeEdge.For(AbsMinimum)
                 ],
                 new ThrowClaim(
                     SpecThrowBehavior.MayThrow,
@@ -263,18 +263,18 @@ public sealed partial class ApiSpecRuntimeOracleTests
             ObserveExceptionStringConstructorEffect,
             SpecEffect.None,
             [
-                new AllocationEdge(
+                new RuntimeEdge(
                     PrepareExceptionConstructorReceiver,
                     InvokePreparedExceptionStringConstructor),
-                new AllocationEdge(
+                new RuntimeEdge(
                     PrepareExceptionConstructorReceiver,
                     InvokePreparedExceptionNullStringConstructor)
             ],
             [
-                new ThrowEdge(
+                new RuntimeEdge(
                     PrepareExceptionConstructorReceiver,
                     InvokePreparedExceptionStringConstructor),
-                new ThrowEdge(
+                new RuntimeEdge(
                     PrepareExceptionConstructorReceiver,
                     InvokePreparedExceptionNullStringConstructor)
             ]);
@@ -297,18 +297,18 @@ public sealed partial class ApiSpecRuntimeOracleTests
             ObserveInvalidOperationExceptionStringConstructorEffect,
             SpecEffect.None,
             [
-                new AllocationEdge(
+                new RuntimeEdge(
                     PrepareInvalidOperationExceptionConstructorReceiver,
                     InvokePreparedInvalidOperationExceptionStringConstructor),
-                new AllocationEdge(
+                new RuntimeEdge(
                     PrepareInvalidOperationExceptionConstructorReceiver,
                     InvokePreparedInvalidOperationExceptionNullStringConstructor)
             ],
             [
-                new ThrowEdge(
+                new RuntimeEdge(
                     PrepareInvalidOperationExceptionConstructorReceiver,
                     InvokePreparedInvalidOperationExceptionStringConstructor),
-                new ThrowEdge(
+                new RuntimeEdge(
                     PrepareInvalidOperationExceptionConstructorReceiver,
                     InvokePreparedInvalidOperationExceptionNullStringConstructor)
             ]);
@@ -324,7 +324,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "an already allocated receiver, excluding newobj",
                 [
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareObjectConstructorReceiver,
                         InvokePreparedObjectConstructor)
                 ],
@@ -332,7 +332,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             throws: Throws(
                 "an already allocated receiver",
                 [
-                    new ThrowEdge(
+                    new RuntimeEdge(
                         PrepareObjectConstructorReceiver,
                         InvokePreparedObjectConstructor)
                 ],
@@ -340,7 +340,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             termination: Termination(
                 "an already allocated receiver",
                 [
-                    new ThrowEdge(
+                    new RuntimeEdge(
                         PrepareObjectConstructorReceiver,
                         InvokePreparedObjectConstructor)
                 ],
@@ -357,16 +357,16 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "null/null and two non-empty strings",
                 [
-                    AllocationEdge.For(ConcatNulls),
-                    AllocationEdge.For(ConcatNonEmpty)
+                    RuntimeEdge.For(ConcatNulls),
+                    RuntimeEdge.For(ConcatNonEmpty)
                 ],
                 SpecAllocationBehavior.None),
             throws: Throws(
                 "null/null, null/value, and two non-empty strings",
                 [
-                    ThrowEdge.For(ConcatNulls),
-                    ThrowEdge.For(ConcatNullAndValue),
-                    ThrowEdge.For(ConcatNonEmpty)
+                    RuntimeEdge.For(ConcatNulls),
+                    RuntimeEdge.For(ConcatNullAndValue),
+                    RuntimeEdge.For(ConcatNonEmpty)
                 ],
                 DoesNotThrowMutation),
             nullness: Nullness(
@@ -385,15 +385,15 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "empty and embedded-null receivers",
                 [
-                    AllocationEdge.For(ReadEmptyStringLength),
-                    AllocationEdge.For(ReadEmbeddedNullStringLength)
+                    RuntimeEdge.For(ReadEmptyStringLength),
+                    RuntimeEdge.For(ReadEmbeddedNullStringLength)
                 ],
                 SpecAllocationBehavior.MayAllocate),
             throws: Throws(
                 "empty and embedded-null receivers",
                 [
-                    ThrowEdge.For(ReadEmptyStringLength),
-                    ThrowEdge.For(ReadEmbeddedNullStringLength)
+                    RuntimeEdge.For(ReadEmptyStringLength),
+                    RuntimeEdge.For(ReadEmbeddedNullStringLength)
                 ],
                 DoesNotThrowMutation),
             postconditions: [
@@ -435,10 +435,10 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "direct null and non-null arguments",
                 [
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareGhostProbe,
                         InvokeAndCatchOldNull),
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareGhostProbe,
                         InvokeAndCatchOldItem)
                 ],
@@ -446,8 +446,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
             throws: Throws(
                 "direct null and non-null arguments",
                 [
-                    ThrowEdge.For(InvokeOldNullDirectly),
-                    ThrowEdge.For(InvokeOldItemDirectly)
+                    RuntimeEdge.For(InvokeOldNullDirectly),
+                    RuntimeEdge.For(InvokeOldItemDirectly)
                 ],
                 DoesNotThrowMutation));
     }
@@ -472,14 +472,14 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 "a direct reference result intrinsic call",
                 [
-                    new AllocationEdge(
+                    new RuntimeEdge(
                         PrepareGhostProbe,
                         InvokeAndCatchResult)
                 ],
                 SpecAllocationBehavior.None),
             throws: Throws(
                 "a direct reference result intrinsic call",
-                [ThrowEdge.For(InvokeResultDirectly)],
+                [RuntimeEdge.For(InvokeResultDirectly)],
                 DoesNotThrowMutation));
     }
 
@@ -523,8 +523,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
             edgeInputs,
             observeEffect,
             effectMutation,
-            [new AllocationEdge(prepare, invoke)],
-            [new ThrowEdge(prepare, invoke)]);
+            [new RuntimeEdge(prepare, invoke)],
+            [new RuntimeEdge(prepare, invoke)]);
     }
 
     private static RowWitness ContractConditionRow(
@@ -543,13 +543,13 @@ public sealed partial class ApiSpecRuntimeOracleTests
             allocation: Allocation(
                 edgeInputs,
                 [
-                    new AllocationEdge(PrepareGhostProbe, preparedFalse),
-                    new AllocationEdge(PrepareGhostProbe, preparedTrue)
+                    new RuntimeEdge(PrepareGhostProbe, preparedFalse),
+                    new RuntimeEdge(PrepareGhostProbe, preparedTrue)
                 ],
                 SpecAllocationBehavior.MayAllocate),
             throws: Throws(
                 edgeInputs,
-                [ThrowEdge.For(directFalse), ThrowEdge.For(directTrue)],
+                [RuntimeEdge.For(directFalse), RuntimeEdge.For(directTrue)],
                 DoesNotThrowMutation));
     }
 
@@ -557,8 +557,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
         string edgeInputs,
         Func<SpecEffect> observeEffect,
         SpecEffect effectMutation,
-        ImmutableArray<AllocationEdge> allocationEdges,
-        ImmutableArray<ThrowEdge> throwEdges)
+        ImmutableArray<RuntimeEdge> allocationEdges,
+        ImmutableArray<RuntimeEdge> throwEdges)
     {
         return Row(
             effects: Effect(
@@ -581,7 +581,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static FacetWitness<SpecAllocationBehavior> Allocation(
         string edgeInputs,
-        ImmutableArray<AllocationEdge> edges,
+        ImmutableArray<RuntimeEdge> edges,
         SpecAllocationBehavior mutation)
     {
         return new(
@@ -594,7 +594,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static FacetWitness<ThrowClaim> Throws(
         string edgeInputs,
-        ImmutableArray<ThrowEdge> edges,
+        ImmutableArray<RuntimeEdge> edges,
         ThrowClaim mutation)
     {
         return new(
@@ -622,7 +622,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static FacetWitness<SpecTerminationBehavior> Termination(
         string edgeInputs,
-        ImmutableArray<ThrowEdge> edges,
+        ImmutableArray<RuntimeEdge> edges,
         SpecTerminationBehavior mutation)
     {
         return new(
@@ -863,7 +863,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
     }
 
     private static SpecAllocationBehavior ObserveAllocation(
-        ImmutableArray<AllocationEdge> edges)
+        ImmutableArray<RuntimeEdge> edges)
     {
         var observedAllocation = false;
         foreach (var edge in edges)
@@ -886,7 +886,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             : SpecAllocationBehavior.None;
     }
 
-    private static ThrowObservation ObserveThrows(ImmutableArray<ThrowEdge> edges)
+    private static ThrowObservation ObserveThrows(ImmutableArray<RuntimeEdge> edges)
     {
         var normalCompletions = 0;
         var exceptionTypes = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
@@ -916,7 +916,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
         "CA1031:Do not catch general exception types",
         Justification = "The runtime oracle classifies every exceptional constructor exit as non-terminating evidence.")]
     private static SpecTerminationBehavior ObserveTermination(
-        ImmutableArray<ThrowEdge> edges)
+        ImmutableArray<RuntimeEdge> edges)
     {
         foreach (var edge in edges)
         {
@@ -1684,33 +1684,16 @@ public sealed partial class ApiSpecRuntimeOracleTests
         }
     }
 
-    private sealed record AllocationEdge(Action Prepare, Action Invoke)
+    private sealed record RuntimeEdge(Action Prepare, Action Invoke)
     {
-        public static AllocationEdge For(Action invoke)
+        public static RuntimeEdge For(Action invoke)
         {
             return new(
             static () => { },
             invoke);
         }
 
-        public static AllocationEdge For(Func<bool> invoke)
-        {
-            return new(
-            static () => { },
-            () => _ = invoke());
-        }
-    }
-
-    private sealed record ThrowEdge(Action Prepare, Action Invoke)
-    {
-        public static ThrowEdge For(Action invoke)
-        {
-            return new(
-            static () => { },
-            invoke);
-        }
-
-        public static ThrowEdge For(Func<bool> invoke)
+        public static RuntimeEdge For(Func<bool> invoke)
         {
             return new(
             static () => { },
