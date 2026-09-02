@@ -197,6 +197,7 @@ the smallest relevant containerized test target passes.
 | R573 | Validate persisted mutation-baseline invocation identities during shard preflight | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R889 | Validate specification-pack options while collecting them, then sort once | `SharpProof.Analyzer.Test`: FinalCompilationCollectorTests passed |
 | R894 | Validate specification-pack object property sets in one pass | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
+| R677 | Reuse acceptance’s Release production inventory in the complexity gate | `SharpProof.ArchitectureTest`: ProductionConsumersUseOneInventoryAuthority passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4415,7 +4416,11 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 ### Status (part two hundred thirteen)
 
-R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
+R677 is `applied`: Release acceptance now passes its already-derived
+production inventory to the complexity gate, avoiding a second inventory
+generation while Debug retains the gate’s intentional independent Release
+configuration. The production-consumer authority test passed; the standalone
+complexity command still reports the pre-existing member ceiling (5822/5808).
 
 ### Status (part two hundred twenty-four)
 
@@ -8450,4 +8455,81 @@ build-file changes were made during this audit.
 ### Status (part four hundred twenty-eight)
 
 R918 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twenty-nine: R919 - repeated parse-option aggregation scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R919 | **`CompilerProbeSnapshot.AppendOptions` scans the same materialized parse-option array three times for related aggregate fields.** Language versions, preprocessor symbols, and specified language versions each perform their own projection, distinct pass, and ordinal sort. One aggregation pass can populate the three distinct sets, followed by the required independent sorts, while preserving the probe schema's separate fields and cross-tree canonicalization. | `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:56-110` |
+
+### Status (part four hundred twenty-nine)
+
+R919 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred thirty: R920 - repeated syntax-tree path normalization
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R920 | **`CompilerProbeSnapshot.CreateSyntaxTreeRows` normalizes each syntax-tree path for sorting and then normalizes it again while building the row.** The indexed tuple retains only the tree and ordinal, so `NormalizePath(item.Tree.FilePath)` is recomputed in `CreateSyntaxTreeRow` for every tree after the sort. Carrying the normalized path in the tuple and passing it to the row builder preserves canonical ordering, the original ordinal, and the emitted path while removing the duplicate string projection. | `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:159-207` |
+
+### Status (part four hundred thirty)
+
+R920 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred thirty-one: R921 - eager unused probe-input capture
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R921 | **`CompilerProbeGenerator.Initialize` reads and materializes text and metadata for every matching additional file although `Generate` emits only the first path-sorted input.** The incremental pipeline captures all `(Path, Text, Metadata)` tuples before the output callback chooses one. A path-first candidate projection or a minimum-selection stage can defer text/metadata capture until the selected input while preserving the empty-input return, path ordering, selected-input fingerprint, and generated source contents; any required provider-observation side effect should be verified before applying this reduction. | `SharpProof.CompilerProbe.TestAsset/CompilerProbeGenerator.cs:10-34,40-54` |
+
+### Status (part four hundred thirty-one)
+
+R921 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred thirty-two: R922 - full sort used for one generator candidate
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R922 | **`CompilerProbeGenerator.Generate` fully sorts the collected inputs solely to select the first path.** No later code consumes the ordering of the remaining tuples; a one-pass minimum-by-path selection can keep the same ordinal path result and tie behavior while avoiding the sort buffer and comparisons for discarded inputs. This is separate from R921's earlier text/metadata capture cost. | `SharpProof.CompilerProbe.TestAsset/CompilerProbeGenerator.cs:40-53` |
+
+### Status (part four hundred thirty-two)
+
+R922 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred thirty-three: R923 - quadratic reflection-fallback cycle checks
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R923 | **`CompilerProbeSnapshot.FindRetainedPortableImage` checks the entire visited-object list for every recursive value.** The list is used only for reference-identity cycle detection, so a deep object graph pays an O(n) `Any` scan at each node before adding the object. A reference-identity `HashSet` carried through the same bounded traversal preserves cycle termination, the depth and 32-item sequence limits, and the exact image-selection order while avoiding repeated linear membership scans. | `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:413-479` |
+
+### Status (part four hundred thirty-three)
+
+R923 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred thirty-four: R924 - repeated portable-image reflection lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R924 | **`CompilerProbeSnapshot.GetPortableReferenceSha256` rediscovers `GetEntireImage` by reflection for every non-file portable reference.** The method name, binding flags, and zero-argument signature depend only on the metadata object's runtime type, but `GetMethod` is repeated before each fallback invocation. A runtime-type keyed optional `MethodInfo` cache can preserve the current retained-image fallback and empty-hash behavior while removing repeated reflection metadata discovery. | `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:374-411` |
+
+### Status (part four hundred thirty-four)
+
+R924 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred thirty-five: R925 - repeated compilation-reference property discovery
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R925 | **`CompilerProbeSnapshot.GetReferencedCompilation` enumerates and filters all reflected properties for every compilation reference.** The desired `Compilation` property is stable for a given Roslyn reference implementation type, while `CreateCompilationReferenceSha256` may visit many nested references recursively. Caching the validated property (or a cached failure) by runtime type preserves the non-C#-reference rejection and per-reference value retrieval without repeating `GetProperties`/`SingleOrDefault` discovery. | `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:480-497` |
+
+### Status (part four hundred thirty-five)
+
+R925 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.

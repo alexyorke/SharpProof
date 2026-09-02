@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [switch]$Json
+    [switch]$Json,
+
+    [Parameter()]
+    [object]$ProductionInventory
 )
 
 Set-StrictMode -Version Latest
@@ -74,12 +77,15 @@ foreach ($metric in @('expressionNodes', 'decisionPoints', 'members')) {
 }
 
 $inventoryScript = Join-Path $repositoryRoot 'scripts/Get-SharpProofProductionInventory.ps1'
-$LASTEXITCODE = 0
-$inventoryJson = & $inventoryScript -RepositoryRoot $repositoryRoot -Configuration Release
-if ($LASTEXITCODE -ne 0) {
-    throw 'Production inventory authority could not be derived for complexity.'
+$inventory = $ProductionInventory
+if ($null -eq $inventory) {
+    $LASTEXITCODE = 0
+    $inventoryJson = & $inventoryScript -RepositoryRoot $repositoryRoot -Configuration Release
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Production inventory authority could not be derived for complexity.'
+    }
+    $inventory = ($inventoryJson -join [Environment]::NewLine) | ConvertFrom-Json
 }
-$inventory = ($inventoryJson -join [Environment]::NewLine) | ConvertFrom-Json
 $projects = @($inventory.projects | Sort-Object name)
 $roots = @($projects | ForEach-Object { [string]$_.name + '/' })
 $fileOptions = [Collections.Generic.Dictionary[string, object]]::new(

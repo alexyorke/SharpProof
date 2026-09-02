@@ -624,7 +624,12 @@ try {
             "$currentDecisionPoints (maximum $maximumDecisionPoints)")
     }
 
-    & (Join-Path $repositoryRoot 'scripts\Test-ProductionCSharpComplexity.ps1')
+    $complexityArguments = @{}
+    if ($Configuration -ceq 'Release') {
+        $complexityArguments.ProductionInventory = $productionInventory
+    }
+    & (Join-Path $repositoryRoot 'scripts\Test-ProductionCSharpComplexity.ps1') `
+        @complexityArguments
 
     Complete-AcceptanceTimingPhase
 
