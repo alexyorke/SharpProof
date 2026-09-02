@@ -5930,3 +5930,23 @@ No implementation or build file was changed.
 
 R785 is `pending` and limited to Package.Test archive/nuspec fixture plumbing.
 No implementation or build file was changed.
+
+## Second survey, part two hundred ninety-seven: R786 - duplicated publication job plumbing
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R786 | **The private-preview and public NuGet publication jobs duplicate their release-pipeline plumbing.** The two mutually exclusive jobs both declare the same publication concurrency group with `cancel-in-progress: false`, depend on `release-qualification`, run on `ubuntu-latest`, check out the full repository, invoke `prepare-qualified-packages`, and finally call `docker compose run --rm ... tooling release-publish -PackageSource nupkgs` with the same tag-bound package inputs. Their real differences are the release-tag allowlist, GitHub environment, feed-credential validation, and authentication mechanism: private preview uses a configured source and secret API key, while public publishing validates a user and exchanges an OIDC token. A reusable workflow or a narrowly scoped composite action can own the shared checkout/preparation/publish path while taking explicit feed and authentication inputs; the environment, permissions, tag policy, and secret handling should remain caller-specific. This is distinct from R497's repeated tooling-image builds and from the release-tag validation repetition noted in the package-consumers workflow review. | `.github/workflows/package-consumers.yml:218-252,256-299` |
+
+### Checked and not proposed (part two hundred ninety-seven)
+
+- The jobs are mutually exclusive and must retain separate environment and
+  credential boundaries; the candidate is shared workflow plumbing, not merging
+  the private and public authorization policies.
+- `release-publish` remains in-container and package-source-bound in both jobs;
+  the suggested seam should not move credential material into the container or
+  bypass the preceding release qualification.
+
+### Status (part two hundred ninety-seven)
+
+R786 is `pending` and limited to GitHub Actions publication plumbing. No
+implementation or build file was changed.
