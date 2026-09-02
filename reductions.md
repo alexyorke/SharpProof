@@ -133,6 +133,7 @@ the smallest relevant containerized test target passes.
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
 | R330 | Centralize Linux process-control ABI constants for `PR_SET_PDEATHSIG`, `pidfd_open`, and `pidfd_send_signal` in the host assembly while retaining separate native wrappers | `SharpProof.Package.Test`: 141 BuildTask, supervisor, and launcher tests passed |
 | R332 | Remove explicit `GeneratePackageOnBuild=false` declarations from the three package projects because the SDK default is already false | `SharpProof.Package.Test`: package/build integration tests passed; canonical MSBuild evaluation confirms `false` |
+| R333 | Reuse one class-level valid supervisor nonce fixture across the five BuildTaskTests methods that exercise it | `SharpProof.Package.Test`: 141 BuildTask, supervisor, and launcher tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1421,7 +1422,6 @@ maintenance seams rather than style preferences.
 | ID | Finding | Evidence |
 |---|---|---|
 | R331 | **The two custom-nuspec project files copy the same packaging skeleton.** `SharpProof.Package.csproj` and `SharpProof.Verifier.csproj` each import `SharpProof.PackageMetadata.props` and repeat the same `Nullable=disable`, `ImplicitUsings=disable`, `TargetFramework=netstandard2.0`, `IncludeBuildOutput=false`, `GeneratePackageOnBuild=false`, `NuspecBasePath`, `NU5128` suppression, `Copyright`, and `NoPackageAnalysis` settings. Their `_SharpProofPrepareNuspecProperties` targets also share the same name, timing, and `version/configuration/repositorycommit` property prefix. A shared custom-nuspec props/target fragment could own this stable skeleton while leaving package IDs, nuspec filenames, native-root validation, and project references explicit. This refines R291's metadata duplication at the project-file layer. | `SharpProof.Package/SharpProof.Package.csproj:1-20,42-45`; `SharpProof.Verifier/SharpProof.Verifier.csproj:1-20,47-52` |
-| R333 | **One verifier-test nonce is copied five times in the same test class.** The exact 64-character value `0123456789abcdef` repeated twice is declared as a local `nonce` in five `BuildTaskTests` methods. Each test intentionally mutates or combines it differently, but the base fixture value is identical and can be a class-level constant or a test helper. This is test-only duplication and does not justify changing the production protocol. | `SharpProof.Package.Test/BuildTaskTests.cs:64-66,118-120,150-152,183-185,393-395` |
 | R334 | **The canonical corpus header is copied three times in one test file.** `CorpusGateTests` repeats the identical three-line schema-3 header literal in each of its format tests. The tests vary the rows and invalid mutations, not the header; one class-level constant preserves those cases while removing two copies of the 166-character fixture. | `SharpProof.Gates.Test/CorpusGateTests.cs:371,403,421` |
 | R335 | **Launcher argument tests repeat the same fixed input hash three times.** `LauncherArgumentTests` declares the exact 64-`a` hash as a local `inputHash` in three methods. The same file already uses `new('a', 64)` in adjacent cases, and `ProtocolJsonTests` has a class-level constant for the same fixture. Promoting the three same-file declarations to one constant would remove local noise; sharing it across test assemblies is optional and not required for this item. | `SharpProof.Package.Test/LauncherArgumentTests.cs:1278-1279,1346-1347,1505-1506`; `SharpProof.Worker.Test/ProtocolJsonTests.cs:18-19` |
 | R336 | **The cache filename suffix has a local authority that production does not reuse.** `VerificationCache.IsOwnedCacheEntry` defines `suffix = ".sharp-proof-cache.json"` for length and ownership checks, but `GetPath` types the same suffix as a separate literal. `WorkerTcbEdgeCaseTests` then repeats the suffix in its own local constant, globs, and path assertions. A class/internal cache-name constant or a test-facing pattern helper could make the writer, scanner, and edge-case fixtures consume one storage convention; this is complementary to R325's hash-format validation. | `SharpProof.Worker/VerificationCache.cs:522-528,548-556`; `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:30,33,49,1176-1189,1144-1145,1260-1262,1311-1312,1361-1364,1455` |
@@ -1436,6 +1436,9 @@ maintenance seams rather than style preferences.
   host internals boundary; native wrappers and failure semantics remain local.
 - R332 is now applied: the SDK's `GeneratePackageOnBuild` default remains
   `false` for Attributes, Package, and Verifier without project-local overrides.
+- R333 is now applied: `BuildTaskTests` keeps one class-level
+  `ValidSupervisorNonce` fixture and uses local aliases only where a test mutates
+  or combines the value.
 - The repeated `SHARPPROOF_CONTRACTS` string spans the public conditional symbol,
   compilation fingerprinting, and synthetic source fixtures. The fixture copies
   are part of R309, while the fingerprint intentionally has a separate
@@ -1454,7 +1457,7 @@ maintenance seams rather than style preferences.
 
 ### Status (part twenty-six)
 
-R331, R333-R339 are `pending`. R331, R336, and R337 touch packaging or storage
+R331, R334-R339 are `pending`. R331, R336, and R337 touch packaging or storage
 authorities and need boundary-aware implementations. R333-R335 and R338-R339
 are smaller, mechanically testable build/test reductions.
 
@@ -2677,3 +2680,40 @@ important but several local implementations repeat the same protocol.
 R493-R496 are `pending`. This pass made no implementation changes; it records
 review candidates only, and the proposed consolidations must preserve Linux
 platform boundaries, path-alias checks, and process-identity semantics.
+
+
+## Second survey, part sixty-two-b: R497 - the toolchain image is rebuilt per job with no cache
+
+Analysing the CI job graph rather than the workflow text. This one is about cost
+and repetition rather than lines of code.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R497 | **The digest-pinned toolchain image is built from scratch once per CI job, with no layer cache and without the prebuilt-image mechanism the repository already provides.** The `prepare-qualified-packages` composite action - whose only unconditional step is `docker compose build tooling` - is invoked **nine times** across the workflows: once each in `ci.yml`, `coverage.yml`, `nightly.yml`, and `security-reusable.yml`, and five times within `package-consumers.yml`. Because each GitHub-hosted job runs on a fresh VM, the local Docker layer cache is empty every time, and **no cache is configured anywhere**: there is no `buildx` setup, no `cache-from`/`cache-to`, no `type=gha`, and no registry cache in any workflow or in `compose.yaml`. A single tag push therefore triggers up to seven full builds of the same image - `package`, `container-verifier`, `release-qualification`, one of the two publish jobs, and the security job, plus `ci.yml` and `coverage.yml`. That image is not cheap: it pulls five digest-pinned base images, copies SDK, targeting-pack, and runtime directories between stages, downloads and unpacks the 31.5 MB Z3 archive, and runs verification commands. The sharpest part is that the escape hatch already exists and is unused - `compose.yaml:8` resolves `image: ${SHARPPROOF_TOOLING_IMAGE:-${COMPOSE_PROJECT_NAME}-tooling:local}`, `docs/container-development.md:236` documents it, and two tests plus `Test-SharpProofContainerContract.ps1:263` pin that exact line - yet **no workflow ever sets `SHARPPROOF_TOOLING_IMAGE`**. Building once and publishing to a registry (or enabling a buildx cache) would let the remaining jobs pull instead of rebuild, and the image's full digest pinning is precisely the property that makes reuse safe. | `.github/actions/prepare-qualified-packages/action.yml:19-21`; `.github/workflows/{ci,coverage,nightly,security-reusable}.yml`; `.github/workflows/package-consumers.yml:40,72,131,236,275`; `compose.yaml:8`; `docs/container-development.md:236`; `eng/container/Dockerfile` |
+
+### Checked and not proposed (part sixty-two-b)
+
+- **Applied R246 is confirmed in place.** That item observed that `ci.yml`,
+  `nightly.yml`, `coverage.yml`, and `security-reusable.yml` each open-coded
+  `docker compose build tooling` rather than reusing the composite action. All
+  four now use `- uses: ./.github/actions/prepare-qualified-packages`. The
+  consolidation is what made the nine-invocation count above easy to measure.
+- **The repeated `tooling` commands across jobs are mostly deliberate.**
+  `acceptance` runs twice by design (Release and Debug configurations);
+  `release-publish` twice because the private-preview and public publish jobs are
+  mutually exclusive; and `package-consumers` twice because
+  `release-qualification` explicitly re-runs it against the *downloaded* artifacts
+  under the step name "Revalidate downloaded packages with a real proof". Only
+  `release-tag` is an unexplained repeat - the `package` job validates the tag and
+  `release-qualification` validates it again with the same command and
+  environment - and it is cheap enough not to be worth filing on its own.
+- No job graph cycle or missing `needs` edge was found: `release-qualification`
+  correctly depends on `package`, `container-verifier`, `security`, and
+  `portable-consumers`, and both publish jobs depend on it.
+
+### Status (part sixty-two-b)
+
+R497 is `pending`. It removes no source lines and is the only finding in this
+survey whose payoff is CI wall-clock and cost rather than maintainability - but it
+is filed on the same evidence standard as the rest, and the mechanism it asks for
+is already built, documented, and test-pinned.

@@ -20,6 +20,9 @@ public sealed class BuildTaskTests
 {
     private static readonly string DotNetHost =
         Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet";
+    private const string ValidSupervisorNonce =
+        "0123456789abcdef0123456789abcdef" +
+        "0123456789abcdef0123456789abcdef";
 
     [Test]
     public async System.Threading.Tasks.Task
@@ -61,9 +64,7 @@ public sealed class BuildTaskTests
     [Test]
     public void SupervisorCleanupReceiptsRequireAnExactNonceAndRecord()
     {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
+        const string nonce = ValidSupervisorNonce;
         var output = "verifier output\nSharpProof.Armed/1 " + nonce +
             "\nSharpProof.Cleanup/1 " + nonce + "\n";
 
@@ -115,9 +116,7 @@ public sealed class BuildTaskTests
     public async System.Threading.Tasks.Task
         VerifierOutputDrainIsBoundedAndStillAuthenticatesCleanup()
     {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
+        const string nonce = ValidSupervisorNonce;
         var input = "SharpProof.Armed/1 " + nonce + "\n" +
             new string(
                 'x',
@@ -147,9 +146,7 @@ public sealed class BuildTaskTests
     public async System.Threading.Tasks.Task
         VerifierArmedStateIsPublishedIndependentlyOfOutputCompletion()
     {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
+        const string nonce = ValidSupervisorNonce;
         using var signal = new ManualResetEventSlim();
         var armed = new System.Threading.Tasks.TaskCompletionSource<bool>(
             System.Threading.Tasks.TaskCreationOptions
@@ -180,9 +177,7 @@ public sealed class BuildTaskTests
     public async System.Threading.Tasks.Task
         VerifierCleanupStateIsPublishedIndependentlyOfOutputCompletion()
     {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
+        const string nonce = ValidSupervisorNonce;
         using var signal = new ManualResetEventSlim();
         var cleanup = new System.Threading.Tasks.TaskCompletionSource<bool>(
             System.Threading.Tasks.TaskCreationOptions
@@ -390,9 +385,7 @@ public sealed class BuildTaskTests
     public async System.Threading.Tasks.Task
         RetainedCleanupAnchorRejectsMissingEventualReceipt()
     {
-        const string nonce =
-            "0123456789abcdef0123456789abcdef" +
-            "0123456789abcdef0123456789abcdef";
+        const string nonce = ValidSupervisorNonce;
         var failure = new TaskCompletionSource<string>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var process = Process.Start("/bin/true");
