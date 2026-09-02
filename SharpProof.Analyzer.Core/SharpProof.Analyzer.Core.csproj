@@ -5,7 +5,6 @@
     <RootNamespace>SharpProof</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <NoWarn>$(NoWarn);RS2002;RS2003</NoWarn>
-    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>

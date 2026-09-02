@@ -6,7 +6,6 @@
     <IsRoslynComponent>true</IsRoslynComponent>
     <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <IsPackable>false</IsPackable>
     <NoWarn>$(NoWarn);RS1035;RS2008</NoWarn>
   </PropertyGroup>
   <ItemGroup>

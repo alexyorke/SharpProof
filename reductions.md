@@ -4576,11 +4576,11 @@ Turning from test code to build configuration: a census of `IsPackable` across a
 
 ### Status (part two hundred fifty)
 
-R731 is `pending`. It is cheap, it is confined to build configuration, and it
-has no behavioural risk because the property is inert today - which is also the
-reason to treat it as tidying rather than as a defect. It belongs with R730: both
-describe a correct authority being shadowed by a second, ungated declaration that
-drifts because nothing compares the two.
+R731 completed: non-shipping projects now inherit a false packability default,
+the three manifest projects explicitly opt in, and the isolated samples/pilots
+build roots carry the same false default because they intentionally do not import
+the root props. The 23 project-level false declarations are gone while the
+manifest remains the packaging authority.
 
 ## Second survey, part two hundred fifty-one: R732-R733 - the analyzer project preamble
 
