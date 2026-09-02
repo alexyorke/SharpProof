@@ -38,16 +38,15 @@ if ($env:SHARPPROOF_CONTAINER -cne '1' -or
     throw 'SharpProof container commands require the canonical container contract.'
 }
 
-if ($NoBuild -and $Command -notin @(
-        'test', 'test-changed', 'semantic-tests', 'portable-tests',
-        'worker-tests', 'package-tests')) {
+$reusableTestCommands = @(
+    'test', 'test-changed', 'semantic-tests', 'portable-tests',
+    'worker-tests', 'package-tests')
+if ($NoBuild -and $Command -notin $reusableTestCommands) {
     throw (
         '-NoBuild is supported only for test commands that can reuse an ' +
         'existing build in the current container workspace.')
 }
-if ($Fast -and $Command -notin @(
-        'test', 'test-changed', 'semantic-tests', 'portable-tests',
-        'worker-tests', 'package-tests')) {
+if ($Fast -and $Command -notin $reusableTestCommands) {
     throw '-Fast is supported only for non-qualifying test commands.'
 }
 if ($Fast -and $NoBuild) {

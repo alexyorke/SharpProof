@@ -4217,14 +4217,6 @@ R652 is deferred: envelope equality and compilation-shape validation are intenti
 
 R654 is deferred: replay validation and the separate operation/evidence digest domains are analyzer-integrity boundaries. Their independent event walks make the field ordering, null normalization, and fail-closed checks auditable; combine them only with a proof that cannot alter those semantics.
 
-## Second survey, part one hundred ninety-eight: R657 - duplicated test-command allowlist
-
-| R657 | **`Invoke-SharpProofContainer.ps1` repeats the same test-command allowlist for two independent switch validations.** The `-NoBuild` guard and the `-Fast` guard each spell out the identical six-command set (`test`, `test-changed`, `semantic-tests`, `portable-tests`, `worker-tests`, `package-tests`) on adjacent branches. Defining one immutable supported-test-command set and using it in both checks removes the drift surface while preserving the separate error messages and the existing mutual-exclusion rule. | `scripts/Invoke-SharpProofContainer.ps1:41-55` |
-
-### Status (part one hundred ninety-eight)
-
-R657 is a pending container-command argument-validation reduction candidate. Preserve the exact allowed command set, independent unsupported-switch errors, and `-Fast`/`-NoBuild` conflict behavior; share only the allowlist data.
-
 ## Second survey, part one hundred ninety-nine: R658 - duplicated vstest project lane
 
 | R658 | **`Invoke-SharpProofContainer.ps1` duplicates the build-and-`vstest` lane for direct project tests and worker tests.** The direct-project branch and the `worker-tests` branch each conditionally restore/build a project, append the shared fast-build arguments, resolve the test assembly, construct a `vstest` command, optionally add the same `/TestCaseFilter:...` argument, and invoke it. A parameterized private test-project runner can retain the direct-target/package exclusion and worker-specific project selection while removing the duplicated lifecycle and filter plumbing. | `scripts/Invoke-SharpProofContainer.ps1:253-275,328-349` |
