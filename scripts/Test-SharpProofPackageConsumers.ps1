@@ -557,6 +557,7 @@ try {
         $testProject,
         '--configuration',
         $Configuration,
+        '--no-restore',
         '--logger',
         'console;verbosity=minimal')
     if ($null -ne $resolvedPackageSource) {

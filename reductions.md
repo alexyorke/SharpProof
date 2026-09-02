@@ -133,6 +133,7 @@ the smallest relevant containerized test target passes.
 | R315 | Share effect-contract violation classification between response authority and counterexample replay | `SharpProof.Worker.Test`: EffectCounterexampleReplayTests, 31 passed; CompilerManifestArtifactTests, 91 passed |
 | R812 | Compare classified lowered calls with the existing indexed call set instead of recounting the IR | `SharpProof.Worker.Test`: CompilerCallableLowererTests, 20 passed |
 | R816 | Restore the security solution once, then run audit and build with `--no-restore` | `SharpProof.ArchitectureTest`: DependencyAutomationTests, 8 passed |
+| R817 | Reuse the container restore for the final package-consumer test invocation | `SharpProof.ArchitectureTest`: ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed, 1 passed |
 | R327 | Remove 22 project-local `TreatWarningsAsErrors` declarations now supplied by the central production policy, retaining the two excluded-project declarations | `test-changed`: 2,846 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
@@ -6667,6 +6668,5 @@ runs dependency audit and the Release build against those restored assets.
 
 ### Status (part three hundred twenty-eight)
 
-R817 is `deferred`: the second restore is normally an incremental no-op, but
-  omitting `--no-restore` makes the intended restore ownership unclear and can
-  repeat dependency evaluation. It is a low-risk build-orchestration cleanup.
+R817 is `applied`: the final package-test invocation now uses the locked solution
+restore already owned by the container command.
