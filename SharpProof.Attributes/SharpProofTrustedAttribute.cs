@@ -1,8 +1,7 @@
 namespace SharpProof.Attributes;
 
 [AttributeUsage(
-    AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface |
-    AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Property,
+    SharpProofAttributeTargets.Declaration,
     Inherited = false)]
 public sealed class SharpProofTrustedAttribute : Attribute
 {

@@ -1,6 +1,6 @@
 namespace SharpProof.Attributes;
 [AttributeUsage(
-    AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Property,
+    SharpProofAttributeTargets.Contract,
     AllowMultiple = true,
     Inherited = false)]
 public sealed class EffectContractAttribute(SharpProofEffect effects) : Attribute
