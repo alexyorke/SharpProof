@@ -170,6 +170,7 @@ the smallest relevant containerized test target passes.
 | R618 | Share Meta-analyzer test compilation and diagnostic setup | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests passed |
 | R617 | Share managed-effect walk-depth entry/exit bookkeeping | `SharpProof.Effects.Test`: ManagedAbstractFlowTests, 34 passed |
 | R626 | Share Effects test compilation construction and diagnostics | `SharpProof.Effects.Test`: ManagedAbstractFlowTests 34; EffectAnalysisTests 147 passed |
+| R858 | Reuse the canonical IR variable collector in fuzz tests | `SharpProof.Fuzz.Test`: FuzzRunnerTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7597,5 +7598,5 @@ build-file changes were made during this audit.
 
 ### Status (part three hundred sixty-eight)
 
-R858 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R858 is `applied`: the fuzz test now uses `IrTermAnalysis.CollectVariables`
+for variable membership, removing a test-only IR-kind traversal.

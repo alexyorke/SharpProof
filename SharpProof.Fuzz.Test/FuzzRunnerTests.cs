@@ -618,7 +618,8 @@ public sealed class FuzzRunnerTests
                 factory.Integer(2)));
         Task<bool> Preserves(IrTerm candidate, CancellationToken _)
         {
-            return Task.FromResult(Contains(candidate, variable));
+            return Task.FromResult(
+                IrTermAnalysis.CollectVariables(candidate).Contains(variable));
         }
 
         var first = await IrStructuralShrinker.MinimizeAsync(
@@ -633,7 +634,9 @@ public sealed class FuzzRunnerTests
         Assert.That(
             IrStructuralShrinker.StructuralSize(first),
             Is.LessThan(IrStructuralShrinker.StructuralSize(formula)));
-        Assert.That(Contains(first, variable), Is.True);
+        Assert.That(
+            IrTermAnalysis.CollectVariables(first).Contains(variable),
+            Is.True);
         Assert.That(first, Is.SameAs(second));
     }
 
@@ -670,29 +673,4 @@ public sealed class FuzzRunnerTests
         Assert.ThrowsAsync<ArgumentOutOfRangeException>(run);
     }
 
-    private static bool Contains(IrTerm term, IrVarId variable)
-    {
-        return term switch
-        {
-            IrVariableTerm item => item.Variable == variable,
-            IrUnaryTerm unary => Contains(unary.Operand, variable),
-            IrBinaryTerm binary =>
-                Contains(binary.Left, variable) ||
-                Contains(binary.Right, variable),
-            IrConditionalTerm conditional =>
-                Contains(conditional.Condition, variable) ||
-                Contains(conditional.WhenTrue, variable) ||
-                Contains(conditional.WhenFalse, variable),
-            IrCastTerm cast => Contains(cast.Operand, variable),
-            IrLengthTerm length => Contains(length.Value, variable),
-            IrSequenceAccessTerm access =>
-                Contains(access.Sequence, variable) ||
-                Contains(access.Index, variable),
-            IrOpaqueTerm opaque =>
-                opaque.Receiver != null &&
-                Contains(opaque.Receiver, variable) ||
-                opaque.Arguments.Any(argument => Contains(argument, variable)),
-            _ => false
-        };
-    }
 }
