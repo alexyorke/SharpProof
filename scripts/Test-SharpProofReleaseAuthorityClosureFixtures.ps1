@@ -36,9 +36,10 @@ try {
     Write-FixtureFile '.github/workflows/package-consumers.yml' @'
 jobs:
   publish:
-    uses: ./.github/actions/build-tooling
+    uses: ./.github/actions/prepare-qualified-packages
 '@
-    Write-FixtureFile '.github/actions/build-tooling/action.yml' "name: build`n"
+    Write-FixtureFile '.github/actions/prepare-qualified-packages/action.yml' `
+        "name: prepare`n"
     Write-FixtureFile 'eng/container/entrypoint.sh' "pwsh scripts/Invoke-SharpProofContainer.ps1`n"
     Write-FixtureFile 'scripts/Invoke-SharpProofContainer.ps1' @'
 & 'scripts/New-SharpProofReleaseEvidence.ps1'

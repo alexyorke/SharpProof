@@ -17,4 +17,5 @@ runs:
         name: nuget-packages-${{ github.sha }}-${{ github.run_attempt }}
         path: nupkgs
     - name: Build the pinned Linux amd64 toolchain
-      uses: ./.github/actions/build-tooling
+      shell: bash
+      run: docker compose build tooling

@@ -37,7 +37,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build the pinned toolchain
-        uses: ./.github/actions/build-tooling
+        run: docker compose build tooling
 
       - name: Run the locally reproducible security profile
         run: docker compose run --rm tooling security

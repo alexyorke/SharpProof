@@ -1,9 +1,0 @@
-name: Build canonical SharpProof tooling image
-description: Build the same pinned Linux amd64 image used by local development.
-
-runs:
-  using: composite
-  steps:
-    - name: Build and load the canonical image
-      shell: bash
-      run: docker compose build tooling
