@@ -4082,7 +4082,9 @@ R623 is a pending corpus-gate orchestration cleanup candidate. Preserve the exac
 
 ### Status (part one hundred sixty-five)
 
-R624 is a pending corpus-manifest validation cleanup candidate. Preserve deterministic duplicate-ID errors and all per-source URL, commit, license, and containment checks; eliminate only the repeated blank-ID branch on the normal load path.
+R624 is applied: the private `ValidateSource` path now relies on the preceding
+`ValidateSourceIds` pass for blank and duplicate IDs, while retaining all
+per-source URL, commit, license, and containment checks.
 
 ## Second survey, part one hundred sixty-six: R625 - repeated corpus line-ending normalization
 

@@ -323,11 +323,6 @@ internal static class OpenSourceCorpusCatalog
         OpenSourceCorpusSource source,
         string corpusDirectory)
     {
-        if (string.IsNullOrWhiteSpace(source.Id))
-        {
-            throw new InvalidDataException("An OSS corpus source has no ID.");
-        }
-
         if (!Uri.TryCreate(
                 source.Repository,
                 UriKind.Absolute,
