@@ -17,8 +17,6 @@ function Get-SharpProofPilotPackageAuthority {
         @($files.Name | Select-Object -Unique).Count -ne 6) {
         throw 'Pilot qualification requires the exact six candidate package files.'
     }
-    Add-Type -AssemblyName System.IO.Compression
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
     return @($files | ForEach-Object {
         $archive = [IO.Compression.ZipFile]::OpenRead($_.FullName)
         try {

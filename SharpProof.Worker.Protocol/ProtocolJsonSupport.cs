@@ -201,24 +201,10 @@ public static partial class WorkerProtocolJson
 
     private static void EnsureNoLoneSurrogates(string? value)
     {
-        if (value == null)
+        if (value != null && !ProtocolUtf16WellFormedness.IsWellFormed(value))
         {
-            return;
-        }
-        for (var index = 0; index < value.Length; index++)
-        {
-            if (char.IsHighSurrogate(value[index]))
-            {
-                if (index + 1 >= value.Length || !char.IsLowSurrogate(value[index + 1]))
-                {
-                    throw new JsonException("JSON strings must not contain lone UTF-16 surrogates.");
-                }
-                index++;
-            }
-            else if (char.IsLowSurrogate(value[index]))
-            {
-                throw new JsonException("JSON strings must not contain lone UTF-16 surrogates.");
-            }
+            throw new JsonException(
+                "JSON strings must not contain lone UTF-16 surrogates.");
         }
     }
 

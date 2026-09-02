@@ -36,7 +36,7 @@ public static class FrameworkTypeMetadataNames
         "System.Runtime.CompilerServices.INotifyCompletion";
     public const string ModuleInitializerAttribute =
         "System.Runtime.CompilerServices.ModuleInitializerAttribute";
-    public static readonly string Monitor = "System.Threading.Monitor";
+    public const string Monitor = "System.Threading.Monitor";
     public const string NullReferenceException =
         "System.NullReferenceException";
     public const string OverflowException = "System.OverflowException";

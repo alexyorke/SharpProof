@@ -37,7 +37,6 @@ function Require-Failure([scriptblock]$Action, [string]$Name) {
 }
 
 try {
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
     Reset-Packages
     $valid = @(Get-SharpProofPilotPackageAuthority $packages $version $commit)
     if ($valid.Count -ne 6) { throw 'Canonical package authority failed.' }

@@ -145,6 +145,9 @@ the smallest relevant containerized test target passes.
 | R348 | Fold `performance-smoke` into the shared `SharpProof.Gates` restore/run switch arm | PowerShell parse; build scheduling tests passed |
 | R349 | Hook consumer configuration validation directly before `CoreCompile` and remove the empty analyzer-consumer shim target | `SharpProof.ArchitectureTest`: build scheduling and consumer configuration tests passed |
 | R352 | Centralize tuple-aware C# type-name validation in `GeneratedFileHelpers.ps1` and remove three generator-local copies | Three generator `-Verify` checks; canonical `SharpProof.sln` build succeeded |
+| R358 | Reuse the linked IR UTF-16 well-formedness scan in protocol JSON validation while keeping protocol-specific error behavior | `SharpProof.Worker.Test`: ProtocolJsonTests 108 passed; canonical solution build succeeded |
+| R360 | Make `FrameworkTypeMetadataNames.Monitor` a compile-time constant like its sibling metadata identities | Canonical solution build succeeded |
+| R371 | Remove redundant PowerShell 7 compression assembly loads from pilot package authority scripts | Pilot authority fixtures passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1522,7 +1525,7 @@ forwarders across `SharpProof.Testing`, `Tools/SharpProof.Fuzz`, `SharpProof.Bui
 
 ### Status (part twenty-seven)
 
-R341-R345 are `pending`.
+R341-R344 are `pending`.
 reductions. R341 and R343 reduce substantial build/test configuration duplication
 across multiple entrypoints. R344 harmonizes path resolution between build tasks.
 
@@ -1552,6 +1555,11 @@ and hashing abstractions across `Directory.Build.props`, `SharpProof.CompilerArt
 - `CompilerConstantAdmission.cs` in `SharpProof.Frontend` isolates boundary checks
   for `int.MinValue`/`int.MaxValue` and literal negation. It is small (37 lines) but
   represents a deliberate semantic gate for constant evaluation.
+- R358 is now applied: protocol JSON delegates surrogate scanning to the linked
+  IR implementation through a protocol-local type name, preserving the existing
+  `JsonException` message and avoiding duplicate fully-qualified types.
+- R360 is now applied: `FrameworkTypeMetadataNames.Monitor` is a `const` like
+  every other framework metadata identity.
 
 ### Status (part twenty-eight)
 
@@ -1596,9 +1604,7 @@ domain bounds across `SharpProof.Worker.Protocol`, `SharpProof.Ir`, `SharpProof.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R358 | **`ProtocolJsonSupport.EnsureNoLoneSurrogates` is a character-for-character duplicate of `Utf16WellFormedness.IsWellFormed`.** `SharpProof.Ir/Utf16WellFormedness.cs:5-29` defines internal static `bool IsWellFormed(string value)` scanning for lone high/low UTF-16 surrogates. `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:202-223` defines private static `void EnsureNoLoneSurrogates(string? value)` executing the exact same surrogate loop to throw `JsonException("JSON strings must not contain lone UTF-16 surrogates.")`. Reusing `Utf16WellFormedness.IsWellFormed` in `ProtocolJsonSupport` eliminates 22 lines of duplicated surrogate-scanning loop logic. | `SharpProof.Ir/Utf16WellFormedness.cs:5-29`; `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:202-223` |
 | R359 | **`IrSummaryProvenance.IsSha256` is an exact duplicate of `WorkerProtocolJson.IsSha256`.** `SharpProof.Summaries/IrRelationalSummary.cs:73-78` defines private static `bool IsSha256(string? value) => value != null && value.Length == 64 && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');`. `SharpProof.Worker.Protocol/ProtocolJson.cs:1056-1060` declares the identical predicate as `internal static bool IsSha256(string? value)`. Consolidating SHA-256 validation in a shared helper removes duplicate hex-validation routines across semantic summaries and protocol layers. | `SharpProof.Summaries/IrRelationalSummary.cs:73-78`; `SharpProof.Worker.Protocol/ProtocolJson.cs:1056-1060` |
-| R360 | **`FrameworkTypeMetadataNames.Monitor` is declared as `public static readonly string` while 23 sibling type identities are `public const string`.** `SharpProof.Specs/FrameworkTypeMetadataNames.cs:39` defines `public static readonly string Monitor = "System.Threading.Monitor";`, whereas lines 9-47 declare 23 other framework types (`ArgumentException`, `Exception`, `NullReferenceException`, `ConditionalAttribute`, etc.) as `public const string`. Declaring `Monitor` as `readonly` instead of `const` prevents its use in compile-time constant expressions, switch cases, and Roslyn pattern matches, forcing callers in `CompilerEffectReplayLowerer.cs:220,327` and `OperationEffectScanner.cs:69,1314` to treat it as a runtime field rather than an inline constant. | `SharpProof.Specs/FrameworkTypeMetadataNames.cs:9-47`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:220,327`; `SharpProof.Effects/OperationEffectScanner.cs:69,1314` |
 | R361 | **`NullableAttributes.cs` in `SharpProof.Specs/Polyfills/` is linked into only one downstream project while sibling polyfills are declared independently.** `SharpProof.Specs/Polyfills/NullableAttributes.cs` defines `NotNullWhenAttribute(bool returnValue)`. `SharpProof.Effects/SharpProof.Effects.csproj:14-15` links it with `<Compile Include="..\SharpProof.Specs\Polyfills\NullableAttributes.cs" Link="Polyfills\NullableAttributes.cs" />`. Meanwhile, `SharpProof.Ir/ArgumentNullGuard.cs:1-8` conditionally compiles its own `NotNullAttribute`. Consolidating BCL code-analysis attribute polyfills under `SharpProof.Specs/Polyfills/` or in `Directory.Build.props` for netstandard2.0 removes ad-hoc per-file linking. | `SharpProof.Specs/Polyfills/NullableAttributes.cs:1-8`; `SharpProof.Effects/SharpProof.Effects.csproj:14-15`; `SharpProof.Ir/ArgumentNullGuard.cs:1-8` |
 | R362 | **`ArchitectureRepository.ProductionProjects` hardcodes a 22-element project array duplicating the classification logic in `Directory.Build.props`.** `SharpProof.ArchitectureTest/ArchitectureRepository.cs:7-30` hardcodes an array of 22 production project names. `Directory.Build.props:33-36` classifies `SharpProofProductionProject` using regex exclusions. When new production projects are added, `ArchitectureRepository.ProductionProjects` must be manually updated in addition to build props and solution files. Deriving production project membership dynamically from project evaluation or solution structure avoids configuration drift. | `SharpProof.ArchitectureTest/ArchitectureRepository.cs:7-30`; `Directory.Build.props:33-36` |
 | R363 | **The default rlimit budget of 3,000,000 resource units is defined independently across three disconnected project layers.** `SharpProof.Smt/IrSmtBackendOptions.cs:5` hardcodes `public const uint DefaultQueryRlimit = 3_000_000;`. `SharpProof.Worker.Protocol/ProtocolModel.schema.json:520` generates `WorkerBudgets.DefaultQueryRlimit = 3000000U;`. `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:18` defines `<SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>`. If the default query rlimit is adjusted, all three independent declarations must be synchronized manually. | `SharpProof.Smt/IrSmtBackendOptions.cs:5`; `SharpProof.Worker.Protocol/ProtocolModel.schema.json:520`; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:18` |
@@ -1617,7 +1623,7 @@ domain bounds across `SharpProof.Worker.Protocol`, `SharpProof.Ir`, `SharpProof.
 
 ### Status (part thirty)
 
-R358-R367 are `pending`. R358, R359, R360, and R364 are direct, safe code reductions.
+R359, R361-R367 are `pending`. R359 and R364 are direct, safe code reductions.
 R361, R362, and R363 reduce cross-layer configuration drift between MSBuild properties,
 Roslyn analyzers, and verification workers.
 
@@ -1632,7 +1638,6 @@ PowerShell Roslyn parse options parsing, and legacy assembly references across
 | R368 | **`OutcomeCachePolicy.IsCacheable` is a 7-line single-method class wrapping an inline type check.** `SharpProof.Verify/Outcomes.cs:42-49` defines `public static class OutcomeCachePolicy { public static bool IsCacheable(ProofOutcome outcome) => outcome == null ? throw new ArgumentNullException(nameof(outcome)) : outcome is ProvenOutcome or RefutedOutcome; }`. The class exists solely to test `outcome is ProvenOutcome or RefutedOutcome`. Inlining the pattern directly at call sites eliminates the trivial wrapper class. | `SharpProof.Verify/Outcomes.cs:42-49` |
 | R369 | **`FactoryGuards.RequireBooleanTerm` in `SharpProof.Verify` repeats IR factory term validation.** `SharpProof.Verify/Evidence.cs:106-124` defines `internal static IrTerm RequireBooleanTerm(IrFactory factory, IrTerm term, string parameterName)` checking null guards, `factory.EnsureTerm(term)`, and `term.Type != factory.BooleanType`. `SharpProof.Ir` already owns term type verification; hoisting this helper to `IrFactory` (e.g. `factory.RequireBooleanTerm(term)`) eliminates the isolated guard class in `SharpProof.Verify`. | `SharpProof.Verify/Evidence.cs:106-124`; `SharpProof.Verify/Backend.cs:97,100` |
 | R370 | **`New-SharpProofCSharpParseOptions` in `scripts/CSharpSourceMetrics.ps1` contains a 56-line custom C# language version parser.** `scripts/CSharpSourceMetrics.ps1:210-266` manually parses version strings (`latest` -> `Latest`, `preview` -> `Preview`, `9.0` -> `CSharp9`, `7.3` -> `CSharp7_3`) via regex matching and switch statements. Because Roslyn's `LanguageVersionFacts` or `[Enum]::Parse([Microsoft.CodeAnalysis.CSharp.LanguageVersion], ...)` already handles standard version strings, the custom 56-line parsing logic can be significantly streamlined. | `scripts/CSharpSourceMetrics.ps1:210-266` |
-| R371 | **`Add-Type -AssemblyName System.IO.Compression.FileSystem` is redundant in PowerShell 7+ scripts.** `scripts/Get-SharpProofPilotPackageAuthority.ps1:20-21` and `scripts/Test-SharpProofPilotAuthorityFixtures.ps1:40` call `Add-Type -AssemblyName System.IO.Compression` and `System.IO.Compression.FileSystem`. In PowerShell Core (PowerShell 7+ on Linux/Windows), `System.IO.Compression` types like `[System.IO.Compression.ZipFile]` are built into the runtime and available without `Add-Type`. | `scripts/Get-SharpProofPilotPackageAuthority.ps1:20-21`; `scripts/Test-SharpProofPilotAuthorityFixtures.ps1:40` |
 | R372 | **`IrSummarySignature` repeats canonical member and variable mapping in `SharpProof.Summaries`.** `SharpProof.Summaries/IrRelationalSummary.cs:81-100` defines `IrSummarySignature` holding `Member`, `Receiver`, `Parameters`, `Result`, and `Provenance`. `SharpProof.CompilerArtifact/CompilerCallablePreparation` and `CompilerManifestArtifact` mirror these identical member signature properties. Consolidating the callable signature abstraction reduces field-by-field conversion boilerplate between compiler artifacts and summary models. | `SharpProof.Summaries/IrRelationalSummary.cs:81-100`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:30-45` |
 
 ### Checked and not proposed (part thirty-one)
@@ -1642,10 +1647,12 @@ PowerShell Roslyn parse options parsing, and legacy assembly references across
   and is an intentional performance optimization. Retained as-is.
 - `SpecResultDomainProjection.cs` in `SharpProof.Worker` projects relational summary results into
   the verifier domain. The logic is verifier-specific and properly decoupled from compiler lowering.
+- R371 is now applied: PowerShell 7's built-in compression types are used directly
+  by the pilot authority scripts, and the authority fixtures still pass.
 
 ### Status (part thirty-one)
 
-R368-R372 are `pending`. R368, R369, and R371 are simple code cleanups. R370 and R372
+R368-R370, R372 are `pending`. R368 and R369 are simple code cleanups. R370 and R372
 streamline script language parsing and relational summary signature models.
 
 ## Second survey, part thirty-two: R373-R374
@@ -3018,3 +3025,32 @@ an instruction to broaden the native-loading surface.
 
 R521 is a `pending` candidate. The proposed seam covers only the common type
 validation; value and term construction remain distinct.
+
+## Second survey, part seventy-two: R522 - protocol hash validation reuse
+
+| R522 | **`WorkerProtocolJson.ValidateResponse` recomputes each response hash validity predicate.** It calls `IsSha256(response.RequestHash)` once while adding the structural error and again before checking an expected request hash; the same two-call pattern is repeated for `InputHash`. The predicate scans the entire 64-character string each time. Storing `requestHashValid` and `inputHashValid` once preserves the current conditional mismatch checks and error ordering while removing four repeated scans from every response validation. | `SharpProof.Worker.Protocol/ProtocolJson.cs:326-339` |
+
+### Status (part seventy-two)
+
+R522 is a `pending` candidate. The proposed change is local memoization only;
+hash comparison and validation semantics remain unchanged.
+
+## Second survey, part seventy-three: R523 - cache filename hex predicate
+
+| R523 | **`VerificationCache.IsOwnedCacheEntry` inlines the same hex-digit predicate already factored as `IsHexDigit`.** `IsHexMarker` calls `IsHexDigit` for each transaction marker character, but the cache-entry test separately spells out the identical lowercase hexadecimal ranges for the first 64 filename characters. Reusing `IsHexDigit` in the LINQ predicate leaves the cache filename length and suffix checks unchanged while removing a second authority for accepted cache-name characters. | `SharpProof.Worker/VerificationCache.cs:367-379,523-529` |
+
+### Status (part seventy-three)
+
+R523 is a `pending` candidate. It is a local predicate reuse and does not alter
+the cache transaction or filename-shape policy.
+
+## Second survey, part seventy-four: R524-R525 - worker claim projection helpers
+
+| R524 | **`CallableProofCore.Create` and `Merge` duplicate proof-label normalization.** After their distinct inputs are prepared, both methods apply `Distinct(StringComparer.Ordinal)` followed by ordinal `OrderBy` and materialize the same sorted string array. `Create` additionally fails closed when a justification has no label, while `Merge` combines two label sequences, so those policies should remain separate; a private `NormalizeLabels` helper can own only the shared deduplication and ordering. | `SharpProof.Worker/CallableEntryFeasibility.cs:166-195` |
+| R525 | **Callable verification and response validation duplicate the core unknown-claim-to-coverage precedence.** `CallableVerificationPolicy.ProjectCallableReason` maps no unknowns to `None`, all unsupported-callable claims to `UnsupportedCallable`, all unsupported-contract claims to `UnsupportedContract`, any infrastructure/backend/malformed reason to `InfrastructureFailure`, and the remainder to `SemanticUnknown`. `WorkerResultAssembler.MatchesCallableProjection` repeats that same sequence before adding timeout, cancellation, missing-claim, and compatibility cases. Extracting a shared core projection and layering the response-specific cases around it reduces drift without collapsing the broader response-state policy. | `SharpProof.Worker/CallableVerificationPolicy.cs:113-136`; `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:204-290` |
+
+### Status (part seventy-four)
+
+R524-R525 are `pending` candidates. The proposed helpers preserve the distinct
+label-failure and response-state policies around their common normalization and
+coverage mapping.
