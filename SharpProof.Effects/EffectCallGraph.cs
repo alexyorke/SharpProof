@@ -92,43 +92,18 @@ internal static class EffectCallGraph
         var distinct = new HashSet<IMethodSymbol>(
             SymbolEqualityComparer.Default);
         var ordered = new List<IMethodSymbol>();
-        using var enumerator = methods.GetEnumerator();
-        while (true)
+        foreach (var method in methods)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!enumerator.MoveNext())
-            {
-                break;
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            var method = enumerator.Current;
             cancellationToken.ThrowIfCancellationRequested();
             if ((!requireKnownNode || nodes.ContainsKey(method)) &&
                 distinct.Add(method))
             {
                 ordered.Add(method);
             }
-
-            cancellationToken.ThrowIfCancellationRequested();
         }
 
-        ordered.Sort(new CancellationAwareMethodComparer(cancellationToken));
+        ordered.Sort(EffectSymbolComparer<IMethodSymbol>.Instance);
         cancellationToken.ThrowIfCancellationRequested();
         return [.. ordered];
-    }
-
-    private sealed class CancellationAwareMethodComparer(
-        CancellationToken cancellationToken) : IComparer<IMethodSymbol>
-    {
-        public int Compare(IMethodSymbol? left, IMethodSymbol? right)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var result = EffectSymbolComparer<IMethodSymbol>.Instance.Compare(
-                left,
-                right);
-            cancellationToken.ThrowIfCancellationRequested();
-            return result;
-        }
     }
 }
