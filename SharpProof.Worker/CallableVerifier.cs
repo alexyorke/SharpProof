@@ -150,8 +150,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 ? ImmutableArray.Create("body:normal-completion")
                 : [];
         var noModeledNormalReturn = normalCompletion is IrBooleanTerm { Value: false };
-        if (!entryFeasibility.IsContradictory &&
-            normalCompletion is not IrBooleanTerm)
+        if (normalCompletion is not IrBooleanTerm)
         {
             var bodyEvidence = assumptions.Where(
                 static assumption =>
@@ -263,9 +262,9 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 ? CallableCounterexampleReplayer.Replay(target, index, refuted.Model.Assignments, cancellationToken)
                 : WorkerClaimReason.None;
             cancellationToken.ThrowIfCancellationRequested();
-            var vacuity = entryFeasibility.IsContradictory
-                ? WorkerVacuityKind.ContradictoryPreconditions :
-                noModeledNormalReturn ? WorkerVacuityKind.NoModeledNormalReturn : WorkerVacuityKind.None;
+            var vacuity = noModeledNormalReturn
+                ? WorkerVacuityKind.NoModeledNormalReturn
+                : WorkerVacuityKind.None;
             var record = CallableClaimResultAssembler.FromOutcome(
                 target,
                 index,
@@ -281,8 +280,6 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                     record.ProofCore,
                     vacuity switch
                     {
-                        WorkerVacuityKind.ContradictoryPreconditions =>
-                            entryFeasibility.ProofCore,
                         WorkerVacuityKind.NoModeledNormalReturn =>
                             normalCompletionProofCore,
                         _ => []
@@ -294,17 +291,6 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                         target,
                         index,
                         WorkerClaimReason.MalformedBackendResult);
-                }
-                else if (vacuity ==
-                         WorkerVacuityKind
-                             .ContradictoryPreconditions)
-                {
-                    record.Assumptions =
-                        CallableClaimResultAssembler
-                            .MarkAssumptionsUsed(
-                                target,
-                                entryFeasibility
-                                    .UsedAssumptionIds);
                 }
             }
 

@@ -211,6 +211,7 @@ the smallest relevant containerized test target passes.
 | R505 | Keep ignored `nupkgs/` inputs in the persistent loop snapshot and workspace | `SharpProof.ArchitectureTest`: HostLoopSnapshotAvoidsBindMountGitDiffScanning 1 passed; shell/PowerShell parses passed |
 | R581 | Reject null non-pack summary evidence identities without dereferencing them | `SharpProof.Worker.Test`: CompilerManifestArtifactTests 91 passed |
 | R582 | Fold user-assumption collection into the proven-core validation pass | `SharpProof.Worker.Test`: WorkerTcbEdgeCaseTests 44 passed |
+| R583 | Remove unreachable contradictory-precondition branches after early return | `SharpProof.Worker.Test`: 695 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3694,7 +3695,9 @@ failure result is returned, preserving the prior fail-closed behavior.
 
 ### Status (part one hundred twenty-four)
 
-R583 is a pending callable-verification reduction candidate. Preserve the early contradictory-entry return and its proof-core/assumption handling; simplify only branches proven unreachable after that return.
+R583 is applied: once contradictory entry feasibility returns the dedicated
+postcondition result, the normal path no longer carries contradictory-vacuity
+branches or their proof/assumption plumbing. The full Worker suite passes.
 
 ## Second survey, part one hundred twenty-five: R584 - repeated test SHA-256 formatting
 
@@ -3711,3 +3714,11 @@ R584 is a pending test-infrastructure reduction candidate. Preserve intentionall
 ### Status (part one hundred twenty-six)
 
 R585 is a pending Worker test-infrastructure reduction candidate. Keep the message and counter behavior configurable so tests still prove that malformed or unsupported inputs never reach the backend.
+
+## Second survey, part one hundred twenty-seven: R586 - duplicate compiler-artifact factory setup
+
+| R586 | **`CompilerManifestArtifactTests` rebuilds the same compilation-to-artifact pipeline in three helpers.** `CreateArtifact`, `CreateContractArtifact`, and `CreateFeatureArtifact` each create a C# compilation, run `ClaimManifestBuilder`, and call `CompilerManifestArtifactProducer.Create` with the same work directory, target framework, cancellation token, and default expression-depth budget; the latter two also repeat the feature-set plumbing. A single parameterized factory can own compilation, discovery, and producer construction while the small wrappers retain their distinct source defaults, contract-reference choice, feature set, and optional specification-pack argument. | `SharpProof.Worker.Test/CompilerManifestArtifactTests.cs:2538-2618` |
+
+### Status (part one hundred twenty-seven)
+
+R586 is a pending Worker test-infrastructure reduction candidate. Preserve the separate malformed-capture and feature-selection scenarios; centralize only the repeated artifact-construction pipeline.
