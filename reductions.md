@@ -152,6 +152,7 @@ the smallest relevant containerized test target passes.
 | R842 | Use a set for pilot-review expected identities that are only membership-tested | `SharpProof.ArchitectureTest`: PilotAuthorityTests passed |
 | R843 | Hoist scalar-catalog key sorting out of per-row validation loops | generator `-Verify` checks passed |
 | R844 | Reuse shared generated-file exact-byte verification in the API-spec generator | generator `-Verify` checks passed |
+| R846 | Accumulate fuzz exception coverage from the already-validated counters | `scripts/Test-SharpProofFuzzRunnerResult.ps1`: 26 fixtures passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7328,8 +7329,8 @@ R845 is `deferred`: the walkers are small and intentionally render different
 
 ### Status (part three hundred fifty-seven)
 
-R846 is `deferred`: the repeated reads are bounded by a small coverage object,
-  but the validated values can be retained locally with no policy change.
+R846 is `applied`: the exception aggregate now uses the counters parsed during
+  the existing coverage-validation loop, preserving all field checks and limits.
 
 ## Second survey, part three hundred fifty-eight: R847 - repeated documentation mutation fixture literal
 

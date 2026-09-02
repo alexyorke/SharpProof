@@ -147,19 +147,19 @@ function Assert-SharpProofFuzzRunnerResult {
             'IndexOutOfRangeExceptions', 'InvalidCastExceptions')
         Assert-ExactJsonObjectProperties -Object $coverage `
             -Expected $coverageProperties -Description 'Frontend coverage'
+        [long]$exceptionTotal = 0
         foreach ($name in $coverageProperties) {
             $count = Get-ExactJsonInt32 $coverage $name
             if ($count -lt 0 -or ($cases -ge 1000 -and $count -eq 0)) {
                 throw "Frontend coverage '$name' is invalid for the executed case count."
             }
+            if ($name -in @(
+                    'DivideByZeroExceptions', 'OverflowExceptions',
+                    'NullReferenceExceptions', 'IndexOutOfRangeExceptions',
+                    'InvalidCastExceptions')) {
+                $exceptionTotal += [long]$count
+            }
         }
-        $exceptionTotal = [long](Get-ExactJsonInt32 `
-                $coverage 'DivideByZeroExceptions') +
-            [long](Get-ExactJsonInt32 $coverage 'OverflowExceptions') +
-            [long](Get-ExactJsonInt32 $coverage 'NullReferenceExceptions') +
-            [long](Get-ExactJsonInt32 `
-                $coverage 'IndexOutOfRangeExceptions') +
-            [long](Get-ExactJsonInt32 $coverage 'InvalidCastExceptions')
         if ($exceptionTotal -gt $cases) {
             throw 'Frontend exception coverage exceeds the executed case count.'
         }
