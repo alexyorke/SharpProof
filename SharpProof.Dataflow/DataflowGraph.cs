@@ -157,7 +157,6 @@ public sealed class DataflowGraph<T>
         var result = ImmutableArray.CreateBuilder<ImmutableArray<int>>(adjacency.Length);
         foreach (var neighbors in adjacency)
         {
-            neighbors.Sort();
             result.Add([.. neighbors]);
         }
         return result.MoveToImmutable();

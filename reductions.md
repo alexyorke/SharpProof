@@ -153,6 +153,7 @@ the smallest relevant containerized test target passes.
 | R373 | Share compiler-probe option and path normalization helpers between generator and snapshot implementations | `SharpProof.Package.Test`: six compiler-probe tests passed |
 | R461 | Replace the interval modular-distance branch ladder with the existing `Normalize` helper | `SharpProof.Dataflow.Test`: 50 passed |
 | R462 | Remove the shadowed `modulus.IsOne` boundary normalization branch from `IntervalDomain.Create` | `SharpProof.Dataflow.Test`: 50 passed |
+| R376 | Avoid re-sorting adjacency lists that are already ordered by the graph's canonical edge sort | `SharpProof.Dataflow.Test`: 50 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1697,7 +1698,6 @@ lattice joins, graph representations, and fixpoint solvers in `SharpProof.Datafl
 | ID | Finding | Evidence |
 |---|---|---|
 | R375 | **`ClosedAbstractDomain<T>` forces duplicate `Havoc` and `Widen` implementations across all derived domains.** `SharpProof.Dataflow/ClosedAbstractDomain.cs:18-19` defines `Havoc` and `Widen` as abstract methods. Every derived domain repeats identical logic: `NullnessDomain.cs:49-53`, `SequenceCardinalityDomain.cs:136-140`, and `IntervalDomain.cs:178-181` each implement `Havoc` as `value.IsBottom ? Bottom : Top`, and finite lattices implement `Widen` as `Join(previous, candidate)`. Providing virtual default implementations in `ClosedAbstractDomain<T>` eliminates boilerplate overrides in all subclasses. | `SharpProof.Dataflow/ClosedAbstractDomain.cs:18-19`; `SharpProof.Dataflow/NullnessDomain.cs:44-53`; `SharpProof.Dataflow/SequenceCardinalityDomain.cs:136-140`; `SharpProof.Dataflow/IntervalDomain.cs:178-181` |
-| R376 | **`DataflowGraph<T>` performs redundant multi-pass sorting on already-sorted adjacency lists.** `SharpProof.Dataflow/DataflowGraph.cs:77-88, 155-164` sorts `Edges` primarily by `SourceId` and secondarily by `TargetId` on line 77. Iterating `Edges` populates `successors[edge.SourceId]` in strictly sorted order. Calling `Freeze(successors)` on line 88 then re-sorts every list with `neighbors.Sort()`. Avoiding the second sort pass on pre-sorted successor lists simplifies graph construction. | `SharpProof.Dataflow/DataflowGraph.cs:77-88, 155-164` |
 | R377 | **4-point flat diamond lattice join and partial order logic is duplicated across enum domains.** `SharpProof.Dataflow/NullnessDomain.cs:17-42` and `SharpProof.Dataflow/SequenceCardinalityDomain.cs:142-169` implement identical 4-element flat diamond lattices ($\bot < \{A, B\} < \top$). Both duplicate identical branch cascades for identity, bottom absorption, and top collapse. Unifying diamond lattice operations reduces duplicated lattice decision trees across abstract domains. | `SharpProof.Dataflow/NullnessDomain.cs:17-42`; `SharpProof.Dataflow/SequenceCardinalityDomain.cs:142-169` |
 | R378 | **`DataflowEdge` contains manual property backing and constructor boilerplate on a `readonly record struct`.** `SharpProof.Dataflow/DataflowGraph.cs:10-27` spans 18 lines manually declaring constructor parameter guards and property assignments for a 2-field record struct. Converting to primary constructor property initializers (`public readonly record struct DataflowEdge(int SourceId, int TargetId) { public int SourceId { get; } = ArgumentNullGuard.RequireNonnegative(SourceId, nameof(SourceId)); ... }`) reduces 18 lines to 5 lines while preserving all validation, deconstructors, and value equality. | `SharpProof.Dataflow/DataflowGraph.cs:10-27` |
 | R379 | **`ForwardDataflowAnalysis` allocates an intermediate dictionary and performs two redundant collection passes per solver round.** `SharpProof.Dataflow/ForwardDataflowAnalysis.cs:138-171` allocates `var changedOutputs = new Dictionary<int, T>()` each round, collects changed block states, loops to write them into `outputs`, and loops a third time to gather successors into `affected`. Because block transfers within a round read invariant `inputs`, `outputs[blockId]` can be updated directly and successors enqueued immediately, eliminating intermediate dictionary allocations and two iteration loops per fixpoint round. | `SharpProof.Dataflow/ForwardDataflowAnalysis.cs:138-171` |
@@ -1712,10 +1712,13 @@ lattice joins, graph representations, and fixpoint solvers in `SharpProof.Datafl
   directions, preserving the same signed-distance result.
 - R462 is now applied: the earlier `modulus.IsOne` boundary rewrite was removed;
   the later extreme-bound handling remains the sole normalization path.
+- R376 is now applied: `DataflowGraph` freezes its already-canonical adjacency
+  order without a second per-list sort.
 
 ### Status (part thirty-two continued)
 
-R375-R379 are `pending`. R376 and R378 are direct, low-risk local simplifications.
+R375, R377-R379 are `pending`. R378 is a direct local simplification but needs
+an `IsExternalInit` compatibility decision for the netstandard2.0 project.
 R375 and R377 generalize abstract domain hierarchy contracts. R379 optimizes fixpoint solver throughput.
 
 ## Second survey, part thirty-three: R380-R385
