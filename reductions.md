@@ -7441,3 +7441,23 @@ R850 is `applied`: validated collector mappings are grouped once in first-seen
 R851 is `applied`: constructor parameters are indexed during validation and
   assignments resolve through that map, preserving lower-camel matching and
   generated output while removing repeated scans.
+
+## Second survey, part three hundred sixty-three: R852 - superseded loop signal traps
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R852 | **`eng/container/loop-command.sh` installs a broad lock-release trap and then replaces it before the main work begins.** `trap release_lock EXIT HUP INT TERM` is set immediately after acquiring the lock; after the temporary manifest paths and `cleanup` function are defined, the script installs `trap cleanup EXIT` plus separate exit-status traps for `HUP`, `INT`, and `TERM`. Thus the first `EXIT`, `HUP`, `INT`, and `TERM` handlers are not the handlers used during workspace reconciliation or command execution. The initial trap does cover a small interruption window while source metadata and temporary files are being initialized, but it is easy to mistake it for the final policy and it duplicates the lock-release part of `cleanup`; defining the final cleanup/trap set once after the temporary paths exist, with an explicit setup-failure guard if needed, would reduce this stateful signal configuration. | `eng/container/loop-command.sh:40-60,91-107` |
+
+### Checked and not proposed (part three hundred sixty-three)
+
+- The `HUP`, `INT`, and `TERM` exit codes are intentionally distinct and should
+  remain explicit if the trap setup is reorganized.
+- `cleanup` must continue to remove all three temporary manifests before
+  releasing the lock; this is not a proposal to drop failure cleanup.
+- The short pre-cleanup interruption window is acknowledged, so deleting the
+  first trap mechanically without replacing that protection is not proposed.
+
+### Status (part three hundred sixty-three)
+
+R852 is `deferred`: the candidate concerns trap lifetime and duplicated cleanup
+  setup, with no shell-file change made during this audit.
