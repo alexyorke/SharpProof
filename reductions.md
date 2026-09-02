@@ -139,6 +139,7 @@ the smallest relevant containerized test target passes.
 | R821 | Reuse the already-computed generated-domain join in lattice-law assertions | `SharpProof.Dataflow.Test`: 50 passed |
 | R822 | Seal replay fixtures only at validation boundaries instead of during construction and again after mutation | `SharpProof.Worker.Test`: CompilerEffectReplayArtifactCodecTests, 8 passed |
 | R823 | Share the JSON-document/reflection invocation wrapper across specification-pack parser tests | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
+| R824 | Share probe JSON array framing between raw-row and string-array serialization | `SharpProof.Package.Test`: CompilerProbeSnapshotTests (5), CompilerProbeInputConsistencyTests (1) passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6839,9 +6840,8 @@ JSON-document lifetime and reflection-invocation helper.
 
 ### Status (part three hundred thirty-five)
 
-R824 is `deferred`: the duplicated loop is small and probe-only, but it is an
-  exact maintenance seam in a hand-written serializer where delimiter changes
-  would otherwise need two updates.
+R824 is `applied`: one callback-driven array writer now owns framing and
+separator handling while raw and escaped element writers remain distinct.
 
 ## Second survey, part three hundred thirty-six: R825 - misleading empty-tree predicate
 

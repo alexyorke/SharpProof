@@ -51,19 +51,7 @@ internal sealed class ProbeJsonObject
     internal void RawArray(string name, IEnumerable<string> rows)
     {
         PropertyName(name);
-        Builder.Append('[');
-        var firstRow = true;
-        foreach (var row in rows)
-        {
-            if (!firstRow)
-            {
-                Builder.Append(',');
-            }
-
-            firstRow = false;
-            Builder.Append(row);
-        }
-        Builder.Append(']');
+        AppendArray(Builder, rows, static (builder, row) => builder.Append(row));
     }
 
     internal string Complete()
@@ -76,6 +64,14 @@ internal sealed class ProbeJsonObject
         StringBuilder builder,
         IEnumerable<string> values)
     {
+        AppendArray(builder, values, AppendString);
+    }
+
+    private static void AppendArray(
+        StringBuilder builder,
+        IEnumerable<string> values,
+        Action<StringBuilder, string> append)
+    {
         builder.Append('[');
         var first = true;
         foreach (var value in values)
@@ -86,7 +82,7 @@ internal sealed class ProbeJsonObject
             }
 
             first = false;
-            AppendString(builder, value);
+            append(builder, value);
         }
         builder.Append(']');
     }
