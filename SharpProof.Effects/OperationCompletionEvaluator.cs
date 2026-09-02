@@ -232,16 +232,15 @@ internal sealed class OperationCompletionEvaluator
         }
         foreach (var subpattern in recursive.DeconstructionSubpatterns)
         {
-            if (!CanCompletePatternEvaluation(subpattern) &&
-                SwitchExpressionFacts.IsTotalPattern(
-                    subpattern,
-                    subpattern.InputType))
+            var canComplete = CanCompletePatternEvaluation(subpattern);
+            var isTotal = SwitchExpressionFacts.IsTotalPattern(
+                subpattern,
+                subpattern.InputType);
+            if (!canComplete && isTotal)
             {
                 return false;
             }
-            if (!SwitchExpressionFacts.IsTotalPattern(
-                    subpattern,
-                    subpattern.InputType))
+            if (!isTotal)
             {
                 return true;
             }
@@ -252,16 +251,15 @@ internal sealed class OperationCompletionEvaluator
             {
                 return false;
             }
-            if (!CanCompletePatternEvaluation(subpattern.Pattern) &&
-                SwitchExpressionFacts.IsTotalPattern(
-                    subpattern.Pattern,
-                    subpattern.Pattern.InputType))
+            var canComplete = CanCompletePatternEvaluation(subpattern.Pattern);
+            var isTotal = SwitchExpressionFacts.IsTotalPattern(
+                subpattern.Pattern,
+                subpattern.Pattern.InputType);
+            if (!canComplete && isTotal)
             {
                 return false;
             }
-            if (!SwitchExpressionFacts.IsTotalPattern(
-                    subpattern.Pattern,
-                    subpattern.Pattern.InputType))
+            if (!isTotal)
             {
                 return true;
             }

@@ -4000,7 +4000,9 @@ R612 is a pending local Effects reduction candidate. Preserve floating-point NaN
 
 ### Status (part one hundred fifty-four)
 
-R613 is a pending local Effects performance/clarity candidate. Preserve the existing order of completion evaluation and total-pattern classification; eliminate only the repeated query for the same subpattern.
+R613 is applied: each recursive-pattern loop now evaluates its total-pattern
+predicate once after the existing completion check and reuses the result,
+preserving evaluation order while removing duplicate pattern traversals.
 
 ## Second survey, part one hundred fifty-five: R614 - unreachable operator-null disjunct
 
