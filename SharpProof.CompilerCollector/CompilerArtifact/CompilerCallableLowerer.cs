@@ -274,16 +274,14 @@ internal sealed class CompilerCallableLowerer
         out CompilerPreparedSpecCall? prepared)
     {
         prepared = null;
-        if (!call.Target.HasValue ||
-            !RoslynProgramLowerer.IsDirectInvocation(invocation) ||
-            invocation.TargetMethod.Parameters.Any(static parameter => parameter.RefKind != RefKind.None) ||
+        if (!TryGetAdmissibleByValueCall(call, invocation) ||
             !_apiSpecs.TryGet(invocation.TargetMethod, out var resolved) ||
             resolved.Template.Facets.Throws.Behavior != SpecThrowBehavior.DoesNotThrow ||
             !TryAdmitSpecCallEffects(invocation, call, resolved.Template, out var consumesMemoryHavoc) ||
             !resolved.Template.Result.HasValue ||
             !TryGetSpecResultType(invocation.Type, resolved.Template.Target.ResultType,
-                _factory.GetVariableInfo(call.Target.Value).Type, out var resultType) ||
-            _factory.GetVariableInfo(call.Target.Value).Type != resultType ||
+                _factory.GetVariableInfo(call.Target!.Value).Type, out var resultType) ||
+            _factory.GetVariableInfo(call.Target!.Value).Type != resultType ||
             invocation.Arguments.Length != resolved.Template.Parameters.Length ||
             resolved.Template.Target.DocumentationCommentId != callIdentity ||
             resolved.Template.Receiver.HasValue != (call.Receiver != null) ||
@@ -305,10 +303,7 @@ internal sealed class CompilerCallableLowerer
         out CompilerPreparedSummaryCall? prepared)
     {
         prepared = null;
-        if (!call.Target.HasValue ||
-            !RoslynProgramLowerer.IsDirectInvocation(invocation) ||
-            invocation.TargetMethod.Parameters.Any(
-                static parameter => parameter.RefKind != RefKind.None) ||
+        if (!TryGetAdmissibleByValueCall(call, invocation) ||
             !_summaries.TryGet(
                 invocation.TargetMethod,
                 call.Member,
@@ -357,6 +352,16 @@ internal sealed class CompilerCallableLowerer
                     provenance.EvidenceSha256,
                     provenance.EvidenceIdentity))]);
         return true;
+    }
+
+    private static bool TryGetAdmissibleByValueCall(
+        IrCallInstruction call,
+        IInvocationOperation invocation)
+    {
+        return call.Target.HasValue &&
+            RoslynProgramLowerer.IsDirectInvocation(invocation) &&
+            !invocation.TargetMethod.Parameters.Any(
+                static parameter => parameter.RefKind != RefKind.None);
     }
 
     private static CompilerSummaryOrigin ToCompilerOrigin(

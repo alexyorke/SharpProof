@@ -190,6 +190,7 @@ the smallest relevant containerized test target passes.
 | R472 | Derive the effect-capability unknown marker from the enum catalog expression | `SharpProof.Effects.Test`: 323 passed |
 | R471 | Inherit effect-summary equivalence from the closed-domain base while retaining Widen forwarding | `SharpProof.Effects.Test`: 323 passed |
 | R473 | Share method/property/type/assembly scope enumeration across analyzer, collector, and effects policies | `SharpProof.Analyzer.Test`: 476; `SharpProof.Effects.Test`: 323 |
+| R475 | Share direct by-value call admission checks between spec and summary lowering | `SharpProof.Worker.Test`: 23 focused compiler-call tests |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2366,7 +2367,7 @@ This pass inspected effect-domain defaults, capability encoding, trust scopes, a
 
 ### Status (part fifty-one)
 
-R474-R475 are `pending` review-only reduction candidates. R471 is applied:
+R474 is a `pending` review-only reduction candidate. R471 is applied:
 `EffectSummaryDomain` now derives from `ClosedAbstractDomain<EffectSummary>` and
 retains its explicit Widen forwarding, while inheriting the shared equivalence
 implementation. R472 is applied:
@@ -2374,6 +2375,8 @@ implementation. R472 is applied:
 validation and `IsUnknown`, removing the numeric bit-position duplicate. R473
 is applied: analyzer, collector, and effects policies now consume one shared
 scope iterator with the same ordering as the former local copies.
+R475 is applied: both callable-lowering paths now share the direct, by-value
+admission predicate while retaining their distinct spec/summary validation.
 
 
 ## Second survey, part fifty-two: R476 - the shipped consumer property surface
