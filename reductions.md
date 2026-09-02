@@ -7066,3 +7066,25 @@ R833 is `deferred`: the extra pass is bounded by one response collection, but
 R834 is `deferred`: the duplicate pass is linear and bounded by manifest size,
   but it repeats deterministic identity extraction immediately before using the
   same IDs for membership validation.
+
+## Second survey, part three hundred forty-six: R835 - duplicate performance-response precondition
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R835 | **`WorkerPerformanceProbe` repeats the same response-validity precondition in its cancellation and timeout predicates.** `IsCompleteCancellation` and `IsCompleteProjectTimeout` each require `response.Errors.Length == 0` and `WorkerProtocolJson.Validate(response).IsValid` before checking their different run status, reason, and result-shape policies. A small `IsValidCleanResponse` helper can own those two shared checks while the cancellation-specific manifest/result assertions and timeout-specific project-timeout witness assertion remain independent. | `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:120-139,189-199` |
+
+### Checked and not proposed (part three hundred forty-six)
+
+- The predicates must remain separate after the shared precondition: one
+  proves typed cooperative cancellation, while the other proves a project
+  timeout observed through the launcher.
+- The cancellation predicate's failure reason, nonempty manifest, and result
+  arrays are not interchangeable with the timeout predicate's witness test.
+- Protocol validation remains required; the candidate only centralizes the
+  repeated clean-response guard.
+
+### Status (part three hundred forty-six)
+
+R835 is `deferred`: the duplicate validation is small and probe-only, but both
+  predicates run on performance-gate responses and can share one explicit
+  authority precondition without weakening either measurement.
