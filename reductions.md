@@ -4353,7 +4353,7 @@ R713 completed: list-pattern length, slice presence, and slice index are prepare
 
 | R714 | **`RequiresCallSiteTreeAnalyzer.IsNonExecutingObservation` resolves the same framework symbol for every local reference.** Each call performs `Compilation.GetTypeByMetadataName("System.Delegate")` before walking the reference's operation ancestors, although the symbol is invariant for the containing compilation and `TreeAnalysis`. Cache the nullable delegate symbol once per analysis (while retaining the existing null fallback and the shared metadata-name authority concern recorded elsewhere) so repeated observations do not repeat compilation lookup. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1276-1338` |
 
-R714 is a pending analyzer framework-symbol lookup reduction candidate. Preserve the null-compilation-symbol behavior, delegate property identity checks, and all ancestor-based non-execution rules.
+R714 completed: `TreeAnalysis` caches the nullable `System.Delegate` symbol once per analysis, preserving null fallback, delegate property identity checks, and all ancestor-based non-execution rules.
 
 | R715 | **`TreeAnalysis.GetPatternDestinations` performs a linear duplicate search for every declared pattern local.** The pending pattern walk calls `result.Any` with `SymbolEqualityComparer.Default` before each append, producing quadratic work as a pattern tree declares more locals. Keep the ordered result list but pair it with a symbol-equality `HashSet` so membership and insertion remain separate without changing traversal order or duplicate suppression. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1341-1448` |
 

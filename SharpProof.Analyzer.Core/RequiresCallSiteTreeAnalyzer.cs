@@ -118,6 +118,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 rootDeclaration.SyntaxTree,
                 semanticModel.Compilation,
                 cancellationToken);
+        private readonly INamedTypeSymbol? _delegateType =
+            semanticModel.Compilation.GetTypeByMetadataName("System.Delegate");
         private AnalyzerSemanticOutcome _rootOutcome =
             AnalyzerSemanticOutcome.NotApplicable;
 
@@ -1276,8 +1278,6 @@ internal static partial class RequiresCallSiteTreeAnalyzer
         private bool IsNonExecutingObservation(
             ILocalReferenceOperation reference)
         {
-            var delegateType = semanticModel.Compilation
-                .GetTypeByMetadataName("System.Delegate");
             if (reference.Syntax.Ancestors()
                 .OfType<AssignmentExpressionSyntax>()
                 .Any(assignment =>
@@ -1308,10 +1308,10 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     continue;
                 }
                 if (operation is IPropertyReferenceOperation property &&
-                    delegateType != null &&
+                    _delegateType != null &&
                     SymbolEqualityComparer.Default.Equals(
                         property.Property.OriginalDefinition.ContainingType,
-                        delegateType) &&
+                        _delegateType) &&
                     property.Property.OriginalDefinition is
                     {
                         IsStatic: false,
