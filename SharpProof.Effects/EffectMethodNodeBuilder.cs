@@ -418,14 +418,7 @@ internal sealed class EffectMethodNodeBuilder
     {
         foreach (var member in type.GetMembers())
         {
-            var initializable = member switch
-            {
-                IFieldSymbol field => field.IsStatic && !field.IsConst,
-                IPropertySymbol property => property.IsStatic,
-                IEventSymbol @event => @event.IsStatic,
-                _ => false
-            };
-            if (!initializable)
+            if (!IsInitializableMember(member, staticInitializers: true))
             {
                 continue;
             }

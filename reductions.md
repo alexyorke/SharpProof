@@ -4033,7 +4033,9 @@ builder's distinct filtering and mapping.
 
 ### Status (part one hundred fifty-seven)
 
-R616 is a pending local Effects cleanup candidate. Preserve the existing static-only and non-const field policy; replace only the duplicated classification switch with the canonical helper.
+R616 is applied: `AllStaticInitializersSatisfy` now reuses
+`IsInitializableMember(member, staticInitializers: true)`, preserving the
+static-only/non-const policy without a duplicate classification switch.
 
 ## Second survey, part one hundred fifty-eight: R617 - duplicate walk-depth scope guard
 
