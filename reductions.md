@@ -6837,3 +6837,25 @@ R823 is `deferred`: the duplication is confined to test plumbing and the
 R824 is `deferred`: the duplicated loop is small and probe-only, but it is an
   exact maintenance seam in a hand-written serializer where delimiter changes
   would otherwise need two updates.
+
+## Second survey, part three hundred thirty-six: R825 - misleading empty-tree predicate
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R825 | **`CompilerCaptureAuthority.IsCanonicalEmptyTree` has a name that contradicts its accepted domain.** The predicate returns `true` immediately for any `CompilerSyntaxTreeSnapshot` with `TextLength != 0`; only zero-length trees are required to carry the empty-text hash and a deduplicated effective-symbol set. In `CompilationFingerprint.ValidTree` this is the intended policy - non-empty trees need no empty-tree special case - but the helper name suggests that a non-empty tree should return `false`, forcing readers to reconstruct the disjunctive meaning from the expression. Renaming it to describe the guard (for example, `HasValidEmptyTreeRepresentation`) or inlining the explicit `TextLength != 0 || ...` policy at its sole caller would reduce misleading indirection without changing acceptance behavior. | `SharpProof.CompilerArtifact/CompilerCaptureAuthority.cs:145-162`; `SharpProof.CompilerArtifact/CompilationFingerprint.cs:298-322` |
+
+### Checked and not proposed (part three hundred thirty-six)
+
+- The non-empty-tree fast path is intentional and must remain; this is not a
+  proposal to reject ordinary syntax trees or to require the empty hash for
+  every capture.
+- The empty-text hash and effective-preprocessor-symbol comparison remain
+  necessary for zero-length trees, including duplicate raw `#define` symbols.
+- This is a naming/shape cleanup at one call site, not a change to the capture
+  fingerprint or its fail-closed validation policy.
+
+### Status (part three hundred thirty-six)
+
+R825 is `deferred`: it has no material runtime cost, but the current positive
+  method name makes a valid non-empty result look paradoxical and invites an
+  incorrect future simplification of the empty-tree branch.
