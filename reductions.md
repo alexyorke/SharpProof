@@ -6650,3 +6650,24 @@ R816 is `deferred`: the second locked restore is usually cheap when assets are
   unchanged, but the pipeline still repeats a full restore invocation. It is a
   low-risk orchestration cleanup if security runtime or restore diagnostics
   show measurable cost.
+
+## Second survey, part three hundred twenty-eight: R817 - package-consumer test restore after solution restore
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R817 | **`package-consumers` restores the product test project again after the container command already restored the solution.** `Invoke-SharpProofContainer.ps1` runs `dotnet restore SharpProof.sln --locked-mode` before calling `Test-SharpProofPackageConsumers.ps1`. That script correctly restores each generated framework consumer and then builds those consumers with `--no-restore`, but its final focused `SharpProof.Package.Test` invocation passes only `test`, the project, configuration, logger, and optional filter. Without `--no-restore`, `dotnet test` can launch another restore for the already-restored product project, outside the explicit locked-mode call. Adding `--no-restore` to that focused invocation, or making the script own the product restore and removing the outer one, can preserve the package-source environment and focused test filter while avoiding a redundant restore path. | `scripts/Invoke-SharpProofContainer.ps1:354-360`; `scripts/Test-SharpProofPackageConsumers.ps1:449-476,555-573` |
+
+### Checked and not proposed (part three hundred twenty-eight)
+
+- The per-framework consumer restores remain necessary because those projects
+  are generated under temporary SDK roots with an offline framework source.
+- The generated consumer builds already use `--no-restore`; R817 concerns only
+  the final in-repository package-test project.
+- Locked-mode enforcement must remain on the owning solution restore; simply
+  dropping both restore operations would weaken package graph validation.
+
+### Status (part three hundred twenty-eight)
+
+R817 is `deferred`: the second restore is normally an incremental no-op, but
+  omitting `--no-restore` makes the intended restore ownership unclear and can
+  repeat dependency evaluation. It is a low-risk build-orchestration cleanup.
