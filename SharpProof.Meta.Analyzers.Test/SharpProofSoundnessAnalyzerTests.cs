@@ -3416,29 +3416,29 @@ public sealed class SharpProofSoundnessAnalyzerTests
 
     private static async Task<ImmutableArray<Diagnostic>> Analyze(string source)
     {
-        var compilation = CSharpCompilation.Create(
-            "MetaAnalyzerTest",
-            [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp12))],
-            PlatformReferences,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var compilerErrors = compilation.GetDiagnostics()
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(compilerErrors, Is.Empty);
-
-        return await compilation
-            .WithAnalyzers([new SharpProofSoundnessAnalyzer()])
-            .GetAnalyzerDiagnosticsAsync();
+        return await AnalyzeCore(source, "MetaAnalyzerTest");
     }
 
-    private static async Task<ImmutableArray<Diagnostic>> AnalyzeGenerated(string source)
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeGenerated(
+        string source)
+    {
+        return await AnalyzeCore(
+            source,
+            "MetaAnalyzerGeneratedTest",
+            "Generated.g.cs");
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeCore(
+        string source,
+        string assemblyName,
+        string? path = null)
     {
         var compilation = CSharpCompilation.Create(
-            "MetaAnalyzerGeneratedTest",
+            assemblyName,
             [CSharpSyntaxTree.ParseText(
                 source,
                 new CSharpParseOptions(LanguageVersion.CSharp12),
-                path: "Generated.g.cs")],
+                path: path ?? string.Empty)],
             PlatformReferences,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var compilerErrors = compilation.GetDiagnostics()

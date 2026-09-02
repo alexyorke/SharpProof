@@ -167,6 +167,7 @@ the smallest relevant containerized test target passes.
 | R603 | Share Roslyn expression-operation wrapper recovery across frontend test suites | `SharpProof.Frontend.Test`: FrontendLoweringTests 37; UnaryAndDefaultLoweringCoverageTests 22 passed |
 | R606 | Share schema-file path resolution and JSON loading across conformance suites | `SharpProof.Ir.Test`: 3; `SharpProof.Worker.Test`: 9 schema tests passed |
 | R605 | Share canonical container admission checks across package integration suites | `SharpProof.Package.Test`: package-layout and Worker MSBuild guard paths passed |
+| R618 | Share Meta-analyzer test compilation and diagnostic setup | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4142,7 +4143,9 @@ R617 is a pending local Effects cleanup candidate. Preserve the fail-closed fall
 
 ### Status (part one hundred fifty-nine)
 
-R618 is a pending test-infrastructure reduction candidate. Preserve the generated source path and assembly identity where they are semantically relevant; consolidate only the shared compilation, error assertion, and analyzer execution sequence.
+R618 is `applied`: ordinary and generated analyzer tests now share one
+compilation/diagnostic host while retaining their distinct assembly names and
+the generated `Generated.g.cs` path.
 
 ## Second survey, part one hundred sixty: R619 - duplicate cancellation-filter prelude
 
