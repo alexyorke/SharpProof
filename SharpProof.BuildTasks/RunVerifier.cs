@@ -835,7 +835,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             {
                 return process.HasExited;
             }
-            if (process.WaitForExit(Math.Min(remaining, 25)))
+            if (process.WaitForExit(
+                    Math.Min(remaining, OutputDrainPollingMilliseconds)))
             {
                 return true;
             }

@@ -2617,8 +2617,10 @@ share one already-canonical equality/prefix predicate.
 
 ### Status (part fifty-eight)
 
-R486-R487 are `pending` review-only candidates. No implementation or build files
-were edited.
+R486 remains `pending` because the larger wait-loop abstraction would need to
+preserve two distinct completion protocols and test hooks. R487 is applied:
+`WaitForExitOrCancellation` now reuses `OutputDrainPollingMilliseconds` for its
+bounded wait slice, leaving one timing authority in `RunVerifier`.
 
 ## Second survey, part fifty-nine: R488 - supervisor record parsing
 
@@ -3601,3 +3603,11 @@ R574 is a pending mutation-pipeline reduction candidate. Preserve validation aft
 ### Status (part one hundred sixteen)
 
 R575 is a pending mutation-pipeline reduction candidate. Keep the final catalog-count and uniqueness assertions and the validation boundary after each child process; only avoid reparsing evidence that has already passed the same checks.
+
+## Second survey, part one hundred seventeen: R576 - duplicate verification-target command construction
+
+| R576 | **`WorkerMsBuildIntegrationTests.ConsumerProject` duplicates the full verification-target process setup.** `RunVerificationTargetAsync` and `RunVerificationTargetWithInvocationIdAsync` each build the same `dotnet msbuild /t:_SharpProofVerifyCore` argument list, including the request/result/cache paths and fixed configuration properties; the only difference is that one creates a new GUID while the other receives an explicit invocation ID. A single core helper or overload can own the command construction and let the generated-ID overload delegate to it, preserving the tests that intentionally reuse an invocation ID while removing a second copy of the command contract. | `SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs:4079-4137` |
+
+### Status (part one hundred seventeen)
+
+R576 is a pending package-integration-test reduction candidate. Preserve the explicit-ID path used by cleanup/recovery tests and the per-call cache/request/result locations; only centralize the duplicated MSBuild argument construction.
