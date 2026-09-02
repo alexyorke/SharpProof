@@ -7652,3 +7652,27 @@ build-file changes were made during this audit.
 
 R860 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred seventy-one: R861 - repeated intrinsic validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R861 | **`ContractBinder.BindCore` can enumerate one operation body twice for intrinsic violations.** When the resolved target has no valid direct clause, the binder calls `ValidateIntrinsics` on `resolution.DirectInventory` before adding the bound invocation clauses; when resolution falls back to the same direct inventory and its `ImplementationBody` is non-null, `BindInvocations` then calls `ValidateIntrinsics` again on the same callable/body and `requiresOnly` mode. `ContractIntrinsicValidator.Validate` performs the full `DescendantsAndSelf` filter, source-order sort, owner/context classification, and violation projection on each call. Carrying a validated result through the binding path, or conditionally skipping the second call when the callable, body, and mode are the already-validated direct inputs, can preserve the early direct-source check and the companion case (where the selected companion inventory has no body) while removing the repeated traversal. | `SharpProof.Contracts/ContractBinder.cs:177-185,205,261-278,320-337`; `SharpProof.Contracts/ContractIntrinsicValidator.cs:12-53`; `SharpProof.Contracts/EffectiveContractSourceResolver.cs:85-145` |
+
+### Checked and not proposed (part three hundred seventy-one)
+
+- The first direct-inventory validation is not independently removable: when a
+  companion supplies the effective contract, the companion inventory can have
+  no implementation body, so `BindInvocations` intentionally does not perform
+  the same check for the direct target.
+- This candidate targets only the repeated successful validation when the
+  effective inventory is the direct one. It does not merge direct and companion
+  contract sources or weaken the resolver's placement and rejected-API checks.
+- `ContractIntrinsicValidator` should remain the authority for intrinsic
+  classification; the reduction is to carry its result or validation state,
+  not to duplicate its rules in `ContractBinder`.
+
+### Status (part three hundred seventy-one)
+
+R861 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
