@@ -163,6 +163,7 @@ the smallest relevant containerized test target passes.
 | R588 | Collapse the unreachable opaque receiver branch while preserving its exception contract | `SharpProof.Ir.Test`: ArgumentNullGuardBoundaryTests, 3 passed |
 | R589 | Share IR program condition evaluation and boolean validation | `SharpProof.Ir.Test`: IrProgramTests, 22 passed |
 | R590 | Reuse the validated sequence-type key when adding an IR type | `SharpProof.Ir.Test`: IrFactoryInvariantRegressionTests, 9 passed |
+| R596 | Reuse one materialized child list across direct and recursive IR shrinker candidates | `SharpProof.Fuzz` build |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3929,7 +3930,9 @@ R595 is a pending Frontend program-lowering robustness reduction candidate. Pres
 
 ### Status (part one hundred thirty-seven)
 
-R596 is a pending fuzz-shrinker reduction candidate. Preserve the direct-child candidates before recursively rebuilt candidates; reuse only the already-materialized child array.
+R596 is `applied`: `GetCandidates` now reuses one materialized child array for
+both direct-child and recursively rebuilt candidates, preserving order while
+removing the duplicate node-shape traversal and allocation.
 
 ## Second survey, part one hundred thirty-eight: R597 - repeated IR shrinker size walks
 
@@ -7499,3 +7502,24 @@ R852 is `deferred`: the candidate concerns trap lifetime and duplicated cleanup
 
 R853 and R854 are `deferred`: both are ledger-only observations, and no
 implementation or build-file changes were made during this audit.
+
+## Second survey, part three hundred sixty-five: R855 - paired release-JSON fixture assertions
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R855 | **`Test-SharpProofReleaseJsonFixtures.ps1` duplicates the complete fixture assertion setup for accepted and rejected documents.** `Assert-Accepted` and `Assert-Rejected` both increment `$script:total`, call `Invoke-SharpProofFixtureAssertion` with the same fixture name, writer, and `Read-SharpProofCanonicalReleaseJson` validator, and increment `$script:passed`; the only behavioral difference is the rejected helper's `-ExpectRejected` switch. A single private assertion helper with an explicit expected-outcome parameter can own that plumbing while the two readable call-site names remain as thin wrappers, and it can preserve the existing counter ordering and failure behavior. | `scripts/Test-SharpProofReleaseJsonFixtures.ps1:21-48` |
+
+### Checked and not proposed (part three hundred sixty-five)
+
+- R855 is separate from R840: it targets duplicate assertion plumbing, while
+  R840 records that the independently maintained `$passed` counter is derived
+  state and should not be used to justify deleting fixture coverage.
+- The accepted and rejected wrapper names remain useful at call sites; the
+  reduction is in their shared implementation, not in the fixture categories.
+- The common validator must stay inside the fixture boundary so each case still
+  receives its own temporary file and canonical-release-JSON parse.
+
+### Status (part three hundred sixty-five)
+
+R855 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
