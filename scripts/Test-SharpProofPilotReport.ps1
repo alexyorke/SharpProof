@@ -115,13 +115,24 @@ function Test-SharpProofPilotReport {
         catch { return $false }
         $manifestClaims = @($response.manifest.claims)
         $claimResults = @($response.claimResults)
+        $claimResultIndex = [Collections.Generic.Dictionary[string, object]]::new(
+            [StringComparer]::Ordinal)
+        $duplicateClaimResultIds = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        foreach ($claimResult in $claimResults) {
+            $claimId = [string]$claimResult.claimId
+            if ($claimResultIndex.ContainsKey($claimId)) {
+                [void]$duplicateClaimResultIds.Add($claimId)
+            } else {
+                $claimResultIndex.Add($claimId, $claimResult)
+            }
+        }
         $actual = @($manifestClaims | ForEach-Object {
                 $claim = $_
-                $matches = @($claimResults | Where-Object {
-                        [string]$_.claimId -ceq [string]$claim.claimId
-                    })
-                if ($matches.Count -ne 1) { return $null }
-                [pscustomobject]@{ claimId=[string]$claim.claimId; kind=[string]$claim.kind; outcome=[string]$matches[0].outcome }
+                $claimId = [string]$claim.claimId
+                if ($duplicateClaimResultIds.Contains($claimId) -or
+                    -not $claimResultIndex.ContainsKey($claimId)) { return $null }
+                [pscustomobject]@{ claimId=$claimId; kind=[string]$claim.kind; outcome=[string]$claimResultIndex[$claimId].outcome }
             } | Sort-Object claimId)
         $reported = @($pilot.claimEvidence | Sort-Object claimId)
         if ($actual.Count -eq 0 -or $actual.Count -ne $reported.Count -or
