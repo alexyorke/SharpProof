@@ -1204,42 +1204,53 @@ public sealed partial class ApiSpecRuntimeOracleTests
     private static Action<TReceiver> CreateParameterlessConstructorInvoker<TReceiver>()
         where TReceiver : class
     {
-        var method = new DynamicMethod(
-            "SharpProof_" + typeof(TReceiver).Name + "_ConstructorWitness",
-            typeof(void),
+        return CreateConstructorInvoker<TReceiver, Action<TReceiver>>(
+            "ConstructorWitness",
             [typeof(TReceiver)],
-            typeof(ApiSpecRuntimeOracleTests).Module,
-            true);
-        var generator = method.GetILGenerator();
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(
-            OpCodes.Call,
-            typeof(TReceiver).GetConstructor(Type.EmptyTypes) ??
-            throw new AssertionException(
-                typeof(TReceiver).FullName + " constructor was unavailable."));
-        generator.Emit(OpCodes.Ret);
-        return method.CreateDelegate<Action<TReceiver>>();
+            Type.EmptyTypes,
+            static generator => generator.Emit(OpCodes.Ldarg_0),
+            "constructor was unavailable.");
     }
 
     private static Action<TReceiver, string?> CreateStringConstructorInvoker<TReceiver>()
         where TReceiver : class
     {
-        var method = new DynamicMethod(
-            "SharpProof_" + typeof(TReceiver).Name + "_StringConstructorWitness",
-            typeof(void),
+        return CreateConstructorInvoker<TReceiver, Action<TReceiver, string?>>(
+            "StringConstructorWitness",
             [typeof(TReceiver), typeof(string)],
+            [typeof(string)],
+            static generator =>
+            {
+                generator.Emit(OpCodes.Ldarg_0);
+                generator.Emit(OpCodes.Ldarg_1);
+            },
+            "string constructor was unavailable.");
+    }
+
+    private static TDelegate CreateConstructorInvoker<TReceiver, TDelegate>(
+        string methodSuffix,
+        Type[] delegateParameterTypes,
+        Type[] constructorParameterTypes,
+        Action<ILGenerator> emitArguments,
+        string unavailableDescription)
+        where TReceiver : class
+        where TDelegate : Delegate
+    {
+        var method = new DynamicMethod(
+            "SharpProof_" + typeof(TReceiver).Name + "_" + methodSuffix,
+            typeof(void),
+            delegateParameterTypes,
             typeof(ApiSpecRuntimeOracleTests).Module,
             true);
         var generator = method.GetILGenerator();
-        generator.Emit(OpCodes.Ldarg_0);
-        generator.Emit(OpCodes.Ldarg_1);
+        emitArguments(generator);
         generator.Emit(
             OpCodes.Call,
-            typeof(TReceiver).GetConstructor([typeof(string)]) ??
+            typeof(TReceiver).GetConstructor(constructorParameterTypes) ??
             throw new AssertionException(
-                typeof(TReceiver).FullName + " string constructor was unavailable."));
+                typeof(TReceiver).FullName + " " + unavailableDescription));
         generator.Emit(OpCodes.Ret);
-        return method.CreateDelegate<Action<TReceiver, string?>>();
+        return method.CreateDelegate<TDelegate>();
     }
 
     private static void PrepareExceptionConstructorReceiver()

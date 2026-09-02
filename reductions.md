@@ -4379,7 +4379,7 @@ R719 completed: constructor throw and termination facets now share one lazy per-
 
 | R720 | **`ApiSpecRuntimeOracleTests` duplicates dynamic-constructor-invoker emission.** `CreateParameterlessConstructorInvoker` and `CreateStringConstructorInvoker` each construct a `DynamicMethod`, obtain a constructor, emit receiver/argument loads plus `Call` and `Ret`, and create a delegate; only the signature, constructor lookup, and extra string argument differ. A parameterized IL-emission helper can centralize the dynamic-method lifecycle while keeping the two strongly typed delegate factories and their constructor-shape diagnostics. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:1166-1205` |
 
-R720 is a pending runtime-oracle IL-harness reduction candidate. Preserve visibility/module settings, argument order, constructor lookup failure messages, and the exact delegate types.
+R720 completed: parameterless and string constructor witnesses now share one dynamic-method/IL-emission helper while preserving module visibility, argument order, constructor lookup diagnostics, and exact delegate types.
 
 ### Status (part two hundred forty-six)
 
