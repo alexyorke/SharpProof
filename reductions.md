@@ -4317,7 +4317,7 @@ R706 completed: module-initializer discovery caches syntax-tree ordinals once pe
 
 | R707 | **`ClosedContractAttributeValidator.GetKind` repeats the closed-attribute membership cascade already exposed by `ContractSelectionInventory.IsClosedContract`.** Both perform the same three symbol-identity comparisons for `NotNull`, `Positive`, and `InRange`; the validator then needs the selected kind for type, ref-kind, and bound validation, but it should consume one canonical classification rather than maintain a second recognition list. Exposing a kind-returning inventory helper can remove the duplicate comparisons while keeping rejected-metadata recognition and all validator-specific checks separate. | `SharpProof.Contracts/ClosedContractAttributeValidator.cs:29-71`; `SharpProof.Contracts/ContractSelectionInventory.cs:103-123` |
 
-R707 is a pending closed-contract identity reduction candidate. Preserve compiler-bound symbol identity, recognition precedence, rejected-attribute behavior, and the validator's type/ref-kind/range diagnostics.
+R707 completed: closed-contract kind classification is now canonical in `ContractSelectionInventory`, preserving compiler-bound symbol identity, recognition precedence, rejected-attribute behavior, and validator type/ref-kind/range diagnostics.
 
 ### Status (part two hundred forty-one)
 

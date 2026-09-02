@@ -32,7 +32,7 @@ internal static class ClosedContractAttributeValidator
         RefKind refKind,
         ContractSelectionInventory symbols)
     {
-        var kind = GetKind(attribute, symbols);
+        var kind = symbols.GetClosedContractKind(attribute);
         if (kind == ClosedContractAttributeKind.None)
         {
             return default;
@@ -55,19 +55,6 @@ internal static class ClosedContractAttributeValidator
                 ValidateRange(attribute, type),
             _ => new ClosedContractAttributeValidation(kind)
         };
-    }
-
-    private static ClosedContractAttributeKind GetKind(
-        AttributeData attribute,
-        ContractSelectionInventory symbols)
-    {
-        return ContractSelectionInventory.Is(attribute, symbols.NotNull)
-            ? ClosedContractAttributeKind.NotNull
-            : ContractSelectionInventory.Is(attribute, symbols.Positive)
-                ? ClosedContractAttributeKind.Positive
-                : ContractSelectionInventory.Is(attribute, symbols.InRange)
-                    ? ClosedContractAttributeKind.InRange
-                    : ClosedContractAttributeKind.None;
     }
 
     private static ClosedContractAttributeValidation ValidateRange(
