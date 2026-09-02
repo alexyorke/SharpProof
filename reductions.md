@@ -4231,7 +4231,7 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 ### Status (part two hundred four)
 
-R663 is a pending effect-method traversal reduction candidate. Preserve CFG reachability, lexical control-effect coverage, using-disposal unwinding, constructor-entry selection, summary join order, and scanner state; combine only safely reusable operation visits/facts.
+R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disposal resolver intentionally use different roots and reachability/unwinding rules. A shared walk could alter direct-witness recording, constructor entry selection, disposal order, or fail-closed effect joins; keep the independent passes until reusable per-operation facts can be proven equivalent.
 
 ## Second survey, part two hundred six: R665-R667 - repeated cache/replay preparation
 
