@@ -18,33 +18,38 @@ function Write-Fixture {
     return $path
 }
 
-function Assert-Accepted {
-    param([string]$Name, [string]$Text, [string]$Type)
+function Assert-Fixture {
+    param(
+        [string]$Name,
+        [string]$Text,
+        [string]$Type,
+        [switch]$ExpectRejected
+    )
     $script:total++
-    Invoke-SharpProofFixtureAssertion `
-        -Name $Name `
-        -Write { Write-Fixture "$Name.json" $Text } `
-        -Validate {
+    $assertion = @{
+        Name = $Name
+        Write = { Write-Fixture "$Name.json" $Text }
+        Validate = {
             param($path)
             $null = Read-SharpProofCanonicalReleaseJson `
                 -Path $path -DocumentType $Type
         }
+    }
+    if ($ExpectRejected) {
+        $assertion.ExpectRejected = $true
+    }
+    Invoke-SharpProofFixtureAssertion @assertion
     $script:passed++
+}
+
+function Assert-Accepted {
+    param([string]$Name, [string]$Text, [string]$Type)
+    Assert-Fixture $Name $Text $Type
 }
 
 function Assert-Rejected {
     param([string]$Name, [string]$Text, [string]$Type)
-    $script:total++
-    Invoke-SharpProofFixtureAssertion `
-        -Name $Name `
-        -Write { Write-Fixture "$Name.json" $Text } `
-        -Validate {
-            param($path)
-            $null = Read-SharpProofCanonicalReleaseJson `
-                -Path $path -DocumentType $Type
-        } `
-        -ExpectRejected
-    $script:passed++
+    Assert-Fixture $Name $Text $Type -ExpectRejected
 }
 
 try {

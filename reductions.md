@@ -172,6 +172,7 @@ the smallest relevant containerized test target passes.
 | R626 | Share Effects test compilation construction and diagnostics | `SharpProof.Effects.Test`: ManagedAbstractFlowTests 34; EffectAnalysisTests 147 passed |
 | R858 | Reuse the canonical IR variable collector in fuzz tests | `SharpProof.Fuzz.Test`: FuzzRunnerTests passed |
 | R854 | Share generated-source argument augmentation in C# formatting | PowerShell parser validation passed |
+| R855 | Share release-JSON accepted/rejected fixture assertion plumbing | `SharpProof.ArchitectureTest`: ReleaseJsonAuthorityTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7545,8 +7546,8 @@ one helper while whitespace and style passes retain distinct arguments.
 
 ### Status (part three hundred sixty-five)
 
-R855 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R855 is `applied`: accepted and rejected fixture wrappers now share one
+counter, write, validation, and expected-outcome assertion path.
 
 ## Second survey, part three hundred sixty-six: R856 - duplicated coverage authority derivation
 
