@@ -4239,19 +4239,6 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
 
-### Status (part two hundred seventeen)
-
-| R682 | **`PreviewConfigurationInterfaceMatchesFrozenSnapshot` reparses each build file repeatedly.** For every text in `buildFiles`, `actualPublicProperties` parses the same XML once for `PropertyGroup` elements and a second time for `CompilerVisibleProperty` elements, then the separate `compilerVisible` projection parses that XML a third time. Parsing each build file once into an `XDocument` and sharing the projections would retain the independent property-surface and compiler-visible checks while removing repeated XML parsing in this architecture test. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:733-771` |
-
-R682 is a pending architecture-test efficiency reduction candidate. Preserve the distinct frozen-property, compiler-visible-property, and text-regex checks; only share the per-file XML parse.
-
-### Status (part two hundred eighteen)
-
-| R683 | **`DevContainerIsNonRootPinnedAndDoesNotNestDocker` reads `devcontainer.json` twice.** It parses one `File.ReadAllText` result into `JsonDocument`, then opens the same path again to obtain `rawConfiguration` for the text-level `pwsh` assertion. Keeping the raw text in a local and parsing that string would preserve both structural and lexical checks without a second file read. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:1318-1326` |
-| R684 | **`PerformanceContractIsIsolatedFromBroadTestAndCoverageRuns` reads the container dispatcher twice.** The test loads `Invoke-SharpProofContainer.ps1` into `containerCommands` for ordering and exclusion checks, then later loads the identical path again into `coverageContainerCommands` for coverage/performance assertions. Reusing the first string would retain those independent assertions while removing the duplicate file I/O. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:1654-1657,1751-1754` |
-
-R683-R684 are pending architecture-test I/O reductions. Preserve the structural-versus-lexical configuration checks and the separate performance, coverage, and ordering assertions.
-
 ### Status (part two hundred nineteen)
 
 | R685 | **`WorkerAndLauncherRuntimeClosuresAreCompilerNeutral` repeats project discovery and file reads across overlapping closures.** The test walks the Worker and Launcher dependency closures separately, and `TransitiveProjectClosure` reparses each project file while the per-project assertions then parse that same project file through `ProjectPackages` and read it again for `RoslynTargetsPath`; shared dependencies therefore incur the same graph and source/project-file I/O more than once. Materializing a shared closure and caching each project's parsed XML/source text would preserve the two root-specific closure assertions and all package/source/target checks while reducing repeated traversal and reads. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:232-255`; `SharpProof.ArchitectureTest/ArchitectureRepository.cs:27-78` |

@@ -729,14 +729,17 @@ public sealed class ArchitectureTests
         var buildFiles = buildFilePaths
             .Select(path => File.ReadAllText(Path.Combine(repository, path)))
             .ToArray();
+        var parsedBuildFiles = buildFiles
+            .Select(static text => (Text: text, Document: XDocument.Parse(text)))
+            .ToArray();
         var combinedBuildSurface = string.Join("\n", buildFiles);
-        var actualPublicProperties = buildFiles
-            .SelectMany(static text =>
-                XDocument.Parse(text)
+        var actualPublicProperties = parsedBuildFiles
+            .SelectMany(static buildFile =>
+                buildFile.Document
                     .Descendants("PropertyGroup")
                     .Elements()
                     .Select(static element => element.Name.LocalName)
-                    .Concat(XDocument.Parse(text)
+                    .Concat(buildFile.Document
                         .Descendants("CompilerVisibleProperty")
                         .Select(static element =>
                             element.Attribute("Include")?.Value)
@@ -745,7 +748,7 @@ public sealed class ArchitectureTests
                             ';',
                             StringSplitOptions.RemoveEmptyEntries)))
                     .Concat(Regex.Matches(
-                            text,
+                            buildFile.Text,
                             @"\$\((SharpProof[A-Za-z0-9_]+)\)",
                             RegexOptions.CultureInvariant)
                         .Select(static match => match.Groups[1].Value)))
@@ -759,8 +762,8 @@ public sealed class ArchitectureTests
             .Concat(retired)
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
-        var compilerVisible = buildFiles
-            .SelectMany(static text => XDocument.Parse(text)
+        var compilerVisible = parsedBuildFiles
+            .SelectMany(static buildFile => buildFile.Document
                 .Descendants()
                 .Where(static element =>
                     element.Name.LocalName == "CompilerVisibleProperty"))
@@ -1315,15 +1318,12 @@ public sealed class ArchitectureTests
     public void DevContainerIsNonRootPinnedAndDoesNotNestDocker()
     {
         var root = TestRepository.FindRoot();
-        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(
-            root,
-            ".devcontainer",
-            "devcontainer.json")));
-        var configuration = document.RootElement;
         var rawConfiguration = File.ReadAllText(Path.Combine(
             root,
             ".devcontainer",
             "devcontainer.json"));
+        using var document = JsonDocument.Parse(rawConfiguration);
+        var configuration = document.RootElement;
         var dockerfile = File.ReadAllText(Path.Combine(
             root,
             "eng",
@@ -1748,22 +1748,18 @@ public sealed class ArchitectureTests
         Assert.That(
             coverageCollector,
             Does.Contain("TestCategory=Coverage"));
-        var coverageContainerCommands = File.ReadAllText(Path.Combine(
-            root,
-            "scripts",
-            "Invoke-SharpProofContainer.ps1"));
         Assert.That(
-            coverageContainerCommands,
+            containerCommands,
             Does.Contain("Invoke-SharpProofCoverage.ps1"));
         Assert.That(
-            coverageContainerCommands,
+            containerCommands,
             Does.Contain("'performance' {"));
         Assert.That(
-            coverageContainerCommands,
+            containerCommands,
             Does.Contain(
                 "function Invoke-SharpProofSolutionBuild"));
         Assert.That(
-            coverageContainerCommands,
+            containerCommands,
             Does.Contain(
                 "Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'"));
         var gateEvidence = File.ReadAllText(Path.Combine(
