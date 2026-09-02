@@ -8241,3 +8241,146 @@ build-file changes were made during this audit.
 
 R900 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part four hundred eleven: R901 - repeated manifest target ordering
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R901 | **`ClaimManifestBuilder.Build` sorts the same target sequence twice.** The lazy `ordered` query is enumerated once to create manifest callable entries and again to flatten claim/effect entries, so the dictionary values and ordinal sort are repeated even though `targets` is unchanged between projections. Materializing the ordered target array once preserves canonical callable and claim order while removing the second sort/enumeration. | `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs:22-45` |
+
+### Status (part four hundred eleven)
+
+R901 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twelve: R902 - repeated contract-selection discovery
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R902 | **`ClaimManifestBuilder.BuildTarget` asks `ContractSelectionInventory` for overlapping selection data twice.** `SelectFeatures` performs the full callable/parameter/return attribute scan with a trusted-boundary augmentation, then `BuildTarget` calls the two-argument overload again for the same method and contract-clause flag to decide analyzer subset admission. A shared base-selection projection plus an explicit trusted augmentation can preserve the intentional difference between trusted and ordinary selection while avoiding repeated attribute traversal and lookup. | `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs:65-80,239-258`; selection implementation at `SharpProof.Contracts/ContractSelectionInventory.cs:146-165` |
+
+### Status (part four hundred twelve)
+
+R902 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred thirteen: R903 - repeated lowered call target-type lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R903 | **`CompilerCallableLowerer.TryPrepareSpecCall` retrieves the same IR target type twice.** The target variable's type is passed to `TryGetSpecResultType`, then `_factory.GetVariableInfo(call.Target!.Value).Type` is called again to compare it with the returned type. A local validated target-type value can feed both operations while retaining the target existence, source/spec type, and lowered-type equality gates. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs:273-287` |
+
+### Status (part four hundred thirteen)
+
+R903 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred fourteen: R904 - repeated receiver-variable search
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R904 | **`CompilerCallableLowerer.TryCreateParameterBindings` searches all contract variables for the receiver on every instance binding.** The receiver is invariant for one target, but the loop calls `contracts.Variables.FirstOrDefault` each time it encounters an instance symbol before adding the same mapping. Precomputing the optional receiver once retains the current static/instance and missing-receiver behavior while avoiding repeated scans when several instance references are lowered. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs:565-600` |
+
+### Status (part four hundred fourteen)
+
+R904 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred fifteen: R905 - repeated body clause-site scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R905 | **`CompilerCallableLowerer.PrepareBody` queries the same cached clause inventory through several body-shape passes.** `FindExecutableBodyStart` tests each leading statement with `IsContractStatement`, and each expression statement invokes a full `Clauses.Any`; the non-void path then enumerates the inventory again to build `elidedClauseSites`, while the void path can call `ContainsOnlyContractStatements`, which repeats the same per-statement lookup. Passing one materialized inventory or syntax-span index through body preparation can preserve empty-statement handling, invalid-clause elision, and exact tree/span matching while removing repeated linear searches. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs:122-153,439-463,606-635`; inventory cache at `SharpProof.Contracts/ContractClauseInventoryBuilder.cs:42-53` |
+
+### Status (part four hundred fifteen)
+
+R905 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred sixteen: R906 - duplicate callable-ID normalization and lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R906 | **`ClaimManifestBuilder.CreateCallableIds.Resolve` performs an avoidable early dictionary probe and normalization.** It normalizes the method and checks `ids.ContainsKey`, then enters a loop that normalizes the same method again and immediately performs `ids.TryGetValue`. The loop can own the single normalized lookup, preserving parent-stack construction, neutral ordinals for clause-free nested callables, and the existing ID reuse behavior without the redundant probe. | `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs:563-650` |
+
+### Status (part four hundred sixteen)
+
+R906 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred seventeen: R907 - per-method compiler-reference rescans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R907 | **`CompilerImplementationIlSummaryLowerer.TryFindReference` scans every compilation reference and every module for each IL summary request.** The relational-summary provider can request many methods from the same external assembly, but each request repeats portable-reference filtering, assembly identity comparison, module-name reads, and duplicate-reference detection. A compilation-scoped reference/module index can retain the current exact-one and cross-module semantics while reducing each lookup to the method's assembly/module key; standalone callers can retain a fallback index-building path. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:140-177,328-375` |
+
+### Status (part four hundred seventeen)
+
+R907 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred eighteen: R908 - repeated IL image authentication after capture
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R908 | **The normal compiler-collector pipeline authenticates each reference image in `CompilerCompilationCapture`, then the IL summary lowerer reopens and reauthenticates the same image for every method.** Capture already compares the loaded metadata with the file metadata and hashes the module; `TryBuild` later opens the module again, performs `MetadataEquals`, and hashes the stream again before translating one method body. A validated module-evidence context can carry the path, digest, and metadata identity into IL lowering while retaining a standalone fallback and the method-body read, so malformed or changed images still fail closed at the boundary. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:302-360`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:180-222,247-268`; producer ordering at `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:14-50` |
+
+### Status (part four hundred eighteen)
+
+R908 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred nineteen: R909 - repeated metadata-compilation construction
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R909 | **`CompilerImplementationIlSummaryLowerer.TryBuild` creates a new full-metadata compilation and resolves the same reference symbol for every method.** `compilation.WithOptions(compilation.Options.WithMetadataImportOptions(MetadataImportOptions.All))` and `GetAssemblyOrModuleSymbol(reference)` depend on the compilation/reference pair, not on the individual method body. A per-compilation metadata-resolution context can reuse that symbol and options object while preserving the explicit all-metadata requirement and the current fail-closed non-assembly result. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:200-211` |
+
+### Status (part four hundred nineteen)
+
+R909 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twenty: R910 - repeated IL branch-target arithmetic
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R910 | **`CompilerImplementationIlSummaryLowerer` recomputes each branch target across validation, leader discovery, and instruction emission.** `TryDecode` checks `DecodedInstruction.BranchTarget` for overflow/range, `Translate` adds the same computed target to the leader set, and branch emission reads it again from the instruction. Storing the validated target in the decoded record, or carrying a checked target side table, preserves malformed-target rejection and all branch/fallthrough ordering while removing repeated checked addition. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:524-545,685-866,892-948,1810-1817` |
+
+### Status (part four hundred twenty)
+
+R910 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twenty-one: R911 - repeated metadata call-token resolution
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R911 | **`CompilerImplementationIlSummaryLowerer.Translator.ResolveMethod` repeats the full metadata-to-Roslyn member search when one IL method calls the same token more than once.** Each lookup reads the definition, recursively builds its declaring type name, resolves that type, enumerates members with the metadata name, and filters by token/module. A translator-local cache keyed by `MethodDefinitionHandle`, including cached failures, can preserve ambiguity and unresolved-target behavior while avoiding repeated metadata and member enumeration for identical call tokens. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:1002-1015,1095-1116` |
+
+### Status (part four hundred twenty-one)
+
+R911 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twenty-two: R912 - repeated admitted-argument type validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R912 | **`Translator.PushArgument` calls `ScalarType.TryCreate` on every argument-load instruction even though the current method passed the same scalar-domain gate before translation.** `TryBuild` first admits the method through `IsCandidate`, whose parameter predicate requires every parameter to be scalar; the translator then repeats that symbol-type check for each `ldarg` and discards the resulting IR type except for its special type. Precomputing the admitted parameter scalar types preserves index bounds and the fail-closed standalone translator contract while removing repeated Roslyn type inspection on every load. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:116-157,1398-1414` |
+
+### Status (part four hundred twenty-two)
+
+R912 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred twenty-three: R913 - unreachable opcode-enum validity checks
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R913 | **Two private IL arithmetic/comparison paths revalidate enum values that their exhaustive callers already constrain.** `ExecuteInstruction` dispatches only the arithmetic opcodes before `Arithmetic` maps them to a valid `IrBinaryOperator`, yet `Arithmetic` calls `Enum.IsDefined` on that exhaustive result. Likewise, `Compare` and `BranchComparison` pass only the mapped comparison opcodes into `TryComparison`, which repeats `Enum.IsDefined` before building the operator. Keeping the defensive default mappings but removing or consolidating the unreachable enum scans preserves unsupported-opcode handling at `ExecuteInstruction` and invalid comparison restrictions without paying a runtime reflection-style check for every operation. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:666-866,1135-1170,1260-1360` |
+
+### Status (part four hundred twenty-three)
+
+R913 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
