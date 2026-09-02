@@ -23,23 +23,8 @@ jobs:
       - name: Build the pinned toolchain
         uses: ./.github/actions/build-tooling
 
-      - name: Kill trusted-boundary mutations
-        run: >-
-          docker compose run --rm tooling mutation
-          -Configuration Release
-
-      - name: Retain fail-closed dependency audit evidence
-        run: docker compose run --rm tooling dependency-audit
-
-      - name: Run the complete acceptance cycle
-        run: >-
-          docker compose run --rm tooling acceptance
-          -Configuration Release
-
-      - name: Run rotating and retained nightly fuzz campaign
-        run: >-
-          docker compose run --rm tooling fuzz-nightly
-          -Configuration Release
+      - name: Run the locally reproducible nightly profile
+        run: docker compose run --rm tooling nightly
 
       - name: Upload nightly evidence
         if: always()

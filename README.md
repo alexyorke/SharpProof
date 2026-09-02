@@ -164,19 +164,28 @@ Docker Engine or Docker Desktop with Compose v2 is the only host prerequisite
 for repository development and verifier qualification. The pinned image
 contains the required SDK, Roslyn, PowerShell, and native solver payload.
 
-Build and run the ordinary checks from the repository root:
+Use the same named profiles locally and in CI. With PowerShell 7 available,
+the optional wrapper builds the pinned tooling image when it is missing, then
+runs the command in an isolated Linux amd64 workspace:
 
 ~~~text
-docker compose build tooling
-docker compose run --rm tooling build
-docker compose run --rm tooling test
+./build.ps1 quick                # changed tests for the edit loop
+./build.ps1 check                # complete local development check
+./build.ps1 pr                   # exact pull-request gate
+./build.ps1 test -Target SharpProof.Effects.Test/SharpProof.Effects.Test.csproj
 ~~~
+
+CI invokes the matching `tooling pr`, `tooling nightly`, `tooling security`,
+and `tooling coverage` container commands. Without host PowerShell, run the
+same profile directly, for example `docker compose run --rm tooling pr`.
+Use `-RebuildImage` with the wrapper, or `docker compose build tooling`, after
+changing the Dockerfile or pinned toolchain.
 
 The package-backed sample matrix exercises passing, diagnostic, mixed-outcome,
 strict-library, and host-rejection consumers:
 
 ~~~text
-docker compose run --rm tooling samples -Configuration Release
+./build.ps1 samples -Configuration Release
 ~~~
 
 For an incremental edit loop, use the persistent development container:
@@ -194,8 +203,8 @@ analyzers during the iterative build. It is not qualification evidence; run
 the command without `-Fast`, or run `sp check`, before delivery.
 
 The [container development guide](docs/container-development.md) explains
-workspace isolation, test targets, resource overrides, and when a disposable
-docker compose run --rm tooling qualification command is preferable.
+workspace isolation, CI-parity profiles, test targets, resource overrides, and
+when a disposable `build.ps1` qualification profile is preferable.
 
 Containers use all CPUs available to Docker and up to 40960 MiB by default.
 Semantic-test scheduling uses every container-visible CPU.

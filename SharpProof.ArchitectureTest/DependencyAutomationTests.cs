@@ -8,6 +8,37 @@ namespace SharpProof.ArchitectureTest;
 public sealed class DependencyAutomationTests
 {
     [Test]
+    public void LocalProfilesMatchTheWorkflowCommands()
+    {
+        var root = TestRepository.FindRoot();
+        var build = File.ReadAllText(Path.Combine(root, "build.ps1"));
+        var dispatcher = File.ReadAllText(Path.Combine(
+            root, "scripts", "Invoke-SharpProofContainer.ps1"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var profile in new[] { "quick", "pr", "nightly", "security" })
+            {
+                Assert.That(
+                    build,
+                    Does.Contain($"Invoke-Container '{profile}'"),
+                    profile);
+                Assert.That(dispatcher, Does.Contain($"'{profile}' {{"), profile);
+            }
+
+            Assert.That(
+                File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml")),
+                Does.Contain("tooling pr"));
+            Assert.That(
+                File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly.yml")),
+                Does.Contain("tooling nightly"));
+            Assert.That(
+                File.ReadAllText(Path.Combine(root, ".github", "workflows", "security-reusable.yml")),
+                Does.Contain("tooling security"));
+        }
+    }
+
+    [Test]
     public void DependabotKeepsCompilerDependenciesOnPatchUpdates()
     {
         var configuration = File.ReadAllText(Path.Combine(
@@ -42,7 +73,7 @@ public sealed class DependencyAutomationTests
             Assert.That(
                 workflow,
                 Does.Contain(
-                    "docker compose run --rm tooling dependency-audit"));
+                    "tooling security"));
             Assert.That(
                 workflow,
                 Does.Contain(
@@ -80,7 +111,7 @@ public sealed class DependencyAutomationTests
             Assert.That(
                 workflow,
                 Does.Contain(
-                    "docker compose run --rm tooling dependency-audit"));
+                    "tooling nightly"));
             Assert.That(
                 workflow,
                 Does.Not.Contain(

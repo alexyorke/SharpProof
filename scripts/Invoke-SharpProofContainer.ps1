@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
+    [ValidateSet('quick', 'pr', 'nightly', 'security', 'contract', 'restore', 'build', 'self-apply', 'check', 'pr-gates', 'test', 'test-changed', 'semantic-tests', 'portable-tests', 'worker-tests', 'package-tests', 'package-consumers', 'samples', 'corpus', 'corpus-update', 'performance', 'performance-smoke', 'gates', 'coverage', 'mutation', 'fuzz-nightly', 'dependency-audit', 'acceptance', 'pack', 'pilots', 'pilot-review', 'release-tag', 'release-baseline', 'release-plan', 'release-qualification', 'release-publish')]
     [string]$Command,
 
     [ValidateSet('Debug', 'Release')]
@@ -87,10 +87,35 @@ function Invoke-RequiredScript(
     if ($LASTEXITCODE -ne 0) { throw $Failure }
 }
 
+function Invoke-PipelineCommand(
+    [string]$PipelineCommand,
+    [string]$PipelineConfiguration,
+    [string[]]$AdditionalArguments = @()) {
+    & $PSCommandPath -Command $PipelineCommand `
+        -Configuration $PipelineConfiguration @AdditionalArguments
+}
+
 $testProjectParallelism = Get-SharpProofTestProjectParallelism `
     -RepositoryRoot $repositoryRoot
 
 switch ($Command) {
+    'quick' {
+        Invoke-PipelineCommand 'test-changed' 'Debug' @('-Fast')
+    }
+    'pr' {
+        Invoke-PipelineCommand 'pr-gates' 'Release'
+    }
+    'nightly' {
+        Invoke-PipelineCommand 'mutation' 'Release'
+        Invoke-PipelineCommand 'dependency-audit' 'Release'
+        Invoke-PipelineCommand 'acceptance' 'Release'
+        Invoke-PipelineCommand 'fuzz-nightly' 'Release'
+    }
+    'security' {
+        Invoke-PipelineCommand 'dependency-audit' 'Release'
+        Invoke-PipelineCommand 'build' 'Release' @(
+            '-Target', 'SharpProof.sln')
+    }
     'contract' {
         & (Join-Path $repositoryRoot `
             'scripts/Test-SharpProofContainerContract.ps1')

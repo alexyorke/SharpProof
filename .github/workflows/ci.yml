@@ -30,9 +30,7 @@ jobs:
         uses: ./.github/actions/build-tooling
 
       - name: Run the single-build PR gate
-        run: >-
-          docker compose run --rm tooling pr-gates
-          -Configuration Release
+        run: docker compose run --rm tooling pr
 
       - name: Upload container gate evidence
         if: always()

@@ -32,6 +32,36 @@ volume. Later starts reuse the workspace, NuGet, and .NET-home volumes, so they
 work offline when the required source and packages are already present. The
 terminal and editor server run as the non-root `sharpproof` user.
 
+## Run the same profiles as CI
+
+From a host checkout with PowerShell 7, `build.ps1` is the convenient
+finite-task entrypoint. It finds or builds the pinned image and invokes the
+same container commands used by GitHub Actions. The coverage profile also
+uses host Git to resolve its comparison ref to an exact commit:
+
+```powershell
+./build.ps1 quick
+./build.ps1 pr
+./build.ps1 nightly
+./build.ps1 security
+./build.ps1 coverage -ComparisonRef origin/master
+```
+
+The workflows add only GitHub-hosted concerns such as event-to-comparison-ref
+selection, cache transport, artifact upload, provenance attestation, OIDC, and
+protected publication environments. Gate selection and ordering live in the
+container pipeline profiles, so reproducing CI does not require translating
+workflow YAML.
+
+Docker remains the only required host tool. Without PowerShell, run the same
+composite profiles directly through Compose:
+
+```text
+docker compose run --rm tooling pr
+docker compose run --rm tooling nightly
+docker compose run --rm tooling security
+```
+
 An existing workspace is never fetched, reset, or switched automatically.
 Commit and push from inside the container. Set a new project name when a clean
 checkout of another ref is required.
@@ -85,9 +115,10 @@ The permanent `dev` service retains `bin` and `obj`, MSBuild nodes, and
 Roslyn's compiler server. It also enables the opt-in MSBuild server, whose
 evaluation cache remains warm between closely spaced commands. A no-change
 rebuild is therefore incremental and avoids repeatedly starting MSBuild.
-Finite `docker compose run --rm tooling ...` commands materialize the current
-source snapshot in a private temporary workspace and pay a cold build; use them
-for qualification, not for every edit. `contract`, `build`, and ordinary test
+Finite `build.ps1` profiles and their equivalent
+`docker compose run --rm tooling ...` commands materialize the current source
+snapshot in a private temporary workspace and pay a cold build; use them for
+qualification, not for every edit. `contract`, `build`, and ordinary test
 commands work when the source directory came from an archive without `.git`.
 
 For a host-edited Git checkout, the separate `loop` service provides the same

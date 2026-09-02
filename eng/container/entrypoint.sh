@@ -53,7 +53,7 @@ fi
 
 requires_clean_exact_commit_source() {
   case "$1" in
-    acceptance|mutation|fuzz-nightly|pack|pilots|release-tag|release-baseline|release-plan|release-qualification|release-publish)
+    nightly|acceptance|mutation|fuzz-nightly|pack|pilots|release-tag|release-baseline|release-plan|release-qualification|release-publish)
       return 0
       ;;
     *)
@@ -67,7 +67,7 @@ requires_git_source() {
     return 0
   fi
   case "$1" in
-    pr-gates|test-changed|package-consumers|performance|coverage)
+    quick|pr|security|pr-gates|test-changed|package-consumers|performance|coverage)
       return 0
       ;;
     *)

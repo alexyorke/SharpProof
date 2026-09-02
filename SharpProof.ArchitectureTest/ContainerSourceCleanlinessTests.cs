@@ -10,6 +10,7 @@ public sealed class ContainerSourceCleanlinessTests
 {
     private static readonly string[] s_exactCommitCommands =
     [
+        "nightly",
         "acceptance",
         "mutation",
         "fuzz-nightly",
@@ -25,6 +26,9 @@ public sealed class ContainerSourceCleanlinessTests
     private static readonly string[] s_gitSourceCommands =
     [
         .. s_exactCommitCommands,
+        "quick",
+        "pr",
+        "security",
         "pr-gates",
         "test-changed",
         "package-consumers",

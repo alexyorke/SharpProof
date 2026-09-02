@@ -989,6 +989,7 @@ public sealed class ArchitectureTests
             root,
             "scripts",
             "Invoke-SharpProofContainer.ps1"));
+        var build = File.ReadAllText(Path.Combine(root, "build.ps1"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -1006,6 +1007,7 @@ public sealed class ArchitectureTests
             Assert.That(
                 workflow,
                 Does.Contain("docker compose run --rm tooling pack"));
+            Assert.That(build, Does.Contain("Invoke-Container $Profile"));
             Assert.That(workflow, Does.Contain("fetch-depth: 0"));
         }
     }
@@ -2237,14 +2239,14 @@ public sealed class ArchitectureTests
         {
             Assert.That(nightlyCases, Is.Positive);
             Assert.That(maximumCampaignCases, Is.GreaterThan(nightlyCases));
-            Assert.That(workflow, Does.Contain("tooling fuzz-nightly"));
+            Assert.That(workflow, Does.Contain("tooling nightly"));
             Assert.That(
                 WorkflowFiles()
                     .Where(path => !path.EndsWith(
                         "nightly.yml",
                         StringComparison.Ordinal))
                     .Select(File.ReadAllText),
-                Has.None.Contain("tooling fuzz-nightly"));
+                Has.None.Contain("tooling nightly"));
             Assert.That(dispatcher,
                 Does.Contain("'fuzz-nightly'")
                     .And.Contain("Invoke-SharpProofFuzzCampaign.ps1")
