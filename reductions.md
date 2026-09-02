@@ -130,6 +130,7 @@ the smallest relevant containerized test target passes.
 | R324 | Centralize the two repeated `AttributeTargets` masks used by the eight public attributes | `SharpProof.Attributes.Test`: 11; `SharpProof.Package.Test`: 295 passed, 1 skipped |
 | R322 | Reuse compiler-artifact specification-pack identity validation in the manifest producer | `SharpProof.Worker.Test`: CompilerManifestArtifactTests, 91 passed |
 | R314 | Centralize compiler summary-origin wire prefixes across artifact, worker, and collector code | `SharpProof.Worker.Test`: WorkerTests, 148 passed; `SharpProof.Analyzer.Test`: FinalCompilationCollectorTests, 55 passed |
+| R315 | Share effect-contract violation classification between response authority and counterexample replay | `SharpProof.Worker.Test`: EffectCounterexampleReplayTests, 31 passed; CompilerManifestArtifactTests, 91 passed |
 | R327 | Remove 22 project-local `TreatWarningsAsErrors` declarations now supplied by the central production policy, retaining the two excluded-project declarations | `test-changed`: 2,846 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
@@ -1181,7 +1182,9 @@ duplication found in this survey.
 
 R314 is `applied`: compiler-artifact owns the summary-origin prefix mapping and
 the worker and collector reuse it, preserving their existing unknown-origin
-handling. R315 is `pending` but is the item in
+handling. R315 is `applied`: response authority and counterexample replay now
+share one effect-contract violation classifier, including the impure-state mask
+and forbidden-exception handling. It remains the item in
 this survey most worth an owner's attention: it is small in line count, currently
 correct, and positioned so that a future edit to one copy silently desynchronizes
 a soundness rule across an assembly boundary. It belongs with R287 in the set of

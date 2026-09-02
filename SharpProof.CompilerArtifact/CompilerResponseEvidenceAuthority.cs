@@ -322,7 +322,9 @@ internal sealed class CompilerResponseEvidenceAuthority :
                 !CompilerEffectAuthority.WitnessesEqual(
                     result.EffectWitness,
                     evidence.Witness) ||
-                !WitnessContradictsContract(evidence, result.EffectWitness))
+                !CompilerEffectViolationAuthority.IsViolation(
+                    evidence,
+                    result.EffectWitness))
             {
                 errors.Add("response.effect_witness_authority");
             }
@@ -649,54 +651,6 @@ internal sealed class CompilerResponseEvidenceAuthority :
             .ThenBy(static value => value.Item3, StringComparer.Ordinal)
             .ToArray();
         return actual.SequenceEqual(canonical);
-    }
-
-    private static bool WitnessContradictsContract(
-        CompilerEffectClaimArtifact evidence,
-        WorkerEffectViolationWitness? witness)
-    {
-        if (witness == null)
-        {
-            return false;
-        }
-
-        var unexpectedEffects = witness.Effects & ~evidence.Constraint.AllowedEffects;
-        var unexpectedCapabilities =
-            witness.Capabilities & ~evidence.Constraint.AllowedCapabilities;
-        const WorkerEffectSet impureState =
-            WorkerEffectSet.ReadsCapturedState |
-            WorkerEffectSet.ReadsStaticState |
-            WorkerEffectSet.ReadsAmbientState |
-            WorkerEffectSet.WritesReceiverState |
-            WorkerEffectSet.WritesArgumentState |
-            WorkerEffectSet.WritesCapturedState |
-            WorkerEffectSet.WritesStaticState |
-            WorkerEffectSet.WritesAmbientState;
-        return evidence.ContractKind switch
-        {
-            WorkerEffectContractKind.EnforcePure =>
-                witness.Capabilities != WorkerEffectCapabilitySet.None ||
-                (witness.Effects & impureState) != WorkerEffectSet.None,
-            WorkerEffectContractKind.ZeroAllocations =>
-                (witness.Effects & WorkerEffectSet.Allocates) != 0,
-            WorkerEffectContractKind.AllowedCapabilities =>
-                unexpectedCapabilities != WorkerEffectCapabilitySet.None,
-            WorkerEffectContractKind.DoesNotThrow =>
-                (witness.Effects & WorkerEffectSet.Throws) != 0,
-            WorkerEffectContractKind.AllowedExceptions =>
-                (witness.Effects & WorkerEffectSet.Throws) != 0 &&
-                witness.ExactExceptionTypeHierarchy.Any(type =>
-                    !evidence.Constraint.AllowedExceptionTypes.Contains(
-                        type, StringComparer.Ordinal)),
-            WorkerEffectContractKind.EffectContract =>
-                unexpectedEffects != WorkerEffectSet.None ||
-                unexpectedCapabilities != WorkerEffectCapabilitySet.None ||
-                (witness.Effects & WorkerEffectSet.Throws) != 0 &&
-                witness.ExactExceptionTypeHierarchy.Any(type =>
-                    !evidence.Constraint.AllowedExceptionTypes.Contains(
-                        type, StringComparer.Ordinal)),
-            _ => false
-        };
     }
 
     private static bool TryReplayPostcondition(
