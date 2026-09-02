@@ -6744,3 +6744,24 @@ R819 is `deferred`: the duplicate scan is cheap for five rows, but the canonical
 
 R820 is `deferred`: the assertions are completely implied, but the cleanup is
   limited to two low-cost test lines.
+
+## Second survey, part three hundred thirty-two: R821 - duplicate generated-domain join
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R821 | **`GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws` computes the same join twice per property iteration.** The local `middle` is assigned `domain.Join(first, second)` and is used to build `upper` and check the generated transitivity premises. A few lines later, `join` is assigned another `domain.Join(first, second)` with the same operands, then used for the join upper-bound and sampled least-upper-bound checks. The two values are the same abstract-domain operation for the same pair, so reusing `middle` for the latter checks removes one domain join for each of 512 iterations without reducing coverage or changing the generated upper-bound construction. | `SharpProof.Dataflow.Test/GeneratedDomainPropertyTests.cs:44-78` |
+
+### Checked and not proposed (part three hundred thirty-two)
+
+- The separate `domain.Join(join, third)` / `domain.Join(middle, third)` result
+  remains necessary because the law checks a generated upper bound involving a
+  third value.
+- The sampled upper-bound loop remains independent: it intentionally tests the
+  same first/second pair against unrelated values from the generated corpus.
+- This is test-harness computation only; domain join semantics and the sampled
+  values remain unchanged.
+
+### Status (part three hundred thirty-two)
+
+R821 is `deferred`: the duplicate join is deterministic and cheap in current
+  domains, but it is unnecessary work in a property loop that may be expanded.
