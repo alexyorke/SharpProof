@@ -137,6 +137,7 @@ the smallest relevant containerized test target passes.
 | R334 | Reuse one class-level schema-3 corpus snapshot header fixture across the corpus format tests | `SharpProof.Gates.Test`: 23 corpus gate tests passed |
 | R335 | Reuse one class-level valid input-hash fixture across the three LauncherArgumentTests methods that exercise it | `SharpProof.Package.Test`: LauncherArgumentTests passed |
 | R336 | Share the verification-cache filename suffix between production path generation/validation and worker edge-case fixtures | `SharpProof.Worker.Test`: WorkerTcbEdgeCaseTests 44 passed |
+| R339 | Derive `EnforceExtendedAnalyzerRules=true` centrally for every `IsRoslynAnalyzer` project | Analyzer and generator builds; canonical MSBuild property evaluation passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1427,7 +1428,6 @@ maintenance seams rather than style preferences.
 | R331 | **The two custom-nuspec project files copy the same packaging skeleton.** `SharpProof.Package.csproj` and `SharpProof.Verifier.csproj` each import `SharpProof.PackageMetadata.props` and repeat the same `Nullable=disable`, `ImplicitUsings=disable`, `TargetFramework=netstandard2.0`, `IncludeBuildOutput=false`, `GeneratePackageOnBuild=false`, `NuspecBasePath`, `NU5128` suppression, `Copyright`, and `NoPackageAnalysis` settings. Their `_SharpProofPrepareNuspecProperties` targets also share the same name, timing, and `version/configuration/repositorycommit` property prefix. A shared custom-nuspec props/target fragment could own this stable skeleton while leaving package IDs, nuspec filenames, native-root validation, and project references explicit. This refines R291's metadata duplication at the project-file layer. | `SharpProof.Package/SharpProof.Package.csproj:1-20,42-45`; `SharpProof.Verifier/SharpProof.Verifier.csproj:1-20,47-52` |
 | R337 | **The stable Roslyn additional-text implementation type name is repeated beside the duplicated guard from R323.** Both `CompilerCompilationCapture` and `CompilerProbeSnapshot` privately declare `CommandLineAdditionalTextTypeName = "Microsoft.CodeAnalysis.AdditionalTextFile"` and compare against it with ordinal equality. R323 already records the larger `GetStableAdditionalText` algorithm duplication; even if the methods remain separate because the probe has no collector project reference, the exact type-name value is a second independent drift point and should be included in that sharing decision. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:58-59,437-442`; `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:7-8,563-573`; R323 |
 | R338 | **Three analyzer components repeat the same `NoWarn` suppression bundle.** `SharpProof.Analyzer.Core`, `SharpProof.Analyzer`, and `SharpProof.CompilerCollector` each append exactly `RS2002;RS2003` to `NoWarn`. These projects share generated diagnostic-descriptor/analyzer infrastructure, while the other Roslyn components use different suppression sets (`RS2008`, `RS1035`, or none). A narrowly scoped analyzer-component property or shared props fragment could remove the three repeated lines, but the reason for suppressing each rule must be confirmed before centralization; this is not evidence that the warnings themselves are unnecessary. | `SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj:8`; `SharpProof.Analyzer/SharpProof.Analyzer.csproj:8`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:9` |
-| R339 | **Every project that marks itself `IsRoslynAnalyzer=true` also repeats `EnforceExtendedAnalyzerRules=true`.** The five projects are `SharpProof.CompilerProbe.TestAsset`, `SharpProof.CompilerCollector`, `SharpProof.ContractForGenerator`, `SharpProof.Analyzer`, and `SharpProof.Meta.Analyzers`; the pair is a stable role policy rather than five independent choices. Keeping the marker local but deriving the second property from it in `Directory.Build.props` would remove repeated policy lines while preserving the test asset's deliberate analyzer identity. | `SharpProof.CompilerProbe.TestAsset/SharpProof.CompilerProbe.TestAsset.csproj:7-8`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:4-5`; `SharpProof.ContractForGenerator/SharpProof.ContractForGenerator.csproj:5-6`; `SharpProof.Analyzer/SharpProof.Analyzer.csproj:4-5`; `SharpProof.Meta.Analyzers/SharpProof.Meta.Analyzers.csproj:4-5` |
 
 ### Checked and not proposed (part twenty-six)
 
@@ -1446,6 +1446,8 @@ maintenance seams rather than style preferences.
 - R336 is now applied: `VerificationCache.CacheFileSuffix` is the single
   production/test authority for cache filenames, including wildcard scans and
   path-validation fixtures.
+- R339 is now applied: `Directory.Build.targets` derives the extended Roslyn
+  analyzer rules from each project's existing `IsRoslynAnalyzer` marker.
 - The repeated `SHARPPROOF_CONTRACTS` string spans the public conditional symbol,
   compilation fingerprinting, and synthetic source fixtures. The fixture copies
   are part of R309, while the fingerprint intentionally has a separate
@@ -1464,9 +1466,9 @@ maintenance seams rather than style preferences.
 
 ### Status (part twenty-six)
 
-R331, R337-R339 are `pending`. R331 and R337 touch packaging
-authorities and need boundary-aware implementations. R338-R339
-are smaller, mechanically testable build/test reductions.
+R331, R337-R338 are `pending`. R331 and R337 touch packaging or cross-assembly
+authorities and need boundary-aware implementations. R338 is a smaller,
+mechanically testable build reduction.
 
 ## Second survey, part twenty-seven: R340-R349
 
@@ -2818,3 +2820,83 @@ R504 is `pending`. Like R497 its payoff is build time rather than
 maintainability, and the two should be considered together - caching the image
 addresses the repetition, while splitting the layer addresses why a cache miss
 costs more than it should.
+
+
+## Second survey, part sixty-five: R505 - two source-materialization paths that disagree
+
+`eng/container/entrypoint.sh` and `eng/container/loop-command.sh` both materialize
+the host working tree into a private container workspace before running a command.
+A line-level diff finds **zero shared runs of three or more lines**, so this is not
+textual duplication - but they implement the same guarantee with different code,
+and they do not materialize the same source.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R505 | **The loop path copies a strictly smaller source set than the task path, while accepting the same command set.** `entrypoint.sh` performs three `git ls-files` passes: a clean-source check, an untracked-file copy (`--others --exclude-standard`), and - critically - a third pass copying **ignored** package inputs (`--others --ignored --exclude-standard -- nupkgs/`), with a comment explaining that "Package jobs download nupkg/snupkg inputs under nupkgs/. Those file extensions are intentionally ignored by Git, so the general untracked copy above cannot see them." `loop-command.sh` performs only the untracked pass and has **no `nupkgs` handling of any kind**, yet it ends with an unrestricted `sp "$@"`, so it accepts all 37 commands in the container dispatcher's `ValidateSet` - including `package-consumers`, `pilots`, `release-plan`, and `release-qualification`, every one of which takes `-PackageSource nupkgs`. Running any of those through the loop therefore executes against a workspace where the package inputs were never copied. The asymmetry runs both ways: the loop has a target-manifest reconciliation pass that removes stale untracked files from its **reused** workspace, which `entrypoint.sh` does not need because it materializes into a fresh `mktemp -d` each time. Each path has a correctness property the other lacks, and neither documents the difference. | `eng/container/entrypoint.sh:92,132,143`; `eng/container/loop-command.sh:125,166-179,205`; `scripts/Invoke-SharpProofContainer.ps1:3` |
+
+### Checked and not proposed (part sixty-five)
+
+- **This is not a de-duplication candidate**, and the measurement is the reason
+  to say so explicitly. The two scripts share the same git verb vocabulary -
+  `clone`, `checkout`, `config`, `diff`, `ls-files`, `remote`, `rev-parse`,
+  `apply` - but a normalized line-level comparison of their 145 and 189
+  significant lines finds **no shared run of three lines**. Extracting a common
+  implementation would be a rewrite, not a merge, and the differences are
+  deliberate: `core.filemode false` for the Docker Desktop bind mount versus
+  `true` for the private Linux volume (commented in place), a process lock the
+  task path does not need, and optional snapshot input. This is the same shape
+  part seventeen found for the three process-deadline implementations, and the
+  R032-R034 deferral reasoning applies unchanged.
+- `loop-command.sh`'s path validation is careful and worth leaving alone: it
+  rejects a target equal to the source or to `/`, requires the target under
+  `/workspace`, validates every inventory path against `""`, `/*`, `../*`, and
+  `*/../*`, and constrains an optional snapshot root to a specific artifacts
+  subdirectory before use.
+- The lock is correct: it uses `mkdir` for atomicity, records the owner PID,
+  reclaims the lock only after confirming the owner is dead with `kill -0`, and
+  releases through a trap on `EXIT HUP INT TERM`.
+
+### Status (part sixty-five)
+
+R505 is `pending`. The fix is small - either mirror the ignored-`nupkgs` copy
+into the loop path, or have the loop reject the commands that require a
+`-PackageSource` - but it should be a deliberate choice, because the two paths
+are intentionally different implementations rather than one shared one.
+
+
+## Second survey, part sixty-six: R506 - analyzer release tracking is disabled six ways
+
+Validating every diagnostic ID that appears in configuration. No ID is
+mistyped and no suppression is undocumented - but the analyzer-release-tracking
+family shows a pattern that extends R273.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R506 | **All six analyzer-shipping projects disable analyzer release tracking, in two different combinations, and only one of them has release-tracking files at all.** `SharpProof.Analyzer`, `SharpProof.Analyzer.Core`, and `SharpProof.CompilerCollector` each `NoWarn` **RS2002 and RS2003** - the rules that forbid re-adding a removed diagnostic ID to the unshipped release and forbid a shipped ID appearing as unshipped. `SharpProof.ContractForGenerator`, `SharpProof.Meta.Analyzers`, and `SharpProof.CompilerProbe.TestAsset` each `NoWarn` **RS2008** - the rule requiring an analyzer to *have* release tracking. Meanwhile `AnalyzerReleases.Shipped.md` and `AnalyzerReleases.Unshipped.md` exist in exactly one project, `SharpProof.Analyzer`. So the mechanism is on for one assembly, off for three, and partially relaxed for three - and the one assembly that does track releases has the two consistency rules for that tracking switched off. Combined with R273's measurement that 21 of the descriptor catalog's 34 IDs (every `SPCF*` and `SPMETA*`) are untracked, the effective state is that release tracking constrains only the 13 `SP*` rules in one file, and even there cannot object to a removed-then-readded or shipped-then-unshipped ID. None of the six suppressions carries an explanatory comment, unlike the neighbouring `SP0024` suppression in `SharpProof.SelfApplication.props`, which does. | `SharpProof.Analyzer/SharpProof.Analyzer.csproj:7`; `SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj:7`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:8`; `SharpProof.ContractForGenerator/SharpProof.ContractForGenerator.csproj:9`; `SharpProof.Meta.Analyzers`, `SharpProof.CompilerProbe.TestAsset` csproj; `SharpProof.Analyzer/AnalyzerReleases.*.md`; R273 |
+
+### Checked and not proposed (part sixty-six)
+
+- **Every diagnostic ID in configuration is real.** The 17 IDs in `.editorconfig`
+  and `.globalconfig` and the 29 in `WarningsAsErrors`/`NoWarn` across all build
+  files were checked: all resolve to genuine CA, CS, IDE, NU, RS, or AD rules,
+  plus `SP0024`, which is SharpProof's own and present in the descriptor catalog.
+  A mistyped suppression silently does nothing, so this was worth confirming;
+  there are none.
+- **`SharpProof.Smoke.Net472` escalates rather than suppresses, and does it
+  well.** Its `WarningsAsErrors` adds `AD0001`, `CS8032`, `CS8034`, and `CS8785` -
+  analyzer crash, analyzer load failure, generator load failure, and generator
+  execution failure. That turns the net472 smoke project into an assertion that
+  the shipped analyzer actually loads and runs on the legacy framework, which is
+  exactly what a smoke test of that kind should do. Worth recording as a
+  deliberate, well-chosen escalation rather than leaving it to look like noise.
+- `NU5128` in the two packaging projects is standard for tools-only packages with
+  no `lib/` assemblies, and `SP0024` in the self-application props carries an
+  inline comment explaining it covers a deliberate negative fixture. Both correct.
+
+### Status (part sixty-six)
+
+R506 is `pending` and is a policy question rather than a reduction - it removes
+no lines. It is filed because six suppressions of one rule family, in two
+combinations, with no comments and only one participating project, is more likely
+to be accumulated drift than a considered position, and R273 already found the
+tracking gap from the other direction.

@@ -13,4 +13,8 @@
          expose a reusable library synchronization-context contract. -->
     <NoWarn>$(NoWarn);CA1515;CA2007;CA5394</NoWarn>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsRoslynAnalyzer)' == 'true'">
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+  </PropertyGroup>
 </Project>
