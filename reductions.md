@@ -6312,3 +6312,25 @@ R801 is `deferred` pending a small accumulator that preserves the current
 R802 is `deferred` pending removal of the caller-side cardinality precheck or
 an explicit result-returning topology seam. No implementation or build file
 was changed.
+
+## Second survey, part three hundred fourteen: R803 - repeated manifest claim partition scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R803 | **`CompilerManifestArtifactJson.ClaimPartitions` scans each sorted claim group twice to build two disjoint projections.** The constructor materializes one ordinal-sorted `Claims` array, then runs one `Where`/materialization pass for `Postconditions` and another for `Effects`. Each `ClaimPartitions` instance is created for a callable during feature-scope parity validation, so the same claims are traversed again even though each row can be classified into at most one of the two retained arrays. A single post-sort loop with two builders can preserve the full sorted `Claims` property, stable per-partition order, and the later independent consumers while removing the second partition scan. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:330-344,573-589`; `SharpProof.Worker.Test/CompilerManifestArtifactTests.cs` |
+
+### Checked and not proposed (part three hundred fourteen)
+
+- The full sorted `Claims` snapshot remains available for callers that need
+  all claim kinds; only the construction of the two filtered arrays is fused.
+- Postcondition and effect arrays remain separate outputs, with their current
+  order and filtering rules; no claim taxonomy or feature-parity rule changes.
+- The cost is bounded by each callable's claim count, so this remains a small
+  deferred cleanup rather than a reason to introduce a broad collection
+  abstraction into manifest validation.
+
+### Status (part three hundred fourteen)
+
+R803 is `deferred` pending a local one-pass partition loop that keeps the
+  current readable outputs without adding more validation indirection. No
+  implementation or build file was changed.
