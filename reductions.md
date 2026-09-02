@@ -6241,3 +6241,27 @@ Linux path-identity API, and the conflict check also detects hard-link aliases.
 Bypassing those public calls would require a new canonical-only API or a
 second security-sensitive implementation for a small validation loop, so the
 review risk outweighs the line-count saving.
+
+## Second survey, part three hundred eleven: R800 - duplicated solver-lane construction
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R800 | **Initial solver-lane creation and timed-out-lane renewal duplicate the backend-to-lane projection.** `SharpProofWorker.TryCreateLanes` invokes the backend factory, rejects a null result, wraps the backend in a `CallableVerifier`, derives its consumed-resource reader, and records disposable ownership through `CreateLane`; `VerificationLane.Renew` repeats the factory/null check and then assigns the same verifier/resource-reader/owner state after accepting a replacement. The two paths must retain different policies - initial creation rejects duplicate backends across the partially built list and disposes all created lanes on setup failure, while renewal serializes replacement, rejects a backend already held by another lane, and keeps the prior backend alive until acceptance - but a shared backend-to-lane-state factory or replacement projection can centralize the repeated construction and ownership wiring without merging those failure and retirement protocols. | `SharpProof.Worker/SharpProofWorker.cs:536-589,598-609,620-667`; `SharpProof.Worker.Test/WorkerTests.cs:5476-5579,5651-5862,5937-6000` |
+
+### Checked and not proposed (part three hundred eleven)
+
+- The initial multi-lane allocation and renewal state machine remain separate;
+  the candidate covers only backend creation, verifier/resource projection,
+  and disposable-owner assignment.
+- Duplicate-backend detection, lock scope, prior-owner disposal ordering,
+  replacement cleanup, and typed renewal outcomes must remain explicit at
+  their respective lifecycle boundaries.
+- This is a deferred reduction: a helper should not hide the distinction
+  between setup failure cleanup and replacement acceptance merely to remove a
+  few repeated lines.
+
+### Status (part three hundred eleven)
+
+R800 is `deferred` pending a seam that reduces the repeated lane projection
+without obscuring the distinct initial-allocation and renewal ownership rules.
+No implementation or build file was changed.
