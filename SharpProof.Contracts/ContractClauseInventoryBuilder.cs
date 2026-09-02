@@ -389,11 +389,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
         }
         if (callable.OriginalDefinition.AssociatedSymbol is
                 IPropertySymbol property &&
-            property.PartialImplementationPart is { } propertyImplementation)
+            property.PartialImplementationPart != null)
         {
-            return callable.MethodKind == MethodKind.PropertyGet
-                ? propertyImplementation.GetMethod
-                : propertyImplementation.SetMethod;
+            return GetPropertyAccessor(callable, property, useImplementation: true);
         }
         return null;
     }
@@ -454,11 +452,9 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     internal static IMethodSymbol NormalizeCallable(IMethodSymbol method)
     {
         if (method.AssociatedSymbol is IPropertySymbol property &&
-            property.PartialImplementationPart is { } implementation)
+            property.PartialImplementationPart != null)
         {
-            return method.MethodKind == MethodKind.PropertyGet
-                ? implementation.GetMethod ?? method
-                : implementation.SetMethod ?? method;
+            return GetPropertyAccessor(method, property, useImplementation: true) ?? method;
         }
         return method.PartialImplementationPart ?? method;
     }
@@ -476,12 +472,26 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     {
         var definition = method.OriginalDefinition;
         if (definition.AssociatedSymbol is IPropertySymbol property &&
-            property.PartialDefinitionPart is { } partialDefinition)
+            property.PartialDefinitionPart != null)
         {
-            return definition.MethodKind == MethodKind.PropertyGet
-                ? partialDefinition.GetMethod ?? definition
-                : partialDefinition.SetMethod ?? definition;
+            return GetPropertyAccessor(
+                definition,
+                property,
+                useImplementation: false) ?? definition;
         }
         return definition.PartialDefinitionPart ?? definition;
+    }
+
+    private static IMethodSymbol? GetPropertyAccessor(
+        IMethodSymbol method,
+        IPropertySymbol property,
+        bool useImplementation)
+    {
+        var part = useImplementation
+            ? property.PartialImplementationPart
+            : property.PartialDefinitionPart;
+        return method.MethodKind == MethodKind.PropertyGet
+            ? part?.GetMethod
+            : part?.SetMethod;
     }
 }

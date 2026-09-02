@@ -170,6 +170,8 @@ the smallest relevant containerized test target passes.
 | R406 | Reuse the validated primary-constructor factory argument for IR term interpretation | `SharpProof.Ir.Test`: 114 passed |
 | R407 | Remove the duplicate launcher exit-code consistency check | `SharpProof.Package.Test`: LauncherArgumentTests 75 passed |
 | R411 | Inline the one-use launcher final-timeout arithmetic | `SharpProof.Package.Test`: LauncherArgumentTests 75 passed |
+| R401 | Fold direct contract-clause fallback branches and inline the private resolution constructor wrapper | `SharpProof.Contracts.Test`: 142 passed |
+| R404 | Share partial-property accessor selection across contract inventory paths | `SharpProof.Contracts.Test`: 142 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1809,6 +1811,8 @@ R391 removes AST-scanning allocation churn.
 R400, R403, R405, and R406 are now applied: IR catalog calls, contract binding,
 signature registration, and factory initialization no longer carry redundant
 forwarders or guards.
+R401 and R404 are now applied: direct contract fallback construction and partial
+property accessor selection share their local logic.
 
 ## Second survey, part thirty-five: R393-R399
 
@@ -1863,8 +1867,8 @@ and program builders across `SharpProof.Ir`, `SharpProof.Contracts`, and `SharpP
 
 ### Status (part thirty-six)
 
-R401, R402, and R404 are `pending`. R400, R403, R405, and R406 are applied direct
-refactoring simplifications.
+R402 is `pending`. R400, R401, R403-R406 are applied direct refactoring
+simplifications.
 R401, R402, and R404 streamline contract resolution flow and IR validation.
 
 ## Second survey, part thirty-seven: R407-R412

@@ -85,9 +85,10 @@ internal sealed class EffectiveContractSourceResolver
             target,
             implementationBody,
             cancellationToken);
-        if (direct.Clauses.Any(static clause => clause.IsValid))
+        if (direct.HasPlacementErrors ||
+            direct.Clauses.Any(static clause => clause.IsValid))
         {
-            return Create(
+            return new(
                 target,
                 direct,
                 direct,
@@ -97,16 +98,6 @@ internal sealed class EffectiveContractSourceResolver
                     : ContractBindingFailure.None);
         }
 
-        if (direct.HasPlacementErrors)
-        {
-            return Create(
-                target,
-                direct,
-                direct,
-                usesCompanion: false,
-                ContractBindingFailure.InvalidClausePlacement);
-        }
-
         if (target.MethodKind == MethodKind.Ordinary)
         {
             var companion = ContractForSymbolMatcher.ResolveCompanion(
@@ -114,7 +105,7 @@ internal sealed class EffectiveContractSourceResolver
                 target);
             if (companion.Failure != ContractBindingFailure.None)
             {
-                return Create(
+                return new(
                     target,
                     direct,
                     direct,
@@ -133,7 +124,7 @@ internal sealed class EffectiveContractSourceResolver
                     : inventory.HasPlacementErrors
                         ? ContractBindingFailure.InvalidClausePlacement
                         : ContractBindingFailure.None;
-                return Create(
+                return new(
                     companion.Method,
                     direct,
                     inventory,
@@ -142,7 +133,7 @@ internal sealed class EffectiveContractSourceResolver
             }
         }
 
-        return Create(
+        return new(
             target,
             direct,
             direct,
@@ -152,18 +143,4 @@ internal sealed class EffectiveContractSourceResolver
                 : ContractBindingFailure.None);
     }
 
-    private static EffectiveContractSourceResolution Create(
-        IMethodSymbol source,
-        ContractClauseInventory directInventory,
-        ContractClauseInventory inventory,
-        bool usesCompanion,
-        ContractBindingFailure failure)
-    {
-        return new EffectiveContractSourceResolution(
-            source,
-            directInventory,
-            inventory,
-            usesCompanion,
-            failure);
-    }
 }
