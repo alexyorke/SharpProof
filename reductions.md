@@ -6580,3 +6580,26 @@ R813 is `deferred`: the inventory itself is cached and contract-only bodies are
   usually short, so the runtime gain is bounded. A per-check site set is a
   simple cleanup if large contract-only bodies or repeated lowerer preparation
   make the repeated scans visible.
+
+## Second survey, part three hundred twenty-five: R814 - disjoint contract inventory walks
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R814 | **`ClaimManifestBuilder.BuildTarget` walks the same clause inventory separately for postconditions and assumptions.** `CreatePostconditions` filters `inventory.Clauses` to non-nested `Ensures` rows and fingerprints them, while `CreateAssumptions` then walks the complete inventory again to select non-nested `Requires` and `Assume` rows and fingerprint them. The projections intentionally produce different manifest objects and are augmented by different attribute sources, but a single clause pass can route each row to the appropriate candidate builder before those distinct attribute projections are appended. That would remove a repeated inventory traversal and make the disjoint clause-kind partition explicit. | `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs:78-89,178-226,261-302` |
+
+### Checked and not proposed (part three hundred twenty-five)
+
+- Return-type closed-contract attributes remain postcondition candidates, while
+  parameter closed-contract attributes and trusted attributes remain assumption
+  candidates; these are separate sources and are not merged.
+- Nested-callable exclusion, invocation/attribute fingerprint choice, rank
+  assignment, and manifest ordinal assignment retain their current policies.
+- The contract source resolution itself remains one shared input; this finding
+  concerns only the two local walks over its already materialized clauses.
+
+### Status (part three hundred twenty-five)
+
+R814 is `deferred`: the inventory is normally small and combining builders
+  would add coordination to `BuildTarget`. It is a reasonable cleanup if the
+  builder gains more clause-derived candidate kinds or profiling shows the
+  repeated walk in large compilations.
