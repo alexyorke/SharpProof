@@ -6123,3 +6123,22 @@ R794 is `applied`: pilot qualification now routes nuspec identity extraction
 through the shared package-identity module while retaining its candidate-set,
 version, commit, filename, and size checks. Pilot fixtures and the focused
 Architecture test passed.
+
+## Second survey, part three hundred six: R795 - repeated PowerShell Git fixture bootstrap
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R795 | **PowerShell fixture drivers repeat the same temporary Git-repository bootstrap.** `Test-SharpProofFuzzEvidenceLifecycle`, `Test-SharpProofMutationEvidence`, `Test-SharpProofReleaseAuthorityClosureFixtures`, and `Test-SharpProofReleaseConfigurationFixtures` each create a temporary repository, run `git init`, configure the same `SharpProof Fixture` user identity, stage fixture files, and create an initial commit before testing their authority logic. `Test-SharpProofReleaseTagFixtures` repeats the checkout half of that sequence before adding its bare remote, source/candidate commits, and tag cases. A shared fixture helper can own repository initialization, deterministic identity, and an optional initial commit while accepting the scenario-specific seed files, branch setup, remote, and later commit/tag policy. This is distinct from R781, which covers the analogous duplication in three C# ArchitectureTest fixtures and their different post-bootstrap Git settings. | `scripts/Test-SharpProofFuzzEvidenceLifecycle.ps1:41-51`; `scripts/Test-SharpProofMutationEvidence.ps1:239-245`; `scripts/Test-SharpProofReleaseAuthorityClosureFixtures.ps1:55-62`; `scripts/Test-SharpProofReleaseConfigurationFixtures.ps1:174-181`; `scripts/Test-SharpProofReleaseTagFixtures.ps1:43-70`; R781 |
+
+### Checked and not proposed (part three hundred six)
+
+- The fixtures retain their different seed contents, commit messages,
+  default-branch settings, remotes, tags, and post-bootstrap mutations; only
+  the deterministic local repository setup is shared.
+- This is fixture infrastructure, not a proposal to share the authority
+  assertions or to make production release scripts depend on test helpers.
+
+### Status (part three hundred six)
+
+R795 is `pending` and limited to temporary Git setup in PowerShell fixtures.
+No implementation or build file was changed.
