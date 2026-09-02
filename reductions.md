@@ -243,6 +243,7 @@ the smallest relevant containerized test target passes.
 | R528 | Share the generated allocation-uncertainty marker predicate | `SharpProof.Effects.Test`: 323 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
+| R789 | Derive offline framework source mappings from the copied package catalog | PowerShell parse; `ContainerConsumerMatrixUsesCatalogOwnedNet8ReferencePacks`: 1 passed |
 | R792 | Reuse the shared C# string encoder in the API-spec runtime-witness generator | Generator `-Verify`; `SharpProof.Specs.Test`: 12 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
@@ -6016,8 +6017,10 @@ and caller-specific validation messages.
 
 ### Status (part three hundred)
 
-R789 is `pending` and limited to offline framework package consumer setup. No
-implementation or build file was changed.
+R789 is `applied`: the offline source mapping is derived from the copied
+package descriptors. PowerShell parsing and the focused architecture test
+passed; package-source validation reached an existing authenticated-artifact
+commit mismatch.
 
 ## Second survey, part three hundred one: R790 - unconsumed supported-framework contract
 
