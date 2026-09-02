@@ -136,6 +136,7 @@ the smallest relevant containerized test target passes.
 | R817 | Reuse the container restore for the final package-consumer test invocation | `SharpProof.ArchitectureTest`: ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed, 1 passed |
 | R819 | Reuse the canonical pilot-project path set instead of rescanning relative paths for uniqueness | `SharpProof.ArchitectureTest`: PilotAuthorityTests passed |
 | R820 | Remove two outcome-family assertions implied by exact concrete outcome checks | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
+| R821 | Reuse the already-computed generated-domain join in lattice-law assertions | `SharpProof.Dataflow.Test`: 50 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6768,8 +6769,8 @@ the exact concrete outcome and payload assertions remain.
 
 ### Status (part three hundred thirty-two)
 
-R821 is `deferred`: the duplicate join is deterministic and cheap in current
-  domains, but it is unnecessary work in a property loop that may be expanded.
+R821 is `applied`: the lattice-law checks reuse the first join result for the
+remaining upper-bound assertions, preserving all generated-domain laws.
 
 ## Second survey, part three hundred thirty-three: R822 - replay fixture resealing
 

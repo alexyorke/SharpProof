@@ -67,7 +67,7 @@ internal static class GeneratedDomainLawAssertions
                 $"Transitivity failed at seed {seed}, iteration {iteration}: " +
                 $"{first}, {middle}, {upper}.");
 
-            var join = domain.Join(first, second);
+            var join = middle;
             Assert.That(
                 domain.LessThanOrEqual(first, join),
                 Is.True,
