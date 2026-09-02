@@ -62,19 +62,19 @@ public sealed class LiftedNullableOperatorRegressionTests
         var unaryMethod = EffectTestHost.SampleMethod(compilation, "SkipUnary");
         var incrementMethod = EffectTestHost.SampleMethod(compilation, "SkipIncrement");
         var compoundMethod = EffectTestHost.SampleMethod(compilation, "SkipCompound");
-        var binaryOperation = Operation(compilation, binaryMethod)
+        var binaryOperation = EffectTestHost.RootOperation(compilation, binaryMethod)
             .DescendantsAndSelf()
             .OfType<IBinaryOperation>()
             .Single(static operation => operation.OperatorMethod != null);
-        var unaryOperation = Operation(compilation, unaryMethod)
+        var unaryOperation = EffectTestHost.RootOperation(compilation, unaryMethod)
             .DescendantsAndSelf()
             .OfType<IUnaryOperation>()
             .Single(static operation => operation.OperatorMethod != null);
-        var incrementOperation = Operation(compilation, incrementMethod)
+        var incrementOperation = EffectTestHost.RootOperation(compilation, incrementMethod)
             .DescendantsAndSelf()
             .OfType<IIncrementOrDecrementOperation>()
             .Single(static operation => operation.OperatorMethod != null);
-        var compoundOperation = Operation(compilation, compoundMethod)
+        var compoundOperation = EffectTestHost.RootOperation(compilation, compoundMethod)
             .DescendantsAndSelf()
             .OfType<ICompoundAssignmentOperation>()
             .Single(static operation => operation.OperatorMethod != null);
@@ -113,14 +113,4 @@ public sealed class LiftedNullableOperatorRegressionTests
             $"the skipped {kind} operator cannot hide the suffix");
     }
 
-    private static IOperation Operation(
-        Compilation compilation,
-        IMethodSymbol method)
-    {
-        var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
-        return compilation.GetSemanticModel(syntax.SyntaxTree)
-            .GetOperation(syntax) ??
-            throw new InvalidOperationException(
-                $"Operation for '{method.Name}' was not found.");
-    }
 }

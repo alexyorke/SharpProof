@@ -60,7 +60,7 @@ public sealed class LiftedNullableConversionRegressionTests
             """);
         var divergingMethod = EffectTestHost.SampleMethod(compilation, "SkipDiverging");
         var throwingMethod = EffectTestHost.SampleMethod(compilation, "SkipThrowing");
-        var conversion = Operation(compilation, divergingMethod)
+        var conversion = EffectTestHost.RootOperation(compilation, divergingMethod)
             .DescendantsAndSelf()
             .OfType<IConversionOperation>()
             .Single(static operation =>
@@ -97,17 +97,6 @@ public sealed class LiftedNullableConversionRegressionTests
                 Is.True,
                 "the normally completing null path must retain the suffix");
         }
-    }
-
-    private static IOperation Operation(
-        Compilation compilation,
-        IMethodSymbol method)
-    {
-        var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
-        return compilation.GetSemanticModel(syntax.SyntaxTree)
-            .GetOperation(syntax) ??
-            throw new InvalidOperationException(
-                $"Operation for '{method.Name}' was not found.");
     }
 
     private static bool IsNullable(ITypeSymbol? type)

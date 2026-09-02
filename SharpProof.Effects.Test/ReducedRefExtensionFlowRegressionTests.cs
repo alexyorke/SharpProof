@@ -28,7 +28,7 @@ public sealed class ReducedRefExtensionFlowRegressionTests
             """,
             mutations);
         var divide = EffectTestHost.SampleMethod(compilation, "Divide");
-        var call = Operation(compilation, divide)
+        var call = EffectTestHost.RootOperation(compilation, divide)
             .DescendantsAndSelf()
             .OfType<IInvocationOperation>()
             .Single();
@@ -59,14 +59,4 @@ public sealed class ReducedRefExtensionFlowRegressionTests
         Assert.That(actual, Does.Contain(metadataName));
     }
 
-    private static IOperation Operation(
-        Compilation compilation,
-        IMethodSymbol method)
-    {
-        var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
-        return compilation.GetSemanticModel(syntax.SyntaxTree)
-            .GetOperation(syntax) ??
-            throw new InvalidOperationException(
-                $"Operation for '{method.Name}' was not found.");
-    }
 }

@@ -3890,7 +3890,9 @@ slash normalization without local copies.
 
 ### Status (part one hundred forty-one)
 
-R600 is a pending Effects-test maintenance candidate. Preserve single-declaration selection, semantic-model binding, and the existing failure message; share only the identical operation lookup.
+R600 is applied with R601: all affected suites now use the existing
+`EffectTestHost.RootOperation` lookup, preserving single-declaration selection,
+semantic-model binding, and the existing failure message.
 
 ## Second survey, part one hundred forty-two: R601 - third copy of the Effects operation lookup
 
@@ -3898,7 +3900,8 @@ R600 is a pending Effects-test maintenance candidate. Preserve single-declaratio
 
 ### Status (part one hundred forty-two)
 
-R601 refines R600's scope. Preserve the existing lookup and diagnostic semantics in all three suites; centralize only their byte-identical helper.
+R601 is applied with R600; the three suites retain their distinct fixtures and
+assertions while sharing the byte-identical operation lookup.
 
 ## Second survey, part one hundred forty-three: R602 - duplicated Worker compiler-test setup
 
@@ -4093,3 +4096,19 @@ per-source URL, commit, license, and containment checks.
 ### Status (part one hundred sixty-six)
 
 R625 is a pending corpus hashing cleanup candidate. Preserve the current normalized-byte hash values and CRLF/CR compatibility; share or specialize only the normalization boundary so callers do not rescan canonical text.
+
+## Second survey, part one hundred sixty-seven: R626 - duplicate Effects test compilation factories
+
+| R626 | **`EffectTestHost` repeats Roslyn compilation construction for reference variants.** `CreateCompilation`, `CreateCompilationWithoutContractPackage`, and `EmitReferenceWithoutContractPackage` each parse C# 12 source, create a deterministic release DLL compilation with nullable enabled, and enforce compilation success; they differ mainly in whether the contract assembly is included and in source/assembly naming. A private compilation core accepting the reference set and parse metadata can own the common options while preserving the explicit contract-present/contract-absent fixtures. | `SharpProof.Effects.Test/EffectTestHost.cs:11-41,50-69,71-90,168-179` |
+
+### Status (part one hundred sixty-seven)
+
+R626 is a pending Effects-test infrastructure cleanup candidate. Preserve the contract-package boundary, assembly/source names, C# 12 parsing, deterministic release options, and typed compile failures; centralize only the shared Roslyn construction.
+
+## Second survey, part one hundred sixty-eight: R627 - repeated ManagedAbstractFlow test analysis setup
+
+| R627 | **`ManagedAbstractFlowTests` repeats the same Roslyn-to-CFG analysis harness.** Many tests locate the single `Calls` method, obtain its semantic model, resolve the `IMethodBodyOperation` and `IMethodSymbol`, build a `ControlFlowGraph`, and call `ManagedAbstractFlow.ForCompilation(...).Analyze(...)`; `AnalyzeSingleCall` centralizes only one narrow case while most tests re-open the sequence. A parameterized test helper can return the compilation, method, root, graph, and analysis while allowing callers to select the operation/assertion they need. | `SharpProof.Effects.Test/ManagedAbstractFlowTests.cs:15-40,267-285,347-363,376-396,409-428,623-645,658-680,731-789,854-884,930-976,1011-1049`; `SharpProof.Effects.Test/ManagedAbstractFlowTests.cs:1053-1067` |
+
+### Status (part one hundred sixty-eight)
+
+R627 is a pending Effects-test harness cleanup candidate. Preserve each fixture's custom references, selected operation, entry state, convergence/budget parameters, and assertion-specific analysis; share only the repeated method/operation/CFG plumbing.
