@@ -4305,7 +4305,7 @@ R704 completed: package-graph authority now routes through the shared PowerShell
 
 | R705 | **`UsingDisposalGraph.GetInternalGotoTargets` repeatedly scans operation and target collections while resolving one goto set.** For each label it searches `scope.Operations` for a span match, calls `IndexOf` on the matching operation (and may search again for the fallback), then materializes `allTargets` only to walk it again for active targets and lifetime escape, while `branches` is rescanned for unconditional-goto detection. A single indexed operation lookup plus one classification pass can remove the repeated enumeration and intermediate walks, preserving span-overlap precedence, fallback selection, target de-duplication, and active-lifetime flags. | `SharpProof.Effects/UsingDisposalGraph.cs:81-109` |
 
-R705 is a pending using-disposal control-flow traversal reduction candidate. Preserve goto target resolution for nested syntax spans, unconditional-label behavior, cancellation-independent ordering, and all three returned classifications.
+R705 completed: internal goto targets now use one indexed operation pass and one target-classification pass, preserving nested-span resolution, unconditional-label behavior, target order, and all three returned classifications.
 
 ### Status (part two hundred thirty-nine)
 

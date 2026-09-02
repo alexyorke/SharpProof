@@ -83,30 +83,77 @@ internal static class UsingDisposalGraph
         IBlockOperation scope,
         int firstActiveOperation)
     {
-        var branches = operation.DescendantsAndSelf()
-            .OfType<IBranchOperation>()
-            .Where(branch => branch.Syntax is GotoStatementSyntax)
-            .ToArray();
-        var allTargets = branches
-            .SelectMany(static branch => branch.Target.DeclaringSyntaxReferences)
-            .Select(static reference => reference.GetSyntax())
-            .Where(target =>
-                target.SyntaxTree == scope.Syntax.SyntaxTree &&
-                scope.Syntax.Span.Contains(target.Span))
-            .Select(target => scope.Operations.IndexOf(
-                scope.Operations.FirstOrDefault(candidate =>
-                    candidate.Syntax.Span.Contains(target.Span) ||
-                    candidate.Syntax.Span.IntersectsWith(target.Span) ||
-                    target.Span.Contains(candidate.Syntax.Span)) ??
-                scope.Operations.First(candidate =>
-                    candidate.Syntax.Span.Start >= target.Span.Start)))
-            .Distinct()
-            .ToArray();
+        var allTargets = new List<int>();
+        var seenTargets = new HashSet<int>();
+        var hasUnconditionalGoto = false;
+        foreach (var branch in operation.DescendantsAndSelf()
+                     .OfType<IBranchOperation>())
+        {
+            if (branch.Syntax is not GotoStatementSyntax)
+            {
+                continue;
+            }
+
+            hasUnconditionalGoto |=
+                IsUnconditionalAtOperationLevel(branch, operation);
+            foreach (var reference in branch.Target.DeclaringSyntaxReferences)
+            {
+                var target = reference.GetSyntax();
+                if (target.SyntaxTree != scope.Syntax.SyntaxTree ||
+                    !scope.Syntax.Span.Contains(target.Span))
+                {
+                    continue;
+                }
+
+                var targetIndex = -1;
+                for (var index = 0;
+                     index < scope.Operations.Length;
+                     index++)
+                {
+                    var candidate = scope.Operations[index];
+                    if (candidate.Syntax.Span.Contains(target.Span) ||
+                        candidate.Syntax.Span.IntersectsWith(target.Span) ||
+                        target.Span.Contains(candidate.Syntax.Span))
+                    {
+                        targetIndex = index;
+                        break;
+                    }
+                }
+
+                if (targetIndex < 0)
+                {
+                    targetIndex = scope.Operations
+                        .Select((candidate, index) => (candidate, index))
+                        .First(item =>
+                            item.candidate.Syntax.Span.Start >= target.Span.Start)
+                        .index;
+                }
+
+                if (seenTargets.Add(targetIndex))
+                {
+                    allTargets.Add(targetIndex);
+                }
+            }
+        }
+
+        var activeTargets = new List<int>();
+        var leavesActiveLifetime = false;
+        foreach (var target in allTargets)
+        {
+            if (target >= firstActiveOperation)
+            {
+                activeTargets.Add(target);
+            }
+            else
+            {
+                leavesActiveLifetime = true;
+            }
+        }
+
         return new(
-            allTargets.Where(target => target >= firstActiveOperation).ToArray(),
-            branches.Any(branch =>
-                IsUnconditionalAtOperationLevel(branch, operation)),
-            allTargets.Any(target => target < firstActiveOperation));
+            activeTargets,
+            hasUnconditionalGoto,
+            leavesActiveLifetime);
     }
 
     private static bool IsUnconditionalAtOperationLevel(
