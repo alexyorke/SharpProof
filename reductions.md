@@ -140,6 +140,7 @@ the smallest relevant containerized test target passes.
 | R822 | Seal replay fixtures only at validation boundaries instead of during construction and again after mutation | `SharpProof.Worker.Test`: CompilerEffectReplayArtifactCodecTests, 8 passed |
 | R823 | Share the JSON-document/reflection invocation wrapper across specification-pack parser tests | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R824 | Share probe JSON array framing between raw-row and string-array serialization | `SharpProof.Package.Test`: CompilerProbeSnapshotTests (5), CompilerProbeInputConsistencyTests (1) passed |
+| R825 | Rename the empty-tree validation predicate to describe its non-empty fast path and zero-length representation check | `SharpProof.Worker.Test`: CompilerManifestArtifactTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6861,9 +6862,8 @@ separator handling while raw and escaped element writers remain distinct.
 
 ### Status (part three hundred thirty-six)
 
-R825 is `deferred`: it has no material runtime cost, but the current positive
-  method name makes a valid non-empty result look paradoxical and invites an
-  incorrect future simplification of the empty-tree branch.
+R825 is `applied`: the predicate now describes the accepted empty-tree
+representation, including the intentional non-empty fast path.
 
 ## Second survey, part three hundred thirty-seven: R826 - duplicated scoped-identifier hashing
 
@@ -6979,3 +6979,25 @@ R829 is `deferred`: it is a small, potentially redundant defensive pass, but
 R830 is `deferred`: it is a zero-risk dead-local removal, pending the next
   launcher validation pass so the surrounding reporting path can be checked
   together.
+
+## Second survey, part three hundred forty-two: R831 - bitwise boolean launcher flags
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R831 | **`ValidateAndReport` uses bitwise boolean operators where logical operators express the policy.** `incompleteError` combines two pure boolean comparisons with `&`, and the final exit expression combines the already-computed `incompleteError` and `assumptionError` with `|`. There is no side effect to preserve and both operands of the final expression have already been evaluated, so `&&`/`||` would produce the same current result while communicating ordinary boolean control flow. The bitwise spelling makes readers wonder whether forced evaluation or flag arithmetic is intentional. | `SharpProof.Worker.Launcher/Program.cs:471-475,495` |
+
+### Checked and not proposed (part three hundred forty-two)
+
+- `ReportAssumptions` must still run before the final return because it emits
+  the assumption diagnostic; changing the final operator does not remove
+  that call.
+- The refuted result must continue to take precedence over incomplete or
+  assumption errors through the existing conditional expression.
+- This candidate concerns operator clarity only; it does not change exit-code
+  values or response validation.
+
+### Status (part three hundred forty-two)
+
+R831 is `deferred`: the current operators are behaviorally equivalent for
+  these operands, but their bitwise form is unexplained accidental complexity
+  in a user-facing exit-policy calculation.
