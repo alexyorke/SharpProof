@@ -8,7 +8,7 @@ internal static class SharpProofControlAttributePolicy
         CancellationToken cancellationToken)
     {
         var suppress = false;
-        foreach (var symbol in EnumerateScopes(method))
+        foreach (var symbol in CompilerMethodScopes.Enumerate(method))
         {
             suppress |= ValidateScope(
                 symbol, session, reportDiagnostic, cancellationToken);
@@ -118,25 +118,6 @@ internal static class SharpProofControlAttributePolicy
                 string.IsNullOrEmpty(reason) ? "<empty>" : reason,
                 "expected a non-empty reason",
                 attribute.GetLocation()));
-        }
-    }
-
-    internal static IEnumerable<ISymbol> EnumerateScopes(IMethodSymbol method)
-    {
-        yield return method;
-        if (method.AssociatedSymbol is IPropertySymbol property)
-        {
-            yield return property;
-        }
-
-        for (var type = method.ContainingType; type != null; type = type.ContainingType)
-        {
-            yield return type;
-        }
-
-        if (method.ContainingAssembly != null)
-        {
-            yield return method.ContainingAssembly;
         }
     }
 

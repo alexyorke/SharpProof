@@ -189,6 +189,7 @@ the smallest relevant containerized test target passes.
 | R468 | Centralize the shared Roslyn runtime copy target for Gates projects | `SharpProof.Gates.Test`: 63; `SharpProof.ArchitectureTest`: 389 |
 | R472 | Derive the effect-capability unknown marker from the enum catalog expression | `SharpProof.Effects.Test`: 323 passed |
 | R471 | Inherit effect-summary equivalence from the closed-domain base while retaining Widen forwarding | `SharpProof.Effects.Test`: 323 passed |
+| R473 | Share method/property/type/assembly scope enumeration across analyzer, collector, and effects policies | `SharpProof.Analyzer.Test`: 476; `SharpProof.Effects.Test`: 323 |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2365,12 +2366,14 @@ This pass inspected effect-domain defaults, capability encoding, trust scopes, a
 
 ### Status (part fifty-one)
 
-R473-R475 are `pending` review-only reduction candidates. R471 is applied:
+R474-R475 are `pending` review-only reduction candidates. R471 is applied:
 `EffectSummaryDomain` now derives from `ClosedAbstractDomain<EffectSummary>` and
 retains its explicit Widen forwarding, while inheriting the shared equivalence
 implementation. R472 is applied:
 `EffectCapabilitySet` now uses one compile-time unknown-marker expression for
-validation and `IsUnknown`, removing the numeric bit-position duplicate.
+validation and `IsUnknown`, removing the numeric bit-position duplicate. R473
+is applied: analyzer, collector, and effects policies now consume one shared
+scope iterator with the same ordering as the former local copies.
 
 
 ## Second survey, part fifty-two: R476 - the shipped consumer property surface
@@ -3552,3 +3555,11 @@ R570 is a pending small reduction candidate. Preserve the checked-command wrappe
 ### Status (part one hundred twelve)
 
 R571 is a pending test-infrastructure reduction candidate. Preserve collectible unloading and resolver detach in `finally`; the helper should not merge the distinct oracle behavior or hide failures from the callback.
+
+## Second survey, part one hundred thirteen: R572 - repeated safe test-workspace disposal
+
+| R572 | **Five disposable test workspaces duplicate the same safe recursive-cleanup guard.** `ScalarDifferentialMatrixTests`, `WorkerTests`, `PackageLayoutSmokeTests`' two workspace types, and `WorkerMsBuildIntegrationTests` each call `Path.GetFullPath` on their owned directory, build the corresponding `Path.GetTempPath()` root, require an ordinal prefix match with a separator, throw `Refusing to remove an unexpected test directory.` on mismatch, then call `Directory.Delete(..., recursive: true)`. A shared `TempDirectory`/test-workspace disposal helper can centralize this deletion safety contract while accepting the per-fixture root and preserving each fixture's own creation and path properties. This is separate from R428's manual `try/finally` cleanup because these classes already implement `IDisposable` and the repeated concern is the security guard itself. | `SharpProof.Worker.Test/ScalarDifferentialMatrixTests.cs:969-983`; `SharpProof.Worker.Test/WorkerTests.cs:7320-7334`; `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:3208-3222,3261-3275`; `SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs:4212-4226` |
+
+### Status (part one hundred thirteen)
+
+R572 is a pending test-infrastructure reduction candidate. Preserve the root-specific safety check and the refusal to delete an unexpected path; only centralize the already-identical guard and recursive-delete operation.

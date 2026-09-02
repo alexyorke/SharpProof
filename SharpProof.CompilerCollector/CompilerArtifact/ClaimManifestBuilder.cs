@@ -455,7 +455,7 @@ internal sealed partial class ClaimManifestBuilder(
     private IEnumerable<(ISymbol Scope, AttributeData Attribute)> TrustedAttributes(
         IMethodSymbol method)
     {
-        foreach (var scope in SharpProofControlAttributePolicy.EnumerateScopes(method))
+        foreach (var scope in CompilerMethodScopes.Enumerate(method))
         {
             foreach (var attribute in scope.GetAttributes())
             {
