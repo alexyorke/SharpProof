@@ -193,6 +193,7 @@ the smallest relevant containerized test target passes.
 | R431 | Resolve the corpus license fixture from the repository root helper | `SharpProof.Gates.Test`: corpus tests passed |
 | R521 | Share IR factory nullable-type validation | `SharpProof.Ir.Test`: 114 passed |
 | R522 | Cache response hash validity during protocol validation | `SharpProof.Worker.Test`: protocol tests passed |
+| R523 | Reuse the cache filename hexadecimal-digit predicate | `SharpProof.Worker.Test`: 695 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3134,8 +3135,8 @@ unchanged.
 
 ### Status (part seventy-three)
 
-R523 is a `pending` candidate. It is a local predicate reuse and does not alter
-the cache transaction or filename-shape policy.
+R523 is applied and validated by the worker tests. It is a local predicate
+reuse and does not alter the cache transaction or filename-shape policy.
 
 ## Second survey, part seventy-four: R524-R525 - worker claim projection helpers
 

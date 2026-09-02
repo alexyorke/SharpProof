@@ -524,8 +524,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
     {
         return fileName.Length == 64 + CacheFileSuffix.Length &&
             fileName.EndsWith(CacheFileSuffix, StringComparison.Ordinal) &&
-            fileName.Take(64).All(static character =>
-                character is >= '0' and <= '9' or >= 'a' and <= 'f');
+            fileName.Take(64).All(IsHexDigit);
     }
 
     private void ValidatePath(string path)
