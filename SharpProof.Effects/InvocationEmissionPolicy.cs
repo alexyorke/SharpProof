@@ -10,6 +10,8 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
             FrameworkTypeMetadataNames.ConditionalAttribute);
     private readonly Dictionary<SyntaxTree, ImmutableHashSet<string>>
         _definedPreprocessorSymbols = [];
+    private readonly Dictionary<IMethodSymbol, ImmutableArray<string>>
+        _conditionalSymbols = new(SymbolEqualityComparer.Default);
 
     internal bool IsElided(IInvocationOperation invocation)
     {
@@ -25,16 +27,21 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
         {
             return false;
         }
-        var conditionalSymbols = target.GetAttributes()
-            .Where(attribute => SymbolEqualityComparer.Default.Equals(
-                attribute.AttributeClass?.OriginalDefinition,
-                _conditionalAttribute.OriginalDefinition))
-            .Select(attribute =>
-                attribute.ConstructorArguments.Length == 1
-                    ? attribute.ConstructorArguments[0].Value as string
-                    : null)
-            .Where(static symbol => !string.IsNullOrWhiteSpace(symbol))
-            .ToImmutableArray();
+        if (!_conditionalSymbols.TryGetValue(target, out var conditionalSymbols))
+        {
+            conditionalSymbols = target.GetAttributes()
+                .Where(attribute => SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass?.OriginalDefinition,
+                    _conditionalAttribute.OriginalDefinition))
+                .Select(attribute =>
+                    attribute.ConstructorArguments.Length == 1
+                        ? attribute.ConstructorArguments[0].Value as string
+                        : null)
+                .Where(static symbol => !string.IsNullOrWhiteSpace(symbol))
+                .Select(static symbol => symbol!)
+                .ToImmutableArray();
+            _conditionalSymbols.Add(target, conditionalSymbols);
+        }
         if (conditionalSymbols.IsDefaultOrEmpty)
         {
             return false;
@@ -50,7 +57,7 @@ internal sealed class InvocationEmissionPolicy(Compilation compilation)
                 definedSymbols);
         }
         return conditionalSymbols.All(symbol =>
-            !definedSymbols.Contains(symbol!));
+            !definedSymbols.Contains(symbol));
     }
 
     internal static bool IsUnimplementedPartial(IMethodSymbol method)

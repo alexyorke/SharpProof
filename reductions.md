@@ -4393,7 +4393,7 @@ R722 completed: known operation kinds are reflected, deduplicated, and sorted on
 
 | R723 | **`InvocationEmissionPolicy.IsElided` decodes conditional attributes afresh for every invocation of a target.** The normalized target method, its `[Conditional]` symbol names, and the conditional-attribute identity are invariant across calls, but the current path re-enumerates and filters `target.GetAttributes()` for each invocation before consulting the already cached per-tree preprocessor symbols. Add a symbol-keyed conditional-name cache, retaining empty-result caching, reduced-method normalization, and the per-tree symbol lookup. | `SharpProof.Effects/InvocationEmissionPolicy.cs:14-54` |
 
-R723 is a pending conditional-invocation metadata cache reduction candidate. Preserve partial-method elision, malformed conditional attributes, syntax-tree-specific symbol sets, and ordinal symbol matching.
+R723 completed: conditional attribute symbol names are cached by target method (including empty results), preserving reduced-method normalization, malformed-attribute filtering, syntax-tree-specific preprocessor symbols, and ordinal symbol matching.
 
 ## Second survey, part two hundred forty-seven: R724-R725 - the unshared process runner
 
