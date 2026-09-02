@@ -138,6 +138,7 @@ the smallest relevant containerized test target passes.
 | R335 | Reuse one class-level valid input-hash fixture across the three LauncherArgumentTests methods that exercise it | `SharpProof.Package.Test`: LauncherArgumentTests passed |
 | R336 | Share the verification-cache filename suffix between production path generation/validation and worker edge-case fixtures | `SharpProof.Worker.Test`: WorkerTcbEdgeCaseTests 44 passed |
 | R339 | Derive `EnforceExtendedAnalyzerRules=true` centrally for every `IsRoslynAnalyzer` project | Analyzer and generator builds; canonical MSBuild property evaluation passed |
+| R340 | Replace the duplicate fuzz oracle enum with an assembly-wide alias to `SharpProof.Testing.DifferentialStatus` | Fuzz project build; existing Testing differential tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1448,6 +1449,9 @@ maintenance seams rather than style preferences.
   path-validation fixtures.
 - R339 is now applied: `Directory.Build.targets` derives the extended Roslyn
   analyzer rules from each project's existing `IsRoslynAnalyzer` marker.
+- R340 is now applied: the fuzz project keeps its existing `FuzzOracleStatus`
+  source spelling through a compile-wide alias, but the enum type is owned by
+  `SharpProof.Testing`.
 - The repeated `SHARPPROOF_CONTRACTS` string spans the public conditional symbol,
   compilation fingerprinting, and synthetic source fixtures. The fixture copies
   are part of R309, while the fingerprint intentionally has a separate
@@ -1479,7 +1483,6 @@ forwarders across `SharpProof.Testing`, `Tools/SharpProof.Fuzz`, `SharpProof.Bui
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R340 | **`DifferentialStatus` and `FuzzOracleStatus` are identical 3-member public enums declared in adjacent test/fuzz projects.** `SharpProof.Testing/IrCSharpDifferentialOracle.cs:12-17` defines `public enum DifferentialStatus { Agreement, Abstained, Mismatch }` and `Tools/SharpProof.Fuzz/FuzzDifferential.cs:3-8` defines `public enum FuzzOracleStatus { Agreement, Abstained, Mismatch }`. `SharpProof.Fuzz` already references `SharpProof.Testing` via `ProjectReference` in `Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj:23`. `FiniteDomainDifferentialResult` and `PartialTermSmtDifferentialResult` in `SharpProof.Fuzz` can consume `SharpProof.Testing.DifferentialStatus` directly, eliminating `FuzzDifferential.cs` entirely. | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:12-17`; `Tools/SharpProof.Fuzz/FuzzDifferential.cs:3-8`; `Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj:23` |
 | R341 | **24 test and tooling files independently re-parse `TRUSTED_PLATFORM_ASSEMBLIES` because `TestMetadataReferences.cs` is restricted to two test projects.** `eng/testing/TestMetadataReferences.cs` already provides `CreatePlatformReferences()` caching `AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")`, but `Directory.Build.props:83-87` compiles it only into `SharpProof.Contracts.Test` and `SharpProof.Worker.Test`. As a result, 24 test hosts, test fixtures, benchmarks, and fuzzers re-implement the same `AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")` split on `Path.PathSeparator` to create Roslyn metadata references. Hoisting `TestMetadataReferences.cs` to all test projects (`Condition="'$(SharpProofTestProject)' == 'true'"`, matching `TestRepository.cs`) centralizes reference creation across the test suite. | `eng/testing/TestMetadataReferences.cs:16-25`; `Directory.Build.props:83-87`; 24 sites including `SharpProof.Analyzer.Test/AnalyzerTestHost.cs:259`; `SharpProof.ContractForGenerator.Test/GeneratorTestHost.cs:197`; `SharpProof.Effects.Test/EffectTestHost.cs:303`; `SharpProof.Frontend.Test/FrontendLoweringTests.cs:1473`; `SharpProof.Package.Test/BuildTaskTests.cs:1645`; `SharpProof.Specs.Test/ApiSpecTests.cs:1186`; `SharpProof.Testing/IrCSharpDifferentialOracle.cs:584`; `SharpProof.Worker.Test/ExceptionIdentityReplayTests.cs:459`; `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1779` |
 | R342 | **`GeneratedFileHelpers.ps1` declares duplicate function pairs within itself and is bypassed by generator-local re-declarations.** Within `GeneratedFileHelpers.ps1`, `Get-RequiredMember` (lines 3-17) and `Required` (lines 119-127) are identical; `Assert-Identifier` (lines 99-107) and `Identifier` (lines 129-136) are identical regex guards; `Assert-TypeName` (lines 109-117) and `TypeName` (lines 138-145) are identical; `Assert-EnumName` (lines 74-77) is an alias for `Assert-EnumValue`; and `Assert-CSharpIdentifier` (lines 94-97) is an alias for `Assert-PascalCaseIdentifier`. Furthermore, `Generate-IrModel.ps1:23-70` dot-sources `GeneratedFileHelpers.ps1` but re-defines `Get-OptionalArray` (identical to `Get-MemberArray`), `Get-OptionalString`, and `Get-OptionalBoolean` locally. | `scripts/GeneratedFileHelpers.ps1:3-17,74-97,99-145`; `scripts/Generate-IrModel.ps1:23-70` |
 | R343 | **The 15 portable and 7 collector analyzer dependency DLL lists are duplicated in full across three MSBuild entry points.** `SharpProof.Package/buildTransitive/SharpProof.targets:22-56`, `SharpProof.AnalyzerConsumer.props:34-65`, and `eng/self-application/SharpProof.SelfApplication.props:49-67` each enumerate the identical 15 portable analyzer dependency assemblies (`SharpProof.Analyzer.Core.dll`, `SharpProof.Contracts.dll`, `SharpProof.Dataflow.dll`, `SharpProof.Effects.dll`, `SharpProof.Frontend.dll`, `SharpProof.Ir.dll`, `SharpProof.Specs.dll`, plus 8 `System.*` assemblies) and the identical 7 collector dependencies (`Microsoft.Bcl.AsyncInterfaces.dll`, `SharpProof.CompilerArtifact.dll`, `SharpProof.Summaries.dll`, `SharpProof.Worker.Protocol.dll`, `System.IO.Pipelines.dll`, `System.Text.Encodings.Web.dll`, `System.Text.Json.dll`). A shared item definition or props fragment would ensure all three entrypoints resolve the identical dependency closure without drifting when Roslyn dependencies are updated. | `SharpProof.Package/buildTransitive/SharpProof.targets:22-56`; `SharpProof.AnalyzerConsumer.props:34-65`; `eng/self-application/SharpProof.SelfApplication.props:49-67` |
@@ -1506,7 +1509,7 @@ forwarders across `SharpProof.Testing`, `Tools/SharpProof.Fuzz`, `SharpProof.Bui
 
 ### Status (part twenty-seven)
 
-R340-R349 are `pending`. R340, R345, R347, R348, and R349 are low-risk, mechanical
+R341-R349 are `pending`. R345, R347, R348, and R349 are low-risk, mechanical
 reductions. R341 and R343 reduce substantial build/test configuration duplication
 across multiple entrypoints. R344 and R346 harmonize path resolution and cryptographic
 hashing between build tasks and protocol serialization.
@@ -2900,3 +2903,61 @@ no lines. It is filed because six suppressions of one rule family, in two
 combinations, with no comments and only one participating project, is more likely
 to be accumulated drift than a considered position, and R273 already found the
 tracking gap from the other direction.
+
+## Second survey, part sixty-seven: R507-R511 - metadata, source locations, and lowering scaffolds
+
+| R507 | **Two metadata readers independently decode a custom attribute's declaring type.** `ApiSpecResolution.IsAttribute` switches over `MemberReference`/`MethodDefinition`, obtains the parent or declaring type, then switches over `TypeReference`/`TypeDefinition` to compare namespace and name. `SharpProofAnalyzerEngine.IsClosedContractAttribute` repeats the same four-handle cases and string extraction; only the final name predicate differs. A small shared metadata helper that resolves the attribute type identity can preserve each caller's fail-closed behavior and matching policy while removing a fragile copy of the ECMA metadata walk. | `SharpProof.Effects/ApiSpecResolution.cs:304-329`; `SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs:523-563` |
+| R508 | **Compiler and diagnostic paths each rebuild `WorkerSourceLocation` from a Roslyn `Location`.** `ClaimManifestBuilder.ToSourceLocation` and `CompilerManifestArtifactProducer.CreateDiagnostic` independently obtain the mapped line span, select a path, and copy source start/length plus one-based line/column into the same protocol model. Their edge policies differ - the manifest builder uses a compiler-generated fallback and remembers a syntax-tree ordinal, while diagnostics reject a source location with no path and bind it afterward - so a shared conversion core with explicit caller policy would reduce field-mapping drift without erasing those distinctions. | `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs:679-707`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:203-229` |
+| R509 | **`CallableClaimResultAssembler` repeats the assumption-evidence projection in three result paths.** `FromOutcome`, `Create`, and `MarkAssumptionsUsed` each enumerate `target.Entry.Assumptions` and construct a fresh `WorkerAssumptionEvidence` with the same `Id` and `Kind`; only the `Used` expression changes (user-assumption membership, existing evidence state, or OR with a supplied set). A shared projector accepting the used-state selector can centralize the protocol-object construction while retaining the three deliberately different usage policies. | `SharpProof.Worker/CallableClaimResultAssembler.cs:66-71,114-135` |
+| R510 | **Assignment effect scanning repeats the same completion-and-commit scaffold across three forms.** `ScanSimpleAssignment`, `ScanReadModifyWrite`, and `ScanCoalesceAssignment` each accumulate an `EffectStep`, return its summary when an intermediate step cannot complete normally, and finally emit `ScanWriteTarget`; the middle operation differs (value, read-modify-write operation, or nullable-flow proof), but the surrounding early-return and write-commit protocol is copied. A narrow helper for sequencing a completing step and committing a write could remove this accidental control-flow complexity while keeping ref-assignment, operator, and coalesce-specific semantics outside the helper. | `SharpProof.Effects/OperationEffectScanner.Assignments.cs:49-69,198-255` |
+| R511 | **Four Roslyn reference visitors repeat the supported-domain/opaque-fallback branch.** `VisitParameterReference`, `VisitFlowCaptureReference`, and `VisitInstanceReference` each test `IsSupportedValueDomain(operation.Type)` and otherwise create an `Opaque` expression with `UnsupportedType`; `VisitLocalReference` performs the same branch after its separate `RefKind` mutation guard. A shared `LowerSupportedReference` helper taking the exact-value factory can own this repeated gate while preserving the distinct variable, capture, and instance lookups and the local mutation rejection. | `SharpProof.Frontend/RoslynOperationLowerer.cs:565-620` |
+
+### Status (part sixty-seven)
+
+R507-R511 are `pending` reduction candidates. They are intentionally framed as
+small shared cores or sequencing helpers: the metadata callers retain their
+different predicates, source-location callers retain their different fallback
+and binding policies, and the effect/lowering callers retain their
+operation-specific semantics.
+
+
+## Second survey, part sixty-seven: coverage configuration - no findings
+
+Cross-checking the coverage baseline and runsettings against the project set.
+No new finding; three applied items confirmed, and one earlier conclusion
+strengthened.
+
+### Checked and not proposed (part sixty-seven)
+
+- **The coverage baseline exactly matches the production classification.** All 23
+  entries in `eng/coverage/baseline.json` resolve to tracked projects, **no**
+  production-classified project is missing from it, and **no** production-excluded
+  project appears in it. Those are two independently maintained lists - the
+  `SharpProofProductionProject` regex in `Directory.Build.props` and the baseline's
+  `projects` map - and they agree perfectly. `declarationOnlyTcbFiles` names one
+  file, `SharpProof.Analyzer.Core/EffectEvaluationTypes.cs`, which exists.
+- **Applied R232 is reflected here.** The production-exclusion regex now names
+  five projects (`Testing`, `Package`, `Verifier`, `Smoke.Net472`,
+  `CompilerProbe.TestAsset`) rather than six; `PortableAnalyzer` is gone, and the
+  coverage baseline's contents are consistent with the five-project form.
+- **Applied R237 was carried out completely, including its consumers.** The three
+  runsettings files are now one, `SharpProof.Managed.runsettings`, with the
+  isolated selectors generated from it. Crucially the *consumer* was removed too:
+  `Get-CoverageExtraProjectNames` in `Get-SharpProofProductionInventory.ps1`,
+  which read `eng/coverage/SharpProof.Gates.runsettings` directly, no longer
+  exists. Had it been left behind it would have thrown on a missing file - the
+  exact shape of R480.
+- **This strengthens the R480 conclusion.** Part fifty-four swept eleven applied
+  removals of named literals and found one orphaned assertion. R237 is a twelfth
+  case, and it too was handled correctly: files removed, consuming function
+  removed, and `ArchitectureTests.cs:1828` now asserts
+  `Does.Not.Contain("SharpProof.Gates.runsettings")` as an absence guard. That is
+  the fourth applied removal confirmed to use the absence-guard pattern, after
+  R231, R232, and R245. R480 remains the single exception across twelve checked
+  removals, not the leading edge of a pattern.
+
+### Status (part sixty-seven)
+
+No new `pending` item. Recorded to close the coverage-configuration area and to
+add a twelfth data point to the applied-removal audit begun in part forty-nine and
+continued in part fifty-four.

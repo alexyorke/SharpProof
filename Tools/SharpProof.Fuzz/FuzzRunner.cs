@@ -1,3 +1,5 @@
+global using FuzzOracleStatus = SharpProof.Testing.DifferentialStatus;
+
 using System.Collections.Immutable;
 using SharpProof.Ir;
 using SharpProof.Testing;
