@@ -6603,3 +6603,26 @@ R814 is `deferred`: the inventory is normally small and combining builders
   would add coordination to `BuildTarget`. It is a reasonable cleanup if the
   builder gains more clause-derived candidate kinds or profiling shows the
   repeated walk in large compilations.
+
+## Second survey, part three hundred twenty-six: R815 - duplicated syntax-tree preflight traversal
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R815 | **`CompilerCompilationCapture.Capture` traverses every syntax tree once for resolver-directive rejection and again for capture.** The preflight `compilation.SyntaxTrees.Any(tree => HasResolverDirective(...))` obtains each tree's root and descends into all trivia; after that succeeds, `CaptureTrees` walks the same tree collection and `CaptureTree` reads text, line mappings, parse options, symbols, and features. The syntax-tree cache avoids rebuilding the snapshot on later captures but does not avoid the resolver-directive traversal, so repeated capture calls pay the preflight cost every time. A capture pass that records the unsupported-directive fact while constructing each snapshot, or a cache entry that includes the preflight result, can preserve fail-closed rejection while avoiding a second tree walk. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:90-112,45-56,170-229,516-520` |
+
+### Checked and not proposed (part three hundred twenty-six)
+
+- Resolver-directive rejection remains an explicit security/compatibility gate;
+  the candidate does not allow `#load` or `#r` merely to avoid a traversal.
+- Line-map, text, parse-option, preprocessor, and feature capture remain the
+  independent snapshot projections required by the compilation fingerprint.
+- Any cache result must account for cancellation and the compilation identity;
+  a process-global directive flag detached from the cached syntax trees would
+  be an unsafe shortcut.
+
+### Status (part three hundred twenty-six)
+
+R815 is `deferred`: one capture normally builds one cache entry and the
+preflight is bounded by source size. It is a plausible cleanup for repeated
+capture or large generated compilations, provided the unsupported-directive
+decision remains fail-closed.
