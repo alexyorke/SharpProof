@@ -4193,14 +4193,6 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred eighty-one: R640 - skeletal snapshot adapter
-
-| R640 | **`CompilerEffectReplayLowerer.TryResolveSource` allocates a skeletal compilation snapshot solely to call a syntax-tree lookup.** After obtaining the cached `CompilerSyntaxTreeSnapshot[]`, it creates `new CompilerCompilationSnapshot { SyntaxTrees = capturedTrees }` and passes that object to `CompilerSourceLocationAuthority.FindUniqueTree`; the authority reads no other snapshot field. A narrow overload accepting the captured tree collection, or a source-tree resolver that takes the collection directly, removes this per-replay adapter object while retaining the authority's remembered-ordinal fast path, geometry checks, and ambiguity rejection. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:418-433`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:108-142` |
-
-### Status (part one hundred eighty-one)
-
-R640 is a pending replay-source allocation/adapter reduction candidate. Preserve unique-tree resolution, cancellation, remembered-tree validation, and the distinction between operation-tree and source-tree identities; remove only the wrapper created to satisfy the current parameter shape.
-
 ## Second survey, part one hundred eighty-two: R641 - repeated source-tree hashing
 
 | R641 | **`CompilerRelationalSummaryProvider.CreateAuthority` rehashes a source tree already captured for the same compilation.** `CompilerManifestArtifactProducer.Create` captures all syntax trees before lowering, and `CompilerCompilationCapture.CaptureTree` computes each tree's full-text SHA. Later, for every source summary authority, `CreateAuthority` calls `declaration.SyntaxTree.GetText` and `CompilerCompilationCapture.ComputeTextSha256` again for the same full tree, even though the authority only needs the captured tree hash. Passing the captured snapshot/tree-hash lookup into the provider, or reusing the capture cache, removes repeated text materialization and SHA-256 work while keeping the declaration-span evidence hash separate. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:14-18,45-58`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:204-215`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:351-389` |

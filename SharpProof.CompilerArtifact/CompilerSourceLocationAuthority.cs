@@ -110,22 +110,33 @@ internal static class CompilerSourceLocationAuthority
         CompilerCompilationSnapshot? compilation,
         CancellationToken cancellationToken = default)
     {
-        if (location == null || compilation is not { SyntaxTrees: not null })
+        return FindUniqueTree(
+            location,
+            compilation?.SyntaxTrees,
+            cancellationToken);
+    }
+
+    internal static int FindUniqueTree(
+        WorkerSourceLocation? location,
+        CompilerSyntaxTreeSnapshot[]? syntaxTrees,
+        CancellationToken cancellationToken = default)
+    {
+        if (location == null || syntaxTrees == null)
         {
             return -1;
         }
 
         var ordinal = -1;
         var remembered = RememberedTree(location);
-        if (remembered >= 0 && remembered < compilation.SyntaxTrees.Length &&
-            HasValidLocationGeometry(location, compilation.SyntaxTrees[remembered], cancellationToken))
+        if (remembered >= 0 && remembered < syntaxTrees.Length &&
+            HasValidLocationGeometry(location, syntaxTrees[remembered], cancellationToken))
         {
             return remembered;
         }
-        for (var index = 0; index < compilation.SyntaxTrees.Length; index++)
+        for (var index = 0; index < syntaxTrees.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var tree = compilation.SyntaxTrees[index];
+            var tree = syntaxTrees[index];
             if (tree == null || !HasValidLocationGeometry(location, tree, cancellationToken))
             {
                 continue;

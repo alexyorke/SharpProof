@@ -429,7 +429,7 @@ internal static class CompilerEffectReplayLowerer
         sourceLineMapSha256 = string.Empty;
         sourceTreeOrdinal = CompilerSourceLocationAuthority.FindUniqueTree(
             location,
-            new CompilerCompilationSnapshot { SyntaxTrees = capturedTrees },
+            capturedTrees,
             cancellationToken);
         if (sourceTreeOrdinal < 0)
         {
