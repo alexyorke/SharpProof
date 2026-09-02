@@ -40,7 +40,17 @@ public sealed class ContractForValidatorGeneratorTests
     [TestCase("double", "0.0", "-0.0")]
     [TestCase("float", "-0.0f", "0.0f")]
     [TestCase("float", "0.0f", "-0.0f")]
-    public void FloatingDefaultBitsMustMatchExactly(
+    [TestCase("decimal", "1.0m", "1.00m")]
+    [TestCase("decimal", "1.00m", "1.0m")]
+    [TestCase("int", "1", "2")]
+    [TestCase("bool", "true", "false")]
+    [TestCase("string", "\"left\"", "\"right\"")]
+    [TestCase("string", "null", "\"value\"")]
+    [TestCase(
+        "System.DayOfWeek",
+        "System.DayOfWeek.Monday",
+        "System.DayOfWeek.Tuesday")]
+    public void DefaultValuesMustMatchExactly(
         string type,
         string targetDefault,
         string companionDefault)
@@ -65,9 +75,18 @@ public sealed class ContractForValidatorGeneratorTests
             Is.EqualTo(["SPCF0005"]));
     }
 
-    [TestCase("1.0m", "1.00m")]
-    [TestCase("1.00m", "1.0m")]
-    public void DecimalDefaultRepresentationMustMatchExactly(
+    [TestCase("double", "0.0", "0.0")]
+    [TestCase("double", "-0.0", "-0.0")]
+    [TestCase("float", "0.0f", "0.0f")]
+    [TestCase("float", "-0.0f", "-0.0f")]
+    [TestCase("double", "double.NaN", "double.NaN")]
+    [TestCase("double", "double.PositiveInfinity", "double.PositiveInfinity")]
+    [TestCase("double", "double.NegativeInfinity", "double.NegativeInfinity")]
+    [TestCase("double", "1.25", "1.25")]
+    [TestCase("float", "-3.5f", "-3.5f")]
+    [TestCase("double", "double.NaN", "-double.NaN")]
+    public void EqualFloatingDefaultsRemainExact(
+        string type,
         string targetDefault,
         string companionDefault)
     {
@@ -75,67 +94,13 @@ public sealed class ContractForValidatorGeneratorTests
             $$"""
             using SharpProof.Attributes;
             public interface ITarget {
-                void Read(decimal value = {{targetDefault}});
+                void Read({{type}} value = {{targetDefault}});
             }
             [ContractFor(typeof(ITarget))]
             public static class TargetContracts {
                 public static void Read(
                     ITarget receiver,
-                    decimal value = {{companionDefault}}) {
-                }
-            }
-            """);
-
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0005"]));
-    }
-
-    [TestCase("double", "0.0")]
-    [TestCase("double", "-0.0")]
-    [TestCase("float", "0.0f")]
-    [TestCase("float", "-0.0f")]
-    [TestCase("double", "double.NaN")]
-    [TestCase("double", "double.PositiveInfinity")]
-    [TestCase("double", "double.NegativeInfinity")]
-    [TestCase("double", "1.25")]
-    [TestCase("float", "-3.5f")]
-    public void EqualFloatingDefaultsRemainExact(
-        string type,
-        string value)
-    {
-        var run = Run(
-            $$"""
-            using SharpProof.Attributes;
-            public interface ITarget {
-                void Read({{type}} value = {{value}});
-            }
-            [ContractFor(typeof(ITarget))]
-            public static class TargetContracts {
-                public static void Read(
-                    ITarget receiver,
-                    {{type}} value = {{value}}) {
-                }
-            }
-            """);
-
-        Assert.That(run.Diagnostics, Is.Empty);
-    }
-
-    [Test]
-    public void CompilerNormalizedNaNSignDefaultsMatch()
-    {
-        var run = Run(
-            """
-            using SharpProof.Attributes;
-            public interface ITarget {
-                void Read(double value = double.NaN);
-            }
-            [ContractFor(typeof(ITarget))]
-            public static class TargetContracts {
-                public static void Read(
-                    ITarget receiver,
-                    double value = -double.NaN) {
+                    {{type}} value = {{companionDefault}}) {
                 }
             }
             """);
@@ -194,39 +159,6 @@ public sealed class ContractForValidatorGeneratorTests
             """));
 
         Assert.That(GeneratorTestHost.Run(compilation).Diagnostics, Is.Empty);
-    }
-
-    [TestCase("int", "1", "2")]
-    [TestCase("bool", "true", "false")]
-    [TestCase("string", "\"left\"", "\"right\"")]
-    [TestCase("string", "null", "\"value\"")]
-    [TestCase(
-        "System.DayOfWeek",
-        "System.DayOfWeek.Monday",
-        "System.DayOfWeek.Tuesday")]
-    public void NonFloatingDefaultsRemainExact(
-        string type,
-        string targetDefault,
-        string companionDefault)
-    {
-        var run = Run(
-            $$"""
-            using SharpProof.Attributes;
-            public interface ITarget {
-                void Read({{type}} value = {{targetDefault}});
-            }
-            [ContractFor(typeof(ITarget))]
-            public static class TargetContracts {
-                public static void Read(
-                    ITarget receiver,
-                    {{type}} value = {{companionDefault}}) {
-                }
-            }
-            """);
-
-        Assert.That(
-            run.Diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0005"]));
     }
 
     [Test]
