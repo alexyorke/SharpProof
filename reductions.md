@@ -1810,8 +1810,9 @@ lattice joins, graph representations, and fixpoint solvers in `SharpProof.Datafl
 
 ### Status (part thirty-two continued)
 
-R375, R377-R379 are `pending`. R378 is a direct local simplification but needs
-an `IsExternalInit` compatibility decision for the netstandard2.0 project.
+R375, R377, and R379 are `pending`. R378 is deferred: the primary-constructor
+form requires an `IsExternalInit` compatibility shim in the netstandard2.0
+project, which would add more infrastructure than the boilerplate removes.
 R375 and R377 generalize abstract domain hierarchy contracts. R379 optimizes fixpoint solver throughput.
 
 ## Second survey, part thirty-three: R380-R385
