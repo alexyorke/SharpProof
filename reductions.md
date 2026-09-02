@@ -7225,3 +7225,24 @@ R840 is `deferred`: the pass counter is logically implied by successful script
 R841 is `deferred`: the duplicate check is cheap for the small release
   manifest, but the helper contract can be simplified without weakening its
   structural validation.
+
+## Second survey, part three hundred fifty-three: R842 - dictionary used only as a pilot-review identity set
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R842 | **`Complete-SharpProofPilotReview.ps1` stores unused values in its expected-identity map.** The `$expected` dictionary is populated with `$pilotId` for every claim and diagnostic key, but all subsequent reads test only `$expected.ContainsKey($key)`; no stored value is retrieved. A `HashSet[string]` would represent the actual set-membership contract and avoid carrying a value that cannot affect validation, while the separate `$seen` set can continue tracking reviewed rows. | `scripts/Complete-SharpProofPilotReview.ps1:71-88,90-109` |
+
+### Checked and not proposed (part three hundred fifty-three)
+
+- `$seen` remains a separate set because it tracks ledger rows and must detect
+  duplicate reviews independently of source-identity construction.
+- `$falsePositives` is not part of this candidate: its dictionary values are
+  read as per-pilot counters when producing the reviewed report.
+- The composite identity keys and exact coverage check remain necessary; only
+  the unused value payload of `$expected` is redundant.
+
+### Status (part three hundred fifty-three)
+
+R842 is `deferred`: the value payload is unused and a set is clearer, but the
+  current dictionary behavior is correct and the cleanup is limited to an
+  internal validation data structure.
