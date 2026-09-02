@@ -1221,17 +1221,9 @@ public sealed class FrontendDifferentialOracle
         var environment = new Dictionary<IrVarId, IrValue>();
         var sequenceOrigins = new Dictionary<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
-        foreach (var binding in lowering.Variables)
+        foreach (var (variable, ordinal) in ParameterBindings(method, lowering))
         {
-            if (binding.Symbol is not IParameterSymbol parameter ||
-                !SymbolEqualityComparer.Default.Equals(
-                    parameter.ContainingSymbol,
-                    method))
-            {
-                continue;
-            }
-
-            var value = parameter.Ordinal switch
+            var value = ordinal switch
             {
                 0 => factory.CreateIntegerValue(generated.Left),
                 1 => factory.CreateIntegerValue(generated.Right),
@@ -1241,9 +1233,9 @@ public sealed class FrontendDifferentialOracle
                     : factory.CreateStringValue(generated.Text),
                 4 => generated.Values == null
                     ? factory.CreateNullValue(
-                        factory.GetVariableInfo(binding.Variable).Type)
+                        factory.GetVariableInfo(variable).Type)
                     : CreateSequenceValue(
-                        factory.GetVariableInfo(binding.Variable).Type,
+                        factory.GetVariableInfo(variable).Type,
                         generated.Values),
                 5 => generated.Reference == null
                     ? factory.CreateNullValue(factory.ObjectType)
@@ -1253,7 +1245,7 @@ public sealed class FrontendDifferentialOracle
                 _ => throw new InvalidOperationException(
                     "The generated method has an unexpected parameter.")
             };
-            environment.Add(binding.Variable, value);
+            environment.Add(variable, value);
         }
         return (environment, sequenceOrigins);
 
@@ -1372,27 +1364,35 @@ public sealed class FrontendDifferentialOracle
             ReferenceEqualityComparer.Instance);
         var sequenceOrigins = new Dictionary<IrValue, Array>(
             ReferenceEqualityComparer.Instance);
-        foreach (var binding in lowering.Variables)
+        foreach (var (variable, ordinal) in ParameterBindings(method, lowering))
         {
-            if (binding.Symbol is not IParameterSymbol parameter ||
-                !SymbolEqualityComparer.Default.Equals(
-                    parameter.ContainingSymbol,
-                    method))
-            {
-                continue;
-            }
-
-            var type = factory.GetVariableInfo(binding.Variable).Type;
+            var type = factory.GetVariableInfo(variable).Type;
             environment.Add(
-                binding.Variable,
+                variable,
                 CreateSemanticEdgeValue(
                     factory,
                     type,
-                    arguments[parameter.Ordinal],
+                    arguments[ordinal],
                     sequenceValues,
                     sequenceOrigins));
         }
         return (environment, sequenceOrigins);
+    }
+
+    private static IEnumerable<(IrVarId Variable, int Ordinal)> ParameterBindings(
+        IMethodSymbol method,
+        FrontendLoweringResult lowering)
+    {
+        foreach (var binding in lowering.Variables)
+        {
+            if (binding.Symbol is IParameterSymbol parameter &&
+                SymbolEqualityComparer.Default.Equals(
+                    parameter.ContainingSymbol,
+                    method))
+            {
+                yield return (binding.Variable, parameter.Ordinal);
+            }
+        }
     }
 
     private static IrValue CreateSemanticEdgeValue(

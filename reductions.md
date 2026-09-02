@@ -176,6 +176,7 @@ the smallest relevant containerized test target passes.
 | R592 | Merge duplicate differential type projection finding into R546 | `SharpProof.Testing.Test`: IrCSharpDifferentialOracleTests, 11 passed |
 | R591 | Replace recursive differential-oracle term collection with an explicit stack | `SharpProof.Testing.Test`: IrCSharpDifferentialOracleTests, 11 passed |
 | R597 | Reuse the shrinker’s existing strict-size candidate gate | `SharpProof.Fuzz.Test`: FuzzRunnerTests, 32 passed |
+| R598 | Share frontend fuzz parameter binding traversal | `SharpProof.Fuzz.Test`: FrontendSemanticEdgeCaseTests 7; FuzzRunnerTests 32 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3967,7 +3968,9 @@ candidate's structural size, preserving candidate ordering and deduplication.
 
 ### Status (part one hundred thirty-nine)
 
-R598 is a pending frontend-fuzzing infrastructure reduction candidate. Preserve the generated-case slot mapping, arbitrary argument conversion, sequence-origin tracking, and parameter-containing-symbol check; centralize only the common binding traversal.
+R598 is `applied`: ordinary and semantic-edge fuzz environments now share one
+parameter-symbol/ordinal traversal while retaining their distinct value
+conversion and sequence-origin policies.
 
 ## Second survey, part one hundred forty: R599 - duplicate architecture-test relative-path helper
 
@@ -7631,4 +7634,21 @@ for variable membership, removing a test-only IR-kind traversal.
 ### Status (part three hundred sixty-nine)
 
 R859 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred seventy: R860 - repeated OSS target identity scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R860 | **`OpenSourceCorpusRunner` linearly searches the OSS manifest twice for every instrumented method.** While rebuilding targets, each annotation ID is resolved with `document.Methods.Single(...)`; after analysis, each manifest method searches `targets.Values.Single(...)` to recover the same `TargetInfo` by that ID. With the catalog's contiguous unique-ID validation already established, these are repeated O(n) scans over roughly 200 entries per method, and the second scan also walks a dictionary's values rather than using its key. A method-ID dictionary and an ID-keyed target index can preserve the existing syntax-tree/start keyed map required by `RecordingSessionFactory` while making both lookups direct and making the one-to-one target invariant explicit. | `SharpProof.Gates/Corpus/OpenSourceCorpusRunner.cs:38-45,77-139`; `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:189-200` |
+
+### Checked and not proposed (part three hundred seventy)
+
+- R860 is distinct from R465, which covers duplicated descriptor lookup loops, and R715, which covers a pattern-local duplicate search with symbol-equality semantics. This finding is the same-method identity indexing seam in the OSS corpus runner.
+- The syntax-tree/start `TargetKey` map should remain because analyzer callbacks identify declarations through their syntax references; the proposed ID index is an additional projection for the later manifest-ordered observation pass.
+- `Single` still has value as an invariant check during construction. The reduction can retain explicit duplicate/missing-target validation while avoiding repeated successful scans after the manifest has already been validated.
+
+### Status (part three hundred seventy)
+
+R860 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
