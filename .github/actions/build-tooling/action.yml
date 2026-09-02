@@ -1,30 +1,9 @@
 name: Build canonical SharpProof tooling image
-description: Build the pinned Linux amd64 image with a shared GitHub Actions cache.
+description: Build the same pinned Linux amd64 image used by local development.
 
 runs:
   using: composite
   steps:
     - name: Build and load the canonical image
       shell: bash
-      run: |
-        set -euo pipefail
-        image="sharpproof-tooling:${GITHUB_SHA}"
-        builder="sharpproof-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${RANDOM}"
-        docker buildx create \
-          --name "${builder}" \
-          --driver docker-container \
-          --use >/dev/null
-        trap 'docker buildx rm "${builder}" >/dev/null 2>&1 || true' EXIT
-        docker buildx inspect --bootstrap >/dev/null
-        echo "SHARPPROOF_TOOLING_IMAGE=${image}" >> "${GITHUB_ENV}"
-        docker buildx build \
-          --platform linux/amd64 \
-          --target dev \
-          --build-arg "USER_UID=$(id -u)" \
-          --build-arg "USER_GID=$(id -g)" \
-          --cache-from type=gha,scope=sharpproof-tooling \
-          --cache-to type=gha,mode=max,scope=sharpproof-tooling \
-          --load \
-          --tag "${image}" \
-          --file eng/container/Dockerfile \
-          .
+      run: docker compose build tooling

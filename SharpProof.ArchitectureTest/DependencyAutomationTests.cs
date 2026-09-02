@@ -275,6 +275,12 @@ public sealed class DependencyAutomationTests
             "eng",
             "container",
             "Dockerfile"));
+        var buildAction = File.ReadAllText(Path.Combine(
+            root,
+            ".github",
+            "actions",
+            "build-tooling",
+            "action.yml"));
 
         using (Assert.EnterMultipleScope())
         {
@@ -289,6 +295,10 @@ public sealed class DependencyAutomationTests
             Assert.That(
                 workflows,
                 Does.Contain("uses: ./.github/actions/build-tooling"));
+            Assert.That(
+                buildAction,
+                Does.Contain("docker compose build tooling")
+                    .And.Not.Contain("docker buildx"));
             Assert.That(dockerfile, Does.Contain("DOTNET_SDK_IMAGE="));
             Assert.That(dockerfile, Does.Contain("DOTNET_MINIMUM_SDK_IMAGE="));
             Assert.That(

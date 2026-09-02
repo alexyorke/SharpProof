@@ -165,8 +165,8 @@ for repository development and verifier qualification. The pinned image
 contains the required SDK, Roslyn, PowerShell, and native solver payload.
 
 Use the same named profiles locally and in CI. With PowerShell 7 available,
-the optional wrapper builds the pinned tooling image when it is missing, then
-runs the command in an isolated Linux amd64 workspace:
+the optional wrapper runs the cached Compose build, then executes the command
+in an isolated Linux amd64 workspace:
 
 ~~~text
 ./build.ps1 quick                # changed tests for the edit loop
@@ -177,9 +177,8 @@ runs the command in an isolated Linux amd64 workspace:
 
 CI invokes the matching `tooling pr`, `tooling nightly`, `tooling security`,
 and `tooling coverage` container commands. Without host PowerShell, run the
-same profile directly, for example `docker compose run --rm tooling pr`.
-Use `-RebuildImage` with the wrapper, or `docker compose build tooling`, after
-changing the Dockerfile or pinned toolchain.
+same two commands directly: `docker compose build tooling`, followed by, for
+example, `docker compose run --rm tooling pr`.
 
 The package-backed sample matrix exercises passing, diagnostic, mixed-outcome,
 strict-library, and host-rejection consumers:

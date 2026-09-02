@@ -20,9 +20,7 @@ param(
 
     [string]$ComparisonRef = '',
 
-    [switch]$Fast,
-
-    [switch]$RebuildImage
+    [switch]$Fast
 )
 
 $ErrorActionPreference = 'Stop'
@@ -38,17 +36,9 @@ function Invoke-Docker([string[]]$Arguments) {
     }
 }
 
-function Initialize-ToolingImage {
+function Build-ToolingImage {
     Invoke-Docker @('compose', 'version', '--short')
-    $image = @(& docker compose config --images | Select-Object -First 1)[0]
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($image)) {
-        throw 'docker compose could not resolve the tooling image.'
-    }
-
-    & docker image inspect $image *> $null
-    if ($RebuildImage -or $LASTEXITCODE -ne 0) {
-        Invoke-Docker @('compose', 'build', 'tooling')
-    }
+    Invoke-Docker @('compose', 'build', 'tooling')
 }
 
 function Invoke-Container(
@@ -68,7 +58,7 @@ function Invoke-Container(
     Invoke-Docker $arguments
 }
 
-Initialize-ToolingImage
+Build-ToolingImage
 
 switch ($Profile) {
     'quick' {

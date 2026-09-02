@@ -35,9 +35,9 @@ terminal and editor server run as the non-root `sharpproof` user.
 ## Run the same profiles as CI
 
 From a host checkout with PowerShell 7, `build.ps1` is the convenient
-finite-task entrypoint. It finds or builds the pinned image and invokes the
-same container commands used by GitHub Actions. The coverage profile also
-uses host Git to resolve its comparison ref to an exact commit:
+finite-task entrypoint. It runs the cached Compose build and invokes the same
+container commands used by GitHub Actions. The coverage profile also uses host
+Git to resolve its comparison ref to an exact commit:
 
 ```powershell
 ./build.ps1 quick
