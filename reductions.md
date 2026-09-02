@@ -154,6 +154,7 @@ status document.
 | R216 | Rejected after implementation: the all-unknown helper adds ten formatted lines. |
 | R057 | Refuted against the current tree: only three tests retain the single-invocation shape; the remaining flow tests select distinct operations or assert graph-specific state. |
 | R204 | Rejected by canonical pack validation: removing the project-side `PackageId` changes restore identity, causing the locked Verifier dependency graph to fail with NU1004 before packing. |
+| R299 | Refuted against the current tree: the contract now pins the 248-entry mutation catalog, the registration script checks that count before execution, and checksum identity was intentionally removed from the package/inventory pipeline. |
 
 ## Deferred
 
@@ -700,11 +701,10 @@ evidence is, but it should be fixed rather than queued.
 
 ### Status (part eight)
 
-R299 should leave this ledger and become a fix: the contract and the catalog
-disagree today, and the branch cannot pass its own mutation gate until one of
-them moves. The reduction-shaped part of it - adding a static catalog-identity
-assertion so the two cannot silently diverge again - is worth doing at the same
-time. R300 is `pending` and is the documentation half of the same problem.
+R299 is refuted on the current tree: its stale 261-entry and SHA-256 claims
+describe the pre-checksum-removal state, while the live registration count and
+contract agree at 248 and the count assertion already runs before a campaign.
+R300 is applied in the active status document.
 
 ## Second survey, part nine: R301-R302
 
