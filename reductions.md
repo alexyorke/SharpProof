@@ -122,6 +122,7 @@ the smallest relevant containerized test target passes.
 | R266 | Remove the undefined `SHARPPROOF_PORTABLE_ARGUMENT_GUARD` preprocessor term | Ir.Test: 114; Dataflow.Test: 50; Smt.Test: 30 |
 | R267 | Forward the duplicate `ArgumentNullGuard` `int` overloads to their `long` implementations | Ir.Test: 114; Dataflow.Test: 50; Smt.Test: 30 |
 | R268 | Consolidate residual generator schema-reading helpers in `GeneratedFileHelpers.ps1`, retaining compatibility wrappers and schema-specific validators | Five generator `-Verify` checks; `test-changed`: ArchitectureTest 389 and 36 package shards passed |
+| R289 | Replace the private ordinal string-sequence helper with framework `SequenceEqual` | `Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R297 | Reuse the shared `DictionaryAnalyzerConfigOptions` in `FinalCompilationCollectorTests` and remove its duplicate private options class | `SharpProof.Analyzer.Test`: 476 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
@@ -532,7 +533,8 @@ observation rather than a reduction, and is filed as such.
 
 ### Status (part four)
 
-R285, R286, R288, and R289 are `pending`. R287 is not a reduction and should not
+R285, R286, and R288 are `pending`. Applied R289 replaces the private sequence
+helper with the ordinal framework comparer. R287 is not a reduction and should not
 be treated as one: it is a possible soundness inconsistency between four
 predicates that answer the same question, and merging them would change analysis
 verdicts. It belongs to an owner of the abstract-value semantics, under the same

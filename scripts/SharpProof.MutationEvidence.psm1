@@ -232,27 +232,6 @@ function Get-OrdinalSortedUniqueStrings {
     return $sorted.ToArray()
 }
 
-function Test-OrdinalStringSequenceEqual {
-    param(
-        [AllowEmptyCollection()]
-        [string[]]$Left,
-
-        [AllowEmptyCollection()]
-        [string[]]$Right
-    )
-
-    if (@($Left).Count -ne @($Right).Count) {
-        return $false
-    }
-    for ($index = 0; $index -lt @($Left).Count; $index++) {
-        if (-not [StringComparer]::Ordinal.Equals(
-                $Left[$index], $Right[$index])) {
-            return $false
-        }
-    }
-    return $true
-}
-
 function Read-SharpProofMutationTestEvidence {
     param(
         [Parameter(Mandatory = $true)]
@@ -558,9 +537,10 @@ function Read-SharpProofMutationTestEvidence {
             Get-OrdinalSortedUniqueStrings -Values $ExpectedLedger)
         if ($expected.Count -ne @($ExpectedLedger).Count -or
             $ledger.Count -ne $expected.Count -or
-            -not (Test-OrdinalStringSequenceEqual `
-                -Left $expected `
-                -Right $ledger)) {
+            -not [Linq.Enumerable]::SequenceEqual(
+                [string[]]$expected,
+                [string[]]$ledger,
+                [StringComparer]::Ordinal)) {
             throw "TRX test ledger changed for '$EvidenceName'."
         }
     }
