@@ -21,9 +21,14 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        var attributes = symbol.GetAttributes();
         _ = ValidateScope(
-            symbol, session, reportDiagnostic, cancellationToken);
-        foreach (var attribute in symbol.GetAttributes())
+            symbol,
+            attributes,
+            session,
+            reportDiagnostic,
+            cancellationToken);
+        foreach (var attribute in attributes)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!session.Attributes.IsRejectedControlAttribute(attribute) ||
@@ -149,9 +154,24 @@ internal static class SharpProofControlAttributePolicy
         Action<Diagnostic> reportDiagnostic,
         CancellationToken cancellationToken)
     {
+        return ValidateScope(
+            symbol,
+            symbol.GetAttributes(),
+            session,
+            reportDiagnostic,
+            cancellationToken);
+    }
+
+    private static bool ValidateScope(
+        ISymbol symbol,
+        ImmutableArray<AttributeData> attributes,
+        AnalyzerSession session,
+        Action<Diagnostic> reportDiagnostic,
+        CancellationToken cancellationToken)
+    {
         var suppress = false;
         cancellationToken.ThrowIfCancellationRequested();
-        foreach (var attribute in symbol.GetAttributes())
+        foreach (var attribute in attributes)
         {
             var suppressing = IsSuppressing(attribute, session.Attributes);
             if (!suppressing.HasValue)

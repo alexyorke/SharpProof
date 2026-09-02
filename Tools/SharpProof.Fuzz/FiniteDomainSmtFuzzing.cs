@@ -34,22 +34,7 @@ public sealed class FiniteDomainSmtDifferentialOracle
         IrTerm formula,
         CancellationToken cancellationToken = default)
     {
-        if (factory == null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
-
-        if (formula == null)
-        {
-            throw new ArgumentNullException(nameof(formula));
-        }
-
-        if (formula.Type != factory.BooleanType)
-        {
-            throw new ArgumentException(
-                "The finite-domain formula must be Boolean.",
-                nameof(formula));
-        }
+        ValidateFormula(factory, formula);
 
         var variables = IrTermAnalysis.CollectVariables(formula)
             .OrderBy(static variable => variable.Value)
@@ -127,22 +112,7 @@ public sealed class FiniteDomainSmtDifferentialOracle
         IrTerm formula,
         CancellationToken cancellationToken = default)
     {
-        if (factory == null)
-        {
-            throw new ArgumentNullException(nameof(factory));
-        }
-
-        if (formula == null)
-        {
-            throw new ArgumentNullException(nameof(formula));
-        }
-
-        if (formula.Type != factory.BooleanType)
-        {
-            throw new ArgumentException(
-                "The finite-domain formula must be Boolean.",
-                nameof(formula));
-        }
+        ValidateFormula(factory, formula);
 
         cancellationToken.ThrowIfCancellationRequested();
         var variables = IrTermAnalysis.CollectVariables(formula)
@@ -254,6 +224,26 @@ public sealed class FiniteDomainSmtDifferentialOracle
                   " while SMT reported " +
                   actual +
                   ".");
+    }
+
+    private static void ValidateFormula(IrFactory factory, IrTerm formula)
+    {
+        if (factory == null)
+        {
+            throw new ArgumentNullException(nameof(factory));
+        }
+
+        if (formula == null)
+        {
+            throw new ArgumentNullException(nameof(formula));
+        }
+
+        if (formula.Type != factory.BooleanType)
+        {
+            throw new ArgumentException(
+                "The finite-domain formula must be Boolean.",
+                nameof(formula));
+        }
     }
 
     private static bool IsSatisfiableByEnumeration(

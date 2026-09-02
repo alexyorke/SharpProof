@@ -183,6 +183,9 @@ the smallest relevant containerized test target passes.
 | R445 | Share XML writer settings and disposal through one coverage save helper | PowerShell parse; `SharpProof.ArchitectureTest`: coverage tests passed |
 | R456 | Let the SDK derive `PackageVersion` from the authoritative `Version` property | `SharpProof.ArchitectureTest`: release/package tests 73 passed |
 | R460 | Combine equivalent unconstrained interval-format switch arms | `SharpProof.Dataflow.Test`: 50 passed |
+| R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
+| R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
+| R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1890,6 +1893,10 @@ I/O, dead validation, and duplicated XML serialization setup.
 R456 is now applied: release props keep one package-version authority via
 `Version` and the SDK default.
 R460 is now applied: zero and unit-modulus interval formatting share one arm.
+R447 is now applied: finite-domain oracle entry points share their formula
+precondition validation.
+R454 and R457 are now applied: analyzer validation reuses generated-code and
+attribute snapshots instead of repeating Roslyn queries.
 
 ## Second survey, part thirty-seven: R407-R412
 
@@ -2071,7 +2078,8 @@ This pass inspected the verifier budget bridge, finite-domain fuzz oracle, switc
 
 ### Status (part forty-three)
 
-R446-R450 are `pending`. R447-R450 are local helper extractions; R446 is a cross-language default-authority reduction.
+R446 and R448-R450 are `pending`. R447 is applied; R446 is a cross-language
+default-authority reduction and R448-R450 are local helper extractions.
 
 ## Second survey, part forty-four: R451-R453
 
@@ -2099,8 +2107,9 @@ This pass inspected the analyzer feature pipeline and verifier/release MSBuild p
 
 ### Status (part forty-five)
 
-R454-R455 are `pending` review-only candidates. R456 is applied: the SDK derives
-PackageVersion from Version without a duplicate assignment.
+R455 is `pending` review-only. R454 is applied for generated-code reuse; R456
+is applied because the SDK derives PackageVersion from Version without a
+duplicate assignment.
 
 ## Second survey, part forty-six: R457-R460
 
@@ -2115,8 +2124,8 @@ This pass inspected analyzer control-attribute validation and the small dataflow
 
 ### Status (part forty-six)
 
-R457-R459 are `pending` review-only candidates. R460 is applied: equivalent
-interval-format switch arms are combined.
+R458-R459 are `pending` review-only candidates. R457 and R460 are applied:
+attribute snapshots and equivalent interval-format switch arms are shared.
 
 ## Second survey, part forty-seven: R463, and two ledger repairs
 

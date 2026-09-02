@@ -85,11 +85,12 @@ internal static partial class AnalyzerFeaturePipeline
         }
         var firstDeclaration = method.DeclaringSyntaxReferences[0]
             .GetSyntax(context.CancellationToken);
-        if (AnalyzerGeneratedCodePolicy.IsGenerated(
-                method,
-                firstDeclaration.SyntaxTree,
-                context.Compilation,
-                context.CancellationToken))
+        var isGenerated = AnalyzerGeneratedCodePolicy.IsGenerated(
+            method,
+            firstDeclaration.SyntaxTree,
+            context.Compilation,
+            context.CancellationToken);
+        if (isGenerated)
         {
             return;
         }
@@ -115,16 +116,6 @@ internal static partial class AnalyzerFeaturePipeline
         if (IsConcreteSemicolonAccessor(method, context.CancellationToken) &&
             selection.Any)
         {
-            var declaration = method.DeclaringSyntaxReferences[0]
-                .GetSyntax(context.CancellationToken);
-            if (AnalyzerGeneratedCodePolicy.IsGenerated(
-                    method,
-                    declaration.SyntaxTree,
-                    context.Compilation,
-                    context.CancellationToken))
-            {
-                return;
-            }
             if (selection.IsSuppressed)
             {
                 session.RecordSemanticOutcome(
