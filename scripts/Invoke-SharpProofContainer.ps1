@@ -415,7 +415,7 @@ switch ($Command) {
             'Sample validation failed.' `
             @{ Configuration = $Configuration; ExpectedSmt = 'Required'; PackageSource = $PackageSource }
     }
-    { $_ -in @('corpus', 'corpus-update', 'gates') } {
+    { $_ -in @('corpus', 'corpus-update', 'gates', 'performance-smoke') } {
         $gateMode = if ($Command -ceq 'gates') { 'all' } else { $Command }
         $gateProject = 'SharpProof.Gates/SharpProof.Gates.csproj'
         Invoke-DotNet @('restore', $gateProject, '--locked-mode')
@@ -434,14 +434,6 @@ switch ($Command) {
         Invoke-RequiredScript 'scripts/Invoke-SharpProofGateEvidence.ps1' `
             'Performance validation failed.' `
             @{ Gate = 'performance'; OutputPath = $output }
-    }
-    'performance-smoke' {
-        $gateProject = 'SharpProof.Gates/SharpProof.Gates.csproj'
-        Invoke-DotNet @('restore', $gateProject, '--locked-mode')
-        Invoke-DotNet @(
-            'run', '--project', $gateProject,
-            '--configuration', $Configuration,
-            '--no-restore', '--', 'performance-smoke')
     }
     'coverage' {
         if ([string]::IsNullOrWhiteSpace(
