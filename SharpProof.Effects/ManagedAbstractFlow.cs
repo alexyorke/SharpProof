@@ -2856,27 +2856,19 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
     internal static bool IsDefinitelyNonNull(IOperation operation)
     {
-        while (operation is IParenthesizedOperation or IConversionOperation)
-        {
-            if (operation is IParenthesizedOperation parenthesized)
-            {
-                operation = parenthesized.Operand;
-            }
-            else if (operation is IConversionOperation { OperatorMethod: null, IsTryCast: false } conversion)
-            {
-                operation = conversion.Operand;
-            }
-            else
-            {
-                break;
-            }
-        }
+        operation = UnwrapSimpleConversions(operation);
         return operation is IInstanceReferenceOperation or IConditionalAccessInstanceOperation or
             IObjectCreationOperation or IArrayCreationOperation or ITypeOfOperation ||
             operation.ConstantValue is { HasValue: true, Value: not null };
     }
 
     internal static bool IsDefinitelyNull(IOperation operation)
+    {
+        operation = UnwrapSimpleConversions(operation);
+        return operation.ConstantValue is { HasValue: true, Value: null };
+    }
+
+    private static IOperation UnwrapSimpleConversions(IOperation operation)
     {
         while (operation is IParenthesizedOperation or IConversionOperation)
         {
@@ -2897,7 +2889,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
                 break;
             }
         }
-        return operation.ConstantValue is { HasValue: true, Value: null };
+        return operation;
     }
 
     private static bool HarmlessConversion(IConversionOperation conversion)

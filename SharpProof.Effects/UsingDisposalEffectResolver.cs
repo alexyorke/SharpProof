@@ -272,9 +272,7 @@ internal sealed class UsingDisposalEffectResolver
             return EffectSummaryOperations.Unsupported();
         }
 
-        if (resource.ConstantValue is { HasValue: true, Value: null } ||
-            _flow?.TryEvaluate(origin, resource, out var value) == true &&
-            value.IsDefinitelyNull)
+        if (IsDefinitelyNull(resource, origin))
         {
             return EffectSummary.Empty;
         }
