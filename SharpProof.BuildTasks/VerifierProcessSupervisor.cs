@@ -303,7 +303,7 @@ internal static partial class VerifierProcessSupervisor
                 }
                 finally
                 {
-                    _ = NativeMethods.Close(descriptor);
+                    _ = LinuxNativeMethods.Close(descriptor);
                 }
             }
             if (supervisorId == Environment.ProcessId)
@@ -356,7 +356,7 @@ internal static partial class VerifierProcessSupervisor
         foreach (var descriptor in descriptors.Where(
                      static descriptor => descriptor >= 0))
         {
-            _ = NativeMethods.Close(descriptor);
+            _ = LinuxNativeMethods.Close(descriptor);
         }
     }
 
@@ -453,7 +453,7 @@ internal static partial class VerifierProcessSupervisor
 
     private static int OpenPidFd(int processId)
     {
-        return (int)NativeMethods.SystemCall2(
+        return (int)LinuxNativeMethods.SystemCall2(
             LinuxProcessControlConstants.PidFdOpenSystemCall,
             processId,
             0);
@@ -461,7 +461,7 @@ internal static partial class VerifierProcessSupervisor
 
     private static int SendPidFdSignal(int descriptor, int signal)
     {
-        return (int)NativeMethods.SystemCall4(
+        return (int)LinuxNativeMethods.SystemCall4(
             LinuxProcessControlConstants.PidFdSendSignalSystemCall,
             descriptor,
             signal,
@@ -492,10 +492,6 @@ internal static partial class VerifierProcessSupervisor
 
     private static partial class NativeMethods
     {
-        [LibraryImport("libc", EntryPoint = "close", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial int Close(int descriptor);
-
         [LibraryImport("libc", EntryPoint = "prctl", SetLastError = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int ControlProcess(
@@ -504,22 +500,6 @@ internal static partial class VerifierProcessSupervisor
             nuint argument3,
             nuint argument4,
             nuint argument5);
-
-        [LibraryImport("libc", EntryPoint = "syscall", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial nint SystemCall2(
-            nint number,
-            int argument1,
-            uint argument2);
-
-        [LibraryImport("libc", EntryPoint = "syscall", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial nint SystemCall4(
-            nint number,
-            int argument1,
-            int argument2,
-            nint argument3,
-            uint argument4);
 
         [LibraryImport("libc", EntryPoint = "waitpid", SetLastError = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]

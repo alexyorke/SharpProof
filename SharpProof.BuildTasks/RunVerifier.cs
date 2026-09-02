@@ -381,7 +381,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 }
                 else
                 {
-                    _ = NativeMethods.Close(processGroupPidFd);
+                    _ = LinuxNativeMethods.Close(processGroupPidFd);
                 }
             }
             process?.Dispose();
@@ -729,7 +729,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         {
             if (anchor.ProcessGroupPidFd >= 0)
             {
-                _ = NativeMethods.Close(anchor.ProcessGroupPidFd);
+                _ = LinuxNativeMethods.Close(anchor.ProcessGroupPidFd);
             }
             anchor.Process.Dispose();
             _ = RetainedCleanupAnchors.TryRemove(token, out _);
@@ -1059,7 +1059,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 "SharpProof verifier containment requires Linux amd64.");
         }
         var descriptor = OpenPidFdOverride?.Invoke(processId) ??
-            checked((int)NativeMethods.SystemCall2(
+            checked((int)LinuxNativeMethods.SystemCall2(
                 LinuxProcessControlConstants.PidFdOpenSystemCall,
                 processId,
                 0));
@@ -1074,7 +1074,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private static int SendPidFdSignal(int descriptor, int signal)
     {
-        return checked((int)NativeMethods.SystemCall4(
+        return checked((int)LinuxNativeMethods.SystemCall4(
             LinuxProcessControlConstants.PidFdSendSignalSystemCall,
             descriptor,
             signal,
@@ -1349,29 +1349,10 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
     private static partial class NativeMethods
     {
-        [LibraryImport("libc", EntryPoint = "close", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial int Close(int descriptor);
-
         [LibraryImport("libc", EntryPoint = "kill", SetLastError = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int Kill(int processId, int signal);
 
-        [LibraryImport("libc", EntryPoint = "syscall", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial nint SystemCall2(
-            nint number,
-            int argument1,
-            uint argument2);
-
-        [LibraryImport("libc", EntryPoint = "syscall", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial nint SystemCall4(
-            nint number,
-            int argument1,
-            int argument2,
-            nint argument3,
-            uint argument4);
     }
 
 }

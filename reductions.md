@@ -149,6 +149,7 @@ the smallest relevant containerized test target passes.
 | R359 | Share lowercase SHA-256 validation through the canonical hash helper used by IR, summaries, and protocol serialization | `SharpProof.Worker.Test`: ProtocolJsonTests 108; `SharpProof.Summaries.Test`: 14 passed |
 | R360 | Make `FrameworkTypeMetadataNames.Monitor` a compile-time constant like its sibling metadata identities | Canonical solution build succeeded |
 | R371 | Remove redundant PowerShell 7 compression assembly loads from pilot package authority scripts | Pilot authority fixtures passed |
+| R356 | Centralize the shared libc `close` and `syscall` imports for the verifier build tasks while retaining task-specific native calls | `SharpProof.Package.Test`: 141 build-task, supervisor, and launcher tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1578,7 +1579,6 @@ smaller role-policy candidate that needs package-layout validation.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R356 | **The verifier's nested libc interop surface repeats three exact imports in two build tasks.** `VerifierProcessSupervisor.NativeMethods` and `RunVerifier.NativeMethods` each declare byte-for-byte `Close(int)`, `SystemCall2(nint, int, uint)`, and `SystemCall4(nint, int, int, nint, uint)` methods with the same `LibraryImport("libc", EntryPoint, SetLastError = true)` and `DefaultDllImportSearchPaths(SafeDirectories)` attributes. The containing classes still need different native methods (`prctl`/`waitpid` versus `kill`) and their wrapper-level failure semantics differ, so only these common imports should move to one internal owner. This is separate from R330's repeated syscall constants: changing an imported signature or attribute currently requires two edits as well as the constant edits. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:495-524`; `SharpProof.BuildTasks/RunVerifier.cs:1352-1376`; R330 |
 | R357 | **Three Roslyn dependency-producing projects repeat the same assembly-copy policy.** `SharpProof.Analyzer.Core`, `SharpProof.Analyzer`, and `SharpProof.CompilerCollector` each set `CopyLocalLockFileAssemblies=true`. They form the analyzer/compiler dependency-producing path and R343 already shows that their packaged dependency closure is maintained as one vocabulary. A narrowly scoped analyzer-component props fragment could own this policy and remove three identical project declarations, but the package and test output layouts must be checked before centralization because `Analyzer.Core` is intentionally not marked `IsRoslynAnalyzer`. | `SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj:6`; `SharpProof.Analyzer/SharpProof.Analyzer.csproj:6`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:6`; R343 |
 
 ### Checked and not proposed (part twenty-nine)
@@ -1591,11 +1591,12 @@ smaller role-policy candidate that needs package-layout validation.
 - The NuGet v3 URL is repeated in package-feed helpers and audit/architecture
   assertions. It is a small fixed external authority already covered by the
   deferred R202-R204 family, so no separate reduction is counted here.
+- R356 is now applied: the verifier tasks share one internal libc import owner;
+  task-specific `prctl`, `waitpid`, and `kill` bindings remain local.
 
 ### Status (part twenty-nine)
 
-R356-R357 are `pending`. R356 is a low-risk interop consolidation if the shared
-owner remains internal to `SharpProof.BuildTasks`; R357 needs package-output
+R357 is `pending`. R357 needs package-output
 tests because its three consumers do not have identical analyzer markers.
 
 ## Second survey, part thirty: R358-R367
