@@ -293,13 +293,19 @@ public sealed class RoslynProgramLowerer(
                 case IInvocationOperation invocation:
                     return LowerInvocation(block, operation, invocation, wantsResult: true)!;
                 case IIncrementOrDecrementOperation mutation:
-                    LowerUnsupportedMutation(block, operation, mutation.Target);
-                    return CreateHavocTemporary(
-                        block, operation, "mutation-result", _expressions.GetTypeId(mutation.Type));
+                    return LowerMutationResult(
+                        block,
+                        operation,
+                        mutation.Target,
+                        value: null,
+                        resultType: _expressions.GetTypeId(mutation.Type));
                 case ICompoundAssignmentOperation mutation:
-                    LowerUnsupportedMutation(block, operation, mutation.Target, mutation.Value);
-                    return CreateHavocTemporary(
-                        block, operation, "mutation-result", _expressions.GetTypeId(mutation.Type));
+                    return LowerMutationResult(
+                        block,
+                        operation,
+                        mutation.Target,
+                        mutation.Value,
+                        _expressions.GetTypeId(mutation.Type));
                 case IFieldReferenceOperation:
                 case IArrayElementReferenceOperation:
                     var location = LowerLocation(block, operation, value);
@@ -347,6 +353,21 @@ public sealed class RoslynProgramLowerer(
             var lowered = _expressions.Lower(value);
             Observe(operation, lowered.Classification);
             return lowered.Term;
+        }
+
+        private IrVariableTerm LowerMutationResult(
+            IrBlockId block,
+            OperationId operation,
+            IOperation target,
+            IOperation? value,
+            IrTypeId resultType)
+        {
+            LowerUnsupportedMutation(block, operation, target, value);
+            return CreateHavocTemporary(
+                block,
+                operation,
+                "mutation-result",
+                resultType);
         }
 
         private void LowerNestedOperations(

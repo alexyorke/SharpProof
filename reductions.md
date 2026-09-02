@@ -3844,7 +3844,9 @@ it removes; the original identity-preserving behavior is retained.
 
 ### Status (part one hundred thirty-five)
 
-R594 is a pending Frontend program-lowering reduction candidate. Preserve evaluation of the compound assignment's value and the same mutation/result types; centralize only the common unsupported-result construction.
+R594 is applied: increment and compound-assignment lowering now share one
+`LowerMutationResult` helper, while the compound path still evaluates its value
+and both paths retain their existing mutation/result types.
 
 ## Second survey, part one hundred thirty-six: R595 - unbounded nested-operation recursion
 
@@ -4157,3 +4159,11 @@ R629 is a pending protocol JSON validation cleanup candidate. Preserve the curre
 ### Status (part one hundred seventy-one)
 
 R630 is a pending protocol-manifest complexity candidate, not a request to remove canonicalization defense. Preserve stable hashes/equality for both canonical and noncanonical manifests; consolidate only duplicated order/projection policy where the call graph proves the same normalization is safe.
+
+## Second survey, part one hundred seventy-two: R631 - duplicated script MVID extraction
+
+| R631 | **Two PowerShell entry points duplicate the portable-executable MVID reader.** `Get-SharpProofModuleVersionId.ps1` and `Invoke-SharpProofGateEvidence.ps1` each open a `PEReader`, obtain a `MetadataReader` through `PEReaderExtensions`, read `GetModuleDefinition().Mvid`, format the GUID as `D`, and repeat nested `try/finally` disposal. The first is an MSBuild build-time value producer and the second binds standalone gate evidence, so their callers and error context remain distinct; a shared script helper/module for the common metadata extraction would remove the duplicated reader lifecycle and keep both boundaries on one MVID-format implementation. | `scripts/Get-SharpProofModuleVersionId.ps1:9-29`; `scripts/Invoke-SharpProofGateEvidence.ps1:57-72` |
+
+### Status (part one hundred seventy-two)
+
+R631 is a pending script-infrastructure reduction candidate. Preserve the build-time output contract, gate-evidence binding, no-metadata handling, canonical `D` formatting, and independent caller diagnostics while sharing only the PE metadata/MVID extraction.
