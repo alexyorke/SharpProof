@@ -76,7 +76,9 @@ public sealed class ContractBinder
         target = ArgumentNullGuard.NotNull(target, nameof(target));
 
         return implementationBody == null
-            ? _bindings.GetOrAdd(target, BindUncached)
+            ? _bindings.GetOrAdd(
+                target,
+                value => BindUncached(value, requiresOnly: false))
             : BindCore(
                 target,
                 implementationBody,
@@ -91,7 +93,9 @@ public sealed class ContractBinder
         target = ArgumentNullGuard.NotNull(target, nameof(target));
 
         return implementationBody == null
-            ? _requiresBindings.GetOrAdd(target, BindRequiresUncached)
+            ? _requiresBindings.GetOrAdd(
+                target,
+                value => BindUncached(value, requiresOnly: true))
             : BindCore(
                 target,
                 implementationBody,
@@ -121,21 +125,14 @@ public sealed class ContractBinder
                 ArgumentNullGuard.NotNull(target, nameof(target))));
     }
 
-    private ContractBindingResult BindUncached(IMethodSymbol target)
+    private ContractBindingResult BindUncached(
+        IMethodSymbol target,
+        bool requiresOnly)
     {
         return BindCore(
             target,
             implementationBody: null,
-            requiresOnly: false,
-            cancellationToken: CancellationToken.None);
-    }
-
-    private ContractBindingResult BindRequiresUncached(IMethodSymbol target)
-    {
-        return BindCore(
-            target,
-            implementationBody: null,
-            requiresOnly: true,
+            requiresOnly,
             cancellationToken: CancellationToken.None);
     }
 

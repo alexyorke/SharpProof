@@ -184,6 +184,7 @@ the smallest relevant containerized test target passes.
 | R456 | Let the SDK derive `PackageVersion` from the authoritative `Version` property | `SharpProof.ArchitectureTest`: release/package tests 73 passed |
 | R460 | Combine equivalent unconstrained interval-format switch arms | `SharpProof.Dataflow.Test`: 50 passed |
 | R464 | Share assembly-metadata value extraction between contract identity readers | `SharpProof.Frontend.Test`: 121 passed |
+| R466 | Parameterize the uncached contract-binding wrapper while retaining separate caches | `SharpProof.Contracts.Test`: 142 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2232,11 +2233,13 @@ This pass inspected contract-API identity, descriptor lookup, binding, and compi
 
 ### Status (part forty-eight)
 
-R466-R467 are `pending` review-only reduction candidates. R464 is applied: both
+R467 is a `pending` review-only reduction candidate. R464 is applied: both
 contract identity readers now share one ordinal metadata-value query, while the
 SHA-256 and MVID decoding rules remain independent. R465 is rejected: a generic
 descriptor helper adds lines and delegate indirection to two already-small,
-type-specific loops, so it is not a net reduction.
+type-specific loops, so it is not a net reduction. R466 is applied: both
+uncached binding paths share one parameterized wrapper, with their dictionaries
+and requires-only flags unchanged.
 
 
 ## Second survey, part forty-nine: verifying the ledger's own Applied table
