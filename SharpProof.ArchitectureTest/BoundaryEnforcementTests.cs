@@ -44,7 +44,7 @@ public sealed class BoundaryEnforcementTests
                 .And.Contain("Testing|Package|Verifier")
                 .And.Contain("Smoke\\.Net472")
                 .And.Contain("CompilerProbe\\.TestAsset")
-                .And.Contain("PortableAnalyzer"));
+                .And.Not.Contain("PortableAnalyzer"));
         Assert.That(condition, Does.Not.Contain("== 'SharpProof."));
 
         var scopedGroup = props
