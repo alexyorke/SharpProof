@@ -5911,3 +5911,22 @@ implementation or build file was changed.
 
 R784 is `pending` and limited to package/release Source Link validation plumbing.
 No implementation or build file was changed.
+
+## Second survey, part two hundred ninety-six: R785 - repeated package nuspec reader
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R785 | **Two package-test helpers repeat ZIP/nuspec loading before projecting different fields.** `PackagedProductFeed.ReadPackage` opens a package archive, selects the single `.nuspec` entry, loads it as `XDocument`, locates `<metadata>`, and then extracts package ID and version. `PackageLayoutSmokeTests.VerifyRepositoryMetadata` independently opens the archive, selects the single `.nuspec`, loads another `XDocument`, and locates `<repository>` before asserting its type, canonical URL, and commit. Both helpers operate in the same `SharpProof.Package.Test` project over the same archive/nuspec shape. A shared reader returning the validated nuspec document or metadata element can own archive disposal, single-entry selection, and XML loading while each caller retains its distinct identity or repository assertions. This is fixture parsing only; it does not merge the package-feed lifecycle with the smoke-test layout checks. | `SharpProof.Package.Test/PackagedProductFeed.cs:262-289`; `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:2143-2166` |
+
+### Checked and not proposed (part two hundred ninety-six)
+
+- ID/version extraction and repository metadata validation remain separate
+  projections because the callers enforce different package-feed and release
+  provenance policies.
+- The shared seam should preserve the single-nuspec invariant and XML disposal;
+  it should not hide which fields each test actually authenticates.
+
+### Status (part two hundred ninety-six)
+
+R785 is `pending` and limited to Package.Test archive/nuspec fixture plumbing.
+No implementation or build file was changed.
