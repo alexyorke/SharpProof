@@ -195,6 +195,7 @@ the smallest relevant containerized test target passes.
 | R480 | Update the container contract gate to assert the environment-based marker path | `SharpProof.ArchitectureTest`: ContainerAuthorityScriptTests 15 |
 | R484 | Share the canonical path-within-directory comparison used by publication and mount checks | `SharpProof.Worker.Test`: LinuxPublicationSetTests 34 |
 | R485 | Share initial publication-path filtering and topology validation | `SharpProof.Worker.Test`: LinuxPublicationSetTests 34 |
+| R498 | Reuse the built-in string-concatenation predicate in the binary effect resolver | `SharpProof.Effects.Test`: StringConcatenation tests 3 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2912,9 +2913,11 @@ implementations, keeping behavior-specific branches separate from shared plumbin
 
 ### Status (part sixty-three)
 
-R498-R502 are `pending`. No implementation files were changed; these are
-review-only candidates, and the suggested sharing must retain fail-closed behavior
-and the analyzer's distinct diagnostic and semantic-evaluation responsibilities.
+R498 is applied: binary string-concatenation resolution now uses the existing
+admission predicate, retaining the constant-folding and user-defined-operator
+exclusions. R499-R502 remain pending review-only candidates; any sharing must
+retain fail-closed behavior and the analyzer's distinct diagnostic and
+semantic-evaluation responsibilities.
 
 
 ## Second survey, part sixty-three-b: R503 - .gitignore negation rules
@@ -3611,3 +3614,11 @@ R575 is a pending mutation-pipeline reduction candidate. Keep the final catalog-
 ### Status (part one hundred seventeen)
 
 R576 is a pending package-integration-test reduction candidate. Preserve the explicit-ID path used by cleanup/recovery tests and the per-call cache/request/result locations; only centralize the duplicated MSBuild argument construction.
+
+## Second survey, part one hundred eighteen: R577 - duplicated package-project topology
+
+| R577 | **The package-project manifest is checked against repeated hard-coded copies of the same topology.** `scripts/package-projects.json` is read as the package-project authority, but `PackagedProductFeed.ReadPackageProjects` separately embeds the three product project paths and `eng/acceptance/Verify.ps1` embeds the same ordered list before checking the manifest and each file. Adding, removing, or reordering a product therefore requires updating the manifest and multiple validators; a shared contract reader or one generated/consumed expected list can retain the explicit count/order and existence checks without maintaining identical path literals in each consumer. | `scripts/package-projects.json:1-8`; `SharpProof.Package.Test/PackagedProductFeed.cs:291-326`; `eng/acceptance/Verify.ps1:529-543` |
+
+### Status (part one hundred eighteen)
+
+R577 is a pending package-topology reduction candidate. Keep an explicit policy check that the manifest contains exactly the supported products and remains in dependency order; centralize only the repeated project-path vocabulary.
