@@ -2144,13 +2144,7 @@ public sealed class PackageLayoutSmokeTests
         string packagePath,
         string commit)
     {
-        using var archive = ZipFile.OpenRead(packagePath);
-        var nuspec = archive.Entries.Single(entry =>
-            entry.FullName.EndsWith(
-                ".nuspec",
-                StringComparison.OrdinalIgnoreCase));
-        using var stream = nuspec.Open();
-        var document = XDocument.Load(stream);
+        var document = PackageNuspecReader.Read(packagePath);
         var repository = document.Descendants().Single(element =>
             element.Name.LocalName == "repository");
         Assert.That(

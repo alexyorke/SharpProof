@@ -269,13 +269,7 @@ internal sealed class PackagedProductFeed : IDisposable
 
     private static PackagedPackage ReadPackage(string path)
     {
-        using var archive = ZipFile.OpenRead(path);
-        var nuspec = archive.Entries.Single(entry =>
-            entry.FullName.EndsWith(
-                ".nuspec",
-                StringComparison.OrdinalIgnoreCase));
-        using var stream = nuspec.Open();
-        var document = XDocument.Load(stream);
+        var document = PackageNuspecReader.Read(path);
         var metadata = document.Root?.Elements()
             .Single(element =>
                 element.Name.LocalName == "metadata") ??
@@ -367,3 +361,17 @@ internal sealed record PackagedPackage(
 internal readonly record struct PackageProcessResult(
     int ExitCode,
     string Output);
+
+internal static class PackageNuspecReader
+{
+    internal static XDocument Read(string packagePath)
+    {
+        using var archive = ZipFile.OpenRead(packagePath);
+        var nuspec = archive.Entries.Single(entry =>
+            entry.FullName.EndsWith(
+                ".nuspec",
+                StringComparison.OrdinalIgnoreCase));
+        using var stream = nuspec.Open();
+        return XDocument.Load(stream);
+    }
+}
