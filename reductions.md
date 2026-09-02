@@ -4235,12 +4235,11 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 ## Second survey, part two hundred six: R665-R667 - repeated cache/replay preparation
 
-| R666 | **`VerificationCache.ReplayCachedClaims` rebuilds a callable's postcondition array for every cached claim.** The target dictionary is created once, but each claim then runs `target.Clauses.Where(...).ToArray()` followed by `Array.FindIndex` over the same declaration set. Precomputing a first-match claim-to-ordinal map (or the postcondition list) per callable removes repeated clause enumeration and allocation while preserving bounds checks, claim-id matching, and fail-closed replay behavior. | `SharpProof.Worker/VerificationCache.cs:604-626` |
 | R667 | **`CallableCounterexampleReplayer.Replay` re-filters all clauses for every postcondition replay.** `CallableVerifier` invokes the replayer from its per-postcondition loop, and each call allocates a fresh `ensures` array from `target.Clauses` before checking the requested ordinal. Passing a prepared postcondition list/ordinal map from the target verification, or caching it at the callable boundary, removes this repeated scan while preserving the current out-of-range and malformed-target failures. | `SharpProof.Worker/CallableCounterexampleReplayer.cs:4-20`; `SharpProof.Worker/CallableVerifier.cs:197-203,261-263` |
 
 ### Status (part two hundred six)
 
-R666-R667 are pending cache/replay preparation reduction candidates. Preserve claim-id first-match semantics, cancellation, and fail-closed counterexample replay behavior; share only repeated declaration preparation.
+R667 is a pending cache/replay preparation reduction candidate. Preserve claim-id first-match semantics, cancellation, and fail-closed counterexample replay behavior; share only repeated declaration preparation.
 
 ## Second survey, part two hundred seven: R668 - redundant MSBuild dependency edge
 

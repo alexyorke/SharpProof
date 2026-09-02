@@ -609,6 +609,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
         var targetByCallable = targets.ToDictionary(
             static target => target.Entry.CallableId,
+            static target => (
+                Target: target,
+                Postconditions: target.Clauses.Where(static clause =>
+                    clause.Kind == CompilerContractKind.Ensures).ToArray()),
             StringComparer.Ordinal);
         var claimById = manifest.Claims.ToDictionary(
             static claim => claim.ClaimId,
@@ -618,24 +622,24 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             cancellationToken.ThrowIfCancellationRequested();
             if (!claimById.TryGetValue(claim.ClaimId, out var declaration) ||
                 declaration.Kind != WorkerClaimKind.Postcondition ||
-                !targetByCallable.TryGetValue(declaration.CallableId, out var target) ||
-                !TryCreateModel(target, claim.Model, out var model))
+                !targetByCallable.TryGetValue(
+                    declaration.CallableId,
+                    out var preparedTarget) ||
+                !TryCreateModel(preparedTarget.Target, claim.Model, out var model))
             {
                 return false;
             }
 
-            var postconditions = target.Clauses.Where(static clause =>
-                clause.Kind == CompilerContractKind.Ensures).ToArray();
             var ordinal = Array.FindIndex(
-                postconditions,
+                preparedTarget.Postconditions,
                 clause => clause.ClaimId == claim.ClaimId);
             if (ordinal < 0 ||
                 !CompilerModelValues.EntryAssumptionsHold(
-                    target,
+                    preparedTarget.Target,
                     model,
                     cancellationToken) ||
                 CallableCounterexampleReplayer.Replay(
-                    target,
+                    preparedTarget.Target,
                     ordinal,
                     model,
                     cancellationToken) != WorkerClaimReason.None)
