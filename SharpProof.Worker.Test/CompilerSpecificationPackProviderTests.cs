@@ -373,29 +373,29 @@ public sealed class CompilerSpecificationPackProviderTests
 
     private static object ParseTerm(string json, int depth = 0)
     {
-        using var document = JsonDocument.Parse(json);
-        return Invoke(
-            s_parseTerm,
-            instance: null,
-            [document.RootElement, depth]);
+        return ParseJson(s_parseTerm, json, depth);
     }
 
     private static object ParseMethod(string json)
     {
-        using var document = JsonDocument.Parse(json);
-        return Invoke(
-            s_parseMethod,
-            instance: null,
-            [document.RootElement]);
+        return ParseJson(s_parseMethod, json);
     }
 
     private static object ParsePack(string json)
     {
+        return ParseJson(s_parsePack, json);
+    }
+
+    private static object ParseJson(
+        MethodInfo method,
+        string json,
+        params object?[] extra)
+    {
         using var document = JsonDocument.Parse(json);
-        return Invoke(
-            s_parsePack,
-            instance: null,
-            [document.RootElement]);
+        var arguments = new object?[extra.Length + 1];
+        arguments[0] = document.RootElement;
+        Array.Copy(extra, 0, arguments, 1, extra.Length);
+        return Invoke(method, instance: null, arguments);
     }
 
     private static IrTerm Instantiate(object term, int depth = 0)

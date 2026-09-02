@@ -138,6 +138,7 @@ the smallest relevant containerized test target passes.
 | R820 | Remove two outcome-family assertions implied by exact concrete outcome checks | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R821 | Reuse the already-computed generated-domain join in lattice-law assertions | `SharpProof.Dataflow.Test`: 50 passed |
 | R822 | Seal replay fixtures only at validation boundaries instead of during construction and again after mutation | `SharpProof.Worker.Test`: CompilerEffectReplayArtifactCodecTests, 8 passed |
+| R823 | Share the JSON-document/reflection invocation wrapper across specification-pack parser tests | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6816,9 +6817,8 @@ once after mutation.
 
 ### Status (part three hundred thirty-four)
 
-R823 is `deferred`: the duplication is confined to test plumbing and the
-  current three methods are short, but centralizing document lifetime would
-  reduce copy/paste drift if another specification-pack parser is covered.
+R823 is `applied`: the three specification-pack parser tests now share one
+JSON-document lifetime and reflection-invocation helper.
 
 ## Second survey, part three hundred thirty-five: R824 - duplicated probe JSON array writer
 
