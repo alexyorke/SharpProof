@@ -6289,3 +6289,26 @@ No implementation or build file was changed.
 R801 is `deferred` pending a small accumulator that preserves the current
   fail-closed handling and ordering while eliminating the repeated merge-loop
   scan. No implementation or build file was changed.
+
+## Second survey, part three hundred thirteen: R802 - repeated release-bundle cardinality check
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R802 | **`Test-SharpProofReleaseArtifacts.ps1` repeats the release-bundle cardinality check immediately before calling its canonical helper.** The script first rejects any manifest whose artifacts are not exactly six rows with three `package` and three `symbols` rows, then calls `Test-SharpProofReleaseBundleTopology`, whose first condition performs the same directory-exists, six-row, and 3/3 kind checks before validating the file set. The caller still needs its manifest-specific package-ID, version, byte-size, payload, dependency, and repository assertions, but those checks do not depend on a second cardinality guard. Letting the shared topology helper own the bundle-shape admission, or changing it to return a validated topology result for the later checks, removes one duplicated contract and keeps R558's separate expected-name validation issue isolated. | `scripts/Test-SharpProofReleaseArtifacts.ps1:63-72`; `scripts/SharpProof.ReleaseBundle.ps1:52-65` |
+
+### Checked and not proposed (part three hundred thirteen)
+
+- The release-artifact script retains its package-ID and symbol-pair loops,
+  actual file-name and byte checks, payload projection, third-party metadata,
+  and repository/version authority checks.
+- R558 concerns duplicate expected-name validation *inside* the shared
+  topology helper and its exact-file-set helper; R802 concerns the caller
+  repeating only the cardinality/kind precondition before invoking that helper.
+- The reduction should preserve the helper's distinct directory and exact
+  regular-file-set checks rather than replacing them with a caller-only test.
+
+### Status (part three hundred thirteen)
+
+R802 is `deferred` pending removal of the caller-side cardinality precheck or
+an explicit result-returning topology seam. No implementation or build file
+was changed.
