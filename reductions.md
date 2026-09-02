@@ -131,6 +131,7 @@ the smallest relevant containerized test target passes.
 | R322 | Reuse compiler-artifact specification-pack identity validation in the manifest producer | `SharpProof.Worker.Test`: CompilerManifestArtifactTests, 91 passed |
 | R314 | Centralize compiler summary-origin wire prefixes across artifact, worker, and collector code | `SharpProof.Worker.Test`: WorkerTests, 148 passed; `SharpProof.Analyzer.Test`: FinalCompilationCollectorTests, 55 passed |
 | R315 | Share effect-contract violation classification between response authority and counterexample replay | `SharpProof.Worker.Test`: EffectCounterexampleReplayTests, 31 passed; CompilerManifestArtifactTests, 91 passed |
+| R812 | Compare classified lowered calls with the existing indexed call set instead of recounting the IR | `SharpProof.Worker.Test`: CompilerCallableLowererTests, 20 passed |
 | R327 | Remove 22 project-local `TreatWarningsAsErrors` declarations now supplied by the central production policy, retaining the two excluded-project declarations | `test-changed`: 2,846 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
@@ -6555,11 +6556,9 @@ object would add more setup to an already policy-heavy preparation method.
 
 ### Status (part three hundred twenty-three)
 
-R812 is `deferred`: the call set is already materialized and the replacement
-comparison is mechanically simple, but the existing final IR walk is a clear
-completeness assertion at a trust boundary. It should be changed only after
-confirming that `selected.Calls` and emitted program calls have the same
-intended scope.
+R812 is `applied`: the lowerer now compares classified calls with the existing
+indexed call set, preserving the completeness assertion without a second full
+IR traversal.
 
 ## Second survey, part three hundred twenty-four: R813 - repeated contract-statement inventory scans
 

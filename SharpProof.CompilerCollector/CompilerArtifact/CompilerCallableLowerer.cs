@@ -206,9 +206,7 @@ internal sealed class CompilerCallableLowerer
 
             return Unsupported(out failure);
         }
-        if (specCalls.Count + summaryCalls.Count != lowering.Program.Blocks
-                .SelectMany(static block => block.Instructions)
-                .Count(static instruction => instruction is IrCallInstruction))
+        if (specCalls.Count + summaryCalls.Count != selected.Calls.Count)
         {
             return Unsupported(out failure);
         }
