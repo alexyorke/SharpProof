@@ -10,57 +10,43 @@ public sealed class WorkerBinaryIdentityTests
     [Test]
     public void StagedComponentConsistencyIsFailClosed()
     {
-        var temporaryWorkspace = new TempDirectory(
+        using var temporaryWorkspace = new TempDirectory(
             "SharpProof.StagedComponent.");
         var temporaryDirectory = temporaryWorkspace.FullName;
-        try
-        {
-            var source = Path.Combine(temporaryDirectory, "source.dll");
-            var staged = Path.Combine(temporaryDirectory, "staged.dll");
-            File.WriteAllBytes(source, [1, 2]);
-            File.WriteAllBytes(staged, [1, 3]);
-            Assert.That(
-                (Action)(() => WorkerBinaryIdentity.EnsureStagedComponentConsistency(
-                    source, staged)),
-                Throws.TypeOf<InvalidDataException>());
-            File.WriteAllBytes(staged, [1, 2]);
-            Assert.DoesNotThrow((Action)(() =>
-                WorkerBinaryIdentity.EnsureStagedComponentConsistency(
-                    source, staged)));
-        }
-        finally
-        {
-            temporaryWorkspace.Dispose();
-        }
+        var source = Path.Combine(temporaryDirectory, "source.dll");
+        var staged = Path.Combine(temporaryDirectory, "staged.dll");
+        File.WriteAllBytes(source, [1, 2]);
+        File.WriteAllBytes(staged, [1, 3]);
+        Assert.That(
+            (Action)(() => WorkerBinaryIdentity.EnsureStagedComponentConsistency(
+                source, staged)),
+            Throws.TypeOf<InvalidDataException>());
+        File.WriteAllBytes(staged, [1, 2]);
+        Assert.DoesNotThrow((Action)(() =>
+            WorkerBinaryIdentity.EnsureStagedComponentConsistency(
+                source, staged)));
     }
 
     [Test]
     public void RuntimeComponentReadsRetainTheDeclaredSizeBoundary()
     {
         const int aboveManifestLimit = 16 * 1024 * 1024 + 1;
-        var temporaryWorkspace = new TempDirectory(
+        using var temporaryWorkspace = new TempDirectory(
             "SharpProof.RuntimeComponentLimit.");
         var temporaryDirectory = temporaryWorkspace.FullName;
-        try
+        var path = Path.Combine(temporaryDirectory, "runtime.dll");
+        using (var stream = File.Create(path))
         {
-            var path = Path.Combine(temporaryDirectory, "runtime.dll");
-            using (var stream = File.Create(path))
-            {
-                stream.SetLength(aboveManifestLimit);
-            }
+            stream.SetLength(aboveManifestLimit);
+        }
 
-            Assert.That(
-                (Action)(() => CompilerManifestArtifactFile.ReadAllBytes(path)),
-                Throws.TypeOf<InvalidDataException>());
-            var bytes = CompilerManifestArtifactFile.ReadAllBytes(
-                path,
-                WorkerBinaryIdentity.MaximumComponentBytes);
-            Assert.That(bytes, Has.Length.EqualTo(aboveManifestLimit));
-        }
-        finally
-        {
-            temporaryWorkspace.Dispose();
-        }
+        Assert.That(
+            (Action)(() => CompilerManifestArtifactFile.ReadAllBytes(path)),
+            Throws.TypeOf<InvalidDataException>());
+        var bytes = CompilerManifestArtifactFile.ReadAllBytes(
+            path,
+            WorkerBinaryIdentity.MaximumComponentBytes);
+        Assert.That(bytes, Has.Length.EqualTo(aboveManifestLimit));
     }
 
     [Test]
@@ -136,58 +122,51 @@ public sealed class WorkerBinaryIdentityTests
     public void MalformedRuntimeDependencyManifestsFailClosed()
     {
         var sourceWorker = typeof(SharpProofWorker).Assembly.Location;
-        var temporaryWorkspace = new TempDirectory(
+        using var temporaryWorkspace = new TempDirectory(
             "SharpProof.MalformedWorkerDeps.");
         var temporaryDirectory = temporaryWorkspace.FullName;
-        try
+        var worker = Path.Combine(temporaryDirectory, "SharpProof.Worker.dll");
+        var dependency = Path.ChangeExtension(worker, ".deps.json");
+        File.Copy(sourceWorker, worker);
+        foreach (var json in new[] {
+                     "{}",
+                     "{\"runtimeTarget\":1,\"targets\":{}}",
+                     "{\"runtimeTarget\":{\"name\":\"missing\"},\"targets\":{}}",
+                     "{\"runtimeTarget\":{\"name\":\"app\"},\"targets\":{\"app\":{\"lib\":{\"runtimeTargets\":{\"asset.dll\":{}}}}}}"
+                     ,
+                     "{\"runtimes/win/../outside.dll\":{}}"
+                 })
         {
-            var worker = Path.Combine(temporaryDirectory, "SharpProof.Worker.dll");
-            var dependency = Path.ChangeExtension(worker, ".deps.json");
-            File.Copy(sourceWorker, worker);
-            foreach (var json in new[] {
-                         "{}",
-                         "{\"runtimeTarget\":1,\"targets\":{}}",
-                         "{\"runtimeTarget\":{\"name\":\"missing\"},\"targets\":{}}",
-                         "{\"runtimeTarget\":{\"name\":\"app\"},\"targets\":{\"app\":{\"lib\":{\"runtimeTargets\":{\"asset.dll\":{}}}}}}"
-                         ,
-                         "{\"runtimes/win/../outside.dll\":{}}"
-                     })
+            File.WriteAllText(dependency, json);
+            Exception? exception = null;
+            try
             {
-                File.WriteAllText(dependency, json);
-                Exception? exception = null;
-                try
-                {
-                    using var snapshot = WorkerBinaryIdentity.CreateSnapshot(worker);
-                }
-                catch (InvalidDataException observed)
-                {
-                    exception = observed;
-                }
-                catch (KeyNotFoundException observed)
-                {
-                    exception = observed;
-                }
-                catch (InvalidOperationException observed)
-                {
-                    exception = observed;
-                }
-                catch (FileNotFoundException observed)
-                {
-                    exception = observed;
-                }
-
-                Assert.That(
-                    exception?.GetType(),
-                    Is.AnyOf(
-                        typeof(InvalidDataException),
-                        typeof(KeyNotFoundException),
-                        typeof(InvalidOperationException),
-                        typeof(FileNotFoundException)));
+                using var snapshot = WorkerBinaryIdentity.CreateSnapshot(worker);
             }
-        }
-        finally
-        {
-            temporaryWorkspace.Dispose();
+            catch (InvalidDataException observed)
+            {
+                exception = observed;
+            }
+            catch (KeyNotFoundException observed)
+            {
+                exception = observed;
+            }
+            catch (InvalidOperationException observed)
+            {
+                exception = observed;
+            }
+            catch (FileNotFoundException observed)
+            {
+                exception = observed;
+            }
+
+            Assert.That(
+                exception?.GetType(),
+                Is.AnyOf(
+                    typeof(InvalidDataException),
+                    typeof(KeyNotFoundException),
+                    typeof(InvalidOperationException),
+                    typeof(FileNotFoundException)));
         }
     }
 
@@ -228,40 +207,33 @@ public sealed class WorkerBinaryIdentityTests
     [Platform("Linux")]
     public void IdentityDistinguishesLinuxComponentNameCase()
     {
-        var temporaryWorkspace = new TempDirectory(
+        using var temporaryWorkspace = new TempDirectory(
             "SharpProof.ComponentCase.");
         var temporaryDirectory = temporaryWorkspace.FullName;
-        try
+        static string WriteClosure(string directory, string workerName)
         {
-            static string WriteClosure(string directory, string workerName)
-            {
-                Directory.CreateDirectory(directory);
-                var worker = Path.Combine(directory, workerName + ".dll");
-                File.WriteAllBytes(worker, [1, 2, 3]);
-                File.WriteAllText(
-                    Path.Combine(directory, workerName + ".deps.json"),
-                    "{}");
-                File.WriteAllText(
-                    Path.Combine(directory, workerName + ".runtimeconfig.json"),
-                    "{}");
-                return worker;
-            }
-
-            var upper = WriteClosure(
-                Path.Combine(temporaryDirectory, "upper"),
-                "Worker");
-            var lower = WriteClosure(
-                Path.Combine(temporaryDirectory, "lower"),
-                "worker");
-
-            Assert.That(
-                WorkerBinaryIdentity.ComputeSha256(lower),
-                Is.Not.EqualTo(WorkerBinaryIdentity.ComputeSha256(upper)));
+            Directory.CreateDirectory(directory);
+            var worker = Path.Combine(directory, workerName + ".dll");
+            File.WriteAllBytes(worker, [1, 2, 3]);
+            File.WriteAllText(
+                Path.Combine(directory, workerName + ".deps.json"),
+                "{}");
+            File.WriteAllText(
+                Path.Combine(directory, workerName + ".runtimeconfig.json"),
+                "{}");
+            return worker;
         }
-        finally
-        {
-            temporaryWorkspace.Dispose();
-        }
+
+        var upper = WriteClosure(
+            Path.Combine(temporaryDirectory, "upper"),
+            "Worker");
+        var lower = WriteClosure(
+            Path.Combine(temporaryDirectory, "lower"),
+            "worker");
+
+        Assert.That(
+            WorkerBinaryIdentity.ComputeSha256(lower),
+            Is.Not.EqualTo(WorkerBinaryIdentity.ComputeSha256(upper)));
     }
 
     [Test]
@@ -274,12 +246,10 @@ public sealed class WorkerBinaryIdentityTests
 
         var sourceDirectory = Path.GetDirectoryName(
             typeof(SharpProofWorker).Assembly.Location)!;
-        var temporaryWorkspace = new TempDirectory(
+        using var temporaryWorkspace = new TempDirectory(
             "SharpProof.WorkerBinaryIdentity.");
         var temporaryDirectory = temporaryWorkspace.FullName;
-        try
-        {
-            foreach (var source in Directory.GetFiles(
+        foreach (var source in Directory.GetFiles(
                          sourceDirectory,
                          "*",
                          SearchOption.AllDirectories))
@@ -494,12 +464,7 @@ public sealed class WorkerBinaryIdentityTests
                 Path.Combine(temporaryDirectory, "SharpProof.Verify.dll"));
             Action missingDependency =
                 () => _ = WorkerBinaryIdentity.ComputeSha256(worker);
-            Assert.Throws<FileNotFoundException>(missingDependency);
-        }
-        finally
-        {
-            temporaryWorkspace.Dispose();
-        }
+        Assert.Throws<FileNotFoundException>(missingDependency);
     }
 
     private static void ValidateLength(string key, long length)

@@ -4281,7 +4281,7 @@ R700 completed: release and standalone gate fixtures now share the canonical ass
 
 | R701 | **`WorkerBinaryIdentityTests` manually disposes `TempDirectory` in five tests.** The tests construct the shared disposable fixture, copy its `FullName`, execute assertions, and then use `finally { temporaryWorkspace.Dispose(); }`; a `using var` declaration preserves the same failure cleanup with less lifecycle scaffolding. Keep the separate conditional disposal in `RuntimeClosurePathsAreImmutable`, where the snapshot's ownership is deliberately dependent on an alias mutation. | `SharpProof.Worker.Test/WorkerBinaryIdentityTests.cs:11-38,42-65,108-151,216-243,260-439` |
 
-R701 is a pending worker-test lifecycle reduction candidate. Preserve temporary-root cleanup, staged-file assertions, malformed-manifest coverage, and the conditional snapshot ownership behavior.
+R701 completed: worker identity tests now use scoped `TempDirectory` fixtures while preserving temporary-root cleanup, staged-file assertions, malformed-manifest coverage, and the conditional snapshot ownership behavior.
 
 ### Status (part two hundred thirty-five)
 
