@@ -460,17 +460,13 @@ public sealed class PortableIrGraphCodecTests
     [Test]
     public void DecoderRejectsNonCanonicalOptionalSentinels()
     {
-        var fixture = CreateFixture();
-        var graph = PortableIrGraphCodec.Encode(
-            fixture.Program,
-            fixture.Roots).Graph;
-        var call = graph.Blocks
-            .SelectMany(static block => block.Instructions)
-            .First(static instruction => instruction.Kind == IrInstructionKind.Call);
-        call.A = -2;
-
-        Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+        AssertDecoderRejects(graph =>
+        {
+            var call = graph.Blocks
+                .SelectMany(static block => block.Instructions)
+                .First(static instruction => instruction.Kind == IrInstructionKind.Call);
+            call.A = -2;
+        });
     }
 
     [TestCase(UnreachableMetadataMutation.Type)]
@@ -483,75 +479,70 @@ public sealed class PortableIrGraphCodecTests
     public void DecoderRejectsMetadataOutsideTheCanonicalEncoderImage(
         UnreachableMetadataMutation mutation)
     {
-        var fixture = CreateFixture();
-        var graph = PortableIrGraphCodec.Encode(
-            fixture.Program,
-            fixture.Roots).Graph;
-
-        switch (mutation)
+        AssertDecoderRejects(graph =>
         {
-            case UnreachableMetadataMutation.Type:
-                graph.Types = [.. graph.Types, new PortableIrType(
-                    IrTypeKind.Reference, "Unused", -1)];
-                break;
-            case UnreachableMetadataMutation.Identity:
-                graph.Identities = [.. graph.Identities, graph.Identities.Length];
-                break;
-            case UnreachableMetadataMutation.Variable:
-                graph.Variables = [.. graph.Variables,
-                    new PortableIrVariable("unused", 1)];
-                break;
-            case UnreachableMetadataMutation.Member:
-                graph.Identities = [.. graph.Identities, graph.Identities.Length];
-                graph.Members = [.. graph.Members, new PortableIrMember(
-                    graph.Identities.Length - 1,
-                    3,
-                    "Unused",
-                    1,
-                    true,
-                    [])];
-                break;
-            case UnreachableMetadataMutation.Operation:
-                graph.Operations = [.. graph.Operations,
-                    new PortableIrOperation("unused")];
-                break;
-            case UnreachableMetadataMutation.Term:
-                graph.Terms = [.. graph.Terms, new PortableIrTerm(
-                    IrTermKind.Integer,
-                    1,
-                    number: 42,
-                    items: [])];
-                break;
-            case UnreachableMetadataMutation.ReorderedOperations:
-                (graph.Operations[0], graph.Operations[1]) =
-                    (graph.Operations[1], graph.Operations[0]);
-                foreach (var instruction in graph.Blocks.SelectMany(
-                             static block => block.Instructions))
-                {
-                    instruction.Operation = instruction.Operation switch
+            switch (mutation)
+            {
+                case UnreachableMetadataMutation.Type:
+                    graph.Types = [.. graph.Types, new PortableIrType(
+                        IrTypeKind.Reference, "Unused", -1)];
+                    break;
+                case UnreachableMetadataMutation.Identity:
+                    graph.Identities = [.. graph.Identities, graph.Identities.Length];
+                    break;
+                case UnreachableMetadataMutation.Variable:
+                    graph.Variables = [.. graph.Variables,
+                        new PortableIrVariable("unused", 1)];
+                    break;
+                case UnreachableMetadataMutation.Member:
+                    graph.Identities = [.. graph.Identities, graph.Identities.Length];
+                    graph.Members = [.. graph.Members, new PortableIrMember(
+                        graph.Identities.Length - 1,
+                        3,
+                        "Unused",
+                        1,
+                        true,
+                        [])];
+                    break;
+                case UnreachableMetadataMutation.Operation:
+                    graph.Operations = [.. graph.Operations,
+                        new PortableIrOperation("unused")];
+                    break;
+                case UnreachableMetadataMutation.Term:
+                    graph.Terms = [.. graph.Terms, new PortableIrTerm(
+                        IrTermKind.Integer,
+                        1,
+                        number: 42,
+                        items: [])];
+                    break;
+                case UnreachableMetadataMutation.ReorderedOperations:
+                    (graph.Operations[0], graph.Operations[1]) =
+                        (graph.Operations[1], graph.Operations[0]);
+                    foreach (var instruction in graph.Blocks.SelectMany(
+                                 static block => block.Instructions))
                     {
-                        0 => 1,
-                        1 => 0,
-                        _ => instruction.Operation
-                    };
-                }
-                foreach (var term in graph.Terms.Where(static term =>
-                             term.Kind == IrTermKind.Opaque && term.C != 0))
-                {
-                    term.D = term.D switch
+                        instruction.Operation = instruction.Operation switch
+                        {
+                            0 => 1,
+                            1 => 0,
+                            _ => instruction.Operation
+                        };
+                    }
+                    foreach (var term in graph.Terms.Where(static term =>
+                                 term.Kind == IrTermKind.Opaque && term.C != 0))
                     {
-                        0 => 1,
-                        1 => 0,
-                        _ => term.D
-                    };
-                }
-                break;
-            default:
-                throw new AssertionException("Unknown metadata mutation.");
-        }
-
-        Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+                        term.D = term.D switch
+                        {
+                            0 => 1,
+                            1 => 0,
+                            _ => term.D
+                        };
+                    }
+                    break;
+                default:
+                    throw new AssertionException("Unknown metadata mutation.");
+            }
+        });
     }
 
     [TestCase(CanonicalSlotMutation.TermUnusedIndex)]
@@ -564,53 +555,47 @@ public sealed class PortableIrGraphCodecTests
     public void DecoderRejectsNonCanonicalSlotsAfterSerialization(
         CanonicalSlotMutation mutation)
     {
-        var fixture = CreateFixture();
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(
-            PortableIrGraphCodec.Encode(fixture.Program, fixture.Roots).Graph,
-            WorkerProtocolJson.Options);
-        var graph = JsonSerializer.Deserialize<PortableIrGraph>(
-            bytes,
-            WorkerProtocolJson.Options)!;
-
-        switch (mutation)
-        {
-            case CanonicalSlotMutation.TermUnusedIndex:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).B = 0;
-                break;
-            case CanonicalSlotMutation.TermUnusedNumber:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).Number = 1;
-                break;
-            case CanonicalSlotMutation.TermUnusedText:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).Text =
-                    "tampered";
-                break;
-            case CanonicalSlotMutation.TermEmptyItems:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Null).Items = [0];
-                break;
-            case CanonicalSlotMutation.InstructionUnusedIndex:
-                graph.Blocks
-                    .SelectMany(static block => block.Instructions)
-                    .First(static row => row.Kind == IrInstructionKind.Assign)
-                    .C = 0;
-                break;
-            case CanonicalSlotMutation.InstructionEmptyItems:
-                graph.Blocks
-                    .SelectMany(static block => block.Instructions)
-                    .First(static row => row.Kind == IrInstructionKind.Assign)
-                    .Items = [0];
-                break;
-            case CanonicalSlotMutation.InstructionUnusedLocation:
-                graph.Blocks
-                    .SelectMany(static block => block.Instructions)
-                    .First(static row => row.Kind == IrInstructionKind.Call)
-                    .Location = new();
-                break;
-            default:
-                throw new AssertionException("Unknown mutation.");
-        }
-
-        Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+        AssertDecoderRejects(
+            graph =>
+            {
+                switch (mutation)
+                {
+                    case CanonicalSlotMutation.TermUnusedIndex:
+                        graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).B = 0;
+                        break;
+                    case CanonicalSlotMutation.TermUnusedNumber:
+                        graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).Number = 1;
+                        break;
+                    case CanonicalSlotMutation.TermUnusedText:
+                        graph.Terms.First(static row => row.Kind == IrTermKind.Boolean).Text =
+                            "tampered";
+                        break;
+                    case CanonicalSlotMutation.TermEmptyItems:
+                        graph.Terms.First(static row => row.Kind == IrTermKind.Null).Items = [0];
+                        break;
+                    case CanonicalSlotMutation.InstructionUnusedIndex:
+                        graph.Blocks
+                            .SelectMany(static block => block.Instructions)
+                            .First(static row => row.Kind == IrInstructionKind.Assign)
+                            .C = 0;
+                        break;
+                    case CanonicalSlotMutation.InstructionEmptyItems:
+                        graph.Blocks
+                            .SelectMany(static block => block.Instructions)
+                            .First(static row => row.Kind == IrInstructionKind.Assign)
+                            .Items = [0];
+                        break;
+                    case CanonicalSlotMutation.InstructionUnusedLocation:
+                        graph.Blocks
+                            .SelectMany(static block => block.Instructions)
+                            .First(static row => row.Kind == IrInstructionKind.Call)
+                            .Location = new();
+                        break;
+                    default:
+                        throw new AssertionException("Unknown mutation.");
+                }
+            },
+            serialize: true);
     }
 
     [TestCase(WireEnumMutation.OpaquePurity)]
@@ -619,30 +604,27 @@ public sealed class PortableIrGraphCodecTests
     [TestCase(WireEnumMutation.HavocKind)]
     public void DecoderRejectsUnknownWireEnumCodes(WireEnumMutation mutation)
     {
-        var fixture = CreateFixture();
-        var graph = PortableIrGraphCodec.Encode(fixture.Program, fixture.Roots).Graph;
-
-        switch (mutation)
+        AssertDecoderRejects(graph =>
         {
-            case WireEnumMutation.OpaquePurity:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Opaque).C = 999;
-                break;
-            case WireEnumMutation.UnaryOperator:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Unary).A = 999;
-                break;
-            case WireEnumMutation.BinaryOperator:
-                graph.Terms.First(static row => row.Kind == IrTermKind.Binary).A = 999;
-                break;
-            case WireEnumMutation.HavocKind:
-                graph.Blocks.SelectMany(static block => block.Instructions)
-                    .First(static row => row.Kind == IrInstructionKind.Havoc).A = 999;
-                break;
-            default:
-                throw new AssertionException("Unknown mutation.");
-        }
-
-        Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+            switch (mutation)
+            {
+                case WireEnumMutation.OpaquePurity:
+                    graph.Terms.First(static row => row.Kind == IrTermKind.Opaque).C = 999;
+                    break;
+                case WireEnumMutation.UnaryOperator:
+                    graph.Terms.First(static row => row.Kind == IrTermKind.Unary).A = 999;
+                    break;
+                case WireEnumMutation.BinaryOperator:
+                    graph.Terms.First(static row => row.Kind == IrTermKind.Binary).A = 999;
+                    break;
+                case WireEnumMutation.HavocKind:
+                    graph.Blocks.SelectMany(static block => block.Instructions)
+                        .First(static row => row.Kind == IrInstructionKind.Havoc).A = 999;
+                    break;
+                default:
+                    throw new AssertionException("Unknown mutation.");
+            }
+        });
     }
 
     [Test]
@@ -683,84 +665,79 @@ public sealed class PortableIrGraphCodecTests
     [TestCase(MalformedMutation.WhitespaceBlockName)]
     public void DecoderRejectsMalformedGraphs(MalformedMutation mutation)
     {
-        var fixture = CreateFixture();
-        var graph = PortableIrGraphCodec.Encode(
-            fixture.Program,
-            fixture.Roots).Graph;
-
-        switch (mutation)
+        var exception = AssertDecoderRejects(graph =>
         {
-            case MalformedMutation.TermIndex:
-                graph.Roots[0] = graph.Terms.Length;
-                break;
-            case MalformedMutation.TermCycle:
-                var unaryIndex = Array.FindIndex(
-                    graph.Terms,
-                    static row => row.Kind == IrTermKind.Unary);
-                graph.Terms[unaryIndex].B = unaryIndex;
-                break;
-            case MalformedMutation.TypeCycle:
-                var sequenceIndex = Array.FindIndex(
-                    graph.Types,
-                    static row => row.Kind == IrTypeKind.Sequence);
-                graph.Types[sequenceIndex].Element = sequenceIndex;
-                break;
-            case MalformedMutation.TermKind:
-                graph.Terms[0].Kind = (IrTermKind)999;
-                break;
-            case MalformedMutation.TermType:
-                var booleanIndex = Array.FindIndex(
-                    graph.Terms,
-                    static row => row.Kind == IrTermKind.Boolean);
-                graph.Terms[booleanIndex].Type = 1;
-                break;
-            case MalformedMutation.InstructionKind:
-                graph.Blocks[0].Instructions[0].Kind = (IrInstructionKind)999;
-                break;
-            case MalformedMutation.NullTopLevelArray:
-                graph.Roots = null!;
-                break;
-            case MalformedMutation.NullMemberParameters:
-                graph.Members[0].ParameterTypes = null!;
-                break;
-            case MalformedMutation.NonCanonicalIdentity:
-                graph.Identities[0] = 1;
-                break;
-            case MalformedMutation.CollapsedMemberPartition:
-                graph.Members[1] = graph.Members[0];
-                break;
-            case MalformedMutation.CollapsedTermPartition:
-                graph.Terms[1] = graph.Terms[0];
-                break;
-            case MalformedMutation.NullInstructionItems:
-                graph.Blocks[0].Instructions[0].Items = null!;
-                break;
-            case MalformedMutation.LocationKind:
-                graph.Blocks[0].Instructions
-                    .First(static instruction => instruction.Location != null)
-                    .Location!.Kind = (IrLocationKind)999;
-                break;
-            case MalformedMutation.ProgramShape:
-                graph.HasProgram = false;
-                break;
-            case MalformedMutation.DuplicateHavocVariable:
-                var havoc = graph.Blocks
-                    .SelectMany(static block => block.Instructions)
-                    .First(static row => row.Kind == IrInstructionKind.Havoc);
-                havoc.Items = [havoc.Items[0], havoc.Items[0]];
-                break;
-            case MalformedMutation.WhitespaceOperationDescription:
-                graph.Operations[0].Description = " ";
-                break;
-            case MalformedMutation.WhitespaceBlockName:
-                graph.Blocks[0].Name = "\t";
-                break;
-            default:
-                throw new AssertionException("Unknown mutation.");
-        }
-
-        var exception = Assert.Throws<InvalidDataException>(
-            (Action)(() => PortableIrGraphCodec.Decode(graph)));
+            switch (mutation)
+            {
+                case MalformedMutation.TermIndex:
+                    graph.Roots[0] = graph.Terms.Length;
+                    break;
+                case MalformedMutation.TermCycle:
+                    var unaryIndex = Array.FindIndex(
+                        graph.Terms,
+                        static row => row.Kind == IrTermKind.Unary);
+                    graph.Terms[unaryIndex].B = unaryIndex;
+                    break;
+                case MalformedMutation.TypeCycle:
+                    var sequenceIndex = Array.FindIndex(
+                        graph.Types,
+                        static row => row.Kind == IrTypeKind.Sequence);
+                    graph.Types[sequenceIndex].Element = sequenceIndex;
+                    break;
+                case MalformedMutation.TermKind:
+                    graph.Terms[0].Kind = (IrTermKind)999;
+                    break;
+                case MalformedMutation.TermType:
+                    var booleanIndex = Array.FindIndex(
+                        graph.Terms,
+                        static row => row.Kind == IrTermKind.Boolean);
+                    graph.Terms[booleanIndex].Type = 1;
+                    break;
+                case MalformedMutation.InstructionKind:
+                    graph.Blocks[0].Instructions[0].Kind = (IrInstructionKind)999;
+                    break;
+                case MalformedMutation.NullTopLevelArray:
+                    graph.Roots = null!;
+                    break;
+                case MalformedMutation.NullMemberParameters:
+                    graph.Members[0].ParameterTypes = null!;
+                    break;
+                case MalformedMutation.NonCanonicalIdentity:
+                    graph.Identities[0] = 1;
+                    break;
+                case MalformedMutation.CollapsedMemberPartition:
+                    graph.Members[1] = graph.Members[0];
+                    break;
+                case MalformedMutation.CollapsedTermPartition:
+                    graph.Terms[1] = graph.Terms[0];
+                    break;
+                case MalformedMutation.NullInstructionItems:
+                    graph.Blocks[0].Instructions[0].Items = null!;
+                    break;
+                case MalformedMutation.LocationKind:
+                    graph.Blocks[0].Instructions
+                        .First(static instruction => instruction.Location != null)
+                        .Location!.Kind = (IrLocationKind)999;
+                    break;
+                case MalformedMutation.ProgramShape:
+                    graph.HasProgram = false;
+                    break;
+                case MalformedMutation.DuplicateHavocVariable:
+                    var havoc = graph.Blocks
+                        .SelectMany(static block => block.Instructions)
+                        .First(static row => row.Kind == IrInstructionKind.Havoc);
+                    havoc.Items = [havoc.Items[0], havoc.Items[0]];
+                    break;
+                case MalformedMutation.WhitespaceOperationDescription:
+                    graph.Operations[0].Description = " ";
+                    break;
+                case MalformedMutation.WhitespaceBlockName:
+                    graph.Blocks[0].Name = "\t";
+                    break;
+                default:
+                    throw new AssertionException("Unknown mutation.");
+            }
+        });
 
         if (mutation == MalformedMutation.WhitespaceOperationDescription)
         {
@@ -816,6 +793,29 @@ public sealed class PortableIrGraphCodecTests
 
         Assert.Throws<InvalidDataException>((Action)(() =>
             PortableIrGraphCodec.Encode(factory, null, [term])));
+    }
+
+    private static InvalidDataException AssertDecoderRejects(
+        Action<PortableIrGraph> mutate,
+        bool serialize = false)
+    {
+        var fixture = CreateFixture();
+        var graph = PortableIrGraphCodec.Encode(
+            fixture.Program,
+            fixture.Roots).Graph;
+        if (serialize)
+        {
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(
+                graph,
+                WorkerProtocolJson.Options);
+            graph = JsonSerializer.Deserialize<PortableIrGraph>(
+                bytes,
+                WorkerProtocolJson.Options)!;
+        }
+
+        mutate(graph);
+        return Assert.Throws<InvalidDataException>(
+            (Action)(() => PortableIrGraphCodec.Decode(graph)))!;
     }
 
     private static PortableIrGraph DeepGraph(

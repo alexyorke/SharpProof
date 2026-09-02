@@ -4239,12 +4239,6 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
 
-### Status (part two hundred twenty-two)
-
-| R688 | **`PortableIrGraphCodecTests` repeats negative-decoder setup and failure assertions.** The metadata, canonical-slot, unknown-enum, and malformed-graph test groups each create the same comprehensive fixture, encode it, mutate one wire field, and assert `InvalidDataException`; the groups differ only in mutation location (with the slot group adding a serialize/deserialize boundary). A shared mutation harness, optionally applying the JSON boundary, can own fixture encoding and the common decode-failure assertion while retaining each enum's explicit mutation switch and specialized message check. | `SharpProof.Worker.Test/PortableIrGraphCodecTests.cs:483-815` |
-
-R688 is a pending portable-IR negative-test harness reduction candidate. Preserve fixture reachability, the optional serialization boundary, mutation-specific wire shapes, and the malformed-operation diagnostic assertion.
-
 ### Status (part two hundred twenty-three)
 
 | R689 | **`ApiSpecRuntimeOracleTests` repeats type-specialized constructor witness observation.** The Exception and InvalidOperationException constructor and string-constructor paths each wrap the same `ObserveReceiverWrites`/`ConstructorWritesReceiver` sequence, with only the receiver type, static receiver slot, and constructor delegate changing; the corresponding `CreateBcl...CtorWitness` methods repeat the same `ConstructorRow` shape as well. A generic receiver/constructor observation helper can retain the type-specific delegates and static state while removing the duplicated field-snapshot and witness assembly scaffolding. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:249-299,688-730` |
