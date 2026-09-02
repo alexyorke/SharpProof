@@ -223,7 +223,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         IEnumerable<string> expectedUsed,
         HashSet<string> errors)
     {
-        if (!SameAssumptions(actual, expected) ||
+        if (!WorkerProtocolJson.SameAssumptionDeclarations(actual, expected) ||
             !IsCanonicalAssumptions(actual, expected))
         {
             errors.Add("response.assumption_usage_authority");
@@ -570,22 +570,6 @@ internal sealed class CompilerResponseEvidenceAuthority :
         return target.Clauses.Any(static clause =>
             clause.Kind == CompilerContractKind.Requires &&
             clause.Condition is IrBooleanTerm { Value: false });
-    }
-
-    private static bool SameAssumptions(
-        WorkerAssumptionEvidence[]? actual,
-        WorkerAssumptionEvidence[]? expected)
-    {
-        static IEnumerable<(string Id, WorkerAssumptionKind Kind)> Normalize(
-            WorkerAssumptionEvidence[]? values)
-        {
-            return (values ?? [])
-                .Where(static value => value != null)
-                .OrderBy(static value => value.Id, StringComparer.Ordinal)
-                .Select(static value => (value.Id, value.Kind));
-        }
-
-        return Normalize(actual).SequenceEqual(Normalize(expected));
     }
 
     private static bool IsCanonicalAssumptions(

@@ -198,6 +198,7 @@ the smallest relevant containerized test target passes.
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
 | R524 | Share callable proof-label normalization | `SharpProof.Worker.Test`: 695 passed |
+| R526 | Share order-insensitive assumption comparison across protocol layers | `SharpProof.Worker.Test`: 695 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3160,10 +3161,10 @@ while preserving the distinct label-failure and response-state policies.
 
 ### Status (part seventy-five)
 
-R526-R527 are `pending` reduction candidates. R526 targets only duplicate
-order-insensitive comparison plumbing; canonical serialization remains distinct.
-R527 targets enumeration mechanics, not the deliberate failure and status
-precedence.
+R527 remains `pending`; R526 shares only duplicate order-insensitive comparison
+plumbing across the protocol and compiler-artifact layers. Canonical
+serialization remains distinct. R527 targets enumeration mechanics, not the
+deliberate failure and status precedence.
 
 ## Second survey, part seventy-six: R528 - allocation sentinel reuse
 
@@ -3320,3 +3321,13 @@ behavior for user-defined or non-reference conversions.
 
 R548 is a `pending` reduction candidate. Preserve the exact boundary values and
 the intentionally smaller C# literal subset if the corpus is centralized.
+
+## Second survey, part ninety-one: R549 - repeated release-tag gate
+
+| R549 | **`package-consumers.yml` runs the same release-tag validation in two jobs.** The `package` job conditionally invokes `tooling release-tag` for every version-tag ref before packing, and the later `release-qualification` job invokes the same command again after downloading or rebuilding the qualified inputs. Both pass the same `GITHUB_REF`, `GITHUB_REF_NAME`, and `GITHUB_SHA` identity fields to the same `Invoke-SharpProofReleaseContainer.ps1 -Mode ValidateTag` logic. Keeping one check at the package boundary and making qualification consume a recorded tag-validation receipt, or explicitly documenting the second invocation as defense-in-depth, would remove a repeated in-container Git/tag traversal and clarify whether two validations are required. | `.github/workflows/package-consumers.yml:40-49,131-137`; `scripts/Invoke-SharpProofReleaseContainer.ps1:41-75` |
+
+### Status (part ninety-one)
+
+R549 is a `pending` reduction candidate. Do not remove the qualification-time
+identity guarantee unless the package artifact and the exact checkout identity
+are bound by an equivalent immutable receipt.

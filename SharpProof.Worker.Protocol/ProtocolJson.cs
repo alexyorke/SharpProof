@@ -960,7 +960,7 @@ public static partial class WorkerProtocolJson
         return [.. (values ?? []).OrderBy(identity, s_ordinal)];
     }
 
-    private static bool SameAssumptionDeclarations(
+    internal static bool SameAssumptionDeclarations(
             WorkerAssumptionEvidence[]? actual, WorkerAssumptionEvidence[]? expected)
     {
         static IEnumerable<(string Id, WorkerAssumptionKind Kind)> Normalize(
