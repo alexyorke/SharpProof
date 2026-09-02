@@ -6056,3 +6056,22 @@ matrix. No implementation or build file was changed.
 
 R791 is `pending` and limited to timed-phase orchestration helpers. No
 implementation or build file was changed.
+
+## Second survey, part three hundred three: R792 - shadowed generator string helper
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R792 | **The API-spec witness generator shadows a shared C# string encoder with a weaker local copy.** `SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1` dot-sources `scripts/GeneratedFileHelpers.ps1`, which already defines `ConvertTo-CSharpString`, and then redeclares the same function locally before using it for catalog witness identifiers. The local version repeats only backslash and quote escaping and requires a non-null string; the shared helper also handles null, empty input, carriage return, line feed, and tab. The current catalog uses identifier-like values, so this is not an observed output defect, but the shadowing creates two authorities with different contracts and makes future generator inputs silently less safe. Removing the local copy and using the shared helper, or giving the generator a narrowly named wrapper with an explicit restricted contract, would eliminate the accidental override while retaining the generator's identifier validation. | `SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1:17,35-42,115`; `scripts/GeneratedFileHelpers.ps1:213-232` |
+
+### Checked and not proposed (part three hundred three)
+
+- The catalog's witness-identifier and factory-name validation remains
+  generator-specific; only the string-literal encoding is duplicated.
+- This is a deferred reduction, not a claim that the current identifier-only
+  input is malformed; the concern is contract drift caused by the shadowed
+  helper.
+
+### Status (part three hundred three)
+
+R792 is `pending` and limited to the API-spec runtime-witness generator's
+string-encoding helper. No implementation or build file was changed.
