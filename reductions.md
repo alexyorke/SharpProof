@@ -5893,3 +5893,21 @@ or build file was changed.
 
 R783 is `pending` and limited to release/coverage reader plumbing. No
 implementation or build file was changed.
+
+## Second survey, part two hundred ninety-five: R784 - duplicated Source Link validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R784 | **The package smoke test and release symbol validator independently implement the same Source Link assertion.** `PackageLayoutSmokeTests.VerifyPortablePdbSourceLink` and `SharpProofSymbolPackageValidator.ValidatePortablePdb` both locate the Source Link custom-debug-information record using the same `CC110556-A091-4D38-9FEC-25AB9A351A6A` GUID, require exactly one record, decode its UTF-8 JSON, require an object-shaped `documents` property, enumerate nonempty mappings, normalize backslashes in mapping names, and require every mapping value to equal the canonical raw-GitHub URL for the authenticated commit. One reports NUnit assertion context and the other throws `InvalidDataException`, but the accepted Source Link contract is otherwise duplicated across a test assembly and the release validator. A shared Source Link model/validator with caller-specific failure adapters can own the format and canonical-URL policy while the smoke test retains its package-layout assertions and the release path retains its fail-closed exception surface. This is narrower than R783's portable-reader lifecycle and separate from R292's archive entry pairing. | `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:24,2086-2132`; `scripts/SharpProof.SymbolPackageValidator.cs:12,245-303`; `scripts/Test-SharpProofSymbolPackages.ps1:1-32` |
+
+### Checked and not proposed (part two hundred ninety-five)
+
+- The two callers should keep different failure surfaces: NUnit diagnostics for
+  package smoke tests and `InvalidDataException` for release validation.
+- Package-layout checks and PDB identity/CodeView checks are not folded into this
+  item; only the shared Source Link record and mapping policy is in scope.
+
+### Status (part two hundred ninety-five)
+
+R784 is `pending` and limited to package/release Source Link validation plumbing.
+No implementation or build file was changed.
