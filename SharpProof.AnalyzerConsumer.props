@@ -111,7 +111,7 @@
 
   <Target Name="_SharpProofRequireSourceTreeVerifierPackage"
           BeforeTargets="CoreCompile"
-          DependsOnTargets="_SharpProofValidateSourceTreeConfiguration"
+          DependsOnTargets="_SharpProofValidateConsumerConfiguration"
           Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierPackagePresent)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
     <Error Text="SharpProof verification requires the matching SharpProof.Verifier package. The source-tree analyzer consumer cannot run verification by itself." />
   </Target>
