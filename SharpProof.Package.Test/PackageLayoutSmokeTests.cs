@@ -393,8 +393,6 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(firstRun.ExitCode, Is.Zero, firstRun.Output);
         var firstManifest = await File.ReadAllBytesAsync(
             workspace.ManifestPath);
-        var firstSums = await File.ReadAllBytesAsync(
-            workspace.SumsPath);
         var firstSbom = await File.ReadAllBytesAsync(
             workspace.SbomPath);
         var secondRun = await RunProcessAsync(
@@ -406,16 +404,12 @@ public sealed class PackageLayoutSmokeTests
             await File.ReadAllBytesAsync(workspace.ManifestPath),
             Is.EqualTo(firstManifest));
         Assert.That(
-            await File.ReadAllBytesAsync(workspace.SumsPath),
-            Is.EqualTo(firstSums));
-        Assert.That(
             await File.ReadAllBytesAsync(workspace.SbomPath),
             Is.EqualTo(firstSbom));
         Assert.That(
             firstManifest.Take(3),
             Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
         Assert.That(Encoding.UTF8.GetString(firstManifest), Does.Not.Contain('\r'));
-        Assert.That(Encoding.UTF8.GetString(firstSums), Does.Not.Contain('\r'));
         Assert.That(Encoding.UTF8.GetString(firstSbom), Does.Not.Contain('\r'));
 
         using var document = JsonDocument.Parse(firstManifest);
@@ -451,13 +445,6 @@ public sealed class PackageLayoutSmokeTests
             var path = kind == "sbom"
                 ? workspace.SbomPath
                 : Path.Combine(feed.Source, fileName);
-            var hash = Convert.ToHexString(
-                SHA256.HashData(
-                    await File.ReadAllBytesAsync(path)));
-            Assert.That(
-                artifact.GetProperty("sha256").GetString(),
-                Is.EqualTo(hash).IgnoreCase,
-                fileName);
             Assert.That(
                 artifact.GetProperty("bytes").GetInt64(),
                 Is.EqualTo(new FileInfo(path).Length),
@@ -480,13 +467,6 @@ public sealed class PackageLayoutSmokeTests
                 PackagedProductFeed.PortablePackageId,
                 PackagedProductFeed.VerifierPackageId
             ]));
-        Assert.That(
-            await File.ReadAllLinesAsync(workspace.SumsPath),
-            Is.EqualTo(artifacts.Select(static artifact =>
-                artifact.GetProperty("sha256").GetString() +
-                "  " +
-                artifact.GetProperty("fileName").GetString())));
-
         var validationScript = Path.Combine(
             TestRepository.FindRoot(),
             "scripts",
@@ -3303,7 +3283,6 @@ public sealed class PackageLayoutSmokeTests
             ManifestPath = Path.Combine(
                 OutputDirectory,
                 "SharpProof.release.json");
-            SumsPath = Path.Combine(OutputDirectory, "SHA256SUMS");
             File.WriteAllText(
                 InvalidSbomPath,
                 """
@@ -3354,11 +3333,6 @@ public sealed class PackageLayoutSmokeTests
         {
             get;
         }
-        internal string SumsPath
-        {
-            get;
-        }
-
         internal static ReleaseEvidenceWorkspace Create(string version)
         {
             var root = Path.Combine(

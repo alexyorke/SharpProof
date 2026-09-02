@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet(
         'valid-disjoint','existing-output','main-package','symbol-package',
-        'manifest','sbom','checksums','fixture-input','relative-dot-alias',
+        'manifest','sbom','fixture-input','relative-dot-alias',
         'absolute-alias','symlink-alias','hardlink-alias','reserved-name',
         'writer-failure','post-write-mutation')]
     [string]$Mutation
@@ -28,7 +28,7 @@ try {
             'SharpProof.Attributes.1.0.0-preview.1.snupkg',
             'SharpProof.Verifier.1.0.0-preview.1.nupkg',
             'SharpProof.Verifier.1.0.0-preview.1.snupkg',
-            'SharpProof.release.json','SharpProof.spdx.json','SHA256SUMS')) {
+            'SharpProof.release.json','SharpProof.spdx.json')) {
         [IO.File]::WriteAllText((Join-Path $packages $name), "input:$name")
     }
     $fixtureInput = Join-Path $fixture 'remote.json'
@@ -42,13 +42,12 @@ try {
         'symbol-package' { $planPath = Join-Path $packages 'SharpProof.1.0.0-preview.1.snupkg' }
         'manifest' { $planPath = Join-Path $packages 'SharpProof.release.json' }
         'sbom' { $planPath = Join-Path $packages 'SharpProof.spdx.json' }
-        'checksums' { $planPath = Join-Path $packages 'SHA256SUMS' }
         'fixture-input' { $planPath = $fixtureInput }
         'relative-dot-alias' {
             $planPath = Join-Path $packages './SharpProof.release.json'
         }
         'absolute-alias' {
-            $planPath = [IO.Path]::GetFullPath((Join-Path $packages 'SHA256SUMS'))
+            $planPath = [IO.Path]::GetFullPath((Join-Path $packages 'SharpProof.release.json'))
         }
         'symlink-alias' {
             $planPath = Join-Path $outputRoot 'link.json'

@@ -62,7 +62,7 @@ function Test-SharpProofPublicationPlanIdentity {
     $versionAuthority = $Plan.versionAuthority
     if (-not (Test-SharpProofExactProperties `
             -Value $versionAuthority -Expected @(
-                'schemaVersion','path','property','version','sha256')) -or
+                'schemaVersion','path','property','version')) -or
         ($versionAuthority.schemaVersion -isnot [int] -and
          $versionAuthority.schemaVersion -isnot [int64]) -or
         [int64]$versionAuthority.schemaVersion -ne 1 -or
@@ -71,9 +71,7 @@ function Test-SharpProofPublicationPlanIdentity {
         $versionAuthority.property -isnot [string] -or
         $versionAuthority.property -cne 'SharpProofPackageVersion' -or
         $versionAuthority.version -isnot [string] -or
-        $versionAuthority.version -cne $version -or
-        $versionAuthority.sha256 -isnot [string] -or
-        $versionAuthority.sha256 -cnotmatch '^[0-9a-f]{64}\z') {
+        $versionAuthority.version -cne $version) {
         throw 'Publication plan version authority is invalid.'
     }
     $destination = $Plan.publicationDestination
@@ -153,9 +151,9 @@ function Test-SharpProofPublicationPlanIdentity {
             }
             $fixture = $destination.fixture
             if (-not (Test-SharpProofExactProperties `
-                    -Value $fixture -Expected @(
-                        'path','fileIdentity','entryCount',
-                        'entriesSha256','archives')) -or
+                -Value $fixture -Expected @(
+                    'path','fileIdentity','entryCount',
+                        'archives')) -or
                 $fixture.path -isnot [string] -or
                 -not [IO.Path]::IsPathFullyQualified($fixture.path) -or
                 [IO.Path]::GetFullPath($fixture.path) -cne $fixture.path -or
@@ -163,9 +161,7 @@ function Test-SharpProofPublicationPlanIdentity {
                 $fixture.fileIdentity -cnotmatch '^[0-9]+:[0-9]+\z' -or
                 ($fixture.entryCount -isnot [int] -and
                  $fixture.entryCount -isnot [int64]) -or
-                [int64]$fixture.entryCount -lt 0 -or
-                $fixture.entriesSha256 -isnot [string] -or
-                $fixture.entriesSha256 -cnotmatch '^[0-9a-f]{64}\z') {
+                [int64]$fixture.entryCount -lt 0) {
                 throw 'Fixture publication authority is invalid.'
             }
             $fixturePrefix = $fixture.path.TrimEnd(
@@ -204,9 +200,9 @@ function Test-SharpProofPublicationPlanIdentity {
     $artifacts = @($Plan.artifacts)
     $expectedRoles = @(
         'main','symbols','main','symbols','main','symbols',
-        'release-manifest','sbom','checksums')
+        'release-manifest','sbom')
     if ($artifacts.Count -ne $expectedRoles.Count) {
-        throw 'Publication plan must bind exactly nine release files.'
+        throw 'Publication plan must bind exactly eight release files.'
     }
     $seen = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
@@ -214,12 +210,11 @@ function Test-SharpProofPublicationPlanIdentity {
         $artifact = $artifacts[$index]
         $properties = @($artifact.PSObject.Properties.Name)
         if (($properties -join '|') -cne
-                'path|fileName|bytes|sha256|role|version|repositoryCommit') {
+                'path|fileName|bytes|role|version|repositoryCommit') {
             throw 'Publication plan artifact schema is invalid.'
         }
         foreach ($property in @(
-                'path','fileName','sha256','role','version',
-                'repositoryCommit')) {
+                'path','fileName','role','version','repositoryCommit')) {
             if ($artifact.$property -isnot [string]) {
                 throw 'Publication plan artifact schema is invalid.'
             }
@@ -236,10 +231,8 @@ function Test-SharpProofPublicationPlanIdentity {
             throw 'Publication plan artifact identity is invalid.'
         }
         $file = Get-Item -LiteralPath $path
-        $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($artifact.bytes -isnot [int64] -or
-            $artifact.bytes -ne [int64]$file.Length -or
-            [string]$artifact.sha256 -cne $hash) {
+            $artifact.bytes -ne [int64]$file.Length) {
             throw "Publication plan artifact bytes changed: '$path'."
         }
     }
@@ -381,8 +374,8 @@ function Test-SharpProofPublicationPlanIdentity {
     $manifest = Get-Content -LiteralPath $artifacts[6].path -Raw | ConvertFrom-Json
     $manifestVersionAuthority = $manifest.versionAuthority
     if (-not (Test-SharpProofExactProperties `
-            -Value $manifestVersionAuthority -Expected @(
-                'schemaVersion','path','property','version','sha256')) -or
+        -Value $manifestVersionAuthority -Expected @(
+                'schemaVersion','path','property','version')) -or
         ($manifestVersionAuthority.schemaVersion -isnot [int] -and
          $manifestVersionAuthority.schemaVersion -isnot [int64]) -or
         [int64]$manifestVersionAuthority.schemaVersion -ne
@@ -396,9 +389,6 @@ function Test-SharpProofPublicationPlanIdentity {
         $manifestVersionAuthority.version -isnot [string] -or
         [string]$manifestVersionAuthority.version -cne
             [string]$versionAuthority.version -or
-        $manifestVersionAuthority.sha256 -isnot [string] -or
-        [string]$manifestVersionAuthority.sha256 -cne
-            [string]$versionAuthority.sha256 -or
         $manifest.packageVersion -isnot [string] -or
         $manifest.repository.commit -isnot [string] -or
         [string]$manifest.packageVersion -cne $version -or
@@ -407,8 +397,7 @@ function Test-SharpProofPublicationPlanIdentity {
     }
     $manifestArtifacts = @($manifest.artifacts)
     foreach ($artifact in $manifestArtifacts) {
-        if ($artifact.fileName -isnot [string] -or
-            $artifact.sha256 -isnot [string]) {
+        if ($artifact.fileName -isnot [string]) {
             throw 'Publication plan release manifest schema is invalid.'
         }
     }
@@ -417,20 +406,9 @@ function Test-SharpProofPublicationPlanIdentity {
             [string]$_.fileName -ceq [string]$artifact.fileName })
         if ($row.Count -ne 1 -or
             $row[0].bytes -isnot [int64] -or
-            $row[0].bytes -ne $artifact.bytes -or
-            [string]$row[0].sha256 -cne [string]$artifact.sha256) {
+            $row[0].bytes -ne $artifact.bytes) {
             throw 'Publication plan does not agree with the release manifest.'
         }
-    }
-    $expectedChecksumBytes = [Text.StringBuilder]::new()
-    foreach ($artifact in $manifestArtifacts) {
-        [void]$expectedChecksumBytes.Append(
-            ([string]$artifact.sha256) + '  ' +
-            ([string]$artifact.fileName) + "`n")
-    }
-    if ([IO.File]::ReadAllText([string]$artifacts[8].path) -cne
-        $expectedChecksumBytes.ToString()) {
-        throw 'Publication plan does not agree with SHA256SUMS.'
     }
 }
 
@@ -454,8 +432,7 @@ function New-SharpProofPublicationPlanIdentities {
     }
     foreach ($pair in @(
             [pscustomobject]@{ Path = Join-Path $Directory 'SharpProof.release.json'; Role = 'release-manifest' },
-            [pscustomobject]@{ Path = Join-Path $Directory 'SharpProof.spdx.json'; Role = 'sbom' },
-            [pscustomobject]@{ Path = Join-Path $Directory 'SHA256SUMS'; Role = 'checksums' })) {
+            [pscustomobject]@{ Path = Join-Path $Directory 'SharpProof.spdx.json'; Role = 'sbom' })) {
         $rows.Add((New-SharpProofPublicationPlanFileIdentity `
             -Path $pair.Path -Role $pair.Role -Version $Version `
             -RepositoryCommit $RepositoryCommit))
@@ -471,7 +448,6 @@ function New-SharpProofPublicationPlanFileIdentity {
         path = $canonical
         fileName = $file.Name
         bytes = [int64]$file.Length
-        sha256 = (Get-FileHash -LiteralPath $canonical -Algorithm SHA256).Hash.ToLowerInvariant()
         role = $Role
         version = $Version
         repositoryCommit = $RepositoryCommit

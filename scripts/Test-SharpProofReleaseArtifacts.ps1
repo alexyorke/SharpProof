@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackageDependencies.ps1')
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
-. (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseBundle.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 
 function Get-SpdxPackageId {
@@ -55,13 +55,11 @@ Test-SharpProofReleaseVersion `
     -ActualVersion $expectedVersion `
     -Owner 'Release tag'
 $manifestPath = Join-Path $resolvedSource 'SharpProof.release.json'
-$sumsPath = Join-Path $resolvedSource 'SHA256SUMS'
 $manifest = Read-SharpProofCanonicalReleaseJson `
     -Path $manifestPath `
     -DocumentType ReleaseManifest
-if ($manifest.schemaVersion -ne 2 -or
-    [string]$manifest.hashAlgorithm -ne 'SHA256') {
-    throw 'Unsupported release evidence schema or hash algorithm.'
+if ($manifest.schemaVersion -ne 2) {
+    throw 'Unsupported release evidence schema.'
 }
 if ([string]$manifest.packageVersion -ne $expectedVersion) {
     throw "Release tag '$ExpectedTag' does not match package version " +
@@ -127,11 +125,8 @@ if (($actualNames -join '|') -ne ($expectedNames -join '|')) {
 foreach ($artifact in $artifacts) {
     $path = Join-Path $resolvedSource ([string]$artifact.fileName)
     $file = Get-Item -LiteralPath $path -ErrorAction Stop
-    $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).
-        Hash.ToLowerInvariant()
-    if ($hash -ne [string]$artifact.sha256 -or
-        [int64]$file.Length -ne [int64]$artifact.bytes) {
-        throw "Release artifact hash or size mismatch: $($artifact.fileName)"
+    if ([int64]$file.Length -ne [int64]$artifact.bytes) {
+        throw "Release artifact size mismatch: $($artifact.fileName)"
     }
 }
 $payloadSets = @($manifest.packagePayloads)
@@ -276,17 +271,6 @@ foreach ($packageId in $expectedPackageIds) {
             Where-Object { [string]$_ -eq $spdxId }).Count -ne 1) {
         throw "Release SBOM does not describe '$packageId'."
     }
-    $expectedHash = [string]@(
-        $artifacts |
-            Where-Object {
-                [string]$_.kind -eq 'package' -and
-                [string]$_.packageId -eq $packageId
-            }
-    )[0].sha256
-    Test-SharpProofSpdxPackageChecksum `
-        -Package $matches[0] `
-        -ExpectedSha256 $expectedHash `
-        -Identity $packageId
 }
 foreach ($key in $componentKeys) {
     $parts = $key.Split("`0")
@@ -324,10 +308,6 @@ Test-SharpProofSbomComponentGraph `
 Test-SharpProofSbomLicenseGraph `
     -SbomPackages $sbomPackages `
     -LicenseGraph $sbomLicenseGraph
-Test-SharpProofReleaseChecksumFile `
-    -Path $sumsPath `
-    -Artifacts $artifacts `
-    -Owner 'SHA256SUMS'
 if (@($manifest.thirdPartyComponents).Count -eq 0 -or
     @($manifest.thirdPartyComponents |
         Where-Object { [string]$_.license -ne 'MIT' }).Count -ne 0) {

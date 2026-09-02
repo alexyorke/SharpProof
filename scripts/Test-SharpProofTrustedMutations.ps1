@@ -1837,28 +1837,12 @@ $mutations = @(
         Filter = 'FullyQualifiedName~SymbolPackagesAreProvenanceArtifactsButNotSbomSubjects'
     },
     [pscustomobject]@{
-        Name = 'release-exact-spdx-checksum-row'
-        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
-        Original = "    `$rows = @(`$checksumProperty.Value)`n    if (`$rows.Count -ne 1 -or `$null -eq `$rows[0]) {"
-        Mutated = "    `$rows = @(`$checksumProperty.Value)`n    if (`$null -eq `$rows[0]) {"
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~SpdxChecksumRowsAreExact'
-    },
-    [pscustomobject]@{
         Name = 'worker-cache-post-publish-rollback'
         File = 'SharpProof.Worker\VerificationCache.cs'
         Original = '                if (published && path != null)'
         Mutated = '                if (false && published && path != null)'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~CacheWriteRollsBackPublicationWhenPostValidationIsCanceled'
-    },
-    [pscustomobject]@{
-        Name = 'release-sbom-symbol-checksum-substitution'
-        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
-        Original = '            -ExpectedSha256 ([string]$main[0].sha256) `'
-        Mutated = '            -ExpectedSha256 ([string]$symbol[0].sha256) `'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~SbomSymbolArtifactScopeTests'
     },
     [pscustomobject]@{
         Name = 'compiler-diagnostic-one-based-location'
@@ -1896,14 +1880,6 @@ $mutations = @(
         Mutated = "}`n# Test-SharpProofPublicationPlanIdentity -Plan `$plan`nif (`$PlanOnly) {"
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~PublisherValidatesCurrentIdentitiesBeforeAndAfterWritingPlan'
-    },
-    [pscustomobject]@{
-        Name = 'release-publication-plan-manifest-version-authority'
-        File = 'scripts\SharpProof.PublicationPlanIdentity.psm1'
-        Original = '        [string]$manifestVersionAuthority.sha256 -cne'
-        Mutated = '        $false -and'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~ReplayRehashesEveryImmutablePlanInput'
     },
     [pscustomobject]@{
         Name = 'release-publication-plan-fixture-authority-replay'
@@ -1946,33 +1922,12 @@ $mutations = @(
         Filter = 'FullyQualifiedName~PublicationDestinationModesAreExactAndAuthenticated'
     },
     [pscustomobject]@{
-        Name = 'release-checksum-byte-comparison'
-        File = 'scripts\SharpProof.ReleaseChecksums.ps1'
-        Original = '    if ($actual.Length -ne $expected.Length -or'
-        Mutated = '    if ($false -or'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~ReleaseChecksumAuthorityTests'
-    },
-    [pscustomobject]@{
         Name = 'release-strict-json-canonical-byte-comparison'
         File = 'scripts\SharpProof.ReleaseJson.ps1'
         Original = '    if ($text -cne $canonical) {'
         Mutated = '    if ($false) {'
         Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
         Filter = 'FullyQualifiedName~ReleaseJsonAuthorityTests'
-    },
-    [pscustomobject]@{
-        Name = 'release-exact-bundle-topology-consumer'
-        File = 'scripts\Publish-SharpProofRelease.ps1'
-        Original = (@'
-    Test-SharpProofReleaseBundleTopology `
-        -Directory $Directory `
-        -Artifacts $artifacts `
-        -Owner 'Publication release bundle'
-'@).TrimEnd()
-        Mutated = '    # release bundle topology validation removed'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~ReleaseBundleAuthorityGuardsEveryReleaseConsumerAndUpload'
     },
     [pscustomobject]@{
         Name = 'acceptance-restore-timeline-owner'

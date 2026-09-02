@@ -335,7 +335,6 @@ foreach ($pilot in $catalog.pilots) {
                     }
                     path = [IO.Path]::GetRelativePath($repositoryRoot, $_).Replace('\', '/')
                     bytes = [int64](Get-Item -LiteralPath $_).Length
-                    sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
                 }
             })
     }

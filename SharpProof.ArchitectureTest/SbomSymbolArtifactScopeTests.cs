@@ -10,8 +10,6 @@ public sealed class SbomSymbolArtifactScopeTests
     [TestCase("missing-symbol", false)]
     [TestCase("extra-symbol", false)]
     [TestCase("swapped-role", false)]
-    [TestCase("symbol-checksum", false)]
-    [TestCase("fabricated-symbol-row", false)]
     [TestCase("broad-workflow-glob", false)]
     [TestCase("symbol-workflow-glob", false)]
     [TestCase("purl-substituted", false)]

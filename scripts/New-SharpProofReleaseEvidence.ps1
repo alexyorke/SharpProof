@@ -16,7 +16,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $resolvedOutput = $null
-. (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseBundle.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofSymbolPackages.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPackagePayloads.ps1')
@@ -111,9 +111,6 @@ function New-DeterministicPackageSbom {
         $id = [string]$item.Identity.Id
         $spdxId = Get-SpdxPackageId -Name $id
         $described.Add($spdxId)
-        $hash = (Get-FileHash `
-            -LiteralPath $item.File.FullName `
-            -Algorithm SHA256).Hash.ToLowerInvariant()
         $license = @($LicenseGraph | Where-Object {
             [string]$_.PackageId -eq $id
         })
@@ -126,12 +123,6 @@ function New-DeterministicPackageSbom {
             versionInfo = $Version
             downloadLocation = 'NOASSERTION'
             filesAnalyzed = $false
-            checksums = @(
-                [pscustomobject][ordered]@{
-                    algorithm = 'SHA256'
-                    checksumValue = $hash
-                }
-            )
             licenseConcluded = [string]$license[0].LicenseExpression
             licenseDeclared = [string]$license[0].LicenseExpression
             copyrightText = 'NOASSERTION'
@@ -229,13 +220,6 @@ function New-DeterministicPackageSbom {
         if ($matches.Count -ne 1) {
             throw "Generated SPDX package identity is invalid: $id"
         }
-        $expectedHash = (Get-FileHash `
-            -LiteralPath $item.File.FullName `
-            -Algorithm SHA256).Hash.ToLowerInvariant()
-        Test-SharpProofSpdxPackageChecksum `
-            -Package $matches[0] `
-            -ExpectedSha256 $expectedHash `
-            -Identity $id
     }
     $json = ($document | ConvertTo-Json -Depth 10) -replace "`r`n", "`n"
     Write-AtomicText -Path $Path -Value ($json + "`n")
@@ -662,9 +646,6 @@ $sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
 
 $artifacts = [Collections.Generic.List[object]]::new()
 foreach ($item in $identities) {
-    $hash = Get-FileHash `
-        -LiteralPath $item.File.FullName `
-        -Algorithm SHA256
     $artifacts.Add([pscustomobject][ordered]@{
         fileName = $item.File.Name
         kind = if ($item.File.Extension -eq '.snupkg') {
@@ -675,7 +656,6 @@ foreach ($item in $identities) {
         }
         packageId = $item.Identity.Id
         bytes = [int64]$item.File.Length
-        sha256 = $hash.Hash.ToLowerInvariant()
     })
 }
 
@@ -770,20 +750,6 @@ foreach ($expectedId in $expectedIds) {
             Where-Object { [string]$_ -eq $spdxId }).Count -ne 1) {
         throw "SPDX SBOM does not describe package '$expectedId'."
     }
-    $packageItem = @(
-        $identities |
-            Where-Object {
-                $_.File.Extension -eq '.nupkg' -and
-                $_.Identity.Id -eq $expectedId
-            }
-    )
-    $expectedHash = (Get-FileHash `
-        -LiteralPath $packageItem[0].File.FullName `
-        -Algorithm SHA256).Hash.ToLowerInvariant()
-    Test-SharpProofSpdxPackageChecksum `
-        -Package $matchingPackages[0] `
-        -ExpectedSha256 $expectedHash `
-        -Identity $expectedId
 }
 foreach ($key in $expectedComponentKeys) {
     $parts = $key.Split("`0")
@@ -830,15 +796,11 @@ Test-SharpProofSbomLicenseGraph `
     -SbomPackages $sbomPackages `
     -LicenseGraph $sbomLicenseGraph
 $sbomFile = Get-Item -LiteralPath $resolvedSbom
-$sbomHash = Get-FileHash `
-    -LiteralPath $resolvedSbom `
-    -Algorithm SHA256
 $artifacts.Add([pscustomobject][ordered]@{
     fileName = $sbomFile.Name
     kind = 'sbom'
     packageId = $null
     bytes = [int64]$sbomFile.Length
-    sha256 = $sbomHash.Hash.ToLowerInvariant()
 })
 
 $artifactsByName = [Collections.Generic.Dictionary[string, object]]::new(
@@ -865,7 +827,6 @@ $manifest = [pscustomobject][ordered]@{
         url = 'https://github.com/alexyorke/SharpProof'
         commit = $commits[0]
     }
-    hashAlgorithm = 'SHA256'
     artifacts = $orderedArtifacts
     packagePayloads = @(
         $packagePayloadEvidence |
@@ -879,14 +840,10 @@ $manifest = [pscustomobject][ordered]@{
 $json = ($manifest | ConvertTo-Json -Depth 8) -replace "`r`n", "`n"
 $json += "`n"
 $manifestPath = Join-Path $resolvedOutput 'SharpProof.release.json'
-$sumsPath = Join-Path $resolvedOutput 'SHA256SUMS'
 Write-AtomicText -Path $manifestPath -Value $json
 $null = Read-SharpProofCanonicalReleaseJson `
     -Path $manifestPath `
     -DocumentType ReleaseManifest
-Write-SharpProofReleaseChecksumFile `
-    -Path $sumsPath `
-    -Artifacts $orderedArtifacts
 foreach ($packageFile in $packageFiles) {
     [IO.File]::Copy(
         $packageFile.FullName,
@@ -903,12 +860,10 @@ Publish-SharpProofReleaseBundleAtomically `
     -Artifacts $orderedArtifacts `
     -Owner 'Generated release bundle'
 $manifestPath = Join-Path $finalOutput 'SharpProof.release.json'
-$sumsPath = Join-Path $finalOutput 'SHA256SUMS'
 
 Write-Host "Wrote deterministic SharpProof release evidence for version $($versions[0])."
 [pscustomobject][ordered]@{
     ManifestPath = $manifestPath
-    Sha256SumsPath = $sumsPath
     PackageVersion = $versions[0]
     RepositoryCommit = $commits[0]
     ArtifactCount = $orderedArtifacts.Count

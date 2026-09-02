@@ -12,7 +12,6 @@ public sealed class PublicationPlanTopologyTests
     [TestCase("symbol-package", false)]
     [TestCase("manifest", false)]
     [TestCase("sbom", false)]
-    [TestCase("checksums", false)]
     [TestCase("fixture-input", false)]
     [TestCase("relative-dot-alias", false)]
     [TestCase("absolute-alias", false)]

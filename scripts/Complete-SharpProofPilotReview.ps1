@@ -47,11 +47,9 @@ if (-not (Test-SharpProofPilotReport -Report $source `
 }
 
 Require-ExactProperties $ledger `
-    @('schemaVersion','sourceReportSha256','commit','packageArtifacts','reviews') `
+    @('schemaVersion','commit','packageArtifacts','reviews') `
     'Review ledger'
-$sourceHash = (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash.ToLowerInvariant()
 if ([int](Get-Property $ledger 'schemaVersion') -ne 1 -or
-    [string](Get-Property $ledger 'sourceReportSha256') -cne $sourceHash -or
     [string](Get-Property $ledger 'commit') -cne [string]$source.commit) {
     throw 'The review ledger is stale or has the wrong identity.'
 }
@@ -62,7 +60,7 @@ if ($sourcePackages.Count -ne 6 -or $ledgerPackages.Count -ne 6) {
     throw 'The review ledger must bind the exact six packages.'
 }
 for ($index = 0; $index -lt 6; $index++) {
-    foreach ($name in @('fileName','packageId','version','repositoryCommit','bytes','sha256')) {
+    foreach ($name in @('fileName','packageId','version','repositoryCommit','bytes')) {
         if ([string](Get-Property $sourcePackages[$index] $name) -cne
             [string](Get-Property $ledgerPackages[$index] $name)) {
             throw 'The review ledger package identities do not match the source report.'
@@ -116,10 +114,6 @@ $reviewed.reviewStatus = 'Reviewed'
 foreach ($pilot in @($reviewed.pilots)) {
     $pilot.falsePositiveReports = [int]($falsePositives[[string]$pilot.id] ?? 0)
 }
-$reviewed | Add-Member NoteProperty reviewEvidence ([pscustomobject]@{
-    sourceReportSha256 = $sourceHash
-    reviewLedgerSha256 = (Get-FileHash -LiteralPath $ledgerPath -Algorithm SHA256).Hash.ToLowerInvariant()
-})
 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($resolvedOutput)) | Out-Null
 [IO.File]::WriteAllText(
     $resolvedOutput,

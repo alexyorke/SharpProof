@@ -36,7 +36,6 @@ switch ($Mutation) {
     'stale-manifest' { $manifestVersion = '9.9.9-preview.9' }
     'stale-sbom' { $sbomVersion = '9.9.9-preview.9' }
     'stale-plan' { $planVersion = '9.9.9-preview.9' }
-    'stale-authority-hash' { $identity.sha256 = '0' * 64 }
 }
 
 Test-SharpProofReleaseVersionSet `

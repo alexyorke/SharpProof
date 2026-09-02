@@ -34,18 +34,15 @@ if ($Gate -in @(
         'portable-windows', 'portable-macos')) {
     $packageArtifacts = @($evidence.packageArtifacts | ForEach-Object {
         $fileName = [string]$_.fileName
-        $sha256 = [string]$_.sha256
         $bytes = [int64]$_.bytes
         if ([IO.Path]::GetFileName($fileName) -cne $fileName -or
             $fileName -notmatch '\.(?:nupkg|snupkg)$' -or
-            $bytes -le 0 -or
-            $sha256 -cnotmatch '^[0-9a-f]{64}$') {
+            $bytes -le 0) {
             throw "Qualification package evidence is malformed: '$fileName'."
         }
         [ordered]@{
             fileName = $fileName
             bytes = $bytes
-            sha256 = $sha256
         }
     } | Sort-Object fileName)
     if ($packageArtifacts.Count -ne 6 -or
@@ -121,9 +118,6 @@ $receipt = [ordered]@{
     evidence = [ordered]@{
         path = $relativeEvidence
         bytes = [int64](Get-Item -LiteralPath $resolvedEvidence).Length
-        sha256 = (Get-FileHash `
-            -LiteralPath $resolvedEvidence `
-            -Algorithm SHA256).Hash.ToLowerInvariant()
     }
 }
 if ($packageArtifacts.Count -ne 0) {

@@ -45,8 +45,6 @@ function Get-SharpProofReleaseVersionAuthority {
         path = 'SharpProof.Release.props'
         property = 'SharpProofPackageVersion'
         version = Get-SharpProofReleaseVersion -RepositoryRoot $root
-        sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).
-            Hash.ToLowerInvariant()
     }
 }
 
@@ -94,8 +92,7 @@ function Test-SharpProofReleaseVersionAuthority {
         [int]$Authority.schemaVersion -ne 1 -or
         [string]$Authority.path -cne [string]$expected.path -or
         [string]$Authority.property -cne [string]$expected.property -or
-        [string]$Authority.version -cne [string]$expected.version -or
-        [string]$Authority.sha256 -cne [string]$expected.sha256) {
+        [string]$Authority.version -cne [string]$expected.version) {
         throw 'Release version authority evidence is invalid.'
     }
 }

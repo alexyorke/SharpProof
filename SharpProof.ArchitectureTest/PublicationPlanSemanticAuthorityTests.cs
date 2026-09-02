@@ -15,9 +15,7 @@ public sealed class PublicationPlanSemanticAuthorityTests
     [TestCase("wrong-topology", false)]
     [TestCase("wrong-license", false)]
     [TestCase("wrong-component", false)]
-    [TestCase("wrong-package-checksum", false)]
     [TestCase("wrong-artifact-scope", false)]
-    [TestCase("inconsistent-checksums", false)]
     [TestCase("validation-removed", false)]
     [TestCase("validation-after-actions", false)]
     public async Task PublicationPlanConsumesStrictReleaseSemanticsBeforeActions(
@@ -35,12 +33,8 @@ public sealed class PublicationPlanSemanticAuthorityTests
                 script, "    Test-SharpProofSbomLicenseGraph `"),
             "wrong-component" => Remove(
                 script, "    Test-SharpProofSbomComponentGraph `"),
-            "wrong-package-checksum" => Remove(
-                script, "        Test-SharpProofSpdxPackageChecksum `"),
             "wrong-artifact-scope" => Remove(
                 script, "    Test-SharpProofSbomArtifactScope `"),
-            "inconsistent-checksums" => Remove(
-                script, "    Test-SharpProofReleaseChecksumFile `"),
             "validation-removed" => Remove(
                 script, "$release = Get-ValidatedRelease `"),
             "validation-after-actions" => script.Replace(
@@ -72,8 +66,6 @@ public sealed class PublicationPlanSemanticAuthorityTests
         {
             SbomParseAuthority,
             "Test-SharpProofReleaseBundleTopology",
-            "Test-SharpProofReleaseChecksumFile",
-            "Test-SharpProofSpdxPackageChecksum",
             "Test-SharpProofSbomTopology",
             "Test-SharpProofSbomArtifactScope",
             "Test-SharpProofSbomDependencyGraph",

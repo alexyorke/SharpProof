@@ -13,7 +13,6 @@ public sealed class ReleaseVersionAuthorityTests
     [TestCase("stale-manifest", false)]
     [TestCase("stale-sbom", false)]
     [TestCase("stale-plan", false)]
-    [TestCase("stale-authority-hash", false)]
     public async Task ReleaseVersionProjectionIsOwnedByReleaseProps(
         string mutation,
         bool expectedSuccess)

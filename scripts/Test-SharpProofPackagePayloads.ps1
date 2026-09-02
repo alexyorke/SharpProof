@@ -1,27 +1,5 @@
 Set-StrictMode -Version Latest
 
-function Get-SharpProofArchiveEntryHash {
-    param(
-        [Parameter(Mandatory = $true)]
-        [IO.Compression.ZipArchiveEntry]$Entry
-    )
-
-    $algorithm = [Security.Cryptography.SHA256]::Create()
-    try {
-        $stream = $Entry.Open()
-        try {
-            return [Convert]::ToHexString(
-                $algorithm.ComputeHash($stream)).ToLowerInvariant()
-        }
-        finally {
-            $stream.Dispose()
-        }
-    }
-    finally {
-        $algorithm.Dispose()
-    }
-}
-
 function Get-SharpProofArchiveAssemblyName {
     param(
         [Parameter(Mandatory = $true)]
@@ -223,10 +201,8 @@ function Test-SharpProofPackagePayload {
             if ($null -eq $entry) {
                 throw "Package '$PackageId' is missing payload '$($specification.Entry)'."
             }
-            $actualHash = Get-SharpProofArchiveEntryHash -Entry $entry
             if ($useEvidence) {
                 $expected = $specification.Evidence
-                $expectedHash = [string]$expected.sha256
                 if ($entry.Length -ne [int64]$expected.bytes) {
                     throw "Package '$PackageId' payload size does not match release evidence: '$($entry.FullName)'."
                 }
@@ -241,14 +217,12 @@ function Test-SharpProofPackagePayload {
                 }
             }
             elseif ($entry.FullName -eq 'tools/native/linux-x64/libz3.so') {
-                $expectedHash = [string]$toolchain.z3.librarySha256
                 if ($entry.Length -ne [int64]$toolchain.z3.libraryBytes) {
                     throw "Package '$PackageId' native payload size is invalid: '$($entry.FullName)'."
                 }
                 $actualThirdParty.Add($entry.FullName)
             }
             elseif ($entry.FullName -eq 'tools/net9/Microsoft.Z3.dll') {
-                $expectedHash = [string]$toolchain.z3.managedAssemblySha256
                 if ($entry.Length -ne [int64]$toolchain.z3.managedAssemblyBytes) {
                     throw "Package '$PackageId' managed Z3 payload size is invalid."
                 }
@@ -259,9 +233,6 @@ function Test-SharpProofPackagePayload {
                 if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
                     throw "Authoritative package output is missing: '$sourcePath'."
                 }
-                $expectedHash = (Get-FileHash `
-                    -LiteralPath $sourcePath `
-                    -Algorithm SHA256).Hash.ToLowerInvariant()
                 if ($entry.FullName.EndsWith('.dll', [StringComparison]::OrdinalIgnoreCase)) {
                     $actualName = Get-SharpProofArchiveAssemblyName -Entry $entry
                     $expectedName = [Reflection.AssemblyName]::GetAssemblyName($sourcePath).Name
@@ -272,9 +243,6 @@ function Test-SharpProofPackagePayload {
                         $actualThirdParty.Add($entry.FullName)
                     }
                 }
-            }
-            if ($actualHash -ne $expectedHash) {
-                throw "Package '$PackageId' payload hash does not match its authoritative output: '$($entry.FullName)'."
             }
             if (-not $useEvidence) {
                 $assemblyName = if ($entry.FullName.EndsWith(
@@ -295,7 +263,6 @@ function Test-SharpProofPackagePayload {
                     }
                     assemblyName = $assemblyName
                     bytes = [int64]$entry.Length
-                    sha256 = $actualHash
                 })
             }
         }

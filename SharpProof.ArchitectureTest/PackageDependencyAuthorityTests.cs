@@ -272,37 +272,7 @@ public sealed class PackageDependencyAuthorityTests
                 script,
                 Does.Contain("Test-SharpProofSbomTopology"),
                 scriptName);
-            Assert.That(
-                script,
-                Does.Contain("Test-SharpProofSpdxPackageChecksum"),
-                scriptName);
         }
-    }
-
-    [TestCase("first-canonical", true)]
-    [TestCase("third-canonical", true)]
-    [TestCase("duplicate-same", false)]
-    [TestCase("duplicate-different", false)]
-    [TestCase("extra-algorithm", false)]
-    [TestCase("missing", false)]
-    [TestCase("wrong", false)]
-    [TestCase("stale", false)]
-    [TestCase("wrong-case", false)]
-    [TestCase("extra-property", false)]
-    [TestCase("missing-property", false)]
-    [TestCase("scalar", false)]
-    [TestCase("null", false)]
-    [TestCase("object", false)]
-    public async Task SpdxChecksumRowsAreExact(
-        string mutation,
-        bool expectedSuccess)
-    {
-        var root = TestRepository.FindRoot();
-        var result = await RunSpdxChecksumAuthorityAsync(root, mutation);
-        Assert.That(
-            result.ExitCode == 0,
-            Is.EqualTo(expectedSuccess),
-            result.Output);
     }
 
     private static string[] WritePackageGraph(string root, string mutation)
@@ -793,52 +763,6 @@ public sealed class PackageDependencyAuthorityTests
         return new ProcessResult(
             process.ExitCode,
             (await output) + Environment.NewLine + (await error));
-    }
-
-    private static async Task<ProcessResult> RunSpdxChecksumAuthorityAsync(
-        string repositoryRoot,
-        string mutation)
-    {
-        var runner = Path.Combine(
-            Path.GetTempPath(),
-            "sharpproof-spdx-checksum-" + Guid.NewGuid().ToString("N") +
-            ".ps1");
-        try
-        {
-            await File.WriteAllTextAsync(
-                runner,
-                "param([string]$Authority,[string]$Mutation)\n" +
-                "$ErrorActionPreference='Stop'\n" +
-                ". $Authority\n" +
-                "$hash='" + new string('a', 64) + "'\n" +
-                "$row=[pscustomobject][ordered]@{algorithm='SHA256';checksumValue=$hash}\n" +
-                "$rows=@($row)\n" +
-                "switch($Mutation){\n" +
-                " 'duplicate-same' {$rows=@($row,$row)}\n" +
-                " 'duplicate-different' {$rows=@($row,[pscustomobject][ordered]@{algorithm='SHA256';checksumValue=('0'*64)})}\n" +
-                " 'extra-algorithm' {$rows=@($row,[pscustomobject][ordered]@{algorithm='SHA1';checksumValue=('0'*40)})}\n" +
-                " 'missing' {$rows=@()}\n" +
-                " 'wrong' {$rows=@([pscustomobject][ordered]@{algorithm='SHA256';checksumValue=('0'*64)})}\n" +
-                " 'stale' {$rows=@([pscustomobject][ordered]@{algorithm='SHA256';checksumValue=('b'*64)})}\n" +
-                " 'wrong-case' {$rows=@([pscustomobject][ordered]@{algorithm='sha256';checksumValue=$hash})}\n" +
-                " 'extra-property' {$rows=@([pscustomobject][ordered]@{algorithm='SHA256';checksumValue=$hash;comment='decoy'})}\n" +
-                " 'missing-property' {$rows=@([pscustomobject][ordered]@{algorithm='SHA256'})}\n" +
-                " 'scalar' {$rows='SHA256:'+ $hash}\n" +
-                " 'null' {$rows=$null}\n" +
-                " 'object' {$rows=$row}\n" +
-                "}\n" +
-                "$package=[pscustomobject]@{name=$Mutation;checksums=$rows}\n" +
-                "Test-SharpProofSpdxPackageChecksum -Package $package -ExpectedSha256 $hash -Identity $Mutation\n",
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            return await RunPowerShellAsync(
-                repositoryRoot,
-                runner,
-                mutation);
-        }
-        finally
-        {
-            File.Delete(runner);
-        }
     }
 
     private sealed record ProcessResult(int ExitCode, string Output);

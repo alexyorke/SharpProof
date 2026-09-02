@@ -2,44 +2,6 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
-function Test-SharpProofSpdxPackageChecksum {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object]$Package,
-
-        [Parameter(Mandatory = $true)]
-        [string]$ExpectedSha256,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Identity
-    )
-
-    if ($ExpectedSha256 -cnotmatch '^[0-9a-f]{64}$') {
-        throw "Expected SHA256 identity is invalid: $Identity"
-    }
-    $checksumProperty = $Package.PSObject.Properties['checksums']
-    if ($null -eq $checksumProperty -or
-        $null -eq $checksumProperty.Value -or
-        $checksumProperty.Value -isnot [array]) {
-        throw "SPDX checksum array is invalid: $Identity"
-    }
-    $rows = @($checksumProperty.Value)
-    if ($rows.Count -ne 1 -or $null -eq $rows[0]) {
-        throw "SPDX checksum array is not exact: $Identity"
-    }
-    $row = $rows[0]
-    $propertyNames = @($row.PSObject.Properties.Name | Sort-Object)
-    if ($propertyNames.Count -ne 2 -or
-        $propertyNames[0] -cne 'algorithm' -or
-        $propertyNames[1] -cne 'checksumValue' -or
-        $row.algorithm -isnot [string] -or
-        [string]$row.algorithm -cne 'SHA256' -or
-        $row.checksumValue -isnot [string] -or
-        [string]$row.checksumValue -cne $ExpectedSha256) {
-        throw "SPDX checksum row is invalid: $Identity"
-    }
-}
-
 function Get-SharpProofNuGetPurl {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
@@ -750,8 +712,7 @@ function Test-SharpProofSbomArtifactScope {
         foreach ($row in $set.Rows) {
             $expectedName = ([string]$row.packageId) + '.' +
                 $PackageVersion + [string]$set.Extension
-            if ([string]$row.fileName -cne $expectedName -or
-                [string]$row.sha256 -notmatch '^[0-9a-f]{64}$') {
+            if ([string]$row.fileName -cne $expectedName) {
                 throw "The release manifest has an invalid $($set.Name) package identity."
             }
         }
@@ -776,10 +737,6 @@ function Test-SharpProofSbomArtifactScope {
             }).Count -ne 1) {
             throw "The SBOM artifact scope is invalid for '$id'."
         }
-        Test-SharpProofSpdxPackageChecksum `
-            -Package $sbomRows[0] `
-            -ExpectedSha256 ([string]$main[0].sha256) `
-            -Identity "$id main package"
     }
 }
 

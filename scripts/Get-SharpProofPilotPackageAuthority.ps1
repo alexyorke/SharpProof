@@ -46,7 +46,6 @@ function Get-SharpProofPilotPackageAuthority {
                 version = $version
                 repositoryCommit = $commit
                 bytes = [int64]$_.Length
-                sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             }
         }
         finally { $archive.Dispose() }

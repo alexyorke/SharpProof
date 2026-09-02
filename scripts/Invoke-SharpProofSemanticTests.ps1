@@ -197,7 +197,6 @@ $architectureFixtures = @(
     'PublicationPlanSemanticAuthorityTests',
     'PublicationPlanTopologyTests',
     'ReleaseAuthorityClosureTests',
-    'ReleaseChecksumAuthorityTests',
     'ReleaseConfigurationScriptTests',
     'ReleaseCoverageBaselineTests',
     'ReleaseJsonAuthorityTests',
@@ -218,7 +217,6 @@ $architectureFixtureSlots = @{
     PublicationDestinationAuthorityTests = 4
     PublicationPlanIdentityTests = 4
     ReleaseAuthorityClosureTests = 8
-    ReleaseChecksumAuthorityTests = 4
     ReleaseCoverageBaselineTests = 8
 }
 $architectureShardingEnabled =

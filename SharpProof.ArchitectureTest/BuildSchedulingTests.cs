@@ -924,7 +924,7 @@ public sealed class BuildSchedulingTests
             typeof(PackageDependencyAuthorityTests),
             typeof(PublicationDestinationAuthorityTests),
             typeof(PublicationPlanIdentityTests),
-            typeof(ReleaseChecksumAuthorityTests)
+            typeof(PublicationPlanSemanticAuthorityTests)
         };
         var workerAttribute = typeof(BuildSchedulingTests).Assembly
             .GetCustomAttributesData()

@@ -79,17 +79,16 @@ function Assert-SharpProofReleaseManifestShape {
     param($Root)
     Assert-SharpProofJsonObject $Root @(
         'schemaVersion', 'packageVersion', 'versionAuthority', 'repository',
-        'hashAlgorithm', 'artifacts', 'packagePayloads', 'thirdPartyComponents'
+        'artifacts', 'packagePayloads', 'thirdPartyComponents'
     ) 'Release manifest'
     Assert-SharpProofJsonInteger $Root.GetProperty('schemaVersion') 'Release manifest schemaVersion'
     Assert-SharpProofJsonKind $Root.GetProperty('packageVersion') String 'Release manifest packageVersion'
-    Assert-SharpProofJsonStringValue $Root.GetProperty('hashAlgorithm') @('SHA256') 'Release manifest hashAlgorithm'
 
     $authority = $Root.GetProperty('versionAuthority')
     Assert-SharpProofJsonObject $authority @(
-        'schemaVersion', 'path', 'property', 'version', 'sha256') 'Release manifest versionAuthority'
+        'schemaVersion', 'path', 'property', 'version') 'Release manifest versionAuthority'
     Assert-SharpProofJsonInteger $authority.GetProperty('schemaVersion') 'Release manifest versionAuthority.schemaVersion'
-    foreach ($name in @('path', 'property', 'version', 'sha256')) {
+    foreach ($name in @('path', 'property', 'version')) {
         Assert-SharpProofJsonKind $authority.GetProperty($name) String "Release manifest versionAuthority.$name"
     }
     $repository = $Root.GetProperty('repository')
@@ -104,8 +103,8 @@ function Assert-SharpProofReleaseManifestShape {
     $index = 0
     foreach ($row in $artifacts.EnumerateArray()) {
         Assert-SharpProofJsonObject $row @(
-            'fileName', 'kind', 'packageId', 'bytes', 'sha256') "Release manifest artifacts[$index]"
-        foreach ($name in @('fileName', 'kind', 'sha256')) {
+            'fileName', 'kind', 'packageId', 'bytes') "Release manifest artifacts[$index]"
+        foreach ($name in @('fileName', 'kind')) {
             Assert-SharpProofJsonKind $row.GetProperty($name) String "Release manifest artifacts[$index].$name"
         }
         Assert-SharpProofJsonStringValue $row.GetProperty('kind') @(
@@ -129,8 +128,8 @@ function Assert-SharpProofReleaseManifestShape {
         $entryIndex = 0
         foreach ($entry in $entries.EnumerateArray()) {
             Assert-SharpProofJsonObject $entry @(
-                'path', 'owner', 'assemblyName', 'bytes', 'sha256') "Release manifest packagePayloads[$index].entries[$entryIndex]"
-            foreach ($name in @('path', 'owner', 'sha256')) {
+                'path', 'owner', 'assemblyName', 'bytes') "Release manifest packagePayloads[$index].entries[$entryIndex]"
+            foreach ($name in @('path', 'owner')) {
                 Assert-SharpProofJsonKind $entry.GetProperty($name) String "Release manifest packagePayloads[$index].entries[$entryIndex].$name"
             }
             Assert-SharpProofJsonStringValue $entry.GetProperty('owner') @(
@@ -181,10 +180,7 @@ function Assert-SharpProofSpdxShape {
     Assert-SharpProofJsonArray $packages Object 'SPDX packages'
     $index = 0
     foreach ($package in $packages.EnumerateArray()) {
-        $names = @($package.EnumerateObject() | ForEach-Object Name)
-        $firstParty = $names -contains 'checksums'
         $expected = @('name', 'SPDXID', 'versionInfo', 'downloadLocation', 'filesAnalyzed')
-        if ($firstParty) { $expected += 'checksums' }
         $expected += @('licenseConcluded', 'licenseDeclared', 'copyrightText', 'externalRefs')
         Assert-SharpProofJsonObject $package $expected "SPDX packages[$index]"
         foreach ($name in @('name', 'SPDXID', 'versionInfo', 'downloadLocation', 'licenseConcluded', 'licenseDeclared', 'copyrightText')) {
@@ -195,19 +191,6 @@ function Assert-SharpProofSpdxShape {
         Assert-SharpProofJsonStringValue $package.GetProperty('copyrightText') @(
             'NOASSERTION') "SPDX packages[$index].copyrightText"
         Assert-SharpProofJsonKind $package.GetProperty('filesAnalyzed') False "SPDX packages[$index].filesAnalyzed"
-        if ($firstParty) {
-            $checksums = $package.GetProperty('checksums')
-            Assert-SharpProofJsonArray $checksums Object "SPDX packages[$index].checksums"
-            $checksumIndex = 0
-            foreach ($checksum in $checksums.EnumerateArray()) {
-                Assert-SharpProofJsonObject $checksum @('algorithm', 'checksumValue') "SPDX packages[$index].checksums[$checksumIndex]"
-                Assert-SharpProofJsonKind $checksum.GetProperty('algorithm') String "SPDX packages[$index].checksums[$checksumIndex].algorithm"
-                Assert-SharpProofJsonKind $checksum.GetProperty('checksumValue') String "SPDX packages[$index].checksums[$checksumIndex].checksumValue"
-                Assert-SharpProofJsonStringValue $checksum.GetProperty('algorithm') @(
-                    'SHA256') "SPDX packages[$index].checksums[$checksumIndex].algorithm"
-                $checksumIndex++
-            }
-        }
         $refs = $package.GetProperty('externalRefs')
         Assert-SharpProofJsonArray $refs Object "SPDX packages[$index].externalRefs"
         $refIndex = 0

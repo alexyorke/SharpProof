@@ -45,7 +45,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PublicationPlanIdentity.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 . (Join-Path $PSScriptRoot 'SharpProof.PublicationDestination.ps1')
-. (Join-Path $PSScriptRoot 'SharpProof.ReleaseChecksums.ps1')
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseBundle.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 
 $packageOrder = $SharpProofPackagePushOrder
@@ -193,12 +193,8 @@ function Get-ValidatedRelease {
         -Path $manifestPath `
         -DocumentType ReleaseManifest
     if ((Get-RequiredProperty $manifest 'schemaVersion' 'Release manifest') -ne
-            2 -or
-        [string](Get-RequiredProperty `
-            $manifest `
-            'hashAlgorithm' `
-            'Release manifest') -ne 'SHA256') {
-        throw 'Release manifest must use schema 2 and SHA256.'
+            2) {
+        throw 'Release manifest must use schema 2.'
     }
     $version = [string](Get-RequiredProperty `
         $manifest `
@@ -267,14 +263,9 @@ function Get-ValidatedRelease {
             $artifact `
             'bytes' `
             "Release artifact '$fileName'")
-        $sha256 = [string](Get-RequiredProperty `
-            $artifact `
-            'sha256' `
-            "Release artifact '$fileName'")
         if (-not $seenFileNames.Add($fileName) -or
             $kind -notin @('package', 'symbols', 'sbom') -or
-            $bytes -lt 0 -or
-            $sha256 -notmatch '^[0-9a-f]{64}$') {
+            $bytes -lt 0) {
             throw "Release artifact metadata is invalid: '$fileName'."
         }
         $path = Get-ArtifactPath `
@@ -284,18 +275,10 @@ function Get-ValidatedRelease {
             throw "Release artifact is missing: $path"
         }
         $file = Get-Item -LiteralPath $path
-        $actualHash = (Get-FileHash `
-            -LiteralPath $path `
-            -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ([int64]$file.Length -ne $bytes -or
-            $actualHash -ne $sha256) {
+        if ([int64]$file.Length -ne $bytes) {
             throw "Release artifact does not match its manifest: '$fileName'."
         }
     }
-    Test-SharpProofReleaseChecksumFile `
-        -Path (Join-Path $Directory 'SHA256SUMS') `
-        -Artifacts $artifacts `
-        -Owner 'Publication SHA256SUMS'
 
     $packageArtifacts = @(
         $artifacts |
@@ -458,12 +441,8 @@ function Get-ValidatedRelease {
             [string]$_.packageId -ceq $packageId
         })
         if ($sbomPackages.Count -ne 1 -or $manifestPackages.Count -ne 1) {
-            throw "Release SBOM package checksum identity is invalid: $packageId"
+            throw "Release SBOM package identity is invalid: $packageId"
         }
-        Test-SharpProofSpdxPackageChecksum `
-            -Package $sbomPackages[0] `
-            -ExpectedSha256 ([string]$manifestPackages[0].sha256) `
-            -Identity $packageId
     }
     Test-SharpProofSbomTopology `
         -SbomPackages @($sbom.packages) `
@@ -659,15 +638,8 @@ function Invoke-NuGetPush {
 }
 
 function Assert-ReleaseDotNetIdentity {
-    if ([string]::IsNullOrWhiteSpace($script:ReleaseDotNetSha256)) {
-        throw 'The release dotnet host identity was not initialized.'
-    }
     if (-not (Test-Path -LiteralPath $script:DotNetPath -PathType Leaf)) {
         throw 'The release dotnet host was replaced or removed after validation.'
-    }
-    $current = (Get-FileHash -LiteralPath $script:DotNetPath -Algorithm SHA256).Hash
-    if ($current -cne $script:ReleaseDotNetSha256) {
-        throw 'The release dotnet host was replaced after validation.'
     }
 }
 
@@ -713,7 +685,7 @@ function New-SharpProofPublicationStage {
         Test-SharpProofPublicationPlanIdentity -Plan $stagedPlan
 
         $identityProperties = @(
-            'fileName','bytes','sha256','role','version','repositoryCommit')
+            'fileName','bytes','role','version','repositoryCommit')
         $expectedIdentities = @($Plan.artifacts | Select-Object $identityProperties) |
             ConvertTo-Json -Compress
         $stagedIdentities = @($stagedArtifacts | Select-Object $identityProperties) |
@@ -808,7 +780,6 @@ if (-not $PlanOnly) {
     $DotNetPath = Resolve-ReleaseDotNet `
         -Candidate $DotNetPath `
         -SdkVersion (Get-RepositorySdkVersion)
-    $ReleaseDotNetSha256 = (Get-FileHash -LiteralPath $DotNetPath -Algorithm SHA256).Hash
 }
 
 $repositoryHead = Get-RepositoryHead

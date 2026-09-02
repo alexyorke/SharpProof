@@ -2,14 +2,14 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('canonical','changed-symbol','stale-manifest','stale-sbom',
-        'stale-checksums','missing-identity','duplicate-identity',
+        'missing-identity','duplicate-identity',
         'version-syntax','commit-syntax','string-schema','decimal-bytes',
         'array-version','array-commit','array-artifact-text',
         'destination-tamper','package-action-tamper','fixture-canonical',
         'fixture-authority-tamper','fixture-nonexistent-archive',
         'registry-canonical',
         'registry-url-tamper','targetless-publish-tamper',
-        'version-authority-hash-tamper','json-roundtrip','two-bundle')]
+        'json-roundtrip','two-bundle')]
     [string]$Mutation
 )
 
@@ -79,7 +79,6 @@ try {
             $artifactRows.Add([pscustomobject][ordered]@{
                 fileName = $file.Name
                 bytes = [int64]$file.Length
-                sha256 = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
             })
         }
     }
@@ -89,7 +88,6 @@ try {
     $artifactRows.Add([pscustomobject][ordered]@{
         fileName = $sbomFile.Name
         bytes = [int64]$sbomFile.Length
-        sha256 = (Get-FileHash $sbom -Algorithm SHA256).Hash.ToLowerInvariant()
     })
     $manifestPath = Join-Path $root 'SharpProof.release.json'
     $manifest = [pscustomobject][ordered]@{
@@ -99,7 +97,6 @@ try {
             path = 'SharpProof.Release.props'
             property = 'SharpProofPackageVersion'
             version = $version
-            sha256 = '0' * 64
         }
         repository = [pscustomobject][ordered]@{ commit = $commit }
         artifacts = @($artifactRows)
@@ -107,12 +104,6 @@ try {
     [IO.File]::WriteAllText(
         $manifestPath,
         (($manifest | ConvertTo-Json -Depth 5) -replace "`r`n","`n") + "`n")
-    $sums = Join-Path $root 'SHA256SUMS'
-    $sumText = [Text.StringBuilder]::new()
-    foreach ($row in $artifactRows) {
-        [void]$sumText.Append("$($row.sha256)  $($row.fileName)`n")
-    }
-    [IO.File]::WriteAllText($sums, $sumText.ToString())
     $identities = @(New-SharpProofPublicationPlanIdentities `
         -Packages @($packages) -Directory $root -Version $version `
         -RepositoryCommit $commit)
@@ -125,7 +116,6 @@ try {
             path = 'SharpProof.Release.props'
             property = 'SharpProofPackageVersion'
             version = $version
-            sha256 = '0' * 64
         }
         repositoryCommit = $commit
         publicationDestination = [pscustomobject][ordered]@{
@@ -204,17 +194,13 @@ try {
         'changed-symbol' { [IO.File]::AppendAllText($packages[0].symbolsPath, 'changed') }
         'stale-manifest' { [IO.File]::AppendAllText($manifestPath, 'changed') }
         'stale-sbom' { [IO.File]::AppendAllText($sbom, 'changed') }
-        'stale-checksums' { [IO.File]::AppendAllText($sums, 'changed') }
         'missing-identity' { $plan.artifacts = @($plan.artifacts | Select-Object -Skip 1) }
         'duplicate-identity' { $plan.artifacts[1].path = $plan.artifacts[0].path }
         'string-schema' { $plan.schemaVersion = '2' }
         'array-version' { $plan.packageVersion = @($version) }
         'array-commit' { $plan.repositoryCommit = @($commit) }
         'array-artifact-text' {
-            $plan.artifacts[0].sha256 = @($plan.artifacts[0].sha256)
-        }
-        'version-authority-hash-tamper' {
-            $plan.versionAuthority.sha256 = '1' * 64
+            $plan.artifacts[0].fileName = @($plan.artifacts[0].fileName)
         }
         'destination-tamper' {
             $plan.publicationDestination.mode = 'registry'

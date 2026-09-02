@@ -38,8 +38,6 @@ function Get-SharpProofPublicationPlanFileIdentity {
         path = [IO.Path]::GetFullPath($resolved)
         fileIdentity = $deviceInode
         bytes = [int64]$file.Length
-        sha256 = (Get-FileHash -LiteralPath $resolved -Algorithm SHA256).
-            Hash.ToLowerInvariant()
     }
 }
 
@@ -58,7 +56,7 @@ function New-SharpProofPublicationInputSnapshot {
     foreach ($file in Get-ChildItem -LiteralPath $packageRoot -File) {
         if ($file.Extension -in @('.nupkg', '.snupkg') -or
             $file.Name -in @(
-                'SharpProof.release.json','SharpProof.spdx.json','SHA256SUMS')) {
+                'SharpProof.release.json','SharpProof.spdx.json')) {
             $files.Add($file)
         }
     }
@@ -94,7 +92,7 @@ function Assert-SharpProofPublicationPlanTopology {
         [Parameter(Mandatory = $true)][object]$InputSnapshot
     )
 
-    $reserved = @('SharpProof.release.json','SharpProof.spdx.json','SHA256SUMS')
+    $reserved = @('SharpProof.release.json','SharpProof.spdx.json')
     if ($reserved -ccontains [IO.Path]::GetFileName($OutputPath)) {
         throw 'PlanOutputPath uses a reserved release-evidence filename.'
     }

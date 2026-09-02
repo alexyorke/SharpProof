@@ -47,20 +47,18 @@ try {
         versionAuthority = [pscustomobject][ordered]@{
             schemaVersion = 1; path = 'SharpProof.Release.props'
             property = 'SharpProofPackageVersion'; version = '1.0.0-preview.1'
-            sha256 = ('a' * 64)
         }
         repository = [pscustomobject][ordered]@{
             type = 'git'; url = 'https://example.invalid/repo'; commit = ('b' * 40)
         }
-        hashAlgorithm = 'SHA256'
         artifacts = @([pscustomobject][ordered]@{
             fileName = 'SharpProof.1.0.0-preview.1.nupkg'; kind = 'package'
-            packageId = 'SharpProof'; bytes = [int64]1; sha256 = ('c' * 64)
+            packageId = 'SharpProof'; bytes = [int64]1
         })
         packagePayloads = @([pscustomobject][ordered]@{
             packageId = 'SharpProof'; entries = @([pscustomobject][ordered]@{
                 path = 'analyzers/dotnet/cs/SharpProof.dll'; owner = 'firstParty'
-                assemblyName = 'SharpProof'; bytes = [int64]1; sha256 = ('d' * 64)
+                assemblyName = 'SharpProof'; bytes = [int64]1
             })
         })
         thirdPartyComponents = @([pscustomobject][ordered]@{
@@ -81,7 +79,8 @@ try {
     Assert-Rejected manifest-row-duplicate ($manifestJson.Replace(
         '      "kind": "package",', "      `"kind`": `"symbols`",`n      `"kind`": `"package`",")) ReleaseManifest
     Assert-Rejected manifest-unknown ($manifestJson.Replace(
-        '  "hashAlgorithm": "SHA256",', "  `"unknown`": true,`n  `"hashAlgorithm`": `"SHA256`",")) ReleaseManifest
+        '  "packageVersion": "1.0.0-preview.1",',
+        "  `"unknown`": true,`n  `"packageVersion`": `"1.0.0-preview.1`",")) ReleaseManifest
     Assert-Rejected manifest-case ($manifestJson.Replace('"artifacts":', '"Artifacts":')) ReleaseManifest
     Assert-Rejected manifest-kind-case ($manifestJson.Replace('"kind": "package"', '"kind": "Package"')) ReleaseManifest
     Assert-Rejected manifest-number-string ($manifestJson.Replace('"bytes": 1', '"bytes": "1"')) ReleaseManifest
@@ -108,7 +107,6 @@ try {
             name = 'SharpProof'; SPDXID = 'SPDXRef-Package-SharpProof'
             versionInfo = '1.0.0-preview.1'; downloadLocation = 'NOASSERTION'
             filesAnalyzed = $false
-            checksums = @([pscustomobject][ordered]@{ algorithm = 'SHA256'; checksumValue = ('e' * 64) })
             licenseConcluded = 'MIT'; licenseDeclared = 'MIT'; copyrightText = 'NOASSERTION'
             externalRefs = @([pscustomobject][ordered]@{
                 referenceCategory = 'PACKAGE-MANAGER'; referenceType = 'purl'
@@ -128,19 +126,13 @@ try {
     Assert-Rejected spdx-duplicate-nested ($spdxJson.Replace(
         '    "created": "2026-01-01T00:00:00Z",',
         "    `"created`": `"forged`",`n    `"created`": `"2026-01-01T00:00:00Z`",")) Spdx
-    Assert-Rejected spdx-row-duplicate ($spdxJson.Replace(
-        '      "algorithm": "SHA256",',
-        "      `"algorithm`": `"SHA1`",`n      `"algorithm`": `"SHA256`",")) Spdx
     Assert-Rejected spdx-case-field ($spdxJson.Replace('"SPDXID":', '"spdxId":')) Spdx
     Assert-Rejected spdx-vocabulary-case ($spdxJson.Replace('"spdxVersion": "SPDX-2.3"', '"spdxVersion": "spdx-2.3"')) Spdx
-    Assert-Rejected spdx-checksum-case ($spdxJson.Replace('"algorithm": "SHA256"', '"algorithm": "sha256"')) Spdx
     Assert-Rejected spdx-relationship-case ($spdxJson.Replace('"relationshipType": "DESCRIBES"', '"relationshipType": "describes"')) Spdx
     Assert-Rejected spdx-scalar-array ($spdxJson.Replace(
         '"documentDescribes": [', '"documentDescribes": "SPDXRef-Package-SharpProof", "discarded": [')) Spdx
     Assert-Rejected spdx-nested-array ($spdxJson.Replace(
         '"relationships": [', '"relationships": [[').Replace("  ]`n}", "  ]]`n}")) Spdx
-    Assert-Rejected spdx-checksum-scalar ($spdxJson.Replace(
-        '"checksums": [', '"checksums": {').Replace("      ],`n      `"licenseConcluded`"", "      },`n      `"licenseConcluded`"")) Spdx
     Assert-Rejected spdx-unknown-row ($spdxJson.Replace(
         '      "relationshipType": "DESCRIBES",',
         "      `"relationshipType`": `"DESCRIBES`",`n      `"foreign`": true,")) Spdx

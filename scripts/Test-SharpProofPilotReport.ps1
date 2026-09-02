@@ -67,7 +67,7 @@ function Test-SharpProofPilotReport {
                 @('SharpProof.Attributes', 'SharpProof', 'SharpProof.Verifier') -cnotcontains [string]$_.packageId -or
                 [string]$_.version -cne [string]$Report.packageVersion -or
                 [string]$_.repositoryCommit -cne $ExpectedCommit -or
-                [int64]$_.bytes -le 0 -or [string]$_.sha256 -cnotmatch '^[0-9a-f]{64}$') {
+                [int64]$_.bytes -le 0) {
                 return $null
             }
             [string]$_.fileName
@@ -101,8 +101,7 @@ function Test-SharpProofPilotReport {
         foreach ($evidence in @($pilot.evidence)) {
             $path = [string]$evidence.path
             if ([string]::IsNullOrWhiteSpace($path) -or [IO.Path]::IsPathRooted($path) -or
-                $path.Contains('..') -or [int64]$evidence.bytes -le 0 -or
-                [string]$evidence.sha256 -cnotmatch '^[0-9a-f]{64}$') { return $false }
+                $path.Contains('..') -or [int64]$evidence.bytes -le 0) { return $false }
         }
         $resultEvidence = @($pilot.evidence | Where-Object kind -ceq 'result')
         if ($resultEvidence.Count -ne 1) { return $false }
@@ -111,9 +110,7 @@ function Test-SharpProofPilotReport {
         if (-not $resultPath.StartsWith($root + [IO.Path]::DirectorySeparatorChar,
                 [StringComparison]::Ordinal) -or
             -not (Test-Path -LiteralPath $resultPath -PathType Leaf) -or
-            [int64](Get-Item -LiteralPath $resultPath).Length -ne [int64]$resultEvidence[0].bytes -or
-            (Get-FileHash -LiteralPath $resultPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne
-                [string]$resultEvidence[0].sha256) { return $false }
+            [int64](Get-Item -LiteralPath $resultPath).Length -ne [int64]$resultEvidence[0].bytes) { return $false }
         try { $response = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json -ErrorAction Stop }
         catch { return $false }
         $manifestClaims = @($response.manifest.claims)
