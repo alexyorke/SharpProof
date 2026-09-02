@@ -4686,6 +4686,8 @@ authorities, but repeatedly recompute data that is stable for one operation.
 
 ### Status (part two hundred fifty-three)
 
-R736 is `pending` and is a localized allocation/lookup cleanup. R737 is `pending`
+R736 completed: selected semicolon accessors now snapshot each method's first
+declaration reference once before sorting, preserving null-path and span ordering
+while removing the repeated Roslyn lookup. R737 is `pending`
 and is lower priority than the authority and boundary findings, but it is a
 straightforward way to make synthetic corpus construction single-pass per seed.

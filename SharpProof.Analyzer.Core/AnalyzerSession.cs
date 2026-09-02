@@ -271,10 +271,17 @@ internal sealed class AnalyzerSession
     {
         return [.. _selectedSemicolonAccessors.Keys
             .Where(method => !_semanticOutcomes.ContainsKey(method))
-            .OrderBy(static method => method.DeclaringSyntaxReferences
-                .FirstOrDefault()?.SyntaxTree.FilePath, StringComparer.Ordinal)
-            .ThenBy(static method => method.DeclaringSyntaxReferences
-                .FirstOrDefault()?.Span.Start ?? int.MaxValue)];
+            .Select(static method =>
+            {
+                var reference = method.DeclaringSyntaxReferences.FirstOrDefault();
+                return (
+                    Method: method,
+                    FilePath: reference?.SyntaxTree.FilePath,
+                    SpanStart: reference?.Span.Start ?? int.MaxValue);
+            })
+            .OrderBy(static item => item.FilePath, StringComparer.Ordinal)
+            .ThenBy(static item => item.SpanStart)
+            .Select(static item => item.Method)];
     }
 
     internal bool TryMarkAttributeValidated(AttributeData attribute)
