@@ -187,6 +187,7 @@ the smallest relevant containerized test target passes.
 | R621 | Share Worker artifact-authority verification baseline | `SharpProof.Worker.Test`: WorkerTests, 148 passed |
 | R625 | Hash already-normalized corpus text without a second line-ending scan | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R623 | Share corpus observation collection between gate execution and snapshot rendering | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
+| R869 | Validate IR sequence elements while taking the immutable snapshot | `SharpProof.Ir.Test`: 114 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7878,8 +7879,10 @@ build-file changes were made during this audit.
 
 ### Status (part three hundred seventy-nine)
 
-R869 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R869 is `applied`: `CreateSequenceValue` now validates each element while
+building its immutable snapshot, preserving one-shot enumeration, element
+type/null rejection, and the returned sequence value. SharpProof.Ir.Test
+passed (114).
 
 ## Second survey, part three hundred eighty: R870 - redundant location type lookup
 

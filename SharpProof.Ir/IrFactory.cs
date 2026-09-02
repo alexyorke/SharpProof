@@ -340,13 +340,23 @@ public sealed class IrFactory
             elementType = info.ElementType.Value;
         }
 
-        var values = elements.ToImmutableArray();
-        if (values.Any(value => value == null || value.Type != elementType))
+        var values = ImmutableArray.CreateBuilder<IrValue>();
+        foreach (var value in elements)
         {
-            throw new ArgumentException("Every sequence element must match the sequence element type.", nameof(elements));
+            if (value == null || value.Type != elementType)
+            {
+                throw new ArgumentException(
+                    "Every sequence element must match the sequence element type.",
+                    nameof(elements));
+            }
+
+            values.Add(value);
         }
 
-        return new IrValue(type, IrValueKind.Sequence, values);
+        return new IrValue(
+            type,
+            IrValueKind.Sequence,
+            values.ToImmutable());
     }
 
     public IrBooleanTerm Boolean(bool value)
