@@ -4449,3 +4449,93 @@ R724's semantic split - `Output` meaning two different things - should be
 resolved deliberately when they are, because collapsing the two families without
 choosing a meaning would silently change what a number of existing assertions
 inspect.
+
+## Second survey, part two hundred forty-eight: R726-R728 - the unshared temporary directory
+
+The companion to the process-runner cluster. Same shape, same two assemblies plus
+three more, and again a shared implementation already exists and is almost unused.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R726 | **Temporary test directories are created 64 times across 37 files under three mutually incompatible naming conventions, and only one of the three can use the repository's own guarded cleanup.** The conventions are: **nested**, `Path.Combine(GetTempPath(), "<Name>", guid)` - 22 sites; **flat**, `Path.Combine(GetTempPath(), "<prefix>" + guid)` - 23 sites; and 18 further shapes that are neither. This is not cosmetic, because `TestRepository.DeleteOwnedTemporaryDirectory` guards its recursive delete by requiring the resolved path to start with `Path.Combine(GetTempPath(), rootName) + DirectorySeparatorChar`. That predicate can only be satisfied by the **nested** convention. Every one of the 23 flat sites is therefore structurally excluded from the guard and must hand-roll an unguarded delete, which is exactly what they do. The flat prefixes are themselves inconsistent in four styles that no rule distinguishes - kebab (`sharpproof-coverage-diff-`), dotted (`SharpProof.ContainerAuthority.`), Pascal-dash (`SharpProofUnreadable-`), and mixed (`SharpProof-isolated-worker-`). Meanwhile the shared `eng/testing/TempDirectory.cs`, which wraps `Directory.CreateTempSubdirectory` in an `IDisposable` and needs no naming convention at all, is used by **7 files**. | 64 `GetTempPath()` sites in 37 files; `eng/testing/TestRepository.cs:28-47`; `eng/testing/TempDirectory.cs:1-19`; nested at `SharpProof.Gates.Test/CorpusGateTests.cs`, `PerformanceGateTests.cs`, `SharpProof.Worker.Test/WorkerTests.cs:7206`, `ScalarDifferentialMatrixTests.cs:876`; flat at `SharpProof.ArchitectureTest/CoverageScriptTests.cs:723,848,937,1103`, `PackageDependencyAuthorityTests.cs:29,66,111,141`, `ProductionInventoryAuthorityTests.cs:14,102`, `SharpProof.Analyzer.Test/ContractApiIdentityAnalyzerTests.cs:365,427,496` |
+| R727 | **The repository built an ownership-guarded recursive delete and 30 of the 34 files that recursively delete do not use it.** `TestRepository.DeleteOwnedTemporaryDirectory` refuses to delete a path outside the expected temp root, throwing `InvalidOperationException` rather than proceeding - a real guard against a path-construction bug recursively erasing an arbitrary directory. There are **56 `Directory.Delete(..., recursive: true)` sites across 34 files**; the guarded helper is called from **5 sites in 4 files** (`PackageLayoutSmokeTests`, `WorkerMsBuildIntegrationTests`, `ScalarDifferentialMatrixTests`, `WorkerTests`). Five further files declare their own private delete helper - `DeleteDirectory`, `DeleteTemporaryRepository` twice, `DeleteStagingDirectory`, `DeleteIfExists` - none of which carries an ownership check. The helper already ships to every test project: it lives in `eng/testing/TestRepository.cs`, linked unconditionally into every `SharpProofTestProject` by `Directory.Build.props:68-73`, so there is no reference or visibility work to do. Only the naming convention in R726 blocks adoption. | `eng/testing/TestRepository.cs:28-47`; `Directory.Build.props:68-73`; 56 sites in 34 files; private helpers at `SharpProof.ArchitectureTest/AcceptanceScriptTests.cs:295`, `CoverageScriptTests.cs:1644`, `ProductionInventoryAuthorityTests.cs:320`, `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:289`, `SharpProof.Worker.Launcher/Program.cs:866` |
+| R728 | **Two functions named `DeleteTemporaryRepository` in the same assembly have different bodies, and the one missing the read-only pre-pass is the only one that actually creates a git repository.** `CoverageScriptTests.cs:1644` and `AcceptanceScriptTests.cs:295` both walk the tree with `Directory.EnumerateFiles(..., SearchOption.AllDirectories)` and `File.SetAttributes(path, FileAttributes.Normal)` before deleting; `ProductionInventoryAuthorityTests.cs:320` is a bare `if (Directory.Exists) Directory.Delete(recursive: true)`. But `ProductionInventoryAuthorityTests` is the **only one of the three that runs `git init`** (`:273-282`, followed by `git add` and `git commit`), so it is the only one whose fixture contains `.git/objects` entries, which git creates read-only on every platform. On Windows `Directory.Delete` throws `UnauthorizedAccessException` on a read-only file, so the file that needs the pre-pass is the one that omits it, while the two that have it never create a read-only file. The failure is latent rather than observed - it does not reproduce on the Linux container where the gates run, because there the directory's write permission governs unlinking, not the file's mode - but it is a divergence in the same direction as R727: three copies of one operation, each with a different subset of the necessary behaviour. `DependencyAuditScriptTests.cs:544` is a fourth, inline, copy of the same read-only pre-pass. | `SharpProof.ArchitectureTest/ProductionInventoryAuthorityTests.cs:273-282,320-326`; `CoverageScriptTests.cs:1644-1659`; `AcceptanceScriptTests.cs:295-309`; `SharpProof.Package.Test/DependencyAuditScriptTests.cs:544` |
+
+### Checked and not proposed (part two hundred forty-eight)
+
+- **No temporary directory is actually leaked.** An earlier pass through this data
+  flagged four files that create a temp path with no cleanup token
+  (`BuildTaskTests`, `ClaimManifestBuilderTests`, `ScalarDifferentialMatrixTests`,
+  `WorkerTests`); all four are accounted for. `ScalarDifferentialMatrixTests` and
+  `WorkerTests` clean up through `TestRepository.DeleteOwnedTemporaryDirectory` in
+  a `Dispose`, and the other two construct a path used as a marker or placeholder
+  without creating a directory. Do not record a leak; R726 to R728 are about
+  convergence, not resource loss.
+- `SharpProof.Worker.Launcher/Program.cs:866` `DeleteIfExists` and
+  `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:289`
+  `DeleteStagingDirectory` are **not** proposed for the shared helper. Both are
+  product code on the shipping path with their own failure semantics, and
+  `TestRepository` is a test-only source linked by `SharpProofTestProject`. Folding
+  them in would move test scaffolding into the TCB. Scope R727 to test and gate
+  code, as with the process runner.
+- `Directory.CreateTempSubdirectory`, which `TempDirectory` already uses, is the
+  better primitive independent of any naming decision: it creates the directory
+  atomically and, on Unix, with owner-only permissions, where
+  `Path.Combine(GetTempPath(), guid)` + `Directory.CreateDirectory` inherits the
+  umask. That is an argument for adopting `TempDirectory` rather than for
+  standardising a prefix convention.
+
+### Status (part two hundred forty-eight)
+
+R726 and R727 are `pending` and are one piece of work: the naming convention
+is what blocks adoption of the guard, so choosing the nested form (or moving to
+`TempDirectory`, which needs no convention) is the enabling step and the delete
+consolidation follows from it. R728 is `pending`, is small, and is worth doing
+first regardless of the other two, because it is a divergence with a specific
+wrong copy rather than a general untidiness - and because collapsing the three
+helpers into one is precisely what R727 proposes, so fixing it in place would be
+wasted work.
+
+## Second survey, part two hundred forty-nine: R729-R730 - platform metadata references, and why the shared sources are not adopted
+
+The third instance of the pattern behind R724-R728, and the one that explains the
+other two: the shared source is not merely under-distributed, it is ignored inside
+the very projects that already compile it.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R729 | **"Build the platform metadata references for a test compilation" is written 23 times, and reading one environment value is done five different ways with two different error messages.** Every copy reads `AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")`, splits on `Path.PathSeparator`, and projects to `MetadataReference.CreateFromFile`. The null handling diverges five ways: `(string?)... ?? throw` (9 sites); `... as string ?? throw` (3); `((string)...!)` null-forgiving with no message at all (4, all in `SharpProof.Frontend.Test` and `SharpProof.Worker.Test`); `(string?)...` followed by an `IsNullOrWhiteSpace` guard (1); and the shared version's own form. The thrown text splits **14 sites across 11 files** saying `"Trusted platform assemblies are unavailable."` against **3 sites across 3 files** saying `"The runtime did not expose trusted platform assemblies."` - one condition, two messages, so a failure report cannot be grep-matched to a single site class. **Ordering diverges independently**: 5 files sort the split paths with `OrderBy(path, StringComparer.Ordinal)` and 18 do not, with no stated rule separating them, even though reference order is what Roslyn uses to resolve duplicate simple names within a reference set. The four null-forgiving sites are the worst of the set: an absent `TRUSTED_PLATFORM_ASSEMBLIES` surfaces there as a `NullReferenceException` inside a LINQ projection rather than as the described `InvalidOperationException` the other 14 sites raise. | 23 files; `eng/testing/TestMetadataReferences.cs:16-24`; `SharpProof.Analyzer.Test/AnalyzerTestHost.cs:264-277`; `SharpProof.Effects.Test/EffectTestHost.cs:300-310`; `SharpProof.ContractForGenerator.Test/GeneratorTestHost.cs:194-211`; `SharpProof.Gates/AnalyzerGateHost.cs:154-166`; `SharpProof.Frontend.Test/ProgramLoweringTests.cs:890-893`, `FrontendLoweringTests.cs`, `OpaqueSemanticIdentityTests.cs`; `SharpProof.Specs.Test/ApiSpecTests.cs:1186-1192`; `SharpProof.Worker.Test/WorkerTests.cs`, `ScalarDifferentialMatrixTests.cs`, `ProtocolJsonTests.cs`, `ExceptionIdentityReplayTests.cs` |
+| R730 | **The shared sources are not under-distributed - they are unreferenced where they are already compiled.** `eng/testing/TestMetadataReferences.cs` is linked into exactly two projects, `SharpProof.Contracts.Test` and `SharpProof.Worker.Test` (`Directory.Build.props:84-88`). Within those two projects, **9 files call `TestMetadataReferences` and 5 files build the same references by hand instead** - `ContractApiIdentityTests`, `ExceptionIdentityReplayTests`, `ProtocolJsonTests`, `ScalarDifferentialMatrixTests`, and `WorkerTests`. The helper is on their compile line; nothing points at it. This reframes R729, R724-R725, and R726-R728 as one problem rather than three: for the process runner, the temporary directory, and the metadata references alike, a correct shared implementation exists, is reachable, and loses to a locally written copy. The missing mechanism is a check, not a helper. The repository already has the shape of one - `BoundaryEnforcementTests` asserts a *set equality* between approved generated outputs and discovered generated files, and `DependencyAutomationTests` pins automation budgets by count - so a test asserting "no file in a project that links `TestMetadataReferences` also reads `TRUSTED_PLATFORM_ASSEMBLIES` directly", or a budget on the count of such reads, is the same technique applied to a new axis. Without it, every future test file is a fresh coin flip and the counts in R729, R724 and R726 grow. | `Directory.Build.props:84-88`; users at `SharpProof.Contracts.Test/ContractForMetadataSignatureTests.cs`, `ContractTestCompilation.cs`, `SharpProof.Worker.Test/ClaimManifestBuilderTests.cs`, `CompilerCallableLowererTests.cs`, `CompilerCallableLowererWaveSixRegressionTests.cs`, `CompilerManifestArtifactTests.cs`, `CompilerRelationalSummaryProviderTests.cs`, `CompilerRuntimeSymbolArtifactTests.cs`, `CompilerSourceLocationAuthorityTests.cs`; hand-rolled in the same two projects at `SharpProof.Contracts.Test/ContractApiIdentityTests.cs`, `SharpProof.Worker.Test/{ExceptionIdentityReplay,ProtocolJson,ScalarDifferentialMatrix,Worker}Tests.cs` |
+
+### Checked and not proposed (part two hundred forty-nine)
+
+- **The divergences are not all errors.** `GeneratorTestHost` appends the
+  `ContractForAttribute` assembly rather than `Contract`'s, which is correct for
+  what it tests; `EffectTestHost` deliberately omits any SharpProof reference; and
+  `TestMetadataReferences.WithSharpProof` checks whether the contract assembly is
+  already present before adding it, which `AnalyzerTestHost:274-276` and
+  `AnalyzerGateHost:163-165` do not - those two can add a second
+  `MetadataReference` for a file already in the trusted set. A consolidation should
+  keep the three distinct reference sets the shared class already exposes
+  (`Platform`, `WithSharpProof`, `CoreLibraryOnly`) and add a fourth for the
+  generator case, not collapse them to one.
+- The `OrderBy(..., Ordinal)` in the five sorting sites is **not** proposed for
+  removal. Two of the five (`WorkerTests`, `WorkerPerformanceProbe`) also filter to
+  a fixed `RequiredReferenceFileNames` set, which reads as a deliberate determinism
+  choice for fixtures whose output is hashed. The finding is that the choice is
+  made five times out of twenty-three with nothing recording why, not that either
+  answer is wrong.
+- `Tools/SharpProof.Fuzz/FrontendFuzzing.cs` and
+  `SharpProof.Testing/IrCSharpDifferentialOracle.cs` are in the count but are not
+  test projects and do not receive `eng/testing` sources. They would need the
+  `Compile Include ... Link` treatment rather than a using-directive, so they
+  belong to a later phase of R730 than the five in-project cases.
+
+### Status (part two hundred forty-nine)
+
+R729 is `pending`. R730 is `pending` and is the item that matters: it is the
+first in this survey to name a *mechanism* gap behind a family of duplications
+rather than another instance of one, and it applies retroactively to R724-R728. If
+only one thing from parts two hundred forty-seven, forty-eight and this one is
+actioned, it should be the check described in R730, because the three
+duplications will otherwise regrow after being collapsed.
