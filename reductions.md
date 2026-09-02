@@ -7045,3 +7045,24 @@ R832 is `deferred`: the duplicate copies occur only on incomplete/failure
 R833 is `deferred`: the extra pass is bounded by one response collection, but
   it is deterministic validation work with no policy benefit and has a simple
   identity-array sharing seam.
+
+## Second survey, part three hundred forty-five: R834 - duplicate manifest callable-ID projection
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R834 | **`ProtocolJson.ValidateManifestCore` projects callable IDs twice before membership checks.** It first passes `callables.Select(value => value.CallableId)` to `ValidateUniqueIds`, which materializes and validates that identity sequence, then immediately walks the same callable rows again with `Where`/`Select` to construct `callableIds` for claim membership. The nonblank/unique identity snapshot can be materialized once and reused to populate the membership set while retaining the distinct `.callable_id` diagnostic and the later `.claim_callable` lookup. | `SharpProof.Worker.Protocol/ProtocolJson.cs:503-522` |
+
+### Checked and not proposed (part three hundred forty-five)
+
+- Claim IDs and claim-to-callable lookup remain separate projections: the
+  latter is keyed by callable ID and feeds `ToLookup` for membership checks.
+- `ValidateUniqueIds` must continue to report its own code even if the same
+  identity snapshot also feeds a set.
+- Filtering blank IDs out of the membership set remains necessary because the
+  manifest can be malformed and validation must stay fail-closed.
+
+### Status (part three hundred forty-five)
+
+R834 is `deferred`: the duplicate pass is linear and bounded by manifest size,
+  but it repeats deterministic identity extraction immediately before using the
+  same IDs for membership validation.
