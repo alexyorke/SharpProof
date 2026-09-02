@@ -201,6 +201,7 @@ the smallest relevant containerized test target passes.
 | R556 | Remove the misleading release-configuration set-membership forwarder | `SharpProof.ArchitectureTest`: ReleaseConfigurationScript 1 passed |
 | R570 | Remove the unused Docker Compose version probe from the build entry point | `SharpProof.ArchitectureTest`: LocalProfilesMatchTheWorkflowCommands 1 passed |
 | R559 | Share the loop command's relative-path safety guard | `SharpProof.ArchitectureTest`: ContainerSourceCleanlinessTests 39 passed |
+| R554 | Remove the unreferenced package-license graph helper | `SharpProof.ArchitectureTest`: PackageDependencyAuthority 45 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3437,9 +3438,9 @@ reduction is about reusing one archive snapshot, not dropping any validation.
 
 ### Status (part ninety-six)
 
-R554 is a `pending` reduction candidate. Confirm that callers outside this
-repository do not consume the dot-sourced function before deleting or reshaping
-it; the repository-local evidence shows no active consumer.
+R554 is applied: repository-wide search found no caller for the license-only
+projection, so the unreferenced helper was removed; dependency and license
+authority checks remain in their active paths.
 
 ## Second survey, part ninety-seven: R555 - unused release-authority local
 

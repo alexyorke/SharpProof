@@ -221,30 +221,6 @@ function Get-SharpProofPackageDependencyGraph {
     return @($edges | Sort-Object FromId, ToId, TargetFramework)
 }
 
-function Get-SharpProofPackageLicenseGraph {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$PackagePaths,
-
-        [Parameter()]
-        [string]$ContractPath = (Join-Path `
-            (Join-Path $PSScriptRoot '..') `
-            'eng/release/package-dependency-contract.json')
-    )
-
-    $null = Get-SharpProofPackageDependencyGraph `
-        -PackagePaths $PackagePaths `
-        -ContractPath $ContractPath
-    $contract = Get-Content -LiteralPath $ContractPath -Raw |
-        ConvertFrom-Json
-    return @($contract.packages | ForEach-Object {
-        [pscustomobject][ordered]@{
-            PackageId = [string]$_.id
-            LicenseExpression = [string]$_.licenseExpression
-        }
-    } | Sort-Object PackageId)
-}
-
 function Get-SharpProofThirdPartyComponentGraph {
     param(
         [Parameter()]
