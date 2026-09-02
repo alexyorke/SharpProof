@@ -20,6 +20,33 @@ internal static class IrTraversal
         };
     }
 
+    internal static bool Any(IrTerm root, Func<IrTerm, bool> predicate)
+    {
+        var pending = new Stack<IrTerm>();
+        var visited = new HashSet<IrId>();
+        pending.Push(root);
+        while (pending.Count != 0)
+        {
+            var term = pending.Pop();
+            if (!visited.Add(term.Id))
+            {
+                continue;
+            }
+
+            if (predicate(term))
+            {
+                return true;
+            }
+
+            foreach (var child in GetChildren(term))
+            {
+                pending.Push(child);
+            }
+        }
+
+        return false;
+    }
+
     internal static ImmutableHashSet<IrVarId> CollectVariables(IrTerm root)
     {
         return CollectVariables([root]);

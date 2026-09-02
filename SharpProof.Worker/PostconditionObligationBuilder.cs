@@ -180,39 +180,26 @@ internal static class PostconditionObligationBuilder
 
     internal static bool IsSupportedProofDomain(IrFactory factory, IrTerm root)
     {
-        var pending = new Stack<IrTerm>();
-        var visited = new HashSet<IrId>();
-        pending.Push(root);
-        while (pending.Count != 0)
+        return !IrTraversal.Any(root, term =>
         {
-            var term = pending.Pop();
-            if (!visited.Add(term.Id))
-            {
-                continue;
-            }
-
             if (term is IrVariableTerm variable &&
                 factory.GetTypeInfo(variable.Type).Kind is not (IrTypeKind.Boolean or IrTypeKind.Integer))
             {
-                return false;
+                return true;
             }
 
             if (term is IrBinaryTerm { Operator: IrBinaryOperator.StringConcat })
             {
-                return false;
+                return true;
             }
 
             if (term is IrLengthTerm length && length.Value.Type == factory.StringType)
             {
-                return false;
+                return true;
             }
 
-            foreach (var child in IrTraversal.GetChildren(term))
-            {
-                pending.Push(child);
-            }
-        }
-        return true;
+            return false;
+        });
     }
 
     internal static IrTerm? ApplyBodySubstitutions(

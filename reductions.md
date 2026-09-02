@@ -3177,12 +3177,13 @@ methods and operators, preserving the operator-only harmless-discard policy.
 
 ### Status (part sixty-nine)
 
-R515 and R517 are applied: charged summary traversal now uses
+R515-R517 are applied: charged summary traversal now uses
 `IrTraversal.GetChildren` in reverse push order, preserving the prior
-visit/budget order, and both public attributes share required-reason validation
-while keeping their distinct messages and metadata. R514 and R516 remain
-pending; validation and traversal changes must retain their security,
-resource-limit, and constructor semantics.
+visit/budget order; the two bounded IR predicates share a cycle-safe
+`IrTraversal.Any` walk; and both public attributes share required-reason
+validation while keeping their distinct messages and metadata. R514 remains
+pending because validation changes must retain their security and geometry
+semantics.
 
 ## Second survey, part seventy: R518-R520 - effect-scanner phases and native-loader cleanup
 
@@ -3789,3 +3790,19 @@ R592 is a pending differential-testing reduction candidate. Keep the factory-spe
 ### Status (part one hundred thirty-four)
 
 R593 is a pending differential-generator reduction candidate. Preserve the field initialization order and the existing sequence type identity; replace only the second equivalent interning request.
+
+## Second survey, part one hundred thirty-five: R594 - duplicate unsupported-mutation result path
+
+| R594 | **`RoslynProgramLowerer.LowerValue` repeats the unsupported-mutation result construction.** The `IIncrementOrDecrementOperation` and `ICompoundAssignmentOperation` arms each call `LowerUnsupportedMutation` and then create/return the same `CreateHavocTemporary(..., "mutation-result", GetTypeId(mutation.Type))`; only the compound arm additionally passes its value operation for evaluation. A shared mutation-result helper or a combined admission path can preserve that side-effect distinction while removing the duplicated unknown-result plumbing. | `SharpProof.Frontend/RoslynProgramLowerer.cs:289-302` |
+
+### Status (part one hundred thirty-five)
+
+R594 is a pending Frontend program-lowering reduction candidate. Preserve evaluation of the compound assignment's value and the same mutation/result types; centralize only the common unsupported-result construction.
+
+## Second survey, part one hundred thirty-six: R595 - unbounded nested-operation recursion
+
+| R595 | **`RoslynProgramLowerer.LowerNestedOperations` recursively walks Roslyn operation trees without the lowerer's depth/stack guard.** The main expression lowerer caps recursive visitor depth at 256, but this preliminary scan follows every child with a direct recursive call and can overflow before that cap is reached when a deeply nested expression is lowered in a program. An explicit stack with a bounded spend/depth policy can retain its intentional stop points for invocations, array elements, anonymous/local functions, and `nameof` while making this prepass safe and consistent with the guarded lowering path. | `SharpProof.Frontend/RoslynProgramLowerer.cs:352-382,471-503` |
+
+### Status (part one hundred thirty-six)
+
+R595 is a pending Frontend program-lowering robustness reduction candidate. Preserve the prepass's side-effect ordering and stop-at-boundary rules; replace only the unbounded recursive traversal.

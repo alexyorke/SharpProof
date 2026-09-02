@@ -31,29 +31,7 @@ internal static class ManagedContractFacts
 
     internal static bool ContainsPotentiallyFailingCast(IrTerm term)
     {
-        var pending = new Stack<IrTerm>();
-        var visited = new HashSet<IrId>();
-        pending.Push(term);
-        while (pending.Count != 0)
-        {
-            var current = pending.Pop();
-            if (!visited.Add(current.Id))
-            {
-                continue;
-            }
-
-            if (current is IrCastTerm)
-            {
-                return true;
-            }
-
-            foreach (var child in IrTraversal.GetChildren(current))
-            {
-                pending.Push(child);
-            }
-        }
-
-        return false;
+        return IrTraversal.Any(term, static current => current is IrCastTerm);
     }
 
     internal static ManagedAbstractValue Evaluate(
