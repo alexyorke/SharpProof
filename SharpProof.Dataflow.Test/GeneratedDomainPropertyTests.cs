@@ -336,22 +336,39 @@ internal static class GeneratedDomainSamples
     }
 }
 
-[TestFixture]
-public sealed class GeneratedIntervalDomainPropertyTests
+public abstract class GeneratedDomainPropertyTests<T>
 {
-    private const int Seed = 0x51A2;
-    private readonly IntervalDomain _domain = IntervalDomain.Instance;
-    private static IReadOnlyList<IntervalValue> Values =>
-        GeneratedDomainSamples.Intervals(Seed, 256);
+    protected abstract IAbstractDomain<T> Domain { get; }
+    protected abstract int Seed { get; }
+    protected abstract IReadOnlyList<T> Values { get; }
 
     [Test]
     public void GeneratedValuesSatisfyLatticeAndBottomLaws()
     {
         GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws(
-            _domain,
+            Domain,
             Values,
             Seed);
     }
+
+    [Test]
+    public void GeneratedHavocIsConservative()
+    {
+        GeneratedDomainLawAssertions.AssertHavocIsConservative(
+            Domain,
+            Values);
+    }
+}
+
+[TestFixture]
+public sealed class GeneratedIntervalDomainPropertyTests :
+    GeneratedDomainPropertyTests<IntervalValue>
+{
+    protected override int Seed => 0x51A2;
+    private readonly IntervalDomain _domain = IntervalDomain.Instance;
+    protected override IAbstractDomain<IntervalValue> Domain => _domain;
+    protected override IReadOnlyList<IntervalValue> Values =>
+        GeneratedDomainSamples.Intervals(Seed, 256);
 
     [Test]
     public void GeneratedTransfersAreMonotone()
@@ -389,30 +406,19 @@ public sealed class GeneratedIntervalDomainPropertyTests
             maximumChanges: 3);
     }
 
-    [Test]
-    public void GeneratedHavocIsConservative()
-    {
-        GeneratedDomainLawAssertions.AssertHavocIsConservative(_domain, Values);
-    }
 }
 
 [TestFixture]
-public sealed class GeneratedSequenceCardinalityDomainPropertyTests
+public sealed class GeneratedSequenceCardinalityDomainPropertyTests :
+    GeneratedDomainPropertyTests<SequenceCardinalityValue>
 {
-    private const int Seed = 0x7E91;
+    protected override int Seed => 0x7E91;
     private readonly SequenceCardinalityDomain _domain =
         SequenceCardinalityDomain.Instance;
-    private static IReadOnlyList<SequenceCardinalityValue> Values =>
+    protected override IAbstractDomain<SequenceCardinalityValue> Domain =>
+        _domain;
+    protected override IReadOnlyList<SequenceCardinalityValue> Values =>
         GeneratedDomainSamples.Sequences(Seed, 256);
-
-    [Test]
-    public void GeneratedValuesSatisfyLatticeAndBottomLaws()
-    {
-        GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws(
-            _domain,
-            Values,
-            Seed);
-    }
 
     [Test]
     public void WideningTerminatesOnGeneratedAscendingChains()
@@ -434,19 +440,16 @@ public sealed class GeneratedSequenceCardinalityDomainPropertyTests
             maximumChanges: 2);
     }
 
-    [Test]
-    public void GeneratedHavocIsConservative()
-    {
-        GeneratedDomainLawAssertions.AssertHavocIsConservative(_domain, Values);
-    }
 }
 
 [TestFixture]
-public sealed class GeneratedNullnessDomainPropertyTests
+public sealed class GeneratedNullnessDomainPropertyTests :
+    GeneratedDomainPropertyTests<NullnessValue>
 {
-    private const int Seed = 0x19F3;
+    protected override int Seed => 0x19F3;
     private readonly NullnessDomain _domain = NullnessDomain.Instance;
-    private static IReadOnlyList<NullnessValue> Values
+    protected override IAbstractDomain<NullnessValue> Domain => _domain;
+    protected override IReadOnlyList<NullnessValue> Values
     {
         get
         {
@@ -459,14 +462,6 @@ public sealed class GeneratedNullnessDomainPropertyTests
         }
     }
 
-    [Test]
-    public void GeneratedValuesSatisfyLatticeAndBottomLaws()
-    {
-        GeneratedDomainLawAssertions.AssertLatticeAndBottomLaws(
-            _domain,
-            Values,
-            Seed);
-    }
 
     [Test]
     public void GeneratedTransfersAreMonotone()
@@ -495,9 +490,4 @@ public sealed class GeneratedNullnessDomainPropertyTests
             maximumChanges: 2);
     }
 
-    [Test]
-    public void GeneratedHavocIsConservative()
-    {
-        GeneratedDomainLawAssertions.AssertHavocIsConservative(_domain, Values);
-    }
 }
