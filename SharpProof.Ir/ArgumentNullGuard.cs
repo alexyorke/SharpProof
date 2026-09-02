@@ -1,4 +1,4 @@
-#if SHARPPROOF_DATAFLOW_ARGUMENT_GUARD || SHARPPROOF_PORTABLE_ARGUMENT_GUARD || SHARPPROOF_SMT_ARGUMENT_GUARD
+#if SHARPPROOF_DATAFLOW_ARGUMENT_GUARD || SHARPPROOF_SMT_ARGUMENT_GUARD
 namespace System.Diagnostics.CodeAnalysis
 {
     [AttributeUsage(AttributeTargets.Parameter)]
@@ -95,7 +95,7 @@ namespace SharpProof
         }
 
         internal static T NotNull<T>(
-#if SHARPPROOF_DATAFLOW_ARGUMENT_GUARD || SHARPPROOF_PORTABLE_ARGUMENT_GUARD || SHARPPROOF_SMT_ARGUMENT_GUARD
+#if SHARPPROOF_DATAFLOW_ARGUMENT_GUARD || SHARPPROOF_SMT_ARGUMENT_GUARD
             [System.Diagnostics.CodeAnalysis.NotNull] T? value,
 #else
             T? value,
