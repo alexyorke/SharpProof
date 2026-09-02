@@ -147,16 +147,6 @@ function Get-SolutionProjectPaths {
     return @($paths | Sort-Object)
 }
 
-function Get-CoverageExtraProjectNames {
-    [xml]$settings = Get-Content -LiteralPath (Join-Path $resolvedRepositoryRoot 'eng/coverage/SharpProof.Gates.runsettings') -Raw
-    $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($modulePath in @($settings.SelectNodes('//ModulePath') | ForEach-Object { [string]$_.InnerText })) {
-        $match = [regex]::Match($modulePath, 'SharpProof\.(?<name>[A-Za-z0-9.]+)\.dll', [Text.RegularExpressions.RegexOptions]::CultureInvariant)
-        if ($match.Success) { [void]$names.Add('SharpProof.' + $match.Groups['name'].Value) }
-    }
-    return @($names | Sort-Object)
-}
-
 function Get-PdbDocumentPath {
     param([Parameter(Mandatory = $true)] [System.Reflection.Metadata.MetadataReader]$Reader, [Parameter(Mandatory = $true)] [System.Reflection.Metadata.DocumentHandle]$Handle)
     if ($Handle.IsNil) { throw 'Production inventory sequence point has no source document.' }
@@ -316,7 +306,6 @@ $commit = Invoke-GitText -Arguments @('rev-parse', 'HEAD')
 if ($commit -notmatch '^[0-9a-f]{40}$') { throw "Production inventory commit is not an exact SHA-1: '$commit'." }
 $manifest = Get-GeneratedManifest
 $generatorSourceRecords = Get-GeneratorSourceRecords
-$extraCoverageProjects = Get-CoverageExtraProjectNames
 $projects = [Collections.Generic.List[object]]::new()
 $compileUnion = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $seenProjectNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -337,7 +326,7 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
     }
     $projectName = Get-PropertyValue -Properties $query.Properties -Name 'MSBuildProjectName'
     $production = Get-PropertyValue -Properties $query.Properties -Name 'SharpProofProductionProject'
-    if ($production -ne 'true' -and $projectName -notin $extraCoverageProjects) { continue }
+    if ($production -ne 'true') { continue }
     if (-not $seenProjectNames.Add($projectName)) { throw "Production inventory has duplicate project '$projectName'." }
     $projectDirectory = Split-Path -Parent $projectPath
     $compilePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -409,9 +398,6 @@ foreach ($result in Get-MsBuildQueries -ProjectRelativePaths @(Get-SolutionProje
         $path = Get-ItemPath -Item $item -ProjectDirectory $projectDirectory
         [void]$additionalFileRecords.Add([pscustomobject][ordered]@{ project = $projectName; path = $path })
     }
-}
-foreach ($projectName in $extraCoverageProjects) {
-    if (-not $seenProjectNames.Contains($projectName)) { throw "Coverage runsettings names an absent project: '$projectName'." }
 }
 foreach ($path in @($manifest.paths)) {
     if (-not $compileUnion.Contains($path)) { throw "Approved generated output is not an evaluated Compile item: '$path'." }

@@ -68,6 +68,59 @@ $managedSettings = Join-Path `
     $repositoryRoot `
     'eng\coverage\SharpProof.Managed.runsettings'
 
+function New-CoverageSettings {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('Include', 'Exclude')]
+        [string]$ModuleSelector,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$ModulePath,
+
+        [Parameter(Mandatory = $true)]
+        [bool]$StaticManagedInstrumentation
+    )
+
+    [xml]$settings = Get-Content -LiteralPath $managedSettings -Raw
+    $modulePaths = $settings.SelectSingleNode('//ModulePaths')
+    $modulePaths.RemoveAll()
+    $selector = $settings.CreateElement($ModuleSelector)
+    $module = $settings.CreateElement('ModulePath')
+    $module.InnerText = $ModulePath
+    [void]$selector.AppendChild($module)
+    [void]$modulePaths.AppendChild($selector)
+    $staticManaged = $settings.SelectSingleNode(
+        '//EnableStaticManagedInstrumentation')
+    $staticManaged.InnerText = if ($StaticManagedInstrumentation) {
+        'True'
+    }
+    else {
+        'False'
+    }
+
+    $path = Join-Path `
+        $resolvedResultsDirectory `
+        ("coverage-$Name.runsettings")
+    $writerSettings = [Xml.XmlWriterSettings]::new()
+    $writerSettings.Encoding = [Text.UTF8Encoding]::new($false)
+    $writerSettings.Indent = $true
+    $writerSettings.NewLineChars = "`n"
+    $writerSettings.NewLineHandling = [Xml.NewLineHandling]::Replace
+    $writer = [Xml.XmlWriter]::Create($path, $writerSettings)
+    try {
+        $settings.Save($writer)
+    }
+    finally {
+        $writer.Dispose()
+    }
+    return $path
+}
+
 # The Microsoft collector is used instead of Coverlet. Static managed
 # instrumentation rewrites assemblies on disk, so concurrent shards receive
 # private managed binaries while immutable dependencies remain hard-linked.
@@ -127,9 +180,11 @@ else {
 # payload on disk, so the broad Worker pass must not rewrite it. Collect its
 # own behavioral coverage in an isolated testhost where no compiler manifest
 # consumes the instrumented assembly.
-$attributesSettings = Join-Path `
-    $repositoryRoot `
-    'eng\coverage\SharpProof.Attributes.runsettings'
+$attributesSettings = New-CoverageSettings `
+    -Name 'attributes' `
+    -ModuleSelector 'Include' `
+    -ModulePath '.*SharpProof\.Attributes\.dll$' `
+    -StaticManagedInstrumentation $false
 & $dotnetWrapper `
     -TimeoutSeconds $TimeoutSeconds `
     test (Join-Path `
@@ -151,9 +206,11 @@ if ($LASTEXITCODE -ne 0) {
 # settings instrument only SharpProof.Gates and never its child processes or
 # product payloads. The ordinary uninstrumented Performance test remains the
 # authoritative threshold gate.
-$gateSettings = Join-Path `
-    $repositoryRoot `
-    'eng\coverage\SharpProof.Gates.runsettings'
+$gateSettings = New-CoverageSettings `
+    -Name 'gates' `
+    -ModuleSelector 'Include' `
+    -ModulePath '.*SharpProof\.Gates\.dll$' `
+    -StaticManagedInstrumentation $false
 & $dotnetWrapper `
     -TimeoutSeconds $TimeoutSeconds `
     test (Join-Path `

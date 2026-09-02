@@ -1569,7 +1569,6 @@ public sealed class CoverageScriptTests
         string repository,
         bool approveTrustedSource = false)
     {
-        Directory.CreateDirectory(Path.Combine(repository, "eng", "coverage"));
         Directory.CreateDirectory(Path.Combine(repository, "eng", "generated"));
         await File.WriteAllTextAsync(
             Path.Combine(repository, "SharpProof.sln"),
@@ -1580,9 +1579,6 @@ public sealed class CoverageScriptTests
             "EndProject\n" +
             "Global\n" +
             "EndGlobal\n");
-        await File.WriteAllTextAsync(
-            Path.Combine(repository, "eng", "coverage", "SharpProof.Gates.runsettings"),
-            "<RunSettings />\n");
         await File.WriteAllTextAsync(
             Path.Combine(repository, "eng", "generated", "approved-outputs.v1.json"),
             approveTrustedSource

@@ -1806,7 +1806,16 @@ public sealed class ArchitectureTests
                 Does.Contain("SharpProof.Managed.runsettings"));
             Assert.That(
                 collector,
-                Does.Contain("SharpProof.Gates.runsettings"));
+                Does.Contain("New-CoverageSettings"));
+            Assert.That(
+                collector,
+                Does.Contain(".*SharpProof\\.Attributes\\.dll$"));
+            Assert.That(
+                collector,
+                Does.Contain(".*SharpProof\\.Gates\\.dll$"));
+            Assert.That(
+                collector,
+                Does.Not.Contain("SharpProof.Gates.runsettings"));
         }
 
         var managedSettings = File.ReadAllText(Path.Combine(
@@ -1852,26 +1861,9 @@ public sealed class ArchitectureTests
                 "<EnableDynamicManagedInstrumentation>False" +
                 "</EnableDynamicManagedInstrumentation>"));
 
-        var gateSettings = File.ReadAllText(Path.Combine(
-            root,
-            "eng",
-            "coverage",
-            "SharpProof.Gates.runsettings"));
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                gateSettings,
-                Does.Contain(
-                    ".*SharpProof\\.Gates\\.dll$"));
-            Assert.That(
-                gateSettings,
-                Does.Contain(
-                    "<CollectFromChildProcesses>False" +
-                    "</CollectFromChildProcesses>"));
-            Assert.That(
-                gateSettings,
-                Does.Not.Contain("SharpProof.Attributes"));
-        }
+        Assert.That(
+            collector,
+            Does.Contain("-StaticManagedInstrumentation $false"));
     }
 
     [Test]

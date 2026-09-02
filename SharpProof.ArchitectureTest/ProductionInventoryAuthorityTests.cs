@@ -201,7 +201,6 @@ public sealed class ProductionInventoryAuthorityTests
     {
         Directory.CreateDirectory(Path.Combine(repository, "Project"));
         Directory.CreateDirectory(Path.Combine(repository, "scripts"));
-        Directory.CreateDirectory(Path.Combine(repository, "eng", "coverage"));
         Directory.CreateDirectory(Path.Combine(repository, "eng", "generated"));
         await File.WriteAllTextAsync(
             Path.Combine(repository, "Project", "Project.csproj"),
@@ -229,9 +228,6 @@ public sealed class ProductionInventoryAuthorityTests
             "Microsoft Visual Studio Solution File, Format Version 12.00\n" +
             "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Project\", \"Project/Project.csproj\", \"{11111111-1111-1111-1111-111111111111}\"\n" +
             "EndProject\nGlobal\nEndGlobal\n");
-        await File.WriteAllTextAsync(
-            Path.Combine(repository, "eng", "coverage", "SharpProof.Gates.runsettings"),
-            "<RunSettings />\n");
         await File.WriteAllTextAsync(
             Path.Combine(repository, "eng", "generated", "approved-outputs.v1.json"),
             "{\"schemaVersion\":1,\"outputs\":[\"Project/Generated.g.cs\"]}\n");
