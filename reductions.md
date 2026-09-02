@@ -196,6 +196,7 @@ the smallest relevant containerized test target passes.
 | R484 | Share the canonical path-within-directory comparison used by publication and mount checks | `SharpProof.Worker.Test`: LinuxPublicationSetTests 34 |
 | R485 | Share initial publication-path filtering and topology validation | `SharpProof.Worker.Test`: LinuxPublicationSetTests 34 |
 | R498 | Reuse the built-in string-concatenation predicate in the binary effect resolver | `SharpProof.Effects.Test`: StringConcatenation tests 3 passed |
+| R503 | Remove redundant and inert `.gitignore` negation rules | `git check-ignore`: 4 probes and 940 tracked paths passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2950,9 +2951,10 @@ individually with `git check-ignore`.
 
 ### Status (part sixty-three-b)
 
-R503 is `pending` and is four lines. It is filed despite its size because
-negation rules are the part of an ignore file where being wrong is silent, and
-three of these four point at paths that do not exist in the repository.
+R503 is applied: the one load-bearing `!eng/release/` exception remains, while
+the redundant file-specific exception and three unused template negations are
+gone. The tracked-file and representative-probe checks still agree with the
+intended ignore policy.
 
 
 ## Second survey, part sixty-four: R504 - Dockerfile layer boundaries
@@ -3622,3 +3624,11 @@ R576 is a pending package-integration-test reduction candidate. Preserve the exp
 ### Status (part one hundred eighteen)
 
 R577 is a pending package-topology reduction candidate. Keep an explicit policy check that the manifest contains exactly the supported products and remains in dependency order; centralize only the repeated project-path vocabulary.
+
+## Second survey, part one hundred nineteen: R578 - duplicate IL-candidate normalization
+
+| R578 | **`CompilerImplementationIlSummaryLowerer.TryBuild` normalizes its method candidate twice.** The method is first passed through `SemanticClaimIdentity.NormalizeCandidate(...).OriginalDefinition` at the start of `TryBuild`, then `IsCandidate` repeats the same normalization before checking method kind, staticness, genericity, assembly, parameters, and return type. An already-normalized predicate or a single normalization boundary can remove that repeated symbol traversal while preserving `IsCandidate`'s standalone-call behavior. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:116-127,140-157` |
+
+### Status (part one hundred nineteen)
+
+R578 is a pending compiler-collector reduction candidate. Keep normalization inside the public/internal `IsCandidate` boundary for independent callers; only avoid repeating it when `TryBuild` has already normalized the same symbol.
