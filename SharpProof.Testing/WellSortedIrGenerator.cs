@@ -23,13 +23,9 @@ public enum GeneratedIrCategory
     ArrayIndex
 }
 
-[SuppressMessage(
-    "Security",
-    "CA5394:Do not use insecure randomness",
-    Justification = "The seeded generator intentionally produces deterministic test cases.")]
-public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
+public static class DifferentialIntegerCorpus
 {
-    private static readonly long[] InterestingIntegers = [
+    public static IReadOnlyList<long> InterestingIntegers { get; } = [
         long.MinValue,
         -3,
         -1,
@@ -39,6 +35,14 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
         3,
         long.MaxValue
     ];
+}
+
+[SuppressMessage(
+    "Security",
+    "CA5394:Do not use insecure randomness",
+    Justification = "The seeded generator intentionally produces deterministic test cases.")]
+public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
+{
     private static readonly IrBinaryOperator[] IntegerOperators = [
         IrBinaryOperator.Add, IrBinaryOperator.Subtract, IrBinaryOperator.Multiply,
         IrBinaryOperator.Divide, IrBinaryOperator.Remainder];
@@ -219,6 +223,7 @@ public sealed class WellSortedIrGenerator(IrFactory factory, int seed)
 
     private long NextInteger()
     {
-        return InterestingIntegers[_random.Next(InterestingIntegers.Length)];
+        return DifferentialIntegerCorpus.InterestingIntegers[
+            _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)];
     }
 }

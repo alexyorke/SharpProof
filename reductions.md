@@ -202,6 +202,7 @@ the smallest relevant containerized test target passes.
 | R570 | Remove the unused Docker Compose version probe from the build entry point | `SharpProof.ArchitectureTest`: LocalProfilesMatchTheWorkflowCommands 1 passed |
 | R559 | Share the loop command's relative-path safety guard | `SharpProof.ArchitectureTest`: ContainerSourceCleanlinessTests 39 passed |
 | R554 | Remove the unreferenced package-license graph helper | `SharpProof.ArchitectureTest`: PackageDependencyAuthority 45 passed |
+| R548 | Share the deterministic differential integer boundary corpus | `SharpProof.Fuzz.Test`: FuzzRunnerTests 32 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3379,8 +3380,8 @@ behavior for user-defined or non-reference conversions.
 
 ### Status (part ninety)
 
-R548 is a `pending` reduction candidate. Preserve the exact boundary values and
-the intentionally smaller C# literal subset if the corpus is centralized.
+R548 is applied: both generators now consume the shared eight-value boundary
+corpus, while the C# generator's smaller literal subset remains local.
 
 ## Second survey, part ninety-one: R549 - repeated release-tag gate
 
@@ -3652,3 +3653,11 @@ R579 is a pending compiler-collector reduction candidate. Preserve the diagnosti
 ### Status (part one hundred twenty-one)
 
 R580 is a pending specification-pack schema reduction candidate. Preserve catalog digest binding and method evidence identity; only remove or surface the currently discarded pack-level evidence value.
+
+## Second survey, part one hundred twenty-two: R581 - nullable summary-evidence validation defect
+
+| R581 | **`CompilationFingerprint.ValidSummaryEvidence` can throw while validating malformed JSON.** For non-specification-pack rows, the final condition reads `row.EvidenceIdentity.Length` without first rejecting a null identity. JSON deserialization can populate a non-nullable string property with null; `CompilerManifestArtifactJson` then reaches this envelope check before the nearby `ValidSummaryEvidenceRow` null-shape guard, so a malformed non-pack summary row can escape as `NullReferenceException` instead of being rejected as invalid evidence. Add a null-safe shape check before reading the identity or route both paths through the existing row validator. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:110-142,153-171`; `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:494-514` |
+
+### Status (part one hundred twenty-two)
+
+R581 is a pending compiler-artifact validation defect. Preserve the stricter authority-mode checks and canonical summary ordering; ensure malformed nullable fields fail closed with the intended validation exception rather than a null dereference.

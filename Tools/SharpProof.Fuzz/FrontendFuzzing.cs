@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Frontend;
 using SharpProof.Ir;
+using SharpProof.Testing;
 
 namespace SharpProof.Fuzz;
 
@@ -653,17 +654,6 @@ public sealed record GeneratedCSharpCase(
 
 public sealed class SmallCSharpCaseGenerator(int seed)
 {
-    private static readonly long[] InterestingIntegers = [
-        long.MinValue,
-        -3,
-        -1,
-        0,
-        1,
-        2,
-        3,
-        long.MaxValue
-    ];
-
     private static readonly long[] LiteralIntegers = [-3, -1, 0, 1, 2, 3];
     private readonly Random _random = new(seed);
 
@@ -677,9 +667,11 @@ public sealed class SmallCSharpCaseGenerator(int seed)
         var values = _random.Next(4) == 0
             ? null
             : Enumerable.Range(0, _random.Next(4))
-                .Select(_ => InterestingIntegers[_random.Next(InterestingIntegers.Length)])
+                .Select(_ => DifferentialIntegerCorpus.InterestingIntegers[
+                    _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)])
                 .ToArray();
-        var index = InterestingIntegers[_random.Next(InterestingIntegers.Length)];
+        var index = DifferentialIntegerCorpus.InterestingIntegers[
+            _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)];
         if (_random.Next(3) == 0 && values != null)
         {
             index = _random.Next(2) == 0 ? -1 : values.Length;
@@ -712,8 +704,10 @@ public sealed class SmallCSharpCaseGenerator(int seed)
             expression,
             expression.Kind == GeneratedExpressionKind.ArrayIndex
                 ? index
-                : InterestingIntegers[_random.Next(InterestingIntegers.Length)],
-            InterestingIntegers[_random.Next(InterestingIntegers.Length)],
+                : DifferentialIntegerCorpus.InterestingIntegers[
+                    _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)],
+            DifferentialIntegerCorpus.InterestingIntegers[
+                _random.Next(DifferentialIntegerCorpus.InterestingIntegers.Count)],
             _random.Next(2) == 0)
         {
             Text = _random.Next(4) switch
