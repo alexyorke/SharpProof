@@ -7246,3 +7246,23 @@ R841 is `deferred`: the duplicate check is cheap for the small release
 R842 is `deferred`: the value payload is unused and a set is clearer, but the
   current dictionary behavior is correct and the cleanup is limited to an
   internal validation data structure.
+
+## Second survey, part three hundred fifty-four: R843 - repeated scalar-catalog key sorting
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R843 | **`Generate-CSharpScalarSemantics.ps1` re-sorts each key collection inside its contiguous-key loop.** The `irOpaquePurities`, `irUnaryOperators`, and `irBinaryOperators` validations each evaluate `@($rows.Key | Sort-Object)[$index]` for every index. The sorted array is identical for the duration of each loop, so the current code performs a full sort once per row instead of materializing one ordered key array and indexing it. Hoisting each `Sort-Object` call out of its loop preserves the contiguous-from-zero check and reduces the validation from repeated sorting to one sort per catalog section. | `scripts/Generate-CSharpScalarSemantics.ps1:264-267,522-526,576-580` |
+
+### Checked and not proposed (part three hundred fifty-four)
+
+- The uniqueness checks remain separate because they validate both the symbolic
+  names and numeric keys before the contiguous-order check.
+- The catalog's source order is not being treated as canonical; the proposed
+  local cache still sorts by key exactly as the current code does.
+- The generator's emitted ordering loops later in the script are output
+  construction, not repeated validation sorts covered by this finding.
+
+### Status (part three hundred fifty-four)
+
+R843 is `deferred`: the catalogs are small, but the repeated sort is a direct
+  avoidable cost and a clear local simplification in build-time validation.
