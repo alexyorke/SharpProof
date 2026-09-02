@@ -39,16 +39,7 @@ dotnet_style_collection_initializer = true:suggestion
 dotnet_style_object_initializer = true:suggestion
 dotnet_style_prefer_collection_expression = true:suggestion
 
-[SharpProof.BuildTasks/InvalidatePublishedResult.cs]
-dotnet_diagnostic.CA1515.severity = none
-
-[SharpProof.BuildTasks/ResetPublishedVerification.cs]
-dotnet_diagnostic.CA1515.severity = none
-
-[SharpProof.BuildTasks/RunVerifier.cs]
-dotnet_diagnostic.CA1515.severity = none
-
-[SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs]
+[SharpProof.BuildTasks/{InvalidatePublishedResult,ResetPublishedVerification,RunVerifier,ValidatePublishedVerificationResult}.cs]
 dotnet_diagnostic.CA1515.severity = none
 
 [SharpProof.Dataflow/IntervalDomain.cs]
@@ -68,21 +59,11 @@ dotnet_diagnostic.CA1032.severity = none
 dotnet_diagnostic.CA1064.severity = none
 dotnet_diagnostic.CA2000.severity = none
 
-[SharpProof.Worker.Launcher/Program.cs]
-dotnet_diagnostic.CA1849.severity = none
-
-
-[SharpProof.Worker/CallableVerifier.cs]
-dotnet_diagnostic.CA1308.severity = none
-
-[SharpProof.Worker/Program.cs]
+[SharpProof.Worker{,.Launcher}/Program.cs]
 dotnet_diagnostic.CA1849.severity = none
 
 [SharpProof.Worker/SharpProofWorker.cs]
 dotnet_diagnostic.CA1515.severity = none
 
-[SharpProof.Worker/VerificationCache.cs]
-dotnet_diagnostic.CA1308.severity = none
-
-[SharpProof.Worker/WorkerInputSnapshot.cs]
+[SharpProof.Worker/{CallableVerifier,VerificationCache,WorkerInputSnapshot}.cs]
 dotnet_diagnostic.CA1308.severity = none
