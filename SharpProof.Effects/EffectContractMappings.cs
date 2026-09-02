@@ -42,7 +42,7 @@ internal static class EffectContractMappings
         return ProjectCapabilities(source).Effects;
     }
 
-    private static (EffectContractCapabilityKind Capabilities, EffectContractKind Effects)
+    internal static (EffectContractCapabilityKind Capabilities, EffectContractKind Effects)
         ProjectCapabilities(EffectCapabilityKind source)
     {
         if ((source & ~EffectCapabilityKind.AllKnown) != 0)

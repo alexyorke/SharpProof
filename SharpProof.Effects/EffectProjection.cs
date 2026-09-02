@@ -24,10 +24,11 @@ public static class EffectSummaryProjector
             effects |= EffectContractKind.Throws;
         }
 
-        if (!summary.Capabilities.IsUnknown)
-        {
-            effects |= EffectContractMappings.ToContractEffects(summary.Capabilities.Kinds);
-        }
+        var projectedCapabilities = summary.Capabilities.IsUnknown
+            ? (Capabilities: EffectContractCapabilityKind.None,
+                Effects: EffectContractKind.None)
+            : EffectContractMappings.ProjectCapabilities(summary.Capabilities.Kinds);
+        effects |= projectedCapabilities.Effects;
 
         var isComplete = summary.Completeness == EffectCompleteness.Complete &&
             !allocationUnknown &&
@@ -37,10 +38,10 @@ public static class EffectSummaryProjector
             !summary.Capabilities.IsUnknown &&
             summary.Uncertainty is EffectUncertainty.None or EffectUncertainty.DirectCall;
 
-        var capabilities = summary.Capabilities.IsUnknown
-            ? EffectContractCapabilityKind.None
-            : EffectContractMappings.ToContractCapabilities(summary.Capabilities.Kinds);
-        return new EffectProjection(effects, capabilities, isComplete);
+        return new EffectProjection(
+            effects,
+            projectedCapabilities.Capabilities,
+            isComplete);
     }
 
     private static EffectContractKind ProjectRegions(EffectRegionSet regions, bool isWrite)
