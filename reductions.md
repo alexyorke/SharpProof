@@ -99,6 +99,7 @@ the smallest relevant containerized test target passes.
 | R225 | Table-drive invalid oracle bindings | Testing.Test: 13 passed |
 | R226 | Table-drive undefined proof goals | Verify.Test: 14 passed |
 | R230 | Route source-tree verifier package checks directly through consumer configuration validation | Package.Test: 2 passed |
+| R231 | Remove no-op empty `SharpProofSpecificationPacks` assignments from source-tree, package, and self-application props | Package.Test and Analyzer.Test: 1 passed each |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -217,7 +218,6 @@ deferred entry say so explicitly and do not lift that deferral.
 | ID | Finding | Evidence |
 |---|---|---|
 | R229 | The analyzer dependency closure is declared twice, in full, with no shared authority. `SharpProof.AnalyzerConsumer.props` lists 15 portable `<Analyzer Include>` assemblies plus 7 collector assemblies; `SharpProof.Package/buildTransitive/SharpProof.targets` lists the same 15 and the same 7 against `$(_SharpProofSharedDirectory)`. Both must be edited together whenever a transitive dependency changes, and a drift surfaces only as an analyzer load failure in a consumer build. The source-tree copy already proves globbing works in this position (`<Analyzer Update="...netstandard2.0\*" ... />`), so each list is a candidate for one wildcard plus the existing role metadata. | `SharpProof.AnalyzerConsumer.props:35-49,60-67`; `SharpProof.Package/buildTransitive/SharpProof.targets:20-35,46-53` |
-| R231 | `<SharpProofSpecificationPacks Condition="'$(SharpProofSpecificationPacks)' == ''"></SharpProofSpecificationPacks>` assigns empty to empty. It appears twice. | `SharpProof.AnalyzerConsumer.props:5`; `SharpProof.Package/buildTransitive/SharpProof.props:12` |
 | R232 | The `SharpProofProductionProject` exclusion regex still names `PortableAnalyzer`, a project with no tracked files (it was removed; see `docs/soundness-notes/2026-08-08-coverage-authority-and-tcb-ownership.md`). An architecture test pins the dead arm in place, so the classification condition cannot shrink without editing the test that guards it. Distinct from the deliberate `PortableAnalyzer` regression guards in `SharpProof.ConsumerContract.props` and `Test-SharpProofPackageConsumers.ps1`, which assert absence and should stay. | `Directory.Build.props:36`; `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:47` |
 | R233 | The root build file has to know every consumer of every shared source file. `SharpProofUsesIrIdentifiers` is a 19-term `Or` chain of project names, and four further `ItemGroup`s gate `eng/testing` sources by explicit project-name lists (12 more names). An opt-in property set in each consuming `.csproj` inverts the coupling and removes roughly 40 lines of central condition. Narrower than deferred R070: this is shared-source gating, not production classification. | `Directory.Build.props:38-58,74-101` |
 | R234 | Roughly 50 `global using` lines across 15 `GlobalUsings.cs` files re-declare namespaces that repo-wide `ImplicitUsings=enable` already supplies (`System`, `System.Collections.Generic`, `System.IO`, `System.Linq`, `System.Threading`, `System.Threading.Tasks`). `SharpProof.CompilerProbe.TestAsset` sets `ImplicitUsings=disable` and must keep its copy; `SharpProof.Package` and `SharpProof.Verifier` also disable it but have no `GlobalUsings.cs`. | `Directory.Build.props:16`; 15 of the 20 tracked `*/GlobalUsings.cs` |
@@ -290,7 +290,7 @@ deferred entry say so explicitly and do not lift that deferral.
 
 ### Status
 
-R229 and R231 through R262 are `pending`, and the active follow-up queue above is
+R229 and R232 through R262 are `pending`, and the active follow-up queue above is
 extended by them; the existing entries in that queue are unchanged. Items that
 refine a deferred entry (R233 under R070, R246 under R069/R132, R259 under
 R027-R031 and R149, R262 under R066-R070) do not lift that deferral. R241, R255,

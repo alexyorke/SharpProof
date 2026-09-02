@@ -10,7 +10,6 @@
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures Condition="'$(SharpProofFeatures)' == ''">all</SharpProofFeatures>
     <SharpProofVerify Condition="'$(SharpProofVerify)' == ''">false</SharpProofVerify>
-    <SharpProofSpecificationPacks Condition="'$(SharpProofSpecificationPacks)' == ''"></SharpProofSpecificationPacks>
     <_SharpProofSelfRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../..'))</_SharpProofSelfRepositoryRoot>
     <_SharpProofSelfAnalyzerDirectory>$([System.IO.Path]::Combine('$(_SharpProofSelfRepositoryRoot)', 'SharpProof.Analyzer', 'bin', '$(Configuration)', 'netstandard2.0'))</_SharpProofSelfAnalyzerDirectory>
     <_SharpProofSelfGeneratorDirectory>$([System.IO.Path]::Combine('$(_SharpProofSelfRepositoryRoot)', 'SharpProof.ContractForGenerator', 'bin', '$(Configuration)', 'netstandard2.0'))</_SharpProofSelfGeneratorDirectory>

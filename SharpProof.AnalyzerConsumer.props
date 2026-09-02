@@ -2,7 +2,6 @@
   <!-- Import this file after the consuming project's SharpProof settings. -->
   <PropertyGroup>
     <_SharpProofAnalyzerConsumerPresent>true</_SharpProofAnalyzerConsumerPresent>
-    <SharpProofSpecificationPacks Condition="'$(SharpProofSpecificationPacks)' == ''"></SharpProofSpecificationPacks>
     <_SharpProofAnalyzerConsumerDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</_SharpProofAnalyzerConsumerDirectory>
     <_SharpProofConsumerContractPath>$([MSBuild]::Escape('$(MSBuildThisFileDirectory)SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props'))</_SharpProofConsumerContractPath>
   </PropertyGroup>
