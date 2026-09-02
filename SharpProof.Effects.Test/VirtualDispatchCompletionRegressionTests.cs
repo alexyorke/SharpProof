@@ -61,7 +61,7 @@ public sealed class VirtualDispatchCompletionRegressionTests
                 Is.True,
                 "the returning runtime override reaches the caller suffix");
             Assert.That(
-                CreateEvaluator(compilation, caller)
+                EffectTestHost.CreateCompletionEvaluator(compilation, caller)
                     .CanCompleteNormally(invocation),
                 Is.True,
                 "virtual dispatch must not inherit base-body noncompletion");
@@ -104,7 +104,7 @@ public sealed class VirtualDispatchCompletionRegressionTests
                 completion.MethodCanCompleteNormally(caller),
                 Is.False);
             Assert.That(
-                CreateEvaluator(compilation, caller)
+                EffectTestHost.CreateCompletionEvaluator(compilation, caller)
                     .CanCompleteNormally(invocation),
                 Is.False);
         }
@@ -123,15 +123,4 @@ public sealed class VirtualDispatchCompletionRegressionTests
             .Single();
     }
 
-    private static OperationCompletionEvaluator CreateEvaluator(
-        Compilation compilation,
-        IMethodSymbol caller)
-    {
-        return new OperationCompletionEvaluator(
-            new EffectAnalysisSession(compilation),
-            caller,
-            static (_, _) => false,
-            static (_, _) => false,
-            static _ => false);
-    }
 }

@@ -184,12 +184,9 @@ public sealed class CompoundAssignmentConversionRegressionTests
         string methodName)
     {
         var method = Method(compilation, methodName);
-        var evaluator = new OperationCompletionEvaluator(
-            new EffectAnalysisSession(compilation),
-            method,
-            static (_, _) => false,
-            static (_, _) => false,
-            static _ => false);
+        var evaluator = EffectTestHost.CreateCompletionEvaluator(
+            compilation,
+            method);
         return evaluator.CanCompleteNormally(Compound(compilation, method));
     }
 

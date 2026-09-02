@@ -15,7 +15,9 @@ public sealed class ArrayAccessCompletionRegressionTests
             "Sample",
             methodName);
 
-        Assert.That(HasStaticWrite(compilation, method), Is.EqualTo(expected));
+        Assert.That(
+            EffectTestHost.HasStaticWrite(compilation, method),
+            Is.EqualTo(expected));
     }
 
     private static CSharpCompilation CreateCompilation()
@@ -40,12 +42,4 @@ public sealed class ArrayAccessCompletionRegressionTests
             """);
     }
 
-    private static bool HasStaticWrite(
-        Compilation compilation,
-        IMethodSymbol method)
-    {
-        return new EffectAnalysisSession(compilation)
-            .Analyze(method)
-            .Summary.Writes.Contains(EffectRegionId.Static());
-    }
 }

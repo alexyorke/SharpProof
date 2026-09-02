@@ -35,7 +35,7 @@ public sealed class OperationCompletionWaveFiveRegressionTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(facts.MethodCanCompleteNormally(choose), Is.True);
-            Assert.That(HasStaticWrite(compilation, run), Is.True);
+            Assert.That(EffectTestHost.HasStaticWrite(compilation, run), Is.True);
         }
     }
 
@@ -103,7 +103,7 @@ public sealed class OperationCompletionWaveFiveRegressionTests
             }
             """);
         var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
-        var conversion = GetOperation(compilation, run)
+        var conversion = EffectTestHost.RootOperation(compilation, run)
             .DescendantsAndSelf()
             .OfType<IConversionOperation>()
             .Single(operation =>
@@ -118,10 +118,10 @@ public sealed class OperationCompletionWaveFiveRegressionTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                CreateCompletionEvaluator(compilation, run)
+                EffectTestHost.CreateCompletionEvaluator(compilation, run)
                     .CanCompleteNormally(conversion),
                 Is.True);
-            Assert.That(HasStaticWrite(compilation, run), Is.True);
+            Assert.That(EffectTestHost.HasStaticWrite(compilation, run), Is.True);
         }
     }
 
@@ -147,7 +147,7 @@ public sealed class OperationCompletionWaveFiveRegressionTests
             }
             """);
         var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
-        var conversion = GetOperation(compilation, run)
+        var conversion = EffectTestHost.RootOperation(compilation, run)
             .DescendantsAndSelf()
             .OfType<IConversionOperation>()
             .Single(operation => operation.OperatorMethod != null);
@@ -158,10 +158,10 @@ public sealed class OperationCompletionWaveFiveRegressionTests
                 conversion.Operand.ConstantValue,
                 Is.EqualTo(new Optional<object?>(null)));
             Assert.That(
-                CreateCompletionEvaluator(compilation, run)
+                EffectTestHost.CreateCompletionEvaluator(compilation, run)
                     .CanCompleteNormally(conversion),
                 Is.True);
-            Assert.That(HasStaticWrite(compilation, run), Is.True);
+            Assert.That(EffectTestHost.HasStaticWrite(compilation, run), Is.True);
         }
     }
 
@@ -203,15 +203,15 @@ public sealed class OperationCompletionWaveFiveRegressionTests
             compilation,
             "Sample",
             "Unknown");
-        var binaryOperation = GetOperation(compilation, binary)
+        var binaryOperation = EffectTestHost.RootOperation(compilation, binary)
             .DescendantsAndSelf()
             .OfType<IBinaryOperation>()
             .Single();
-        var compoundOperation = GetOperation(compilation, compound)
+        var compoundOperation = EffectTestHost.RootOperation(compilation, compound)
             .DescendantsAndSelf()
             .OfType<ICompoundAssignmentOperation>()
             .Single();
-        var unknownOperation = GetOperation(compilation, unknown)
+        var unknownOperation = EffectTestHost.RootOperation(compilation, unknown)
             .DescendantsAndSelf()
             .OfType<IBinaryOperation>()
             .Single();
@@ -221,52 +221,21 @@ public sealed class OperationCompletionWaveFiveRegressionTests
             Assert.That(binaryOperation.IsLifted, Is.True);
             Assert.That(compoundOperation.IsLifted, Is.True);
             Assert.That(
-                CreateCompletionEvaluator(compilation, binary)
+                EffectTestHost.CreateCompletionEvaluator(compilation, binary)
                     .CanCompleteNormally(binaryOperation),
                 Is.True);
             Assert.That(
-                CreateCompletionEvaluator(compilation, compound)
+                EffectTestHost.CreateCompletionEvaluator(compilation, compound)
                     .CanCompleteCompoundOperator(compoundOperation),
                 Is.True);
             Assert.That(
-                CreateCompletionEvaluator(compilation, unknown)
+                EffectTestHost.CreateCompletionEvaluator(compilation, unknown)
                     .CanCompleteNormally(unknownOperation),
                 Is.True);
-            Assert.That(HasStaticWrite(compilation, binary), Is.True);
-            Assert.That(HasStaticWrite(compilation, compound), Is.True);
-            Assert.That(HasStaticWrite(compilation, unknown), Is.True);
+            Assert.That(EffectTestHost.HasStaticWrite(compilation, binary), Is.True);
+            Assert.That(EffectTestHost.HasStaticWrite(compilation, compound), Is.True);
+            Assert.That(EffectTestHost.HasStaticWrite(compilation, unknown), Is.True);
         }
     }
 
-    private static IOperation GetOperation(
-        Compilation compilation,
-        IMethodSymbol method)
-    {
-        var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
-        return compilation.GetSemanticModel(syntax.SyntaxTree)
-            .GetOperation(syntax) ??
-            throw new InvalidOperationException(
-                $"Operation for '{method.Name}' was not found.");
-    }
-
-    private static OperationCompletionEvaluator CreateCompletionEvaluator(
-        Compilation compilation,
-        IMethodSymbol caller)
-    {
-        return new OperationCompletionEvaluator(
-            new EffectAnalysisSession(compilation),
-            caller,
-            static (_, _) => false,
-            static (_, _) => false,
-            static _ => false);
-    }
-
-    private static bool HasStaticWrite(
-        Compilation compilation,
-        IMethodSymbol method)
-    {
-        return new EffectAnalysisSession(compilation)
-            .Analyze(method)
-            .Summary.Writes.Contains(EffectRegionId.Static());
-    }
 }

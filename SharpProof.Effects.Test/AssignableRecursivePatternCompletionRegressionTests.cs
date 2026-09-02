@@ -55,7 +55,7 @@ public sealed class AssignableRecursivePatternCompletionRegressionTests
             compilation,
             "Sample",
             methodName);
-        var pattern = GetOperation(compilation, method)
+        var pattern = EffectTestHost.RootOperation(compilation, method)
             .DescendantsAndSelf()
             .OfType<ISwitchExpressionOperation>()
             .Single()
@@ -79,33 +79,11 @@ public sealed class AssignableRecursivePatternCompletionRegressionTests
                 Is.True,
                 methodName);
             Assert.That(
-                CreateCompletionEvaluator(compilation, method)
+                EffectTestHost.CreateCompletionEvaluator(compilation, method)
                     .CanCompleteNormally(pattern),
                 Is.False,
                 methodName);
         }
     }
 
-    private static IOperation GetOperation(
-        Compilation compilation,
-        IMethodSymbol method)
-    {
-        var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
-        return compilation.GetSemanticModel(syntax.SyntaxTree)
-            .GetOperation(syntax) ??
-            throw new InvalidOperationException(
-                $"Operation for '{method.Name}' was not found.");
-    }
-
-    private static OperationCompletionEvaluator CreateCompletionEvaluator(
-        Compilation compilation,
-        IMethodSymbol caller)
-    {
-        return new OperationCompletionEvaluator(
-            new EffectAnalysisSession(compilation),
-            caller,
-            static (_, _) => false,
-            static (_, _) => false,
-            static _ => false);
-    }
 }

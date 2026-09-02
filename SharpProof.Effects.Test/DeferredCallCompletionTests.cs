@@ -73,19 +73,13 @@ public sealed class DeferredCallCompletionTests
             }
             """);
         var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
-        var syntax = run.DeclaringSyntaxReferences.Single().GetSyntax();
-        var root = compilation.GetSemanticModel(syntax.SyntaxTree)
-            .GetOperation(syntax) ??
-            throw new InvalidOperationException("Run operation was not found.");
+        var root = EffectTestHost.RootOperation(compilation, run);
         var awaitOperation = root.DescendantsAndSelf()
             .OfType<IAwaitOperation>()
             .Single();
-        var completion = new OperationCompletionEvaluator(
-            new EffectAnalysisSession(compilation),
-            run,
-            static (_, _) => false,
-            static (_, _) => false,
-            static _ => false);
+        var completion = EffectTestHost.CreateCompletionEvaluator(
+            compilation,
+            run);
         var result = new EffectAnalysisSession(compilation).Analyze(run);
 
         using (Assert.EnterMultipleScope())
@@ -103,19 +97,13 @@ public sealed class DeferredCallCompletionTests
     {
         var compilation = EffectTestHost.CreateCompilation(source);
         var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
-        var syntax = run.DeclaringSyntaxReferences.Single().GetSyntax();
-        var root = compilation.GetSemanticModel(syntax.SyntaxTree)
-            .GetOperation(syntax) ??
-            throw new InvalidOperationException("Run operation was not found.");
+        var root = EffectTestHost.RootOperation(compilation, run);
         var invocation = root.DescendantsAndSelf()
             .OfType<IInvocationOperation>()
             .Single(operation => operation.TargetMethod.Name == "Deferred");
-        var completion = new OperationCompletionEvaluator(
-            new EffectAnalysisSession(compilation),
-            run,
-            static (_, _) => false,
-            static (_, _) => false,
-            static _ => false);
+        var completion = EffectTestHost.CreateCompletionEvaluator(
+            compilation,
+            run);
         var result = new EffectAnalysisSession(compilation).Analyze(run);
 
         using (Assert.EnterMultipleScope())

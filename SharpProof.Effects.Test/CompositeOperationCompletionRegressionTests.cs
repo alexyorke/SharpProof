@@ -24,7 +24,7 @@ public sealed class CompositeOperationCompletionRegressionTests
             }
             """);
         var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
-        var initializer = GetOperation(compilation, run)
+        var initializer = EffectTestHost.RootOperation(compilation, run)
             .DescendantsAndSelf()
             .OfType<IArrayInitializerOperation>()
             .Single();
@@ -53,7 +53,7 @@ public sealed class CompositeOperationCompletionRegressionTests
             }
             """);
         var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
-        var interpolation = GetOperation(compilation, run)
+        var interpolation = EffectTestHost.RootOperation(compilation, run)
             .DescendantsAndSelf()
             .OfType<IInterpolatedStringOperation>()
             .Single();
@@ -66,12 +66,9 @@ public sealed class CompositeOperationCompletionRegressionTests
         IMethodSymbol run,
         IOperation composite)
     {
-        var completion = new OperationCompletionEvaluator(
-            new EffectAnalysisSession(compilation),
-            run,
-            static (_, _) => false,
-            static (_, _) => false,
-            static _ => false);
+        var completion = EffectTestHost.CreateCompletionEvaluator(
+            compilation,
+            run);
         var result = new EffectAnalysisSession(compilation).Analyze(run);
 
         using (Assert.EnterMultipleScope())
@@ -83,14 +80,4 @@ public sealed class CompositeOperationCompletionRegressionTests
         }
     }
 
-    private static IOperation GetOperation(
-        Compilation compilation,
-        IMethodSymbol method)
-    {
-        var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
-        return compilation.GetSemanticModel(syntax.SyntaxTree)
-            .GetOperation(syntax) ??
-            throw new InvalidOperationException(
-                $"Operation for '{method.Name}' was not found.");
-    }
 }

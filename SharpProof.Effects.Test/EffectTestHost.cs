@@ -207,6 +207,38 @@ internal static class EffectTestHost
                    .Single(static method => method.MethodKind == MethodKind.Ordinary);
     }
 
+    internal static IOperation RootOperation(
+        Compilation compilation,
+        IMethodSymbol method)
+    {
+        var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
+        return compilation.GetSemanticModel(syntax.SyntaxTree)
+            .GetOperation(syntax) ??
+            throw new InvalidOperationException(
+                $"Operation for '{method.Name}' was not found.");
+    }
+
+    internal static OperationCompletionEvaluator CreateCompletionEvaluator(
+        Compilation compilation,
+        IMethodSymbol caller)
+    {
+        return new(
+            new EffectAnalysisSession(compilation),
+            caller,
+            static (_, _) => false,
+            static (_, _) => false,
+            static _ => false);
+    }
+
+    internal static bool HasStaticWrite(
+        Compilation compilation,
+        IMethodSymbol method)
+    {
+        return new EffectAnalysisSession(compilation)
+            .Analyze(method)
+            .Summary.Writes.Contains(EffectRegionId.Static());
+    }
+
     internal static INamedTypeSymbol RequireType(
         Compilation compilation,
         string metadataName)
