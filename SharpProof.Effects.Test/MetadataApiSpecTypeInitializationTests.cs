@@ -1,5 +1,6 @@
 using SharpProof.Ir;
 using SharpProof.Specs;
+using static SharpProof.Testing.ApiSpecTestFacets;
 
 namespace SharpProof.Effects.Test;
 
@@ -59,25 +60,7 @@ public sealed class MetadataApiSpecTypeInitializationTests
             "focused metadata API specification");
         var approvedAssemblies = ImmutableArray.Create(
             new ApiSpecAssemblyIdentity(assemblyName, string.Empty));
-        var facets = new ApiSpecFacets(
-            new SpecEffectFacet(SpecEffect.None, evidence),
-            new SpecAllocationFacet(
-                SpecAllocationBehavior.None,
-                evidence),
-            new SpecThrowFacet(
-                SpecThrowBehavior.DoesNotThrow,
-                [],
-                evidence),
-            new SpecNullnessFacet(
-                SpecNullness.NotApplicable,
-                evidence),
-            new SpecCardinalityFacet(
-                SpecCardinality.NotApplicable,
-                null,
-                evidence),
-            new SpecTerminationFacet(
-                SpecTerminationBehavior.Terminates,
-                evidence));
+        var facets = NeutralFacets(evidence, includeTermination: true);
         var table = ApiSpecTable.Create([
             new ApiSpecDeclaration(
                 new ApiSpecTarget(

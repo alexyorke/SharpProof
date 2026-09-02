@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using SharpProof.Ir;
+using static SharpProof.Testing.ApiSpecTestFacets;
 
 namespace SharpProof.Specs.Test;
 
@@ -87,22 +88,7 @@ public sealed class ApiSpecConditionalNullInstantiationTests
                 [IrTypeKind.Boolean, IrTypeKind.Reference],
                 null,
                 [new ApiSpecAssemblyIdentity("ConditionalNull", string.Empty)]),
-            new ApiSpecFacets(
-                new SpecEffectFacet(SpecEffect.None, Evidence),
-                new SpecAllocationFacet(
-                    SpecAllocationBehavior.None,
-                    Evidence),
-                new SpecThrowFacet(
-                    SpecThrowBehavior.DoesNotThrow,
-                    [],
-                    Evidence),
-                new SpecNullnessFacet(
-                    SpecNullness.NotApplicable,
-                    Evidence),
-                new SpecCardinalityFacet(
-                    SpecCardinality.NotApplicable,
-                    null,
-                    Evidence)),
+            NeutralFacets(Evidence),
             [new SpecPostconditionDeclaration(postcondition, Evidence)]);
         return ApiSpecTable.Create([declaration]).Templates.Single();
     }

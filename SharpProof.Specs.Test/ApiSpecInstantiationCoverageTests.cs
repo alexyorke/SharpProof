@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using NUnit.Framework;
 using SharpProof.Ir;
+using static SharpProof.Testing.ApiSpecTestFacets;
 
 namespace SharpProof.Specs.Test;
 
@@ -532,22 +533,7 @@ public sealed class ApiSpecInstantiationCoverageTests
                 parameterTypes,
                 resultType,
                 [new ApiSpecAssemblyIdentity("Coverage", string.Empty)]),
-            new ApiSpecFacets(
-                new SpecEffectFacet(SpecEffect.None, Evidence),
-                new SpecAllocationFacet(
-                    SpecAllocationBehavior.None,
-                    Evidence),
-                new SpecThrowFacet(
-                    SpecThrowBehavior.DoesNotThrow,
-                    [],
-                    Evidence),
-                new SpecNullnessFacet(
-                    SpecNullness.NotApplicable,
-                    Evidence),
-                new SpecCardinalityFacet(
-                    SpecCardinality.NotApplicable,
-                    null,
-                    Evidence)),
+            NeutralFacets(Evidence),
             [.. postconditions.Select(
                 condition =>
                     new SpecPostconditionDeclaration(

@@ -93,6 +93,12 @@
              Link="DictionaryAnalyzerConfigOptions.cs" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Effects.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Specs.Test'">
+    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\ApiSpecTestFacets.cs"
+             Link="ApiSpecTestFacets.cs" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(SharpProofProductionProject)' == 'true'">
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
                       PrivateAssets="all" />

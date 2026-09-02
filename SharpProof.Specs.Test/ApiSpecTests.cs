@@ -7,6 +7,7 @@ using NUnit.Framework;
 using SharpProof.Attributes;
 using SharpProof.Ir;
 using SharpProof.Specs;
+using static SharpProof.Testing.ApiSpecTestFacets;
 
 namespace SharpProof.Specs.Test;
 
@@ -1056,22 +1057,7 @@ public sealed class ApiSpecTests
                         publicKeyToken,
                         ApiSpecReferenceFamily.SharpProofPackage)
                 ]),
-            new ApiSpecFacets(
-                new SpecEffectFacet(SpecEffect.None, evidence),
-                new SpecAllocationFacet(
-                    SpecAllocationBehavior.None,
-                    evidence),
-                new SpecThrowFacet(
-                    SpecThrowBehavior.DoesNotThrow,
-                    [],
-                    evidence),
-                new SpecNullnessFacet(
-                    SpecNullness.NotApplicable,
-                    evidence),
-                new SpecCardinalityFacet(
-                    SpecCardinality.NotApplicable,
-                    null,
-                    evidence)),
+            NeutralFacets(evidence),
             []);
     }
 

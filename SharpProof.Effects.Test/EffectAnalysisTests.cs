@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using SharpProof.Ir;
 using SharpProof.Specs;
+using static SharpProof.Testing.ApiSpecTestFacets;
 
 namespace SharpProof.Effects.Test;
 
@@ -8329,22 +8330,7 @@ public sealed class EffectAnalysisTests
                     [IrTypeKind.Reference],
                     null,
                     frameworkAssemblies),
-                new ApiSpecFacets(
-                    new SpecEffectFacet(SpecEffect.None, evidence),
-                    new SpecAllocationFacet(
-                        SpecAllocationBehavior.None,
-                        evidence),
-                    new SpecThrowFacet(
-                        SpecThrowBehavior.DoesNotThrow,
-                        [],
-                        evidence),
-                    new SpecNullnessFacet(
-                        SpecNullness.NotApplicable,
-                        evidence),
-                    new SpecCardinalityFacet(
-                        SpecCardinality.NotApplicable,
-                        null,
-                        evidence)),
+                NeutralFacets(evidence),
                 [])
         ]);
         var result = new EffectAnalysisSession(compilation, table).Analyze(
