@@ -198,6 +198,7 @@ the smallest relevant containerized test target passes.
 | R498 | Reuse the built-in string-concatenation predicate in the binary effect resolver | `SharpProof.Effects.Test`: StringConcatenation tests 3 passed |
 | R503 | Remove redundant and inert `.gitignore` negation rules | `git check-ignore`: 4 probes and 940 tracked paths passed |
 | R555 | Remove the unread release-authority path local | `SharpProof.ArchitectureTest`: ReleaseConfigurationScript 1 passed |
+| R556 | Remove the misleading release-configuration set-membership forwarder | `SharpProof.ArchitectureTest`: ReleaseConfigurationScript 1 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3453,9 +3454,8 @@ props path; root normalization and delegated version lookup remain unchanged.
 
 ### Status (part ninety-eight)
 
-R556 is a `pending` reduction candidate. Preserve the expected-value string
-conversion and duplicate detection in `Require-ExactSet`; only remove the alias
-whose name does not describe the enforced comparison.
+R556 is applied: both environment set checks call `Require-ExactSet` directly;
+expected-value conversion and duplicate detection remain centralized there.
 
 ## Second survey, part ninety-nine: R557 - publication-plan revalidation loop
 
@@ -3632,3 +3632,11 @@ R577 is a pending package-topology reduction candidate. Keep an explicit policy 
 ### Status (part one hundred nineteen)
 
 R578 is a pending compiler-collector reduction candidate. Keep normalization inside the public/internal `IsCandidate` boundary for independent callers; only avoid repeating it when `TryBuild` has already normalized the same symbol.
+
+## Second survey, part one hundred twenty: R579 - duplicated effect-authority projection
+
+| R579 | **`CompilerManifestArtifactProducer.Create` duplicates effect-claim projection across its two callable-construction branches.** When compiler diagnostics exist and when normal lowering succeeds, each branch copies `item.EffectClaims` into `EffectClaims` and iterates the same claims to call `CompilerEffectAuthority.BindSourceTree` and populate `EffectAuthorities`. Only the callable failure reason/body differs. Constructing the branch-specific artifact first and applying one shared effect-evidence attachment helper would remove the parallel projection and keep source-tree binding behavior consistent. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:31-75` |
+
+### Status (part one hundred twenty)
+
+R579 is a pending compiler-collector reduction candidate. Preserve the diagnostic-failure and normal-lowering branches and their distinct failure metadata; centralize only the identical effect evidence/authority attachment.

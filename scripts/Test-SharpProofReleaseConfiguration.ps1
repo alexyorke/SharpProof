@@ -56,16 +56,6 @@ function Invoke-GitHubJson {
     return $items.ToArray()
 }
 
-function Require-SetMembers {
-    param(
-        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Actual,
-        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Expected,
-        [Parameter(Mandatory = $true)][string]$Owner
-    )
-
-    Require-ExactSet -Actual $Actual -Expected $Expected -Owner $Owner
-}
-
 function Require-ExactSet {
     param(
         [AllowEmptyCollection()][string[]]$Actual = @(),
@@ -280,7 +270,7 @@ foreach ($required in $contract.environments) {
 
     $variables = Invoke-GitHubJson "repos/$repository/environments/$escapedName/variables" -Paginate
     $actualVariables = @($variables.variables | ForEach-Object { [string]$_.name })
-    Require-SetMembers `
+    Require-ExactSet `
         -Actual $actualVariables `
         -Expected @($required.variables) `
         -Owner "Environment '$name' variables"
@@ -288,7 +278,7 @@ foreach ($required in $contract.environments) {
     $secrets = Invoke-GitHubJson "repos/$repository/environments/$escapedName/secrets" -Paginate
     $actualSecrets = @($secrets.secrets | ForEach-Object { [string]$_.name })
     $requiredSecrets = @($required.secrets)
-    Require-SetMembers `
+    Require-ExactSet `
         -Actual $actualSecrets `
         -Expected $requiredSecrets `
         -Owner "Environment '$name' secrets"
