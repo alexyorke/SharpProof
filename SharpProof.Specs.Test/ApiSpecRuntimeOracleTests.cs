@@ -532,6 +532,8 @@ public sealed partial class ApiSpecRuntimeOracleTests
         SpecEffect effectMutation,
         ImmutableArray<RuntimeEdge> edges)
     {
+        var observedThrows = new Lazy<ThrowObservation>(
+            () => ObserveThrows(edges));
         return Row(
             effects: Effect(
                 edgeInputs,
@@ -543,11 +545,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
                 SpecAllocationBehavior.MayAllocate),
             throws: Throws(
                 edgeInputs,
-                edges,
+                observedThrows,
                 DoesNotThrowMutation),
             termination: Termination(
                 edgeInputs,
-                edges,
+                observedThrows,
                 SpecTerminationBehavior.Unknown));
     }
 
@@ -579,6 +581,21 @@ public sealed partial class ApiSpecRuntimeOracleTests
             mutation);
     }
 
+    private static FacetWitness<ThrowClaim> Throws(
+        string edgeInputs,
+        Lazy<ThrowObservation> observed,
+        ThrowClaim mutation)
+    {
+        return new(
+            FacetKind.Throws,
+            edgeInputs,
+            static template => new ThrowClaim(
+                template.Facets.Throws.Behavior,
+                template.Facets.Throws.ExceptionMetadataNames),
+            claim => MatchesThrowClaim(observed.Value, claim),
+            mutation);
+    }
+
     private static FacetWitness<SpecNullness> Nullness(
         string edgeInputs,
         Func<SpecNullness> observe,
@@ -602,6 +619,19 @@ public sealed partial class ApiSpecRuntimeOracleTests
             edgeInputs,
             static template => template.Facets.Termination!.Behavior,
             claim => ObserveTermination(edges) == claim,
+            mutation);
+    }
+
+    private static FacetWitness<SpecTerminationBehavior> Termination(
+        string edgeInputs,
+        Lazy<ThrowObservation> observed,
+        SpecTerminationBehavior mutation)
+    {
+        return new(
+            FacetKind.Termination,
+            edgeInputs,
+            static template => template.Facets.Termination!.Behavior,
+            claim => ObserveTermination(observed.Value) == claim,
             mutation);
     }
 
@@ -909,6 +939,14 @@ public sealed partial class ApiSpecRuntimeOracleTests
         }
 
         return SpecTerminationBehavior.Terminates;
+    }
+
+    private static SpecTerminationBehavior ObserveTermination(
+        ThrowObservation observation)
+    {
+        return observation.NormalCompletions == observation.InvocationCount
+            ? SpecTerminationBehavior.Terminates
+            : SpecTerminationBehavior.Unknown;
     }
 
     private static bool MatchesThrowClaim(
