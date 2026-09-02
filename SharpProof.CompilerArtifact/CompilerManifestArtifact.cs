@@ -327,6 +327,22 @@ internal sealed class WorkerRuntimeClosureSnapshot(
 
 internal static class CompilerManifestArtifactJson
 {
+    private sealed class ClaimPartitions
+    {
+        internal ClaimPartitions(IEnumerable<WorkerClaimManifestEntry> claims)
+        {
+            Claims = [.. claims.OrderBy(static claim => claim.Ordinal)];
+            Postconditions = [.. Claims.Where(static claim =>
+                claim.Kind == WorkerClaimKind.Postcondition)];
+            Effects = [.. Claims.Where(static claim =>
+                claim.Kind == WorkerClaimKind.Effect)];
+        }
+
+        internal WorkerClaimManifestEntry[] Claims { get; }
+        internal WorkerClaimManifestEntry[] Postconditions { get; }
+        internal WorkerClaimManifestEntry[] Effects { get; }
+    }
+
     internal static string Serialize(
         CompilerManifestArtifact artifact,
         CancellationToken cancellationToken = default)
@@ -554,6 +570,10 @@ internal static class CompilerManifestArtifactJson
             loweredById.Add(lowered.CallableId, lowered);
         }
 
+        var claimsByCallable = manifestClaims
+            .Where(static claim => claim != null)
+            .ToLookup(static claim => claim!.CallableId, StringComparer.Ordinal);
+
         foreach (var callable in manifestCallables)
         {
             if (callable == null ||
@@ -563,16 +583,10 @@ internal static class CompilerManifestArtifactJson
                 return false;
             }
 
-            var claims = manifestClaims
-                .Where(claim => claim != null && claim.CallableId == callable.CallableId)
-                .OrderBy(static claim => claim!.Ordinal)
-                .ToArray();
-            var postconditions = claims
-                .Where(static claim => claim!.Kind == WorkerClaimKind.Postcondition)
-                .ToArray();
-            var effects = claims
-                .Where(static claim => claim!.Kind == WorkerClaimKind.Effect)
-                .ToArray();
+            var claimPartitions = new ClaimPartitions(
+                claimsByCallable[callable.CallableId]);
+            var postconditions = claimPartitions.Postconditions;
+            var effects = claimPartitions.Effects;
             var selectedEffects = callable.SelectedFeatures.Contains(WorkerSelectedFeature.Effects);
             var selectedContracts = callable.SelectedFeatures.Contains(WorkerSelectedFeature.Contracts);
 

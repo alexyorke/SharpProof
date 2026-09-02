@@ -4193,14 +4193,6 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred eighty-six: R645 - repeated claim partitioning
-
-| R645 | **`CompilerManifestArtifactJson.HasFeatureScopeParity` rescans and repartitions the full manifest claim array three times for every callable.** It independently builds `claims`, `postconditions`, and `effects` with three `Where(...).OrderBy(...).ToArray()` pipelines over `manifestClaims` inside the callable loop. A single grouping/partition pass keyed by `CallableId` can supply the three views and avoid O(callables x claims) repeated enumeration while keeping postcondition/effect ordering and all selected-feature checks unchanged. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:526-568` |
-
-### Status (part one hundred eighty-six)
-
-R645 is a pending feature-scope validation reduction candidate. Preserve claim ordinal ordering, null filtering, per-callable isolation, selected-feature policy, and effect/postcondition distinctions; share only the claim partitioning work.
-
 ## Second survey, part one hundred eighty-seven: R646 - repeated source-location validity predicate
 
 | R646 | **`CompilerSourceLocationAuthority.IsBound` validates a non-sentinel location twice.** Its main path first calls `WorkerProtocolJson.HasValidLocation(location)` before the binding checks, then calls `HasValidLocationGeometry`, which invokes the same location predicate again before validating the line map and span. A geometry helper with an explicit already-validated path, or moving the common predicate to one boundary, removes the duplicate field scan while preserving the `allowNone` sentinel branch, source-tree hash checks, and geometry validation. | `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:79-103,145-185` |
