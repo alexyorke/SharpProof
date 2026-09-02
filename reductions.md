@@ -154,6 +154,7 @@ the smallest relevant containerized test target passes.
 | R844 | Reuse shared generated-file exact-byte verification in the API-spec generator | generator `-Verify` checks passed |
 | R846 | Accumulate fuzz exception coverage from the already-validated counters | `scripts/Test-SharpProofFuzzRunnerResult.ps1`: 26 fixtures passed |
 | R847 | Centralize the canonical container resource claim used by documentation mutations | `DocumentationSupportContractTests`: 22 mutation cases passed; 1 pre-existing clean-fixture docs failure |
+| R848 | Reuse the ordered validated diagnostic symbols for supported-list emission | diagnostic generator `-Verify` passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7372,6 +7373,6 @@ R847 is `applied`: the six resource-claim mutations now reuse one canonical
 
 ### Status (part three hundred fifty-nine)
 
-R848 is `deferred`: the second pass is small and runs only for outputs that
-  expose a supported-diagnostics member, but retaining the validated symbols
-  would remove a straightforward generator traversal.
+R848 is `applied`: supported-diagnostics lists now use the ordered symbols
+  captured during validation, avoiding a second raw catalog projection while
+  preserving source order and uniqueness checks.
