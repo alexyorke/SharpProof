@@ -7579,3 +7579,20 @@ build-file changes were made during this audit.
 
 R857 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred sixty-eight: R858 - test-local IR variable traversal
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R858 | **`FuzzRunnerTests.Contains` duplicates the repository's public IR variable collector.** The test helper recursively switches over variables, unary/binary/conditional/cast/length/sequence-access, and opaque terms to answer whether one variable occurs. `IrTermAnalysis.CollectVariables` already exposes the same complete traversal through the canonical `IrTraversal` child enumeration, including opaque receivers and arguments; the test can ask whether its result contains the target variable instead of maintaining a second IR-kind list. Reusing the collector removes test-only traversal code and keeps the test aligned automatically when a new term kind is added. | `SharpProof.Fuzz.Test/FuzzRunnerTests.cs:673-696`; `SharpProof.Ir/IrSemanticTerms.cs:116-120`; `SharpProof.Ir/IrTraversal.cs:4-18,50-78` |
+
+### Checked and not proposed (part three hundred sixty-eight)
+
+- R858 is separate from R537, which targets the production fuzzer shrinker's private child enumeration, and R596, which targets that shrinker's repeated child materialization. This note is limited to the test helper's variable-membership query.
+- `IrTermAnalysis.CollectVariables` is public and reachable through the fuzz test's existing IR reference, so this reduction does not require a friend-assembly or project-reference change.
+- The replacement must preserve the helper's boolean question at its call sites; it should not replace the test's explicit structural-size or candidate-generation logic with a different traversal contract.
+
+### Status (part three hundred sixty-eight)
+
+R858 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
