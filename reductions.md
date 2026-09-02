@@ -6507,3 +6507,27 @@ R810 is `deferred`: the repeated clause walk is target-invariant and can be
   cached, but introducing a label catalog would add plumbing to a fail-closed
   authority. It is worthwhile if response validation profiles show many claims
   per callable or if R809 is implemented.
+
+## Second survey, part three hundred twenty-two: R811 - duplicated lowerer contract partitions
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R811 | **`CompilerCallableLowerer.Prepare` partitions and counts the same contract collections with four independent passes.** It filters `target.Entry.Assumptions` once for preconditions and once for user assumptions, then counts `contracts.Clauses` once for `Requires` and once for `Assume` solely to compare those counts with the two materialized arrays. The arrays are consumed later to assign assumption IDs while the clauses are projected again into `CompilerPreparedClause` values. A small partition/count result can build both assumption arrays and both clause-kind counts in one pass per source collection, preserving the ordinal assignment and the unsupported-contract failure gate while removing repeated filtering pipelines. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs:59-83` |
+
+### Checked and not proposed (part three hundred twenty-two)
+
+- The later clause projection still needs to preserve source clause order and
+  assign independent precondition, user-assumption, and postcondition ordinals;
+  those semantics are not redundant.
+- Preconditions and user assumptions remain separate arrays because their IDs
+  are consumed by different clause kinds; only their collection plumbing is a
+  candidate for fusion.
+- `HasManifestParity` and body preparation are separate validation stages and
+  are not folded into this local partition helper.
+
+### Status (part three hundred twenty-two)
+
+R811 is `deferred`: the collections are normally small, and a fused result
+  object would add more setup to an already policy-heavy preparation method.
+  It remains a clear cleanup if lowerer allocation or contract-heavy methods
+  make the repeated passes measurable.
