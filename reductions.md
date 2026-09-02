@@ -193,6 +193,7 @@ the smallest relevant containerized test target passes.
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
+| R575 | Reuse validated mutation-shard evidence between timing and aggregation | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3767,7 +3768,10 @@ second baseline JSON read and parse.
 
 ### Status (part one hundred sixteen)
 
-R575 is a pending mutation-pipeline reduction candidate. Keep the final catalog-count and uniqueness assertions and the validation boundary after each child process; only avoid reparsing evidence that has already passed the same checks.
+R575 is `applied`: shard completeness validation now returns the parsed,
+validated evidence object. Reused shards, completed child shards, and final
+aggregation reuse that object while retaining the post-process validation and
+final catalog coverage checks. Mutation evidence behavioral fixtures passed.
 
 ## Second survey, part one hundred seventeen: R576 - duplicate verification-target command construction
 

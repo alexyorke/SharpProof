@@ -98,9 +98,9 @@ function Resolve-ShardReceiptPath {
     return $resolved
 }
 
-function Test-CompleteShard([object]$Shard) {
+function Get-CompleteShard([object]$Shard) {
     if (-not (Test-Path -LiteralPath $Shard.Path -PathType Leaf)) {
-        return $false
+        return $null
     }
     try {
         $evidence = Get-Content -LiteralPath $Shard.Path -Raw |
@@ -114,7 +114,7 @@ function Test-CompleteShard([object]$Shard) {
             [int]$evidence.mutationCount -le 0 -or
             [int]$evidence.mutationCount -ne $rows.Count -or
             [int]$evidence.killedCount -ne $rows.Count) {
-            return $false
+            return $null
         }
 
         $baselineGroups = @{}
@@ -123,7 +123,7 @@ function Test-CompleteShard([object]$Shard) {
             if (-not $test.StartsWith(
                     'FullyQualifiedName~',
                     [StringComparison]::Ordinal)) {
-                return $false
+                return $null
             }
             $method = $test.Substring('FullyQualifiedName~'.Length)
             $log = Resolve-ShardReceiptPath `
@@ -141,7 +141,7 @@ function Test-CompleteShard([object]$Shard) {
                         -Project ([string]$row.project) `
                         -Filter $test `
                         -Configuration $Configuration).Identity) {
-                return $false
+                return $null
             }
 
             $mutation = Read-SharpProofMutationTestEvidence `
@@ -158,7 +158,7 @@ function Test-CompleteShard([object]$Shard) {
                 -not (Test-SharpProofOrdinalStringSequence `
                     -Left @($row.selectedTests) `
                     -Right @($mutation.testLedger))) {
-                return $false
+                return $null
             }
 
             if (-not $baselineGroups.ContainsKey($baselineTrx)) {
@@ -184,14 +184,14 @@ function Test-CompleteShard([object]$Shard) {
                 if (-not (Test-SharpProofOrdinalStringSequence `
                         -Left @($expected.Ledger) `
                         -Right @($baseline.testLedgers[$expected.Method]))) {
-                    return $false
+                    return $null
                 }
             }
         }
-        return $true
+        return $evidence
     }
     catch {
-        return $false
+        return $null
     }
 }
 
@@ -298,10 +298,9 @@ function New-ShardTiming {
 $running = [Collections.Generic.List[object]]::new()
 try {
     foreach ($shard in $shards) {
-        if (Test-CompleteShard $shard) {
+        $evidence = Get-CompleteShard $shard
+        if ($null -ne $evidence) {
             Write-Host "Reusing completed mutation shard $($shard.Index + 1)."
-            $evidence = Get-Content -LiteralPath $shard.Path -Raw |
-                ConvertFrom-Json
             $shardTimings.Add((New-ShardTiming `
                     -Shard $shard `
                     -Evidence $evidence `
@@ -357,14 +356,12 @@ try {
         if (-not [string]::IsNullOrWhiteSpace($stderr)) {
             Write-Host $stderr.TrimEnd()
         }
-        if ($active.Process.ExitCode -ne 0 -or
-            -not (Test-CompleteShard $active.Shard)) {
+        $evidence = Get-CompleteShard $active.Shard
+        if ($active.Process.ExitCode -ne 0 -or $null -eq $evidence) {
             throw (
                 "Mutation shard $($active.Shard.Index + 1) failed with " +
                 "exit code $($active.Process.ExitCode).")
         }
-        $evidence = Get-Content -LiteralPath $active.Shard.Path -Raw |
-            ConvertFrom-Json
         $shardTimings.Add((New-ShardTiming `
                 -Shard $active.Shard `
                 -Evidence $evidence `
@@ -387,10 +384,10 @@ finally {
 $orderedResults = [Collections.Generic.List[object]]::new()
 $finalParent = Split-Path -Parent $output
 foreach ($shard in $shards) {
-    if (-not (Test-CompleteShard $shard)) {
+    $evidence = Get-CompleteShard $shard
+    if ($null -eq $evidence) {
         throw "Mutation shard evidence is incomplete: $($shard.Path)"
     }
-    $evidence = Get-Content -LiteralPath $shard.Path -Raw | ConvertFrom-Json
     foreach ($result in @($evidence.mutations)) {
         foreach ($property in @('log', 'trx', 'baselineTrx')) {
             $source = Join-Path (Split-Path -Parent $shard.Path) `
