@@ -187,6 +187,7 @@ the smallest relevant containerized test target passes.
 | R466 | Parameterize the uncached contract-binding wrapper while retaining separate caches | `SharpProof.Contracts.Test`: 142 passed |
 | R467 | Share symbol/type documentation-ID fallback handling | `SharpProof.Frontend.Test`: 121 passed |
 | R468 | Centralize the shared Roslyn runtime copy target for Gates projects | `SharpProof.Gates.Test`: 63; `SharpProof.ArchitectureTest`: 389 |
+| R472 | Derive the effect-capability unknown marker from the enum catalog expression | `SharpProof.Effects.Test`: 323 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2363,7 +2364,9 @@ This pass inspected effect-domain defaults, capability encoding, trust scopes, a
 
 ### Status (part fifty-one)
 
-R471-R475 are `pending`. They are review-only reduction candidates; no implementation or build files were edited.
+R471, R473-R475 are `pending` review-only reduction candidates. R472 is applied:
+`EffectCapabilitySet` now uses one compile-time unknown-marker expression for
+validation and `IsUnknown`, removing the numeric bit-position duplicate.
 
 
 ## Second survey, part fifty-two: R476 - the shipped consumer property surface
@@ -3537,3 +3540,11 @@ R569 is a pending small reduction candidate. It affects only the acceptance evid
 ### Status (part one hundred eleven)
 
 R570 is a pending small reduction candidate. Preserve the checked-command wrapper and the tooling-image build; only remove the unused version probe or make its diagnostic purpose explicit.
+
+## Second survey, part one hundred twelve: R571 - repeated collectible runtime fixture
+
+| R571 | **Three runtime-oracle test fixtures duplicate the same collectible `AssemblyLoadContext` harness.** `RuntimeFlagshipOracleTests`, `RuntimeRequiresOracleTests`, and `RuntimeEffectOracleTests` each create a collectible context, attach `ResolveFromDefaultContext`, load an emitted image from a non-writable `MemoryStream`, invoke a callback, detach the resolver, and unload in `finally`; they also repeat the same assembly-name resolver that scans `AppDomain.CurrentDomain.GetAssemblies()` with `AssemblyName.ReferenceMatchesDefinition`. Only the context name and emitted-image wrapper type differ. A shared test helper linked from `eng/testing` can parameterize those two seams and centralize the load/unload lifetime, leaving each oracle's runtime assertions and image representation explicit. | `SharpProof.Analyzer.Test/RuntimeFlagshipOracleTests.cs:229-262`; `SharpProof.Analyzer.Test/RuntimeRequiresOracleTests.cs:116-149`; `SharpProof.Effects.Test/RuntimeEffectOracleTests.cs:439-472` |
+
+### Status (part one hundred twelve)
+
+R571 is a pending test-infrastructure reduction candidate. Preserve collectible unloading and resolver detach in `finally`; the helper should not merge the distinct oracle behavior or hide failures from the callback.

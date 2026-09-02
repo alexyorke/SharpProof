@@ -2,12 +2,13 @@ namespace SharpProof.Effects;
 
 public readonly record struct EffectCapabilitySet
 {
+    private const EffectCapabilityKind UnknownMarker =
+        EffectCapabilityKind.Unknown & ~EffectCapabilityKind.AllKnown;
+
     public EffectCapabilitySet(EffectCapabilityKind kinds)
     {
-        var unknownMarker =
-            EffectCapabilityKind.Unknown & ~EffectCapabilityKind.AllKnown;
         if ((kinds & ~EffectCapabilityKind.Unknown) != 0 ||
-            ((kinds & unknownMarker) != 0 &&
+            ((kinds & UnknownMarker) != 0 &&
              kinds != EffectCapabilityKind.Unknown))
         {
             throw new ArgumentOutOfRangeException(nameof(kinds));
@@ -23,7 +24,7 @@ public readonly record struct EffectCapabilitySet
     {
         get;
     }
-    public bool IsUnknown => (Kinds & (EffectCapabilityKind)(1 << 13)) != 0;
+    public bool IsUnknown => (Kinds & UnknownMarker) != 0;
     public bool IsEmpty => Kinds == EffectCapabilityKind.None;
 
     public bool Contains(EffectCapabilityKind capability)
