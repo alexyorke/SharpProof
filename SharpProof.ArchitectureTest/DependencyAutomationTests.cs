@@ -17,14 +17,26 @@ public sealed class DependencyAutomationTests
 
         using (Assert.EnterMultipleScope())
         {
-            foreach (var profile in new[] { "quick", "pr", "nightly", "security" })
+            foreach (var (profile, configuration) in new Dictionary<string, string>
+            {
+                ["quick"] = "Debug",
+                ["pr"] = "Release",
+                ["nightly"] = "Release",
+                ["security"] = "Release"
+            })
             {
                 Assert.That(
                     build,
-                    Does.Contain($"Invoke-Container '{profile}'"),
+                    Does.Contain($"{profile} = '{configuration}'"),
                     profile);
                 Assert.That(dispatcher, Does.Contain($"'{profile}' {{"), profile);
             }
+            Assert.That(
+                build,
+                Does.Contain("$forcedConfigurations.ContainsKey($Profile)"));
+            Assert.That(
+                build,
+                Does.Contain("Invoke-Container $Profile $forcedConfigurations[$Profile]"));
 
             Assert.That(
                 File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml")),

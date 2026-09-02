@@ -60,19 +60,18 @@ function Invoke-Container(
 
 Build-ToolingImage
 
+$forcedConfigurations = @{
+    quick = 'Debug'
+    pr = 'Release'
+    nightly = 'Release'
+    security = 'Release'
+}
+if ($forcedConfigurations.ContainsKey($Profile)) {
+    Invoke-Container $Profile $forcedConfigurations[$Profile]
+    return
+}
+
 switch ($Profile) {
-    'quick' {
-        Invoke-Container 'quick' 'Debug'
-    }
-    'pr' {
-        Invoke-Container 'pr' 'Release'
-    }
-    'nightly' {
-        Invoke-Container 'nightly' 'Release'
-    }
-    'security' {
-        Invoke-Container 'security' 'Release'
-    }
     'coverage' {
         if ([string]::IsNullOrWhiteSpace($ComparisonRef)) {
             throw 'coverage requires -ComparisonRef <commit-or-ref>.'
