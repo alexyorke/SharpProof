@@ -190,18 +190,7 @@ internal static class CallableEvidenceBuilder
         }
 
         var evidence = assumptions.ToImmutable();
-        var replayVariables = target.Variables
-            .Where(variable =>
-                variable.Role is
-                    CompilerVariableRole.Receiver or
-                    CompilerVariableRole.Parameter &&
-                factory.GetTypeInfo(
-                    factory.GetVariableInfo(variable.Variable).Type)
-                    .Kind is
-                    IrTypeKind.Boolean or
-                    IrTypeKind.Integer)
-            .Select(static variable => variable.Variable)
-            .ToImmutableArray();
+        var replayVariables = ReplayVariables(target);
         cancellationToken.ThrowIfCancellationRequested();
         var usesSupportedDomain = evidence.All(assumption =>
             IsSupportedProofDomain(
@@ -357,18 +346,7 @@ internal static class CallableEvidenceBuilder
             }
         }
 
-        var replayVariables = target.Variables
-            .Where(variable =>
-                variable.Role is
-                    CompilerVariableRole.Receiver or
-                    CompilerVariableRole.Parameter &&
-                factory.GetTypeInfo(
-                    factory.GetVariableInfo(variable.Variable).Type)
-                    .Kind is
-                    IrTypeKind.Boolean or
-                    IrTypeKind.Integer)
-            .Select(static variable => variable.Variable)
-            .ToImmutableArray();
+        var replayVariables = ReplayVariables(target);
         cancellationToken.ThrowIfCancellationRequested();
         return CallableEntryEvidenceBuildResult.Success(
             new CallableEntryEvidence(
@@ -400,6 +378,23 @@ internal static class CallableEvidenceBuilder
                 assumptionIds.Add(justification, assumptionId);
             }
         }
+    }
+
+    private static ImmutableArray<IrVarId> ReplayVariables(
+        CompilerCallablePreparation target)
+    {
+        return target.Variables
+            .Where(variable =>
+                variable.Role is
+                    CompilerVariableRole.Receiver or
+                    CompilerVariableRole.Parameter &&
+                target.Factory.GetTypeInfo(
+                    target.Factory.GetVariableInfo(variable.Variable).Type)
+                    .Kind is
+                    IrTypeKind.Boolean or
+                    IrTypeKind.Integer)
+            .Select(static variable => variable.Variable)
+            .ToImmutableArray();
     }
 
 }
