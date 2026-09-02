@@ -11,6 +11,19 @@ function Test-SharpProofPublicationCommitSyntax {
     return $Commit -cmatch '^[0-9a-f]{40}\z'
 }
 
+function Get-SharpProofPublicationHttpsValue {
+    param([Parameter(Mandatory = $true)][string]$Value)
+
+    try {
+        return Resolve-SharpProofPublicationHttpsDestination `
+            -Value $Value `
+            -Owner 'Registry publication destination'
+    }
+    catch {
+        return $null
+    }
+}
+
 function Test-SharpProofExactProperties {
     param(
         [Parameter(Mandatory = $true)][object]$Value,
@@ -95,14 +108,7 @@ function Test-SharpProofPublicationPlanIdentity {
             foreach ($value in @(
                     $destination.mainDestination,
                     $destination.symbolDestination)) {
-                $uri = $null
-                if (-not [Uri]::TryCreate(
-                        $value, [UriKind]::Absolute, [ref]$uri) -or
-                    $uri.Scheme -cne 'https' -or
-                    [string]::IsNullOrWhiteSpace($uri.Host) -or
-                    -not [string]::IsNullOrEmpty($uri.UserInfo) -or
-                    -not [string]::IsNullOrEmpty($uri.Query) -or
-                    -not [string]::IsNullOrEmpty($uri.Fragment)) {
+                if ($null -eq (Get-SharpProofPublicationHttpsValue -Value $value)) {
                     throw 'Registry publication destination is invalid.'
                 }
             }
@@ -115,17 +121,10 @@ function Test-SharpProofPublicationPlanIdentity {
                 throw 'Registry publication destination is invalid.'
             }
             else {
-                $baseUri = $null
-                if (-not [Uri]::TryCreate(
-                        $destination.packageBaseAddress,
-                        [UriKind]::Absolute,
-                        [ref]$baseUri) -or
-                    $baseUri.Scheme -cne 'https' -or
-                    [string]::IsNullOrWhiteSpace($baseUri.Host) -or
-                    -not [string]::IsNullOrEmpty($baseUri.UserInfo) -or
-                    -not [string]::IsNullOrEmpty($baseUri.Query) -or
-                    -not [string]::IsNullOrEmpty($baseUri.Fragment) -or
-                    $baseUri.AbsoluteUri.TrimEnd('/') -cne
+                $normalizedBaseAddress = Get-SharpProofPublicationHttpsValue `
+                    -Value $destination.packageBaseAddress
+                if ($null -eq $normalizedBaseAddress -or
+                    $normalizedBaseAddress.TrimEnd('/') -cne
                         $destination.packageBaseAddress) {
                     throw 'Registry publication destination is invalid.'
                 }

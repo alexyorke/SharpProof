@@ -3440,9 +3440,10 @@ are bound by an equivalent immutable receipt.
 
 ### Status (part ninety-two)
 
-R550 is a `pending` reduction candidate. Preserve the registry plan's
-canonical package-base-address check and its existing fail-closed schema errors
-when reusing the shared HTTPS predicate.
+R550 is applied: publication-plan registry destinations now use the shared HTTPS
+resolver, while the validator retains its generic registry error and the
+canonical package-base-address check. Canonical and registry-canonical fixtures
+pass.
 
 ## Second survey, part ninety-three: R551 - fixture package identity parsing
 
