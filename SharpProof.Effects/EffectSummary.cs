@@ -152,7 +152,7 @@ public sealed record EffectSummary
     }
 }
 
-public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
+public sealed class EffectSummaryDomain : ClosedAbstractDomain<EffectSummary>
 {
     public static EffectSummaryDomain Instance { get; } = new();
 
@@ -160,10 +160,10 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
     {
     }
 
-    public EffectSummary Bottom => EffectSummary.Bottom;
-    public EffectSummary Top => EffectSummary.Top;
+    public override EffectSummary Bottom => EffectSummary.Bottom;
+    public override EffectSummary Top => EffectSummary.Top;
 
-    public bool LessThanOrEqual(EffectSummary left, EffectSummary right)
+    public override bool LessThanOrEqual(EffectSummary left, EffectSummary right)
     {
         left = ArgumentNullGuard.NotNull(left, nameof(left));
         right = ArgumentNullGuard.NotNull(right, nameof(right));
@@ -190,13 +190,7 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
                 ~right.AnalysisIncompleteReason) == 0;
     }
 
-    public bool AreEquivalent(EffectSummary left, EffectSummary right)
-    {
-        return LessThanOrEqual(left, right) &&
-        LessThanOrEqual(right, left);
-    }
-
-    public EffectSummary Join(EffectSummary left, EffectSummary right)
+    public override EffectSummary Join(EffectSummary left, EffectSummary right)
     {
         left = ArgumentNullGuard.NotNull(left, nameof(left));
         right = ArgumentNullGuard.NotNull(right, nameof(right));
@@ -225,12 +219,14 @@ public sealed class EffectSummaryDomain : IAbstractDomain<EffectSummary>
             left.AnalysisIncompleteReason | right.AnalysisIncompleteReason);
     }
 
-    public EffectSummary Widen(EffectSummary previous, EffectSummary next)
+    public override EffectSummary Widen(
+        EffectSummary previous,
+        EffectSummary next)
     {
         return Join(previous, next);
     }
 
-    public EffectSummary Havoc(EffectSummary value)
+    public override EffectSummary Havoc(EffectSummary value)
     {
         value = ArgumentNullGuard.NotNull(value, nameof(value));
 

@@ -188,6 +188,7 @@ the smallest relevant containerized test target passes.
 | R467 | Share symbol/type documentation-ID fallback handling | `SharpProof.Frontend.Test`: 121 passed |
 | R468 | Centralize the shared Roslyn runtime copy target for Gates projects | `SharpProof.Gates.Test`: 63; `SharpProof.ArchitectureTest`: 389 |
 | R472 | Derive the effect-capability unknown marker from the enum catalog expression | `SharpProof.Effects.Test`: 323 passed |
+| R471 | Inherit effect-summary equivalence from the closed-domain base while retaining Widen forwarding | `SharpProof.Effects.Test`: 323 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2356,7 +2357,7 @@ This pass inspected effect-domain defaults, capability encoding, trust scopes, a
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R471 | **`EffectSummaryDomain` reimplements defaults already provided by `ClosedAbstractDomain<T>`.** It implements `IAbstractDomain<EffectSummary>` directly and repeats both `AreEquivalent` as two order checks and `Widen` as `Join`; `SharpProof.Dataflow.ClosedAbstractDomain<T>` already supplies those exact implementations. Deriving this domain from the shared base and retaining only its effect-specific `LessThanOrEqual`, `Join`, and `Havoc` logic removes duplicate lattice plumbing, subject to preserving the public type and null-guard behavior. | `SharpProof.Effects/EffectSummary.cs:150-192,223-233`; `SharpProof.Dataflow/ClosedAbstractDomain.cs:6-24` |
+| R471 | **`EffectSummaryDomain` reimplements the equivalence default provided by `ClosedAbstractDomain<T>`.** It implements `IAbstractDomain<EffectSummary>` directly and repeats `AreEquivalent` as two order checks; `SharpProof.Dataflow.ClosedAbstractDomain<T>` supplies that exact implementation while leaving `Widen` abstract. Deriving this domain from the shared base and retaining its effect-specific `LessThanOrEqual`, `Join`, `Widen`, and `Havoc` logic removes the duplicate equivalence plumbing while preserving the public type and null-guard behavior. | `SharpProof.Effects/EffectSummary.cs:150-192,223-233`; `SharpProof.Dataflow/ClosedAbstractDomain.cs:6-24` |
 | R472 | **`EffectCapabilitySet.IsUnknown` repeats the unknown-bit value numerically.** The constructor and validation logic already derive the unknown marker from `EffectCapabilityKind.Unknown & ~EffectCapabilityKind.AllKnown`, but the property tests `(EffectCapabilityKind)(1 << 13)` directly. Reading the marker from the enum/catalog expression once removes a hidden second authority and keeps the predicate correct if the capability layout changes. | `SharpProof.Effects/EffectValues.cs:5-27`; `SharpProof.Effects/EffectContractValues.cs:15-18`; `SharpProof.Effects/EffectContractMappings.catalog.json:10-27` |
 | R473 | **`TrustedBoundaryPolicy.EnumerateScopes` duplicates `SharpProofControlAttributePolicy.EnumerateScopes` across assembly boundaries.** Both iterators yield the method, its associated property, every containing type, and its containing assembly in the same order. A neutral shared contract-scope enumerator in a lower dependency layer could serve both policies; the trust predicate and rejected-attribute handling should remain separate. | `SharpProof.Effects/TrustedBoundaryPolicy.cs:50-69`; `SharpProof.Analyzer.Core/SharpProofControlAttributePolicy.cs:119-136` |
 | R474 | **`EffectAnalysisSession.Analyze` and `AnalyzeAll` duplicate effect-result assembly.** Both compute `EffectModuleInitialization.SummarizeBeforeEntry`, combine it with the method summary through `EffectStep`, and expose direct witnesses only when initialization cannot prevent body entry; the single-method path does this at lines 113-129 and the all-method path repeats it inside the projection loop at lines 141-157. A private result factory taking the method, summary, initialization, and optional node witnesses can preserve the locking and lookup differences while centralizing the result semantics. | `SharpProof.Effects/EffectAnalysisSession.cs:104-129,132-157` |
@@ -2364,7 +2365,10 @@ This pass inspected effect-domain defaults, capability encoding, trust scopes, a
 
 ### Status (part fifty-one)
 
-R471, R473-R475 are `pending` review-only reduction candidates. R472 is applied:
+R473-R475 are `pending` review-only reduction candidates. R471 is applied:
+`EffectSummaryDomain` now derives from `ClosedAbstractDomain<EffectSummary>` and
+retains its explicit Widen forwarding, while inheriting the shared equivalence
+implementation. R472 is applied:
 `EffectCapabilitySet` now uses one compile-time unknown-marker expression for
 validation and `IsUnknown`, removing the numeric bit-position duplicate.
 
