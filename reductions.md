@@ -4193,14 +4193,6 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred ninety-one: R650 - repeated summary-evidence scans
-
-| R650 | **`CompilerLoweredArtifact.DecodeBody` rescans the full compilation summary-evidence table for every summary and dependency row.** Each summary call invokes `ValidSummaryEvidence`, which filters `compilation.SummaryEvidence` and materializes a match array; `ValidDependencyEvidence` invokes the same lookup once per dependency entry. The evidence table is immutable for the decode, so a canonical key dictionary built once per body can replace repeated O(summary rows x evidence rows) scans while retaining the exact-one-match rule and the subsequent `ValidSummaryEvidenceRow` authority check. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:754-820,1111-1174` |
-
-### Status (part one hundred ninety-one)
-
-R650 is a pending lowered-summary evidence lookup reduction candidate. Preserve duplicate/missing-row rejection, origin/call/identity/hash matching, canonical dependency order, and authority-mode validation; share only the immutable evidence indexing.
-
 ## Second survey, part one hundred ninety-two: R651 - effect evidence validation twice
 
 | R651 | **Effect evidence is validated once directly and again through authority matching.** `CompilerLoweredArtifact.DecodeEffects` calls `CompilerEffectClaimArtifactCodec.Validate(evidence, compilation)` before `CompilerEffectAuthority.Matches`, while `Matches` rebuilds the authority payload and `HasValidAuthorityPayload` seals and validates that copied evidence again. `CompilerManifestArtifactJson.HasFeatureScopeParity` repeats the same sequence with its effect rows. An internal matched-authority path can accept a caller-proven validated evidence row, or a combined routine can return the validation result, removing the duplicate codec hash/shape/replay work without weakening the independent authority-copy comparison. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:500-520`; `SharpProof.CompilerArtifact/CompilerEffectAuthority.cs:65-143`; `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:613-646` |
@@ -4248,3 +4240,19 @@ R655 is a pending worker-response validation reduction candidate. Preserve manif
 ### Status (part one hundred ninety-seven)
 
 R656 is a pending container-command helper reduction candidate. Preserve wrapper/static-graph behavior, timeout propagation, `$LASTEXITCODE` handling, quiet-mode failure diagnostics, temporary-log cleanup, and exception text; share only the common checked invocation.
+
+## Second survey, part one hundred ninety-eight: R657 - duplicated test-command allowlist
+
+| R657 | **`Invoke-SharpProofContainer.ps1` repeats the same test-command allowlist for two independent switch validations.** The `-NoBuild` guard and the `-Fast` guard each spell out the identical six-command set (`test`, `test-changed`, `semantic-tests`, `portable-tests`, `worker-tests`, `package-tests`) on adjacent branches. Defining one immutable supported-test-command set and using it in both checks removes the drift surface while preserving the separate error messages and the existing mutual-exclusion rule. | `scripts/Invoke-SharpProofContainer.ps1:41-55` |
+
+### Status (part one hundred ninety-eight)
+
+R657 is a pending container-command argument-validation reduction candidate. Preserve the exact allowed command set, independent unsupported-switch errors, and `-Fast`/`-NoBuild` conflict behavior; share only the allowlist data.
+
+## Second survey, part one hundred ninety-nine: R658 - duplicated vstest project lane
+
+| R658 | **`Invoke-SharpProofContainer.ps1` duplicates the build-and-`vstest` lane for direct project tests and worker tests.** The direct-project branch and the `worker-tests` branch each conditionally restore/build a project, append the shared fast-build arguments, resolve the test assembly, construct a `vstest` command, optionally add the same `/TestCaseFilter:...` argument, and invoke it. A parameterized private test-project runner can retain the direct-target/package exclusion and worker-specific project selection while removing the duplicated lifecycle and filter plumbing. | `scripts/Invoke-SharpProofContainer.ps1:253-275,328-349` |
+
+### Status (part one hundred ninety-nine)
+
+R658 is a pending container test-lane factoring candidate. Preserve `-NoBuild` and `-Fast` semantics, restore/build ordering, assembly resolution, filter syntax, direct-target exclusion, and command-specific control flow; share only the common project-to-`vstest` runner.

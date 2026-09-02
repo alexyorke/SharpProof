@@ -9,6 +9,103 @@ internal static class CompilerLoweredArtifact
         WorkerClaimEvidence.CompanionClause
     ];
 
+    private sealed class SummaryEvidenceIndex
+    {
+        private readonly CompilerCompilationSnapshot _compilation;
+        private readonly Dictionary<(
+            CompilerSummaryOrigin Origin,
+            string CallIdentity,
+            string EvidenceSha256,
+            string EvidenceIdentity),
+            (CompilerSummaryEvidenceSnapshot Row, int Count)> _rows = new();
+
+        internal SummaryEvidenceIndex(CompilerCompilationSnapshot compilation)
+        {
+            _compilation = compilation;
+            foreach (var row in compilation.SummaryEvidence ?? [])
+            {
+                if (row == null)
+                {
+                    continue;
+                }
+
+                var key = (
+                    row.Origin,
+                    row.CallIdentity,
+                    row.EvidenceSha256,
+                    row.EvidenceIdentity);
+                if (_rows.TryGetValue(key, out var existing))
+                {
+                    _rows[key] = (existing.Row, existing.Count + 1);
+                }
+                else
+                {
+                    _rows.Add(key, (row, 1));
+                }
+            }
+        }
+
+        internal bool IsValid(
+            CompilerSummaryOrigin origin,
+            string? callIdentity,
+            string? sha256,
+            string? identity)
+        {
+            if (!Enum.IsDefined(typeof(CompilerSummaryOrigin), origin) ||
+                !WorkerProtocolJson.IsSha256(sha256) ||
+                !ValidSummaryCallIdentity(callIdentity) ||
+                !ValidSummaryEvidenceIdentity(origin, identity, _compilation))
+            {
+                return false;
+            }
+
+            var key = (origin, callIdentity!, sha256!, identity!);
+            return _rows.TryGetValue(key, out var match) &&
+                match.Count == 1 &&
+                CompilationFingerprint.ValidSummaryEvidenceRow(
+                    match.Row,
+                    _compilation,
+                    authorityMode: true);
+        }
+
+        internal bool AreValidDependencies(
+            CompilerSummaryEvidenceArtifact[]? evidence)
+        {
+            if (evidence == null)
+            {
+                return false;
+            }
+
+            string? previous = null;
+            foreach (var item in evidence)
+            {
+                if (item == null ||
+                    !IsValid(
+                        item.Origin,
+                        item.CallIdentity,
+                        item.EvidenceSha256,
+                        item.EvidenceIdentity))
+                {
+                    return false;
+                }
+
+                var key = ((int)item.Origin).ToString(
+                        CultureInfo.InvariantCulture) + "|" +
+                    item.CallIdentity + "|" +
+                    item.EvidenceIdentity + "|" + item.EvidenceSha256;
+                if (previous != null &&
+                    StringComparer.Ordinal.Compare(previous, key) >= 0)
+                {
+                    return false;
+                }
+
+                previous = key;
+            }
+
+            return true;
+        }
+    }
+
     internal static CompilerCallableArtifact Encode(CompilerCallablePreparation preparation)
     {
         preparation = ArgumentNullGuard.NotNull(preparation, nameof(preparation));
@@ -645,6 +742,7 @@ internal static class CompilerLoweredArtifact
         }
 
         var programVariables = ValidateExecutableBody(graph.Program, variables);
+        var summaryEvidence = new SummaryEvidenceIndex(compilation);
 
         var canonical = new HashSet<IrVarId>(variables.Select(static item => item.Variable));
         var parameters = variables
@@ -762,15 +860,12 @@ internal static class CompilerLoweredArtifact
             if (instruction is not IrCallInstruction call ||
                 !identities.TryGetValue(call.Id, out var identity) ||
                 summary.Identity != identity ||
-                !ValidSummaryEvidence(
+                !summaryEvidence.IsValid(
                     summary.Origin,
                     summary.Identity,
                     summary.EvidenceSha256,
-                    summary.EvidenceIdentity,
-                    compilation) ||
-                !ValidDependencyEvidence(
-                    summary.DependencyEvidence,
-                    compilation) ||
+                    summary.EvidenceIdentity) ||
+                !summaryEvidence.AreValidDependencies(summary.DependencyEvidence) ||
                 !WorkerProtocolJson.IsSha256(summary.InstantiationSha256) ||
                 summary.NormalRelationRoot != clauseRootCount + index ||
                 !WorkerProtocolJson.IsSha256(summary.EvidenceSha256) ||
@@ -1129,71 +1224,6 @@ internal static class CompilerLoweredArtifact
             identity.All(static character => !char.IsControl(character));
     }
 
-    private static bool ValidSummaryEvidence(
-        CompilerSummaryOrigin origin,
-        string? callIdentity,
-        string? sha256,
-        string? identity,
-        CompilerCompilationSnapshot compilation)
-    {
-        if (Enum.IsDefined(typeof(CompilerSummaryOrigin), origin) &&
-            WorkerProtocolJson.IsSha256(sha256) &&
-            ValidSummaryCallIdentity(callIdentity) &&
-            ValidSummaryEvidenceIdentity(origin, identity, compilation))
-        {
-            var rows = compilation.SummaryEvidence ?? [];
-            var matches = rows.Where(row => row != null &&
-                    row.Origin == origin &&
-                    row.CallIdentity == callIdentity &&
-                    row.EvidenceSha256 == sha256 &&
-                    row.EvidenceIdentity == identity)
-                .ToArray();
-            return matches.Length == 1 &&
-                CompilationFingerprint.ValidSummaryEvidenceRow(
-                    matches[0], compilation, authorityMode: true);
-        }
-
-        return false;
-    }
-
-    private static bool ValidDependencyEvidence(
-        CompilerSummaryEvidenceArtifact[]? evidence,
-        CompilerCompilationSnapshot compilation)
-    {
-        if (evidence == null)
-        {
-            return false;
-        }
-
-        string? previous = null;
-        foreach (var item in evidence)
-        {
-            if (item == null ||
-                !ValidSummaryEvidence(
-                    item.Origin,
-                    item.CallIdentity,
-                    item.EvidenceSha256,
-                    item.EvidenceIdentity,
-                    compilation))
-            {
-                return false;
-            }
-
-            var key = ((int)item.Origin).ToString(
-                    CultureInfo.InvariantCulture) + "|" +
-                item.CallIdentity + "|" +
-                item.EvidenceIdentity + "|" + item.EvidenceSha256;
-            if (previous != null &&
-                StringComparer.Ordinal.Compare(previous, key) >= 0)
-            {
-                return false;
-            }
-
-            previous = key;
-        }
-
-        return true;
-    }
     internal static WorkerClaimEvidence ManifestEvidence(
         CompilerContractEvidence value)
     {
