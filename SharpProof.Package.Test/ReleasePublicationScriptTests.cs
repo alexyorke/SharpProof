@@ -944,14 +944,31 @@ public sealed class ReleasePublicationScriptTests
         var repository = document.Descendants().Single(element =>
             element.Name.LocalName == "repository");
         repository.SetAttributeValue("commit", commit);
-        nuspec.Delete();
+        RewriteEntry(
+            archive,
+            nuspec,
+            entryName,
+            stream =>
+            {
+                using var output = new StreamWriter(
+                    stream,
+                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                document.Save(output);
+            });
+    }
+
+    private static void RewriteEntry(
+        ZipArchive archive,
+        ZipArchiveEntry entry,
+        string entryName,
+        Action<Stream> writeContents)
+    {
+        entry.Delete();
         var replacement = archive.CreateEntry(
             entryName,
             CompressionLevel.Optimal);
-        using var output = new StreamWriter(
-            replacement.Open(),
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        document.Save(output);
+        using var output = replacement.Open();
+        writeContents(output);
     }
 
     private static void RewriteEntry(
@@ -960,12 +977,11 @@ public sealed class ReleasePublicationScriptTests
         string entryName,
         byte[] contents)
     {
-        entry.Delete();
-        var replacement = archive.CreateEntry(
+        RewriteEntry(
+            archive,
+            entry,
             entryName,
-            CompressionLevel.Optimal);
-        using var output = replacement.Open();
-        output.Write(contents);
+            stream => stream.Write(contents));
     }
 
     private sealed class PublicationWorkspace : IDisposable

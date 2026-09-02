@@ -4239,12 +4239,6 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
 
-### Status (part two hundred twenty)
-
-| R686 | **`ReleasePublicationScriptTests` duplicates archive-entry replacement scaffolding.** `RewriteRepositoryCommit` and `RewriteEntry` both delete an existing `ZipArchiveEntry`, create a replacement at a supplied name with `CompressionLevel.Optimal`, open its stream, and write replacement content; only the writer is text/document serialization versus raw bytes. A small replacement helper accepting a write callback can centralize the archive mutation protocol while preserving the two content encodings and their callers' distinct transformations. | `SharpProof.Package.Test/ReleasePublicationScriptTests.cs:927-970` |
-
-R686 is a pending release-test fixture reduction candidate. Preserve archive compression, entry-name replacement, UTF-8-without-BOM document output, and raw-byte mutation behavior.
-
 ### Status (part two hundred twenty-one)
 
 | R687 | **`LauncherArgumentTests` repeats the base verification argument vector across collision cases.** The directory-result, I/O-collision, nested-cache, worker-output, worker-runtime, and launcher-runtime tests each spell out the same `verify`, worker, request, result, compiler-manifest, verify-policy, and assumption-policy flags before varying only the paths or cache setting. A small `CreateProjectionArguments` helper with named path/cache parameters can remove the repeated argument plumbing while leaving every collision topology explicit at the call site. | `SharpProof.Package.Test/LauncherArgumentTests.cs:462-850` |
