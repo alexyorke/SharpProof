@@ -14,9 +14,9 @@ $ErrorActionPreference = 'Stop'
 $acceptanceRoot = $PSScriptRoot
 $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
-$wrapperPath = Join-Path $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 . (Join-Path $repositoryRoot 'scripts\SharpProof.FuzzEvidenceLifecycle.ps1')
+Import-Module (Join-Path $repositoryRoot 'scripts\SharpProof.ContainerExecution.psm1') -Force
 $pullRequestCases = Assert-SharpProofFuzzCaseBudget `
     -Value $contract.fuzz.pullRequestCases `
     -Name 'contract.fuzz.pullRequestCases'
@@ -227,25 +227,10 @@ trap {
     throw $_.Exception.Message
 }
 
-function Invoke-SharpProofDotnet {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$Arguments,
-
-        [int]$TimeoutSeconds = 300
-    )
-
-    & $wrapperPath `
-        -TimeoutSeconds $TimeoutSeconds `
-        @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
-}
-
 Start-AcceptanceTimingPhase -Name 'restore'
-Invoke-SharpProofDotnet -Arguments @(
-    'restore', 'SharpProof.sln', '--locked-mode')
+Invoke-SharpProofRequiredDotnet -Arguments @(
+    'restore', 'SharpProof.sln', '--locked-mode') `
+    -TimeoutSeconds 300
 Complete-AcceptanceTimingPhase
 
 Start-AcceptanceTimingPhase -Name 'static-validation'
@@ -641,7 +626,7 @@ try {
 
     if (-not $SkipBuild) {
         Start-AcceptanceTimingPhase -Name 'build'
-        Invoke-SharpProofDotnet `
+        Invoke-SharpProofRequiredDotnet `
             -Arguments @('build', 'SharpProof.sln', '-c', $Configuration, '--no-restore') `
             -TimeoutSeconds ([int]$contract.automation.solutionBuildWallSeconds)
         Complete-AcceptanceTimingPhase
@@ -682,7 +667,7 @@ try {
 
     if (-not $SkipTests) {
         Start-AcceptanceTimingPhase -Name 'fuzz'
-        Invoke-SharpProofDotnet -Arguments @(
+        Invoke-SharpProofRequiredDotnet -Arguments @(
             'run',
             '--project',
             'Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj',
@@ -700,7 +685,7 @@ try {
         Complete-AcceptanceTimingPhase
 
         Start-AcceptanceTimingPhase -Name 'corpus-and-performance'
-        Invoke-SharpProofDotnet -Arguments @(
+        Invoke-SharpProofRequiredDotnet -Arguments @(
             'run',
             '--project',
             'SharpProof.Gates\SharpProof.Gates.csproj',

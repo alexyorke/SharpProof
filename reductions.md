@@ -3690,10 +3690,11 @@ R577 is a pending package-topology reduction candidate. Keep an explicit policy 
 
 ### Status (part one hundred nineteen)
 
-R578 is applied: `TryBuild` now calls a normalized-candidate predicate after
-its existing normalization step, while `IsCandidate` keeps its standalone
-normalization boundary for independent callers. The admissibility checks and
-abstention behavior are unchanged.
+R578 remains deferred. The normalized-predicate extraction passed the focused
+implementation-IL tests, but added seven measured expression nodes to a
+coordinator layer already at its 4,544-node ceiling. Keeping the acceptance
+ratchet intact would require moving the candidate policy across a trusted-file
+boundary, which is more structural complexity than this small runtime saving.
 
 ## Second survey, part one hundred twenty: R579 - duplicated effect-authority projection
 
@@ -3961,3 +3962,51 @@ R609 is a pending Effects-test maintenance candidate. Preserve the `Subject`/`Ex
 ### Status (part one hundred fifty-one)
 
 R610 is a pending generator-infrastructure reduction candidate. Preserve ordinal duplicate detection, array/object recursion, and each generator's distinct schema validation; share only the common `JsonElement` property walk.
+
+## Second survey, part one hundred fifty-two: R611 - duplicate pattern type projection
+
+| R611 | **`SwitchExpressionFacts` extracts the same matched type twice.** `IsTotalPattern` and `IsPatternEvaluationUnavoidable` each switch over `ITypePatternOperation`, `IDeclarationPatternOperation`, and `IRecursivePatternOperation` to obtain `MatchedType`, returning null for every other pattern kind. A private `GetMatchedType` helper can own this identical projection while leaving the two callers' distinct list-pattern, nullability, and recursive-subpattern policies unchanged. | `SharpProof.Effects/SwitchExpressionFacts.cs:365-372,434-441` |
+
+### Status (part one hundred fifty-two)
+
+R611 is a pending local Effects reduction candidate. Preserve each caller's separate input-nullability and recursive-pattern decisions; share only the three-kind matched-type projection.
+
+## Second survey, part one hundred fifty-three: R612 - repeated relational operator table
+
+| R612 | **`SwitchExpressionFacts` implements the same relational operator table three times.** `MatchRelationalPattern` maps `LessThan`, `LessThanOrEqual`, `GreaterThan`, and `GreaterThanOrEqual` from a comparison result, while `TryMatchRelationalConstants` routes floating values through `MatchesFloating` and other comparable values through `Matches`, whose switch arms repeat that same four-way mapping. A single comparison-to-selection helper can remove the duplicated decision table; retain the current NaN rejection, exact-type admission, and `ArgumentException` fallback policies at their existing boundaries. | `SharpProof.Effects/SwitchExpressionFacts.cs:604-645,688-745` |
+
+### Status (part one hundred fifty-three)
+
+R612 is a pending local Effects reduction candidate. Preserve floating-point NaN behavior and the distinction between an unsupported comparison and a definite non-match; consolidate only the repeated relational operator mapping.
+
+## Second survey, part one hundred fifty-four: R613 - repeated total-pattern query
+
+| R613 | **`OperationCompletionEvaluator.CanCompletePatternEvaluation` recomputes the same total-pattern predicate.** In both the deconstruction-subpattern loop and the property-subpattern loop, it calls `SwitchExpressionFacts.IsTotalPattern` once in the incomplete-evaluation guard and immediately calls it again for the early-return test. The predicate is pure for the same pattern/type inputs, so caching one local boolean per subpattern removes four repeated pattern traversals without changing the distinction between a failing total pattern and a non-total pattern that can be skipped. | `SharpProof.Effects/OperationCompletionEvaluator.cs:233-267` |
+
+### Status (part one hundred fifty-four)
+
+R613 is a pending local Effects performance/clarity candidate. Preserve the existing order of completion evaluation and total-pattern classification; eliminate only the repeated query for the same subpattern.
+
+## Second survey, part one hundred fifty-five: R614 - unreachable operator-null disjunct
+
+| R614 | **`OperationCompletionEvaluator.CanCompleteBinary` retains an unreachable null check.** The return at the end of the user-defined conditional-operator branch is guarded by `if (binary.OperatorMethod != null)`, yet still evaluates `binary.OperatorMethod == null || CanCompleteInvocation(...)`. The first disjunct can never be true in that branch, so removing it exposes the actual required invocation check and removes accidental state-machine complexity without changing the branch result. | `SharpProof.Effects/OperationCompletionEvaluator.cs:1301-1367` |
+
+### Status (part one hundred fifty-five)
+
+R614 is a pending local Effects cleanup candidate. Preserve the outer `OperatorMethod != null` branch and its truth-operator short-circuit cases; simplify only the impossible null alternative in the final return.
+
+## Second survey, part one hundred fifty-six: R615 - duplicate control-flow region iterator
+
+| R615 | **`EffectMethodNodeBuilder` defines the same enclosing-region iterator twice.** `CreateFinallyEntries` and `CreateExceptionalRegionOperations` each declare a local `EnclosingRegions(ControlFlowRegion?)` iterator that yields the region and walks `EnclosingRegion` until null, with identical loop structure. A single private iterator can serve both region projections while retaining their separate finally/catch mapping and ordering logic. | `SharpProof.Effects/EffectMethodNodeBuilder.cs:962-1025,1028-1081` |
+
+### Status (part one hundred fifty-six)
+
+R615 is a pending local Effects infrastructure candidate. Preserve the null-terminated enclosing-region walk and each caller's distinct filtering/mapping; remove only the duplicate iterator declarations.
+
+## Second survey, part one hundred fifty-seven: R616 - reuse static-initializable member predicate
+
+| R616 | **`EffectMethodNodeBuilder.AllStaticInitializersSatisfy` repeats an existing member-kind switch.** Its `initializable` local reproduces the field/property/event staticness and non-const-field checks that `IsInitializableMember(member, staticInitializers: true)` already owns below and that the other initializer paths already call. Reusing that helper removes a second member-classification authority while leaving the method's predicate evaluation, syntax-reference enumeration, and semantic-model handling unchanged. | `SharpProof.Effects/EffectMethodNodeBuilder.cs:414-447,676-688` |
+
+### Status (part one hundred fifty-seven)
+
+R616 is a pending local Effects cleanup candidate. Preserve the existing static-only and non-const field policy; replace only the duplicated classification switch with the canonical helper.
