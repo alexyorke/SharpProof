@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -574,32 +573,4 @@ public sealed class RequiresReplaySoundnessTests
         }
     }
 
-    private sealed class RecordingSessionFactory : IAnalyzerSessionFactory
-    {
-        private readonly ConcurrentDictionary<
-            string,
-            AnalyzerSemanticOutcome> _outcomes =
-            new(StringComparer.Ordinal);
-
-        internal ConcurrentDictionary<string, AnalyzerSemanticOutcome>
-            Outcomes => _outcomes;
-
-        public AnalyzerSession Create(
-            Compilation compilation,
-            AnalyzerConfiguration configuration,
-            CancellationToken cancellationToken)
-        {
-            return new AnalyzerSession(
-                compilation,
-                configuration,
-                cancellationToken,
-                (method, outcome) => _outcomes.AddOrUpdate(
-                    method.Name,
-                    outcome,
-                    (_, current) =>
-                        AnalyzerSemanticOutcomes.Combine(
-                            current,
-                            outcome)));
-        }
-    }
 }
