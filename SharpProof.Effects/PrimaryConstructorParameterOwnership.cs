@@ -23,11 +23,9 @@ internal static class PrimaryConstructorParameterOwnership
             return false;
         }
 
-        return parameter.DeclaringSyntaxReferences.Any(static reference =>
-            reference.GetSyntax() is ParameterSyntax
-            {
-                Parent.Parent: TypeDeclarationSyntax
-            });
+        return HasPrimaryConstructorParameter(
+            parameter.DeclaringSyntaxReferences,
+            recordsOnly: false);
     }
 
     internal static bool IsPositionalRecordProperty(
@@ -35,10 +33,19 @@ internal static class PrimaryConstructorParameterOwnership
     {
         return property.ContainingType.IsRecord &&
             property.GetMethod?.IsImplicitlyDeclared == true &&
-            property.DeclaringSyntaxReferences.Any(static reference =>
-                reference.GetSyntax() is ParameterSyntax
-                {
-                    Parent.Parent: RecordDeclarationSyntax
-                });
+            HasPrimaryConstructorParameter(
+                property.DeclaringSyntaxReferences,
+                recordsOnly: true);
+    }
+
+    private static bool HasPrimaryConstructorParameter(
+        IEnumerable<SyntaxReference> references,
+        bool recordsOnly)
+    {
+        return references.Any(reference =>
+            reference.GetSyntax() is ParameterSyntax
+            {
+                Parent.Parent: TypeDeclarationSyntax declaration
+            } && (!recordsOnly || declaration is RecordDeclarationSyntax));
     }
 }
