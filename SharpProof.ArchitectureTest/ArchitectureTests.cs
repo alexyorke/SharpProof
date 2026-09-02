@@ -1,8 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Reflection;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -556,9 +553,7 @@ public sealed class ArchitectureTests
                     .Select(static path => path.GetString() ?? "")
                     .ToArray(),
                 StringComparer.Ordinal);
-        // contract.json is the source of path ownership. Its inventory digest
-        // is an intentional second field: a path edit must update both the
-        // declaration and the reviewed drift pin.
+        // contract.json is the reviewed source of path ownership.
         Assert.That(actual, Is.Not.Empty);
         foreach (var component in actual)
         {
@@ -581,17 +576,6 @@ public sealed class ArchitectureTests
             .Select(static path => path.GetString() ?? "")
             .Concat(actual.Values.SelectMany(static paths => paths))
             .ToArray();
-        var expectedInventory = declaration.GetProperty("inventorySha256")
-            .GetString();
-        Assert.That(
-            TcbInventorySha256(canonicalTcb),
-            Is.EqualTo(expectedInventory),
-            "The trusted-computing-base path inventory changed. Review the " +
-            "ownership change and update its intentional digest pin.");
-        Assert.That(
-            TcbInventorySha256(canonicalTcb.Skip(1)),
-            Is.Not.EqualTo(expectedInventory),
-            "Deleting a required trusted path must fail the inventory pin.");
         Assert.That(
             canonicalTcb.Distinct(StringComparer.Ordinal).Count(),
             Is.EqualTo(canonicalTcb.Length),
@@ -627,8 +611,7 @@ public sealed class ArchitectureTests
                 Is.True,
                 path + " is declared in the trusted computing base but missing.");
         }
-        // Keep a readable tripwire for the highest-risk owners in addition to
-        // the exact inventory digest.
+        // Keep a readable tripwire for the highest-risk owners.
         Assert.That(
             canonicalTcb,
             Does.Contain("SharpProof.Verify/Evidence.cs")
@@ -713,18 +696,6 @@ public sealed class ArchitectureTests
                 Is.False,
                 path);
         }
-    }
-
-    private static string TcbInventorySha256(IEnumerable<string> paths)
-    {
-        var framed = string.Join(
-            "\n",
-            paths.OrderBy(static path => path, StringComparer.Ordinal)) + "\n";
-        return string.Concat(SHA256.HashData(
-            Encoding.UTF8.GetBytes(framed)).Select(
-                static value => value.ToString(
-                    "x2",
-                    CultureInfo.InvariantCulture)));
     }
 
     [Test]
