@@ -4142,7 +4142,9 @@ R627 is a pending Effects-test harness cleanup candidate. Preserve each fixture'
 
 ### Status (part one hundred sixty-nine)
 
-R628 is a pending protocol-stream cleanup candidate. Preserve zero-count behavior, exact one-byte overflow detection, limit diagnostics, cancellation propagation, and disposal; share only the common exhausted-budget decision.
+R628 is applied: synchronous and asynchronous exhausted-budget probes now
+share `CompleteOverflowProbe`, preserving zero-count behavior, one-byte
+overflow detection, limit diagnostics, cancellation, and disposal.
 
 ## Second survey, part one hundred seventy: R629 - redundant root JSON kind check
 

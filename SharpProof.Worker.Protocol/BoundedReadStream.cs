@@ -133,11 +133,7 @@ internal sealed class BoundedReadStream : Stream
 
     private int ProbeForOverflow()
     {
-        if (_inner.ReadByte() >= 0)
-        {
-            throw new InvalidDataException(_limitMessage);
-        }
-        return 0;
+        return CompleteOverflowProbe(_inner.ReadByte() >= 0);
     }
 
     private async Task<int> ProbeForOverflowAsync(
@@ -150,6 +146,15 @@ internal sealed class BoundedReadStream : Stream
                 1,
                 cancellationToken)
             .ConfigureAwait(false) != 0)
+        {
+            return CompleteOverflowProbe(hasMoreData: true);
+        }
+        return CompleteOverflowProbe(hasMoreData: false);
+    }
+
+    private int CompleteOverflowProbe(bool hasMoreData)
+    {
+        if (hasMoreData)
         {
             throw new InvalidDataException(_limitMessage);
         }
