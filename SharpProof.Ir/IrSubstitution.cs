@@ -31,11 +31,10 @@ public static class IrSubstitution
         // Materialize the caller-supplied view once. IReadOnlyDictionary is an
         // interface, not an immutable snapshot; validation and rewriting must
         // operate on the same mapping.
-        var replacementSnapshot = replacements.ToArray();
-        var replacementMap = replacementSnapshot.ToDictionary(
+        var replacementMap = replacements.ToDictionary(
             static pair => pair.Key,
             static pair => pair.Value);
-        foreach (var replacement in replacementSnapshot)
+        foreach (var replacement in replacementMap)
         {
             var variable = factory.GetVariableInfo(replacement.Key);
             factory.EnsureTerm(replacement.Value, nameof(replacements));
@@ -46,7 +45,7 @@ public static class IrSubstitution
                     nameof(replacements));
             }
         }
-        if (replacementSnapshot.Length == 0)
+        if (replacementMap.Count == 0)
         {
             return root;
         }
