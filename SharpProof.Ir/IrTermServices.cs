@@ -24,17 +24,13 @@ internal static class IrTermServices
 
         if (!member.IsStatic && receiver == null)
         {
-            if (opaque)
-            {
-                ArgumentNullGuard.NotNull(
-                    receiver,
+            throw opaque
+                ? new ArgumentNullException(
                     nameof(receiver),
-                    "An instance member requires a receiver.");
-            }
-
-            throw new ArgumentException(
-                "An instance member requires a receiver.",
-                parameterName);
+                    "An instance member requires a receiver.")
+                : new ArgumentException(
+                    "An instance member requires a receiver.",
+                    parameterName);
         }
 
         if (receiver != null)

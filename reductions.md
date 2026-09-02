@@ -160,6 +160,7 @@ the smallest relevant containerized test target passes.
 | R851 | Resolve bound-contract assignments through a validated parameter map | bound-contract generator `-Verify` passed |
 | R338 | Centralize the shared RS2002/RS2003 analyzer suppression policy | CompilerCollector build passed with central policy |
 | R276 | Reuse exact duplicate raw-string fixtures across Worker and analyzer tests | Worker CompilerManifestArtifactTests: 91; WorkerTests: 148; GeneratedContractForAnalyzerTests: 22 passed |
+| R588 | Collapse the unreachable opaque receiver branch while preserving its exception contract | `SharpProof.Ir.Test`: ArgumentNullGuardBoundaryTests, 3 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3845,7 +3846,10 @@ R587 is a pending cross-layer replay reduction candidate. Preserve the compiler 
 
 ### Status (part one hundred twenty-nine)
 
-R588 is a pending IR validation reduction candidate. Preserve whichever exception type and message the public/internal callers intentionally expose; simplify only the branch whose second throw cannot execute after the null guard.
+R588 is `applied`: the opaque and non-opaque null-receiver contracts now use
+one conditional throw, preserving their exception types, parameter names, and
+message while removing the unreachable nested branch. `ArgumentNullGuardBoundaryTests`
+passed (3 tests).
 
 ## Second survey, part one hundred thirty: R589 - duplicate program condition evaluation
 
