@@ -1845,8 +1845,10 @@ stream readers, and location authority helpers across `SharpProof.CompilerArtifa
 ### Status (part thirty-three)
 
 R380 is applied: canonical diagnostic sorting and canonical-order checks now
-share one comparer; R385 remains `pending` because location hashing is part of
-the artifact equality contract and needs a separate compatibility check.
+share one comparer. R385 is refuted on the current tree: the cited
+`GetLocationHashCode` authority is absent; `CompilerSourceLocationAuthority`
+provides `LocationsEqual`, while the replay comparer owns a broader artifact
+hash that cannot be delegated to a nonexistent location-only helper.
 
 ## Second survey, part thirty-four: R386-R392
 
