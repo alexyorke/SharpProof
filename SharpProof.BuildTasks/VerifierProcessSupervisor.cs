@@ -1,16 +1,14 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using SharpProof.Host;
 
 namespace SharpProof.BuildTasks;
 
 internal static partial class VerifierProcessSupervisor
 {
     private const int ChildSubreaper = 36;
-    private const int ParentDeathSignal = 1;
     private const int SetDumpable = 4;
-    private const int PidFdOpenSystemCall = 434;
-    private const int PidFdSendSignalSystemCall = 424;
     private const int SignalKill = 9;
     private const int SignalNone = 0;
     private const int SignalStop = 19;
@@ -188,7 +186,7 @@ internal static partial class VerifierProcessSupervisor
         // verifier it starts) to init; PDEATHSIG makes the kernel terminate
         // the whole inherited launch chain instead.
         if (NativeMethods.ControlProcess(
-                ParentDeathSignal,
+                LinuxProcessControlConstants.ParentDeathSignal,
                 SignalKill,
                 0,
                 0,
@@ -456,7 +454,7 @@ internal static partial class VerifierProcessSupervisor
     private static int OpenPidFd(int processId)
     {
         return (int)NativeMethods.SystemCall2(
-            PidFdOpenSystemCall,
+            LinuxProcessControlConstants.PidFdOpenSystemCall,
             processId,
             0);
     }
@@ -464,7 +462,7 @@ internal static partial class VerifierProcessSupervisor
     private static int SendPidFdSignal(int descriptor, int signal)
     {
         return (int)NativeMethods.SystemCall4(
-            PidFdSendSignalSystemCall,
+            LinuxProcessControlConstants.PidFdSendSignalSystemCall,
             descriptor,
             signal,
             0,

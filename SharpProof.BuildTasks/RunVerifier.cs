@@ -31,8 +31,6 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
     internal const int OutputDrainPollingMilliseconds = 25;
     private const int MaximumProtocolLineCharacters = 160;
-    private const int PidFdSendSignalSystemCall = 424;
-    private const int PidFdOpenSystemCall = 434;
     private const int SignalTerminate = 15;
     private const int SignalStop = 19;
     private const int SignalKill = 9;
@@ -1062,7 +1060,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         }
         var descriptor = OpenPidFdOverride?.Invoke(processId) ??
             checked((int)NativeMethods.SystemCall2(
-                PidFdOpenSystemCall,
+                LinuxProcessControlConstants.PidFdOpenSystemCall,
                 processId,
                 0));
         if (descriptor < 0)
@@ -1077,7 +1075,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     private static int SendPidFdSignal(int descriptor, int signal)
     {
         return checked((int)NativeMethods.SystemCall4(
-            PidFdSendSignalSystemCall,
+            LinuxProcessControlConstants.PidFdSendSignalSystemCall,
             descriptor,
             signal,
             0,

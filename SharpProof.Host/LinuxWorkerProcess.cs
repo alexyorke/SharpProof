@@ -17,7 +17,6 @@ public sealed record LinuxWorkerCompletion(
 public sealed partial class LinuxWorkerProcess : IDisposable
 {
     public const string StartMessage = "SharpProof.Start/1";
-    private const int ParentDeathSignal = 1;
     private const int SignalKill = 9;
     private const int SignalTerminate = 15;
     private const int PollMilliseconds = 25;
@@ -117,7 +116,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             1);
         EnsureLinux();
         if (NativeMethods.ControlProcess(
-                ParentDeathSignal,
+                LinuxProcessControlConstants.ParentDeathSignal,
                 SignalKill,
                 0,
                 0,
@@ -350,4 +349,11 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int Kill(int processId, int signal);
     }
+}
+
+internal static class LinuxProcessControlConstants
+{
+    internal const int ParentDeathSignal = 1;
+    internal const int PidFdOpenSystemCall = 434;
+    internal const int PidFdSendSignalSystemCall = 424;
 }

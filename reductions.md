@@ -131,6 +131,7 @@ the smallest relevant containerized test target passes.
 | R327 | Remove 22 project-local `TreatWarningsAsErrors` declarations now supplied by the central production policy, retaining the two excluded-project declarations | `test-changed`: 2,846 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
+| R330 | Centralize Linux process-control ABI constants for `PR_SET_PDEATHSIG`, `pidfd_open`, and `pidfd_send_signal` in the host assembly while retaining separate native wrappers | `SharpProof.Package.Test`: 141 BuildTask, supervisor, and launcher tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1418,7 +1419,6 @@ maintenance seams rather than style preferences.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R330 | **Linux process-control ABI constants are redeclared across the host/build-task boundary.** `PidFdOpenSystemCall = 434` and `PidFdSendSignalSystemCall = 424` are private constants in both `RunVerifier` and `VerifierProcessSupervisor`, even though both methods invoke the same `pidfd_open` and `pidfd_send_signal` syscalls. `ParentDeathSignal = 1` is likewise declared in `LinuxWorkerProcess` and `VerifierProcessSupervisor` for the same `PR_SET_PDEATHSIG` control. R278 already covers the repeated signal numbers, but not these six declarations of three low-level ABI values. A shared Linux process-control constants owner could remove the repeated numbers; the separate P/Invoke wrappers and their failure semantics should remain distinct. | `SharpProof.BuildTasks/RunVerifier.cs:34-35`; `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:10-13`; `SharpProof.Host/LinuxWorkerProcess.cs:20`; R278 |
 | R331 | **The two custom-nuspec project files copy the same packaging skeleton.** `SharpProof.Package.csproj` and `SharpProof.Verifier.csproj` each import `SharpProof.PackageMetadata.props` and repeat the same `Nullable=disable`, `ImplicitUsings=disable`, `TargetFramework=netstandard2.0`, `IncludeBuildOutput=false`, `GeneratePackageOnBuild=false`, `NuspecBasePath`, `NU5128` suppression, `Copyright`, and `NoPackageAnalysis` settings. Their `_SharpProofPrepareNuspecProperties` targets also share the same name, timing, and `version/configuration/repositorycommit` property prefix. A shared custom-nuspec props/target fragment could own this stable skeleton while leaving package IDs, nuspec filenames, native-root validation, and project references explicit. This refines R291's metadata duplication at the project-file layer. | `SharpProof.Package/SharpProof.Package.csproj:1-20,42-45`; `SharpProof.Verifier/SharpProof.Verifier.csproj:1-20,47-52` |
 | R332 | **`GeneratePackageOnBuild=false` is explicitly repeated in three package projects even though it is the SDK default.** The setting appears in `SharpProof.Attributes`, `SharpProof.Package`, and `SharpProof.Verifier`; a canonical-container evaluation of an unrelated project with no local declaration (`SharpProof.Analyzer`) also reports `GeneratePackageOnBuild=false`. Unless the explicit value is intended only as prose documentation, the three declarations are behaviorally redundant and can be removed or centralized. | `SharpProof.Attributes/SharpProof.Attributes.csproj:12`; `SharpProof.Package/SharpProof.Package.csproj:8`; `SharpProof.Verifier/SharpProof.Verifier.csproj:8`; canonical-container `dotnet msbuild -getProperty:GeneratePackageOnBuild` reports `false` for both a declaring package project and the non-declaring `SharpProof.Analyzer` project |
 | R333 | **One verifier-test nonce is copied five times in the same test class.** The exact 64-character value `0123456789abcdef` repeated twice is declared as a local `nonce` in five `BuildTaskTests` methods. Each test intentionally mutates or combines it differently, but the base fixture value is identical and can be a class-level constant or a test helper. This is test-only duplication and does not justify changing the production protocol. | `SharpProof.Package.Test/BuildTaskTests.cs:64-66,118-120,150-152,183-185,393-395` |
@@ -1431,6 +1431,9 @@ maintenance seams rather than style preferences.
 
 ### Checked and not proposed (part twenty-six)
 
+- R330 is now applied: `LinuxProcessControlConstants` owns the three shared ABI
+  values in `SharpProof.Host`, and build tasks consume them through the existing
+  host internals boundary; native wrappers and failure semantics remain local.
 - The repeated `SHARPPROOF_CONTRACTS` string spans the public conditional symbol,
   compilation fingerprinting, and synthetic source fixtures. The fixture copies
   are part of R309, while the fingerprint intentionally has a separate
@@ -1449,8 +1452,8 @@ maintenance seams rather than style preferences.
 
 ### Status (part twenty-six)
 
-R330-R339 are `pending`. R330, R331, R336, and R337 touch platform, packaging,
-or storage authorities and need boundary-aware implementations. R332-R335 and
+R331-R339 are `pending`. R331, R336, and R337 touch packaging or storage
+authorities and need boundary-aware implementations. R332-R335 and
 R338-R339 are smaller, mechanically testable build/test reductions.
 
 ## Second survey, part twenty-seven: R340-R349
