@@ -3,8 +3,6 @@ namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerManifestArtifactProducer
 {
-    private static readonly char[] PackIdentitySeparators = [';'];
-
     internal static CompilerManifestArtifact Create(CSharpCompilation compilation, string projectDirectory,
         string targetFramework, WorkerFeatureSet features, ClaimManifestBuildResult discovery,
         int maximumExpressionDepth, CancellationToken cancellationToken,
@@ -153,9 +151,9 @@ internal static class CompilerManifestArtifactProducer
             else if (authority.Origin == CompilerSummaryOrigin.SpecificationPack)
             {
                 if (authority.EvidenceSha256 != snapshot.SpecificationPackCatalogSha256 ||
-                    !IsSelectedPackIdentity(
-                        authority.EvidenceIdentity,
-                        snapshot.SpecificationPackIds))
+                        !CompilerSpecificationPackAuthorityValidation.IsValidPackIdentity(
+                            authority.EvidenceIdentity,
+                            snapshot.SpecificationPackIds))
                 {
                     throw new InvalidOperationException(
                         "A specification-pack summary authority is not bound to the selected catalog.");
@@ -164,24 +162,6 @@ internal static class CompilerManifestArtifactProducer
 
             return row;
         })];
-    }
-
-    private static bool IsSelectedPackIdentity(
-        string identity,
-        IEnumerable<string> selectedPackIds)
-    {
-        if (identity.Length == 0 ||
-            !CompilerSpecificationPackCatalogVersions.PackIdentities
-                .Split(PackIdentitySeparators, StringSplitOptions.RemoveEmptyEntries)
-                .Contains(identity, StringComparer.Ordinal))
-        {
-            return false;
-        }
-
-        var separator = identity.LastIndexOf('@');
-        return separator > 0 && selectedPackIds.Contains(
-            identity.Substring(0, separator),
-            StringComparer.Ordinal);
     }
 
     private static CompilerLocationAuthorityArtifact[] CreateLocationAuthorities(

@@ -128,6 +128,7 @@ the smallest relevant containerized test target passes.
 | R297 | Reuse the shared `DictionaryAnalyzerConfigOptions` in `FinalCompilationCollectorTests` and remove its duplicate private options class | `SharpProof.Analyzer.Test`: 476 passed |
 | R317 | Correct the active bug/status figures and include both documents in the maintained-document gate | `Test-SharpProofReadme.ps1` passed |
 | R324 | Centralize the two repeated `AttributeTargets` masks used by the eight public attributes | `SharpProof.Attributes.Test`: 11; `SharpProof.Package.Test`: 295 passed, 1 skipped |
+| R322 | Reuse compiler-artifact specification-pack identity validation in the manifest producer | `SharpProof.Worker.Test`: CompilerManifestArtifactTests, 91 passed |
 | R327 | Remove 22 project-local `TreatWarningsAsErrors` declarations now supplied by the central production policy, retaining the two excluded-project declarations | `test-changed`: 2,846 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
@@ -1448,11 +1449,11 @@ inside two large files, where file-level diffing diluted it below threshold.
 
 ### Status (part twenty-three)
 
-R322 is `pending` and is the most substantive of the three: it duplicates an
-identity-validation rule across a producer/validator boundary with the two copies
-already diverging in strictness, and the fix requires no new reference or
-visibility change. R323 folds into R281 and should be done with it. Applied R324
-centralizes the two compile-time target masks without changing attribute metadata.
+R322 is `applied`: the manifest producer now reuses the compiler-artifact
+authority's identity validation, including its length and selected-pack checks,
+so the producer and validator cannot drift. R323 folds into R281 and should be
+done with it. Applied R324 centralizes the two compile-time target masks without
+changing attribute metadata.
 
 With this part, every assembly in the repository has been examined twice - once in
 the first pass by size and structure, and once with the later techniques - and the
