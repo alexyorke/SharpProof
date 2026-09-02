@@ -261,8 +261,9 @@ if ($irOpaquePurityRows.Count -eq 0 -or
         $irOpaquePurityRows.Count) {
     throw 'irOpaquePurities must contain unique purities and keys.'
 }
+$orderedIrOpaquePurityKeys = @($irOpaquePurityRows.Key | Sort-Object)
 for ($index = 0; $index -lt $irOpaquePurityRows.Count; $index++) {
-    if (@($irOpaquePurityRows.Key | Sort-Object)[$index] -ne $index) {
+    if ($orderedIrOpaquePurityKeys[$index] -ne $index) {
         throw 'irOpaquePurities keys must be contiguous from zero.'
     }
 }
@@ -519,8 +520,9 @@ if (@(Compare-Object `
         -DifferenceObject @($irUnaryRows.Operator)).Count -ne 0) {
     throw 'irUnaryOperators must cover every IR unary operator exactly once.'
 }
+$orderedIrUnaryKeys = @($irUnaryRows.Key | Sort-Object)
 for ($index = 0; $index -lt $irUnaryRows.Count; $index++) {
-    if (@($irUnaryRows.Key | Sort-Object)[$index] -ne $index) {
+    if ($orderedIrUnaryKeys[$index] -ne $index) {
         throw 'irUnaryOperators keys must be contiguous from zero.'
     }
 }
@@ -573,8 +575,9 @@ if (@(Compare-Object `
         -DifferenceObject @($irBinaryRows.Operator)).Count -ne 0) {
     throw 'irBinaryOperators must cover every IR binary operator exactly once.'
 }
+$orderedIrBinaryKeys = @($irBinaryRows.Key | Sort-Object)
 for ($index = 0; $index -lt $irBinaryRows.Count; $index++) {
-    if (@($irBinaryRows.Key | Sort-Object)[$index] -ne $index) {
+    if ($orderedIrBinaryKeys[$index] -ne $index) {
         throw 'irBinaryOperators keys must be contiguous from zero.'
     }
 }

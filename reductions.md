@@ -150,6 +150,7 @@ the smallest relevant containerized test target passes.
 | R835 | Share the clean-response precondition in worker performance probes | `SharpProof.Gates.Test`: CooperativeTimeoutProbeRejectsPartialProtocolEvidence passed; broader PerformanceGateTests had 27 passed and 2 pre-existing package-policy failures |
 | R837 | Reuse the manifest claim-owner index for unknown-coverage validation | `SharpProof.Worker.Test`: ProtocolJsonTests 108 passed |
 | R842 | Use a set for pilot-review expected identities that are only membership-tested | `SharpProof.ArchitectureTest`: PilotAuthorityTests passed |
+| R843 | Hoist scalar-catalog key sorting out of per-row validation loops | generator `-Verify` checks passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7265,5 +7266,5 @@ R842 is `applied`: expected pilot-review identities are now stored in an
 
 ### Status (part three hundred fifty-four)
 
-R843 is `deferred`: the catalogs are small, but the repeated sort is a direct
-  avoidable cost and a clear local simplification in build-time validation.
+R843 is `applied`: each scalar catalog's keys are sorted once before its
+  contiguous-key validation loop, preserving source-order-independent checks.
