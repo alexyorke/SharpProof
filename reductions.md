@@ -4241,10 +4241,9 @@ R677 is a pending acceptance-preparation reduction. Preserve production-inventor
 
 ### Status (part two hundred fifteen)
 
-| R679 | **`IrRelationalSummaryBuilder.Run.Supported` traverses each term twice for admission.** `Supported` first calls `Charge`, whose explicit-stack walk visits the complete reachable term DAG and charges each unseen node, then calls `IrTermAnalysis.GetDepth`, which performs a second bottom-up traversal with a separate memo dictionary over that same DAG. Carrying the maximum depth through the charged walk, or reusing a bounded depth memo, can retain both the global symbolic-operation budget and stack-safe depth check without repeating term enumeration. | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:773-829`; `SharpProof.Ir/IrSemanticTerms.cs:134-163` |
 | R680 | **`ContractIntrinsicValidator` duplicates the same context-only violation classification.** `Classify` and `ClassifyMethodReference` independently implement the identical `outside Ensures` decision and the identical `inside Old` decision for Result versus Old; the invocation-specific method then continues with argument/signature checks, while the method-reference path always rejects the reference signature. A shared context-classification helper can preserve those distinct signature tails and the current violation kinds while removing the repeated policy branches. | `SharpProof.Contracts/ContractIntrinsicValidator.cs:64-116` |
 
-R679-R680 are pending analysis-boundary reductions. Preserve stack-safe traversal, symbolic-operation charging, context-sensitive intrinsic diagnostics, and the invocation/reference-specific signature rules.
+R680 is a pending analysis-boundary reduction. Preserve context-sensitive intrinsic diagnostics and the invocation/reference-specific signature rules.
 
 ### Status (part two hundred sixteen)
 

@@ -193,6 +193,7 @@ public static class IrRelationalSummaryBuilder
             string EvidenceIdentity,
             string EvidenceSha256), IrSummaryProvenance> _dependencyProvenance = [];
         private readonly HashSet<IrId> _visitedTerms = [];
+        private readonly Dictionary<IrId, int> _termDepths = [];
         private int _remainingOperations;
         private bool _mayThrow;
         private IrSummaryAbstentionReason _reason;
@@ -776,7 +777,7 @@ public static class IrRelationalSummaryBuilder
             {
                 return false;
             }
-            if (IrTermAnalysis.GetDepth(term) <=
+            if (IrTermAnalysis.GetDepth(term, _termDepths) <=
                 _limits.MaximumExpressionDepth)
             {
                 return true;
