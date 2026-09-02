@@ -141,6 +141,7 @@ the smallest relevant containerized test target passes.
 | R823 | Share the JSON-document/reflection invocation wrapper across specification-pack parser tests | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R824 | Share probe JSON array framing between raw-row and string-array serialization | `SharpProof.Package.Test`: CompilerProbeSnapshotTests (5), CompilerProbeInputConsistencyTests (1) passed |
 | R825 | Rename the empty-tree validation predicate to describe its non-empty fast path and zero-length representation check | `SharpProof.Worker.Test`: CompilerManifestArtifactTests passed |
+| R826 | Share scoped identifier hash mixing between IR and specification identifiers | `SharpProof.Ir.Test`: 114; `SharpProof.Specs.Test`: identifier and API-spec suites passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6884,9 +6885,8 @@ representation, including the intentional non-empty fast path.
 
 ### Status (part three hundred thirty-seven)
 
-R826 is `deferred`: the duplicated expression is only a few operations, but it
-  is part of identity semantics and a future change to one hash mix could make
-  otherwise analogous scoped IDs behave inconsistently in dictionaries.
+R826 is `applied`: IR and specification identifiers now share one internal
+scoped hash primitive while retaining their distinct value and display types.
 
 ## Second survey, part three hundred thirty-eight: R827 - internal replay compatibility shim
 

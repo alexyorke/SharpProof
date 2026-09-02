@@ -22,15 +22,23 @@ public readonly record struct ScopedIrId<TTag>
 
     public override int GetHashCode()
     {
-        return unchecked(
-            ((int)Scope * 397) ^
-            (int)(Scope >> 32) ^
-            Value);
+        return ScopedIdentifierHashCode.Compute(Scope, Value);
     }
 
     public override string ToString()
     {
         return default(TTag).Prefix +
             Value.ToString(CultureInfo.InvariantCulture);
+    }
+}
+
+internal static class ScopedIdentifierHashCode
+{
+    internal static int Compute(long scope, int value)
+    {
+        return unchecked(
+            ((int)scope * 397) ^
+            (int)(scope >> 32) ^
+            value);
     }
 }
