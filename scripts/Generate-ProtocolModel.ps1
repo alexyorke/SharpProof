@@ -135,6 +135,23 @@ function Assert-ValidationMember {
     }
 }
 
+function ConvertTo-ValidationConditionListSource {
+    param(
+        [object]$Condition,
+        [string]$RootType,
+        [string]$Operation,
+        [string]$JoinOperator)
+    $parts = @(Get-RequiredMember `
+        $Condition 'conditions' "validation '$Operation'" |
+        ForEach-Object {
+            ConvertTo-ValidationConditionSource $_ $RootType
+        })
+    if ($parts.Count -eq 0) {
+        throw "Validation '$Operation' requires conditions."
+    }
+    return '(' + ($parts -join "`n$JoinOperator ") + ')'
+}
+
 function ConvertTo-ValidationConditionSource {
     param([object]$Condition, [string]$RootType)
     $operation = [string](
@@ -150,26 +167,14 @@ function ConvertTo-ValidationConditionSource {
     switch ($operation) {
         'property' { return $property.Source }
         'all' {
-            $parts = @(Get-RequiredMember `
-                $Condition 'conditions' "validation '$operation'" |
-                ForEach-Object {
-                    ConvertTo-ValidationConditionSource $_ $RootType
-                })
-            if ($parts.Count -eq 0) {
-                throw "Validation '$operation' requires conditions."
-            }
-            return '(' + ($parts -join "`n&& ") + ')'
+            return ConvertTo-ValidationConditionListSource `
+                -Condition $Condition -RootType $RootType `
+                -Operation $operation -JoinOperator '&&'
         }
         'any' {
-            $parts = @(Get-RequiredMember `
-                $Condition 'conditions' "validation '$operation'" |
-                ForEach-Object {
-                    ConvertTo-ValidationConditionSource $_ $RootType
-                })
-            if ($parts.Count -eq 0) {
-                throw "Validation '$operation' requires conditions."
-            }
-            return '(' + ($parts -join "`n|| ") + ')'
+            return ConvertTo-ValidationConditionListSource `
+                -Condition $Condition -RootType $RootType `
+                -Operation $operation -JoinOperator '||'
         }
         'implies' {
             $antecedent = ConvertTo-ValidationConditionSource (

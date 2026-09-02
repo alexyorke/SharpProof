@@ -4239,12 +4239,6 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
 
-### Status (part two hundred sixteen)
-
-| R681 | **`Generate-ProtocolModel.ps1.ConvertTo-ValidationConditionSource` duplicates the `all` and `any` condition renderer.** Both branches enumerate nested `conditions`, recursively render each condition with the same root type, reject an empty list with the same shape of error, and join the parts inside parentheses; only the join token changes from `&&` to `||`. A small operator-parameterized renderer can preserve the generated expression and schema-specific diagnostics while removing the duplicated recursion and empty-list handling. | `scripts/Generate-ProtocolModel.ps1:143-167` |
-
-R681 is a pending generator-complexity reduction candidate. Preserve recursive condition validation, empty-condition rejection, generated line wrapping, and the distinct conjunction/disjunction semantics.
-
 ### Status (part two hundred seventeen)
 
 | R682 | **`PreviewConfigurationInterfaceMatchesFrozenSnapshot` reparses each build file repeatedly.** For every text in `buildFiles`, `actualPublicProperties` parses the same XML once for `PropertyGroup` elements and a second time for `CompilerVisibleProperty` elements, then the separate `compilerVisible` projection parses that XML a third time. Parsing each build file once into an `XDocument` and sharing the projections would retain the independent property-surface and compiler-visible checks while removing repeated XML parsing in this architecture test. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:733-771` |
