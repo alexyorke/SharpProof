@@ -31,15 +31,11 @@ internal static class CallableEvidenceBuilder
                 continue;
             }
 
-            var predicate = ApplyBodySubstitutions(
-                factory,
-                clause.Condition,
-                target.Variables,
-                null,
-                ImmutableDictionary<IrVarId, IrTerm>.Empty,
-                allowMissingResult: true);
-            if (predicate == null ||
-                GetDepth(predicate) > maximumExpressionDepth)
+            var predicate = NormalizeDirectClause(
+                target,
+                clause,
+                maximumExpressionDepth);
+            if (predicate == null)
             {
                 return CallableEvidenceBuildResult.Fail(
                     WorkerClaimReason.UnsupportedExpression);
@@ -208,6 +204,23 @@ internal static class CallableEvidenceBuilder
             usesSupportedDomain));
     }
 
+    private static IrTerm? NormalizeDirectClause(
+        CompilerCallablePreparation target,
+        CompilerPreparedClause clause,
+        int maximumExpressionDepth)
+    {
+        var predicate = ApplyBodySubstitutions(
+            target.Factory,
+            clause.Condition,
+            target.Variables,
+            null,
+            ImmutableDictionary<IrVarId, IrTerm>.Empty,
+            allowMissingResult: true);
+        return predicate == null || GetDepth(predicate) > maximumExpressionDepth
+            ? null
+            : predicate;
+    }
+
     private static bool TryGetSummaryPrefix(
         CompilerSummaryOrigin origin,
         out string prefix)
@@ -271,15 +284,11 @@ internal static class CallableEvidenceBuilder
 
             if (clause.Kind == CompilerContractKind.Requires)
             {
-                var predicate = ApplyBodySubstitutions(
-                    factory,
-                    clause.Condition,
-                    target.Variables,
-                    null,
-                    ImmutableDictionary<IrVarId, IrTerm>.Empty,
-                    allowMissingResult: true);
+                var predicate = NormalizeDirectClause(
+                    target,
+                    clause,
+                    maximumExpressionDepth);
                 if (predicate == null ||
-                    GetDepth(predicate) > maximumExpressionDepth ||
                     !IsSupportedProofDomain(factory, predicate))
                 {
                     return CallableEntryEvidenceBuildResult.Fail(
