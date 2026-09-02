@@ -23,4 +23,11 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
+    <InternalsVisibleTo Include="SharpProof.Effects.Test" />
+  </ItemGroup>
 </Project>

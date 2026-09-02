@@ -35,4 +35,13 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
+    <InternalsVisibleTo Include="SharpProof.ContractForGenerator" />
+    <InternalsVisibleTo Include="SharpProof.ContractForGenerator.Test" />
+    <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
+    <InternalsVisibleTo Include="SharpProof.Gates" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+  </ItemGroup>
 </Project>

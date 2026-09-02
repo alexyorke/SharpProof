@@ -16,4 +16,7 @@
     <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
     <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Package.Test" />
+  </ItemGroup>
 </Project>

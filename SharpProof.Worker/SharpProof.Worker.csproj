@@ -29,4 +29,7 @@
     <ProjectReference Include="..\SharpProof.Verify\SharpProof.Verify.csproj" />
     <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Worker.Test" />
+  </ItemGroup>
 </Project>

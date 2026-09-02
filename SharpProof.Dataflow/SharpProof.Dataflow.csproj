@@ -17,4 +17,8 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Dataflow.Test" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
+  </ItemGroup>
 </Project>

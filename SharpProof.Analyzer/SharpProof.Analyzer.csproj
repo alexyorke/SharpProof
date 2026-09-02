@@ -26,4 +26,8 @@
       OutputItemType="Analyzer"
       ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
+    <InternalsVisibleTo Include="SharpProof.Gates" />
+  </ItemGroup>
 </Project>

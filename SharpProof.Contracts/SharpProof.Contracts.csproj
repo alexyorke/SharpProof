@@ -18,5 +18,10 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />
+    <InternalsVisibleTo Include="SharpProof.ContractForGenerator" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
+    <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
+    <InternalsVisibleTo Include="SharpProof.Worker" />
   </ItemGroup>
 </Project>

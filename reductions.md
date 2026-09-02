@@ -126,6 +126,7 @@ the smallest relevant containerized test target passes.
 | R297 | Reuse the shared `DictionaryAnalyzerConfigOptions` in `FinalCompilationCollectorTests` and remove its duplicate private options class | `SharpProof.Analyzer.Test`: 476 passed |
 | R317 | Correct the active bug/status figures and include both documents in the maintained-document gate | `Test-SharpProofReadme.ps1` passed |
 | R324 | Centralize the two repeated `AttributeTargets` masks used by the eight public attributes | `SharpProof.Attributes.Test`: 11; `SharpProof.Package.Test`: 295 passed, 1 skipped |
+| R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -1057,7 +1058,6 @@ Assembly-visibility declarations, and a check of the process-lifetime code in
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R316 | `InternalsVisibleTo` is declared **four different ways** across the 20 assemblies that use it: as an `<InternalsVisibleTo Include="..."/>` MSBuild item in the `.csproj` (10 assemblies), as a fully-qualified `[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(...)]` in `AssemblyInfo.cs` (6), as `using System.Runtime.CompilerServices;` plus the short attribute in `AssemblyInfo.cs` (4), and once in the legacy `Properties/AssemblyInfo.cs` location - `SharpProof.Dataflow` is the only project in the repository that uses the `Properties/` subdirectory at all. Worse than the spelling variety, **three assemblies split the declaration across both mechanisms**, so answering "who can see this assembly's internals?" requires reading two files and taking the union: `SharpProof.Contracts` declares 5 in `AssemblyInfo.cs` and 1 in the csproj; `SharpProof.Frontend` 3 and 4; and `SharpProof.Ir` **10 and 10, for 18 distinct assemblies, with `SharpProof.CompilerCollector` and `SharpProof.Worker` declared in both places**. Those two are outright duplicate grants. Consolidating on one mechanism - the csproj item is the modern one and already the plurality - removes the split, the two duplicates, and four of the five `AssemblyInfo.cs` files that exist only to hold these attributes. | `SharpProof.Ir/AssemblyInfo.cs` and `SharpProof.Ir/SharpProof.Ir.csproj`; `SharpProof.Contracts/AssemblyInfo.cs` and its csproj; `SharpProof.Frontend/AssemblyInfo.cs` and its csproj; `SharpProof.Dataflow/Properties/AssemblyInfo.cs`; 20 assemblies surveyed |
 
 ### Checked and not proposed (part seventeen)
 
@@ -1087,12 +1087,10 @@ Assembly-visibility declarations, and a check of the process-lifetime code in
 
 ### Status (part seventeen)
 
-R316 is `pending` and mechanical, with one caveat worth stating: the csproj
-`InternalsVisibleTo` item requires the project to be SDK-style with
-`GenerateAssemblyInfo` enabled, which every affected project already is, since ten
-of them already use that form. The two duplicate grants in `SharpProof.Ir` are
-harmless today - a repeated grant is idempotent - so this is a legibility and
-maintenance item, not a correctness one.
+Applied R316 consolidates all IVT-only assembly metadata into the SDK item form;
+projects retaining other assembly attributes (such as NUnit parallelism) keep
+their `AssemblyInfo.cs` files. The two duplicate grants in `SharpProof.Ir` were
+idempotent and are now represented once in the project metadata.
 
 ## Second survey, part eighteen: R317
 

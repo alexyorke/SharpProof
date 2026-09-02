@@ -25,5 +25,13 @@
     <InternalsVisibleTo Include="SharpProof.Specs.Test" />
     <InternalsVisibleTo Include="SharpProof.Summaries" />
     <InternalsVisibleTo Include="SharpProof.Worker" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer" />
+    <InternalsVisibleTo Include="SharpProof.Analyzer.Core" />
+    <InternalsVisibleTo Include="SharpProof.Contracts" />
+    <InternalsVisibleTo Include="SharpProof.Ir.Test" />
+    <InternalsVisibleTo Include="SharpProof.Smt" />
+    <InternalsVisibleTo Include="SharpProof.Testing" />
+    <InternalsVisibleTo Include="SharpProof.Verify" />
+    <InternalsVisibleTo Include="SharpProof.Worker.Launcher" />
   </ItemGroup>
 </Project>

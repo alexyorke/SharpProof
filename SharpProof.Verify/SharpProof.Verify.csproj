@@ -14,4 +14,10 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SharpProof.Specs\SharpProof.Specs.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SharpProof.Smt.Test" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz" />
+    <InternalsVisibleTo Include="SharpProof.Verify.Test" />
+    <InternalsVisibleTo Include="SharpProof.Worker" />
+  </ItemGroup>
 </Project>
