@@ -139,9 +139,18 @@ switch ($Command) {
         Invoke-PipelineCommand 'fuzz-nightly' 'Release'
     }
     'security' {
-        Invoke-PipelineCommand 'dependency-audit' 'Release'
-        Invoke-PipelineCommand 'build' 'Release' @(
-            '-Target', 'SharpProof.sln')
+        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
+        $output = Join-Path $repositoryRoot (
+            'artifacts/dependency-audit/dependency-audit.json')
+        Invoke-RequiredScript 'scripts/Test-SharpProofDependencyAudit.ps1' `
+            'Dependency audit failed.' `
+            @{
+                SolutionPath = Join-Path $repositoryRoot 'SharpProof.sln'
+                NuGetConfigurationPath = Join-Path $repositoryRoot 'NuGet.Config'; OutputPath = $output
+            }
+        Invoke-DotNet @(
+            'build', 'SharpProof.sln', '--configuration', 'Release',
+            '--no-restore')
     }
     'contract' {
         & (Join-Path $repositoryRoot `

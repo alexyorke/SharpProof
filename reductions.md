@@ -132,6 +132,7 @@ the smallest relevant containerized test target passes.
 | R314 | Centralize compiler summary-origin wire prefixes across artifact, worker, and collector code | `SharpProof.Worker.Test`: WorkerTests, 148 passed; `SharpProof.Analyzer.Test`: FinalCompilationCollectorTests, 55 passed |
 | R315 | Share effect-contract violation classification between response authority and counterexample replay | `SharpProof.Worker.Test`: EffectCounterexampleReplayTests, 31 passed; CompilerManifestArtifactTests, 91 passed |
 | R812 | Compare classified lowered calls with the existing indexed call set instead of recounting the IR | `SharpProof.Worker.Test`: CompilerCallableLowererTests, 20 passed |
+| R816 | Restore the security solution once, then run audit and build with `--no-restore` | `SharpProof.ArchitectureTest`: DependencyAutomationTests, 8 passed |
 | R327 | Remove 22 project-local `TreatWarningsAsErrors` declarations now supplied by the central production policy, retaining the two excluded-project declarations | `test-changed`: 2,846 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
@@ -6646,10 +6647,8 @@ decision remains fail-closed.
 
 ### Status (part three hundred twenty-seven)
 
-R816 is `deferred`: the second locked restore is usually cheap when assets are
-  unchanged, but the pipeline still repeats a full restore invocation. It is a
-  low-risk orchestration cleanup if security runtime or restore diagnostics
-  show measurable cost.
+R816 is `applied`: the security command owns one locked solution restore, then
+runs dependency audit and the Release build against those restored assets.
 
 ## Second survey, part three hundred twenty-eight: R817 - package-consumer test restore after solution restore
 
