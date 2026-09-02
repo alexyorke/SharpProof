@@ -13,13 +13,39 @@ function Invoke-SharpProofRequiredDotnet {
         [string[]]$Arguments,
 
         [Parameter(Mandatory = $true)]
-        [int]$TimeoutSeconds
+        [int]$TimeoutSeconds,
+
+        [switch]$Quiet
     )
 
-    & (Get-SharpProofDotnetWrapperPath) `
-        -TimeoutSeconds $TimeoutSeconds @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    if (-not $Quiet) {
+        & (Get-SharpProofDotnetWrapperPath) `
+            -TimeoutSeconds $TimeoutSeconds @Arguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+        }
+        return
+    }
+
+    $outputPath = Join-Path ([IO.Path]::GetTempPath()) (
+        'sharpproof-dotnet-' + [Guid]::NewGuid().ToString('N') + '.log')
+    try {
+        & (Get-SharpProofDotnetWrapperPath) `
+            -TimeoutSeconds $TimeoutSeconds `
+            -OutputPath $outputPath @Arguments
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            if (Test-Path -LiteralPath $outputPath -PathType Leaf) {
+                $output = Get-Content -LiteralPath $outputPath -Raw
+                if (-not [string]::IsNullOrWhiteSpace($output)) {
+                    Write-Host $output.TrimEnd()
+                }
+            }
+            throw "dotnet $($Arguments -join ' ') failed with exit code $exitCode."
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $outputPath -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -319,7 +345,9 @@ function Invoke-SharpProofParallelDotnetBuilds {
 
         [Parameter(Mandatory = $true)]
         [ValidateRange(1, 86400)]
-        [int]$TimeoutSeconds
+        [int]$TimeoutSeconds,
+
+        [switch]$Quiet
     )
 
     if ($Builds.Count -eq 0) {
@@ -378,6 +406,7 @@ function Invoke-SharpProofParallelDotnetBuilds {
                 Arguments = $effectiveArguments
                 SharedCompilationId = $sharedCompilationId
                 Process = $process
+                StartedUtc = $process.StartTime.ToUniversalTime()
                 StandardOutput = $process.StandardOutput.ReadToEndAsync()
                 StandardError = $process.StandardError.ReadToEndAsync()
             })
@@ -396,16 +425,27 @@ function Invoke-SharpProofParallelDotnetBuilds {
         foreach ($active in $running) {
             $stdout = $active.StandardOutput.GetAwaiter().GetResult()
             $stderr = $active.StandardError.GetAwaiter().GetResult()
-            Write-Host "--- Build $($active.Name) ---"
-            if (-not [string]::IsNullOrWhiteSpace($stdout)) {
-                Write-Host $stdout.TrimEnd()
+            $exitCode = $active.Process.ExitCode
+            if (-not $Quiet -or $exitCode -ne 0) {
+                Write-Host "--- Build $($active.Name) ---"
+                if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                    Write-Host $stdout.TrimEnd()
+                }
+                if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                    Write-Host $stderr.TrimEnd()
+                }
             }
-            if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-                Write-Host $stderr.TrimEnd()
+            else {
+                $elapsedSeconds = (
+                    $active.Process.ExitTime.ToUniversalTime() -
+                    $active.StartedUtc).TotalSeconds
+                Write-Host (
+                    "Build {0}: passed ({1:0.0}s)" -f
+                    $active.Name, $elapsedSeconds)
             }
-            if ($active.Process.ExitCode -ne 0) {
+            if ($exitCode -ne 0) {
                 $failures.Add(
-                    "$($active.Name) exited $($active.Process.ExitCode): " +
+                    "$($active.Name) exited ${exitCode}: " +
                     ($active.Arguments -join ' '))
             }
         }

@@ -230,7 +230,8 @@ if ($selectedRelative.Count -gt 0) {
             }
             Invoke-SharpProofRequiredDotnet `
                 -Arguments @('restore', $restoreTarget, '--locked-mode') `
-                -TimeoutSeconds $TimeoutSeconds
+                -TimeoutSeconds $TimeoutSeconds `
+                -Quiet
         }
         $semanticFilter =
             'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
@@ -248,7 +249,8 @@ if ($selectedRelative.Count -gt 0) {
                 }
                 Invoke-SharpProofRequiredDotnet `
                     -Arguments $changedProjectBuildArguments `
-                    -TimeoutSeconds $TimeoutSeconds
+                    -TimeoutSeconds $TimeoutSeconds `
+                    -Quiet
             }
             if ($directChangedProjectIsArchitecture) {
                 & (Join-Path $PSScriptRoot `
@@ -256,10 +258,12 @@ if ($selectedRelative.Count -gt 0) {
                     -Configuration $Configuration `
                     -NoBuild `
                     -ArchitectureOnly `
+                    -Quiet `
                     -TimeoutSeconds $TimeoutSeconds
                 if ($LASTEXITCODE -ne 0) {
                     throw 'Changed architecture tests failed.'
                 }
+                Write-Host 'Changed architecture tests passed.'
                 $testArguments = @()
             }
             else {
@@ -287,7 +291,9 @@ if ($selectedRelative.Count -gt 0) {
         if ($testArguments.Count -gt 0) {
             Invoke-SharpProofRequiredDotnet `
                 -Arguments $testArguments `
-                -TimeoutSeconds $TimeoutSeconds
+                -TimeoutSeconds $TimeoutSeconds `
+                -Quiet
+            Write-Host 'Changed project tests passed.'
         }
     }
     finally {
@@ -306,6 +312,7 @@ if ($runPackageTests) {
     if ($Fast) {
         $packageArguments.Fast = $true
     }
+    $packageArguments.Quiet = $true
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
         @packageArguments
     if ($LASTEXITCODE -ne 0) {

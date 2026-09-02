@@ -7,6 +7,8 @@ param(
 
     [switch]$Fast,
 
+    [switch]$Quiet,
+
     [switch]$ArchitectureOnly,
 
     [ValidateRange(1, 86400)]
@@ -101,7 +103,8 @@ if (-not $NoBuild) {
                 -Encoding utf8NoBOM
         Invoke-SharpProofRequiredDotnet `
             -Arguments @('restore', $semanticBuildFilter, '--locked-mode') `
-            -TimeoutSeconds $TimeoutSeconds
+            -TimeoutSeconds $TimeoutSeconds `
+            -Quiet:$Quiet
         $buildArguments = @(
             'build', $semanticBuildFilter,
             '-c', $Configuration, '--no-restore')
@@ -110,7 +113,8 @@ if (-not $NoBuild) {
         }
         Invoke-SharpProofRequiredDotnet `
             -Arguments $buildArguments `
-            -TimeoutSeconds $TimeoutSeconds
+            -TimeoutSeconds $TimeoutSeconds `
+            -Quiet:$Quiet
     }
     finally {
         if (Test-Path -LiteralPath $semanticBuildFilter) {
@@ -517,24 +521,32 @@ try {
             $active.Process.WaitForExit()
             $stdout = $active.StandardOutput.GetAwaiter().GetResult()
             $stderr = $active.StandardError.GetAwaiter().GetResult()
-            Write-Host "--- Semantic test $($active.Task.Name) ---"
-            if (-not [string]::IsNullOrWhiteSpace($stdout)) {
-                Write-Host $stdout.TrimEnd()
-            }
-            if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-                Write-Host $stderr.TrimEnd()
-            }
+            $exitCode = $active.Process.ExitCode
             $elapsed = [long](
                 ($active.Process.ExitTime.ToUniversalTime() -
                     $active.StartedUtc).TotalMilliseconds)
+            if (-not $Quiet -or $exitCode -ne 0) {
+                Write-Host "--- Semantic test $($active.Task.Name) ---"
+                if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                    Write-Host $stdout.TrimEnd()
+                }
+                if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                    Write-Host $stderr.TrimEnd()
+                }
+            }
+            else {
+                Write-Host (
+                    "Semantic test {0}: passed ({1:0.0}s)" -f
+                    $active.Task.Name, ($elapsed / 1000.0))
+            }
             $timings.Add([pscustomobject]@{
                 name = $active.Task.Name
                 elapsedMilliseconds = $elapsed
-                exitCode = $active.Process.ExitCode
+                exitCode = $exitCode
             })
-            if ($active.Process.ExitCode -ne 0) {
+            if ($exitCode -ne 0) {
                 $failures.Add(
-                    "$($active.Task.Name) exited $($active.Process.ExitCode).")
+                    "$($active.Task.Name) exited $exitCode.")
             }
             [void]$running.Remove($active)
             $activeSlots -= $active.Task.Slots

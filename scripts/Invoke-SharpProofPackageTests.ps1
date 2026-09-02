@@ -14,6 +14,8 @@ param(
     [ValidateRange(1, 86400)]
     [int]$TimeoutSeconds = 1800,
 
+    [switch]$Quiet,
+
     [string]$CoverageSettings = '',
 
     [string]$CoverageResultsDirectory = ''
@@ -99,7 +101,8 @@ function Invoke-RequiredBuilds {
         -Builds $Builds `
         -RepositoryRoot $repositoryRoot `
         -Parallelism $buildParallelism `
-        -TimeoutSeconds $TimeoutSeconds
+        -TimeoutSeconds $TimeoutSeconds `
+        -Quiet:$Quiet
 }
 
 function Get-TestMethodTimings {
@@ -310,7 +313,8 @@ try {
                 -Arguments @(
                     'restore', 'SharpProof.sln', '--locked-mode',
                     '/nodeReuse:false') `
-                -TimeoutSeconds $TimeoutSeconds
+                -TimeoutSeconds $TimeoutSeconds `
+                -Quiet:$Quiet
         }
     }
 
@@ -361,7 +365,8 @@ try {
                         '--no-restore', '--no-build', '--nologo',
                         '/nodeReuse:false', '--output', $feed,
                         '/p:GeneratePackageOnBuild=false') `
-                    -TimeoutSeconds $TimeoutSeconds
+                    -TimeoutSeconds $TimeoutSeconds `
+                    -Quiet:$Quiet
             }
         }
     }
@@ -668,16 +673,27 @@ try {
             $active.Process.WaitForExit()
             $stdout = $active.StandardOutput.GetAwaiter().GetResult()
             $stderr = $active.StandardError.GetAwaiter().GetResult()
-            Write-Host "--- Package test $($active.Shard.Name) ---"
-            if (-not [string]::IsNullOrWhiteSpace($stdout)) {
-                Write-Host $stdout.TrimEnd()
+            $exitCode = $active.Process.ExitCode
+            $elapsedSeconds = (
+                $active.Process.ExitTime.ToUniversalTime() -
+                $active.StartedUtc).TotalSeconds
+            if (-not $Quiet -or $exitCode -ne 0) {
+                Write-Host "--- Package test $($active.Shard.Name) ---"
+                if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                    Write-Host $stdout.TrimEnd()
+                }
+                if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                    Write-Host $stderr.TrimEnd()
+                }
             }
-            if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-                Write-Host $stderr.TrimEnd()
+            else {
+                Write-Host (
+                    "Package test {0}: passed ({1:0.0}s)" -f
+                    $active.Shard.Name, $elapsedSeconds)
             }
-            if ($active.Process.ExitCode -ne 0) {
+            if ($exitCode -ne 0) {
                 $failures.Add(
-                    "$($active.Shard.Name) exited $($active.Process.ExitCode): " +
+                    "$($active.Shard.Name) exited ${exitCode}: " +
                     $active.Shard.Filter)
             }
             $shardTimings.Add([pscustomobject]@{
@@ -686,7 +702,7 @@ try {
                 elapsedMilliseconds = [long](
                     ($active.Process.ExitTime.ToUniversalTime() -
                         $active.StartedUtc).TotalMilliseconds)
-                exitCode = $active.Process.ExitCode
+                exitCode = $exitCode
             })
             [void]$running.Remove($active)
             $active.Process.Dispose()
