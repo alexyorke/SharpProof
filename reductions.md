@@ -7203,3 +7203,25 @@ R839 is `deferred`: the arrays are tiny and the two phases make diagnostic
 R840 is `deferred`: the pass counter is logically implied by successful script
   completion, but the emitted evidence shape may intentionally expose both
   fields for generic fixture consumers.
+
+## Second survey, part three hundred fifty-two: R841 - repeated object-kind checks in release JSON validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R841 | **Release-manifest object arrays validate each element's object kind twice.** `Assert-SharpProofJsonArray` is called with `Object` for `artifacts`, `packagePayloads`, and nested `entries`, so it enumerates each array and checks every item is a JSON object. The caller then enumerates the same items and immediately calls `Assert-SharpProofJsonObject`, whose first operation repeats the identical `ValueKind == Object` check before validating properties. An array-shape helper that only checks the container, or an object-array helper that combines the two passes, can retain the strict property and duplicate-name checks while removing the repeated per-element kind test. | `scripts/SharpProof.ReleaseJson.ps1:43-64,73-81,124-150,152-164` |
+
+### Checked and not proposed (part three hundred fifty-two)
+
+- The per-row `Assert-SharpProofJsonObject` call still owns property order,
+  duplicate-name rejection, and row-specific diagnostics; only its repeated
+  object-kind precondition is in scope.
+- String arrays such as third-party component entries do not have this exact
+  duplication because their caller does not invoke the object helper.
+- The strict JSON parse and canonical-byte comparison remain independent
+  release-authority checks.
+
+### Status (part three hundred fifty-two)
+
+R841 is `deferred`: the duplicate check is cheap for the small release
+  manifest, but the helper contract can be simplified without weakening its
+  structural validation.
