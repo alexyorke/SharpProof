@@ -481,17 +481,11 @@ public sealed class EffectAnalysisSession
                     var target = HasSameContainingType(method, call.Target)
                         ? ComputeBody(call.Target)
                         : Compute(call.Target);
-                    initializationSummary = EffectSummaryDomain.Instance.Join(
+                    initializationSummary = JoinCall(
                         initializationSummary,
-                        EffectExceptionFlow.KeepEscaping(
-                            WrapTypeInitializationFailures(
-                                EffectSummaryOperations.Remap(
-                                    target,
-                                    call.Receiver,
-                                    call.WriteReceiver,
-                                    call.Arguments)),
-                            call.Origin,
-                            _compilation));
+                        call,
+                        target,
+                        wrapTypeInitializationFailures: true);
                 }
                 summary = EffectSummaryDomain.Instance.Join(
                     summary,
@@ -531,16 +525,7 @@ public sealed class EffectAnalysisSession
                     HasSameContainingType(method, call.Target)
                         ? ComputeBody(call.Target)
                         : Compute(call.Target);
-                summary = EffectSummaryDomain.Instance.Join(
-                    summary,
-                    EffectExceptionFlow.KeepEscaping(
-                        EffectSummaryOperations.Remap(
-                            target,
-                            call.Receiver,
-                            call.WriteReceiver,
-                            call.Arguments),
-                        call.Origin,
-                        _compilation));
+                summary = JoinCall(summary, call, target);
             }
 
             computeDepth--;
@@ -556,6 +541,30 @@ public sealed class EffectAnalysisSession
 
         _bodySummaries = bodySummaries.ToImmutable();
         return summaries.ToImmutable();
+
+        EffectSummary JoinCall(
+            EffectSummary summary,
+            EffectCallSite call,
+            EffectSummary target,
+            bool wrapTypeInitializationFailures = false)
+        {
+            var remapped = EffectSummaryOperations.Remap(
+                target,
+                call.Receiver,
+                call.WriteReceiver,
+                call.Arguments);
+            if (wrapTypeInitializationFailures)
+            {
+                remapped = WrapTypeInitializationFailures(
+                    remapped);
+            }
+            return EffectSummaryDomain.Instance.Join(
+                summary,
+                EffectExceptionFlow.KeepEscaping(
+                    remapped,
+                    call.Origin,
+                    _compilation));
+        }
 
         static IOrderedEnumerable<EffectCallSite> OrderCalls(
             IEnumerable<EffectCallSite> calls)
