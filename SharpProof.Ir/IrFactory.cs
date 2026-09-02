@@ -299,10 +299,7 @@ public sealed class IrFactory
     {
         lock (_gate)
         {
-            if (!IrOperatorCatalog.IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
-            {
-                throw new ArgumentException("Null requires a string, reference, or sequence type.", nameof(type));
-            }
+            RequireNullableTypeCore(type, nameof(type));
 
             return new IrValue(type, IrValueKind.Null, null);
         }
@@ -391,10 +388,7 @@ public sealed class IrFactory
     {
         lock (_gate)
         {
-            if (!IrOperatorCatalog.IsNullable(GetTypeInfoCore(type, nameof(type)).Kind))
-            {
-                throw new ArgumentException("Null requires a string, reference, or sequence type.", nameof(type));
-            }
+            RequireNullableTypeCore(type, nameof(type));
 
             return Intern(
                 new StructuralKey(IrTermKind.Null, type.Value),
@@ -744,6 +738,15 @@ public sealed class IrFactory
     private IrTypeInfo GetTypeInfoCore(IrTypeId id, string parameterName)
     {
         return GetScoped(id.Scope, id.Value, _types, parameterName);
+    }
+
+    private void RequireNullableTypeCore(IrTypeId type, string parameterName)
+    {
+        if (!IrOperatorCatalog.IsNullable(GetTypeInfoCore(type, parameterName).Kind))
+        {
+            throw new ArgumentException(
+                "Null requires a string, reference, or sequence type.", parameterName);
+        }
     }
 
     private IrVariableInfo GetVariableInfoCore(IrVarId id, string name)

@@ -191,6 +191,7 @@ the smallest relevant containerized test target passes.
 | R414 | Fuse model-variable validation and Z3 symbol construction | `SharpProof.Smt.Test`: 30 passed |
 | R418 | Reuse encoded arithmetic operands across SMT binary operators | `SharpProof.Smt.Test`: 30 passed |
 | R431 | Resolve the corpus license fixture from the repository root helper | `SharpProof.Gates.Test`: corpus tests passed |
+| R521 | Share IR factory nullable-type validation | `SharpProof.Ir.Test`: 114 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3113,8 +3114,8 @@ an instruction to broaden the native-loading surface.
 
 ### Status (part seventy-one)
 
-R521 is a `pending` candidate. The proposed seam covers only the common type
-validation; value and term construction remain distinct.
+R521 is applied and validated by the IR test suite. The shared seam covers
+only common type validation; value and term construction remain distinct.
 
 ## Second survey, part seventy-two: R522 - protocol hash validation reuse
 
@@ -3282,3 +3283,13 @@ collapse the definedness and satisfiability predicates into one policy.
 R545 is a `pending` reduction candidate. Preserve the current default analyzer,
 concurrent-analysis, suppressed-diagnostic, exception, and cancellation
 semantics when consolidating the test-host helper.
+
+## Second survey, part eighty-eight: R546 - differential type mapping
+
+| R546 | **`IrCSharpDifferentialOracle` maintains two parallel IR-type mappings.** `TryGetCSharpType` maps Boolean, integer, string, object-reference, and recursively nested sequence types to generated C# type names, while `TryGetRuntimeType` repeats the same kind checks and sequence recursion to produce `System.Type` values. Keeping the source-name and runtime-type projections separate may be necessary at the final boundary, but a shared supported-type descriptor or canonical IR-type classification would remove the repeated vocabulary and reduce the chance that generated code and runtime argument construction drift apart. | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:349-365,451-470` |
+
+### Status (part eighty-eight)
+
+R546 is a `pending` reduction candidate. Preserve the special object-type
+identity checks, recursive sequence support, and unsupported-type behavior when
+centralizing the shared classification.
