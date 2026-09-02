@@ -9,13 +9,10 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
-if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
-    $CatalogPath = Join-Path $repositoryRoot `
-        'eng\diagnostics\diagnostic-descriptors.v1.json'
-}
-$CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
+$CatalogPath = Resolve-SharpProofPath $CatalogPath (
+    Join-Path $repositoryRoot 'eng\diagnostics\diagnostic-descriptors.v1.json')
 if (-not [IO.File]::Exists($CatalogPath)) {
     throw "Diagnostic catalog not found: $CatalogPath"
 }

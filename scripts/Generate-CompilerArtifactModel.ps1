@@ -14,37 +14,19 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if ([string]::IsNullOrWhiteSpace($SchemaPath)) {
-    $SchemaPath = Join-Path $repositoryRoot `
-        'SharpProof.CompilerArtifact\CompilerArtifactModel.schema.json'
-}
-if ([string]::IsNullOrWhiteSpace($ProtocolSchemaPath)) {
-    $ProtocolSchemaPath = Join-Path $repositoryRoot `
-        'SharpProof.Worker.Protocol\ProtocolModel.schema.json'
-}
-if ([string]::IsNullOrWhiteSpace($ModelOutputPath)) {
-    $ModelOutputPath = Join-Path $repositoryRoot `
-        'SharpProof.CompilerArtifact\CompilerArtifactModel.generated.cs'
-}
-if ([string]::IsNullOrWhiteSpace($PortableOutputPath)) {
-    $PortableOutputPath = Join-Path $repositoryRoot `
-        'SharpProof.CompilerArtifact\PortableIrModel.generated.cs'
-}
-if ([string]::IsNullOrWhiteSpace($CompilationOutputPath)) {
-    $CompilationOutputPath = Join-Path $repositoryRoot `
-        'SharpProof.CompilerArtifact\CompilerCompilationModel.generated.cs'
-}
-if ([string]::IsNullOrWhiteSpace($CollectorOutputPath)) {
-    $CollectorOutputPath = Join-Path $repositoryRoot `
-        'SharpProof.CompilerCollector\CompilerArtifact\CompilerWireMappings.generated.cs'
-}
-$SchemaPath = [IO.Path]::GetFullPath($SchemaPath)
-$ProtocolSchemaPath = [IO.Path]::GetFullPath($ProtocolSchemaPath)
-$ModelOutputPath = [IO.Path]::GetFullPath($ModelOutputPath)
-$PortableOutputPath = [IO.Path]::GetFullPath($PortableOutputPath)
-$CompilationOutputPath = [IO.Path]::GetFullPath($CompilationOutputPath)
-$CollectorOutputPath = [IO.Path]::GetFullPath($CollectorOutputPath)
+$repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
+$SchemaPath = Resolve-SharpProofPath $SchemaPath (
+    Join-Path $repositoryRoot 'SharpProof.CompilerArtifact\CompilerArtifactModel.schema.json')
+$ProtocolSchemaPath = Resolve-SharpProofPath $ProtocolSchemaPath (
+    Join-Path $repositoryRoot 'SharpProof.Worker.Protocol\ProtocolModel.schema.json')
+$ModelOutputPath = Resolve-SharpProofPath $ModelOutputPath (
+    Join-Path $repositoryRoot 'SharpProof.CompilerArtifact\CompilerArtifactModel.generated.cs')
+$PortableOutputPath = Resolve-SharpProofPath $PortableOutputPath (
+    Join-Path $repositoryRoot 'SharpProof.CompilerArtifact\PortableIrModel.generated.cs')
+$CompilationOutputPath = Resolve-SharpProofPath $CompilationOutputPath (
+    Join-Path $repositoryRoot 'SharpProof.CompilerArtifact\CompilerCompilationModel.generated.cs')
+$CollectorOutputPath = Resolve-SharpProofPath $CollectorOutputPath (
+    Join-Path $repositoryRoot 'SharpProof.CompilerCollector\CompilerArtifact\CompilerWireMappings.generated.cs')
 if (-not [IO.File]::Exists($SchemaPath)) {
     throw "Compiler-artifact schema not found: $SchemaPath"
 }

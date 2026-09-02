@@ -8,11 +8,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
-    $CatalogPath = Join-Path $repositoryRoot 'SharpProof.DeclarativeModels.catalog.json'
-}
-$CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
+$repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
+$CatalogPath = Resolve-SharpProofPath $CatalogPath (
+    Join-Path $repositoryRoot 'SharpProof.DeclarativeModels.catalog.json')
 $catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json -Depth 100
 
 if ([string](Required $catalog 'schema' 'Declarative-model catalog') -ne

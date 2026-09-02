@@ -22,27 +22,15 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
-    $CatalogPath = Join-Path $repositoryRoot 'SharpProof.Specs\DefaultApiSpecCatalog.json'
-}
-if ([string]::IsNullOrWhiteSpace($SourceOutputPath)) {
-    $SourceOutputPath = Join-Path $repositoryRoot 'SharpProof.Specs\DefaultApiSpecCatalog.generated.cs'
-}
-if ([string]::IsNullOrWhiteSpace($DocumentationOutputPath)) {
-    $DocumentationOutputPath = Join-Path $repositoryRoot 'docs\api-spec-catalog.generated.md'
-}
-if ([string]::IsNullOrWhiteSpace($RuntimeWitnessOutputPath)) {
-    $RuntimeWitnessOutputPath = Join-Path `
-        $repositoryRoot `
-        'SharpProof.Specs.Test\ApiSpecRuntimeWitnesses.generated.cs'
-}
-
-$CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
-$SourceOutputPath = [IO.Path]::GetFullPath($SourceOutputPath)
-$DocumentationOutputPath = [IO.Path]::GetFullPath($DocumentationOutputPath)
-$RuntimeWitnessOutputPath = [IO.Path]::GetFullPath(
-    $RuntimeWitnessOutputPath)
+$repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
+$CatalogPath = Resolve-SharpProofPath $CatalogPath (
+    Join-Path $repositoryRoot 'SharpProof.Specs\DefaultApiSpecCatalog.json')
+$SourceOutputPath = Resolve-SharpProofPath $SourceOutputPath (
+    Join-Path $repositoryRoot 'SharpProof.Specs\DefaultApiSpecCatalog.generated.cs')
+$DocumentationOutputPath = Resolve-SharpProofPath $DocumentationOutputPath (
+    Join-Path $repositoryRoot 'docs\api-spec-catalog.generated.md')
+$RuntimeWitnessOutputPath = Resolve-SharpProofPath $RuntimeWitnessOutputPath (
+    Join-Path $repositoryRoot 'SharpProof.Specs.Test\ApiSpecRuntimeWitnesses.generated.cs')
 if (-not [IO.File]::Exists($CatalogPath)) {
     throw "API-spec catalog not found: $CatalogPath"
 }

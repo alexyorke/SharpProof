@@ -19,25 +19,13 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
-    $CatalogPath = Join-Path `
-        $repositoryRoot `
-        'SharpProof.Frontend\CSharpScalarSemantics.json'
-}
-if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path `
-        $repositoryRoot `
-        'SharpProof.Frontend\CSharpScalarSemantics.generated.cs'
-}
-if ([string]::IsNullOrWhiteSpace($IrOutputPath)) {
-    $IrOutputPath = Join-Path `
-        $repositoryRoot `
-        'SharpProof.Ir\IrOperatorCatalog.generated.cs'
-}
-$CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
-$OutputPath = [IO.Path]::GetFullPath($OutputPath)
-$IrOutputPath = [IO.Path]::GetFullPath($IrOutputPath)
+$repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
+$CatalogPath = Resolve-SharpProofPath $CatalogPath (
+    Join-Path $repositoryRoot 'SharpProof.Frontend\CSharpScalarSemantics.json')
+$OutputPath = Resolve-SharpProofPath $OutputPath (
+    Join-Path $repositoryRoot 'SharpProof.Frontend\CSharpScalarSemantics.generated.cs')
+$IrOutputPath = Resolve-SharpProofPath $IrOutputPath (
+    Join-Path $repositoryRoot 'SharpProof.Ir\IrOperatorCatalog.generated.cs')
 if (-not [IO.File]::Exists($CatalogPath)) {
     throw "C# scalar-semantics catalog not found: $CatalogPath"
 }

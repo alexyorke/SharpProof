@@ -10,17 +10,11 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if ([string]::IsNullOrWhiteSpace($SchemaPath))
-{
-    $SchemaPath = Join-Path $repositoryRoot 'SharpProof.Ir\IrModel.schema.json'
-}
-if ([string]::IsNullOrWhiteSpace($OutputPath))
-{
-    $OutputPath = Join-Path $repositoryRoot 'SharpProof.Ir\IrModel.generated.cs'
-}
-$SchemaPath = [IO.Path]::GetFullPath($SchemaPath)
-$OutputPath = [IO.Path]::GetFullPath($OutputPath)
+$repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
+$SchemaPath = Resolve-SharpProofPath $SchemaPath (
+    Join-Path $repositoryRoot 'SharpProof.Ir\IrModel.schema.json')
+$OutputPath = Resolve-SharpProofPath $OutputPath (
+    Join-Path $repositoryRoot 'SharpProof.Ir\IrModel.generated.cs')
 if (-not [IO.File]::Exists($SchemaPath))
 {
     throw "IR model schema not found: $SchemaPath"

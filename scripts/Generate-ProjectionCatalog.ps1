@@ -8,12 +8,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
-if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
-    $CatalogPath = Join-Path $repositoryRoot 'SharpProof.Projection.catalog.json'
-}
-$CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
+$CatalogPath = Resolve-SharpProofPath $CatalogPath (
+    Join-Path $repositoryRoot 'SharpProof.Projection.catalog.json')
 $catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json -Depth 100
 
 function TypeName([string]$Value, [string]$Context) {

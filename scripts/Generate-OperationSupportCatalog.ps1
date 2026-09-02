@@ -9,15 +9,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
-    $CatalogPath = Join-Path $repositoryRoot 'SharpProof.Frontend\OperationSupport.catalog.json'
-}
-if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path $repositoryRoot 'SharpProof.Frontend\OperationSupportCatalog.generated.cs'
-}
-$CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
-$OutputPath = [IO.Path]::GetFullPath($OutputPath)
+$repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
+$CatalogPath = Resolve-SharpProofPath $CatalogPath (
+    Join-Path $repositoryRoot 'SharpProof.Frontend\OperationSupport.catalog.json')
+$OutputPath = Resolve-SharpProofPath $OutputPath (
+    Join-Path $repositoryRoot 'SharpProof.Frontend\OperationSupportCatalog.generated.cs')
 $catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json
 if ([int]$catalog.schemaVersion -ne 1) {
     throw 'Only operation-support catalog schema version 1 is supported.'

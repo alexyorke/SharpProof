@@ -9,15 +9,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
-    $CatalogPath = Join-Path $repositoryRoot 'SharpProof.Effects\EffectContractMappings.catalog.json'
-}
-if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path $repositoryRoot 'SharpProof.Effects\EffectContractMappings.generated.cs'
-}
-$CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
-$OutputPath = [IO.Path]::GetFullPath($OutputPath)
+$repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
+$CatalogPath = Resolve-SharpProofPath $CatalogPath (
+    Join-Path $repositoryRoot 'SharpProof.Effects\EffectContractMappings.catalog.json')
+$OutputPath = Resolve-SharpProofPath $OutputPath (
+    Join-Path $repositoryRoot 'SharpProof.Effects\EffectContractMappings.generated.cs')
 $catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json
 
 $lines = [Collections.Generic.List[string]]::new()

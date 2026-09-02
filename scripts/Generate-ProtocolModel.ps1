@@ -11,22 +11,13 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'GeneratedFileHelpers.ps1')
 
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if ([string]::IsNullOrWhiteSpace($SchemaPath)) {
-    $SchemaPath = Join-Path $repositoryRoot `
-        'SharpProof.Worker.Protocol\ProtocolModel.schema.json'
-}
-if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path $repositoryRoot `
-        'SharpProof.Worker.Protocol\ProtocolModel.generated.cs'
-}
-if ([string]::IsNullOrWhiteSpace($AnalyzerOutputPath)) {
-    $AnalyzerOutputPath = Join-Path $repositoryRoot `
-        'SharpProof.Analyzer.Core\EffectEvaluationProducerTupleCatalog.generated.cs'
-}
-$SchemaPath = [IO.Path]::GetFullPath($SchemaPath)
-$OutputPath = [IO.Path]::GetFullPath($OutputPath)
-$AnalyzerOutputPath = [IO.Path]::GetFullPath($AnalyzerOutputPath)
+$repositoryRoot = Get-SharpProofRepositoryRoot $PSScriptRoot
+$SchemaPath = Resolve-SharpProofPath $SchemaPath (
+    Join-Path $repositoryRoot 'SharpProof.Worker.Protocol\ProtocolModel.schema.json')
+$OutputPath = Resolve-SharpProofPath $OutputPath (
+    Join-Path $repositoryRoot 'SharpProof.Worker.Protocol\ProtocolModel.generated.cs')
+$AnalyzerOutputPath = Resolve-SharpProofPath $AnalyzerOutputPath (
+    Join-Path $repositoryRoot 'SharpProof.Analyzer.Core\EffectEvaluationProducerTupleCatalog.generated.cs')
 if (-not [IO.File]::Exists($SchemaPath)) {
     throw "Protocol schema not found: $SchemaPath"
 }

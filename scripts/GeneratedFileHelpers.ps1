@@ -73,6 +73,25 @@ function NamespaceName([string]$Value, [string]$Context)
     return $Value
 }
 
+function Get-SharpProofRepositoryRoot([string]$ScriptRoot)
+{
+    return (Resolve-Path (Join-Path $ScriptRoot '..')).Path
+}
+
+function Resolve-SharpProofPath
+{
+    param(
+        [AllowNull()][string]$Path,
+        [Parameter(Mandatory = $true)][string]$DefaultPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path))
+    {
+        $Path = $DefaultPath
+    }
+    return [IO.Path]::GetFullPath($Path)
+}
+
 function ConvertTo-CSharpString
 {
     param(
