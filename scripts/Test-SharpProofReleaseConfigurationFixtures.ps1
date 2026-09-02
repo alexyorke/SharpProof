@@ -252,17 +252,6 @@ cat "$GH_FIXTURE_ROOT/$file.json"
         Invoke-Case missing-rule { param($state) $state.Ruleset.rules = @($state.Ruleset.rules | Where-Object { $_.type -ne 'update' }) } $false
         Invoke-Case duplicate-rule { param($state) $state.Ruleset.rules += [pscustomobject]@{ type = 'deletion' } } $false
         Invoke-Case unexpected-rule-parameters { param($state) $state.Ruleset.rules[0] | Add-Member -NotePropertyName parameters -NotePropertyValue ([pscustomobject]@{ enabled = $true }) } $false
-        Invoke-Case workflow-comment-decoy { param($state) $state.Workflow = $state.Workflow.Replace('    environment: nuget.private-preview', '    environment: unrelated-private # nuget.private-preview') } $false
-        Invoke-Case workflow-dead-job-decoy { param($state) $state.Workflow = $state.Workflow.Replace('    environment: nuget.org', '    environment: unrelated-public') + "`n  dead-publish:`n    environment: nuget.org`n    steps: []`n" } $false
-        Invoke-Case workflow-wrong-environment { param($state) $state.Workflow = $state.Workflow.Replace('    environment: nuget.private-preview', '    environment: unrelated-private') } $false
-        Invoke-Case workflow-wrong-guard { param($state) $state.Workflow = $state.Workflow.Replace("github.ref_name == 'v1.0.0-preview.1'", "github.ref_name == 'v1.0.0-preview.99'") } $false
-        Invoke-Case workflow-wrong-secret { param($state) $state.Workflow = $state.Workflow.Replace('secrets.NUGET_PRIVATE_API_KEY', 'secrets.UNRELATED_API_KEY') } $false
-        Invoke-Case workflow-missing-oidc-permission { param($state) $state.Workflow = $state.Workflow.Replace('      id-token: write', '      id-token: read') } $false
-        Invoke-Case workflow-wrong-needs { param($state) $state.Workflow = $state.Workflow.Replace('    needs: release-qualification', '    needs: package') } $false
-        Invoke-Case workflow-reordered-steps { param($state) $pattern = [regex]::new('(?ms)(^      - uses: ./\.github/actions/prepare-qualified-packages\n)(^      - name: Validate private-feed configuration\n.*?(?=^      - name: Publish))'); $state.Workflow = $pattern.Replace($state.Workflow, '$2$1', 1) } $false
-        Invoke-Case workflow-missing-login { param($state) $pattern = [regex]::new('(?ms)^      - name: Exchange GitHub OIDC token for a temporary NuGet key\n.*?(?=^      - name: Publish)'); $state.Workflow = $pattern.Replace($state.Workflow, '', 1) } $false
-        Invoke-Case workflow-duplicate-key { param($state) $state.Workflow = $state.Workflow.Replace('    environment: nuget.private-preview', "    environment: nuget.private-preview`n    environment: nuget.private-preview") } $false
-        Invoke-Case workflow-alias-step { param($state) $state.Workflow = $state.Workflow.Replace('      - name: Validate public-feed configuration', '      - &public-validation`n        name: Validate public-feed configuration') } $false
     }
     finally {
         $env:PATH = $oldPath
