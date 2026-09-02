@@ -4311,7 +4311,7 @@ R705 completed: internal goto targets now use one indexed operation pass and one
 
 | R706 | **`EffectModuleInitialization.Discover` repeatedly linearly resolves syntax-tree ordinals.** Duplicate normalized initializers compare both syntax references through `syntaxTrees.IndexOf`, and the final ordering performs another `IndexOf` for every retained initializer. Caching the reference-to-ordinal map once per compilation removes repeated scans of the full syntax-tree list while retaining the `int.MaxValue` fallback and lexical tree/span/name tie-breakers. | `SharpProof.Effects/EffectModuleInitialization.cs:34-93,141-159` |
 
-R706 is a pending module-initializer ordering allocation/traversal reduction candidate. Preserve source-tree identity, deterministic Roslyn order, duplicate normalized-method handling, and unknown-tree fallback behavior.
+R706 completed: module-initializer discovery caches syntax-tree ordinals once per compilation, preserving source-tree identity, deterministic Roslyn order, duplicate normalized-method handling, and unknown-tree fallback behavior.
 
 ### Status (part two hundred forty)
 

@@ -31,7 +31,11 @@ internal sealed class EffectModuleInitialization
             return [];
         }
 
-        var syntaxTrees = _compilation.SyntaxTrees.ToImmutableArray();
+        var syntaxTreeOrdinals = _compilation.SyntaxTrees
+            .Select(static (tree, ordinal) => (tree, ordinal))
+            .ToDictionary(
+                static item => item.tree,
+                static item => item.ordinal);
         var initializers = new Dictionary<IMethodSymbol, SyntaxReference>(
             SymbolEqualityComparer.Default);
         var pending = new Queue<INamespaceOrTypeSymbol>();
@@ -69,7 +73,7 @@ internal sealed class EffectModuleInitialization
                         CompareSourceOrder(
                             syntaxReference,
                             existingReference,
-                            syntaxTrees) < 0)
+                            syntaxTreeOrdinals) < 0)
                     {
                         initializers[normalized] = syntaxReference;
                     }
@@ -83,7 +87,9 @@ internal sealed class EffectModuleInitialization
         // Roslyn emits the calls in lexical symbol order. For source methods,
         // that key is the syntax-tree ordinal followed by declaration position.
         return [.. initializers
-            .OrderBy(pair => GetSyntaxTreeOrdinal(pair.Value, syntaxTrees))
+            .OrderBy(pair => GetSyntaxTreeOrdinal(
+                pair.Value,
+                syntaxTreeOrdinals))
             .ThenBy(static pair => pair.Value.Span.Start)
             .ThenBy(
                 static pair => pair.Key.Name,
@@ -141,10 +147,10 @@ internal sealed class EffectModuleInitialization
     private static int CompareSourceOrder(
         SyntaxReference left,
         SyntaxReference right,
-        ImmutableArray<SyntaxTree> syntaxTrees)
+        IReadOnlyDictionary<SyntaxTree, int> syntaxTreeOrdinals)
     {
-        var result = GetSyntaxTreeOrdinal(left, syntaxTrees).CompareTo(
-            GetSyntaxTreeOrdinal(right, syntaxTrees));
+        var result = GetSyntaxTreeOrdinal(left, syntaxTreeOrdinals).CompareTo(
+            GetSyntaxTreeOrdinal(right, syntaxTreeOrdinals));
         return result != 0
             ? result
             : left.Span.Start.CompareTo(right.Span.Start);
@@ -152,9 +158,12 @@ internal sealed class EffectModuleInitialization
 
     private static int GetSyntaxTreeOrdinal(
         SyntaxReference syntaxReference,
-        ImmutableArray<SyntaxTree> syntaxTrees)
+        IReadOnlyDictionary<SyntaxTree, int> syntaxTreeOrdinals)
     {
-        var ordinal = syntaxTrees.IndexOf(syntaxReference.SyntaxTree);
-        return ordinal >= 0 ? ordinal : int.MaxValue;
+        return syntaxTreeOrdinals.TryGetValue(
+            syntaxReference.SyntaxTree,
+            out var ordinal)
+            ? ordinal
+            : int.MaxValue;
     }
 }
