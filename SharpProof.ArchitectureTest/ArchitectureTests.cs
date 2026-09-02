@@ -741,7 +741,9 @@ public sealed class ArchitectureTests
                         .Select(static element =>
                             element.Attribute("Include")?.Value)
                         .Where(static value => value != null)
-                        .Select(static value => value!))
+                        .SelectMany(static value => value!.Split(
+                            ';',
+                            StringSplitOptions.RemoveEmptyEntries)))
                     .Concat(Regex.Matches(
                             text,
                             @"\$\((SharpProof[A-Za-z0-9_]+)\)",
@@ -759,9 +761,14 @@ public sealed class ArchitectureTests
             .ToArray();
         var compilerVisible = buildFiles
             .SelectMany(static text => XDocument.Parse(text)
-                .Descendants("CompilerVisibleProperty"))
+                .Descendants()
+                .Where(static element =>
+                    element.Name.LocalName == "CompilerVisibleProperty"))
             .Select(static value => value.Attribute("Include")?.Value)
             .Where(static value => value != null)
+            .SelectMany(static value => value!.Split(
+                ';',
+                StringSplitOptions.RemoveEmptyEntries))
             .ToArray();
         var contract = contractDocument.RootElement;
         var worker = contract.GetProperty("worker");
@@ -799,10 +806,8 @@ public sealed class ArchitectureTests
             foreach (var property in active)
             {
                 Assert.That(
-                    combinedBuildSurface,
-                    Does.Contain("$(" + property + ")")
-                        .Or.Contain("<" + property)
-                        .Or.Contain("Include=\"" + property + "\""),
+                    actualPublicProperties,
+                    Does.Contain(property),
                     property);
             }
             foreach (var property in retired)

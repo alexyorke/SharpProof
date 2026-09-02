@@ -2894,12 +2894,8 @@ public sealed class WorkerMsBuildIntegrationTests
                 static group => group.Key,
                 static group => group.Last().Value,
                 StringComparer.Ordinal);
-        var compilerVisible = portableProps
-            .Descendants("CompilerVisibleProperty")
-            .Concat(verifierProps.Descendants("CompilerVisibleProperty"))
-            .Select(static element =>
-                element.Attribute("Include")?.Value)
-            .Where(static value => value != null);
+        var compilerVisible = CompilerVisibleProperties(portableProps)
+            .Concat(CompilerVisibleProperties(verifierProps));
 
         using (Assert.EnterMultipleScope())
         {
@@ -3474,8 +3470,9 @@ public sealed class WorkerMsBuildIntegrationTests
         XDocument document)
     {
         return document.Descendants("CompilerVisibleProperty")
-            .Select(static property =>
-                property.Attribute("Include")?.Value);
+            .SelectMany(static property =>
+                (property.Attribute("Include")?.Value ?? string.Empty)
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries));
     }
 
     private sealed record CompilerManifestArtifact(

@@ -11,8 +11,6 @@
     <_SharpProofCollectorDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofCollectorDirectory)'))</_SharpProofCollectorDirectory>
   </PropertyGroup>
   <ItemGroup>
-    <CompilerVisibleProperty Include="SharpProofProfile" />
-    <CompilerVisibleProperty Include="SharpProofFeatures" />
-    <CompilerVisibleProperty Include="SharpProofSpecificationPacks" />
+    <CompilerVisibleProperty Include="SharpProofProfile;SharpProofFeatures;SharpProofSpecificationPacks" />
   </ItemGroup>
 </Project>

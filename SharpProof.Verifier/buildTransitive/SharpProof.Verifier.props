@@ -28,11 +28,6 @@
     <_SharpProofDotNetHost Condition="'$(_SharpProofDotNetHost)' == ''">dotnet</_SharpProofDotNetHost>
   </PropertyGroup>
   <ItemGroup>
-    <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
-    <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
-    <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
-    <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
-    <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
-    <CompilerVisibleProperty Include="SharpProofVerifyMaximumExpressionDepth" />
+    <CompilerVisibleProperty Include="SharpProofVerifyPolicy;SharpProofAssumptionPolicy;_SharpProofCompilerManifestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth" />
   </ItemGroup>
 </Project>

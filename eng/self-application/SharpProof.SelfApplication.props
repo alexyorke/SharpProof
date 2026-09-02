@@ -30,15 +30,7 @@
       '$(SharpProofSelfApplication)' == 'true' AND
       '$(_SharpProofAnalyzerConsumerPresent)' != 'true' AND
       '$(_SharpProofPortablePackagePresent)' != 'true'">
-    <CompilerVisibleProperty Include="SharpProofProfile" />
-    <CompilerVisibleProperty Include="SharpProofFeatures" />
-    <CompilerVisibleProperty Include="SharpProofVerifyPolicy" />
-    <CompilerVisibleProperty Include="SharpProofAssumptionPolicy" />
-    <CompilerVisibleProperty Include="SharpProofSpecificationPacks" />
-    <CompilerVisibleProperty Include="_SharpProofCompilerManifestPath" />
-    <CompilerVisibleProperty Include="_SharpProofCompilationTargetFramework" />
-    <CompilerVisibleProperty Include="_SharpProofProjectDirectory" />
-    <CompilerVisibleProperty Include="SharpProofVerifyMaximumExpressionDepth" />
+    <CompilerVisibleProperty Include="SharpProofProfile;SharpProofFeatures;SharpProofVerifyPolicy;SharpProofAssumptionPolicy;SharpProofSpecificationPacks;_SharpProofCompilerManifestPath;_SharpProofCompilationTargetFramework;_SharpProofProjectDirectory;SharpProofVerifyMaximumExpressionDepth" />
 
     <Analyzer Include="$(_SharpProofSelfAnalyzerDirectory)/SharpProof.Analyzer.dll">
       <SharpProofAnalyzerRole>EntryPoint</SharpProofAnalyzerRole>

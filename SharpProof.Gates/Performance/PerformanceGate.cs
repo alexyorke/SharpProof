@@ -1533,7 +1533,8 @@ internal static class PerformanceGate
     {
         var visibleProperties = portableProps
             .Descendants("CompilerVisibleProperty")
-            .Select(static element => (string?)element.Attribute("Include"))
+            .SelectMany(static element => SplitMsBuildList(
+                (string?)element.Attribute("Include")))
             .ToHashSet(StringComparer.Ordinal);
         var profile = FindDefaultProperty(
             portableContract,

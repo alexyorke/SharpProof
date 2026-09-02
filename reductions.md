@@ -129,6 +129,7 @@ the smallest relevant containerized test target passes.
 | R317 | Correct the active bug/status figures and include both documents in the maintained-document gate | `Test-SharpProofReadme.ps1` passed |
 | R324 | Centralize the two repeated `AttributeTargets` masks used by the eight public attributes | `SharpProof.Attributes.Test`: 11; `SharpProof.Package.Test`: 295 passed, 1 skipped |
 | R327 | Remove 22 project-local `TreatWarningsAsErrors` declarations now supplied by the central production policy, retaining the two excluded-project declarations | `test-changed`: 2,846 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
+| R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1381,15 +1382,14 @@ observed divergence rather than a hypothetical one.
 ## Second survey, part twenty-five: R327-R329
 
 This pass returned to the build graph after checking current MSBuild evaluation,
-not just source text. The two remaining items below are pending reduction
-candidates. R327 is deliberately narrower than the earlier broad warning-policy
+not just source text. R329 remains a pending reduction candidate. R327 is
+deliberately narrower than the earlier broad warning-policy
 proposals: it targets only exact project-local declarations that the central
 policy already provides, while preserving the projects that the central
 classification excludes.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R328 | **The nine-name `CompilerVisibleProperty` vocabulary is declared through four build entry points.** `SharpProof.AnalyzerConsumer.props` and the self-application props each spell all nine names in the same order. The package props separately spells the profile/features/specification-pack subset, while the verifier props spells the other six names, yielding 27 item declarations for nine distinct names. The differing import conditions are meaningful, so this is not a safe blind file merge; a shared item-list fragment or another single source of truth could preserve those conditions while removing declaration drift between normal package consumption, self-application, and verifier consumption. | `SharpProof.AnalyzerConsumer.props:11-21`; `eng/self-application/SharpProof.SelfApplication.props:29-41`; `SharpProof.Package/buildTransitive/SharpProof.props:13-17`; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:30-37` |
 | R329 | **Refines R264: verifier path re-rooting is duplicated in the cleanup target.** The initialize target derives effective request, result, compiler-manifest, and SARIF paths, including configured-path normalization and `TargetFramework` re-rooting. `SharpProofResetPublishedVerification` repeats the same four default/configured/full-path/re-root sequences for its `_SharpProofClean*` properties. There are therefore eight copies of the path-selection algorithm across two target lifecycles; a shared target/property helper could reduce the repeated MSBuild expressions while retaining the distinct initialize and cleanup property names and timing. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:45-63` and `:255-271`; R264 currently records only the initialize-side copies |
 
 ### Checked and not proposed (part twenty-five)
@@ -1400,11 +1400,13 @@ classification excludes.
 - R327 is now applied: the 22 production-project declarations were removed;
   `SharpProof.Testing` and `SharpProof.CompilerProbe.TestAsset` retain their
   intentional local declarations.
+- R328 is now applied: each build entry point keeps its existing property set and
+  conditions while using a single semicolon-delimited `CompilerVisibleProperty`
+  item, and the evaluation/documentation tests split that list at the boundary.
 
 ### Status (part twenty-five)
 
-R328 and R329 remain `pending`; both need care around import conditions and target
-ordering.
+R329 remains `pending`; it needs care around import conditions and target ordering.
 
 ## Second survey, part twenty-six: R330-R339
 
@@ -1523,3 +1525,467 @@ and hashing abstractions across `Directory.Build.props`, `SharpProof.CompilerArt
 R350-R355 are `pending`. R350, R352, and R355 are clean build/script maintenance
 simplifications. R351, R353, and R354 address projection/mapping redundancy,
 allocation overhead in canonical hashing, and duplicate repository root resolution.
+
+## Second survey, part twenty-nine: R356-R357
+
+This pass narrowed the remaining native interop and Roslyn project-policy repeats.
+The native declarations are exact duplicates, while the project setting is a
+smaller role-policy candidate that needs package-layout validation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R356 | **The verifier's nested libc interop surface repeats three exact imports in two build tasks.** `VerifierProcessSupervisor.NativeMethods` and `RunVerifier.NativeMethods` each declare byte-for-byte `Close(int)`, `SystemCall2(nint, int, uint)`, and `SystemCall4(nint, int, int, nint, uint)` methods with the same `LibraryImport("libc", EntryPoint, SetLastError = true)` and `DefaultDllImportSearchPaths(SafeDirectories)` attributes. The containing classes still need different native methods (`prctl`/`waitpid` versus `kill`) and their wrapper-level failure semantics differ, so only these common imports should move to one internal owner. This is separate from R330's repeated syscall constants: changing an imported signature or attribute currently requires two edits as well as the constant edits. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:495-524`; `SharpProof.BuildTasks/RunVerifier.cs:1352-1376`; R330 |
+| R357 | **Three Roslyn dependency-producing projects repeat the same assembly-copy policy.** `SharpProof.Analyzer.Core`, `SharpProof.Analyzer`, and `SharpProof.CompilerCollector` each set `CopyLocalLockFileAssemblies=true`. They form the analyzer/compiler dependency-producing path and R343 already shows that their packaged dependency closure is maintained as one vocabulary. A narrowly scoped analyzer-component props fragment could own this policy and remove three identical project declarations, but the package and test output layouts must be checked before centralization because `Analyzer.Core` is intentionally not marked `IsRoslynAnalyzer`. | `SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj:6`; `SharpProof.Analyzer/SharpProof.Analyzer.csproj:6`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:6`; R343 |
+
+### Checked and not proposed (part twenty-nine)
+
+- The replay fixture classes repeat three exception identity constants, but one
+  uses `Assembly::` and the other uses `assembly::`. The casing difference sits
+  on a protocol identity boundary and may be intentional coverage of canonical
+  normalization; it is not safe to collapse the fixtures without first proving
+  the codec's case semantics.
+- The NuGet v3 URL is repeated in package-feed helpers and audit/architecture
+  assertions. It is a small fixed external authority already covered by the
+  deferred R202-R204 family, so no separate reduction is counted here.
+
+### Status (part twenty-nine)
+
+R356-R357 are `pending`. R356 is a low-risk interop consolidation if the shared
+owner remains internal to `SharpProof.BuildTasks`; R357 needs package-output
+tests because its three consumers do not have identical analyzer markers.
+
+## Second survey, part thirty: R358-R367
+
+This pass surveyed protocol serialization, string/surrogate validation, metadata
+naming conventions, polyfill distributions, resource limit defaults, and SMT/dataflow
+domain bounds across `SharpProof.Worker.Protocol`, `SharpProof.Ir`, `SharpProof.Specs`,
+`SharpProof.Effects`, `SharpProof.Smt`, `SharpProof.ArchitectureTest`, and `SharpProof.Worker`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R358 | **`ProtocolJsonSupport.EnsureNoLoneSurrogates` is a character-for-character duplicate of `Utf16WellFormedness.IsWellFormed`.** `SharpProof.Ir/Utf16WellFormedness.cs:5-29` defines internal static `bool IsWellFormed(string value)` scanning for lone high/low UTF-16 surrogates. `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:202-223` defines private static `void EnsureNoLoneSurrogates(string? value)` executing the exact same surrogate loop to throw `JsonException("JSON strings must not contain lone UTF-16 surrogates.")`. Reusing `Utf16WellFormedness.IsWellFormed` in `ProtocolJsonSupport` eliminates 22 lines of duplicated surrogate-scanning loop logic. | `SharpProof.Ir/Utf16WellFormedness.cs:5-29`; `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:202-223` |
+| R359 | **`IrSummaryProvenance.IsSha256` is an exact duplicate of `WorkerProtocolJson.IsSha256`.** `SharpProof.Summaries/IrRelationalSummary.cs:73-78` defines private static `bool IsSha256(string? value) => value != null && value.Length == 64 && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');`. `SharpProof.Worker.Protocol/ProtocolJson.cs:1056-1060` declares the identical predicate as `internal static bool IsSha256(string? value)`. Consolidating SHA-256 validation in a shared helper removes duplicate hex-validation routines across semantic summaries and protocol layers. | `SharpProof.Summaries/IrRelationalSummary.cs:73-78`; `SharpProof.Worker.Protocol/ProtocolJson.cs:1056-1060` |
+| R360 | **`FrameworkTypeMetadataNames.Monitor` is declared as `public static readonly string` while 23 sibling type identities are `public const string`.** `SharpProof.Specs/FrameworkTypeMetadataNames.cs:39` defines `public static readonly string Monitor = "System.Threading.Monitor";`, whereas lines 9-47 declare 23 other framework types (`ArgumentException`, `Exception`, `NullReferenceException`, `ConditionalAttribute`, etc.) as `public const string`. Declaring `Monitor` as `readonly` instead of `const` prevents its use in compile-time constant expressions, switch cases, and Roslyn pattern matches, forcing callers in `CompilerEffectReplayLowerer.cs:220,327` and `OperationEffectScanner.cs:69,1314` to treat it as a runtime field rather than an inline constant. | `SharpProof.Specs/FrameworkTypeMetadataNames.cs:9-47`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:220,327`; `SharpProof.Effects/OperationEffectScanner.cs:69,1314` |
+| R361 | **`NullableAttributes.cs` in `SharpProof.Specs/Polyfills/` is linked into only one downstream project while sibling polyfills are declared independently.** `SharpProof.Specs/Polyfills/NullableAttributes.cs` defines `NotNullWhenAttribute(bool returnValue)`. `SharpProof.Effects/SharpProof.Effects.csproj:14-15` links it with `<Compile Include="..\SharpProof.Specs\Polyfills\NullableAttributes.cs" Link="Polyfills\NullableAttributes.cs" />`. Meanwhile, `SharpProof.Ir/ArgumentNullGuard.cs:1-8` conditionally compiles its own `NotNullAttribute`. Consolidating BCL code-analysis attribute polyfills under `SharpProof.Specs/Polyfills/` or in `Directory.Build.props` for netstandard2.0 removes ad-hoc per-file linking. | `SharpProof.Specs/Polyfills/NullableAttributes.cs:1-8`; `SharpProof.Effects/SharpProof.Effects.csproj:14-15`; `SharpProof.Ir/ArgumentNullGuard.cs:1-8` |
+| R362 | **`ArchitectureRepository.ProductionProjects` hardcodes a 22-element project array duplicating the classification logic in `Directory.Build.props`.** `SharpProof.ArchitectureTest/ArchitectureRepository.cs:7-30` hardcodes an array of 22 production project names. `Directory.Build.props:33-36` classifies `SharpProofProductionProject` using regex exclusions. When new production projects are added, `ArchitectureRepository.ProductionProjects` must be manually updated in addition to build props and solution files. Deriving production project membership dynamically from project evaluation or solution structure avoids configuration drift. | `SharpProof.ArchitectureTest/ArchitectureRepository.cs:7-30`; `Directory.Build.props:33-36` |
+| R363 | **The default rlimit budget of 3,000,000 resource units is defined independently across three disconnected project layers.** `SharpProof.Smt/IrSmtBackendOptions.cs:5` hardcodes `public const uint DefaultQueryRlimit = 3_000_000;`. `SharpProof.Worker.Protocol/ProtocolModel.schema.json:520` generates `WorkerBudgets.DefaultQueryRlimit = 3000000U;`. `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:18` defines `<SharpProofVerifyQueryRlimit Condition="'$(SharpProofVerifyQueryRlimit)' == ''">3000000</SharpProofVerifyQueryRlimit>`. If the default query rlimit is adjusted, all three independent declarations must be synchronized manually. | `SharpProof.Smt/IrSmtBackendOptions.cs:5`; `SharpProof.Worker.Protocol/ProtocolModel.schema.json:520`; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:18` |
+| R364 | **`MethodResourceBudget.RequireNonnegative` duplicates `ArgumentNullGuard.RequireNonnegative`.** `SharpProof.Worker/MethodResourceBudget.cs:49-53` defines a local static helper `RequireNonnegative(long count) => count >= 0 ? count : throw new InvalidOperationException("The backend resource counter cannot be negative.");`. `SharpProof.Ir/ArgumentNullGuard.cs` already provides `RequireNonnegative(long value, string paramName)`. `MethodResourceBudget` already consumes `ArgumentNullGuard.RequirePositive` on line 7; replacing the local helper with `ArgumentNullGuard.RequireNonnegative` removes 5 redundant lines. | `SharpProof.Worker/MethodResourceBudget.cs:7-12,49-53`; `SharpProof.Ir/ArgumentNullGuard.cs:52-62` |
+| R365 | **`FinalCompilationCollector.ParseSpecificationPacks` implements custom semicolon list splitting and validation.** `SharpProof.CompilerCollector/FinalCompilationCollector.cs:87-111` implements custom splitting on `[';']`, trimming, blank checks, and uniqueness verification for `SharpProofSpecificationPacks`. Similar semicolon list parsing logic exists in `scripts/CSharpSourceMetrics.ps1:258-262` and MSBuild option decoders. Centralizing delimited property parsing in a shared option helper standardizes error handling for list-valued build properties. | `SharpProof.CompilerCollector/FinalCompilationCollector.cs:87-111`; `scripts/CSharpSourceMetrics.ps1:258-262` |
+| R366 | **`CompilerSourceIntegerDomain.Contains` is a trivial 14-line wrapper around basic interval comparisons.** `SharpProof.CompilerArtifact/CompilerSourceIntegerDomain.cs:5-12` defines `Contains(CompilerIntegerInterval? interval, IrValue value)` checking `value.Kind == IrValueKind.Integer && value.Integer >= bounds.Minimum && value.Integer <= bounds.Maximum`. `SharpProof.Dataflow/IntervalValue.cs:73-89` already provides rich `Contains(long value)` domain containment. Inlining or unifying the interval bounds check avoids creating single-method static domain wrappers. | `SharpProof.CompilerArtifact/CompilerSourceIntegerDomain.cs:5-12`; `SharpProof.Dataflow/IntervalValue.cs:73-89` |
+| R367 | **`EffectClaimResultAssembler` repeats `CallableClaimResultAssembler.Create` calls with repetitive argument bundles across six branches.** `SharpProof.Worker/EffectClaimResultAssembler.cs:33-39,43-49,53-67,77-83,85-93,95-100` calls `CallableClaimResultAssembler.Create(target, evidence.ClaimId, outcome, reason, certainty)` six separate times across different feasibility and replay outcome branches. Refactoring to a unified result assembly builder reduces repetitive parameter forwarding across the 117-line file. | `SharpProof.Worker/EffectClaimResultAssembler.cs:33-100` |
+
+### Checked and not proposed (part thirty)
+
+- `IntervalValue.ToString()` in `SharpProof.Dataflow` formats intervals with invariant culture
+  (handling negative signs under `sv-SE`/`fi-FI` where minus becomes U+2212). This culture
+  isolation is verified by test fixtures and is required for deterministic string representations.
+- `Z3ExpressionOwner` finalization pattern in `SharpProof.Smt` safely disposes native Z3 ASTs.
+  Retained as essential native interop safety.
+
+### Status (part thirty)
+
+R358-R367 are `pending`. R358, R359, R360, and R364 are direct, safe code reductions.
+R361, R362, and R363 reduce cross-layer configuration drift between MSBuild properties,
+Roslyn analyzers, and verification workers.
+
+## Second survey, part thirty-one: R368-R372
+
+This pass investigated outcome caching policies, verification factory term guards,
+PowerShell Roslyn parse options parsing, and legacy assembly references across
+`SharpProof.Verify`, `SharpProof.Ir`, `SharpProof.Summaries`, and `scripts/`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R368 | **`OutcomeCachePolicy.IsCacheable` is a 7-line single-method class wrapping an inline type check.** `SharpProof.Verify/Outcomes.cs:42-49` defines `public static class OutcomeCachePolicy { public static bool IsCacheable(ProofOutcome outcome) => outcome == null ? throw new ArgumentNullException(nameof(outcome)) : outcome is ProvenOutcome or RefutedOutcome; }`. The class exists solely to test `outcome is ProvenOutcome or RefutedOutcome`. Inlining the pattern directly at call sites eliminates the trivial wrapper class. | `SharpProof.Verify/Outcomes.cs:42-49` |
+| R369 | **`FactoryGuards.RequireBooleanTerm` in `SharpProof.Verify` repeats IR factory term validation.** `SharpProof.Verify/Evidence.cs:106-124` defines `internal static IrTerm RequireBooleanTerm(IrFactory factory, IrTerm term, string parameterName)` checking null guards, `factory.EnsureTerm(term)`, and `term.Type != factory.BooleanType`. `SharpProof.Ir` already owns term type verification; hoisting this helper to `IrFactory` (e.g. `factory.RequireBooleanTerm(term)`) eliminates the isolated guard class in `SharpProof.Verify`. | `SharpProof.Verify/Evidence.cs:106-124`; `SharpProof.Verify/Backend.cs:97,100` |
+| R370 | **`New-SharpProofCSharpParseOptions` in `scripts/CSharpSourceMetrics.ps1` contains a 56-line custom C# language version parser.** `scripts/CSharpSourceMetrics.ps1:210-266` manually parses version strings (`latest` -> `Latest`, `preview` -> `Preview`, `9.0` -> `CSharp9`, `7.3` -> `CSharp7_3`) via regex matching and switch statements. Because Roslyn's `LanguageVersionFacts` or `[Enum]::Parse([Microsoft.CodeAnalysis.CSharp.LanguageVersion], ...)` already handles standard version strings, the custom 56-line parsing logic can be significantly streamlined. | `scripts/CSharpSourceMetrics.ps1:210-266` |
+| R371 | **`Add-Type -AssemblyName System.IO.Compression.FileSystem` is redundant in PowerShell 7+ scripts.** `scripts/Get-SharpProofPilotPackageAuthority.ps1:20-21` and `scripts/Test-SharpProofPilotAuthorityFixtures.ps1:40` call `Add-Type -AssemblyName System.IO.Compression` and `System.IO.Compression.FileSystem`. In PowerShell Core (PowerShell 7+ on Linux/Windows), `System.IO.Compression` types like `[System.IO.Compression.ZipFile]` are built into the runtime and available without `Add-Type`. | `scripts/Get-SharpProofPilotPackageAuthority.ps1:20-21`; `scripts/Test-SharpProofPilotAuthorityFixtures.ps1:40` |
+| R372 | **`IrSummarySignature` repeats canonical member and variable mapping in `SharpProof.Summaries`.** `SharpProof.Summaries/IrRelationalSummary.cs:81-100` defines `IrSummarySignature` holding `Member`, `Receiver`, `Parameters`, `Result`, and `Provenance`. `SharpProof.CompilerArtifact/CompilerCallablePreparation` and `CompilerManifestArtifact` mirror these identical member signature properties. Consolidating the callable signature abstraction reduces field-by-field conversion boilerplate between compiler artifacts and summary models. | `SharpProof.Summaries/IrRelationalSummary.cs:81-100`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:30-45` |
+
+### Checked and not proposed (part thirty-one)
+
+- `CSharpSourceMetricsEngine.Measure` in `scripts/CSharpSourceMetrics.ps1` compiles an in-memory
+  Roslyn syntax walker via C# snippet. This avoids slow PowerShell AST walking over large codebases
+  and is an intentional performance optimization. Retained as-is.
+- `SpecResultDomainProjection.cs` in `SharpProof.Worker` projects relational summary results into
+  the verifier domain. The logic is verifier-specific and properly decoupled from compiler lowering.
+
+### Status (part thirty-one)
+
+R368-R372 are `pending`. R368, R369, and R371 are simple code cleanups. R370 and R372
+streamline script language parsing and relational summary signature models.
+
+## Second survey, part thirty-two: R373-R374
+
+This pass checked the compiler-probe asset's local utility surface and the
+contract-runtime preprocessor symbol across source, generated, and MSBuild
+boundaries.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R373 | **The compiler-probe asset repeats two exact utility methods in its generator and snapshot implementations.** `CompilerProbeGenerator` and `CompilerProbeSnapshot` each define `GetOption(AnalyzerConfigOptions, string)` with the same `TryGetValue`-or-empty behavior and `NormalizePath(string)` with the same backslash-to-slash replacement. Both classes live in `SharpProof.CompilerProbe.TestAsset`, so a small internal helper or linked source file can remove the four duplicate method bodies without changing the generator/snapshot algorithms that consume them. | `SharpProof.CompilerProbe.TestAsset/CompilerProbeGenerator.cs:114-124`; `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:583-593` |
+| R374 | **The contract-runtime preprocessor symbol is independently authored at four boundaries.** `SharpProof.Attributes.Contract.ConditionalSymbol` defines `SHARPPROOF_CONTRACTS`; `SharpProof.Frontend/ContractApi.catalog.json` repeats it and generates `ContractApiCatalog.ConditionalSymbol`; `SharpProof.CompilerArtifact/CompilationFingerprint` repeats it to reject runtime-contract compilations; and `SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props` repeats it in both its detection regex and diagnostic text. R309 covers the intentionally synthetic test fixtures, but no check currently proves these production/build values remain equal. Directly importing one assembly constant is constrained by the analyzer and MSBuild boundaries; a generated shared value or a consistency gate could remove the independent literals and make symbol drift fail early. | `SharpProof.Attributes/Contract.cs:7`; `SharpProof.Frontend/ContractApi.catalog.json:5`; `SharpProof.Frontend/ContractApiMetadata.generated.cs:64-65,220-221`; `SharpProof.CompilerArtifact/CompilationFingerprint.cs:7-8`; `SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props:10,27`; R309 |
+
+### Checked and not proposed (part thirty-two)
+
+- `CompilerProbeGenerator.GetOption` and `CompilerProbeSnapshot.GetOption` are
+  exact duplicates, but the broader `CompilerProbeSnapshot` and collector
+  algorithm sharing is already tracked by R281, R323, and R337. R373 is limited
+  to the two small helpers so it does not double-count those larger seams.
+- The generated `ContractApiMetadata.generated.cs` copy is derived from the
+  catalog rather than independently edited. It is counted in R374 as a
+  generated projection; the drift concern is the catalog/build/public split,
+  not generated-file maintenance by itself.
+
+### Status (part thirty-two)
+
+R373-R374 are `pending`. R373 is a low-risk same-assembly helper extraction.
+R374 needs a source-of-truth decision across C#, generated metadata, compiler
+fingerprinting, and MSBuild before any literal is removed.
+
+## Second survey, part thirty-two: R373-R379
+
+This pass surveyed abstract domains, transfer functions, modular arithmetic bounds,
+lattice joins, graph representations, and fixpoint solvers in `SharpProof.Dataflow`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R373 | **`IntervalDomain.TryCongruentBoundary` re-implements modular difference normalization with nested conditionals.** `SharpProof.Dataflow/IntervalDomain.cs:254-260` computes circular modular distance using a 7-line 4-way nested ternary (`atOrAbove ? remainder >= boundaryRemainder ? ... : ... : ...`). `IntervalDomain.Normalize(BigInteger value, BigInteger modulus)` at `IntervalDomain.cs:210-214` already normalizes signed differences into $[0, \text{modulus}-1]$. Replacing the nested ternary with `Normalize(atOrAbove ? remainder - boundaryRemainder : boundaryRemainder - remainder, modulus)` eliminates 7 lines of nested branches. | `SharpProof.Dataflow/IntervalDomain.cs:210-214, 254-260` |
+| R374 | **`IntervalDomain.Create` contains redundant extreme boundary normalization branches.** `SharpProof.Dataflow/IntervalDomain.cs:35-45` conditionally converts `lowerBound == long.MinValue` and `upperBound == long.MaxValue` to `null` when `modulus.IsOne`. Subsequently, lines 67-68 unconditionally convert `long.MinValue` and `long.MaxValue` to `null` for all moduli (`adjustedLower = lowerBound == long.MinValue ? null : lowerBound`). Lines 35-45 are completely shadowed by lines 67-68. | `SharpProof.Dataflow/IntervalDomain.cs:35-45, 67-68` |
+| R375 | **`ClosedAbstractDomain<T>` forces duplicate `Havoc` and `Widen` implementations across all derived domains.** `SharpProof.Dataflow/ClosedAbstractDomain.cs:18-19` defines `Havoc` and `Widen` as abstract methods. Every derived domain repeats identical logic: `NullnessDomain.cs:49-53`, `SequenceCardinalityDomain.cs:136-140`, and `IntervalDomain.cs:178-181` each implement `Havoc` as `value.IsBottom ? Bottom : Top`, and finite lattices implement `Widen` as `Join(previous, candidate)`. Providing virtual default implementations in `ClosedAbstractDomain<T>` eliminates boilerplate overrides in all subclasses. | `SharpProof.Dataflow/ClosedAbstractDomain.cs:18-19`; `SharpProof.Dataflow/NullnessDomain.cs:44-53`; `SharpProof.Dataflow/SequenceCardinalityDomain.cs:136-140`; `SharpProof.Dataflow/IntervalDomain.cs:178-181` |
+| R376 | **`DataflowGraph<T>` performs redundant multi-pass sorting on already-sorted adjacency lists.** `SharpProof.Dataflow/DataflowGraph.cs:77-88, 155-164` sorts `Edges` primarily by `SourceId` and secondarily by `TargetId` on line 77. Iterating `Edges` populates `successors[edge.SourceId]` in strictly sorted order. Calling `Freeze(successors)` on line 88 then re-sorts every list with `neighbors.Sort()`. Avoiding the second sort pass on pre-sorted successor lists simplifies graph construction. | `SharpProof.Dataflow/DataflowGraph.cs:77-88, 155-164` |
+| R377 | **4-point flat diamond lattice join and partial order logic is duplicated across enum domains.** `SharpProof.Dataflow/NullnessDomain.cs:17-42` and `SharpProof.Dataflow/SequenceCardinalityDomain.cs:142-169` implement identical 4-element flat diamond lattices ($\bot < \{A, B\} < \top$). Both duplicate identical branch cascades for identity, bottom absorption, and top collapse. Unifying diamond lattice operations reduces duplicated lattice decision trees across abstract domains. | `SharpProof.Dataflow/NullnessDomain.cs:17-42`; `SharpProof.Dataflow/SequenceCardinalityDomain.cs:142-169` |
+| R378 | **`DataflowEdge` contains manual property backing and constructor boilerplate on a `readonly record struct`.** `SharpProof.Dataflow/DataflowGraph.cs:10-27` spans 18 lines manually declaring constructor parameter guards and property assignments for a 2-field record struct. Converting to primary constructor property initializers (`public readonly record struct DataflowEdge(int SourceId, int TargetId) { public int SourceId { get; } = ArgumentNullGuard.RequireNonnegative(SourceId, nameof(SourceId)); ... }`) reduces 18 lines to 5 lines while preserving all validation, deconstructors, and value equality. | `SharpProof.Dataflow/DataflowGraph.cs:10-27` |
+| R379 | **`ForwardDataflowAnalysis` allocates an intermediate dictionary and performs two redundant collection passes per solver round.** `SharpProof.Dataflow/ForwardDataflowAnalysis.cs:138-171` allocates `var changedOutputs = new Dictionary<int, T>()` each round, collects changed block states, loops to write them into `outputs`, and loops a third time to gather successors into `affected`. Because block transfers within a round read invariant `inputs`, `outputs[blockId]` can be updated directly and successors enqueued immediately, eliminating intermediate dictionary allocations and two iteration loops per fixpoint round. | `SharpProof.Dataflow/ForwardDataflowAnalysis.cs:138-171` |
+
+### Checked and not proposed (part thirty-two)
+
+- `IntervalValue.SingletonValue` throwing on non-singletons is a fail-closed guard preventing
+  symbolic interval evaluation on indeterminate bounds. Retained as-is.
+- Explicit non-negative interval constraints on sequence cardinality length domain prevent
+  negative length inferences. Retained as-is.
+
+### Status (part thirty-two)
+
+R373-R379 are `pending`. R373, R374, R376, and R378 are direct, low-risk local simplifications.
+R375 and R377 generalize abstract domain hierarchy contracts. R379 optimizes fixpoint solver throughput.
+
+## Second survey, part thirty-three: R380-R385
+
+This pass surveyed compiler artifact models, code generation scripts, diagnostic ordering,
+stream readers, and location authority helpers across `SharpProof.CompilerArtifact`,
+`SharpProof.CompilerCollector`, and `scripts/Generate-CompilerArtifactModel.ps1`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R380 | **`CompilerDiagnosticArtifactOrdering` duplicates an 11-stage comparison ladder between LINQ `Canonicalize` and imperative `Compare`.** `SharpProof.CompilerArtifact/CompilationFingerprint.cs:438-453` applies an 11-level chained LINQ sort (`OrderBy(Code).ThenBy(Message)...ThenBy(SourceLineMapSha256)`). Lines 463-521 re-implement the identical 11-stage comparison ladder across 58 lines of manual `StringComparer.Ordinal.Compare` and field-by-field branching in `Compare`. Unifying both paths on a single `IComparer<CompilerDiagnosticArtifact>` eliminates 58 lines of redundant ladder code and prevents ordering divergence. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:438-453, 463-521` |
+| R381 | **`Generate-CompilerArtifactModel.ps1` emits duplicate reason catalog classes into two generated files.** `scripts/Generate-CompilerArtifactModel.ps1:1488-1515` generates verbatim duplicate classes: `CompilerCallableArtifactReasonCatalog` in `CompilerArtifactModel.generated.cs:562-574` and `CompilerCallableProducerReasonCatalog` in `CompilerWireMappings.generated.cs:311-323`. Both define identical constants, failure reason arrays, and lookup methods in the same namespace `SharpProof.CompilerArtifact`. Because `SharpProof.CompilerCollector` already accesses internal types in `SharpProof.CompilerArtifact` via `InternalsVisibleTo`, `CompilerCallableProducerReasonCatalog` is completely redundant. | `scripts/Generate-CompilerArtifactModel.ps1:1488-1515`; `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:562-574`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs:311-323` |
+| R382 | **`CompilerEffectReplayLowerer.TryResolveSource` duplicates the syntax tree loop from `CompilerSourceLocationAuthority.FindUniqueTree`.** `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:426-455` manually loops over `capturedTrees`, checks `CompilerSourceLocationAuthority.HasValidLocationGeometry`, and verifies single-match uniqueness across 30 lines. `CompilerSourceLocationAuthority.FindUniqueTree` (`CompilerSourceLocationAuthority.cs:115-150`) already implements this exact tree-resolution and ambiguity-checking loop. Delegating `TryResolveSource` to `FindUniqueTree` removes 30 lines of duplicate loop logic. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:426-455`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:115-150` |
+| R383 | **`CompilerManifestArtifact.cs` implements duplicate chunked stream-to-byte-array readers.** `WorkerBinaryIdentity.ReadSnapshotBytes` (`SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:205-231`) and `CompilerManifestArtifactFile.ReadAllBytes` (`SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:980-1009`) implement near-identical bounded buffer-filling loops with EOF checks (`throw new InvalidDataException("... changed while it was read.")`) and trailing-byte verification. Extracting a single bounded stream reader helper eliminates 25+ lines of duplicate buffer-reading boilerplate. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:205-231, 980-1009` |
+| R384 | **`CompilerCompilationCapture.LowerHex` re-implements lowercase hex byte formatting.** `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:230-241` defines a private `LowerHex` method performing manual character array allocation and bit-shift arithmetic to format Roslyn checksums. `SharpProof.Ir/HashEncoding.cs:33-46` already provides `HashEncoding.ToLowerHex(ReadOnlySpan<byte>)`, which `CompilerCompilationCapture.cs` already references elsewhere. Replacing `LowerHex` with `HashEncoding.ToLowerHex` eliminates 12 lines of manual nibble arithmetic. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:213, 230-241`; `SharpProof.Ir/HashEncoding.cs:33-46` |
+| R385 | **`ReplayEventComparer` manually inlines location hashing and comparison instead of reusing `CompilerSourceLocationAuthority`.** `SharpProof.CompilerArtifact/CompilerEffectAuthority.cs:365-371` manually hashes all five fields of `WorkerSourceLocation` (`Path`, `Start`, `Length`, `Line`, `Column`) with bespoke null checks instead of using `CompilerSourceLocationAuthority.GetLocationHashCode` (`CompilerSourceLocationAuthority.cs:228-241`). Reusing the authority keeps location equality and hash distribution centralized. | `SharpProof.CompilerArtifact/CompilerEffectAuthority.cs:365-371`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:228-241` |
+
+### Checked and not proposed (part thirty-three)
+
+- `CompilationFingerprint.ComputeSha256` ensures deterministic invariant hashing across platform
+  line endings and culture settings; canonical serialization order is required for verifiable builds.
+- `CompilerModelValues.cs` contains low-level value packers for compiler wire formats. These are
+  isolated for fast serialization and decoupled from Roslyn symbols.
+
+### Status (part thirty-three)
+
+R380-R385 are `pending`. R381, R382, and R384 are immediate code and script generator cleanups.
+R380, R383, and R385 unify comparison, streaming I/O, and location hashing authorities.
+
+## Second survey, part thirty-four: R386-R392
+
+This pass surveyed the effect system, exception reachability, using disposal unwinding,
+ownership classification, call graph ordering, and summary operations in `SharpProof.Effects`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R386 | **`ExceptionHandlerReachability` duplicates the using-disposal unwinding loop and completion predicates from `UsingDisposalEffectResolver`.** `UsingDisposalEffectResolver.ResolveResources` (`SharpProof.Effects/UsingDisposalEffectResolver.cs:141-198`) and `ExceptionHandlerReachability.GetUsingDisposalExceptions` (`SharpProof.Effects/ExceptionHandlerReachability.cs:2085-2141`) implement the identical 55-line algorithm for tracking acquired `IVariableDeclarationGroupOperation` declarators, checking `allInitializersComplete`, reversing acquired items, and unwinding disposals. Furthermore, `ExceptionHandlerReachability.cs:2379-2438` duplicates four completion/unwinding predicates (`CanDisposalsCompleteNormally`, `CanDisposalCompleteNormally`, `CanDisposalUnwind`, `IsDefinitelyNullResource`) nearly verbatim from `UsingDisposalEffectResolver.cs:200-254`. Hoisting the shared unwinding loop and predicates into `UsingDisposalGraph` eliminates ~90 lines of duplicate disposal simulation code. | `SharpProof.Effects/UsingDisposalEffectResolver.cs:141-254`; `SharpProof.Effects/ExceptionHandlerReachability.cs:2085-2141, 2379-2438` |
+| R387 | **Three separate routines duplicate member initializer syntax-to-operation extraction loops.** `EffectMethodNodeBuilder.EnsureBeforeFieldInitNode` (`SharpProof.Effects/EffectMethodNodeBuilder.cs:267-285`), `EffectMethodNodeBuilder.ScanMemberInitializers` (`lines 326-343`), and `ManagedAbstractFlow.ConstructorMayCompleteNormally` (`SharpProof.Effects/ManagedAbstractFlow.cs:2245-2266`) each iterate `GetMemberInitializerReferences`, fetch syntax via `reference.GetSyntax()`, extract initializer expressions with `EffectProjections.GetInitializerExpression`, and query the `SemanticModel` for operations. Providing a centralized `GetMemberInitializerOperations` helper removes ~40 lines of repetitive Roslyn resolution. | `SharpProof.Effects/EffectMethodNodeBuilder.cs:267-285, 326-343`; `SharpProof.Effects/ManagedAbstractFlow.cs:2245-2266` |
+| R388 | **`ConversionOwnershipClassifier` duplicates local vs captured symbol region classification across three methods.** `ClassifyLocalStorage` (`SharpProof.Effects/ConversionOwnershipClassifier.cs:542-553`), `ClassifyRefLocalStorage` (`lines 148-161`), and `ClassifyLocal` (`lines 842-855`) each perform identical checks for `SymbolEqualityComparer.Default.Equals(local.ContainingSymbol?.OriginalDefinition, _method.OriginalDefinition)` and fall back to the exact same captured ordinal extraction (`local.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Start ?? 0`). Extracting a shared `ClassifyCapturedLocal` helper eliminates ~20 lines of duplicate symbol span inspection. | `SharpProof.Effects/ConversionOwnershipClassifier.cs:148-161, 542-553, 842-855` |
+| R389 | **`DefiniteOperationFacts` duplicates harmless conversion unwrapping loops.** `DefiniteOperationFacts.IsDefinitelyNonNull` (`SharpProof.Effects/ManagedAbstractFlow.cs:2857-2877`) and `DefiniteOperationFacts.IsDefinitelyNull` (`lines 2879-2901`) contain duplicate 15-line `while (operation is IParenthesizedOperation or IConversionOperation)` loops unwrapping harmless parenthesized and implicit conversion operations. In addition, `UsingDisposalEffectResolver.cs:275-280` inlines the nullness check body instead of calling its existing helper `IsDefinitelyNull` (`lines 255-260`). Consolidating unwrapping into `UnwrapHarmlessConversions` eliminates redundant loop boilerplate. | `SharpProof.Effects/ManagedAbstractFlow.cs:2857-2901`; `SharpProof.Effects/UsingDisposalEffectResolver.cs:255-260, 275-280` |
+| R390 | **`EffectCallGraph.OrderMethods` contains redundant while-enumerator cancellation checks and comparer overhead.** `SharpProof.Effects/EffectCallGraph.cs:95-115` writes a manual `while (true)` enumerator loop checking `cancellationToken.ThrowIfCancellationRequested()` four times per iteration, while `CancellationAwareMethodComparer` (`lines 121-133`) checks cancellation twice for every pairwise comparison during sorting. Standardizing on `foreach` and sort boundary cancellation simplifies ~25 lines of manual enumerator plumbing. | `SharpProof.Effects/EffectCallGraph.cs:95-115, 121-133` |
+| R391 | **`EffectSummaryOperations.Join` causes high-frequency param-array allocations across over 45 AST scanning call sites.** `SharpProof.Effects/EffectSummaryOperations.cs:7-20` defines only `Join(params EffectSummary[] summaries)`, routing all calls through array allocation. Over 45 call sites in `OperationEffectScanner.cs`, `OperationEffectScanner.Assignments.cs`, and `OperationEffectScanner.Expressions.cs` pass 2 or 3 arguments, allocating an array per AST node visit. Providing non-allocating 2- and 3-argument overloads or standardizing on `EffectSummaryDomain.Instance.Join(a, b)` eliminates heap churn during AST scanning. | `SharpProof.Effects/EffectSummaryOperations.cs:7-20`; `SharpProof.Effects/OperationEffectScanner.cs:187, 337, 466, 504, 511, 519, 522, 589, 830, 836, 917`; `SharpProof.Effects/OperationEffectScanner.Expressions.cs:187, 212, 437, 453, 474, 502, 541, 555, 595, 606, 613, 630, 743, 758, 777, 826, 860, 864` |
+| R392 | **`OperationCompletionEvaluator` instantiates two identical fields of `DefiniteOperationFacts`.** `SharpProof.Effects/OperationCompletionEvaluator.cs:12-16, 31-36, 1203-1210` declares both `_completionFacts` and `_staticInitializationFacts` with identical constructor arguments (`session.Compilation`, `cancellationToken`). `DefiniteOperationFacts` only holds compilation and cancellation state; consolidating both onto `_completionFacts` eliminates redundant fields and constructor allocations. | `SharpProof.Effects/OperationCompletionEvaluator.cs:12-16, 31-36, 1203-1210` |
+
+### Checked and not proposed (part thirty-four)
+
+- `PropertyDispatchFacts.cs` evaluates auto-property and accessor dispatch paths with strict
+  Roslyn syntax guards. Retained as-is for contract verification safety.
+- `StringConcatenationEffectResolver` implements multi-part string interpolation formatting
+  semantics. Retained as-is to preserve exact BCL format string exception behaviors.
+
+### Status (part thirty-four)
+
+R386-R392 are `pending`. R387, R388, R389, R390, and R392 are clean local refactorings.
+R386 eliminates major algorithmic duplication between exception reachability and using disposal.
+R391 removes AST-scanning allocation churn.
+
+## Second survey, part thirty-five: R393-R399
+
+This pass surveyed relational summaries, API specifications, spec term instantiation,
+content hashing, assembly validation, and summary lowerers across `SharpProof.Summaries`,
+`SharpProof.Specs`, and `SharpProof.CompilerCollector`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R393 | **`CompilerSpecificationPackProvider` duplicates the relational spec pack AST, JSON parser, and term instantiator from `SharpProof.Specs`.** `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:258-297, 559-693, 821-849` defines a private 7-node term AST, an 85-line JSON parser (`ParseTerm`), operator string mappers, and a recursive term instantiator. `SharpProof.Specs` (referenced by `CompilerCollector`) already provides the identical declarative term hierarchy (`SpecTermDeclaration` in `DefaultApiSpecCatalog.generated.cs:126-159`) and term instantiation engine (`ApiSpecInstantiator.InstantiatePostconditions` in `ApiSpecInstantiation.cs:132-326`) for `RelationalSpecPackCatalog.json`. Consolidating relational spec pack term parsing onto `SharpProof.Specs` eliminates >150 lines of duplicate AST definitions, switch tables, and recursive AST instantiators. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:258-297, 559-693, 821-849`; `SharpProof.Specs/DefaultApiSpecCatalog.generated.cs:126-159`; `SharpProof.Specs/ApiSpecInstantiation.cs:132-326` |
+| R394 | **`ApiSpecInstantiator.InstantiatePostconditions` allocates three fresh dictionaries and performs linear variable scans per call.** `SharpProof.Specs/ApiSpecInstantiation.cs:42-44, 71-74` allocates three immutable dictionaries on every instantiation call (`substitutions.ToImmutableDictionary()`, `template.Variables.ToImmutableDictionary(Id)`, and `template.Variables.ToImmutableDictionary((Role, Ordinal))`). In addition, `ApiSpecContentDigest.cs:92-94` performs a linear scan `variables.Single(item => item.Role == variable.Role && item.Ordinal == variable.Ordinal)` for every variable term across all postconditions. Pre-indexing variable mappings on immutable `ApiSpecTemplate` during table compilation eliminates per-instantiation dictionary allocations and linear scans. | `SharpProof.Specs/ApiSpecInstantiation.cs:42-44, 71-74, 166-171`; `SharpProof.Specs/ApiSpecContentDigest.cs:92-94`; `SharpProof.Specs/ApiSpecTable.cs:120-121` |
+| R395 | **Three summary compiler lowerers duplicate IR variable synthesis, signature construction, and environment initialization.** `CompilerRelationalSummaryProvider.TryBuildSource` (`SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:231-243`), `CompilerImplementationIlSummaryLowerer.TryBuild` (`CompilerImplementationIlSummaryLowerer.cs:248-266`), and `CompilerSpecificationPackProvider.TryBuild` (`CompilerSpecificationPackProvider.cs:150-211`) all independently synthesize parameter/result IR variables, construct `IrSummarySignature`, map the parameter environment dictionary, and invoke `IrRelationalSummaryBuilder.Build`. Centralizing this canonical signature/environment sequence in `SharpProof.Summaries` eliminates ~70 lines of repetitive lowerer boilerplate. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:231-243, 293-308`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:248-266, 288-296`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:150-211` |
+| R396 | **Lack of value equality on `IrSummaryProvenance` forces ad-hoc 4-tuple dictionary keys and duplicate 4-stage sorting chains.** `SharpProof.Summaries/IrRelationalSummary.cs:28-79` defines `IrSummaryProvenance` as a standard class without `IEquatable`. Consequently, `IrRelationalSummaryBuilder.cs:190-194` declares `Dictionary<(IrSummaryOrigin Origin, string EvidenceCallIdentity, string EvidenceIdentity, string EvidenceSha256), IrSummaryProvenance>`, allocates 4-tuples on every dependency add (lines 523-528), and executes a 4-level `OrderBy().ThenBy().ThenBy().ThenBy()` chain (lines 279-287). `CompilerRelationalSummaryProvider.cs:42-47` repeats the same 4-level sorting chain. Declaring `IrSummaryProvenance` as a record class or implementing `IEquatable` removes custom tuple keys and duplicate sorting logic. | `SharpProof.Summaries/IrRelationalSummary.cs:28-79`; `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:190-194, 279-287, 521-529`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:42-47` |
+| R397 | **`ApiSpecTable.ValidateDeclaration` uses ad-hoc string concatenation and LINQ for approved assembly uniqueness checks.** `SharpProof.Specs/ApiSpecTable.cs:229-238` checks assembly uniqueness by concatenating `assembly.Name + "\u001f" + assembly.PublicKeyToken.ToUpperInvariant() + "\u001f" + (int)assembly.ReferenceFamily` and counting `.Distinct().Count()`. Because `ApiSpecAssemblyIdentity` is already a record holding `(Name, PublicKeyToken, ReferenceFamily)`, checking uniqueness via `IEqualityComparer<ApiSpecAssemblyIdentity>` or a `HashSet` avoids allocating formatted delimiter strings and LINQ enumerators for every target assembly during spec table validation. | `SharpProof.Specs/ApiSpecTable.cs:229-238`; `SharpProof.Specs/DefaultApiSpecCatalog.generated.cs:112-116` |
+| R398 | **Constructor-to-property boilerplate across `IrRelationalSummary`, `IrRelationalSummaryBuildResult`, and `IrSummaryInstantiation`.** `SharpProof.Summaries/IrRelationalSummary.cs:102-181` contains ~60 lines of repetitive parameter-to-field/property mapping in classic constructor syntax. Adopting C# 12 primary constructors or positional records on these carrier models eliminates ~40 lines of constructor plumbing while preserving full immutability and API compatibility. | `SharpProof.Summaries/IrRelationalSummary.cs:102-181` |
+| R399 | **`ApiSpecTermValidator.TryNegate` duplicates integer negation overflow handling from `IrScalarOperations`.** `SharpProof.Specs/ApiSpecTermValidator.cs:275-287` implements a local helper catching `OverflowException` from `checked(-value)` while line 295 delegates binary arithmetic directly to `IrScalarOperations.Evaluate`. Hoisting unary negation into `IrScalarOperations` unifies scalar evaluation across IR interpretation and spec validation, eliminating ad-hoc overflow-catching arithmetic in `ApiSpecTermValidator`. | `SharpProof.Specs/ApiSpecTermValidator.cs:275-287`; `SharpProof.Ir/IrInterpreter.cs:18-48` |
+
+### Checked and not proposed (part thirty-five)
+
+- `ApiSpecContentDigest.ComputeSha256` ensures deterministic invariant cryptographic signatures
+  over normalized API specifications. Retained as-is for spec security and auditability.
+- `DefaultApiSpecCatalog.generated.cs` code generation maps specification catalogs from JSON;
+  the generator ensures strict schema validation at build time.
+
+### Status (part thirty-five)
+
+R393-R399 are `pending`. R393 eliminates a major AST and JSON parsing duplication in `CompilerCollector`.
+R394, R396, and R397 optimize term instantiation, dependency sorting, and assembly validation.
+R395, R398, and R399 streamline summary lowerers and scalar arithmetic.
+
+## Second survey, part thirty-six: R400-R406
+
+This pass surveyed the IR model, operator catalogs, contract resolvers, type specialization,
+and program builders across `SharpProof.Ir`, `SharpProof.Contracts`, and `SharpProof.Attributes`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R400 | **`IrTermServices.cs` declares redundant pass-through forwarders for `IrOperatorCatalog`.** `SharpProof.Ir/IrTermServices.cs:201-204, 277-282` defines `IsNullable(IrTypeKind)` and `GetBuiltInType(IrFactory, IrTypeKind)` which do nothing other than forward to `IrOperatorCatalog.IsNullable` and `IrOperatorCatalog.GetBuiltInType` (`SharpProof.Ir/IrOperatorCatalog.generated.cs:55-73`). Both methods have identical internal visibility in `SharpProof.Ir`. Calling `IrOperatorCatalog` directly at all 5 call sites in `IrFactory.cs` (lines 302, 394, 536, 543, 551) and `IrTermServices.cs` eliminates 10 lines of forwarding boilerplate. | `SharpProof.Ir/IrTermServices.cs:201-204, 277-282`; `SharpProof.Ir/IrOperatorCatalog.generated.cs:55-73`; `SharpProof.Ir/IrFactory.cs:302, 394, 434, 536, 543, 551` |
+| R401 | **`EffectiveContractSourceResolver` duplicates direct-clause fallback resolution across three branches and uses an unnecessary constructor wrapper.** `SharpProof.Contracts/EffectiveContractSourceResolver.cs:88-153` contains three branches returning direct clause resolution: lines 88-98 and 100-108 can be folded into a single guard (`if (direct.HasPlacementErrors || direct.Clauses.Any(static clause => clause.IsValid))`). In addition, lines 155-168 declare a private static helper `Create` that merely invokes `new EffectiveContractSourceResolution(...)`. Inlining the constructor call eliminates 14 boilerplate lines. | `SharpProof.Contracts/EffectiveContractSourceResolver.cs:88-108, 145-168`; `SharpProof.Contracts/EffectiveContractModels.generated.cs:12-25` |
+| R402 | **Boolean term validation guards are duplicated across `IrSemanticTerms`, `IrProgramBuilder`, and `IrFactory`.** `SharpProof.Ir/IrSemanticTerms.cs:104-119` (`ValidateBooleanTerm`), `SharpProof.Ir/IrProgramBuilder.cs:302-311` (`ValidateBoolean`), and `SharpProof.Ir/IrFactory.cs:496-499` each independently check null arguments, call `EnsureTerm`, and verify `term.Type == BooleanType`. Hoisting a canonical `factory.RequireBooleanTerm(term, parameterName)` helper onto `IrFactory` removes repetitive validation logic across IR producers. | `SharpProof.Ir/IrSemanticTerms.cs:104-119`; `SharpProof.Ir/IrProgramBuilder.cs:302-311`; `SharpProof.Ir/IrFactory.cs:496-499` |
+| R403 | **`ContractExpressionBinder.Bind` is an unnecessary single-expression wrapper around private `BindWithFrontend`.** `SharpProof.Contracts/ContractExpressionBinder.cs:42-45` defines `internal ExpressionBindingResult Bind(IOperation operation) => BindWithFrontend(operation);`, where `BindWithFrontend` (`lines 103-136`) has only that single caller. Renaming `BindWithFrontend` directly to `Bind` eliminates the forwarding layer. | `SharpProof.Contracts/ContractExpressionBinder.cs:42-45, 103-136` |
+| R404 | **`ContractClauseInventoryBuilder` repeats partial property-accessor extraction logic across three methods.** `GetPartialImplementation` (`SharpProof.Contracts/ContractClauseInventoryBuilder.cs:390-398`), `NormalizeCallable` (`lines 456-462`), and `GetPartialDefinition` (`lines 477-485`) each repeat the exact same conditional selection between `property.GetMethod` and `property.SetMethod` based on `method.MethodKind == MethodKind.PropertyGet`. Centralizing accessor resolution in a shared helper simplifies partial property contract tracking. | `SharpProof.Contracts/ContractClauseInventoryBuilder.cs:382-399, 454-464, 466-487` |
+| R405 | **`ContractCanonicalization.TypeSpecializer` duplicates method signature type registration loops.** `SharpProof.Contracts/ContractCanonicalization.cs:44-52` and lines 61-70 execute the identical return-type and parameter loop to register definition and constructed types with `AddSignatureType`. Factoring out `AddMethodSignature(IMethodSymbol definition, IMethodSymbol constructed)` eliminates the duplicate loop. | `SharpProof.Contracts/ContractCanonicalization.cs:44-52, 61-70` |
+| R406 | **`IrProgramInterpreter` primary constructor duplicates argument null guards on adjacent field initializers.** `SharpProof.Ir/IrProgramInterpreter.cs:11-16` calls `ArgumentNullGuard.NotNull(factory, nameof(factory))` twice in adjacent field initializers (`_factory` and `_terms = new(ArgumentNullGuard.NotNull(factory, nameof(factory)))`), while `IrInterpreter` constructor also validates `factory != null`. Passing `_factory` directly to `_terms` removes the redundant guard call. | `SharpProof.Ir/IrProgramInterpreter.cs:11-16`; `SharpProof.Ir/IrInterpreter.cs:104-105` |
+
+### Checked and not proposed (part thirty-six)
+
+- `IrSubstitution.cs` performs variable substitution via immutable term rewriting trees.
+  Retained as-is for pure functional IR safety and acyclic AST preservation.
+- `ContractRuntimePolicy.ThrowIfRuntimeEvaluationEnabled` enforces fail-closed static analyzer
+  boundaries against runtime contract reflection.
+
+### Status (part thirty-six)
+
+R400-R406 are `pending`. R400, R403, R405, and R406 are direct, safe refactoring simplifications.
+R401, R402, and R404 streamline contract resolution flow and IR validation.
+
+## Second survey, part thirty-seven: R407-R412
+
+This pass surveyed worker execution, protocol serialization, process launching,
+and budget tracking across `SharpProof.Worker`, `SharpProof.Worker.Protocol`,
+`SharpProof.Worker.Launcher`, and `SharpProof.Host`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R407 | **`SharpProof.Worker.Launcher/Program.cs` contains a verbatim duplicate exit-code inconsistency check.** In `ValidateAndReport` (`SharpProof.Worker.Launcher/Program.cs:409-422`), lines 409-415 and lines 416-422 are identical consecutive `if` blocks checking `workerExitCode is not (null or 0) && response?.RunStatus == WorkerRunStatus.Complete` and printing the identical error message. Deleting the duplicate block removes 7 lines with zero risk. | `SharpProof.Worker.Launcher/Program.cs:409-422` |
+| R408 | **Callable and effect verifiers duplicate vacuous contradictory precondition claim assembly.** `CallableVerifier.ContradictoryPostconditions` (`SharpProof.Worker/CallableVerifier.cs:317-340`), `CallableVerifier.VerifyPostconditionsAsync` (`lines 298-308`), and `EffectClaimResultAssembler.Assemble` (`SharpProof.Worker/EffectClaimResultAssembler.cs:51-67`) execute the identical multi-step mutation sequence to set `Vacuity = ContradictoryPreconditions`, assign `ProofCore = [.. entryFeasibility.ProofCore]`, and map `Assumptions = MarkAssumptionsUsed(...)`. Extracting `CallableClaimResultAssembler.CreateContradictory` unifies vacuous claim construction. | `SharpProof.Worker/CallableVerifier.cs:298-308, 317-340`; `SharpProof.Worker/EffectClaimResultAssembler.cs:51-67` |
+| R409 | **`WorkerProtocolJson.ValidateForRequest` overloads duplicate a 28-line parameter guard sequence and force launcher branching.** `SharpProof.Worker.Protocol/ProtocolJson.cs:197-227` and lines 229-266 repeat the identical 28-line parameter validation and invariant checking sequence. Because the two overloads are separate, `SharpProof.Worker.Launcher/Program.cs:385-403` contains an 18-line `if/else` block duplicating 8 parameter lines per branch. Making `evidenceAuthority = null` optional on a single method removes ~40 lines across protocol and launcher. | `SharpProof.Worker.Protocol/ProtocolJson.cs:197-266`; `SharpProof.Worker.Launcher/Program.cs:385-403` |
+| R410 | **`CallableVerifier.VerifyPostconditionsAsync` duplicates resource limit abort handling and `SharpProofWorker` open-codes resource reading.** In `CallableVerifier.cs:235-239` and lines 244-250, resource limit exhaustion before and after query dispatch executes the identical recovery block (`records.AddRange(CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.ResourceLimit).Skip(index)); break;`). Furthermore, `SharpProofWorker.cs:20-23` open-codes backend resource retrieval instead of calling `ReadResources(backend)` (`lines 607-609`). Unifying the abort sequence and reader call cleans up resource enforcement. | `SharpProof.Worker/CallableVerifier.cs:235-250`; `SharpProof.Worker/SharpProofWorker.cs:20-23, 607-609` |
+| R411 | **`SharpProof.Worker.Launcher/Program.cs` contains an isolated single-call arithmetic wrapper `ComputeFinalLimit`.** `SharpProof.Worker.Launcher/Program.cs:303-307` defines `internal static int ComputeFinalLimit(int projectMilliseconds, int terminationGraceMilliseconds) => checked(projectMilliseconds + terminationGraceMilliseconds);` called only once at line 249. Inlining the expression or delegating to `WorkerExecutionEnvelope` consolidates timeout arithmetic. | `SharpProof.Worker.Launcher/Program.cs:249-251, 303-307`; `SharpProof.Worker.Protocol/WorkerExecutionEnvelope.cs:8-26` |
+| R412 | **Redundant partial class wrapper `LauncherPresentation.Level` exists solely to expose a private generated method.** `SharpProof.Worker.Launcher/LauncherProjections.generated.cs:64-76` generates `private static string Level(object policy, string advisory)`, forcing `Program.cs:897-903` to declare a 7-line partial class wrapper `internal static string Level(Enum policy, string advisory)`. Emitting the generated method as `internal` directly in `Generate-ProjectionCatalog.ps1` allows deleting the handwritten wrapper. | `SharpProof.Worker.Launcher/Program.cs:897-903`; `SharpProof.Worker.Launcher/LauncherProjections.generated.cs:64-76` |
+
+### Checked and not proposed (part thirty-seven)
+
+- `VerificationCache.cs` calculates deterministic cache keys from canonical compiler manifests
+  and input snapshots. Cache eviction and key hashing are required for incremental verification.
+- `AcyclicBlockPredicateExecutor.cs` verifies acyclic method control flow bounds. Retained as-is.
+
+### Status (part thirty-seven)
+
+R407-R412 are `pending`. R407 and R411 are trivial launcher cleanups. R408 and R410 unify
+claim assembly and budget enforcement in the verification worker. R409 and R412 reduce protocol and projection boilerplate.
+
+## Second survey, part thirty-eight: R413-R419
+
+This pass surveyed SMT backend encoding, Z3 expression management, proof kernel justifications,
+cancellation handling, and unsat core validation across `SharpProof.Smt` and `SharpProof.Verify`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R413 | **`Justification` in `SharpProof.Verify` is an unused, empty top-level inheritance layer.** `SharpProof.Verify/Evidence.cs:29-41` declares `public abstract class Justification` with a private protected constructor and zero members, subclassed only by `public abstract class ProofJustification : Justification`. Across the entire repository, all models, proof core collections, justifications, and declarative schemas operate exclusively on `ProofJustification`. Collapsing `Justification` and `ProofJustification` eliminates an empty, redundant inheritance level. | `SharpProof.Verify/Evidence.cs:29-41`; `SharpProof.Verify/DeclarativeModels.generated.cs:64,68`; `SharpProof.DeclarativeModels.catalog.json:941,948` |
+| R414 | **`QueryEncoder` constructor performs double iteration over `Variables` and contains an unreachable defensive guard.** In `SharpProof.Smt/IrSmtBackend.cs:407-445`, `QueryEncoder` loops through `Variables` twice: once to filter integer variables and once by index to construct Z3 constants. Both passes call `meter.Consume()` and look up `_factory.GetVariableInfo(variable).Type`. In addition, the second loop contains an unreachable exception branch (`"The model-variable type was not prevalidated."`). Fusing into a single loop avoids duplicate traversals, dictionary lookups, and dead code. | `SharpProof.Smt/IrSmtBackend.cs:407-445` |
+| R415 | **Native Z3 integer constant AST handles are re-allocated afresh per query operation.** In `SharpProof.Smt/IrSmtBackend.cs`, `_owner.Own(_context.MkInt(long.MinValue))`, `_context.MkInt(long.MaxValue)`, `_context.MkInt(0)`, and `_context.MkInt(-1)` are called repeatedly across `CheckCore` (lines 173-178), `Bounded` (lines 687-692), `DivideTowardZero` (line 706), and `DivisionDefined` (lines 727-736). Pre-allocating and caching fixed integer constants (`Zero`, `MinusOne`, `LongMin`, `LongMax`) once per query on `QueryEncoder` eliminates repetitive native Z3 handle allocations and reduces `Z3ExpressionOwner` tracking overhead. | `SharpProof.Smt/IrSmtBackend.cs:173-179, 687-692, 706, 727-736` |
+| R416 | **Cancellation polling and exception filtering are duplicated between `IrSmtBackend` and `ProofKernel`.** In `SharpProof.Smt/IrSmtBackend.cs:77-116`, `cancellationToken.ThrowIfCancellationRequested()` is called 7 times in 40 lines across catch blocks for `QueryResourceLimitException`, `UnsupportedIrEncodingException`, and general `Exception`. In `SharpProof.Verify/ProofKernel.cs:20-29`, `catch (OperationCanceledException) { throw; }` precedes `catch (Exception)`. Adding `and not OperationCanceledException` to the exception filter in `ProofKernel` and routing `IrSmtBackend` errors through a single failure wrapper cleans up repetitive cancellation checks. | `SharpProof.Smt/IrSmtBackend.cs:77-116`; `SharpProof.Verify/ProofKernel.cs:20-29` |
+| R417 | **`ProofKernel.CreateProven` performs redundant `.Distinct()` calls and multi-pass traversal over `UnsatCore`.** `SharpProof.Smt/IrSmtBackend.cs:316-317` already deduplicates and sorts `UnsatCore` (`BackendCheckResult.Unsatisfiable(core.Distinct().OrderBy(...))`). In `SharpProof.Verify/ProofKernel.cs:58-68`, `CreateProven` executes `result.UnsatCore.Any(...)` bounds checking followed by `foreach (var index in result.UnsatCore.Distinct())`. Calling `.Distinct()` allocates an unnecessary hash set over an already-distinct immutable array; fusing bounds checks and justification mapping into a single loop avoids multiple traversals. | `SharpProof.Smt/IrSmtBackend.cs:316-317`; `SharpProof.Verify/ProofKernel.cs:58-68` |
+| R418 | **`QueryEncoder.EncodeBinary` repeats `Integer(left)` and `Integer(right)` typechecks and comparison wrappers across 7 switch arms.** In `SharpProof.Smt/IrSmtBackend.cs:597-612`, `Integer(left)` and `Integer(right)` (each doing runtime typecasting) are called 14 times across 7 arithmetic/relational operator arms, each wrapping the result in `new EncodedValue(_owner.Own(...), defined)`. Extracting integer operands once upfront reduces 14 runtime typechecks to 2 and removes repetitive wrapper allocation. | `SharpProof.Smt/IrSmtBackend.cs:597-612` |
+| R419 | **`BackendCheckResult` defines a redundant private forwarding constructor.** `SharpProof.Verify/Backend.cs:35-42` defines a private constructor `BackendCheckResult(status, unsatCore, model, failureReason) : this(..., default)` whose sole purpose is to forward to the generated internal constructor in `DeclarativeModels.generated.cs:43-50`. Factory methods `Unsatisfiable`, `Satisfiable`, and `Unknown` can directly invoke the generated constructor, eliminating the redundant overload. | `SharpProof.Verify/Backend.cs:35-42`; `SharpProof.Verify/DeclarativeModels.generated.cs:43-50` |
+
+### Checked and not proposed (part thirty-eight)
+
+- `Z3ExpressionOwner` disposes native Z3 AST handles upon solver query completion.
+  Retained as essential native memory safety.
+- `OutcomeCachePolicy` evaluates cacheability based on terminal proof outcomes.
+
+### Status (part thirty-eight)
+
+R413-R419 are `pending`. R413, R414, R418, and R419 are clean code and AST simplifications.
+R415, R416, and R417 eliminate native handle allocations, cancellation clutter, and redundant LINQ passes.
+
+## Second survey, part thirty-nine: R420-R426
+
+This pass surveyed MSBuild properties, build targets, packaging scripts, release version
+extraction, and test compilation links across `scripts/`, `Directory.Build.props`, `eng/`,
+and `SharpProof.Verifier`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R420 | **Missing import causes dead item evaluation for compiler-visible properties in self-application.** `eng/self-application/SharpProof.SelfApplication.props:29-34` declares `<CompilerVisibleProperty Include="@(_SharpProofCompilerVisibleProperty)" />` when self-application is enabled and portable packages are absent. However, `SharpProof.CompilerVisibleProperties.props` (which defines `@(_SharpProofCompilerVisibleProperty)`) is never imported in `SharpProof.SelfApplication.props` or `Directory.Build.targets`. Consequently, the item list evaluates to empty and injects 0 properties during self-application builds. Importing the props file restores the intended 9 compiler-visible properties. | `eng/self-application/SharpProof.SelfApplication.props:29-34`; `SharpProof.Package/buildTransitive/SharpProof.CompilerVisibleProperties.props:1-33` |
+| R421 | **`_SharpProofPackageBuildTasksPath` duplicates `_SharpProofBuildTasksPath` and creates redundant targets condition re-evaluation.** In `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:11-17`, `_SharpProofBuildTasksPath` and `_SharpProofPackageBuildTasksPath` have character-identical definitions and identical test overrides. In `SharpProof.Verifier.targets:12-13, 35`, both properties are re-evaluated and compared with `!=` on line 35 (which can never trigger). Consolidating on `_SharpProofBuildTasksPath` eliminates 6 lines of redundant property definitions and dead condition checks. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:11-17`; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:12-13, 35` |
+| R422 | **`Test-SharpProofPackagePayloads.ps1` performs redundant disk I/O and reflection double-unpacking for every DLL.** In `scripts/Test-SharpProofPackagePayloads.ps1:236-256`, `Get-SharpProofArchiveAssemblyName` writes the entry bytes to a temp file, queries reflection, and deletes the file at line 237. Lines 248-255 call `Get-SharpProofArchiveAssemblyName` a second time for every DLL entry to build `$payloadEvidence`. Reusing the extracted assembly name avoids duplicate disk I/O and reflection inspection. | `scripts/Test-SharpProofPackagePayloads.ps1:236-256` |
+| R423 | **Release version extraction and XML parsing is duplicated across three scripts bypassing `Get-SharpProofReleaseVersion`.** `Invoke-SharpProofContainer.ps1:580-584`, `Test-SharpProofPilots.ps1:91-96`, and `Test-SharpProofReadme.ps1:376-382` each manually parse `SharpProof.Release.props` XML and perform string replacement instead of calling `Get-SharpProofReleaseVersion` (`scripts/Get-SharpProofReleaseVersion.ps1:12-36`). Consolidating onto the central helper enforces release version syntax validation and removes 18 lines of duplicated XML parsing. | `scripts/Invoke-SharpProofContainer.ps1:580-584`; `scripts/Test-SharpProofPilots.ps1:91-96`; `scripts/Test-SharpProofReadme.ps1:376-382`; `scripts/Get-SharpProofReleaseVersion.ps1:12-36` |
+| R424 | **Verbose default `IncludeAssets` on `Microsoft.CodeAnalysis.Analyzers` package references adds boilerplate across 5 analyzer projects.** `SharpProof.Analyzer.csproj:9-13`, `SharpProof.Analyzer.Core.csproj:11-15`, `SharpProof.CompilerCollector.csproj:10-14`, `SharpProof.ContractForGenerator.csproj:10-14`, and `SharpProof.CompilerProbe.TestAsset.csproj:15-19` explicitly declare `IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"` (the default asset list). Compacting to `<PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />` or moving it to `Directory.Build.props` removes 15 lines of XML boilerplate. | `SharpProof.Analyzer/SharpProof.Analyzer.csproj:9-13`; `SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj:11-15`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:10-14`; `SharpProof.ContractForGenerator/SharpProof.ContractForGenerator.csproj:10-14`; `SharpProof.CompilerProbe.TestAsset/SharpProof.CompilerProbe.TestAsset.csproj:15-19` |
+| R425 | **`DiagnosticDescriptorCatalogAssertions.cs` link is duplicated across three test projects instead of centrally in `Directory.Build.props`.** `SharpProof.Analyzer.Test.csproj:18-19`, `SharpProof.ContractForGenerator.Test.csproj:16-17`, and `SharpProof.Meta.Analyzers.Test.csproj:12-13` repeat identical 2-line `<Compile Include="..\eng\testing\DiagnosticDescriptorCatalogAssertions.cs" Link="..." />` elements. Hoisting to `Directory.Build.props:89-94` alongside `DictionaryAnalyzerConfigOptions.cs` centralizes test infrastructure linking. | `SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj:18-19`; `SharpProof.ContractForGenerator.Test/SharpProof.ContractForGenerator.Test.csproj:16-17`; `SharpProof.Meta.Analyzers.Test/SharpProof.Meta.Analyzers.Test.csproj:12-13`; `Directory.Build.props:89-94` |
+| R426 | **Package source directory and symbol pairing verification is duplicated between consumer testing and release evidence scripts.** `scripts/Test-SharpProofPackageConsumers.ps1:40-93` and `scripts/New-SharpProofReleaseEvidence.ps1:312-418` duplicate a 40-line verification sequence (enumerating 3 `.nupkg`/`.snupkg` pairs, matching `$SharpProofPackageIds`, asserting single version, verifying git commit, and pairing symbol packages). Moving the shared logic to `scripts/SharpProof.PackageIdentity.psm1` eliminates ~40 duplicate script lines. | `scripts/Test-SharpProofPackageConsumers.ps1:40-93`; `scripts/New-SharpProofReleaseEvidence.ps1:312-418`; `scripts/SharpProof.PackageIdentity.psm1:1-111` |
+
+### Checked and not proposed (part thirty-nine)
+
+- `Directory.Packages.props` central package management pins package versions centrally;
+  retained as-is for dependency security.
+- `Get-SharpProofTcbPaths.ps1` resolves cryptographic trust boundary inventory.
+
+### Status (part thirty-nine)
+
+R420 is merged into applied R328: the proposed shared item import was not needed;
+the self-application entry point now directly carries the grouped property list,
+so no dead item evaluation remains. R421-R426 are `pending` and streamline build
+props, test links, and package scripts.
+
+## Second survey, part forty: R427-R432
+
+This pass surveyed architecture test suites, temporary directory lifecycles, gate process runners,
+differential oracles, and gate compilation hosts across `SharpProof.ArchitectureTest`, `SharpProof.Gates`,
+`SharpProof.Testing`, and `Tools/SharpProof.Fuzz`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R427 | **`ProcessResult` record and `RunAsync` process runner are duplicated across 8 test files in `SharpProof.ArchitectureTest`.** `AcceptanceScriptTests.cs:260-287`, `ContainerAuthorityScriptTests.cs:260-281`, `CoverageScriptTests.cs:1615-1642`, `FuzzRunnerEvidenceTests.cs:103-120`, and 4 other test suites each declare private `ProcessResult` records and near-identical asynchronous process spawning wrappers. Furthermore, 8 single-test files roll 20-line `pwsh -NoLogo -File` execution boilerplate. Hoisting `RunProcessAsync` and `ProcessResult` to `ArchitectureRepository.cs` eliminates 8 duplicate records and >200 lines of subprocess boilerplate. | `SharpProof.ArchitectureTest/AcceptanceScriptTests.cs:260-287`; `SharpProof.ArchitectureTest/ContainerAuthorityScriptTests.cs:260-281`; `SharpProof.ArchitectureTest/CoverageScriptTests.cs:1615-1642`; `SharpProof.ArchitectureTest/ArchitectureRepository.cs:5-132` |
+| R428 | **28 test methods roll manual temporary directory creation and `try/finally` cleanup bypassing linked `TempDirectory`.** `SharpProof.Package.Test/BuildTaskTests.cs` (across 27 test methods) and `SharpProof.Gates.Test/AcceptancePerformanceContractTests.cs:35-58` manually create temp directories and write `try { ... } finally { directory.Delete(recursive: true); }` blocks, despite `eng/testing/TempDirectory.cs` already being linked into both projects via `Directory.Build.props:76-81`. Adopting `using var temp = new TempDirectory(...)` eliminates ~100 lines of boilerplate and prevents directory leaks on test failures. | `SharpProof.Package.Test/BuildTaskTests.cs:423-438, 446-455, 492-500, 536-545, 596-605, 701-710, 755-765, 936-945, 991-1000, 1163-1175, 1219-1230, 1243-1255, 1278-1295, 1330-1345, 1432-1445, 1467-1480, 1506-1520, 1555-1570, 1600-1615, 1719-1730, 1800-1815, 1871-1885, 1999-2015, 2075-2090, 2122-2135, 2160-2175, 2197-2210`; `SharpProof.Gates.Test/AcceptancePerformanceContractTests.cs:35-58`; `eng/testing/TempDirectory.cs:1-20` |
+| R429 | **Subprocess stream piping and timeout termination in `OpenSourceCorpusImporter` and `PerformanceGate` duplicate `GateProcess`.** `OpenSourceCorpusImporter.ReadGitBlobAsync` (`SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:448-489`) and `PerformanceGate.cs:645-706` (`RunDotnetAsync` and `TerminateProcessAsync`) manually re-implement process startup, standard stream reading, timeout cancellation linked tokens, and tree termination instead of delegating to `GateProcess.cs:5-48`. Consolidating onto `GateProcess` standardizes process management across gates and removes ~45 duplicate lines. | `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:448-489`; `SharpProof.Gates/Performance/PerformanceGate.cs:645-706`; `SharpProof.Gates/GateProcess.cs:5-48` |
+| R430 | **Diagnostic error formatting and evaluation status descriptions are duplicated between differential oracle and fuzzing.** `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1760-1774` (`FormatErrors`) and `FrontendFuzzing.cs:1747-1758` (`Describe`) duplicate Roslyn error filtering/formatting and `IrEvaluationResult` string formatting from `SharpProof.Testing/IrCSharpDifferentialOracle.cs:59-64, 472-488`. Because `SharpProof.Fuzz` references `SharpProof.Testing`, exposing these formatting helpers in `SharpProof.Testing` eliminates ~30 lines of duplicate formatting logic. | `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1747-1774`; `SharpProof.Testing/IrCSharpDifferentialOracle.cs:59-64, 472-488` |
+| R431 | **`CorpusGateTests` uses brittle 4-level relative path navigation instead of canonical repository root resolution.** `CorpusGateTests.OssImporterRejectsMitLicenseWithAppendedRestrictions` (`SharpProof.Gates.Test/CorpusGateTests.cs:17-25`) locates license fixtures via `Path.Combine(TestDirectory, "..", "..", "..", "..", "SharpProof.Gates", ...)`. Using `RepositoryLayout.FindRoot()` aligns the fixture path with repository root discovery standards and avoids breakage under multi-TFM build layouts. | `SharpProof.Gates.Test/CorpusGateTests.cs:17-25`; `SharpProof.Gates/RepositoryLayout.cs:5-25` |
+| R432 | **Redundant LINQ `.Cast<MetadataReference>()` and unaligned parse options in `AnalyzerGateHost.cs`.** In `SharpProof.Gates/AnalyzerGateHost.cs:160-167`, `trustedPlatformAssemblies.Split(...).Select(...).Cast<MetadataReference>()` invokes a redundant LINQ cast on `PortableExecutableReference` instances. In addition, lines 27-28 duplicate `CSharpParseOptions` instantiation from `AnalyzerTestHost.cs:14-15`. Removing the no-op cast and aligning parser setup cleans up gate compilation infrastructure. | `SharpProof.Gates/AnalyzerGateHost.cs:27-28, 160-167`; `SharpProof.Analyzer.Test/AnalyzerTestHost.cs:14-15` |
+
+### Checked and not proposed (part forty)
+
+- `IrCSharpDifferentialOracle.cs` differential execution compares native IR execution against
+  Roslyn Roslyn-compiled dynamic assemblies. Preserved as the gold-standard fuzzing oracle.
+- `AcceptancePerformanceContractTests.cs` validates wall-clock and memory thresholds under container bounds.
+
+### Status (part forty)
+
+R427-R432 are `pending`. R427, R428, and R429 eliminate massive test boilerplate and subprocess duplication.
+R430, R431, and R432 clean up gate hosts, fixture paths, and oracle diagnostics.
+
+## Second survey, part forty-one: R433-R439
+
+This pass surveyed Roslyn analyzer engines, diagnostic descriptors, symbol matchers,
+generated code policies, and AST/CFG traversal routines across `SharpProof.Analyzer`,
+`SharpProof.Analyzer.Core`, and `SharpProof.Meta.Analyzers`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R433 | **`PrimaryConstructorCallableInventory.IsDeclaration` is completely unreferenced dead code.** `SharpProof.Analyzer.Core/PrimaryConstructorCallableInventory.cs:59-71` defines `IsDeclaration(IMethodSymbol, SyntaxNode?, SemanticModel?, CancellationToken)` across 13 lines. Across the entire codebase and test suite, only `TryGet` and `TryGetSynthesizedDefault` are consumed. Deleting this unused method removes 13 lines of dead code. | `SharpProof.Analyzer.Core/PrimaryConstructorCallableInventory.cs:59-71` |
+| R434 | **`AnalyzerGeneratedCodePolicy.IsGenerated` defines a redundant single-casting forwarding overload.** `SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs:18-29` defines `IsGenerated(IMethodSymbol, SyntaxTree, Compilation, CancellationToken)` which simply casts `method` to `(ISymbol)method` and forwards to `IsGenerated(ISymbol, ...)`. Because `IMethodSymbol` inherits from `ISymbol`, every call passing an `IMethodSymbol` binds directly to the `ISymbol` overload. Removing this forwarding overload eliminates 12 lines of boilerplate. | `SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs:18-29` |
+| R435 | **`IsExactNamespace` symbol identity matcher is duplicated in `SharpProof.Meta.Analyzers`.** `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1855-1876` and `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:969-984` contain character-identical implementations of `IsExactNamespace(INamespaceSymbol?, params string[])` that traverse parent namespaces. Exposing `SharpProofSoundnessAnalyzer.IsExactNamespace` internally and reusing it removes 22 duplicate lines. | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1855-1876`; `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:969-984` |
+| R436 | **Conversion and parenthesized operation unwrapping loop is duplicated in `SharpProof.Meta.Analyzers`.** `CacheSoundnessRules.UnwrapValue` (`SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:524-541`) and `CancellationBoundaryAnalyzer.Unwrap` (`SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs:357-373`) implement identical `while (operation is IConversionOperation or IParenthesizedOperation)` loops to unwrap underlying operands. Consolidating into a single shared helper eliminates 18 redundant lines. | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:524-541`; `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs:357-373` |
+| R437 | **`ContractForCompanionValidator.Validate` executes redundant dual-pass nested loops over symmetric comparisons.** `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:63-93` runs two sequential $O(N \times M)$ nested loops over `targets` and `candidates` evaluating `ContractForSymbolMatcher.MemberSignaturesMatch(target, candidate)`: lines 63-77 populate `byTarget` and lines 79-93 populate `byCandidate`. Fusing into a single nested loop over `targets` $\times$ `candidates` populates both maps simultaneously and halves symbol comparison overhead. | `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:63-93` |
+| R438 | **`ContractForCompanionValidator.At` is a trivial 7-line wrapper around `Diagnostic.Create`.** `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:267-273` defines `At(descriptor, location, arguments) => Diagnostic.Create(descriptor, location, arguments);`, forcing `ContractForValidationEngine.cs` to declare `using static ContractForCompanionValidator;`. Calling `Diagnostic.Create` directly eliminates unnecessary indirection. | `SharpProof.Analyzer.Core/ContractForValidation/ContractForCompanionValidator.cs:267-273`; `SharpProof.Analyzer.Core/ContractForValidation/ContractForValidationEngine.cs:3, 34-39, 88-90` |
+| R439 | **CFG `BasicBlock` operations and branch value concatenation is duplicated and open-coded.** `RequiresCallSiteTreeAnalyzer.cs:1093-1100` and `CacheSoundnessRules.cs:1244-1248` define `BlockOperations(BasicBlock)` to concatenate `block.Operations` and `block.BranchValue`, yet lines 1539-1542 and `RequiresCallSiteDiscovery.cs:152-154` inline this concatenation manually. Reusing `BlockOperations` across `SharpProof.Analyzer.Core` standardizes CFG block traversal. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1093-1100, 1539-1542`; `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:152-154`; `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1244-1248` |
+
+### Checked and not proposed (part forty-one)
+
+- `LanguageSubsetGate.cs` performs fail-closed syntax and language version checks on incoming syntax trees.
+  Retained as essential subset safety.
+- `RequiresCallSiteDiscovery.cs` constructs static call graphs across Roslyn control-flow blocks.
+
+### Status (part forty-one)
+
+R433-R439 are `pending`. R433 deletes dead inventory methods. R434, R435, R436, and R438 are direct
+code and AST unwrapping cleanups. R437 and R439 optimize validator loops and CFG traversal.
+
+## Second survey, part forty-two: R440-R445
+
+This pass surveyed C# metrics, complexity analyzers, code coverage reporters, and baseline
+reconciliation scripts across `scripts/CSharpSourceMetrics.ps1`, `scripts/Test-ProductionCSharpComplexity.ps1`,
+`scripts/Invoke-SharpProofCoverage.ps1`, and `scripts/Test-SharpProofCoverage.ps1`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R440 | **`CSharpSourceMetricsEngine.Measure` executes dual full-tree AST traversals and uses reflection-based syntax kind conversions.** `scripts/CSharpSourceMetrics.ps1:69-152` iterates over `root.DescendantTokens()` on lines 72-78 and subsequently iterates over `root.DescendantNodes()` on lines 84-142, performing two separate full-tree traversals per file. In addition, `Get-CSharpSyntaxKindName` (`lines 48-57`) and `scripts/GeneratedFileHelpers.ps1:231, 245` convert tokens and node types to strings via `[Enum]::GetName` and reflection rather than comparing integer raw kinds directly. Combining node/token counting into a single traversal and using integer kind checks eliminates repetitive tree walks and string allocations. | `scripts/CSharpSourceMetrics.ps1:48-57, 69-152`; `scripts/GeneratedFileHelpers.ps1:228-261` |
+| R441 | **`Test-ProductionCSharpComplexity.ps1` reads files before checking exclusions and performs redundant second disk reads for line counts.** In `scripts/Test-ProductionCSharpComplexity.ps1:131-168`, line 132 loads every file from disk with `Get-Content -Raw` prior to checking `if ($path.Replace('\', '/') -in $approvedGeneratedFiles)` on line 133, discarding generated files after I/O. Then on line 157, line count measurement invokes `$lines = @(Get-Content -LiteralPath $path)`—a second disk read of the same file. Checking exclusions upfront and deriving line counts from the in-memory string eliminates a redundant disk read per file. | `scripts/Test-ProductionCSharpComplexity.ps1:131-168` |
+| R442 | **`Test-SharpProofCoverage.ps1` performs redundant string splitting, sorting, and unreachable verification of module identities.** In `scripts/Test-SharpProofCoverage.ps1:408-424`, lines 409-415 verify exact string equality `[string]$authorityNode.modules -cne $expectedModuleIdentityText` (which is already sorted). Lines 416-424 immediately follow by splitting `$authorityNode.modules` by comma, executing `Sort-Object`, rejoining into a string, and asserting inequality again. Because the first condition guaranteed exact match, lines 416-424 are dead defensive array allocations and sorts. | `scripts/Test-SharpProofCoverage.ps1:408-424` |
+| R443 | **`Test-SharpProofCoverage.ps1` executes a redundant second-pass sequence-point traversal for aggregate coverage.** `Measure-Coverage` (`scripts/Test-SharpProofCoverage.ps1:515-542`) is called per-project in lines 547-588 to calculate project metrics. On line 592, the script calls `Measure-Coverage -Paths $productionPaths`, re-traversing every sequence point in all files a second time. Because production projects partition the source file universe without overlap, aggregate covered/coverable lines can be accumulated directly during the first loop, eliminating repository-wide second-pass traversal. | `scripts/Test-SharpProofCoverage.ps1:515-542, 544-596` |
+| R444 | **Per-file Git diff subprocess spawning in changed-TCB coverage calculation.** In `scripts/Test-SharpProofCoverage.ps1:670-727`, lines 673-708 spawn an individual `git diff` process for each changed file in a loop. In addition, `$changedMetadataFiles` is filtered with `Where-Object` on line 711 while lines 719-727 repeat the exclusion check. Spawning a single `git diff` with all changed paths and recording metadata inline eliminates multi-process invocation latency and duplicate set filtering. | `scripts/Test-SharpProofCoverage.ps1:670-727` |
+| R445 | **Duplicated `XmlWriterSettings` setup and stream disposal boilerplate across coverage scripts.** `scripts/Invoke-SharpProofCoverage.ps1:107-118` and lines 289-304 repeat identical 16-line blocks of `XmlWriterSettings` instantiation (UTF-8 without BOM, Indent = true, NewLineHandling = Replace) and `try/finally` disposal logic for runsettings and Cobertura report rewriting. Extracting a shared `Save-XmlDocument` helper centralizes XML encoding policies and eliminates 16 lines of repetitive stream boilerplate. | `scripts/Invoke-SharpProofCoverage.ps1:107-118, 289-304` |
+
+### Checked and not proposed (part forty-two)
+
+- `Resolve-SharpProofReleaseCoverageBaseline.ps1` calculates deterministic minimum line coverage thresholds.
+  Threshold verification is essential for regression prevention.
+- `CSharpSourceMetrics.ps1` token and trivia counting enforces statement and branch complexity budgets.
+
+### Status (part forty-two)
+
+R440-R445 are `pending`. R441, R442, and R445 are direct I/O, dead check, and XML writer simplifications.
+R440, R443, and R444 optimize AST traversals, sequence point aggregation, and git diff process spawning.
+
+## Second survey, part forty-three: R446-R450
+
+This pass inspected the verifier budget bridge, finite-domain fuzz oracle, switch-expression flow analysis, and effect-flow helpers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R446 | **Verifier defaults are independently hard-coded in the protocol model, shipped MSBuild props, and the build-task surface.** The generated protocol model declares `DefaultMethodRlimit=20000000`, `DefaultMethodWallTimeMilliseconds=10000`, `DefaultProjectWallTimeMilliseconds=300000`, `MaximumParallelism=4`, `DefaultMaximumExpressionDepth=64`, `WorkerLauncherDefaults.TerminationGraceMilliseconds=1000`, and `WorkerCacheOptions.DefaultMaximumBytes=536870912`; `SharpProof.Verifier.props` repeats the same values as seven literal MSBuild defaults, and `RunVerifier` repeats the project wall-time and termination-grace values as task-property initializers. R319/R363 already record the query-rlimit copy, so this entry covers the remaining budget vocabulary. A generated props fragment or one checked source-of-truth for protocol and MSBuild defaults would remove the drift surface while preserving the consumer override conditions. | `SharpProof.Worker.Protocol/ProtocolModel.schema.json:514,520-521`; `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:27-30,75-95`; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:18-26`; `SharpProof.BuildTasks/RunVerifier.cs:79-81` |
+| R447 | **`FiniteDomainSmtDifferentialOracle` validates the same formula contract twice.** `IsDefinedForAllAssignments` and `CompareAsync` each null-check `factory`, null-check `formula`, compare `formula.Type` to `factory.BooleanType`, and throw the same Boolean-formula `ArgumentException` (`Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs:32-52` and `:125-145`). The methods intentionally retain different static/instance APIs and then perform different oracle work, but the common precondition can be one private helper, avoiding two copies of validation and message text. | `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs:32-52,125-145` |
+| R448 | **`SwitchExpressionFacts` repeats the per-arm selection and stop-condition algorithm across known, unknown, and unmatched-path queries.** The constant-value branch of `GetArms` (`lines 145-174`) and `GetArmsForUnknownValue` (`lines 270-298`) both compute a pattern selection, apply the guard, optionally add the arm, and stop on an always-selected arm or an abruptly evaluated pattern/guard. `HasReachableUnmatchedPath` (`lines 200-249`) repeats the same stop checks without the add step. In the known-value branch, `GetArms` and `HasReachableUnmatchedPath` compute `pattern` and then call `GetArmSelection`, which recomputes that pattern before applying the guard. A parameterized per-arm evaluator can preserve the distinct known/unknown selection functions while removing the duplicated traversal and the repeated selection calculation. | `SharpProof.Effects/SwitchExpressionFacts.cs:145-174,200-249,257-298` |
+| R449 | **`CoalesceAssignmentFlowCaptures` and `ConditionalTruthOperatorFlowCaptures` duplicate the capture table, ambiguity handling, and reference-resolution loop.** Both classes own the same `HashSet<CaptureId>` plus `Dictionary<CaptureId, IOperation>`, record the first value, mark a capture ambiguous when a later value has a different identity, and follow capture references with a cycle-protected loop until no mapping remains. Only the capture-selection predicate and the small public surface differ: coalesce assignment uses a syntax predicate and exposes `Resolve`, while logical-and/or uses an inline predicate and exposes `TryResolve`. A shared internal capture-resolution component parameterized by the predicate would remove the duplicated state machine within the same `SharpProof.Effects` assembly. | `SharpProof.Effects/CoalesceAssignmentFlowCaptures.cs:6-35`; `SharpProof.Effects/ConditionalTruthOperatorFlowCaptures.cs:6-38` |
+| R450 | **`EffectExceptionFlow` duplicates the catch-chain escape state machine for known and unknown thrown types.** `CanEscape` and `CanUnknownEscape` each initialize `canReachNext`/`canEscape`, iterate catches, skip `CatchSelection.Never`, propagate `ContainsRethrow`, and terminate after `CatchSelection.Always`; their only material difference is how the catch type selection is computed (`EffectExceptionFlow.cs:145-171,177-208`). A shared loop taking the type-selection function would centralize the ordered-catch semantics and leave the known/unknown type rules explicit at the call sites. | `SharpProof.Effects/EffectExceptionFlow.cs:145-208` |
+
+### Checked and not proposed (part forty-three)
+
+- `VerificationCache` repeats cleanup scaffolding, but its read and write paths have different rollback ownership and publication semantics; keep the transaction behavior separate until a state-machine extraction can prove those paths equivalent.
+- The generated protocol model is not a hand-edited target; the reduction target in R446 is the independent MSBuild/build-task literals and their source-of-truth linkage.
+
+### Status (part forty-three)
+
+R446-R450 are `pending`. R447-R450 are local helper extractions; R446 is a cross-language default-authority reduction.
+
+## Second survey, part forty-four: R451-R453
+
+This pass inspected cache soundness local resolution and the PowerShell process/JSON readers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R451 | **`CacheSoundnessRules` duplicates the local-reference resolution wrapper for value factories and numeric enums.** `ResolveValueFactoryLocal` and `ResolveNumericEnumLocal` independently perform the same cycle guard, `GetReachingLocalValues` call, self-reference check, `Any` traversal, and `finally` cleanup; the latter adds only the `enumType` argument and selects `IsNonCacheableNumericEnumValue` instead of `IsNonCacheableValueFactory`. A private resolver that owns the `LocalResolution` bookkeeping and accepts the value predicate (or a shared reaching-write result) would centralize this fragile cycle/cleanup protocol. `ResolveCacheLocal` and the general semantic-answer resolver have different cycle outcomes and empty-write behavior, so they should not be folded into this reduction without preserving those semantics. | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:370-394,789-818` |
+| R452 | **The gate, dependency-audit, and fuzz-campaign scripts each build an encoded `pwsh` child process by hand.** The first two scripts repeat argument quoting, wrapper escaping, command construction, UTF-16 Base64 encoding, and `Start-Process` with `-NoLogo`, `-NoProfile`, `-EncodedCommand`, working-directory, wait, pass-through, and redirected output/error (`Invoke-SharpProofGateEvidence.ps1:77-107`; `Test-SharpProofDependencyAudit.ps1:223-249`). `Invoke-SharpProofFuzzCampaign.ps1:97-124` has the same protocol behind `Invoke-BoundedDotnetProcess`, expressed as a hashtable and with optional redirection. A common low-level encoded-PowerShell runner could own quoting and launch invariants while callers supply the wrapper, arguments, timeout, and output policy; this complements R305's pairwise census and removes a three-script drift surface. | `scripts/Invoke-SharpProofGateEvidence.ps1:77-107`; `scripts/Test-SharpProofDependencyAudit.ps1:223-249`; `scripts/Invoke-SharpProofFuzzCampaign.ps1:97-124` |
+| R453 | **The two fuzz-evidence validators duplicate the full bounded UTF-8 JSON read protocol.** `Assert-SharpProofFuzzRunnerResult` and `Read-SharpProofRetainedFuzzSeedManifest` each open a shared-read `FileStream`, reject empty or over-1048576-byte input, fill an exact-size byte array with a loop that rejects short reads, check `ReadByte()` for concurrent growth, decode with strict UTF-8, and parse a `JsonDocument`; only the error labels and schema validation differ. A helper returning the parsed document (with an explicit disposal contract) or the validated byte/text payload can preserve the different schemas while centralizing the size, encoding, and race checks. | `scripts/Assert-SharpProofFuzzRunnerResult.ps1:62-96`; `scripts/SharpProof.FuzzEvidenceLifecycle.ps1:82-114` |
+
+### Status (part forty-four)
+
+R451-R453 are `pending`. They are scoped helper extractions; no implementation or build files were edited.
+
+## Second survey, part forty-five: R454-R456
+
+This pass inspected the analyzer feature pipeline and verifier/release MSBuild properties.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R454 | **`AnalyzerFeaturePipeline.ValidateMethodAttributes` repeats a generated-code check for the same declaration.** The method obtains `method.DeclaringSyntaxReferences[0]` at entry and calls `AnalyzerGeneratedCodePolicy.IsGenerated` with that tree before any analysis. Inside the only later branch that can continue for a concrete semicolon accessor, it obtains the same first declaring syntax reference again and repeats the same four-argument check; no declaration, compilation, or cancellation context has changed. Cache the initial result (or the syntax tree) and reuse it, eliminating the second syntax lookup and generated-code scan while retaining the early-return behavior. | `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:86-94,115-126`; `SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs:31-46` |
+| R455 | **`SharpProof.Verifier.targets` copies one verification-active condition across four evaluation points.** `_SharpProofValidateRuntimeClosure`, the initialization `PropertyGroup`, the compiler-owned-output `ItemGroup`, and the public `SharpProofVerify` target each spell out the same conjunction of `SharpProofVerify`, normalized profile, supported host, non-design-time build, and `BuildingProject`. A private `_SharpProofVerificationActive` property evaluated at the same import/evaluation phase, or a narrowly scoped shared target condition, could own this policy once; the weaker invalidation and unsupported-host conditions should remain separate because they intentionally run when verification is inactive or unsupported. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:33-39,86-113,244-249` |
+| R456 | **`SharpProof.Release.props` explicitly assigns `PackageVersion` to the same value already assigned to `Version`.** The release props set both to `$(SharpProofPackageVersion)`, while the SDK normally derives `PackageVersion` from `Version`; retaining both creates a second authority with no differing value. Remove the explicit `PackageVersion` assignment or keep it only if packaging tests prove a deliberate override is required, and preserve the independent assembly/file/informational version assignments. | `SharpProof.Release.props:7-12` |
+
+### Status (part forty-five)
+
+R454-R456 are `pending`. They are review-only reduction candidates; no implementation or build files were edited.

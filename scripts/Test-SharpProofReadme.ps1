@@ -616,8 +616,14 @@ $workerPropertyNames = @(
         'SharpProofVerify'
         foreach ($packagePropsDocument in $packagePropsDocuments) {
             $packagePropsDocument.SelectNodes(
-                '//CompilerVisibleProperty[starts-with(@Include, "SharpProof")]') |
-                ForEach-Object { $_.GetAttribute('Include') }
+                '//CompilerVisibleProperty' +
+                '[starts-with(@Include, "SharpProof")]') |
+                ForEach-Object {
+                    $_.GetAttribute('Include').Split(';',
+                        [StringSplitOptions]::RemoveEmptyEntries) |
+                        Where-Object { $_.StartsWith(
+                            'SharpProof', [StringComparison]::Ordinal) }
+                }
             $packagePropsDocument.SelectNodes(
                 '//PropertyGroup/*[starts-with(local-name(), "SharpProofVerify") or local-name() = "SharpProofDotNetHost"]') |
                 ForEach-Object { $_.Name }
