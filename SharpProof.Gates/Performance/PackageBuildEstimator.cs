@@ -144,29 +144,27 @@ internal static class PackageBuildEstimator
                 second.Ratio));
         }
 
-        var baselineFirstMedian = Median(baselineFirst);
-        var unannotatedAdvisoryFirstMedian =
-            Median(unannotatedAdvisoryFirst);
-        var ratios = ordered
-            .Select(static sample => sample.Ratio)
-            .ToImmutableArray();
+        var baselineFirstSorted = ValidateAndSort(baselineFirst);
+        var unannotatedAdvisoryFirstSorted =
+            ValidateAndSort(unannotatedAdvisoryFirst);
+        var balanced = balancedRatios.MoveToImmutable();
+        var balancedSorted = ValidateAndSort(balanced);
+        var ratiosSorted = ValidateAndSort(
+            ordered.Select(static sample => sample.Ratio));
         return new PackageBuildStatistics(
-            Median(balancedRatios),
-            Median(ratios),
-            baselineFirstMedian,
-            unannotatedAdvisoryFirstMedian,
-            NearestRankPercentile(ratios, 0.95),
-            balancedRatios.MoveToImmutable());
+            MedianSorted(balancedSorted),
+            MedianSorted(ratiosSorted),
+            MedianSorted(baselineFirstSorted),
+            MedianSorted(unannotatedAdvisoryFirstSorted),
+            NearestRankPercentileSorted(ratiosSorted, 0.95),
+            balanced);
     }
 
     internal static double Median(IEnumerable<double> values)
     {
         ArgumentNullException.ThrowIfNull(values);
         var sorted = ValidateAndSort(values);
-        var upperIndex = sorted.Length / 2;
-        return (sorted.Length & 1) != 0
-            ? sorted[upperIndex]
-            : Midpoint(sorted[upperIndex - 1], sorted[upperIndex]);
+        return MedianSorted(sorted);
     }
 
     private static double GeometricMean(double first, double second)
@@ -202,10 +200,25 @@ internal static class PackageBuildEstimator
                 nameof(values));
         }
 
+        return NearestRankPercentileSorted(sorted, rank);
+    }
+
+    private static double MedianSorted(IReadOnlyList<double> sorted)
+    {
+        var upperIndex = sorted.Count / 2;
+        return (sorted.Count & 1) != 0
+            ? sorted[upperIndex]
+            : Midpoint(sorted[upperIndex - 1], sorted[upperIndex]);
+    }
+
+    private static double NearestRankPercentileSorted(
+        IReadOnlyList<double> sorted,
+        double rank)
+    {
         var index = Math.Clamp(
-            (int)Math.Ceiling(rank * sorted.Length) - 1,
+            (int)Math.Ceiling(rank * sorted.Count) - 1,
             0,
-            sorted.Length - 1);
+            sorted.Count - 1);
         return sorted[index];
     }
 

@@ -178,6 +178,7 @@ the smallest relevant containerized test target passes.
 | R597 | Reuse the shrinker’s existing strict-size candidate gate | `SharpProof.Fuzz.Test`: FuzzRunnerTests, 32 passed |
 | R598 | Share frontend fuzz parameter binding traversal | `SharpProof.Fuzz.Test`: FrontendSemanticEdgeCaseTests 7; FuzzRunnerTests 32 passed |
 | R602, R608 | Share Worker compiler-test compilation setup across five suites | `SharpProof.Worker.Test`: CompilerCallableLowererTests 20; CompilerRelationalSummaryProviderTests 3; CompilerCallableLowererWaveSixRegressionTests 3; ClaimManifestBuilderTests 50; CompilerRuntimeSymbolArtifactTests 2 passed |
+| R565 | Reuse sorted package-build statistic arrays for medians and P95 | `SharpProof.Gates.Test`: PackageBuildEstimator tests, 6 passed; 27 other PerformanceGateTests passed (2 pre-existing policy failures) |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3657,7 +3658,11 @@ R564 is an unimplemented defect finding. Do not fold it into a generic helper re
 
 ### Status (part one hundred six)
 
-R565 is a pending reduction candidate. Its payoff is small for the current sample sizes, but the repeated full-array work adds avoidable complexity and would scale with package-build repetitions.
+R565 is `applied`: `Estimate` validates and sorts each derived statistic
+collection once, then reuses the sorted arrays for medians and the raw-ratio
+P95 while retaining the public statistic-method validation path. The focused
+estimator tests passed; the two unrelated `PerformanceGateTests` failures are
+the pre-existing advisory-package-policy defect recorded by R564.
 
 ## Second survey, part one hundred seven: R566 - duplicate percentile algorithms
 
