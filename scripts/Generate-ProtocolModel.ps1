@@ -671,22 +671,6 @@ foreach ($nameValue in $requiredJsonRoots) {
             "required JSON root '$name'") -ne 'class') {
         throw "Required JSON root '$name' is not a unique class."
     }
-    $properties = @(Get-MemberArray $declarationByName[$name] 'properties')
-    $lines.Add("    internal static readonly string[] ${name}JsonProperties = [")
-    $current = '        '
-    foreach ($property in $properties) {
-        $jsonName = [string](
-            Get-RequiredMember $property 'jsonName' "required JSON root '$name'")
-        $addition = (ConvertTo-CSharpString $jsonName) + ', '
-        if ($current.Trim().Length -gt 0 -and
-            ($current.Length + $addition.Length) -gt 140) {
-            $lines.Add($current.TrimEnd())
-            $current = '        '
-        }
-        $current += $addition
-    }
-    $lines.Add($current.TrimEnd())
-    $lines.Add('    ];')
 }
 $lines.Add('')
 $lines.Add('    internal static readonly IReadOnlyDictionary<string, WorkerProtocolJsonObjectShape> JsonObjectShapes =')

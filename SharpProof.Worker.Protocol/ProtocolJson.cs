@@ -78,12 +78,12 @@ public static partial class WorkerProtocolJson
 
     public static WorkerVerifyRequest? DeserializeRequest(string json)
     {
-        return Deserialize<WorkerVerifyRequest>(json, WorkerProtocolMetadata.WorkerVerifyRequestJsonProperties);
+        return Deserialize<WorkerVerifyRequest>(json);
     }
 
     public static WorkerVerifyResponse? DeserializeResponse(string json)
     {
-        return Deserialize<WorkerVerifyResponse>(json, WorkerProtocolMetadata.WorkerVerifyResponseJsonProperties);
+        return Deserialize<WorkerVerifyResponse>(json);
     }
 
     public static string SerializeRequest(WorkerVerifyRequest request)
@@ -1026,9 +1026,8 @@ public static partial class WorkerProtocolJson
         return new(nameof(value), value, "The manifest contains an unknown enum value.");
     }
 
-    private static T? Deserialize<T>(string json, IEnumerable<string> requiredProperties)
+    private static T? Deserialize<T>(string json)
     {
-        _ = requiredProperties;
         EnsureJsonShape(json, typeof(T).Name);
         return JsonSerializer.Deserialize<T>(json, s_options);
     }

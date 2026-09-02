@@ -81,7 +81,6 @@ public sealed class ProtocolModelSchemaTests
     public void GeneratedRuntimeMetadataMatchesSchemaExactly()
     {
         using var schema = ReadSchema();
-        AssertRequiredJsonRoots(schema.RootElement);
         AssertDefinedEnums(schema.RootElement);
         AssertManifestNames(schema.RootElement);
         AssertValidationPlans(schema.RootElement);
@@ -188,26 +187,6 @@ public sealed class ProtocolModelSchemaTests
                     Is.EqualTo(TableContains(table, arguments)),
                     $"{name}({string.Join(", ", arguments)})");
             }
-        }
-    }
-
-    private static void AssertRequiredJsonRoots(JsonElement schema)
-    {
-        var declarations = schema.GetProperty("declarations")
-            .EnumerateArray()
-            .ToDictionary(
-                static declaration => declaration.GetProperty("name").GetString()!,
-                StringComparer.Ordinal);
-        foreach (var root in schema.GetProperty("requiredJsonRoots").EnumerateArray())
-        {
-            var name = root.GetString()!;
-            var expected = declarations[name].GetProperty("properties")
-                .EnumerateArray()
-                .Select(static property => property.GetProperty("jsonName").GetString());
-            var actual = (string[])s_protocolMetadata.GetField(
-                name + "JsonProperties",
-                BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
-            Assert.That(actual, Is.EqualTo(expected), name);
         }
     }
 

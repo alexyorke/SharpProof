@@ -459,13 +459,6 @@ internal readonly struct WorkerProtocolRule<T>(string code, Func<T, bool> isVali
 
 internal static class WorkerProtocolMetadata
 {
-    internal static readonly string[] WorkerVerifyRequestJsonProperties = [
-        "protocolVersion", "compilerManifest", "budgets", "cache", "verifyPolicy", "assumptionPolicy",
-    ];
-    internal static readonly string[] WorkerVerifyResponseJsonProperties = [
-        "protocolVersion", "requestHash", "inputHash", "manifest", "runStatus", "failureReason", "callableResults", "claimResults",
-        "summary", "errors",
-    ];
 
     internal static readonly IReadOnlyDictionary<string, WorkerProtocolJsonObjectShape> JsonObjectShapes =
         new Dictionary<string, WorkerProtocolJsonObjectShape>(StringComparer.Ordinal)
