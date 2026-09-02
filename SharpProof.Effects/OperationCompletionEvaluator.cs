@@ -13,7 +13,6 @@ internal sealed class OperationCompletionEvaluator
     private readonly Func<IOperation?, IOperation, bool> _isProvenNull;
     private readonly Func<IOperation?, IOperation, bool> _isProvenNonNull;
     private readonly Func<IInvocationOperation, bool> _isImplicitLockEnterWithNullValue;
-    private readonly DefiniteOperationFacts _staticInitializationFacts;
 
     internal OperationCompletionEvaluator(
         EffectAnalysisSession session,
@@ -29,9 +28,6 @@ internal sealed class OperationCompletionEvaluator
         _caller = caller;
         _compilation = session.Compilation;
         _completionFacts = new DefiniteOperationFacts(
-            session.Compilation,
-            cancellationToken);
-        _staticInitializationFacts = new DefiniteOperationFacts(
             session.Compilation,
             cancellationToken);
         _isProvenNull = isProvenNull;
@@ -1201,9 +1197,9 @@ internal sealed class OperationCompletionEvaluator
         }
 
         return EffectMethodNodeBuilder.AllStaticInitializersSatisfy(
-                type,
-                _compilation,
-                _staticInitializationFacts.MayCompleteNormally) &&
+            type,
+            _compilation,
+            _completionFacts.MayCompleteNormally) &&
             type.StaticConstructors.All(constructor =>
                 constructor.DeclaringSyntaxReferences.Length == 0 ||
                 _completionFacts.MethodCanCompleteNormally(constructor));

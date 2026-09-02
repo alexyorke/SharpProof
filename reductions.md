@@ -158,6 +158,7 @@ the smallest relevant containerized test target passes.
 | R384 | Reuse `HashEncoding.ToLowerHex` for compiler checksum bytes instead of manual nibble formatting | `SharpProof.Worker.Test`: CompilerManifestArtifactTests 91 passed |
 | R382 | Delegate compiler effect replay source-tree uniqueness to `CompilerSourceLocationAuthority.FindUniqueTree` | `SharpProof.Worker.Test`: source-location and effect-replay tests 44 passed |
 | R383 | Share the bounded stream-to-byte-array reader between runtime-component and compiler-manifest paths | `SharpProof.Worker.Test`: compiler manifest/replay tests 99 passed |
+| R392 | Reuse one `DefiniteOperationFacts` instance for completion and static-initialization checks | `SharpProof.Effects.Test`: operation-completion/static-initialization tests 7 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1770,7 +1771,6 @@ ownership classification, call graph ordering, and summary operations in `SharpP
 | R389 | **`DefiniteOperationFacts` duplicates harmless conversion unwrapping loops.** `DefiniteOperationFacts.IsDefinitelyNonNull` (`SharpProof.Effects/ManagedAbstractFlow.cs:2857-2877`) and `DefiniteOperationFacts.IsDefinitelyNull` (`lines 2879-2901`) contain duplicate 15-line `while (operation is IParenthesizedOperation or IConversionOperation)` loops unwrapping harmless parenthesized and implicit conversion operations. In addition, `UsingDisposalEffectResolver.cs:275-280` inlines the nullness check body instead of calling its existing helper `IsDefinitelyNull` (`lines 255-260`). Consolidating unwrapping into `UnwrapHarmlessConversions` eliminates redundant loop boilerplate. | `SharpProof.Effects/ManagedAbstractFlow.cs:2857-2901`; `SharpProof.Effects/UsingDisposalEffectResolver.cs:255-260, 275-280` |
 | R390 | **`EffectCallGraph.OrderMethods` contains redundant while-enumerator cancellation checks and comparer overhead.** `SharpProof.Effects/EffectCallGraph.cs:95-115` writes a manual `while (true)` enumerator loop checking `cancellationToken.ThrowIfCancellationRequested()` four times per iteration, while `CancellationAwareMethodComparer` (`lines 121-133`) checks cancellation twice for every pairwise comparison during sorting. Standardizing on `foreach` and sort boundary cancellation simplifies ~25 lines of manual enumerator plumbing. | `SharpProof.Effects/EffectCallGraph.cs:95-115, 121-133` |
 | R391 | **`EffectSummaryOperations.Join` causes high-frequency param-array allocations across over 45 AST scanning call sites.** `SharpProof.Effects/EffectSummaryOperations.cs:7-20` defines only `Join(params EffectSummary[] summaries)`, routing all calls through array allocation. Over 45 call sites in `OperationEffectScanner.cs`, `OperationEffectScanner.Assignments.cs`, and `OperationEffectScanner.Expressions.cs` pass 2 or 3 arguments, allocating an array per AST node visit. Providing non-allocating 2- and 3-argument overloads or standardizing on `EffectSummaryDomain.Instance.Join(a, b)` eliminates heap churn during AST scanning. | `SharpProof.Effects/EffectSummaryOperations.cs:7-20`; `SharpProof.Effects/OperationEffectScanner.cs:187, 337, 466, 504, 511, 519, 522, 589, 830, 836, 917`; `SharpProof.Effects/OperationEffectScanner.Expressions.cs:187, 212, 437, 453, 474, 502, 541, 555, 595, 606, 613, 630, 743, 758, 777, 826, 860, 864` |
-| R392 | **`OperationCompletionEvaluator` instantiates two identical fields of `DefiniteOperationFacts`.** `SharpProof.Effects/OperationCompletionEvaluator.cs:12-16, 31-36, 1203-1210` declares both `_completionFacts` and `_staticInitializationFacts` with identical constructor arguments (`session.Compilation`, `cancellationToken`). `DefiniteOperationFacts` only holds compilation and cancellation state; consolidating both onto `_completionFacts` eliminates redundant fields and constructor allocations. | `SharpProof.Effects/OperationCompletionEvaluator.cs:12-16, 31-36, 1203-1210` |
 
 ### Checked and not proposed (part thirty-four)
 
@@ -1778,10 +1778,12 @@ ownership classification, call graph ordering, and summary operations in `SharpP
   Roslyn syntax guards. Retained as-is for contract verification safety.
 - `StringConcatenationEffectResolver` implements multi-part string interpolation formatting
   semantics. Retained as-is to preserve exact BCL format string exception behaviors.
+- R392 is now applied: `OperationCompletionEvaluator` shares its completion facts
+  for static-initialization checks instead of allocating a second equivalent object.
 
 ### Status (part thirty-four)
 
-R386-R392 are `pending`. R387, R388, R389, R390, and R392 are clean local refactorings.
+R386-R391 are `pending`. R387, R388, R389, and R390 are clean local refactorings.
 R386 eliminates major algorithmic duplication between exception reachability and using disposal.
 R391 removes AST-scanning allocation churn.
 
@@ -3117,3 +3119,14 @@ only the repeated validation work around it.
 R531 is a `pending` reduction candidate with correctness implications beyond
 line-count reduction. The proposed seam preserves the worker's validation and
 interpretation policy while centralizing only the digest construction.
+
+## Second survey, part seventy-nine: R532-R533 - source-location sentinels
+
+| R532 | **The worker replay path duplicates compiler-artifact source-location helpers.** `EffectCounterexampleReplayer.WitnessesEqual` uses a private five-field tuple comparison, and its `Copy` method rebuilds `WorkerSourceLocation` field by field. `CompilerSourceLocationAuthority` already owns `LocationsEqual` and `CopyLocation`, and the worker already consumes that artifact assembly for replay validation and fingerprints. Calling the shared helpers removes a second equality/copy definition and keeps future source-location fields from being silently omitted by the replay path. | `SharpProof.Worker/EffectCounterexampleReplayer.cs:275-311`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:258-291` |
+| R533 | **The all-zero source-location sentinel is spelled twice.** `WorkerProtocolJson.HasValidLocationOrNone` checks `Path`, `Start`, `Length`, `Line`, and `Column` individually after the normal location predicate fails; `CompilerSourceLocationAuthority.IsNone` defines the same five-field zero shape with a property pattern. A shared protocol-level `IsNone` helper can be used by both validation layers, preserving `HasValidLocationOrNone`'s valid-location alternative and the compiler authority's binding policy while removing a second sentinel definition. | `SharpProof.Worker.Protocol/ProtocolJson.cs:826-840`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:19-29` |
+
+### Status (part seventy-nine)
+
+R532-R533 are `pending` reduction candidates. R532 is a cross-layer helper
+reuse; R533 centralizes only the zero-location representation and does not
+change ordinary location validity.
