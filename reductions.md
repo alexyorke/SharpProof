@@ -196,6 +196,7 @@ the smallest relevant containerized test target passes.
 | R523 | Reuse the cache filename hexadecimal-digit predicate | `SharpProof.Worker.Test`: 695 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
+| R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3108,7 +3109,8 @@ enumeration, walk mechanics, and constructor validation.
 
 ### Status (part seventy)
 
-R518-R520 are `pending` candidates. R519 keeps the two evaluation phases
+R519-R520 remain `pending`; R518 shares only the nullness branch and retains
+the receiver/lock exception identities. R519 keeps the two evaluation phases
 separate, and R520 is recorded as a cleanup/exception-path concern rather than
 an instruction to broaden the native-loading surface.
 

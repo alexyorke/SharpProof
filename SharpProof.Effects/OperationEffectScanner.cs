@@ -1215,19 +1215,24 @@ internal sealed partial class OperationEffectScanner
 
     private EffectSummary PotentialNullReceiver(IOperation? instance, IOperation access)
     {
-        if (_nullnessEvaluator.IsProvenNonNull(instance, access))
-        {
-            return EffectSummary.Empty;
-        }
-
-        return Throw(FrameworkTypeMetadataNames.NullReferenceException);
+        return PotentialNullAccess(
+            instance, access, FrameworkTypeMetadataNames.NullReferenceException);
     }
 
     private EffectSummary PotentialNullLock(IOperation value, IOperation origin)
     {
+        return PotentialNullAccess(
+            value, origin, FrameworkTypeMetadataNames.ArgumentNullException);
+    }
+
+    private EffectSummary PotentialNullAccess(
+        IOperation? value,
+        IOperation origin,
+        string exceptionType)
+    {
         return _nullnessEvaluator.IsProvenNonNull(value, origin)
             ? EffectSummary.Empty
-            : Throw(FrameworkTypeMetadataNames.ArgumentNullException);
+            : Throw(exceptionType);
     }
 
     private EffectSummary ArrayCreationExceptions(
