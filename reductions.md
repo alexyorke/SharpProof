@@ -247,6 +247,7 @@ the smallest relevant containerized test target passes.
 | R791 | Share timed phase execution between developer-check and package-test orchestrators | PowerShell parses; timing helper behavior; Architecture scheduling/plan tests: 28 passed |
 | R792 | Reuse the shared C# string encoder in the API-spec runtime-witness generator | Generator `-Verify`; `SharpProof.Specs.Test`: 12 passed |
 | R794 | Reuse shared package identity parsing in pilot qualification | Pilot authority fixtures; `PilotAuthorityTests`: 1 passed |
+| R793 | Share repository-scoped Git text execution between inventory and coverage scripts | PowerShell parses; Git helper behavior; authority tests: 36 passed (1 pre-existing complexity-cap failure) |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -6099,8 +6100,10 @@ Generator verification and the focused Specs tests passed.
 
 ### Status (part three hundred four)
 
-R793 is `pending` and limited to repository-scoped Git text execution helpers.
-No implementation or build file was changed.
+R793 is `applied`: inventory and coverage now use the shared argument-safe Git
+runner with explicit output/error policies. PowerShell parsing, direct helper
+behavior, and authority tests passed apart from the pre-existing complexity
+ceiling failure.
 
 ## Second survey, part three hundred five: R794 - pilot package identity reparse
 
