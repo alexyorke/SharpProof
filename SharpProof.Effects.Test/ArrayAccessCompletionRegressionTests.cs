@@ -3,28 +3,19 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class ArrayAccessCompletionRegressionTests
 {
-    [Test]
-    public void DefinitelyOutOfRangeAccessSuppressesSuffixWrite()
+    [TestCase("DefinitelyOutOfRange", false)]
+    [TestCase("UnknownIndex", true)]
+    public void ArrayAccessControlsSuffixWrite(
+        string methodName,
+        bool expected)
     {
         var compilation = CreateCompilation();
         var method = EffectTestHost.RequireMethod(
             compilation,
             "Sample",
-            "DefinitelyOutOfRange");
+            methodName);
 
-        Assert.That(HasStaticWrite(compilation, method), Is.False);
-    }
-
-    [Test]
-    public void UnknownIndexRetainsSuffixWrite()
-    {
-        var compilation = CreateCompilation();
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "UnknownIndex");
-
-        Assert.That(HasStaticWrite(compilation, method), Is.True);
+        Assert.That(HasStaticWrite(compilation, method), Is.EqualTo(expected));
     }
 
     private static CSharpCompilation CreateCompilation()
