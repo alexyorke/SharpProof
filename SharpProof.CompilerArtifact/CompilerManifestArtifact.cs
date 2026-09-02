@@ -375,9 +375,7 @@ internal static class CompilerManifestArtifactJson
     {
         json = ArgumentNullGuard.NotNull(json, nameof(json));
         cancellationToken.ThrowIfCancellationRequested();
-        RequireSpecificationPackAuthorityProperties(json);
-        cancellationToken.ThrowIfCancellationRequested();
-        RequireDiagnosticClassificationProperties(json);
+        RequireCompatibilityProperties(json, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
@@ -702,7 +700,9 @@ internal static class CompilerManifestArtifactJson
         return true;
     }
 
-    private static void RequireSpecificationPackAuthorityProperties(string json)
+    private static void RequireCompatibilityProperties(
+        string json,
+        CancellationToken cancellationToken)
     {
         using var document = JsonDocument.Parse(
             json,
@@ -715,14 +715,7 @@ internal static class CompilerManifestArtifactJson
         RequireProperty(compilation, "specificationPackIds");
         RequireProperty(compilation, "specificationPackCatalogVersion");
         RequireProperty(compilation, "specificationPackCatalogSha256");
-    }
-
-    private static void RequireDiagnosticClassificationProperties(string json)
-    {
-        using var document = JsonDocument.Parse(
-            json,
-            new JsonDocumentOptions { MaxDepth = WorkerProtocolJson.MaximumJsonDepth });
-        var root = document.RootElement;
+        cancellationToken.ThrowIfCancellationRequested();
         if (!root.TryGetProperty("compilerDiagnostics", out var diagnostics) ||
             diagnostics.ValueKind != JsonValueKind.Array)
         {
@@ -731,6 +724,7 @@ internal static class CompilerManifestArtifactJson
 
         foreach (var diagnostic in diagnostics.EnumerateArray())
         {
+            cancellationToken.ThrowIfCancellationRequested();
             RequireProperty(diagnostic, "isSource");
         }
     }

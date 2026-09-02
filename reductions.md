@@ -4193,14 +4193,6 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred eighty-four: R643 - repeated manifest JSON preparse
-
-| R643 | **`CompilerManifestArtifactJson.Deserialize` parses the complete manifest JSON twice before deserialization.** `RequireSpecificationPackAuthorityProperties` creates one `JsonDocument`, and `RequireDiagnosticClassificationProperties` creates a second `JsonDocument` over the same input; both then inspect a small set of required properties before `JsonSerializer.Deserialize` parses the payload again. A single compatibility-property pass can retain both presence contracts and cancellation boundaries while removing one full preliminary parse; the typed deserialization and canonical reserialization checks remain separate concerns. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:372-395,705-736` |
-
-### Status (part one hundred eighty-four)
-
-R643 is a pending compiler-manifest input parsing reduction candidate. Preserve required-property compatibility checks, the optional diagnostic-array behavior, JSON depth limits, and the typed serializer validation; combine only the two preliminary document walks.
-
 ## Second survey, part one hundred eighty-five: R644 - duplicate diagnostic-shape pass
 
 | R644 | **`CompilerManifestArtifactJson.Serialize` checks diagnostic shapes before canonicalization and then checks them again inside `Validate`.** The early `HasValidDiagnosticShapes` guard exists at lines 337-340, while `Validate` calls `HasValidDiagnostics`, whose first operation is the same per-item shape predicate before checking canonical ordering and source binding. Canonicalization only reorders the array and does not change item shape, so one shape pass can be retained at the validation boundary while preserving the early JSON-specific failure behavior through a narrower canonicalizer precondition or a shared validation result. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:330-356,429-457,750-772` |
