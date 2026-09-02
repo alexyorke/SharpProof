@@ -114,9 +114,6 @@ function Invoke-TestProject([string]$ProjectPath) {
     Invoke-DotNet $arguments
 }
 
-$testProjectParallelism = Get-SharpProofTestProjectParallelism `
-    -RepositoryRoot $repositoryRoot
-
 switch ($Command) {
     'quick' {
         Invoke-PipelineCommand 'test-changed' 'Debug' @('-Fast')
@@ -290,6 +287,8 @@ switch ($Command) {
         }
         if ($Target.EndsWith('.sln', [StringComparison]::OrdinalIgnoreCase) -or
             $Target.EndsWith('.slnf', [StringComparison]::OrdinalIgnoreCase)) {
+            $testProjectParallelism = Get-SharpProofTestProjectParallelism `
+                -RepositoryRoot $repositoryRoot
             $arguments += "/m:$testProjectParallelism"
         }
         if (-not [string]::IsNullOrWhiteSpace($TestFilter)) {
@@ -317,6 +316,8 @@ switch ($Command) {
         if (-not $NoBuild) {
             Invoke-DotNet @('restore', $target, '--locked-mode')
         }
+        $testProjectParallelism = Get-SharpProofTestProjectParallelism `
+            -RepositoryRoot $repositoryRoot
         $arguments = @(
             'test', $target, '--configuration', $Configuration,
             '--no-restore', "/m:$testProjectParallelism")

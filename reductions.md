@@ -4217,14 +4217,6 @@ R652 is deferred: envelope equality and compilation-shape validation are intenti
 
 R654 is deferred: replay validation and the separate operation/evidence digest domains are analyzer-integrity boundaries. Their independent event walks make the field ordering, null normalization, and fail-closed checks auditable; combine them only with a proof that cannot alter those semantics.
 
-## Second survey, part two hundred: R659 - eager test parallelism discovery
-
-| R659 | **`Invoke-SharpProofContainer.ps1` computes test-project parallelism before dispatching every command.** The top-level assignment calls `Get-SharpProofTestProjectParallelism`, which reads and parses `eng/acceptance/contract.json` unless an override is set, but the value is consumed only by the solution/filter branch of `test` and by `portable-tests`. Restore, build, gates, packaging, release, corpus, and other commands pay the contract-read and CPU-budget work without using it. Resolve this value lazily in the two test paths while preserving override precedence and invalid-contract failures when those paths actually need the setting. | `scripts/Invoke-SharpProofContainer.ps1:98-99`; `scripts/Invoke-SharpProofContainer.ps1:253-349`; `scripts/SharpProof.ContainerExecution.psm1:106-162` |
-
-### Status (part two hundred)
-
-R659 is a pending container-dispatch laziness reduction candidate. Preserve the test parallelism override/divisor rules and error behavior for consumers, and defer only the unused computation for non-test commands.
-
 ## Second survey, part two hundred one: R660 - repeated solution prerequisite blocks
 
 | R660 | **`Invoke-SharpProofContainer.ps1` repeats the locked solution restore and Release build preamble across qualifying commands.** `pr-gates`, `performance`, `coverage`, and `fuzz-nightly` each open-code some or all of the same `restore SharpProof.sln --locked-mode` plus `build SharpProof.sln --configuration Release --no-restore` sequence, while `package` carries a near-identical build with only package-specific properties. A narrowly scoped prerequisite helper can accept the configuration and optional build properties, preserving each lane's follow-up command, Release enforcement, and output semantics while reducing drift in the shared restore/build contract. | `scripts/Invoke-SharpProofContainer.ps1:217-227,428-451,493-500,535-560` |
