@@ -100,27 +100,9 @@ public sealed class CompilerRuntimeSymbolArtifactTests
             #undef SHARPPROOF_CONTRACTS
             internal static class Subject { }
             """;
-        var parse = new CSharpParseOptions(
-            LanguageVersion.CSharp12,
-            preprocessorSymbols: [Contract.ConditionalSymbol]);
-        var compilation = CSharpCompilation.Create(
+        var compilation = WorkerTestCompilation.Create(
             "CompilerRuntimeSymbolArtifactTests",
-            [CSharpSyntaxTree.ParseText(source, parse, "Subject.cs")],
-            TestMetadataReferences.WithSharpProof,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions:
-                    NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static error => error.ToString())));
+            ("Subject.cs", source));
         var discovery = new ClaimManifestBuilder(compilation).Build();
         return CompilerManifestArtifactProducer.Create(
             compilation,

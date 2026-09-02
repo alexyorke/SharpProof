@@ -177,6 +177,7 @@ the smallest relevant containerized test target passes.
 | R591 | Replace recursive differential-oracle term collection with an explicit stack | `SharpProof.Testing.Test`: IrCSharpDifferentialOracleTests, 11 passed |
 | R597 | Reuse the shrinker’s existing strict-size candidate gate | `SharpProof.Fuzz.Test`: FuzzRunnerTests, 32 passed |
 | R598 | Share frontend fuzz parameter binding traversal | `SharpProof.Fuzz.Test`: FrontendSemanticEdgeCaseTests 7; FuzzRunnerTests 32 passed |
+| R602, R608 | Share Worker compiler-test compilation setup across five suites | `SharpProof.Worker.Test`: CompilerCallableLowererTests 20; CompilerRelationalSummaryProviderTests 3; CompilerCallableLowererWaveSixRegressionTests 3; ClaimManifestBuilderTests 50; CompilerRuntimeSymbolArtifactTests 2 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4007,7 +4008,10 @@ assertions while sharing the byte-identical operation lookup.
 
 ### Status (part one hundred forty-three)
 
-R602 is a pending Worker-test harness reduction candidate. Preserve the contract preprocessor symbol, nullable context, metadata-reference set, diagnostic assertion, and suite-specific assembly/subject names; share only the common compilation setup.
+R602 is `applied` with R608: the five Worker compiler-focused suites now share
+the contract preprocessor symbol, nullable context, metadata references,
+diagnostic assertion, and compilation options while retaining their
+suite-specific assembly and subject identities.
 
 ## Second survey, part one hundred forty-four: R603 - duplicated frontend expression-operation recovery
 
@@ -4062,7 +4066,9 @@ R607 refines R600-R601. Preserve the existing missing-operation exception and al
 
 ### Status (part one hundred forty-nine)
 
-R608 refines R602 to the full five-suite overlap. Preserve each caller's assembly/file identity, source cardinality, output kind, discovery, and artifact construction; share only the common parse/reference/options/error-validation setup.
+R608 is `applied` with R602: the shared helper accepts the caller's output kind
+and source sequence, preserving source cardinality, file identity, discovery,
+and artifact construction at each of the five call sites.
 
 ## Second survey, part one hundred fifty: R609 - repeated Effects subject-method lookup
 
@@ -7675,4 +7681,48 @@ build-file changes were made during this audit.
 ### Status (part three hundred seventy-one)
 
 R861 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred seventy-two: R862 - duplicate summary count scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R862 | **`WorkerProtocolJson.ValidateSummary` scans the same materialized claim results twice to reconstruct summary counts.** `CountsMatch` groups the `claims` sequence once for `OutcomeCounts` and then groups a second projection of the same sequence for `ReasonCounts`; each call independently allocates its expected dictionary and walks every claim. The validation must remain independent from the producer-side accumulator described by R745, but a validation-only count snapshot can accumulate outcome and reason dictionaries in one pass, after which the two supplied summary arrays can retain their separate positive-count, enum-defined, duplicate-key, and exact-count checks. This removes one full claim traversal without making an untrusted response self-validating. | `SharpProof.Worker.Protocol/ProtocolJson.cs:763-784`; `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:108-127` |
+
+### Checked and not proposed (part three hundred seventy-two)
+
+- R862 does not reuse `WorkerResultAssembler`'s producer summary: the
+  validator must derive expected counts from the untrusted response itself.
+- Outcome and reason arrays remain separately validated because they have
+  different enum types, wire fields, and error codes; only their shared claim
+  traversal and expected-count preparation are candidates for reuse.
+- The response's callable/claim total check and assumption-summary
+  recomputation remain independent validation rules.
+
+### Status (part three hundred seventy-two)
+
+R862 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred seventy-three: R863 - repeated manifest assumption normalization
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R863 | **Response validation repeatedly normalizes the same declared assumption list for one manifest callable.** `ValidateCallableResults` compares each callable result with its declared manifest assumptions, and `ValidateClaimResult` compares every owned claim result with that same callable's assumptions. Each call to `SameAssumptionDeclarations` filters nulls, sorts by ordinal ID, projects `(Id, Kind)`, and performs `SequenceEqual`, so a callable with many claims re-sorts the identical manifest-side array once for the callable result and again for every claim result. Caching the normalized declared tuple array in `ManifestIdentityIndexes` and comparing each result against that snapshot can preserve duplicate/null handling and per-result validation while removing repeated owner-side sorting and projection. | `SharpProof.Worker.Protocol/ProtocolJson.cs:585-600,620-673,977-989` |
+
+### Checked and not proposed (part three hundred seventy-three)
+
+- The candidate does not cache away validation of each result's own
+  assumptions; every untrusted result still needs its own normalization and
+  comparison.
+- This is distinct from R526, which records the duplicated comparison helper
+  across compiler and protocol assemblies, and from R836, which targets the
+  response manifest's row/index materialization.
+- The cached form must preserve the current null filtering, ordinal ordering,
+  duplicate retention, and `SequenceEqual` behavior; a set-only representation
+  would silently change malformed-input semantics.
+
+### Status (part three hundred seventy-three)
+
+R863 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.

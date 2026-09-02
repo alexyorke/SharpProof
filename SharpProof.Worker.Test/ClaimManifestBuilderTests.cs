@@ -2607,31 +2607,10 @@ public sealed class ClaimManifestBuilderTests
         OutputKind outputKind,
         params (string FileName, string Source)[] sources)
     {
-        var parseOptions = new CSharpParseOptions(
-            LanguageVersion.CSharp12,
-            preprocessorSymbols: [Contract.ConditionalSymbol]);
-        var compilation = CSharpCompilation.Create(
+        return WorkerTestCompilation.Create(
             "ManifestTests",
-            sources.Select(source => CSharpSyntaxTree.ParseText(
-                source.Source,
-                parseOptions,
-                source.FileName)),
-            TestMetadataReferences.WithSharpProof,
-            new CSharpCompilationOptions(
-                outputKind,
-                nullableContextOptions: NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic =>
-                    diagnostic.ToString())));
-        return compilation;
+            outputKind,
+            sources);
     }
 
 }

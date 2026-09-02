@@ -139,30 +139,12 @@ public sealed class CompilerCallableLowererWaveSixRegressionTests
         ClaimManifestBuildResult Discovery) CreateCompilation(
         string source)
     {
-        var parse = new CSharpParseOptions(
-            LanguageVersion.CSharp12,
-            preprocessorSymbols: [Contract.ConditionalSymbol]);
-        var compilation = CSharpCompilation.Create(
+        var compilation = WorkerTestCompilation.Create(
             "CompilerCallableLowererWaveSixRegressionTests",
-            [CSharpSyntaxTree.ParseText(
-                source,
-                parse,
-                Path.Combine(
+            (Path.Combine(
                     TestContext.CurrentContext.WorkDirectory,
-                    "CompilerCallableLowererWaveSixSubject.cs"))],
-            TestMetadataReferences.WithSharpProof,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(Environment.NewLine, errors.Select(static error =>
-                error.ToString())));
+                    "CompilerCallableLowererWaveSixSubject.cs"),
+                source));
 
         var discovery = new ClaimManifestBuilder(compilation).Build();
         return (compilation, discovery);
