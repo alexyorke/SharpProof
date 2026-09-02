@@ -173,6 +173,11 @@ the smallest relevant containerized test target passes.
 | R401 | Fold direct contract-clause fallback branches and inline the private resolution constructor wrapper | `SharpProof.Contracts.Test`: 142 passed |
 | R404 | Share partial-property accessor selection across contract inventory paths | `SharpProof.Contracts.Test`: 142 passed |
 | R423 | Reuse the release-version authority helper across container, pilot, and documentation scripts | Architecture release/documentation tests: 30 passed |
+| R433 | Remove the unreferenced primary-constructor declaration predicate | `SharpProof.Analyzer.Test`: 476 passed |
+| R434 | Remove the redundant method-symbol generated-code forwarding overload | `SharpProof.Analyzer.Test`: 476 passed |
+| R435 | Share exact namespace matching between Meta analyzer rule families | `SharpProof.Meta.Analyzers.Test`: 163 passed |
+| R436 | Share operation unwrapping between Meta analyzer rule families | `SharpProof.Meta.Analyzers.Test`: 163 passed |
+| R438 | Inline the contract validation diagnostic factory wrapper | `SharpProof.Analyzer.Test`: 476 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1873,6 +1878,8 @@ simplifications.
 R401, R402, and R404 streamline contract resolution flow and IR validation.
 R423 is now applied: release scripts use `Get-SharpProofReleaseVersion` rather
 than parsing the props file independently.
+R433-R436 and R438 are now applied: dead/forwarding analyzer helpers and the
+duplicated namespace/operation plumbing were removed without changing diagnostics.
 
 ## Second survey, part thirty-seven: R407-R412
 
@@ -2005,8 +2012,8 @@ generated code policies, and AST/CFG traversal routines across `SharpProof.Analy
 
 ### Status (part forty-one)
 
-R433-R439 are `pending`. R433 deletes dead inventory methods. R434, R435, R436, and R438 are direct
-code and AST unwrapping cleanups. R437 and R439 optimize validator loops and CFG traversal.
+R437 and R439 are `pending`. R433-R436 and R438 are applied direct code and AST
+unwrapping cleanups. R437 and R439 optimize validator loops and CFG traversal.
 
 ## Second survey, part forty-two: R440-R445
 
@@ -3203,3 +3210,13 @@ model-specific rebuild and minimization policy intact.
 R538-R539 are `pending` reduction candidates. R538 removes duplicated traversal
 scaffolding without merging the reachability-specific dispatcher; R539 keeps
 the two evidence flags distinct while avoiding repeated array work.
+
+## Second survey, part eighty-four: R540 - callable projection scans
+
+| R540 | **`WorkerResultAssembler.MatchesCallableProjection` repeatedly scans each callable's unknown-reason array.** After materializing `reasons`, it performs separate `All`/`Any` passes for unsupported-callable, unsupported-contract, infrastructure, method-timeout, project-timeout, and cancellation cases, with an earlier `owned.All` pass over the same claims. A single aggregation pass can record the relevant flags and preserve the current precedence (`UnsupportedCallable`, `UnsupportedContract`, infrastructure, method timeout, project timeout, canceled, semantic unknown) while reducing repeated enumeration and making the projection policy easier to audit. | `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:228-274` |
+
+### Status (part eighty-four)
+
+R540 is a `pending` reduction candidate. The proposed change is limited to
+classification aggregation; it does not alter the compatibility exceptions
+handled after the primary projection.

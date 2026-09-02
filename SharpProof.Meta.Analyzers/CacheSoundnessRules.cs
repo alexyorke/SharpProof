@@ -523,21 +523,7 @@ internal static class CacheSoundnessRules
 
     private static IOperation UnwrapValue(IOperation operation)
     {
-        while (true)
-        {
-            switch (operation)
-            {
-                case IConversionOperation
-                { OperatorMethod: null } conversion:
-                    operation = conversion.Operand;
-                    continue;
-                case IParenthesizedOperation parenthesized:
-                    operation = parenthesized.Operand;
-                    continue;
-                default:
-                    return operation;
-            }
-        }
+        return OperationUnwrapping.Unwrap(operation)!;
     }
 
     private static bool IsDescendantOf(
@@ -1845,34 +1831,11 @@ internal static class CacheSoundnessRules
                    type.Name,
                    "WorkerVerifyResponse",
                    StringComparison.Ordinal) &&
-               IsExactNamespace(
+               SharpProofSoundnessAnalyzer.IsExactNamespace(
                    type.ContainingNamespace,
                    "SharpProof",
                    "Worker",
                    "Protocol");
-    }
-
-    private static bool IsExactNamespace(
-        INamespaceSymbol? value,
-        params string[] expected)
-    {
-        var current = value;
-        for (var index = expected.Length - 1; index >= 0; index--)
-        {
-            if (current == null ||
-                current.IsGlobalNamespace ||
-                !string.Equals(
-                    current.Name,
-                    expected[index],
-                    StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            current = current.ContainingNamespace;
-        }
-
-        return current?.IsGlobalNamespace == true;
     }
 
     private static bool IsSharpProofNamespace(INamespaceSymbol? symbol)

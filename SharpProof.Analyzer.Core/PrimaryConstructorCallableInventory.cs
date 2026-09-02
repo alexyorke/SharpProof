@@ -56,20 +56,6 @@ internal static class PrimaryConstructorCallableInventory
         return TrySingle(matches, out constructor);
     }
 
-    internal static bool IsDeclaration(
-        IMethodSymbol method,
-        SyntaxNode? declaration,
-        SemanticModel? semanticModel,
-        CancellationToken cancellationToken)
-    {
-        return declaration is TypeDeclarationSyntax type &&
-            semanticModel != null &&
-            TryGet(type, semanticModel, cancellationToken, out var constructor) &&
-            SymbolEqualityComparer.Default.Equals(
-                constructor,
-                ContractClauseInventoryBuilder.NormalizeCallable(method));
-    }
-
     private static bool TrySingle(
         IMethodSymbol[] matches,
         out IMethodSymbol constructor)

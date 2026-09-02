@@ -1,7 +1,5 @@
 namespace SharpProof.ContractForValidation;
 
-using static ContractForCompanionValidator;
-
 internal static class ContractForValidationEngine
 {
     internal static ImmutableArray<Diagnostic> Validate(
@@ -31,7 +29,7 @@ internal static class ContractForValidationEngine
                              int.MaxValue))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                diagnostics.Add(At(
+                diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidTarget,
                     ContractForCompanionValidator.GetSourceLocation(
                         candidate, compilation, Location.None),
@@ -85,7 +83,7 @@ internal static class ContractForValidationEngine
                     cancellationToken);
                 continue;
             }
-            diagnostics.Add(At(ContractForDiagnosticDescriptors.DuplicateCompanion,
+            diagnostics.Add(Diagnostic.Create(ContractForDiagnosticDescriptors.DuplicateCompanion,
                 companion.AttributeLocation, companion.Target.Name));
         }
 
@@ -198,7 +196,7 @@ internal static class ContractForValidationEngine
                         fallback,
                         cancellationToken)
                     : fallback;
-                diagnostics.Add(At(
+                diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidTarget, location, companion.Name));
                 continue;
             }
@@ -210,7 +208,7 @@ internal static class ContractForValidationEngine
                 cancellationToken);
             if (!ContractForSymbolMatcher.TryGetTarget(attribute, out var target))
             {
-                diagnostics.Add(At(ContractForDiagnosticDescriptors.InvalidTarget,
+                diagnostics.Add(Diagnostic.Create(ContractForDiagnosticDescriptors.InvalidTarget,
                     attributeLocation, companion.Name));
                 continue;
             }

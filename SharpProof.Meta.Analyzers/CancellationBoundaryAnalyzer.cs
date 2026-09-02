@@ -356,20 +356,7 @@ internal static class CancellationBoundaryAnalyzer
 
     private static IOperation? Unwrap(IOperation? operation)
     {
-        while (true)
-        {
-            switch (operation)
-            {
-                case IConversionOperation { OperatorMethod: null } conversion:
-                    operation = conversion.Operand;
-                    continue;
-                case IParenthesizedOperation parenthesized:
-                    operation = parenthesized.Operand;
-                    continue;
-                default:
-                    return operation;
-            }
-        }
+        return OperationUnwrapping.Unwrap(operation);
     }
 
     private static IOperation? UnwrapConfigureAwait(

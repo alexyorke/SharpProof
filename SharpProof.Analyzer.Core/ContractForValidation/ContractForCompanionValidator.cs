@@ -17,13 +17,13 @@ internal static class ContractForCompanionValidator
             case ContractForSymbolMatcher.CompanionRelationshipIssue.None:
                 return true;
             case ContractForSymbolMatcher.CompanionRelationshipIssue.SelfTarget:
-                diagnostics.Add(At(
+                diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.SelfTarget,
                     companion.AttributeLocation,
                     companion.Companion.Name));
                 return false;
             case ContractForSymbolMatcher.CompanionRelationshipIssue.Cycle:
-                diagnostics.Add(At(
+                diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.CyclicRelationship,
                     companion.AttributeLocation,
                     companion.Companion.Name,
@@ -48,7 +48,7 @@ internal static class ContractForCompanionValidator
                 companion.Companion,
                 (companion.Target, companion.IsOpenTarget)))
         {
-            diagnostics.Add(At(
+            diagnostics.Add(Diagnostic.Create(
                 ContractForDiagnosticDescriptors.InvalidCompanionType,
                 companion.AttributeLocation,
                 companion.Companion.Name,
@@ -101,7 +101,7 @@ internal static class ContractForCompanionValidator
             ISymbol symbol,
             params object?[] arguments)
         {
-            diagnostics.Add(At(
+            diagnostics.Add(Diagnostic.Create(
                 descriptor,
                 GetSourceLocation(
                     symbol,
@@ -230,7 +230,7 @@ internal static class ContractForCompanionValidator
 
         if (inventory.ImplementationBody == null)
         {
-            diagnostics.Add(At(
+            diagnostics.Add(Diagnostic.Create(
                 ContractForDiagnosticDescriptors.BodyRequired,
                 GetSourceLocation(method, compilation, fallback),
                 method.Name));
@@ -254,7 +254,7 @@ internal static class ContractForCompanionValidator
             if (!clause.IsValid &&
                 clause.Placement != ContractClausePlacement.NestedCallable)
             {
-                diagnostics.Add(At(
+                diagnostics.Add(Diagnostic.Create(
                     ContractForDiagnosticDescriptors.InvalidClausePlacement,
                     clause.Location,
                     clause.Kind,
@@ -262,14 +262,6 @@ internal static class ContractForCompanionValidator
                     clause.Placement));
             }
         }
-    }
-
-    internal static Diagnostic At(
-        DiagnosticDescriptor descriptor,
-        Location location,
-        params object?[] arguments)
-    {
-        return Diagnostic.Create(descriptor, location, arguments);
     }
 
     internal static Location GetSourceLocation(

@@ -966,7 +966,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         return false;
     }
 
-    private static bool IsExactNamespace(INamespaceSymbol? value, params string[] expected)
+    internal static bool IsExactNamespace(
+        INamespaceSymbol? value,
+        params string[] expected)
     {
         var current = value;
         for (var index = expected.Length - 1; index >= 0; index--)
