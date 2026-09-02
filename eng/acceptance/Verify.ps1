@@ -96,20 +96,34 @@ function Add-AcceptanceTimingPhase {
 
         [Parameter(Mandatory = $true)]
         [ValidateSet('passed', 'failed', 'skipped')]
-        [string]$Status
+        [string]$Status,
+
+        [long]$StartedMilliseconds = -1,
+
+        [long]$CompletedMilliseconds = -1
     )
 
-    $completedMilliseconds = [long]$timingStopwatch.Elapsed.TotalMilliseconds
-    $startedMilliseconds = $completedMilliseconds - $ElapsedMilliseconds
-    if ($ElapsedMilliseconds -lt 0 -or $startedMilliseconds -lt 0) {
+    if ($CompletedMilliseconds -lt 0) {
+        $CompletedMilliseconds =
+            [long]$timingStopwatch.Elapsed.TotalMilliseconds
+    }
+    if ($StartedMilliseconds -lt 0) {
+        $StartedMilliseconds =
+            $CompletedMilliseconds - $ElapsedMilliseconds
+    }
+    if ($ElapsedMilliseconds -lt 0 -or
+        $StartedMilliseconds -lt 0 -or
+        $CompletedMilliseconds -lt $StartedMilliseconds -or
+        $CompletedMilliseconds - $StartedMilliseconds -ne
+            $ElapsedMilliseconds) {
         throw "Acceptance timing phase '$Name' has an invalid duration."
     }
     $timingPhases.Add([pscustomobject][ordered]@{
         name = $Name
         startedUtc = $timingStartedUtc.AddMilliseconds(
-            $startedMilliseconds).ToString('o')
+            $StartedMilliseconds).ToString('o')
         completedUtc = $timingStartedUtc.AddMilliseconds(
-            $completedMilliseconds).ToString('o')
+            $CompletedMilliseconds).ToString('o')
         elapsedMilliseconds = $ElapsedMilliseconds
         status = $Status
     })
@@ -137,16 +151,14 @@ function Complete-AcceptanceTimingPhase {
     }
     $activeTimingStopwatch.Stop()
     $completedMilliseconds = [long]$timingStopwatch.Elapsed.TotalMilliseconds
-    $timingPhases.Add([pscustomobject][ordered]@{
-        name = $activeTimingName
-        startedUtc = $timingStartedUtc.AddMilliseconds(
-            $activeTimingStartedMilliseconds).ToString('o')
-        completedUtc = $timingStartedUtc.AddMilliseconds(
-            $completedMilliseconds).ToString('o')
-        elapsedMilliseconds =
-            $completedMilliseconds - $activeTimingStartedMilliseconds
-        status = $Status
-    })
+    $elapsedMilliseconds =
+        $completedMilliseconds - $activeTimingStartedMilliseconds
+    Add-AcceptanceTimingPhase `
+        -Name $activeTimingName `
+        -ElapsedMilliseconds $elapsedMilliseconds `
+        -Status $Status `
+        -StartedMilliseconds $activeTimingStartedMilliseconds `
+        -CompletedMilliseconds $completedMilliseconds
     $script:activeTimingName = $null
     $script:activeTimingStopwatch = $null
     $script:activeTimingStartedMilliseconds = $null

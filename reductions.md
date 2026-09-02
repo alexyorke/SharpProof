@@ -3607,7 +3607,10 @@ R568 is a pending reduction candidate. Preserve the acceptance-specific timing p
 
 ### Status (part one hundred ten)
 
-R569 is a pending small reduction candidate. It affects only the acceptance evidence writer and must preserve its failed/incomplete phase semantics.
+R569 is applied: `Complete-AcceptanceTimingPhase` now computes the active
+phase's exact start/completion ticks and delegates record construction to
+`Add-AcceptanceTimingPhase`. Optional explicit bounds preserve the active
+phase timestamps, while skipped/manual phases retain their derived timing.
 
 ## Second survey, part one hundred eleven: R570 - unused Compose version probe
 
@@ -3916,3 +3919,27 @@ R605 is a pending package-test infrastructure reduction candidate. Preserve all 
 ### Status (part one hundred forty-seven)
 
 R606 is a pending cross-assembly test utility reduction candidate. Preserve each schema's explicit project/file identity and the existing `JsonDocument` disposal at every call site; share only root resolution, path composition, file loading, and parsing.
+
+## Second survey, part one hundred forty-eight: R607 - reuse the canonical Effects operation loader
+
+| R607 | **The three duplicated Effects regression helpers have an existing canonical implementation.** `LiftedNullableConversionRegressionTests.Operation`, `LiftedNullableOperatorRegressionTests.Operation`, and `ReducedRefExtensionFlowRegressionTests.Operation` duplicate the same declaring-syntax/semantic-model/`GetOperation` lookup that `EffectTestHost.RootOperation` already provides for other suites. The reduction can therefore be a direct reuse of the shared host helper rather than a new fourth helper; the regression suites keep their distinct source fixtures and assertions. | `SharpProof.Effects.Test/EffectTestHost.cs:225-235`; `SharpProof.Effects.Test/LiftedNullableConversionRegressionTests.cs:102-113`; `SharpProof.Effects.Test/LiftedNullableOperatorRegressionTests.cs:116-127`; `SharpProof.Effects.Test/ReducedRefExtensionFlowRegressionTests.cs:62-73`; R600-R601 |
+
+### Status (part one hundred forty-eight)
+
+R607 refines R600-R601. Preserve the existing missing-operation exception and all suite-specific assertions; replace only the three private copies with calls to `EffectTestHost.RootOperation`.
+
+## Second survey, part one hundred forty-nine: R608 - expanded Worker compiler-test harness overlap
+
+| R608 | **R602's Worker compiler-test harness duplication spans five suites, not three.** `ClaimManifestBuilderTests.GetCompilation` and `CompilerRuntimeSymbolArtifactTests.CreateArtifact` repeat the same C# 12 parse options with `Contract.ConditionalSymbol`, `TestMetadataReferences.WithSharpProof`, nullable-enabled DLL compilation, error-diagnostic collection, and empty-error assertion already identified in `CompilerCallableLowererTests`, `CompilerRelationalSummaryProviderTests`, and the wave-six regression suite. The two added callers vary in multi-tree/output-kind support or the subsequent discovery/artifact pipeline, but those seams can remain parameters around one shared compilation-and-diagnostic helper. | `SharpProof.Worker.Test/ClaimManifestBuilderTests.cs:2600-2633`; `SharpProof.Worker.Test/CompilerRuntimeSymbolArtifactTests.cs:103-128`; R602 |
+
+### Status (part one hundred forty-nine)
+
+R608 refines R602 to the full five-suite overlap. Preserve each caller's assembly/file identity, source cardinality, output kind, discovery, and artifact construction; share only the common parse/reference/options/error-validation setup.
+
+## Second survey, part one hundred fifty: R609 - repeated Effects subject-method lookup
+
+| R609 | **Three Effects regression suites manually repeat a helper that already exists.** `ConstructorRuntimeOrderRegressionTests`, `ReducedExtensionReceiverCompletionTests`, and `UsingInitializerUnwindRegressionTests` each resolve `Subject`, call `GetMembers("Exercise")`, filter to `IMethodSymbol`, and select the single result. `EffectTestHost.RequireMethod(compilation, typeMetadataName, methodName)` already centralizes the type/member lookup and additionally enforces an ordinary-method kind. Replacing the three local chains with that existing helper removes repeated Roslyn symbol plumbing while leaving each analysis and assertion sequence unchanged. | `SharpProof.Effects.Test/ConstructorRuntimeOrderRegressionTests.cs:37-40`; `SharpProof.Effects.Test/ReducedExtensionReceiverCompletionTests.cs:33-36`; `SharpProof.Effects.Test/UsingInitializerUnwindRegressionTests.cs:60-63`; `SharpProof.Effects.Test/EffectTestHost.cs:133-149` |
+
+### Status (part one hundred fifty)
+
+R609 is a pending Effects-test maintenance candidate. Preserve the `Subject`/`Exercise` identity and single-method expectation; replace only the repeated lookup chains with `EffectTestHost.RequireMethod`.
