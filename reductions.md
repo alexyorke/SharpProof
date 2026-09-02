@@ -5969,3 +5969,23 @@ implementation or build file was changed.
 
 R787 is `pending` and limited to the Gates CLI dispatch plumbing. No
 implementation or build file was changed.
+
+## Second survey, part two hundred ninety-nine: R788 - repeated parallelism policy wrappers
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R788 | **`SharpProof.ContainerExecution.psm1` repeats four named parallelism wrappers around one policy engine.** `Get-SharpProofTestProjectParallelism`, `Get-SharpProofSemanticTestParallelism`, `Get-SharpProofPackageTestParallelism`, and `Get-SharpProofBuildParallelism` each redeclare a cmdlet/mandatory `RepositoryRoot` parameter block and forward it to `Get-SharpProofCpuBudget`; only the policy descriptor changes. The descriptors are meaningful and must remain visible: project tests use `testProjectCpuDivisor`, semantic tests allow all visible processors after two override names, package tests use `packageTestCpuPercent`, and builds use `buildCpuPercent`, with different invalid messages. A small policy table or one internal descriptor-driven dispatcher can own the repeated parameter/forwarding plumbing while retaining the four public semantic names, override precedence, contract-field choice, and caller-specific error text. This is wrapper plumbing only; it should not collapse the distinct CPU-budget policies into one shared default. | `scripts/SharpProof.ContainerExecution.psm1:176-235` |
+
+### Checked and not proposed (part two hundred ninety-nine)
+
+- The four entry points communicate different scheduler policies and should
+  remain separately named at call sites; only their repeated forwarding shape
+  is in scope.
+- `Get-SharpProofParallelismOverride` and `Get-SharpProofCpuBudget` already own
+  the shared validation and calculation logic, so this does not propose a
+  second budget implementation.
+
+### Status (part two hundred ninety-nine)
+
+R788 is `pending` and limited to container-execution parallelism wrappers. No
+implementation or build file was changed.
