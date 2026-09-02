@@ -4323,7 +4323,7 @@ R707 completed: closed-contract kind classification is now canonical in `Contrac
 
 | R708 | **`Invoke-SharpProofDevCheck.ps1` does not execute the command plan it reads.** `Get-SharpProofDevCheckPlan.ps1` emits restore, solution-build, semantic-test, package-product-build, one package-pack row per manifest project, and performance-smoke commands, but the runner parses the JSON only to validate schema/configuration and test whether the package-product-build row exists; it then reconstructs the restore, build, semantic-test, package-test, and smoke invocations by hand. The plan's package-project enumeration and most command fields are therefore a second, non-authoritative description that can drift without changing the check. Either execute the planned rows or reduce the plan to the small decision data the runner actually needs, retaining the deliberate Debug-only Release package-product build and phase timing. | `scripts/Get-SharpProofDevCheckPlan.ps1:22-57`; `scripts/Invoke-SharpProofDevCheck.ps1:25-109` |
 
-R708 is a pending developer-check orchestration reduction candidate. Preserve configuration-specific package builds, no-build/restore relationships, parallel build behavior, timing evidence, and plan schema validation.
+R708 completed: the developer check now resolves and validates every planned phase and package row, using plan-owned configurations and inclusion while preserving no-build/restore relationships, parallel build behavior, timing evidence, and schema validation.
 
 ### Status (part two hundred forty-two)
 

@@ -32,9 +32,46 @@ if ([int]$commandPlan.schemaVersion -ne 1 -or
     [string]$commandPlan.configuration -cne $Configuration) {
     throw 'Developer-check command plan is invalid.'
 }
-$packageProductBuild = @($commandPlan.commands | Where-Object {
+$plannedCommands = @($commandPlan.commands)
+function Get-RequiredPlanCommand {
+    param([Parameter(Mandatory = $true)][string]$Id)
+
+    $matches = @($plannedCommands | Where-Object {
+            [string]$_.id -ceq $Id
+        })
+    if ($matches.Count -ne 1) {
+        throw "Developer-check command plan must contain exactly one '$Id' row."
+    }
+    return $matches[0]
+}
+
+$restoreCommand = Get-RequiredPlanCommand 'restore'
+$solutionBuildCommand = Get-RequiredPlanCommand 'solution-build'
+$semanticTestsCommand = Get-RequiredPlanCommand 'semantic-tests'
+$performanceSmokeCommand = Get-RequiredPlanCommand 'performance-smoke'
+$packageProductBuildCommands = @($plannedCommands | Where-Object {
         [string]$_.id -ceq 'package-product-build'
-    }).Count -eq 1
+    })
+if ($packageProductBuildCommands.Count -gt 1) {
+    throw 'Developer-check command plan contains duplicate package product builds.'
+}
+$packagePackCommands = @($plannedCommands | Where-Object {
+        [string]$_.id -like 'package-pack:*'
+    })
+if ($packagePackCommands.Count -ne 3 -or
+    @($packagePackCommands | Where-Object {
+            [string]$_.configuration -cne 'Release' -or
+            -not [bool]$_.noBuild
+        }).Count -ne 0) {
+    throw 'Developer-check package-pack rows are invalid.'
+}
+if ([string]$restoreCommand.configuration -cne $Configuration -or
+    [string]$solutionBuildCommand.configuration -cne $Configuration -or
+    [string]$semanticTestsCommand.configuration -cne $Configuration -or
+    [string]$performanceSmokeCommand.configuration -cne $Configuration) {
+    throw 'Developer-check phase configurations do not match the requested configuration.'
+}
+$packageProductBuild = $packageProductBuildCommands.Count -eq 1
 $timings = [Collections.Generic.List[object]]::new()
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 
@@ -63,9 +100,11 @@ Invoke-TimedPhase -Name 'restore' -Action {
 Invoke-TimedPhase -Name 'build' -Action {
     $builds = [Collections.Generic.List[object]]::new()
     $builds.Add([pscustomobject]@{
-        Name = 'solution-' + $Configuration.ToLowerInvariant()
+        Name = 'solution-' +
+            ([string]$solutionBuildCommand.configuration).ToLowerInvariant()
         Arguments = @(
-            'build', 'SharpProof.sln', '-c', $Configuration,
+            'build', 'SharpProof.sln', '-c',
+            [string]$solutionBuildCommand.configuration,
             '--no-restore')
     })
     if ($packageProductBuild) {
@@ -74,7 +113,8 @@ Invoke-TimedPhase -Name 'build' -Action {
             Arguments = @(
                 'build',
                 'SharpProof.Verifier/SharpProof.Verifier.csproj',
-                '-c', 'Release', '--no-restore',
+                '-c', [string]$packageProductBuildCommands[0].configuration,
+                '--no-restore',
                 '-p:GeneratePackageOnBuild=false')
         })
     }
@@ -86,8 +126,8 @@ Invoke-TimedPhase -Name 'build' -Action {
 }
 Invoke-TimedPhase -Name 'semantic-tests' -Action {
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofSemanticTests.ps1') `
-        -Configuration $Configuration `
-        -NoBuild `
+        -Configuration ([string]$semanticTestsCommand.configuration) `
+        -NoBuild:([bool]$semanticTestsCommand.noBuild) `
         -TimeoutSeconds $TimeoutSeconds
 }
 Invoke-TimedPhase -Name 'package-tests' -Action {
@@ -96,13 +136,17 @@ Invoke-TimedPhase -Name 'package-tests' -Action {
         TimeoutSeconds = $TimeoutSeconds
     }
     $packageArguments.NoBuild = $true
+    if (-not [bool]$packagePackCommands[0].noBuild) {
+        $packageArguments.Remove('NoBuild')
+    }
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
         @packageArguments
 }
 Invoke-TimedPhase -Name 'performance-smoke' -Action {
     & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds `
         run --project SharpProof.Gates/SharpProof.Gates.csproj `
-        -c $Configuration --no-build --no-restore -- performance-smoke
+        -c ([string]$performanceSmokeCommand.configuration) `
+        --no-build --no-restore -- performance-smoke
     if ($LASTEXITCODE -ne 0) {
         throw 'Developer performance smoke failed.'
     }
