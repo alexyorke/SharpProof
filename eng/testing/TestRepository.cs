@@ -24,4 +24,25 @@ internal static class TestRepository
         throw new DirectoryNotFoundException(
             "Could not locate the SharpProof repository root.");
     }
+
+    internal static void DeleteOwnedTemporaryDirectory(
+        string path,
+        string rootName,
+        string errorMessage = "Refusing to remove an unexpected test directory.")
+    {
+        var resolved = Path.GetFullPath(path);
+        var expectedRoot = Path.GetFullPath(
+            Path.Combine(Path.GetTempPath(), rootName));
+        if (!resolved.StartsWith(
+                expectedRoot + Path.DirectorySeparatorChar,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(errorMessage);
+        }
+
+        if (Directory.Exists(resolved))
+        {
+            Directory.Delete(resolved, recursive: true);
+        }
+    }
 }

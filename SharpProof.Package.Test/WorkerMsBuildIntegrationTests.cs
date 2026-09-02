@@ -4187,23 +4187,9 @@ public sealed class WorkerMsBuildIntegrationTests
 
         public void Dispose()
         {
-            var resolved = Path.GetFullPath(_root);
-            var expectedRoot = Path.GetFullPath(
-                Path.Combine(
-                    Path.GetTempPath(),
-                    "SharpProof.Package.Test"));
-            if (!resolved.StartsWith(
-                    expectedRoot + Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Refusing to remove an unexpected test directory.");
-            }
-
-            if (Directory.Exists(resolved))
-            {
-                Directory.Delete(resolved, recursive: true);
-            }
+            TestRepository.DeleteOwnedTemporaryDirectory(
+                _root,
+                "SharpProof.Package.Test");
         }
 
         private static string CreateProjectXml(

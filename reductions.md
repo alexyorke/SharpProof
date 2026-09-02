@@ -3640,14 +3640,6 @@ the discarded Compose version probe and its extra failure point are gone.
 
 R571 is a pending test-infrastructure reduction candidate. Preserve collectible unloading and resolver detach in `finally`; the helper should not merge the distinct oracle behavior or hide failures from the callback.
 
-## Second survey, part one hundred thirteen: R572 - repeated safe test-workspace disposal
-
-| R572 | **Five disposable test workspaces duplicate the same safe recursive-cleanup guard.** `ScalarDifferentialMatrixTests`, `WorkerTests`, `PackageLayoutSmokeTests`' two workspace types, and `WorkerMsBuildIntegrationTests` each call `Path.GetFullPath` on their owned directory, build the corresponding `Path.GetTempPath()` root, require an ordinal prefix match with a separator, throw `Refusing to remove an unexpected test directory.` on mismatch, then call `Directory.Delete(..., recursive: true)`. A shared `TempDirectory`/test-workspace disposal helper can centralize this deletion safety contract while accepting the per-fixture root and preserving each fixture's own creation and path properties. This is separate from R428's manual `try/finally` cleanup because these classes already implement `IDisposable` and the repeated concern is the security guard itself. | `SharpProof.Worker.Test/ScalarDifferentialMatrixTests.cs:969-983`; `SharpProof.Worker.Test/WorkerTests.cs:7320-7334`; `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:3208-3222,3261-3275`; `SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs:4212-4226` |
-
-### Status (part one hundred thirteen)
-
-R572 is a pending test-infrastructure reduction candidate. Preserve the root-specific safety check and the refusal to delete an unexpected path; only centralize the already-identical guard and recursive-delete operation.
-
 ## Second survey, part one hundred fourteen: R573 - incomplete baseline identity preflight
 
 | R573 | **`Test-CompleteBaseline` computes a canonical invocation and discards it.** The parallel mutation driver calls `Get-SharpProofMutationBaselineInvocation` for every saved baseline row, but never compares the returned `Identity` with the row's persisted `invocation` field. The baseline writer does persist that field, and the child `Test-SharpProofTrustedMutations.ps1` later performs the real identity comparison, so the outer preflight adds only a non-empty-field check and defers a malformed or tampered identity failure until shard startup. Compare the saved identity in this preflight (or remove the unused result if this layer is intentionally only a shape check) and keep the child validation as the direct-entrypoint boundary. | `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1:218-256`; `scripts/Test-SharpProofTrustedMutations.ps1:2492-2543,2640-2646` |
@@ -4184,3 +4176,19 @@ R632 is a pending fixture-infrastructure reduction candidate. Preserve cleanup i
 ### Status (part one hundred seventy-four)
 
 R633 is a pending fuzz-oracle infrastructure reduction candidate. Preserve collectible unloading, image ownership/disposal, runtime-type lookup failures, and distinct batch versus semantic-edge result handling; share only the assembly lifetime scaffold.
+
+## Second survey, part one hundred seventy-five: R634 - duplicate constructor witness edge sets
+
+| R634 | **`ApiSpecRuntimeOracleTests` builds the same constructor witness edge set twice per constructor family.** The scalar `ConstructorRow` overload creates separate one-item `ImmutableArray<RuntimeEdge>` instances for allocation and throws even though both contain the same prepare/invoke pair, and the string-constructor callers repeat the same two `RuntimeEdge` objects in their allocation and throw arguments. `ConstructorRow` then reuses the throw set for termination, so one immutable edge array is sufficient for all three facet observations. The Exception and InvalidOperationException builders differ in the receiver type, descriptions, and delegates and should remain explicit; a shared edge-array path removes only the duplicate fixture plumbing and object construction. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:249-315,515-580` |
+
+### Status (part one hundred seventy-five)
+
+R634 is a pending test-fixture simplification candidate. Preserve separate exception-type witnesses and the repeated observations over the same prepared calls; share only the immutable edge-set construction.
+
+## Second survey, part one hundred seventy-six: R635 - duplicate empty-sequence observation wrappers
+
+| R635 | **`ApiSpecRuntimeOracleTests` repeats the empty-sequence observation wrappers for arrays and `Enumerable.Empty`.** `ObserveArrayEmptyNullness` and `ObserveEnumerableEmptyNullness` both forward two object/value-type factories to `ObserveNullness`, while the corresponding cardinality methods repeat the same two-factory forwarding to `ObserveCardinality`; only the factory pair changes. A small pair-parameterized helper for nullness and cardinality can own these calls without merging the deliberately distinct array versus enumerable runtime witnesses or their allocation/throw edges. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:153-190,983-1034` |
+
+### Status (part one hundred seventy-six)
+
+R635 is a pending runtime-oracle test reduction candidate. Preserve both generic instantiation families and their independent witnesses; factor only the duplicated two-edge observation adapters.

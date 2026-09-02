@@ -961,23 +961,9 @@ public sealed class ScalarDifferentialMatrixTests
 
         public void Dispose()
         {
-            var resolved = Path.GetFullPath(DirectoryPath);
-            var expectedRoot = Path.GetFullPath(
-                Path.Combine(
-                    Path.GetTempPath(),
-                    "SharpProof.ScalarDifferential"));
-            if (!resolved.StartsWith(
-                    expectedRoot + Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Refusing to remove an unexpected test directory.");
-            }
-
-            if (Directory.Exists(resolved))
-            {
-                Directory.Delete(resolved, recursive: true);
-            }
+            TestRepository.DeleteOwnedTemporaryDirectory(
+                DirectoryPath,
+                "SharpProof.ScalarDifferential");
         }
 
         private CSharpCompilation CreateCompilation(bool includeContracts)
