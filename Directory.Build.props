@@ -14,6 +14,7 @@
     <LangVersion Condition="'$(LangVersion)' == ''">12.0</LangVersion>
     <Nullable Condition="'$(Nullable)' == ''">enable</Nullable>
     <ImplicitUsings Condition="'$(ImplicitUsings)' == ''">enable</ImplicitUsings>
+    <IsPackable Condition="'$(IsPackable)' == ''">false</IsPackable>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <!-- Run every built-in .NET analyzer rule, including rules disabled by default. -->
     <AnalysisLevel>latest-all</AnalysisLevel>
@@ -25,7 +26,6 @@
 
   <PropertyGroup Condition="'$(SharpProofTestProject)' == 'true'">
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <IsPackable Condition="'$(IsPackable)' == ''">false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
@@ -87,6 +87,13 @@
                         '$(MSBuildProjectName)' == 'SharpProof.Worker.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestMetadataReferences.cs"
              Link="TestMetadataReferences.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(IsRoslynAnalyzer)' == 'true'">
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test' OR

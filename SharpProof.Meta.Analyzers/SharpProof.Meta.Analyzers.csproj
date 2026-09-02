@@ -7,10 +7,6 @@
   <ItemGroup>
     <Compile Include="..\eng\RoslynCfgThrowFacts.cs"
              Link="RoslynCfgThrowFacts.cs" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
