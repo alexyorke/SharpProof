@@ -6208,3 +6208,24 @@ No implementation or build file was changed.
 R798 is `pending` and limited to separating stable launcher topology validation
 from the manifest-dependent cache-path check. No implementation or build file
 was changed.
+
+## Second survey, part three hundred ten: R799 - repeated canonicalization inside launcher path validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R799 | **`LauncherArguments.ValidateDistinctPaths` repeatedly canonicalizes the same paths within one validation pass.** Publication paths first go through `RequireLocalPath`, which canonicalizes and verifies their filesystem type, then are canonicalized again when building `writablePaths` and again in the final conflict set; worker/runtime roots and launcher companion paths are canonicalized once to derive `runtimeDirectories` and again for `paths`. The containment check then passes those already-canonical `writablePaths` and `runtimeDirectories` into `LinuxPathIdentity.IsSameOrDescendant`, whose public boundary canonicalizes both arguments again. Publication-marker derivation also canonicalizes its publication input before the resulting marker path is canonicalized for the conflict set. A local canonical-path map or internal canonical-only path predicates can preserve the public validation boundaries and all symlink/filesystem checks while reusing identities within this method. This is narrower than R798: R798 covers repeated whole validation phases around manifest loading, while R799 covers redundant path walks inside one phase. | `SharpProof.Worker.Launcher/Program.cs:985-1029`; `SharpProof.Host/LinuxPathIdentity.cs:315-330,332-335,469-480` |
+
+### Checked and not proposed (part three hundred ten)
+
+- `RequireLocalPath` must remain for publication admission, including its
+  supported-filesystem check; the candidate is reuse of its canonical result.
+- The public `LinuxPathIdentity` methods must retain their canonicalizing
+  boundaries for external callers; only an explicitly canonical internal seam
+  should bypass that work.
+- Marker identity, runtime-component identity, symlink rejection, and pairwise
+  nested/same-file conflict semantics remain part of the validation contract.
+
+### Status (part three hundred ten)
+
+R799 is `pending` and limited to per-call canonical-path reuse in launcher
+  topology validation. No implementation or build file was changed.
