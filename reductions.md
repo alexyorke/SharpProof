@@ -4193,14 +4193,6 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred eighty-seven: R646 - repeated source-location validity predicate
-
-| R646 | **`CompilerSourceLocationAuthority.IsBound` validates a non-sentinel location twice.** Its main path first calls `WorkerProtocolJson.HasValidLocation(location)` before the binding checks, then calls `HasValidLocationGeometry`, which invokes the same location predicate again before validating the line map and span. A geometry helper with an explicit already-validated path, or moving the common predicate to one boundary, removes the duplicate field scan while preserving the `allowNone` sentinel branch, source-tree hash checks, and geometry validation. | `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:79-103,145-185` |
-
-### Status (part one hundred eighty-seven)
-
-R646 is a pending source-location validation reduction candidate. Preserve sentinel handling, location-shape rejection, line-map validation, tree binding, and cancellation behavior; share only the repeated valid-location predicate.
-
 ## Second survey, part one hundred eighty-eight: R647 - allocating portable-IR slot checks
 
 | R647 | **`PortableIrGraphCodec.RequireCanonicalSlots` allocates and boxes on every decoded row.** The helper is declared with `params object?[]`, so each term, instruction, and location validation call materializes an object array and boxes its integer/long slot values. For every slot marked `unused`, `IsCanonicalSlotDefault` allocates another `{ null, -1, 0L }` object array merely to call `Contains`. A typed/generated slot validator can preserve the schema-driven slot counts and defaults without per-row arrays, boxing, or repeated temporary collections on the portable-IR decode path. | `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:195-221,634-657,720-770` |

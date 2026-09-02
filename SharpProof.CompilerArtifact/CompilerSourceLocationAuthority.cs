@@ -79,10 +79,11 @@ internal static class CompilerSourceLocationAuthority
     internal static bool HasValidLocationGeometry(
         WorkerSourceLocation? location,
         CompilerSyntaxTreeSnapshot? tree,
+        bool locationAlreadyValidated = false,
         CancellationToken cancellationToken = default)
     {
         if (location == null || tree == null ||
-            !WorkerProtocolJson.HasValidLocation(location) ||
+            !locationAlreadyValidated && !WorkerProtocolJson.HasValidLocation(location) ||
             !HasValidLineMap(tree, cancellationToken) ||
             location.Start < 0 ||
             location.Length < 0 ||
@@ -129,7 +130,10 @@ internal static class CompilerSourceLocationAuthority
         var ordinal = -1;
         var remembered = RememberedTree(location);
         if (remembered >= 0 && remembered < syntaxTrees.Length &&
-            HasValidLocationGeometry(location, syntaxTrees[remembered], cancellationToken))
+            HasValidLocationGeometry(
+                location,
+                syntaxTrees[remembered],
+                cancellationToken: cancellationToken))
         {
             return remembered;
         }
@@ -137,7 +141,10 @@ internal static class CompilerSourceLocationAuthority
         {
             cancellationToken.ThrowIfCancellationRequested();
             var tree = syntaxTrees[index];
-            if (tree == null || !HasValidLocationGeometry(location, tree, cancellationToken))
+            if (tree == null || !HasValidLocationGeometry(
+                    location,
+                    tree,
+                    cancellationToken: cancellationToken))
             {
                 continue;
             }
@@ -192,7 +199,11 @@ internal static class CompilerSourceLocationAuthority
             string.Equals(tree.Path, sourceTreePath, StringComparison.Ordinal) &&
             string.Equals(tree.Sha256, sourceTreeSha256, StringComparison.Ordinal) &&
             string.Equals(tree.LineMapSha256, sourceLineMapSha256, StringComparison.Ordinal) &&
-            HasValidLocationGeometry(location, tree, cancellationToken);
+            HasValidLocationGeometry(
+                location,
+                tree,
+                locationAlreadyValidated: true,
+                cancellationToken: cancellationToken);
     }
 
     internal static CompilerLocationAuthorityArtifact CreateAuthority(
