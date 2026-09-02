@@ -4275,9 +4275,7 @@ R699 completed: accepted and rejected fuzz fixtures now share one result asserti
 
 ### Status (part two hundred thirty-three)
 
-| R700 | **Release-JSON and standalone-gate fixture scripts duplicate the write/accept/reject harness.** `Test-SharpProofReleaseJsonFixtures.ps1` and `Test-SharpProofStandaloneGateEvidence.ps1` each create a named JSON file, increment/track a fixture assertion around a validator, treat any validator exception as rejection, and throw when a negative fixture is accepted; only the validator command and expected arguments differ. A shared test-harness helper accepting the validation action can remove this repeated scaffolding without merging the distinct release-document and gate-envelope validators. | `scripts/Test-SharpProofReleaseJsonFixtures.ps1:12-47`; `scripts/Test-SharpProofStandaloneGateEvidence.ps1:77-101` |
-
-R700 is a pending release/gate fixture-harness reduction candidate. Preserve UTF-8 fixture writing, validator-specific expected values, rejection handling, and each script's independent coverage/cleanup.
+R700 completed: release and standalone gate fixtures now share the canonical assertion harness while retaining validator-specific writers, expected values, rejection handling, and independent cleanup.
 
 ### Status (part two hundred thirty-four)
 
