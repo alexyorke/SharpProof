@@ -1359,11 +1359,10 @@ internal sealed class OperationCompletionEvaluator
                 }
 
                 return CanCompleteNormally(binary.RightOperand) &&
-                    (binary.OperatorMethod == null ||
-                     CanCompleteInvocation(
-                         binary.OperatorMethod,
-                         instance: null,
-                         binary));
+                    CanCompleteInvocation(
+                        binary.OperatorMethod,
+                        instance: null,
+                        binary);
             }
 
             return true;

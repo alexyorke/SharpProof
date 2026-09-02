@@ -4008,7 +4008,9 @@ R613 is a pending local Effects performance/clarity candidate. Preserve the exis
 
 ### Status (part one hundred fifty-five)
 
-R614 is a pending local Effects cleanup candidate. Preserve the outer `OperatorMethod != null` branch and its truth-operator short-circuit cases; simplify only the impossible null alternative in the final return.
+R614 is applied: the user-defined conditional-operator path now calls
+`CanCompleteInvocation` directly after its existing non-null guard, preserving
+the truth-operator short-circuit cases without the unreachable null disjunct.
 
 ## Second survey, part one hundred fifty-six: R615 - duplicate control-flow region iterator
 
