@@ -169,6 +169,7 @@ the smallest relevant containerized test target passes.
 | R605 | Share canonical container admission checks across package integration suites | `SharpProof.Package.Test`: package-layout and Worker MSBuild guard paths passed |
 | R618 | Share Meta-analyzer test compilation and diagnostic setup | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests passed |
 | R617 | Share managed-effect walk-depth entry/exit bookkeeping | `SharpProof.Effects.Test`: ManagedAbstractFlowTests, 34 passed |
+| R626 | Share Effects test compilation construction and diagnostics | `SharpProof.Effects.Test`: ManagedAbstractFlowTests 34; EffectAnalysisTests 147 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4214,7 +4215,9 @@ R625 is a pending corpus hashing cleanup candidate. Preserve the current normali
 
 ### Status (part one hundred sixty-seven)
 
-R626 is a pending Effects-test infrastructure cleanup candidate. Preserve the contract-package boundary, assembly/source names, C# 12 parsing, deterministic release options, and typed compile failures; centralize only the shared Roslyn construction.
+R626 is `applied`: contract-present, contract-absent, and emitted reference
+fixtures now share one deterministic Roslyn compilation core while retaining
+their reference sets, assembly/source names, and typed compile failures.
 
 ## Second survey, part one hundred sixty-eight: R627 - repeated ManagedAbstractFlow test analysis setup
 

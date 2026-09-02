@@ -12,13 +12,13 @@ internal static class EffectTestHost
         string source,
         params MetadataReference[] additionalReferences)
     {
-        return CreateCompilation(
+        return CreateCompilationCore(
             [CSharpSyntaxTree.ParseText(
                 source,
                 CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.CSharp12),
                 path: "EffectsTest.cs")],
             "EffectsTest",
-            additionalReferences);
+            DefaultReferences.AddRange(additionalReferences));
     }
 
     internal static CSharpCompilation CreateCompilation(
@@ -26,18 +26,10 @@ internal static class EffectTestHost
         string assemblyName = "EffectsTest",
         params MetadataReference[] additionalReferences)
     {
-        var references = DefaultReferences.AddRange(additionalReferences);
-        var compilation = CSharpCompilation.Create(
-            assemblyName,
+        return CreateCompilationCore(
             syntaxTrees,
-            references,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                optimizationLevel: OptimizationLevel.Release,
-                nullableContextOptions: NullableContextOptions.Enable,
-                deterministic: true));
-        RequireNoErrors(compilation);
-        return compilation;
+            assemblyName,
+            DefaultReferences.AddRange(additionalReferences));
     }
 
     internal static PortableExecutableReference EmitReference(
@@ -51,41 +43,28 @@ internal static class EffectTestHost
         string source,
         params MetadataReference[] additionalReferences)
     {
-        var compilation = CSharpCompilation.Create(
-            "EffectsTest",
+        return CreateCompilationCore(
             [CSharpSyntaxTree.ParseText(
                 source,
                 CSharpParseOptions.Default.WithLanguageVersion(
                     LanguageVersion.CSharp12),
                 path: "EffectsTest.cs")],
-            PlatformReferences.AddRange(additionalReferences),
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                optimizationLevel: OptimizationLevel.Release,
-                nullableContextOptions: NullableContextOptions.Enable,
-                deterministic: true));
-        RequireNoErrors(compilation);
-        return compilation;
+            "EffectsTest",
+            PlatformReferences.AddRange(additionalReferences));
     }
 
     internal static PortableExecutableReference EmitReferenceWithoutContractPackage(
         string source,
         string assemblyName)
     {
-        var compilation = CSharpCompilation.Create(
-            assemblyName,
+        var compilation = CreateCompilationCore(
             [CSharpSyntaxTree.ParseText(
                 source,
                 CSharpParseOptions.Default.WithLanguageVersion(
                     LanguageVersion.CSharp12),
                 path: assemblyName + ".cs")],
-            PlatformReferences,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                optimizationLevel: OptimizationLevel.Release,
-                nullableContextOptions: NullableContextOptions.Enable,
-                deterministic: true));
-        RequireNoErrors(compilation);
+            assemblyName,
+            PlatformReferences);
         return EmitImage(compilation).Reference;
     }
 
@@ -295,6 +274,24 @@ internal static class EffectTestHost
         return compilation.GetTypeByMetadataName(metadataName) ??
         throw new InvalidOperationException(
             $"Type '{metadataName}' was not found.");
+    }
+
+    private static CSharpCompilation CreateCompilationCore(
+        IEnumerable<SyntaxTree> syntaxTrees,
+        string assemblyName,
+        IEnumerable<MetadataReference> references)
+    {
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            syntaxTrees,
+            references,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                optimizationLevel: OptimizationLevel.Release,
+                nullableContextOptions: NullableContextOptions.Enable,
+                deterministic: true));
+        RequireNoErrors(compilation);
+        return compilation;
     }
 
     private static ImmutableArray<MetadataReference> CreatePlatformReferences()
