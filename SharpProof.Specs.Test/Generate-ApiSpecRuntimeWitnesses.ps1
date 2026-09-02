@@ -32,15 +32,6 @@ if (-not [IO.File]::Exists($CatalogPath)) {
     throw "API-spec catalog not found: $CatalogPath"
 }
 
-function ConvertTo-CSharpString {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Value
-    )
-
-    return '"' + $Value.Replace('\', '\\').Replace('"', '\"') + '"'
-}
-
 function ConvertTo-FactoryName {
     param(
         [Parameter(Mandatory = $true)]
