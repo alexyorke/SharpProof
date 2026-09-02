@@ -7180,3 +7180,26 @@ R838 is `deferred`: the duplicate request validation is deterministic boundary
 R839 is `deferred`: the arrays are tiny and the two phases make diagnostic
   ordering explicit at the call site, but their positional coupling is brittle
   generated-code plumbing that could be made self-describing.
+
+## Second survey, part three hundred fifty-one: R840 - redundant release-fixture pass counter
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R840 | **`Test-SharpProofReleaseJsonFixtures.ps1` maintains a pass counter that cannot diverge from its total counter.** `$passed` and `$total` both start at zero, and both `Assert-Accepted` and `Assert-Rejected` increment their respective counters only after `Invoke-SharpProofFixtureAssertion` returns. With strict error handling, a failed fixture aborts before the final JSON is emitted, so every emitted successful result necessarily has `passed == total`; the only consumer asserts that equality. The independent `$passed` state can be removed or replaced by a derived value while retaining the total count and the existing fixture failures. | `scripts/Test-SharpProofReleaseJsonFixtures.ps1:4,11-12,21-47,106-107`; `SharpProof.ArchitectureTest/ReleaseJsonAuthorityTests.cs:27-36` |
+
+### Checked and not proposed (part three hundred fifty-one)
+
+- The total count remains useful because the architecture test requires at
+  least ten exercised fixtures.
+- Rejected fixtures remain meaningful coverage: their assertion helper must
+  still confirm the validator rejects each mutation before the counters are
+  updated.
+- The two-field JSON shape may be shared with external fixture tooling, so the
+  candidate is limited to deriving `passed` rather than deleting it without
+  checking that contract.
+
+### Status (part three hundred fifty-one)
+
+R840 is `deferred`: the pass counter is logically implied by successful script
+  completion, but the emitted evidence shape may intentionally expose both
+  fields for generic fixture consumers.
