@@ -818,6 +818,30 @@ public sealed class ArchitectureTests
                 ';',
                 StringSplitOptions.RemoveEmptyEntries))
             .ToArray();
+        var dogfoodCompilerVisible = new[]
+        {
+            Path.Combine(repository, "SharpProof.AnalyzerConsumer.props"),
+            Path.Combine(
+                repository,
+                "eng",
+                "self-application",
+                "SharpProof.SelfApplication.props")
+        }
+        .Select(path => XDocument.Load(path)
+            .Descendants()
+            .Where(static element =>
+                element.Name.LocalName == "CompilerVisibleProperty")
+            .Select(static element => element.Attribute("Include")?.Value)
+            .Where(static value => value != null)
+            .SelectMany(static value => value!.Split(
+                ';',
+                StringSplitOptions.RemoveEmptyEntries))
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToArray())
+        .ToArray();
+        var expectedCompilerVisible = compilerVisible
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToArray();
         var contract = contractDocument.RootElement;
         var worker = contract.GetProperty("worker");
         var cache = contract.GetProperty("cache");
@@ -851,6 +875,8 @@ public sealed class ArchitectureTests
                 Is.EqualTo(frozenPublicProperties),
                 "Every SharpProof* MSBuild property consumed or declared by " +
                 "the shipping build files must be frozen in the preview snapshot.");
+            Assert.That(dogfoodCompilerVisible[0], Is.EqualTo(expectedCompilerVisible));
+            Assert.That(dogfoodCompilerVisible[1], Is.EqualTo(expectedCompilerVisible));
             foreach (var property in active)
             {
                 Assert.That(
