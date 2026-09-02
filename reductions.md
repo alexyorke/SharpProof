@@ -8732,3 +8732,25 @@ build-file changes were made during this audit.
 
 R942 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part four hundred fifty-three: R943 - full preprocessor-symbol set for one membership query
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R943 | **`CSharpPreprocessorSymbols.IsDefined` materializes every currently defined symbol when its caller needs only one answer.** `IsDefined` delegates to `GetDefined`, which copies parse-option symbols into a builder and walks all leading `#define`/`#undef` directives before testing the requested name. `ContractRuntimePolicy` asks only for the single reserved conditional symbol for each tree, so a direct ordered membership helper can avoid the full immutable-set allocation and retain directive cancellation, active-directive handling, whitespace validation, and cancellation behavior; keep `GetDefined` for callers that need the complete set. | `SharpProof.Frontend/CSharpPreprocessorSymbols.cs:8-40,42-54`; caller `SharpProof.Analyzer.Core/ContractRuntimePolicy.cs:7-26` |
+
+### Status (part four hundred fifty-three)
+
+R943 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred fifty-four: R944 - unused selection-inventory construction on missing contract API
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R944 | **`ContractApiSymbols.TryCreate` builds a compilation-wide selection inventory before checking whether the contract clause symbols exist.** When `ContractClauseSymbols.TryCreate` returns null, the method immediately returns null and the newly created `ContractSelectionInventory` is never read. Moving `ForCompilation` after the null guard removes work on compilations without the contract API while preserving the existing failure result and the cached selection inventory for successful callers. | `SharpProof.Contracts/ContractApiSymbols.cs:14-23`; selection construction `SharpProof.Contracts/ContractSelectionInventory.cs:14-39` |
+
+### Status (part four hundred fifty-four)
+
+R944 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
