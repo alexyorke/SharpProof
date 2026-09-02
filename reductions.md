@@ -4239,12 +4239,6 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
 
-### Status (part two hundred twenty-three)
-
-| R689 | **`ApiSpecRuntimeOracleTests` repeats type-specialized constructor witness observation.** The Exception and InvalidOperationException constructor and string-constructor paths each wrap the same `ObserveReceiverWrites`/`ConstructorWritesReceiver` sequence, with only the receiver type, static receiver slot, and constructor delegate changing; the corresponding `CreateBcl...CtorWitness` methods repeat the same `ConstructorRow` shape as well. A generic receiver/constructor observation helper can retain the type-specific delegates and static state while removing the duplicated field-snapshot and witness assembly scaffolding. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:249-299,688-730` |
-
-R689 is a pending API-spec runtime-oracle reduction candidate. Preserve uninitialized-receiver preparation, instance-field snapshots, null/non-null string edges, and the distinct Exception versus InvalidOperationException constructor identities.
-
 ### Status (part two hundred twenty-four)
 
 | R690 | **`DefaultApiSpecCatalogGenerationTests` implements two recursive term describers.** `Describe(JsonElement)` and `Describe(SpecTermDeclaration)` walk the same variable, literal, unary, binary, conditional, and length tree shapes and emit the same canonical shape string; they differ only in extracting fields from JSON versus generated objects and in their unknown-kind exception type. A small normalized-term adapter or shared kind/child formatter can keep the source-versus-generated comparison while removing the second recursive walker. | `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:575-649` |

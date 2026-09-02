@@ -248,7 +248,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateBclExceptionCtorWitness()
     {
-        return ConstructorRow(
+        return CreateBclConstructorWitness(
             "an already allocated Exception receiver, excluding newobj",
             ObserveExceptionConstructorEffect,
             SpecEffect.None,
@@ -258,23 +258,18 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateBclExceptionCtorStringWitness()
     {
-        return ConstructorRow(
+        return CreateBclConstructorWitness(
             "an already allocated Exception receiver and null/non-null messages, excluding newobj",
             ObserveExceptionStringConstructorEffect,
             SpecEffect.None,
-            [
-                new RuntimeEdge(
-                    PrepareExceptionConstructorReceiver,
-                    InvokePreparedExceptionStringConstructor),
-                new RuntimeEdge(
-                    PrepareExceptionConstructorReceiver,
-                    InvokePreparedExceptionNullStringConstructor)
-            ]);
+            PrepareExceptionConstructorReceiver,
+            InvokePreparedExceptionStringConstructor,
+            InvokePreparedExceptionNullStringConstructor);
     }
 
     private static RowWitness CreateBclInvalidOperationExceptionCtorWitness()
     {
-        return ConstructorRow(
+        return CreateBclConstructorWitness(
             "an already allocated InvalidOperationException receiver, excluding newobj",
             ObserveInvalidOperationExceptionConstructorEffect,
             SpecEffect.None,
@@ -284,18 +279,13 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateBclInvalidOperationExceptionCtorStringWitness()
     {
-        return ConstructorRow(
+        return CreateBclConstructorWitness(
             "an already allocated InvalidOperationException receiver and null/non-null messages, excluding newobj",
             ObserveInvalidOperationExceptionStringConstructorEffect,
             SpecEffect.None,
-            [
-                new RuntimeEdge(
-                    PrepareInvalidOperationExceptionConstructorReceiver,
-                    InvokePreparedInvalidOperationExceptionStringConstructor),
-                new RuntimeEdge(
-                    PrepareInvalidOperationExceptionConstructorReceiver,
-                    InvokePreparedInvalidOperationExceptionNullStringConstructor)
-            ]);
+            PrepareInvalidOperationExceptionConstructorReceiver,
+            InvokePreparedInvalidOperationExceptionStringConstructor,
+            InvokePreparedInvalidOperationExceptionNullStringConstructor);
     }
 
     private static RowWitness CreateBclObjectCtorWitness()
@@ -496,18 +486,18 @@ public sealed partial class ApiSpecRuntimeOracleTests
             mutation);
     }
 
-    private static RowWitness ConstructorRow(
+    private static RowWitness CreateBclConstructorWitness(
         string edgeInputs,
         Func<SpecEffect> observeEffect,
         SpecEffect effectMutation,
         Action prepare,
-        Action invoke)
+        params Action[] invokes)
     {
         return ConstructorRow(
             edgeInputs,
             observeEffect,
             effectMutation,
-            [new RuntimeEdge(prepare, invoke)]);
+            [.. invokes.Select(invoke => new RuntimeEdge(prepare, invoke))]);
     }
 
     private static RowWitness ContractConditionRow(
@@ -687,46 +677,50 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static SpecEffect ObserveExceptionConstructorEffect()
     {
-        return ObserveReceiverWrites(
-            static () => ConstructorWritesReceiver(
-                PrepareExceptionConstructorReceiver,
-                static () => s_exceptionConstructorReceiver,
-                InvokePreparedExceptionConstructor));
+        return ObserveConstructorWrites(
+            PrepareExceptionConstructorReceiver,
+            static () => s_exceptionConstructorReceiver,
+            InvokePreparedExceptionConstructor);
     }
 
     private static SpecEffect ObserveExceptionStringConstructorEffect()
     {
-        return ObserveReceiverWrites(
-            static () => ConstructorWritesReceiver(
-                PrepareExceptionConstructorReceiver,
-                static () => s_exceptionConstructorReceiver,
-                InvokePreparedExceptionStringConstructor),
-            static () => ConstructorWritesReceiver(
-                PrepareExceptionConstructorReceiver,
-                static () => s_exceptionConstructorReceiver,
-                InvokePreparedExceptionNullStringConstructor));
+        return ObserveConstructorWrites(
+            PrepareExceptionConstructorReceiver,
+            static () => s_exceptionConstructorReceiver,
+            InvokePreparedExceptionStringConstructor,
+            InvokePreparedExceptionNullStringConstructor);
     }
 
     private static SpecEffect ObserveInvalidOperationExceptionConstructorEffect()
     {
-        return ObserveReceiverWrites(
-            static () => ConstructorWritesReceiver(
-                PrepareInvalidOperationExceptionConstructorReceiver,
-                static () => s_invalidOperationExceptionConstructorReceiver,
-                InvokePreparedInvalidOperationExceptionConstructor));
+        return ObserveConstructorWrites(
+            PrepareInvalidOperationExceptionConstructorReceiver,
+            static () => s_invalidOperationExceptionConstructorReceiver,
+            InvokePreparedInvalidOperationExceptionConstructor);
     }
 
     private static SpecEffect ObserveInvalidOperationExceptionStringConstructorEffect()
     {
+        return ObserveConstructorWrites(
+            PrepareInvalidOperationExceptionConstructorReceiver,
+            static () => s_invalidOperationExceptionConstructorReceiver,
+            InvokePreparedInvalidOperationExceptionStringConstructor,
+            InvokePreparedInvalidOperationExceptionNullStringConstructor);
+    }
+
+    private static SpecEffect ObserveConstructorWrites<TException>(
+        Action prepare,
+        Func<TException> receiver,
+        params Action[] invokes)
+        where TException : Exception
+    {
         return ObserveReceiverWrites(
-            static () => ConstructorWritesReceiver(
-                PrepareInvalidOperationExceptionConstructorReceiver,
-                static () => s_invalidOperationExceptionConstructorReceiver,
-                InvokePreparedInvalidOperationExceptionStringConstructor),
-            static () => ConstructorWritesReceiver(
-                PrepareInvalidOperationExceptionConstructorReceiver,
-                static () => s_invalidOperationExceptionConstructorReceiver,
-                InvokePreparedInvalidOperationExceptionNullStringConstructor));
+            [.. invokes.Select(invoke =>
+                (Func<bool>)(() => ConstructorWritesReceiver(
+                    prepare,
+                    receiver,
+                    invoke)))]);
     }
 
     private static SpecEffect ObserveReceiverWrites(
@@ -737,10 +731,11 @@ public sealed partial class ApiSpecRuntimeOracleTests
             : SpecEffect.Unknown;
     }
 
-    private static bool ConstructorWritesReceiver(
+    private static bool ConstructorWritesReceiver<TException>(
         Action prepare,
-        Func<Exception> receiver,
+        Func<TException> receiver,
         Action invoke)
+        where TException : Exception
     {
         prepare();
         var target = receiver();
