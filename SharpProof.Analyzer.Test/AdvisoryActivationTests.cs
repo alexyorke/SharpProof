@@ -46,9 +46,7 @@ public sealed class AdvisoryActivationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factory.CreateCount, Is.EqualTo(1));
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         }
     }
 
@@ -170,9 +168,7 @@ public sealed class AdvisoryActivationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factory.CreateCount, Is.EqualTo(1));
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(Enumerable.Repeat("SP0047", 3)));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 3);
             Assert.That(
                 diagnostics.Select(static diagnostic =>
                     diagnostic.GetMessage(
@@ -222,9 +218,7 @@ public sealed class AdvisoryActivationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factory.CreateCount, Is.EqualTo(1));
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
             Assert.That(
                 diagnostics.Select(static diagnostic => diagnostic.Id),
                 Does.Not.Contain("AD0001"));
@@ -267,9 +261,7 @@ public sealed class AdvisoryActivationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factory.CreateCount, Is.EqualTo(1));
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         }
     }
 
@@ -311,9 +303,7 @@ public sealed class AdvisoryActivationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(factory.CreateCount, Is.EqualTo(1));
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0027"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         }
     }
 

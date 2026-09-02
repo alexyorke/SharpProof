@@ -135,9 +135,7 @@ public sealed class RequiresCallSiteDiscoveryTests
             compilation,
             mode: "CONTRACTS");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", expectedDiagnostics)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", expectedDiagnostics);
     }
 
     [TestCase(false, 0)]
@@ -213,9 +211,7 @@ public sealed class RequiresCallSiteDiscoveryTests
             compilation,
             mode: "CONTRACTS");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", expectedDiagnostics)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", expectedDiagnostics);
     }
 
     [Test]
@@ -856,9 +852,7 @@ public sealed class RequiresCallSiteDiscoveryTests
             compilation,
             mode: "CONTRACTS");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 3)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 3);
     }
 
     [Test]
@@ -898,9 +892,7 @@ public sealed class RequiresCallSiteDiscoveryTests
             compilation,
             mode: "CONTRACTS");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 3)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 3);
     }
 
     [Test]

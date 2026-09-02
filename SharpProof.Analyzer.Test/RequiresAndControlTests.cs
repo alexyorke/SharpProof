@@ -24,9 +24,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -62,9 +60,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 6)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 6);
     }
 
     [Test]
@@ -132,9 +128,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -174,9 +168,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 4)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 4);
     }
 
     [Test]
@@ -224,9 +216,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 2)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 2);
         Assert.That(
             diagnostics.Select(static diagnostic => diagnostic.GetMessage(
                 CultureInfo.InvariantCulture)),
@@ -254,9 +244,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 2)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 2);
     }
 
     [Test]
@@ -277,9 +265,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 2)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 2);
     }
 
     [Test]
@@ -302,9 +288,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 2)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 2);
     }
 
     [Test]
@@ -357,9 +341,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 5)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 5);
     }
 
     [Test]
@@ -481,9 +463,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -520,9 +500,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -539,9 +517,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -560,9 +536,7 @@ public sealed class RequiresAndControlTests
             ["SP0027"],
             allowCompilationErrors: true);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -579,9 +553,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -598,9 +570,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -641,9 +611,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -900,9 +868,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -925,9 +891,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -1167,9 +1131,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("false"));
@@ -1200,9 +1162,7 @@ public sealed class RequiresAndControlTests
             ["SP0027"],
             additionalReferences: [external]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -1301,9 +1261,7 @@ public sealed class RequiresAndControlTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047", "SP0047"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047");
             Assert.That(
                 diagnostics.Select(diagnostic =>
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)),
@@ -1371,9 +1329,7 @@ public sealed class RequiresAndControlTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
             Assert.That(
                 diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
                 Does.Contain("RequiresCallSiteAnalysisUnknown"));
@@ -1403,9 +1359,7 @@ public sealed class RequiresAndControlTests
             mode: null,
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -1577,9 +1531,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -1647,9 +1599,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.StartWith(
@@ -1680,9 +1630,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -1734,9 +1682,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -1781,9 +1727,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
     }
 
     [Test]
@@ -1881,9 +1825,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027", "SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027", "SP0027");
     }
 
     [Test]
@@ -1921,9 +1863,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -1961,9 +1901,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -2028,9 +1966,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -2068,9 +2004,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027", "SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027", "SP0027");
     }
 
     [Test]
@@ -2093,9 +2027,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
     }
 
     [Test]
@@ -2119,9 +2051,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -2140,9 +2070,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -2159,9 +2087,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [TestCase("int value = 0", false)]
@@ -2187,9 +2113,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -2215,9 +2139,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -2241,9 +2163,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 3)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 3);
     }
 
     [Test]
@@ -2262,9 +2182,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -2307,9 +2225,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]
@@ -2355,9 +2271,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
@@ -2430,9 +2344,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
     }
 
     [Test]
@@ -2514,9 +2426,7 @@ public sealed class RequiresAndControlTests
             "effects",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024", "SP0024", "SP0024", "SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024", "SP0024", "SP0024");
     }
 
     [Test]
@@ -2549,9 +2459,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 4)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 4);
     }
 
     [Test]
@@ -2642,9 +2550,7 @@ public sealed class RequiresAndControlTests
             "all-experimental",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 5)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 5);
     }
 
     [Test]
@@ -2682,9 +2588,7 @@ public sealed class RequiresAndControlTests
             ["SP0024"],
             features: "effects");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 4)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 4);
         var messages = diagnostics.Select(diagnostic =>
             diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToArray();
         Assert.That(messages[0], Does.Contain("Contract.Result").And.Contain("<placement>"));
@@ -2741,9 +2645,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 4)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 4);
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
@@ -2785,9 +2687,7 @@ public sealed class RequiresAndControlTests
             profile: "strict",
             features: "contracts");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(
             diagnostics.Single().Severity,
             Is.EqualTo(DiagnosticSeverity.Error));
@@ -2823,9 +2723,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024", "SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
@@ -2947,9 +2845,7 @@ public sealed class RequiresAndControlTests
             "effects",
             ["SP0002", "SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0002"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("TrustedWithoutSummary"));
@@ -3019,9 +2915,7 @@ public sealed class RequiresAndControlTests
             "all-experimental",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024", "SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
     }
 
     [Test]
@@ -3036,9 +2930,7 @@ public sealed class RequiresAndControlTests
             "all-experimental",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
     }
 
     [Test]
@@ -3063,9 +2955,7 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
 
     [Test]

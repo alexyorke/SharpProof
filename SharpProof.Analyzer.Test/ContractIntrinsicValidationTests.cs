@@ -77,9 +77,7 @@ public sealed class ContractIntrinsicValidationTests
             "contracts",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(
             diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("Contract.Result")
@@ -105,9 +103,7 @@ public sealed class ContractIntrinsicValidationTests
             "contracts",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 2)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 2);
         var messages = diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture))
             .ToArray();
@@ -125,9 +121,7 @@ public sealed class ContractIntrinsicValidationTests
     private static void AssertNestingDiagnostic(
         IReadOnlyCollection<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
     {
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),

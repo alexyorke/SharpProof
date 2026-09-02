@@ -63,8 +63,6 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0027", 4)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 4);
     }
 }

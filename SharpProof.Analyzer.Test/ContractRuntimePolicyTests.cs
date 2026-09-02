@@ -75,9 +75,7 @@ public sealed class ContractRuntimePolicyTests
 
         var diagnostics = await Analyze(compilation);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0002"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
     }
 
     private static CSharpCompilation CreateCompilation(string source)
@@ -101,9 +99,7 @@ public sealed class ContractRuntimePolicyTests
     {
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0025"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
             Assert.That(
                 diagnostics.Single().GetMessage(
                     System.Globalization.CultureInfo.InvariantCulture),

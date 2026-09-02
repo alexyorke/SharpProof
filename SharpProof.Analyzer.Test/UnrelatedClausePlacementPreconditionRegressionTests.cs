@@ -33,8 +33,6 @@ public sealed class UnrelatedClausePlacementPreconditionRegressionTests
             "contracts",
             ["SP0027"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
     }
 }

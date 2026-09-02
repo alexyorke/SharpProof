@@ -30,9 +30,7 @@ public sealed class EffectContractAttributeDiagnosticsTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0024", "SP0024"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
             Assert.That(
                 diagnostics.Select(static diagnostic =>
                     diagnostic.Location.SourceSpan.Start),

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
+using NUnit.Framework;
 using SharpProof.Analyzer;
 using SharpProof.Attributes;
 using SharpProof.Testing;
@@ -14,6 +15,23 @@ internal static class AnalyzerTestHost
         new(LanguageVersion.Preview);
     private static readonly Lazy<ImmutableArray<MetadataReference>> References =
         new(CreateReferences);
+
+    internal static void AssertIds(
+        IEnumerable<Diagnostic> diagnostics,
+        params string[] expected)
+    {
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EqualTo(expected));
+    }
+
+    internal static void AssertIds(
+        IEnumerable<Diagnostic> diagnostics,
+        string expected,
+        int count)
+    {
+        AssertIds(diagnostics, [.. Enumerable.Repeat(expected, count)]);
+    }
 
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         string source,

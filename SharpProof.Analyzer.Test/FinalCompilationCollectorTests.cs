@@ -89,9 +89,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0049"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
             Assert.That(
                 diagnostics.Single().GetMessage(CultureInfo.InvariantCulture),
                 Does.Contain("ill-formed UTF-16"));
@@ -119,9 +117,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0049"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
             Assert.That(
                 diagnostics.FirstOrDefault()?.GetMessage(
                     CultureInfo.InvariantCulture) ?? string.Empty,
@@ -339,9 +335,7 @@ public sealed class FinalCompilationCollectorTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(collectorDiagnostics, Is.Empty);
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0025"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
             Assert.That(File.Exists(path), Is.False);
         }
     }
@@ -673,9 +667,7 @@ public sealed class FinalCompilationCollectorTests
             CreateCompilation(),
             Options(workspace.Path));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0049"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
         Assert.That(
             diagnostics[0].DefaultSeverity,
             Is.EqualTo(DiagnosticSeverity.Error));
@@ -694,9 +686,7 @@ public sealed class FinalCompilationCollectorTests
                 workspace.SealPath("invalid-depth"),
                 maximumExpressionDepth: value));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0049"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
     }
 
     [TestCase(";dotnet.scalar")]
@@ -717,9 +707,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0049"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
             Assert.That(File.Exists(path), Is.False);
         }
     }
@@ -769,9 +757,7 @@ public sealed class FinalCompilationCollectorTests
             compilation.ReplaceReference(reference, inMemory),
             Options(workspace.SealPath("in-memory")));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0049"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
     }
 
     [Test]
@@ -797,9 +783,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0049"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
             Assert.That(File.Exists(artifactPath), Is.False);
         }
     }
@@ -825,9 +809,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0049"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
             Assert.That(File.Exists(artifactPath), Is.False);
         }
     }
@@ -1055,9 +1037,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0049"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
             Assert.That(File.Exists(artifactPath), Is.False);
         }
     }
@@ -1112,9 +1092,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0049"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
             Assert.That(File.Exists(path), Is.False);
         }
     }
@@ -1147,9 +1125,7 @@ public sealed class FinalCompilationCollectorTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0049"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0049");
             Assert.That(File.Exists(path), Is.False);
         }
     }

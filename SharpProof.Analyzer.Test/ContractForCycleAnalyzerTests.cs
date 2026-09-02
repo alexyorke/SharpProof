@@ -65,9 +65,7 @@ public sealed class ContractForCycleAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0009", "SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0009", "SP0047");
         Assert.That(
             diagnostics[0].GetMessage(
                 System.Globalization.CultureInfo.InvariantCulture),

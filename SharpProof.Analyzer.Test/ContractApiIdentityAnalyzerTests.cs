@@ -181,9 +181,7 @@ public sealed class ContractApiIdentityAnalyzerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(Enumerable.Repeat("SP0047", 7)));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 7);
             Assert.That(
                 diagnostics.Select(diagnostic => diagnostic.GetMessage(
                     System.Globalization.CultureInfo.InvariantCulture)),
@@ -229,9 +227,7 @@ public sealed class ContractApiIdentityAnalyzerTests
             profile: "advisory",
             features: "contracts");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0047", "SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047");
     }
 
     [Test]
@@ -341,9 +337,7 @@ public sealed class ContractApiIdentityAnalyzerTests
         ImmutableArray<Diagnostic> diagnostics,
         string method)
     {
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
         var message = diagnostics.Single().GetMessage(
             System.Globalization.CultureInfo.InvariantCulture);
         Assert.That(
@@ -480,9 +474,7 @@ public sealed class ContractApiIdentityAnalyzerTests
                 profile: "advisory",
                 features: "contracts");
 
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
             Assert.That(
                 diagnostics.Single().GetMessage(
                     System.Globalization.CultureInfo.InvariantCulture),
@@ -571,9 +563,7 @@ public sealed class ContractApiIdentityAnalyzerTests
                 profile: "advisory",
                 features: "contracts");
 
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047", "SP0047"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047");
             Assert.That(
                 diagnostics.All(static diagnostic => diagnostic.Location.IsInSource),
                 Is.True);

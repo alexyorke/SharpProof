@@ -98,9 +98,7 @@ public sealed class GeneratedContractForAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0001"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0001");
     }
 
     [TestCase("advisory", "contracts", true)]
@@ -134,9 +132,7 @@ public sealed class GeneratedContractForAnalyzerTests
             RejectedContractForSource,
             hintName: "PeerContracts.cs");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0001"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0001");
     }
 
     [Test]
@@ -153,9 +149,7 @@ public sealed class GeneratedContractForAnalyzerTests
             """,
             hintName: "PeerContracts.cs");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0004"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0004");
     }
 
     [Test]
@@ -212,9 +206,7 @@ public sealed class GeneratedContractForAnalyzerTests
             """,
             handwritten);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0002", "SPCF0002"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0002", "SPCF0002");
         Assert.That(
             diagnostics.Select(static diagnostic =>
                 Path.GetFileName(diagnostic.Location.SourceTree?.FilePath)),
@@ -331,9 +323,7 @@ public sealed class GeneratedContractForAnalyzerTests
             """,
             additionalDiagnosticIds: ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(
             diagnostics.Single().GetMessage(
                 System.Globalization.CultureInfo.InvariantCulture),
@@ -405,9 +395,7 @@ public sealed class GeneratedContractForAnalyzerTests
             """,
             additionalDiagnosticIds: ["SP0047"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SPCF0003"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SPCF0003");
     }
 
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeGeneratedAsync(

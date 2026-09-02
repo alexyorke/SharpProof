@@ -202,9 +202,7 @@ public sealed class AnalyzerModeAndEffectTests
             profile: profile,
             features: features);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0025"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain(allowedValues));
@@ -225,9 +223,7 @@ public sealed class AnalyzerModeAndEffectTests
             new FailingOptionsProvider(failGlobalOptions),
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0025"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("configuration provider failed"));
@@ -252,9 +248,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0025"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
             Assert.That(
                 diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
                 Does.Contain("option was removed"));
@@ -276,9 +270,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0025"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
             Assert.That(
                 diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
                 Does.Contain("option was removed"));
@@ -304,9 +296,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0025"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0025");
             Assert.That(
                 diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
                 Does.Contain("option was removed"));
@@ -1188,9 +1178,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0046"],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0046"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0046");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -1239,9 +1227,7 @@ public sealed class AnalyzerModeAndEffectTests
             new SharpProofAnalyzer(factory),
             allowCompilationErrors: true);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0002"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
         Assert.That(
             factory.OutcomeCounts["Write"],
             Is.EqualTo(1));
@@ -1277,9 +1263,7 @@ public sealed class AnalyzerModeAndEffectTests
             "effects",
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0002"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
         Assert.That(
             diagnostics[0].Location.SourceTree!.FilePath,
             Is.EqualTo("Fixture.cs"));
@@ -1363,9 +1347,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0002"],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0002"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
         Assert.That(factory.OutcomeCounts["get_Value"], Is.EqualTo(1));
     }
 
@@ -1385,9 +1367,7 @@ public sealed class AnalyzerModeAndEffectTests
             "effects",
             ["SP0024"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
     }
 
     [Test]
@@ -1473,9 +1453,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0002"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
             Assert.That(
                 factory.Outcomes["Run"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -1512,9 +1490,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0002"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
             Assert.That(
                 factory.Outcomes["Run"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -1546,9 +1522,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0002"],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0002"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
         Assert.That(
             factory.Outcomes["Mutate"],
             Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -1609,9 +1583,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0027"],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -1676,9 +1648,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0027"],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027", "SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -1740,9 +1710,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0027"],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -1811,9 +1779,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0027"],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0027"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -1926,9 +1892,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0045", "SP0045", "SP0045"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0045", "SP0045", "SP0045");
             Assert.That(
                 factory.Outcomes["FrameworkObject"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Refuted));
@@ -1992,9 +1956,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0016"],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0016", 3)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0016", 3);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -2064,9 +2026,7 @@ public sealed class AnalyzerModeAndEffectTests
             mode: null,
             []);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("'Selected'"));
@@ -2108,9 +2068,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0047"],
             features: "contracts");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0047", "SP0047", "SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047", "SP0047");
         var messages = diagnostics.Select(diagnostic =>
             diagnostic.GetMessage(CultureInfo.InvariantCulture)).ToArray();
         using (Assert.EnterMultipleScope())
@@ -2214,9 +2172,7 @@ public sealed class AnalyzerModeAndEffectTests
             mode: null,
             ["SP0047"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0047", 4)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 4);
         Assert.That(
             diagnostics.Select(diagnostic =>
                 diagnostic.GetMessage(CultureInfo.InvariantCulture)),
@@ -2248,9 +2204,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(Enumerable.Repeat("SP0047", 3)));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 3);
             Assert.That(
                 diagnostics.Select(diagnostic => diagnostic.GetMessage(
                     CultureInfo.InvariantCulture)),
@@ -2336,9 +2290,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(Enumerable.Repeat("SP0047", 2)));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", 2);
             Assert.That(factory.OutcomeCounts["add_Changed"], Is.EqualTo(1));
             Assert.That(factory.OutcomeCounts["remove_Changed"], Is.EqualTo(1));
         }
@@ -2367,9 +2319,7 @@ public sealed class AnalyzerModeAndEffectTests
         {
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(
-                    diagnostics.Select(static diagnostic => diagnostic.Id),
-                    Is.EqualTo(["SP0047"]));
+                AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
                 Assert.That(factory.OutcomeCounts["get_Value"], Is.EqualTo(1));
                 Assert.That(factory.Outcomes["get_Value"],
                     Is.EqualTo(AnalyzerSemanticOutcome.Abstained));
@@ -2495,9 +2445,7 @@ public sealed class AnalyzerModeAndEffectTests
             "effects",
             ["SP0046"]);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0046", 8)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0046", 8);
     }
 
     [Test]
@@ -2596,9 +2544,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0045"],
             new SharpProofAnalyzer(factory));
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0045", 4)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0045", 4);
         Assert.That(
             diagnostics.Single(diagnostic =>
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)
@@ -2767,9 +2713,7 @@ public sealed class AnalyzerModeAndEffectTests
             "UnknownDivide",
             "UnknownCheckedAdd"
         };
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0046", unsafeMethods.Length)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0046", unsafeMethods.Length);
         foreach (var methodName in unsafeMethods)
         {
             Assert.That(
@@ -2825,9 +2769,7 @@ public sealed class AnalyzerModeAndEffectTests
             mode: null,
             []);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
     }
 
     [Test]
@@ -2934,9 +2876,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047", "SP0047"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0047");
             Assert.That(
                 diagnostics.Select(diagnostic =>
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)),
@@ -3005,9 +2945,7 @@ public sealed class AnalyzerModeAndEffectTests
             new SharpProofAnalyzer(factory),
             features: "effects");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0047", "SP0045", "SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047", "SP0045", "SP0047");
         Assert.That(
             diagnostics.Where(static diagnostic => diagnostic.Id == "SP0047")
                 .Select(diagnostic =>
@@ -3082,9 +3020,7 @@ public sealed class AnalyzerModeAndEffectTests
             new SharpProofAnalyzer(factory),
             features: "effects");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0047"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("EffectContractDoesNotCoverBodySummary"));
@@ -3150,9 +3086,7 @@ public sealed class AnalyzerModeAndEffectTests
             new SharpProofAnalyzer(factory),
             features: "effects");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0046"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0046");
         Assert.That(
             factory.Outcomes["RethrowBeforeSiblingCatch"],
             Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -3330,9 +3264,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0046", "SP0046", "SP0046"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0046", "SP0046", "SP0046");
             Assert.That(
                 factory.Outcomes["SafeConstruction"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Proven));
@@ -3385,9 +3317,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0047"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0047");
             Assert.That(
                 diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
                 Does.Contain("EffectContractDoesNotCoverBodySummary"));
@@ -3431,9 +3361,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0046"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0046");
             Assert.That(
                 diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
                 Does.Contain("NullReferenceException"));
@@ -3518,9 +3446,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0046", "SP0046"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0046", "SP0046");
             Assert.That(
                 diagnostics.Select(static diagnostic =>
                     diagnostic.GetMessage(CultureInfo.InvariantCulture)),
@@ -3609,9 +3535,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0046", "SP0046"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0046", "SP0046");
             Assert.That(
                 factory.Outcomes["WrongAllowed"],
                 Is.EqualTo(AnalyzerSemanticOutcome.Unknown));
@@ -3667,9 +3591,7 @@ public sealed class AnalyzerModeAndEffectTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EqualTo(["SP0024", "SP0024"]));
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0024", "SP0024");
             Assert.That(
                 messages,
                 Has.Some.Contain("closed System.Exception-derived types"));
@@ -3698,9 +3620,7 @@ public sealed class AnalyzerModeAndEffectTests
             ["SP0024"],
             features: "contracts");
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(["SP0024"]));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(
             diagnostics[0].GetMessage(CultureInfo.InvariantCulture),
             Does.Contain("[EffectContract]"));

@@ -1675,9 +1675,7 @@ public sealed class NestedRequiresCallSiteTests
             enabledIds: ["SP0024"],
             allowCompilationErrors: true);
 
-        Assert.That(
-            diagnostics.Select(static diagnostic => diagnostic.Id),
-            Is.EqualTo(Enumerable.Repeat("SP0024", 6)));
+        AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 6);
         Assert.That(
             diagnostics.Select(static diagnostic =>
                 diagnostic.Location.SourceSpan.Start),
@@ -1804,8 +1802,7 @@ public sealed class NestedRequiresCallSiteTests
         int count)
     {
         Assert.That(
-            diagnostics.Select(static diagnostic =>
-                diagnostic.Id),
+            diagnostics.Select(static diagnostic => diagnostic.Id),
             Is.EqualTo(
                 Enumerable.Repeat("SP0027", count)),
             string.Join(", ", diagnostics.Select(static diagnostic =>
