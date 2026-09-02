@@ -434,16 +434,10 @@ public static class IrStructuralShrinker
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var currentSize = StructuralSize(current);
             var changed = false;
             foreach (var candidate in GetCandidates(factory, current))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (StructuralSize(candidate) >= currentSize)
-                {
-                    continue;
-                }
-
                 if (!await preservesMismatch(candidate, cancellationToken)
                         .ConfigureAwait(false))
                 {

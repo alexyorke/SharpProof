@@ -175,6 +175,7 @@ the smallest relevant containerized test target passes.
 | R855 | Share release-JSON accepted/rejected fixture assertion plumbing | `SharpProof.ArchitectureTest`: ReleaseJsonAuthorityTests passed |
 | R592 | Merge duplicate differential type projection finding into R546 | `SharpProof.Testing.Test`: IrCSharpDifferentialOracleTests, 11 passed |
 | R591 | Replace recursive differential-oracle term collection with an explicit stack | `SharpProof.Testing.Test`: IrCSharpDifferentialOracleTests, 11 passed |
+| R597 | Reuse the shrinker’s existing strict-size candidate gate | `SharpProof.Fuzz.Test`: FuzzRunnerTests, 32 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3956,7 +3957,9 @@ removing the duplicate node-shape traversal and allocation.
 
 ### Status (part one hundred thirty-eight)
 
-R597 is a pending fuzz-shrinker performance reduction candidate. Retain the existing size comparison and candidate de-duplication; avoid only recomputing sizes already known to the same shrink iteration.
+R597 is `applied`: `MinimizeAsync` now relies on `GetCandidates`' existing
+strictly-decreasing size filter instead of recomputing the current and each
+candidate's structural size, preserving candidate ordering and deduplication.
 
 ## Second survey, part one hundred thirty-nine: R598 - duplicated frontend fuzz environment binding
 
