@@ -16,25 +16,12 @@ function Get-SharpProofMutationBaselineInvocation {
     $arguments = @(
         'test', $Project, '-c', $Configuration, '--no-restore',
         '--filter', $Filter, '--logger', 'console;verbosity=minimal')
-    $frames = @($arguments | ForEach-Object {
-            $_.Length.ToString(
-                [Globalization.CultureInfo]::InvariantCulture) + ':' + $_
-        })
-    $hasher = [Security.Cryptography.SHA256]::Create()
-    try {
-        $bytes = [Text.UTF8Encoding]::new($false).GetBytes(
-            [string]::Concat($frames))
-        $sha256 = [Convert]::ToHexString(
-            $hasher.ComputeHash($bytes)).ToLowerInvariant()
-    }
-    finally {
-        $hasher.Dispose()
-    }
+    $identity = [string]::Join('|', $arguments)
     [pscustomobject]@{
         Project = $Project
         Filter = $Filter
         Configuration = $Configuration
-        Sha256 = $sha256
+        Identity = $identity
     }
 }
 
@@ -51,21 +38,21 @@ function Get-SharpProofMutationBaselinePlan {
             -Project ([string]$mutation.Project) `
             -Filter ([string]$mutation.Filter) `
             -Configuration $Configuration
-        if (-not $groups.ContainsKey($invocation.Sha256)) {
-            $groups.Add($invocation.Sha256, [pscustomobject]@{
+        if (-not $groups.ContainsKey($invocation.Identity)) {
+            $groups.Add($invocation.Identity, [pscustomobject]@{
                     Invocation = $invocation
                     Mutations = [Collections.Generic.List[object]]::new()
                 })
         }
-        elseif ($groups[$invocation.Sha256].Invocation.Project -cne
+        elseif ($groups[$invocation.Identity].Invocation.Project -cne
                 $invocation.Project -or
-            $groups[$invocation.Sha256].Invocation.Filter -cne
+            $groups[$invocation.Identity].Invocation.Filter -cne
                 $invocation.Filter -or
-            $groups[$invocation.Sha256].Invocation.Configuration -cne
+            $groups[$invocation.Identity].Invocation.Configuration -cne
                 $invocation.Configuration) {
             throw 'Mutation baseline invocation identities collided.'
         }
-        $groups[$invocation.Sha256].Mutations.Add($mutation)
+        $groups[$invocation.Identity].Mutations.Add($mutation)
     }
     return @($groups.Values | Sort-Object {
             $_.Invocation.Project

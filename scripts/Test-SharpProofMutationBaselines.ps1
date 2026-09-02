@@ -31,8 +31,8 @@ if ($plan.Count -ne 2 -or
 
 $reversed = @(Get-SharpProofMutationBaselinePlan `
         -Mutations @($duplicate, $second, $first) -Configuration Release)
-if (($plan.Invocation.Sha256 -join ',') -cne
-    ($reversed.Invocation.Sha256 -join ',')) {
+if (($plan.Invocation.Identity -join ',') -cne
+    ($reversed.Invocation.Identity -join ',')) {
     throw 'Parallel baseline planning is not canonical.'
 }
 
@@ -40,8 +40,8 @@ $otherProject = Get-SharpProofMutationBaselineInvocation `
     -Project Other.Tests -Filter $second.Filter -Configuration Release
 $otherConfiguration = Get-SharpProofMutationBaselineInvocation `
     -Project $second.Project -Filter $second.Filter -Configuration Debug
-if ($otherProject.Sha256 -eq $plan[1].Invocation.Sha256 -or
-    $otherConfiguration.Sha256 -eq $plan[1].Invocation.Sha256) {
+if ($otherProject.Identity -eq $plan[1].Invocation.Identity -or
+    $otherConfiguration.Identity -eq $plan[1].Invocation.Identity) {
     throw 'Project or configuration was omitted from baseline identity.'
 }
 
