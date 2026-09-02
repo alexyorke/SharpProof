@@ -20,6 +20,10 @@ $gitPath = (Get-Command git -CommandType Application -ErrorAction Stop |
 Get-Command docker -CommandType Application -ErrorAction Stop | Out-Null
 
 function Get-GitUntrackedPaths {
+    param(
+        [switch]$IgnoredPackages
+    )
+
     $startInfo = [Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $gitPath
     $startInfo.WorkingDirectory = $repositoryRoot
@@ -27,14 +31,20 @@ function Get-GitUntrackedPaths {
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
-    foreach ($argument in @(
-            '-C',
-            $repositoryRoot,
-            'ls-files',
-            '-z',
-            '--others',
-            '--exclude-standard',
-            '--')) {
+    $arguments = @(
+        '-C',
+        $repositoryRoot,
+        'ls-files',
+        '-z',
+        '--others',
+        '--exclude-standard')
+    if ($IgnoredPackages) {
+        $arguments += @('--ignored', '--', 'nupkgs/')
+    }
+    else {
+        $arguments += '--'
+    }
+    foreach ($argument in $arguments) {
         [void]$startInfo.ArgumentList.Add($argument)
     }
 
@@ -43,7 +53,7 @@ function Get-GitUntrackedPaths {
     $output = [IO.MemoryStream]::new()
     try {
         if (-not $process.Start()) {
-            throw 'Could not start Git untracked-file discovery.'
+            throw 'Could not start Git file inventory discovery.'
         }
         $copy = $process.StandardOutput.BaseStream.CopyToAsync($output)
         $errorOutput = $process.StandardError.ReadToEndAsync()
@@ -52,7 +62,7 @@ function Get-GitUntrackedPaths {
         $stderr = $errorOutput.GetAwaiter().GetResult()
         if ($process.ExitCode -ne 0) {
             throw (
-                'Git untracked-file discovery failed with exit code ' +
+                'Git file inventory discovery failed with exit code ' +
                 "$($process.ExitCode): $stderr")
         }
     }
@@ -66,7 +76,7 @@ function Get-GitUntrackedPaths {
         return @()
     }
     if ($bytes[$bytes.Length - 1] -ne 0) {
-        throw 'Git returned a non-terminated untracked-file inventory.'
+        throw 'Git returned a non-terminated file inventory.'
     }
 
     $paths = [Collections.Generic.List[string]]::new()
@@ -166,13 +176,16 @@ try {
     }
 
     $untrackedPaths = @(Get-GitUntrackedPaths)
+    $packagePaths = @(Get-GitUntrackedPaths -IgnoredPackages)
+    $sourcePaths = @($untrackedPaths + $packagePaths)
+    $sourcePaths = @($sourcePaths | Sort-Object -Unique)
     $manifest = [IO.File]::Open(
         $sourceManifest,
         [IO.FileMode]::CreateNew,
         [IO.FileAccess]::Write,
         [IO.FileShare]::None)
     try {
-        foreach ($relativePath in $untrackedPaths) {
+        foreach ($relativePath in $sourcePaths) {
             $normalized = $relativePath.Replace('\', '/')
             if ([IO.Path]::IsPathRooted($normalized) -or
                 $normalized.Split('/') -contains '..') {
@@ -217,10 +230,13 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Could not verify the host tracked-source patch.'
     }
-    $verificationUntracked = @(Get-GitUntrackedPaths)
+    $verificationPaths = @(
+        Get-GitUntrackedPaths
+        Get-GitUntrackedPaths -IgnoredPackages)
+    $verificationUntracked = @($verificationPaths | Sort-Object -Unique)
     if ($verificationHead -cne $head -or
         @(Compare-Object `
-            -ReferenceObject $untrackedPaths `
+            -ReferenceObject $sourcePaths `
             -DifferenceObject $verificationUntracked `
             -SyncWindow 0).Count -ne 0 -or
         -not (Test-ExactFileBytes `
@@ -228,7 +244,7 @@ try {
             -RightPath $verificationPatch)) {
         throw 'The host source changed while its loop snapshot was captured.'
     }
-    foreach ($relativePath in $untrackedPaths) {
+    foreach ($relativePath in $sourcePaths) {
         if (-not (Test-ExactFileBytes `
                 -LeftPath (Join-Path $repositoryRoot $relativePath) `
                 -RightPath (Join-Path $snapshotFiles $relativePath))) {

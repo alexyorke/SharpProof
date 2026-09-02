@@ -135,6 +135,8 @@ else
     --binary --full-index --no-ext-diff HEAD -- . > "${source_patch}"
   git -C "${source_root}" ls-files -z \
     --others --exclude-standard -- > "${source_manifest}"
+  git -C "${source_root}" ls-files -z \
+    --others --ignored --exclude-standard -- nupkgs/ >> "${source_manifest}"
 fi
 
 if [[ ! -d "${target_root}/.git" ]]; then
@@ -177,6 +179,8 @@ fi
 
 git -C "${target_root}" ls-files -z \
   --others --exclude-standard -- > "${target_manifest}"
+git -C "${target_root}" ls-files -z \
+  --others --ignored --exclude-standard -- nupkgs/ >> "${target_manifest}"
 git -C "${target_root}" reset --hard --quiet
 while IFS= read -r -d '' relative_path; do
   validate_relative_path "${relative_path}" target

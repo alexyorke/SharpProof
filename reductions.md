@@ -208,6 +208,7 @@ the smallest relevant containerized test target passes.
 | R499 | Share unsupported-value abstention classification in the Roslyn lowerer | `SharpProof.Frontend.Test`: 121 passed |
 | R500 | Reuse the supported-unknown count during corpus outcome validation | `SharpProof.Gates.Test`: CorpusGateTests 23 passed |
 | R504 | Express container script modes with `COPY --chmod` | `SharpProof.ArchitectureTest`: ContainerAuthorityScriptTests 15; `docker compose build tooling` passed |
+| R505 | Keep ignored `nupkgs/` inputs in the persistent loop snapshot and workspace | `SharpProof.ArchitectureTest`: HostLoopSnapshotAvoidsBindMountGitDiffScanning 1 passed; shell/PowerShell parses passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3049,10 +3050,10 @@ and they do not materialize the same source.
 
 ### Status (part sixty-five)
 
-R505 is `pending`. The fix is small - either mirror the ignored-`nupkgs` copy
-into the loop path, or have the loop reject the commands that require a
-`-PackageSource` - but it should be a deliberate choice, because the two paths
-are intentionally different implementations rather than one shared one.
+R505 is applied as a parity fix: host loop snapshots and the persistent
+container workspace now include ignored `nupkgs/` package inputs, and stale
+package files are reconciled with the same manifest. The deliberate source
+materialization differences remain otherwise unchanged.
 
 
 ## Second survey, part sixty-six: R506 - analyzer release tracking is disabled six ways
@@ -3688,3 +3689,19 @@ R582 is a pending worker-result reduction candidate. Keep the current fail-close
 ### Status (part one hundred twenty-four)
 
 R583 is a pending callable-verification reduction candidate. Preserve the early contradictory-entry return and its proof-core/assumption handling; simplify only branches proven unreachable after that return.
+
+## Second survey, part one hundred twenty-five: R584 - repeated test SHA-256 formatting
+
+| R584 | **Worker and package test fixtures reimplement the lowercase SHA-256 formatter.** `WorkerTests.TestProject.CreateRequest`, `ScalarDifferentialMatrixTests`, `WorkerTcbEdgeCaseTests`, and two `WorkerMsBuildIntegrationTests` sites each call `SHA256.HashData` and concatenate per-byte `ToString("x2", CultureInfo.InvariantCulture)` results, even though the referenced Worker.Protocol assembly exposes `WorkerProtocolJson.ComputeSha256` for the same canonical wire representation. A shared test helper or direct use of that formatter can remove five copies of byte-to-hex conversion and keep fixture hashes aligned with the protocol's lowercase policy; retain independent hashing only where a test intentionally exercises a different case or malformed digest. | `SharpProof.Worker.Test/WorkerTests.cs:7260-7269`; `SharpProof.Worker.Test/ScalarDifferentialMatrixTests.cs:917-926`; `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:1440-1444`; `SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs:443-446,3408-3410` |
+
+### Status (part one hundred twenty-five)
+
+R584 is a pending test-infrastructure reduction candidate. Preserve intentionally uppercase or malformed protocol-hash fixtures; centralize only the repeated lowercase digest construction used to represent valid file and payload hashes.
+
+## Second survey, part one hundred twenty-six: R585 - repeated throwing backend fixture
+
+| R585 | **Three Worker test fixtures duplicate the same unexpected-backend fake.** `AcyclicBlockPredicateExecutorTests`, `CompilerCallableLowererTests`, and `WorkerTcbEdgeCaseTests` each define an `UnexpectedBackend` with an interlocked call counter, a `CallCount` accessor, and a `CheckAsync` implementation that increments the counter and throws an assertion exception; only the message differs. A parameterized shared `ThrowingBackend` test helper can retain the per-test diagnostic and call-count assertions while removing three copies of the backend plumbing. | `SharpProof.Worker.Test/AcyclicBlockPredicateExecutorTests.cs:861-872`; `SharpProof.Worker.Test/CompilerCallableLowererTests.cs:692-706`; `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:1779-1793` |
+
+### Status (part one hundred twenty-six)
+
+R585 is a pending Worker test-infrastructure reduction candidate. Keep the message and counter behavior configurable so tests still prove that malformed or unsupported inputs never reach the backend.
