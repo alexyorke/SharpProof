@@ -8099,3 +8099,135 @@ build-file changes were made during this audit.
 
 R888 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred ninety-nine: R889 - repeated specification-pack option passes
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R889 | **`FinalCompilationCollector.ParseSpecificationPacks` materializes the same option and then traverses it three more times.** After `Split`/`Trim` creates `packs`, the method makes one pass for blank rejection, a second pass through `Distinct` for duplicate rejection, and a third pass to sort the values before returning them. A single collection pass with a duplicate set can preserve empty-item and duplicate failures, followed by the one required canonical sort, without changing the returned ordering or the existing custom parser behavior recorded by R365. | `SharpProof.CompilerCollector/FinalCompilationCollector.cs:87-111` |
+
+### Status (part three hundred ninety-nine)
+
+R889 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred: R890 - duplicated pack-authority projection
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R890 | **`CompilerManifestArtifactProducer.Create` copies the same specification-pack authority into two output objects independently.** The selected IDs, catalog version, and catalog digest are assigned to `snapshot` at the start, then copied again from the same `CompilerSpecificationPackAuthority` into the top-level `CompilerManifestArtifact`. Both wire locations may be required by the schema, so the reduction is to create one immutable authority projection and use it for both assignments, retaining both serialized representations and the later fingerprint/validation checks while removing a second materialization point. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:11-21,59-65` |
+
+### Status (part four hundred)
+
+R890 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred one: R891 - per-authority source-tree rebinding scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R891 | **`CompilerManifestArtifactProducer.BuildSummaryEvidence` searches every captured syntax tree for every source summary authority.** Each source row repeats the same path/sha256 lookup and then applies its span bounds to the matching tree. A source-tree index keyed by `(Path, Sha256)` whose values retain all matching snapshots can reduce the repeated collection scan while preserving the current span predicate, duplicate-tree behavior, and fail-closed rejection of an authority that is not bound to a captured tree. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:101-132` |
+
+### Status (part four hundred one)
+
+R891 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred two: R892 - per-authority captured-module scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R892 | **`CompilerManifestArtifactProducer.BuildSummaryEvidence` flattens and filters every captured reference module for each IL summary authority.** The method then allocates a temporary array solely to distinguish zero, one, and multiple matching `(Name, Sha256)` modules. A module index keyed by those two fields, with duplicate values retained, can provide the same exact-one check and MVID projection without rescanning all references or changing malformed-duplicate rejection. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:133-149` |
+
+### Status (part four hundred two)
+
+R892 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred three: R893 - repeated multi-module metadata-name reads
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R893 | **`CompilerCompilationCapture.CaptureReference` reads each linked module name once to sort the backing modules and again when capturing the sorted modules.** The sort invokes `ReadModuleName(module.GetMetadataReader())`; the subsequent loop obtains a reader and calls `ReadModuleName` again before resolving the sibling path. Decorating each module with its already-read name (and retaining the original first-module position) can remove the duplicate metadata lookup while preserving canonical module order and all later loaded-file identity checks. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:278-307` |
+
+### Status (part four hundred three)
+
+R893 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred four: R894 - multi-pass JSON property-set validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R894 | **`CompilerSpecificationPackProvider.RequireObject` allocates and traverses the property set multiple times for one schema check.** It builds an expected-name `HashSet`, materializes all actual properties, scans them for unknown names, then creates another distinct-name set to detect duplicates. A single actual-name set populated while enumerating the properties can retain exact-count, unknown-property, and duplicate rejection with one traversal and fewer temporary structures; the strict fail-closed property-set contract must remain unchanged. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:698-719` |
+
+### Status (part four hundred four)
+
+R894 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred five: R895 - redundant catalog duplicate lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R895 | **`CompilerSpecificationPackProvider.LoadCatalog` checks pack-key uniqueness twice under its sorted-input invariant.** `previousPack` rejects every non-increasing ID, which already catches duplicates and out-of-order entries; the following `packs.ContainsKey(pack.Id)` is therefore unreachable after the first element unless that invariant is removed. Keeping either the monotonic check or a direct dictionary insertion failure, rather than both, can shorten the catalog parser while preserving the sorted/unique requirement and the same fail-closed error boundary. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:385-399` |
+
+### Status (part four hundred five)
+
+R895 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred six: R896 - double lookup before method insertion
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R896 | **The enabled specification-pack method map probes a key and then probes it again to insert it.** For every method, the constructor calls `methods.ContainsKey(method.DocumentationCommentId)` and, after the overlap branch, calls `methods.Add(...)` with the same key. A single insertion API that reports an existing key, or an equivalent lookup-plus-assignment helper, can retain overlap rejection while removing the duplicate dictionary lookup and preserving the evidence-enriched value. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:46-73` |
+
+### Status (part four hundred six)
+
+R896 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred seven: R897 - repeated Boolean term property lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R897 | **`CompilerSpecificationPackProvider.ParseTerm` retrieves a Boolean literal's `value` property twice.** The first `Get("value")` checks the JSON kind and the second `Get("value").GetBoolean()` reads the same immutable `JsonElement` again. Caching that element within the Boolean case preserves the strict Boolean-kind/value validation and removes one property lookup; the integer branch already reads its value once through `TryGetInt64`. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:589-603` |
+
+### Status (part four hundred seven)
+
+R897 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred eight: R898 - repeated specification result-type proof
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R898 | **`CompilerSpecificationPackProvider.TryBuild` repeats a result-type equality already established by the admission and instantiation gates.** Before instantiation it requires `memberInfo.ReturnType == TypeId(definition.ResultType)`; `ParseMethod` requires the root term type to equal that same definition result type; and `Instantiate` checks every constructed term against its parsed type, including the root. The later `resultExpression.Type != memberInfo.ReturnType` branch therefore restates the same invariant. Removing only that final check, or carrying a validated result-type token into the builder, can preserve all malformed-catalog, method-shape, and factory-type checks without a duplicate proof. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:128-144,172-180,543-550,562-648` |
+
+### Status (part four hundred eight)
+
+R898 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred nine: R899 - repeated source-candidate declaration-count check
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R899 | **`CompilerRelationalSummaryProvider.TryBuildSource` checks the declaring-syntax-reference count after `IsSourceCandidate` has already required exactly one.** The candidate predicate includes `DeclaringSyntaxReferences.Length: 1`, and the next condition repeats `method.DeclaringSyntaxReferences.Length != 1` before reading the sole declaration. Removing that local duplicate keeps the candidate predicate as the source-shape gate and leaves the declaration-kind, CFG, and lowerer checks intact. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:184-203,316-330` |
+
+### Status (part four hundred nine)
+
+R899 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred ten: R900 - repeated captured-tree lookup scans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R900 | **`CompilerRelationalSummaryProvider.FindCapturedTree` linearly rescans the compilation's syntax-tree array for every source summary authority.** `CreateAuthority` calls it once for each source summary, and the helper compares every compilation tree by reference before selecting the same-index captured snapshot. A reference-identity map built once when captured trees are supplied can preserve index alignment, the fallback behavior for uncaptured trees, and the existing source authority data while removing repeated scans as the summary set grows. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:356-405,435-451` |
+
+### Status (part four hundred ten)
+
+R900 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
