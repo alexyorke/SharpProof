@@ -301,14 +301,27 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                     return null;
                 }
 
-                if (values.Any(value => !value.Environment.ContainsKey(variable)))
+                var first = values[0].Environment[variable];
+                var complete = true;
+                var differs = false;
+                for (var index = 1; index < values.Count; index++)
+                {
+                    if (!values[index].Environment.TryGetValue(
+                            variable,
+                            out var current))
+                    {
+                        complete = false;
+                        break;
+                    }
+                    differs |= current.Id != first.Id;
+                }
+                if (!complete)
                 {
                     continue;
                 }
 
-                var first = values[0].Environment[variable];
                 IrTerm merged = first;
-                if (values.Any(value => value.Environment[variable].Id != first.Id))
+                if (differs)
                 {
                     merged = values[^1].Environment[variable];
                     for (var index = values.Count - 2; index >= 0; index--)

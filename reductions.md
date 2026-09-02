@@ -251,6 +251,8 @@ the smallest relevant containerized test target passes.
 | R790 | Drive package-consumer framework coverage from the acceptance contract | PowerShell parse; `ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed`: 1 passed |
 | R797 | Share the staged-worker version projection between launcher input-hash and response-version calculations | `SharpProof.Package.Test`: `LauncherArgumentTests`, 75 passed |
 | R798 | Validate launcher path topology once before snapshot/request projection, then retain only the manifest-dependent final pass | `SharpProof.Package.Test`: `LauncherArgumentTests`, 75 passed |
+| R801 | Merge incoming-environment completeness and difference checks into one forward scan | `SharpProof.Worker.Test`: `AcyclicBlockPredicateExecutorTests`, 14 passed with `-Fast` |
+| R802 | Let the shared release-bundle topology helper own the six-artifact/cardinality precondition | PowerShell parse; `ReleaseJsonAuthorityTests` fixture coverage |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -6286,9 +6288,9 @@ No implementation or build file was changed.
 
 ### Status (part three hundred twelve)
 
-R801 is `deferred` pending a small accumulator that preserves the current
-  fail-closed handling and ordering while eliminating the repeated merge-loop
-  scan. No implementation or build file was changed.
+R801 is `applied`: incoming environments now combine completeness and differing
+value detection in one forward scan; conditional construction and accounting
+remain unchanged. The focused worker fixture suite passed.
 
 ## Second survey, part three hundred thirteen: R802 - repeated release-bundle cardinality check
 
@@ -6309,9 +6311,9 @@ R801 is `deferred` pending a small accumulator that preserves the current
 
 ### Status (part three hundred thirteen)
 
-R802 is `deferred` pending removal of the caller-side cardinality precheck or
-an explicit result-returning topology seam. No implementation or build file
-was changed.
+R802 is `applied`: release-artifact validation now delegates the six-artifact
+and 3/3 package/symbol shape to `Test-SharpProofReleaseBundleTopology`, which
+already owns that admission check; package-specific assertions remain local.
 
 ## Second survey, part three hundred fourteen: R803 - repeated manifest claim partition scans
 

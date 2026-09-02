@@ -61,11 +61,6 @@ if ([string]$manifest.repository.type -ne 'git' -or
 }
 
 $artifacts = @($manifest.artifacts)
-if ($artifacts.Count -ne 6 -or
-    @($artifacts | Where-Object { $_.kind -eq 'package' }).Count -ne 3 -or
-    @($artifacts | Where-Object { $_.kind -eq 'symbols' }).Count -ne 3) {
-    throw 'Release evidence must contain three packages and three symbol packages.'
-}
 Test-SharpProofReleaseBundleTopology `
     -Directory $resolvedSource `
     -Artifacts $artifacts `

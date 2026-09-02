@@ -63,6 +63,14 @@ function Invoke-SharpProofRequiredDotnet {
                 (Test-Path -LiteralPath $outputPath -PathType Leaf)) {
                 $output = Get-Content -LiteralPath $outputPath -Raw
                 if (-not [string]::IsNullOrWhiteSpace($output)) {
+                    $maximumFailureOutputLength = 12000
+                    if ($output.Length -gt $maximumFailureOutputLength) {
+                        $headLength = 6000
+                        $tailLength = $maximumFailureOutputLength - $headLength
+                        $output = $output.Substring(0, $headLength) +
+                            "`n... output truncated ...`n" +
+                            $output.Substring($output.Length - $tailLength)
+                    }
                     Write-Host $output.TrimEnd()
                 }
             }
