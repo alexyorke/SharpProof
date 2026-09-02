@@ -161,7 +161,11 @@ public sealed class IrFactory
                 return existing;
             }
 
-            return GetOrCreateTypeCore(default, GetStringCore(element.Name) + "[]", IrTypeKind.Sequence, elementType);
+            return CreateTypeCore(
+                key,
+                GetStringCore(element.Name) + "[]",
+                IrTypeKind.Sequence,
+                elementType);
         }
     }
 
@@ -746,6 +750,15 @@ public sealed class IrFactory
             return existing;
         }
 
+        return CreateTypeCore(key, name, kind, elementType);
+    }
+
+    private IrTypeId CreateTypeCore(
+        (IrTypeKind Kind, int Identity, int ElementType) key,
+        string name,
+        IrTypeKind kind,
+        IrTypeId? elementType)
+    {
         var nameId = InternStringCore(name);
         var id = new IrTypeId(_scope, _types.Count);
         _typeIds.Add(key, id);

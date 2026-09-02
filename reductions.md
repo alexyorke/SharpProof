@@ -162,6 +162,7 @@ the smallest relevant containerized test target passes.
 | R276 | Reuse exact duplicate raw-string fixtures across Worker and analyzer tests | Worker CompilerManifestArtifactTests: 91; WorkerTests: 148; GeneratedContractForAnalyzerTests: 22 passed |
 | R588 | Collapse the unreachable opaque receiver branch while preserving its exception contract | `SharpProof.Ir.Test`: ArgumentNullGuardBoundaryTests, 3 passed |
 | R589 | Share IR program condition evaluation and boolean validation | `SharpProof.Ir.Test`: IrProgramTests, 22 passed |
+| R590 | Reuse the validated sequence-type key when adding an IR type | `SharpProof.Ir.Test`: IrFactoryInvariantRegressionTests, 9 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3869,7 +3870,10 @@ tests).
 
 ### Status (part one hundred thirty-one)
 
-R590 is a pending IR factory reduction candidate. Preserve the existing interning key and the optimization of not materializing a display name for an already-interned element type; remove only the duplicate dictionary probe.
+R590 is `applied`: sequence-type creation now passes its already-validated
+interning key to the shared add path, preserving the display-name allocation
+optimization and type interning while removing the second dictionary probe.
+`IrFactoryInvariantRegressionTests` passed (9 tests).
 
 ## Second survey, part one hundred thirty-two: R591 - recursive differential-oracle traversal
 
