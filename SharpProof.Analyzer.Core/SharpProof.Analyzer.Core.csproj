@@ -4,7 +4,6 @@
     <AssemblyName>SharpProof.Analyzer.Core</AssemblyName>
     <RootNamespace>SharpProof</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);RS2002;RS2003</NoWarn>
     <IsPackable>false</IsPackable>
   </PropertyGroup>

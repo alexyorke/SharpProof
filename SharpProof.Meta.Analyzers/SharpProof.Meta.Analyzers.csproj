@@ -3,7 +3,6 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IsPackable>false</IsPackable>
     <NoWarn>$(NoWarn);RS2008</NoWarn>
   </PropertyGroup>

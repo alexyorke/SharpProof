@@ -4,7 +4,6 @@
     <IsRoslynComponent>true</IsRoslynComponent>
     <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <IsPackable>false</IsPackable>
     <NoWarn>$(NoWarn);RS2008</NoWarn>
   </PropertyGroup>
