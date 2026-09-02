@@ -1101,6 +1101,20 @@ internal sealed partial class OperationEffectScanner
             return true;
         }
 
+        result = result.Then(ScanImplicitPatternCall(
+            method,
+            receiver,
+            pattern,
+            instance));
+        return true;
+    }
+
+    private EffectStep ScanImplicitPatternCall(
+        IMethodSymbol method,
+        EffectRegionSet receiver,
+        IOperation pattern,
+        IOperation? instance)
+    {
         var argumentRegions = Enumerable.Repeat(
                 EffectRegionSet.Empty,
                 method.Parameters.Length)
@@ -1122,8 +1136,7 @@ internal sealed partial class OperationEffectScanner
         var completesNormally = method.IsAbstract ||
             method.IsVirtual && !method.IsSealed ||
             _completionEvaluator.CanMethodCompleteNormally(method);
-        result = result.Then(new EffectStep(call, completesNormally));
-        return true;
+        return new EffectStep(call, completesNormally);
     }
 
     private EffectSummary ScanDefaultPattern(IOperation pattern)
@@ -1153,28 +1166,11 @@ internal sealed partial class OperationEffectScanner
         var receiver = _conversionOwnership.ClassifyRegion(
             instance,
             aliasSource: true);
-        var argumentRegions = Enumerable.Repeat(
-                EffectRegionSet.Empty,
-                deconstruct.Parameters.Length)
-            .ToImmutableArray();
-        var actualArguments = Enumerable.Repeat<IOperation?>(
-                null,
-                deconstruct.Parameters.Length)
-            .ToImmutableArray();
-        var call = _callResolver.Resolve(
+        var result = ScanImplicitPatternCall(
             deconstruct,
             receiver,
-            receiver,
-            argumentRegions,
-            actualArguments,
-            deconstruct.IsVirtual || deconstruct.IsAbstract,
             pattern,
-            instance,
-            ImmutableArray<IArgumentOperation>.Empty);
-        var completesNormally = deconstruct.IsAbstract ||
-            deconstruct.IsVirtual && !deconstruct.IsSealed ||
-            _completionEvaluator.CanMethodCompleteNormally(deconstruct);
-        var result = new EffectStep(call, completesNormally);
+            instance);
         return result.CompletesNormally
             ? result.Then(ScanSequence(pattern.ChildOperations)).Summary
             : result.Summary;

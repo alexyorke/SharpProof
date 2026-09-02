@@ -4255,9 +4255,7 @@ R694 completed: container-source fixtures now own repository and archive roots w
 
 ### Status (part two hundred twenty-eight)
 
-| R695 | **`OperationEffectScanner` duplicates implicit pattern-call resolution.** `TryScanReachableListPatternMember` and `ScanRecursivePattern` independently allocate empty argument-region and actual-operation arrays, call `_callResolver.Resolve` with the same dispatch/instance shape, derive normal completion from abstract/virtual status plus `CanMethodCompleteNormally`, and wrap the result in an `EffectStep`; only the target method and pattern-specific receiver/continuation differ. A shared implicit-pattern-call helper can centralize this construction while leaving list-member reachability and recursive-pattern child scanning distinct. | `SharpProof.Effects/OperationEffectScanner.cs:1077-1126,1144-1180` |
-
-R695 is a pending effect-scanner duplication reduction candidate. Preserve compiler-intrinsic list-member filtering, receiver ownership, dispatch uncertainty, actual-argument emptiness, completion semantics, and recursive child traversal.
+R695 completed: list and recursive pattern calls now share one resolver/completion step helper while preserving intrinsic filtering, receiver ownership, dispatch uncertainty, empty actual arguments, and child traversal.
 
 ### Status (part two hundred twenty-nine)
 
@@ -4382,3 +4380,13 @@ R717 is a pending CFG-reference ordering reduction candidate. Preserve assignmen
 | R718 | **`BlockMayThrowBeforeAssignmentCommit` rescans the entire CFG for each qualifying assignment reference.** Once a tracked value is killed, the helper walks the reference's ancestors to find the owning simple assignment and then scans every block and descendant operation bounded by the same `after`/commit span; multiple qualifying references or repeated paths can repeat that full graph walk. Cache the bounded throw result by graph/assignment interval (or pre-index throwing operations) while retaining the current span bounds and `RoslynCfgThrowFacts` predicate. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1202-1232` |
 
 R718 is a pending assignment-commit exception-scan reduction candidate. Preserve multi-block RHS coverage, exceptional-successor semantics, and the current conservative result when no owning assignment is found.
+
+### Status (part two hundred forty-five)
+
+| R719 | **`ApiSpecRuntimeOracleTests.ConstructorRow` executes every constructor edge twice for related facets.** The same prepared `RuntimeEdge` array is passed to `ObserveThrows` and `ObserveTermination`; both invoke and prepare each edge, while termination is exactly derivable from the throw observation's normal-completion count (`all normal` versus `any exception`). Share one isolated throw observation per edge set or derive the termination facet from it, preserving the per-edge preparation needed to isolate receiver state and the current exception classification. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:529-552,866-912` |
+
+R719 is a pending runtime-oracle duplicate-execution reduction candidate. Preserve edge isolation, empty-edge behavior, exception swallowing, normal-completion counts, and the declared throw/termination claim semantics.
+
+| R720 | **`ApiSpecRuntimeOracleTests` duplicates dynamic-constructor-invoker emission.** `CreateParameterlessConstructorInvoker` and `CreateStringConstructorInvoker` each construct a `DynamicMethod`, obtain a constructor, emit receiver/argument loads plus `Call` and `Ret`, and create a delegate; only the signature, constructor lookup, and extra string argument differ. A parameterized IL-emission helper can centralize the dynamic-method lifecycle while keeping the two strongly typed delegate factories and their constructor-shape diagnostics. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:1166-1205` |
+
+R720 is a pending runtime-oracle IL-harness reduction candidate. Preserve visibility/module settings, argument order, constructor lookup failure messages, and the exact delegate types.
