@@ -20,12 +20,7 @@ namespace SharpProof
     {
         internal static int RequireNonnegative(int value, string parameterName)
         {
-            if (value < 0)
-            {
-                throw new ArgumentOutOfRangeException(parameterName);
-            }
-
-            return value;
+            return (int)RequireNonnegative((long)value, parameterName);
         }
 
         internal static int RequireIndex(
@@ -53,12 +48,7 @@ namespace SharpProof
 
         internal static int RequirePositive(int value, string parameterName)
         {
-            if (value <= 0)
-            {
-                throw new ArgumentOutOfRangeException(parameterName);
-            }
-
-            return value;
+            return (int)RequirePositive((long)value, parameterName);
         }
 
         internal static long RequirePositive(long value, string parameterName)
