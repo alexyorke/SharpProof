@@ -9,107 +9,49 @@ public sealed class IrUnboxingDifferentialRegressionTests
     [Test]
     public void InterpreterUsesCSharpObjectUnboxingSemantics()
     {
-        var factory = new IrFactory();
-        var value = factory.CreateVariable("value", factory.ObjectType);
-        var variable = factory.Variable(value);
-        var unboxInteger = factory.Cast(factory.IntegerType, variable);
-        var unboxBoolean = factory.Cast(factory.BooleanType, variable);
-        var interpreter = new IrInterpreter(factory);
-
-        var nullInteger = Evaluate(
-            interpreter,
-            unboxInteger,
-            value,
-            factory.CreateNullValue(factory.ObjectType));
-        var nullBoolean = Evaluate(
-            interpreter,
-            unboxBoolean,
-            value,
-            factory.CreateNullValue(factory.ObjectType));
-        var wrongIntegerBox = Evaluate(
-            interpreter,
-            unboxInteger,
-            value,
-            factory.CreateReferenceValue(factory.ObjectType, true));
-        var wrongBooleanBox = Evaluate(
-            interpreter,
-            unboxBoolean,
-            value,
-            factory.CreateReferenceValue(factory.ObjectType, 17L));
-        var integer = Evaluate(
-            interpreter,
-            unboxInteger,
-            value,
-            factory.CreateReferenceValue(factory.ObjectType, 17L));
-        var boolean = Evaluate(
-            interpreter,
-            unboxBoolean,
-            value,
-            factory.CreateReferenceValue(factory.ObjectType, true));
+        var fixture = CreateFixture();
+        var interpreter = new IrInterpreter(fixture.Factory);
+        var results = fixture.Cases.ToDictionary(
+            @case => @case.Name,
+            @case => Evaluate(
+                interpreter,
+                @case.Term,
+                fixture.Value,
+                @case.Value),
+            StringComparer.Ordinal);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                nullInteger.Exception?.Kind,
+                results["null integer"].Exception?.Kind,
                 Is.EqualTo(IrExceptionKind.NullReference));
             Assert.That(
-                nullBoolean.Exception?.Kind,
+                results["null boolean"].Exception?.Kind,
                 Is.EqualTo(IrExceptionKind.NullReference));
             Assert.That(
-                wrongIntegerBox.Exception?.Kind,
+                results["wrong integer box"].Exception?.Kind,
                 Is.EqualTo(IrExceptionKind.InvalidCast));
             Assert.That(
-                wrongBooleanBox.Exception?.Kind,
+                results["wrong boolean box"].Exception?.Kind,
                 Is.EqualTo(IrExceptionKind.InvalidCast));
-            Assert.That(integer.Value!.Integer, Is.EqualTo(17));
-            Assert.That(boolean.Value!.Boolean, Is.True);
+            Assert.That(results["integer"].Value!.Integer, Is.EqualTo(17));
+            Assert.That(results["boolean"].Value!.Boolean, Is.True);
         }
     }
 
     [Test]
     public void DifferentialOracleAgreesWithCompiledCSharpObjectUnboxing()
     {
-        var factory = new IrFactory();
-        var value = factory.CreateVariable("value", factory.ObjectType);
-        var variable = factory.Variable(value);
-        var unboxInteger = factory.Cast(factory.IntegerType, variable);
-        var unboxBoolean = factory.Cast(factory.BooleanType, variable);
-        var oracle = new IrCSharpDifferentialOracle(factory);
-        var cases = new (string Name, IrTerm Term, IrValue Value)[]
-        {
-            (
-                "null integer",
-                unboxInteger,
-                factory.CreateNullValue(factory.ObjectType)),
-            (
-                "null boolean",
-                unboxBoolean,
-                factory.CreateNullValue(factory.ObjectType)),
-            (
-                "wrong integer box",
-                unboxInteger,
-                factory.CreateReferenceValue(factory.ObjectType, true)),
-            (
-                "wrong boolean box",
-                unboxBoolean,
-                factory.CreateReferenceValue(factory.ObjectType, 17L)),
-            (
-                "integer",
-                unboxInteger,
-                factory.CreateReferenceValue(factory.ObjectType, 17L)),
-            (
-                "boolean",
-                unboxBoolean,
-                factory.CreateReferenceValue(factory.ObjectType, true))
-        };
+        var fixture = CreateFixture();
+        var oracle = new IrCSharpDifferentialOracle(fixture.Factory);
 
-        foreach (var @case in cases)
+        foreach (var @case in fixture.Cases)
         {
             var result = oracle.Compare(
                 @case.Term,
                 new Dictionary<IrVarId, IrValue>
                 {
-                    [value] = @case.Value
+                    [fixture.Value] = @case.Value
                 });
 
             Assert.That(
@@ -117,6 +59,44 @@ public sealed class IrUnboxingDifferentialRegressionTests
                 Is.EqualTo(DifferentialStatus.Agreement),
                 @case.Name + ": " + result.Detail);
         }
+    }
+
+    private static UnboxingFixture CreateFixture()
+    {
+        var factory = new IrFactory();
+        var value = factory.CreateVariable("value", factory.ObjectType);
+        var variable = factory.Variable(value);
+        var unboxInteger = factory.Cast(factory.IntegerType, variable);
+        var unboxBoolean = factory.Cast(factory.BooleanType, variable);
+        return new(
+            factory,
+            value,
+            [
+                new(
+                    "null integer",
+                    unboxInteger,
+                    factory.CreateNullValue(factory.ObjectType)),
+                new(
+                    "null boolean",
+                    unboxBoolean,
+                    factory.CreateNullValue(factory.ObjectType)),
+                new(
+                    "wrong integer box",
+                    unboxInteger,
+                    factory.CreateReferenceValue(factory.ObjectType, true)),
+                new(
+                    "wrong boolean box",
+                    unboxBoolean,
+                    factory.CreateReferenceValue(factory.ObjectType, 17L)),
+                new(
+                    "integer",
+                    unboxInteger,
+                    factory.CreateReferenceValue(factory.ObjectType, 17L)),
+                new(
+                    "boolean",
+                    unboxBoolean,
+                    factory.CreateReferenceValue(factory.ObjectType, true))
+            ]);
     }
 
     private static IrEvaluationResult Evaluate(
@@ -132,4 +112,14 @@ public sealed class IrUnboxingDifferentialRegressionTests
                 [variable] = value
             });
     }
+
+    private sealed record UnboxingFixture(
+        IrFactory Factory,
+        IrVarId Value,
+        IReadOnlyList<UnboxingCase> Cases);
+
+    private sealed record UnboxingCase(
+        string Name,
+        IrTerm Term,
+        IrValue Value);
 }
