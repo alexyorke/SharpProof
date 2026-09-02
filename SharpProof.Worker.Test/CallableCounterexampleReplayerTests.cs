@@ -68,16 +68,12 @@ public sealed class CallableCounterexampleReplayerTests
         var builder = new IrProgramBuilder(factory);
         var entry = builder.CreateBlock("entry");
         builder.Return(entry, factory.CreateOperation(), factory.Integer(42));
-        var target = new CompilerCallablePreparation(factory,
-            new WorkerCallableManifestEntry { CallableId = "void", ClaimIds = ["claim"] },
-            [new CompilerPreparedClause(CompilerContractKind.Ensures, factory.Boolean(false),
-                CompilerContractEvidence.CompilerBoundInvocation, "claim", null)],
-            [], WorkerClaimReason.None,
-            CompilerPreparedBody.ProgramBody(
-                builder.Build(),
-                ImmutableDictionary<IrVarId, IrVarId>.Empty,
-                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
-                ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty));
+        var target = CreateProgramTarget(
+            factory,
+            "void",
+            factory.Boolean(false),
+            [],
+            builder.Build());
 
         Assert.That(CallableCounterexampleReplayer.Replay(
             target, 0, ImmutableDictionary<IrVarId, IrValue>.Empty),
@@ -208,19 +204,10 @@ public sealed class CallableCounterexampleReplayerTests
             entry,
             factory.CreateOperation(),
             factory.Integer(0));
-        var target = new CompilerCallablePreparation(
+        var target = CreateProgramTarget(
             factory,
-            new WorkerCallableManifestEntry
-            {
-                CallableId = "malformed-result",
-                ClaimIds = ["claim"]
-            },
-            [new CompilerPreparedClause(
-                CompilerContractKind.Ensures,
-                factory.Boolean(false),
-                CompilerContractEvidence.CompilerBoundInvocation,
-                "claim",
-                null)],
+            "malformed-result",
+            factory.Boolean(false),
             [new CompilerCanonicalVariable(
                 CompilerVariableRole.Result,
                 -1,
@@ -228,16 +215,7 @@ public sealed class CallableCounterexampleReplayerTests
                 null,
                 null,
                 "result")],
-            WorkerClaimReason.None,
-            CompilerPreparedBody.ProgramBody(
-                builder.Build(),
-                ImmutableDictionary<IrVarId, IrVarId>.Empty,
-                ImmutableDictionary<
-                    IrInstructionId,
-                    CompilerPreparedSpecCall>.Empty,
-                ImmutableDictionary<
-                    IrInstructionId,
-                    CompilerPreparedSummaryCall>.Empty));
+            builder.Build());
 
         Assert.That(
             CallableCounterexampleReplayer.Replay(
@@ -258,22 +236,13 @@ public sealed class CallableCounterexampleReplayerTests
             entry,
             factory.CreateOperation(),
             factory.Integer(byte.MaxValue + 1));
-        var target = new CompilerCallablePreparation(
+        var target = CreateProgramTarget(
             factory,
-            new WorkerCallableManifestEntry
-            {
-                CallableId = "byte-result",
-                ClaimIds = ["claim"]
-            },
-            [new CompilerPreparedClause(
-                CompilerContractKind.Ensures,
-                factory.Binary(
-                    IrBinaryOperator.LessThanOrEqual,
-                    factory.Variable(result),
-                    factory.Integer(byte.MaxValue)),
-                CompilerContractEvidence.CompilerBoundInvocation,
-                "claim",
-                null)],
+            "byte-result",
+            factory.Binary(
+                IrBinaryOperator.LessThanOrEqual,
+                factory.Variable(result),
+                factory.Integer(byte.MaxValue)),
             [new CompilerCanonicalVariable(
                 CompilerVariableRole.Result,
                 -1,
@@ -281,16 +250,7 @@ public sealed class CallableCounterexampleReplayerTests
                 null,
                 new CompilerIntegerInterval(byte.MinValue, byte.MaxValue),
                 "result")],
-            WorkerClaimReason.None,
-            CompilerPreparedBody.ProgramBody(
-                builder.Build(),
-                ImmutableDictionary<IrVarId, IrVarId>.Empty,
-                ImmutableDictionary<
-                    IrInstructionId,
-                    CompilerPreparedSpecCall>.Empty,
-                ImmutableDictionary<
-                    IrInstructionId,
-                    CompilerPreparedSummaryCall>.Empty));
+            builder.Build());
         var response = new WorkerVerifyResponse
         {
             CallableResults =
@@ -357,6 +317,35 @@ public sealed class CallableCounterexampleReplayerTests
                 factory.Variable(source));
             return builder.Build();
         });
+    }
+
+    private static CompilerCallablePreparation CreateProgramTarget(
+        IrFactory factory,
+        string callableId,
+        IrTerm postcondition,
+        ImmutableArray<CompilerCanonicalVariable> variables,
+        IrProgram program)
+    {
+        return new CompilerCallablePreparation(
+            factory,
+            new WorkerCallableManifestEntry
+            {
+                CallableId = callableId,
+                ClaimIds = ["claim"]
+            },
+            [new CompilerPreparedClause(
+                CompilerContractKind.Ensures,
+                postcondition,
+                CompilerContractEvidence.CompilerBoundInvocation,
+                "claim",
+                null)],
+            variables,
+            WorkerClaimReason.None,
+            CompilerPreparedBody.ProgramBody(
+                program,
+                ImmutableDictionary<IrVarId, IrVarId>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall>.Empty,
+                ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall>.Empty));
     }
 
     private static ReplayFixture CreateObstacle(ReplayObstacle obstacle)
