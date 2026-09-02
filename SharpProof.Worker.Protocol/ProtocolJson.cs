@@ -511,11 +511,16 @@ public static partial class WorkerProtocolJson
         errors.Check(manifest.SchemaVersion == WorkerManifestVersions.Current, prefix + ".schema");
         var callables = Present(manifest.Callables, prefix + ".callables", errors);
         var claims = Present(manifest.Claims, prefix + ".claims", errors);
-        ValidateUniqueIds(callables.Select(static value => value.CallableId), prefix + ".callable_id", errors);
-        ValidateUniqueIds(claims.Select(static value => value.ClaimId), prefix + ".claim_id", errors);
+        var callableIdValues = ValidateUniqueIds(
+            callables.Select(static value => value.CallableId),
+            prefix + ".callable_id", errors);
+        _ = ValidateUniqueIds(
+            claims.Select(static value => value.ClaimId),
+            prefix + ".claim_id", errors);
         var callableIds = new HashSet<string>(
-            callables.Where(static value => !string.IsNullOrWhiteSpace(value.CallableId))
-                .Select(static value => value.CallableId),
+            callableIdValues
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(static value => value!),
             s_ordinal);
         var claimsByCallable = claims.ToLookup(
             static value => (string?)value.CallableId,
@@ -922,15 +927,17 @@ public static partial class WorkerProtocolJson
         Validator errors) where T : class
     {
         var present = Present(values, collectionCode, errors);
-        ValidateUniqueIds(present.Select(identity), identityCode, errors);
-        ValidateExactIds(present.Select(identity), expectedIds, setCode, errors);
+        var identities = ValidateUniqueIds(present.Select(identity), identityCode, errors);
+        ValidateExactIds(identities, expectedIds, setCode, errors);
         return present;
     }
-    private static void ValidateUniqueIds(IEnumerable<string?> values, string code, Validator errors)
+    private static string?[] ValidateUniqueIds(
+        IEnumerable<string?> values, string code, Validator errors)
     {
         var items = values.ToArray();
         errors.Check(items.All(static value => !string.IsNullOrWhiteSpace(value)) &&
             items.Distinct(s_ordinal).Count() == items.Length, code);
+        return items;
     }
     private static void ValidateExactIds(IEnumerable<string?> actual, IEnumerable<string?> expected, string code, Validator errors)
     {

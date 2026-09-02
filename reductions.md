@@ -145,6 +145,8 @@ the smallest relevant containerized test target passes.
 | R827 | Remove the internal callable-replay overload that re-filters clauses; pass prepared ensures lists from test fixtures | `SharpProof.Worker.Test`: CallableCounterexampleReplayerTests 15; WorkerTcbEdgeCaseTests 44 |
 | R830 | Remove the unused launcher assumption total local | `SharpProof.Package.Test`: launcher argument and validation tests passed |
 | R831 | Use logical boolean operators for launcher policy predicates | `SharpProof.Package.Test`: LauncherArgumentTests 75 passed |
+| R833 | Reuse the result identity snapshot for protocol uniqueness and exact-set validation | `SharpProof.Worker.Test`: ProtocolJsonTests passed |
+| R834 | Reuse the manifest callable identity snapshot for membership validation | `SharpProof.Worker.Test`: ProtocolJsonTests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7022,9 +7024,10 @@ R831 is `applied`: launcher policy predicates now use logical operators while
 
 ### Status (part three hundred forty-three)
 
-R832 is `deferred`: the duplicate copies occur only on incomplete/failure
-  responses, but the ownership boundary is explicit and can be simplified
-  without changing the wire model.
+R832 is `refuted`: `CreateIncomplete` passes lazy result projections to
+  `Create`, so its `ToArray` calls are the first materialization of those
+  projected results; the earlier manifest arrays are separate inputs needed
+  for lookup and are not duplicate result copies.
 
 ## Second survey, part three hundred forty-four: R833 - duplicate protocol result-ID projection
 
@@ -7043,9 +7046,8 @@ R832 is `deferred`: the duplicate copies occur only on incomplete/failure
 
 ### Status (part three hundred forty-four)
 
-R833 is `deferred`: the extra pass is bounded by one response collection, but
-  it is deterministic validation work with no policy benefit and has a simple
-  identity-array sharing seam.
+R833 is `applied`: one materialized result-identity array now feeds both
+  uniqueness and exact-set validation.
 
 ## Second survey, part three hundred forty-five: R834 - duplicate manifest callable-ID projection
 
@@ -7064,9 +7066,8 @@ R833 is `deferred`: the extra pass is bounded by one response collection, but
 
 ### Status (part three hundred forty-five)
 
-R834 is `deferred`: the duplicate pass is linear and bounded by manifest size,
-  but it repeats deterministic identity extraction immediately before using the
-  same IDs for membership validation.
+R834 is `applied`: callable IDs materialized for uniqueness now also populate
+  the claim-membership set without a second projection.
 
 ## Second survey, part three hundred forty-six: R835 - duplicate performance-response precondition
 
