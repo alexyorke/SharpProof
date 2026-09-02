@@ -7111,3 +7111,24 @@ R835 is `deferred`: the duplicate validation is small and probe-only, but both
 R836 is `deferred`: response validation is a high-frequency boundary and the
   duplicate manifest walk is broader than a single identity projection, but a
   snapshot API needs careful error-order and malformed-input compatibility.
+
+## Second survey, part three hundred forty-eight: R837 - duplicate unknown-coverage owner index
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R837 | **`ProtocolJson.ValidateUnknownCoverage` rebuilds a manifest claim-owner map already available in the response indexes.** The response path has just constructed `ManifestIdentityIndexes`, including an ordinal `ClaimsById` index that retains the first row for duplicate IDs. `ValidateUnknownCoverage` instead filters `manifest.Claims`, groups by claim ID, selects the first callable ID, and builds a new dictionary before checking unknown results; that is another full claim traversal and a second first-row identity policy. Passing the existing index into the helper and resolving each unknown result's claim owner through it can remove the group/dictionary allocation while preserving the current first-match behavior and the separate incomplete-callable set. | `SharpProof.Worker.Protocol/ProtocolJson.cs:349-356,681-700,991-1011` |
+
+### Checked and not proposed (part three hundred forty-eight)
+
+- The incomplete-callable set remains response-specific and must still be
+  built from validated callable results, not from manifest metadata.
+- Duplicate or null manifest rows still need the same fail-closed treatment;
+  the shared index must retain its current first-entry semantics.
+- `ValidateRun`'s result-claim lookup is not folded into this candidate: it
+  indexes untrusted result rows, whereas R837 concerns manifest claim owners.
+
+### Status (part three hundred forty-eight)
+
+R837 is `deferred`: the extra owner map is linear and bounded, but it repeats
+  an identity projection at a response-validation boundary that already owns a
+  compatible index.
