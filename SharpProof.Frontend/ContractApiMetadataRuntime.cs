@@ -18,10 +18,34 @@ internal static partial class ContractApiMetadata
         string name,
         out ContractApiMethodDescriptor descriptor)
     {
-        foreach (var candidate in Methods)
+        return TryFind(
+            Methods,
+            static candidate => candidate.Name,
+            name,
+            out descriptor);
+    }
+
+    internal static bool TryGetAttribute(
+        string metadataName,
+        out ContractApiAttributeDescriptor descriptor)
+    {
+        return TryFind(
+            Attributes,
+            static candidate => candidate.MetadataName,
+            metadataName,
+            out descriptor);
+    }
+
+    private static bool TryFind<T>(
+        IEnumerable<T> candidates,
+        Func<T, string> getName,
+        string name,
+        out T descriptor)
+    {
+        foreach (var candidate in candidates)
         {
             if (string.Equals(
-                    candidate.Name,
+                    getName(candidate),
                     name,
                     StringComparison.Ordinal))
             {
@@ -30,27 +54,7 @@ internal static partial class ContractApiMetadata
             }
         }
 
-        descriptor = default;
-        return false;
-    }
-
-    internal static bool TryGetAttribute(
-        string metadataName,
-        out ContractApiAttributeDescriptor descriptor)
-    {
-        foreach (var candidate in Attributes)
-        {
-            if (string.Equals(
-                    candidate.MetadataName,
-                    metadataName,
-                    StringComparison.Ordinal))
-            {
-                descriptor = candidate;
-                return true;
-            }
-        }
-
-        descriptor = default;
+        descriptor = default!;
         return false;
     }
 

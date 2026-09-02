@@ -184,6 +184,7 @@ the smallest relevant containerized test target passes.
 | R456 | Let the SDK derive `PackageVersion` from the authoritative `Version` property | `SharpProof.ArchitectureTest`: release/package tests 73 passed |
 | R460 | Combine equivalent unconstrained interval-format switch arms | `SharpProof.Dataflow.Test`: 50 passed |
 | R464 | Share assembly-metadata value extraction between contract identity readers | `SharpProof.Frontend.Test`: 121 passed |
+| R465 | Share descriptor-name lookup between contract methods and attributes | `SharpProof.Frontend.Test`: 121 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2231,9 +2232,11 @@ This pass inspected contract-API identity, descriptor lookup, binding, and compi
 
 ### Status (part forty-eight)
 
-R465-R467 are `pending` review-only reduction candidates. R464 is applied: both
+R466-R467 are `pending` review-only reduction candidates. R464 is applied: both
 contract identity readers now share one ordinal metadata-value query, while the
-SHA-256 and MVID decoding rules remain independent.
+SHA-256 and MVID decoding rules remain independent. R465 is applied: both
+descriptor collections use one ordinal generic lookup protocol while retaining
+their distinct selectors and output types.
 
 
 ## Second survey, part forty-nine: verifying the ledger's own Applied table
@@ -3501,3 +3504,19 @@ R566 is a pending reduction candidate. The two call sites currently use the same
 ### Status (part one hundred eight)
 
 R567 is a pending reduction candidate. The current implementations agree for the non-null string arrays produced by these evidence paths, but the local copy can drift from the shared ordinal contract.
+
+## Second survey, part one hundred nine: R568 - acceptance dotnet wrapper
+
+| R568 | **`eng/acceptance/Verify.ps1` keeps a local checked-dotnet wrapper after the shared container helper was introduced.** The acceptance script resolves `scripts/Invoke-SharpProofDotnet.ps1` itself and defines `Invoke-SharpProofDotnet` solely to forward an argument array, timeout, and nonzero-exit exception. `SharpProof.ContainerExecution.psm1` already exports `Get-SharpProofDotnetWrapperPath` and `Invoke-SharpProofRequiredDotnet` for that exact path-and-check protocol; the acceptance calls do not need a distinct quiet or output mode. Importing the shared module and passing its existing timeout parameter removes a second wrapper contract and keeps acceptance aligned with the other container entrypoints. | `eng/acceptance/Verify.ps1:17,218-231,234-236,630-634,671-701`; `scripts/SharpProof.ContainerExecution.psm1:4-49,537`; R269 |
+
+### Status (part one hundred nine)
+
+R568 is a pending reduction candidate. Preserve the acceptance-specific timing phases and timeout values; only replace the local process-forwarding shim.
+
+## Second survey, part one hundred ten: R569 - acceptance timing record duplication
+
+| R569 | **`Verify.ps1` builds acceptance timing phase records in two helpers.** `Add-AcceptanceTimingPhase` and `Complete-AcceptanceTimingPhase` each create the same ordered object with `name`, `startedUtc`, `completedUtc`, `elapsedMilliseconds`, and `status`; they differ only in whether the elapsed duration comes from a skipped/manual phase or the active phase's start offset. After `Complete` computes that duration, it can delegate record creation to `Add`, reducing two parallel serialization paths and keeping timestamp formatting in one place. Retain the active-phase guard, stopwatch stop, and state reset around that delegation. | `eng/acceptance/Verify.ps1:89-153` |
+
+### Status (part one hundred ten)
+
+R569 is a pending small reduction candidate. It affects only the acceptance evidence writer and must preserve its failed/incomplete phase semantics.
