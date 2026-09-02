@@ -84,16 +84,22 @@ internal static class CallableClaimResultAssembler
         CompilerCallablePreparation target, int contractOrdinal, WorkerClaimReason reason)
     {
         var claimId = target.Entry.ClaimIds[contractOrdinal];
-        var certainty = target.EffectClaims.Any(evidence => evidence.ClaimId == claimId)
-            ? WorkerEffectEvidenceCertainty.Unavailable
-            : WorkerEffectEvidenceCertainty.Unspecified;
-        return Create(target, claimId, WorkerClaimOutcome.Unknown, reason, certainty);
+        return CreateUnknown(
+            target,
+            claimId,
+            reason,
+            target.EffectClaims.Any(evidence => evidence.ClaimId == claimId));
     }
 
     internal static ImmutableArray<WorkerClaimResult> Unknowns(
         CompilerCallablePreparation target, WorkerClaimReason reason)
     {
-        return [.. target.Entry.ClaimIds.Select((_, index) => Unknown(target, index, reason))];
+        var effectClaimIds = EffectClaimIds(target);
+        return [.. target.Entry.ClaimIds.Select(claimId => CreateUnknown(
+            target,
+            claimId,
+            reason,
+            effectClaimIds.Contains(claimId)))];
     }
 
     internal static ImmutableArray<WorkerClaimResult> PostconditionUnknowns(
@@ -104,8 +110,38 @@ internal static class CallableClaimResultAssembler
         // ClaimIds without clamping.
         var ensures = target.Clauses.Count(static clause =>
             clause.Kind == CompilerContractKind.Ensures);
+        var effectClaimIds = EffectClaimIds(target);
         return [.. Enumerable.Range(0, Math.Min(ensures, target.Entry.ClaimIds.Length))
-            .Select(index => Unknown(target, index, reason))];
+            .Select(index =>
+                CreateUnknown(
+                    target,
+                    target.Entry.ClaimIds[index],
+                    reason,
+                    effectClaimIds.Contains(target.Entry.ClaimIds[index])))];
+    }
+
+    private static HashSet<string> EffectClaimIds(
+        CompilerCallablePreparation target)
+    {
+        return new HashSet<string>(
+            target.EffectClaims.Select(static evidence => evidence.ClaimId),
+            StringComparer.Ordinal);
+    }
+
+    private static WorkerClaimResult CreateUnknown(
+        CompilerCallablePreparation target,
+        string claimId,
+        WorkerClaimReason reason,
+        bool hasEffectEvidence)
+    {
+        return Create(
+            target,
+            claimId,
+            WorkerClaimOutcome.Unknown,
+            reason,
+            hasEffectEvidence
+                ? WorkerEffectEvidenceCertainty.Unavailable
+                : WorkerEffectEvidenceCertainty.Unspecified);
     }
 
     internal static WorkerClaimResult Create(
