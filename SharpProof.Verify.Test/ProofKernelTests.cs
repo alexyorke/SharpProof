@@ -32,7 +32,7 @@ public sealed class ProofKernelTests
         Assert.That(
             ((LoweredJustification)((ProvenOutcome)outcome).Core[0]).Operation,
             Is.EqualTo(secondOperation));
-        Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.True);
+        Assert.That(outcome is ProvenOutcome or RefutedOutcome, Is.True);
     }
 
     [Test]
@@ -50,7 +50,7 @@ public sealed class ProofKernelTests
         Assert.That(
             ((RefutedOutcome)outcome).Model.Assignments[fixture.Variable].Integer,
             Is.Zero);
-        Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.True);
+        Assert.That(outcome is ProvenOutcome or RefutedOutcome, Is.True);
     }
 
     [Test]
@@ -172,8 +172,8 @@ public sealed class ProofKernelTests
         Assert.That(
             ((UnknownOutcome)incomplete).Reason,
             Is.EqualTo(AbstentionReason.CounterexampleReplayFailed));
-        Assert.That(OutcomeCachePolicy.IsCacheable(spurious), Is.False);
-        Assert.That(OutcomeCachePolicy.IsCacheable(incomplete), Is.False);
+        Assert.That(spurious is ProvenOutcome or RefutedOutcome, Is.False);
+        Assert.That(incomplete is ProvenOutcome or RefutedOutcome, Is.False);
     }
 
     [TestCase(
@@ -205,7 +205,7 @@ public sealed class ProofKernelTests
         Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(((UnknownOutcome)outcome).Reason,
             Is.EqualTo(expectedReason));
-        Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.False);
+        Assert.That(outcome is ProvenOutcome or RefutedOutcome, Is.False);
     }
 
     [Test]
@@ -255,7 +255,7 @@ public sealed class ProofKernelTests
                 new StubBackend(BackendCheckResult.Unknown(pair.Item1)))
                 .VerifyAsync(fixture.Query);
             Assert.That(((UnknownOutcome)outcome).Reason, Is.EqualTo(pair.Item2));
-            Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.False);
+            Assert.That(outcome is ProvenOutcome or RefutedOutcome, Is.False);
         }
     }
 
@@ -274,7 +274,7 @@ public sealed class ProofKernelTests
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
             Is.EqualTo(AbstentionReason.InfrastructureFailure));
-        Assert.That(OutcomeCachePolicy.IsCacheable(outcome), Is.False);
+        Assert.That(outcome is ProvenOutcome or RefutedOutcome, Is.False);
     }
 
     [Test]

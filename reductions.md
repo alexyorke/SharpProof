@@ -134,6 +134,7 @@ the smallest relevant containerized test target passes.
 | R812 | Compare classified lowered calls with the existing indexed call set instead of recounting the IR | `SharpProof.Worker.Test`: CompilerCallableLowererTests, 20 passed |
 | R816 | Restore the security solution once, then run audit and build with `--no-restore` | `SharpProof.ArchitectureTest`: DependencyAutomationTests, 8 passed |
 | R817 | Reuse the container restore for the final package-consumer test invocation | `SharpProof.ArchitectureTest`: ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed, 1 passed |
+| R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R327 | Remove 22 project-local `TreatWarningsAsErrors` declarations now supplied by the central production policy, retaining the two excluded-project declarations | `test-changed`: 2,846 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
@@ -1775,7 +1776,9 @@ PowerShell Roslyn parse options parsing, and legacy assembly references across
 
 ### Status (part thirty-one)
 
-R368-R370, R372 are `pending`. R368 and R369 are simple code cleanups. R370 and R372
+R369, R370, and R372 are `pending`. R368 is applied: verification tests now use
+the cacheability type pattern directly after removing the unused wrapper. R369
+and R370 are simple code cleanups; R372
 streamline script language parsing and relational summary signature models.
 
 ## Second survey, part thirty-two: R373-R374
@@ -6693,3 +6696,24 @@ restore already owned by the container command.
 R818 is `deferred`: the dead branch is a small clarity issue, but choosing
 between fail-fast enforcement and an actually exercised unsupported-host test
 changes the script's supported invocation contract.
+
+## Second survey, part three hundred thirty: R819 - repeated pilot project uniqueness scan
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R819 | **`Test-SharpProofPilotReport` proves catalog project uniqueness twice.** While validating each catalog row, it canonicalizes the project path and inserts that full path into `$catalogProjects`; a duplicate physical project path immediately returns `false`. The catalog is already required to contain exactly five rows, so that hash-set pass establishes five distinct projects. The following aggregate condition nevertheless projects the original relative `project` strings through `Select-Object -Unique` and requires a count of five. That second scan adds a separate representation of the same invariant and can be removed, or replaced by an assertion over the canonical set, without changing the library-uniqueness or category-distribution checks that remain independent. | `scripts/Test-SharpProofPilotReport.ps1:62-75,91-95` |
+
+### Checked and not proposed (part three hundred thirty)
+
+- The separate library uniqueness check remains meaningful because the loop
+  validates each library against its row but does not insert library IDs into a
+  uniqueness set.
+- Category counts remain a distinct matrix contract; project uniqueness does not
+  establish the required effect-heavy, contract-heavy, and mixed-strict split.
+- Canonical path containment and the exact five-row catalog requirement remain
+  necessary; only the second project uniqueness representation is redundant.
+
+### Status (part three hundred thirty)
+
+R819 is `deferred`: the duplicate scan is cheap for five rows, but the canonical
+  path set is the stronger invariant and is the clearer single authority.

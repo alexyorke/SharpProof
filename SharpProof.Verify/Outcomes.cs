@@ -38,12 +38,3 @@ public sealed partial class RefutedOutcome : ProofOutcome
 public sealed partial class UnknownOutcome : ProofOutcome
 {
 }
-
-public static class OutcomeCachePolicy
-{
-    public static bool IsCacheable(ProofOutcome outcome)
-    {
-        return outcome == null ? throw new ArgumentNullException(nameof(outcome)) :
-        outcome is ProvenOutcome or RefutedOutcome;
-    }
-}
