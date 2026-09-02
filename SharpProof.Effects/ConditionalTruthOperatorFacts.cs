@@ -52,40 +52,8 @@ internal static class ConditionalTruthOperatorFacts
             return false;
         }
 
-        var declaration = method.DeclaringSyntaxReferences[0].GetSyntax();
-        ExpressionSyntax? expression = null;
-        if (declaration is MethodDeclarationSyntax
-            { ExpressionBody.Expression: { } body })
-        {
-            expression = body;
-        }
-        else if (declaration is OperatorDeclarationSyntax
-        { ExpressionBody.Expression: { } operatorBody })
-        {
-            expression = operatorBody;
-        }
-        else if (declaration is MethodDeclarationSyntax
-        { Body.Statements.Count: 1 } methodBody &&
-            methodBody.Body!.Statements[0] is
-                ReturnStatementSyntax { Expression: { } returned })
-        {
-            expression = returned;
-        }
-        else if (declaration is OperatorDeclarationSyntax
-        { Body.Statements.Count: 1 } operatorMethodBody &&
-            operatorMethodBody.Body!.Statements[0] is
-                ReturnStatementSyntax { Expression: { } operatorReturned })
-        {
-            expression = operatorReturned;
-        }
-        else if (declaration is OperatorDeclarationSyntax
-        { Body: { } operatorBlock } &&
-            TryGetReturnAfterHarmlessDiscards(
-                operatorBlock,
-                out var returnedAfterDiscards))
-        {
-            expression = returnedAfterDiscards;
-        }
+        var expression = GetReturnExpression(
+            method.DeclaringSyntaxReferences[0].GetSyntax());
         if (expression == null)
         {
             return false;
@@ -101,6 +69,37 @@ internal static class ConditionalTruthOperatorFacts
         }
 
         return false;
+    }
+
+    private static ExpressionSyntax? GetReturnExpression(SyntaxNode declaration)
+    {
+        if (declaration is not BaseMethodDeclarationSyntax method ||
+            method is not (MethodDeclarationSyntax or OperatorDeclarationSyntax))
+        {
+            return null;
+        }
+
+        if (method.ExpressionBody?.Expression is { } expression)
+        {
+            return expression;
+        }
+
+        if (method.Body?.Statements.Count == 1 &&
+            method.Body.Statements[0] is ReturnStatementSyntax
+            { Expression: { } returned })
+        {
+            return returned;
+        }
+
+        if (method is OperatorDeclarationSyntax { Body: { } operatorBlock } &&
+            TryGetReturnAfterHarmlessDiscards(
+                operatorBlock,
+                out var returnedAfterDiscards))
+        {
+            return returnedAfterDiscards;
+        }
+
+        return null;
     }
 
     private static bool TryGetReturnAfterHarmlessDiscards(

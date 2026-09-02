@@ -200,6 +200,7 @@ the smallest relevant containerized test target passes.
 | R524 | Share callable proof-label normalization | `SharpProof.Worker.Test`: 695 passed |
 | R526 | Share order-insensitive assumption comparison across protocol layers | `SharpProof.Worker.Test`: 695 passed |
 | R539 | Aggregate trusted-boundary assumption flags in one protocol pass | `SharpProof.Worker.Test`: 695 passed |
+| R513 | Share conditional truth operator return-expression extraction | `SharpProof.Effects.Test`: 323 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3086,9 +3087,8 @@ continued in part fifty-four.
 
 ### Status (part sixty-eight)
 
-R512-R513 are `pending` reduction candidates. Both preserve the distinct
-validation and syntax policies; the proposed seam is only the repeated
-enumeration or declaration-shape plumbing.
+R512 remains `pending`; R513 shares only return-expression extraction for
+methods and operators, preserving the operator-only harmless-discard policy.
 
 ## Second survey, part sixty-nine: R514-R517 - artifact validation and IR traversal seams
 
@@ -3342,3 +3342,13 @@ are bound by an equivalent immutable receipt.
 R550 is a `pending` reduction candidate. Preserve the registry plan's
 canonical package-base-address check and its existing fail-closed schema errors
 when reusing the shared HTTPS predicate.
+
+## Second survey, part ninety-three: R551 - fixture package identity parsing
+
+| R551 | **`Get-SharpProofPublicationFixtureArchiveCatalog` repeats package identity extraction.** For each fixture archive it first calls the shared `Get-SharpProofNuspecMetadata`, then independently selects the `n:id` and `n:version` nodes, checks their cardinality, and converts them to strings. `Get-SharpProofPackageIdentity` in `SharpProof.PackageIdentity.psm1` already performs the same metadata lookup and ID/version extraction through that helper; the fixture path additionally needs its own package-name and release-version policy, which should remain explicit. Reusing the shared identity projection for the common fields would remove duplicate XML-query plumbing while retaining fixture-specific role, archive, and version validation. | `scripts/SharpProof.PublicationDestination.ps1:57-96`; `scripts/SharpProof.PackageIdentity.psm1:16-73` |
+
+### Status (part ninety-three)
+
+R551 is a `pending` reduction candidate. Keep the fixture archive's exact-one
+identity-node and release-version checks, and do not broaden the shared package
+identity helper's repository requirements for fixture packages.
