@@ -98,14 +98,7 @@ switch ($Profile) {
         $arguments = if ($Fast) { @('-Fast') } else { @() }
         Invoke-Container 'test-changed' $Configuration $arguments
     }
-    'package-consumers' {
-        if ([string]::IsNullOrWhiteSpace($PackageSource)) {
-            throw 'package-consumers requires -PackageSource.'
-        }
-        Invoke-Container 'package-consumers' $Configuration @(
-            '-PackageSource', $PackageSource)
-    }
-    { $_ -in @('pilots', 'release-plan') } {
+    { $_ -in @('package-consumers', 'pilots', 'release-plan') } {
         if ([string]::IsNullOrWhiteSpace($PackageSource)) {
             throw "$Profile requires -PackageSource."
         }
