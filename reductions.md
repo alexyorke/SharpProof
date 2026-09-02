@@ -4233,14 +4233,11 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disposal resolver intentionally use different roots and reachability/unwinding rules. A shared walk could alter direct-witness recording, constructor entry selection, disposal order, or fail-closed effect joins; keep the independent passes until reusable per-operation facts can be proven equivalent.
 
-## Second survey, part two hundred eleven: R673-R674 - repeated release/PDB path preparation
-
-| R673 | **`Invoke-SharpProofReleaseContainer.ps1` repeats annotated-tag identity checks in two modes.** `ValidateTag` calls `cat-file -t` and `rev-parse <tag>^{commit}` to prove an annotated tag resolves to the checkout commit, and `WriteQualificationEvidence` repeats the same two Git queries after its own version/tag checks. A helper that validates the tag object and resolved commit can serve both modes; `ValidateTag` can retain its additional `origin/master` ancestry check and mode-specific environment/ref diagnostics. | `scripts/Invoke-SharpProofReleaseContainer.ps1:60-68,128-133` |
 | R674 | **`Get-SharpProofProductionInventory.Get-PortablePdbModule` canonicalizes repeated PDB document identities once per sequence point.** The sequence-point loop obtains a document handle/name and calls `Resolve-RepositoryPath` for every visible point, while a portable PDB commonly reuses the same document across many methods and points. A per-module document-handle or source-name cache can validate each document path once and reuse the canonical relative path; line/range validation, compile-membership checks, and compiler-generated filtering remain per point. | `scripts/Get-SharpProofProductionInventory.ps1:243-270` |
 
 ### Status (part two hundred eleven)
 
-R673-R674 are pending preparation reductions. Preserve release tag object type and commit binding, the extra ancestry guard, PDB document containment and canonicality, per-point source/range checks, and fail-closed errors; share only repeated identity/path preparation.
+R674 is a pending PDB preparation reduction. Preserve PDB document containment and canonicality, per-point source/range checks, and fail-closed errors; share only repeated identity/path preparation.
 
 ## Second survey, part two hundred twelve: R675 - eager tooling-image build
 
@@ -4308,3 +4305,21 @@ R686 is a pending release-test fixture reduction candidate. Preserve archive com
 | R687 | **`LauncherArgumentTests` repeats the base verification argument vector across collision cases.** The directory-result, I/O-collision, nested-cache, worker-output, worker-runtime, and launcher-runtime tests each spell out the same `verify`, worker, request, result, compiler-manifest, verify-policy, and assumption-policy flags before varying only the paths or cache setting. A small `CreateProjectionArguments` helper with named path/cache parameters can remove the repeated argument plumbing while leaving every collision topology explicit at the call site. | `SharpProof.Package.Test/LauncherArgumentTests.cs:462-850` |
 
 R687 is a pending launcher-test data-construction reduction candidate. Preserve the exact flag order, relative/absolute path variants, cache-enabled cases, and each test's distinct pre-manifest validation assertion.
+
+### Status (part two hundred twenty-two)
+
+| R688 | **`PortableIrGraphCodecTests` repeats negative-decoder setup and failure assertions.** The metadata, canonical-slot, unknown-enum, and malformed-graph test groups each create the same comprehensive fixture, encode it, mutate one wire field, and assert `InvalidDataException`; the groups differ only in mutation location (with the slot group adding a serialize/deserialize boundary). A shared mutation harness, optionally applying the JSON boundary, can own fixture encoding and the common decode-failure assertion while retaining each enum's explicit mutation switch and specialized message check. | `SharpProof.Worker.Test/PortableIrGraphCodecTests.cs:483-815` |
+
+R688 is a pending portable-IR negative-test harness reduction candidate. Preserve fixture reachability, the optional serialization boundary, mutation-specific wire shapes, and the malformed-operation diagnostic assertion.
+
+### Status (part two hundred twenty-three)
+
+| R689 | **`ApiSpecRuntimeOracleTests` repeats type-specialized constructor witness observation.** The Exception and InvalidOperationException constructor and string-constructor paths each wrap the same `ObserveReceiverWrites`/`ConstructorWritesReceiver` sequence, with only the receiver type, static receiver slot, and constructor delegate changing; the corresponding `CreateBcl...CtorWitness` methods repeat the same `ConstructorRow` shape as well. A generic receiver/constructor observation helper can retain the type-specific delegates and static state while removing the duplicated field-snapshot and witness assembly scaffolding. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:249-299,688-730` |
+
+R689 is a pending API-spec runtime-oracle reduction candidate. Preserve uninitialized-receiver preparation, instance-field snapshots, null/non-null string edges, and the distinct Exception versus InvalidOperationException constructor identities.
+
+### Status (part two hundred twenty-four)
+
+| R690 | **`DefaultApiSpecCatalogGenerationTests` implements two recursive term describers.** `Describe(JsonElement)` and `Describe(SpecTermDeclaration)` walk the same variable, literal, unary, binary, conditional, and length tree shapes and emit the same canonical shape string; they differ only in extracting fields from JSON versus generated objects and in their unknown-kind exception type. A small normalized-term adapter or shared kind/child formatter can keep the source-versus-generated comparison while removing the second recursive walker. | `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:575-649` |
+
+R690 is a pending API-spec generation-test reduction candidate. Preserve JSON field validation, generated-object typing, recursive ordering, and the current distinction between invalid catalog data and impossible generated term kinds.

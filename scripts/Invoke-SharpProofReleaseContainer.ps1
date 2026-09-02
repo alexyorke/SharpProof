@@ -38,6 +38,25 @@ function Resolve-RepositoryPath([string]$Path) {
         -ParameterName 'Release path'
 }
 
+function Assert-AnnotatedTagCommit {
+    param(
+        [Parameter(Mandatory = $true)][string]$TagRef,
+        [Parameter(Mandatory = $true)][string]$ExpectedCommit,
+        [Parameter(Mandatory = $true)][string]$InvalidTagMessage,
+        [Parameter(Mandatory = $true)][string]$CommitMismatchMessage
+    )
+
+    $tagType = (& git -C $repositoryRoot cat-file -t $TagRef 2>$null).Trim()
+    if ($LASTEXITCODE -ne 0 -or $tagType -cne 'tag') {
+        throw $InvalidTagMessage
+    }
+    $tagCommit = (& git -C $repositoryRoot rev-parse `
+            "${TagRef}^{commit}" 2>$null).Trim()
+    if ($LASTEXITCODE -ne 0 -or $tagCommit -cne $ExpectedCommit) {
+        throw $CommitMismatchMessage
+    }
+}
+
 switch ($Mode) {
     'ValidateTag' {
         $version = Get-SharpProofReleaseVersion `
@@ -57,16 +76,11 @@ switch ($Mode) {
         if ($LASTEXITCODE -ne 0 -or $commit -cne $head) {
             throw "Release commit '$commit' does not match checkout HEAD '$head'."
         }
-        $tagType = (& git -C $repositoryRoot cat-file -t $expectedRef `
-                2>$null)
-        if ($LASTEXITCODE -ne 0 -or ([string]$tagType).Trim() -cne 'tag') {
-            throw 'Release tag must exist as an annotated tag object.'
-        }
-        $tagCommit = (& git -C $repositoryRoot rev-parse `
-                "${expectedRef}^{commit}" 2>$null)
-        if ($LASTEXITCODE -ne 0 -or ([string]$tagCommit).Trim() -cne $commit) {
-            throw 'Release tag does not identify the checked-out commit.'
-        }
+        Assert-AnnotatedTagCommit `
+            -TagRef $expectedRef `
+            -ExpectedCommit $commit `
+            -InvalidTagMessage 'Release tag must exist as an annotated tag object.' `
+            -CommitMismatchMessage 'Release tag does not identify the checked-out commit.'
         & git -C $repositoryRoot merge-base --is-ancestor `
             $commit origin/master 2>$null
         if ($LASTEXITCODE -ne 0) {
@@ -126,12 +140,11 @@ switch ($Mode) {
             throw "Qualification tag '$tag' does not match package version '$version'."
         }
         $tagRef = "refs/tags/$tag"
-        if ((& git -C $repositoryRoot cat-file -t $tagRef 2>$null).Trim() -cne
-                'tag' -or
-            (& git -C $repositoryRoot rev-parse "${tagRef}^{commit}").Trim() -cne
-                $head) {
-            throw 'Qualification requires an annotated tag at checkout HEAD.'
-        }
+        Assert-AnnotatedTagCommit `
+            -TagRef $tagRef `
+            -ExpectedCommit $head `
+            -InvalidTagMessage 'Qualification requires an annotated tag at checkout HEAD.' `
+            -CommitMismatchMessage 'Qualification requires an annotated tag at checkout HEAD.'
         & (Join-Path $repositoryRoot `
             'scripts/Test-SharpProofReleaseArtifacts.ps1') `
             -PackageSource $packageRoot `
