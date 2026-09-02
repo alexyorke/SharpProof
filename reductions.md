@@ -4193,14 +4193,6 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred eighty-nine: R648 - recovered skeletal snapshot adapter
-
-| R648 | **`CompilerEffectReplayLowerer.TryResolveSource` allocates a skeletal compilation snapshot solely to call a syntax-tree lookup.** After obtaining the cached `CompilerSyntaxTreeSnapshot[]`, it creates `new CompilerCompilationSnapshot { SyntaxTrees = capturedTrees }` and passes that object to `CompilerSourceLocationAuthority.FindUniqueTree`; the authority reads no other snapshot field. A narrow overload accepting the captured tree collection, or a source-tree resolver that takes the collection directly, removes this per-replay adapter object while retaining the authority's remembered-ordinal fast path, geometry checks, and ambiguity rejection. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:418-433`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:108-142` |
-
-### Status (part one hundred eighty-nine)
-
-R648 is a pending replay-source allocation/adapter reduction candidate. Preserve unique-tree resolution, cancellation, remembered-tree validation, and the distinction between operation-tree and source-tree identities; remove only the wrapper created to satisfy the current parameter shape.
-
 ## Second survey, part one hundred ninety: R649 - duplicate lowered-program walks
 
 | R649 | **`CompilerLoweredArtifact.DecodeBody` walks the decoded program twice for separate checks.** It first calls `ValidateExecutableBody`, which recursively visits reachable blocks to enforce terminators, cycles, reachability limits, and return types, then calls `CollectProgramVariables`, which scans the program's blocks and instructions again to collect every referenced variable for parameter-binding and summary-free-variable checks. A shared program-analysis pass can return the required reachability/terminator state and variable set, or at least reuse one instruction traversal, while explicitly retaining the current all-block variable collection if unreachable blocks remain part of the malformed-input policy. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:647-657,928-1002,1004-1083` |
