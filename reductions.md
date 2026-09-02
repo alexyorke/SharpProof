@@ -4199,7 +4199,7 @@ R639 is a pending specification-pack admission/lookup reduction candidate. Prese
 
 ### Status (part one hundred ninety-two)
 
-R651 is a pending compiler-effect authority validation reduction candidate. Preserve independent authority-copy validation, replay geometry checks, evidence/authority field equality, and fail-closed exception handling; bypass only the repeated validation of an evidence object already checked by the caller.
+R651 is deferred: the apparent duplicate work crosses an intentional trust boundary. The evidence row and the copied authority payload must each retain independent hash, shape, and replay-geometry validation; removing either check could admit a forged digest or replay witness.
 
 ## Second survey, part one hundred ninety-three: R652 - repeated pack-authority validation
 
