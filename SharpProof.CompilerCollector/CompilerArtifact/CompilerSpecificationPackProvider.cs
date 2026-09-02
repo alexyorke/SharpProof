@@ -147,9 +147,12 @@ internal sealed class CompilerSpecificationPackProvider
             return false;
         }
 
+        var specificationPackPrefix =
+            CompilerSpecificationPackAuthorityValidation.GetSummaryPrefix(
+                CompilerSummaryOrigin.SpecificationPack)!;
         var parameters = memberInfo.ParameterTypes
             .Select((type, ordinal) => _factory.CreateVariable(
-                "spec-pack:parameter:" + ordinal.ToString(
+                specificationPackPrefix + ":parameter:" + ordinal.ToString(
                     CultureInfo.InvariantCulture),
                 type))
             .ToImmutableArray();
@@ -181,14 +184,14 @@ internal sealed class CompilerSpecificationPackProvider
         }
 
         var result = _factory.CreateVariable(
-            "spec-pack:result",
+            specificationPackPrefix + ":result",
             memberInfo.ReturnType);
         var builder = new IrProgramBuilder(_factory);
-        var entry = builder.CreateBlock("spec-pack:entry");
+        var entry = builder.CreateBlock(specificationPackPrefix + ":entry");
         builder.SetEntry(entry);
         builder.Return(
             entry,
-            _factory.CreateOperation("spec-pack:return"),
+            _factory.CreateOperation(specificationPackPrefix + ":return"),
             resultExpression);
         var signature = new IrSummarySignature(
             member,

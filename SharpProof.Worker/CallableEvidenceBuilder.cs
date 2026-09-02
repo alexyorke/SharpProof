@@ -225,13 +225,8 @@ internal static class CallableEvidenceBuilder
         CompilerSummaryOrigin origin,
         out string prefix)
     {
-        prefix = origin switch
-        {
-            CompilerSummaryOrigin.Source => "source-summary",
-            CompilerSummaryOrigin.ImplementationIl => "il-summary",
-            CompilerSummaryOrigin.SpecificationPack => "spec-pack",
-            _ => string.Empty
-        };
+        prefix = CompilerSpecificationPackAuthorityValidation
+            .GetSummaryPrefix(origin) ?? string.Empty;
         return prefix.Length != 0;
     }
 
@@ -245,15 +240,20 @@ internal static class CallableEvidenceBuilder
 
         var values = evidence.Select(item =>
         {
-            var prefix = item.Origin switch
+            var prefix = CompilerSpecificationPackAuthorityValidation
+                .GetSummaryPrefix(item.Origin);
+            if (prefix == null)
             {
-                CompilerSummaryOrigin.Source => "source-summary",
-                CompilerSummaryOrigin.ImplementationIl => "il-summary",
-                CompilerSummaryOrigin.SpecificationPack => "spec-pack:" + item.EvidenceIdentity,
-                _ => throw new InvalidDataException(
-                    "A summary dependency has an unsupported origin.")
-            };
-            return prefix + ":" + item.CallIdentity + ":" + item.EvidenceSha256;
+                throw new InvalidDataException(
+                    "A summary dependency has an unsupported origin.");
+            }
+
+            var evidencePrefix = item.Origin ==
+                    CompilerSummaryOrigin.SpecificationPack
+                ? prefix + ":" + item.EvidenceIdentity
+                : prefix;
+            return evidencePrefix + ":" + item.CallIdentity + ":" +
+                item.EvidenceSha256;
         });
         return ":deps=" + string.Join(";", values);
     }

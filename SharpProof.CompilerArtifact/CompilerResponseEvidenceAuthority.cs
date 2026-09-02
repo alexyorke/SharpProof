@@ -468,7 +468,8 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
             foreach (var summary in body.SummaryCalls.Values)
             {
-                var prefix = SummaryPrefix(summary.Origin);
+                var prefix = CompilerSpecificationPackAuthorityValidation
+                    .GetSummaryPrefix(summary.Origin);
                 if (prefix == null)
                 {
                     continue;
@@ -568,20 +569,10 @@ internal sealed class CompilerResponseEvidenceAuthority :
         };
     }
 
-    private static string? SummaryPrefix(CompilerSummaryOrigin origin)
-    {
-        return origin switch
-        {
-            CompilerSummaryOrigin.Source => "source-summary",
-            CompilerSummaryOrigin.ImplementationIl => "il-summary",
-            CompilerSummaryOrigin.SpecificationPack => "spec-pack",
-            _ => null
-        };
-    }
-
     private static string SummaryLabel(CompilerPreparedSummaryCall summary)
     {
-        var prefix = SummaryPrefix(summary.Origin);
+        var prefix = CompilerSpecificationPackAuthorityValidation
+            .GetSummaryPrefix(summary.Origin);
         if (prefix == null)
         {
             return string.Empty;
@@ -605,7 +596,8 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
         var values = evidence.Select(item =>
         {
-            var prefix = SummaryPrefix(item.Origin);
+            var prefix = CompilerSpecificationPackAuthorityValidation
+                .GetSummaryPrefix(item.Origin);
             if (prefix == null)
             {
                 return string.Empty;

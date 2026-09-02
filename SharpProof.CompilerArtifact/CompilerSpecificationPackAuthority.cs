@@ -4,6 +4,17 @@ internal static class CompilerSpecificationPackAuthorityValidation
 {
     private static readonly char[] PackIdentitySeparators = [';'];
 
+    internal static string? GetSummaryPrefix(CompilerSummaryOrigin origin)
+    {
+        return origin switch
+        {
+            CompilerSummaryOrigin.Source => "source-summary",
+            CompilerSummaryOrigin.ImplementationIl => "il-summary",
+            CompilerSummaryOrigin.SpecificationPack => "spec-pack",
+            _ => null
+        };
+    }
+
     internal static bool IsValid(
         string[]? packIds,
         int catalogVersion,
