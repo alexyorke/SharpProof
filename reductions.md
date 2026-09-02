@@ -3686,7 +3686,10 @@ R577 is a pending package-topology reduction candidate. Keep an explicit policy 
 
 ### Status (part one hundred nineteen)
 
-R578 is a pending compiler-collector reduction candidate. Keep normalization inside the public/internal `IsCandidate` boundary for independent callers; only avoid repeating it when `TryBuild` has already normalized the same symbol.
+R578 is applied: `TryBuild` now calls a normalized-candidate predicate after
+its existing normalization step, while `IsCandidate` keeps its standalone
+normalization boundary for independent callers. The admissibility checks and
+abstention behavior are unchanged.
 
 ## Second survey, part one hundred twenty: R579 - duplicated effect-authority projection
 
@@ -3943,3 +3946,11 @@ R608 refines R602 to the full five-suite overlap. Preserve each caller's assembl
 ### Status (part one hundred fifty)
 
 R609 is a pending Effects-test maintenance candidate. Preserve the `Subject`/`Exercise` identity and single-method expectation; replace only the repeated lookup chains with `EffectTestHost.RequireMethod`.
+
+## Second survey, part one hundred fifty-one: R610 - residual generator JSON uniqueness validator
+
+| R610 | **Two generators carry the same recursive JSON property-uniqueness validator.** `Generate-LauncherArguments.ps1` and `Generate-ContractApiCatalog.ps1` both recurse through arrays and objects, maintain an ordinal `HashSet` of `JsonElement` property names, throw on duplicate names, and recurse into each property value. The applied generator-validator consolidation does not cover this residual `JsonElement` walk, whose only differences are parameter-binding syntax and named invocation style. Moving it into `GeneratedFileHelpers.ps1` would remove the duplicate recursive guard while leaving each generator's schema-specific `Assert-Properties`, choice, and type validation local. | `scripts/Generate-LauncherArguments.ps1:21-45`; `scripts/Generate-ContractApiCatalog.ps1:28-55`; `scripts/GeneratedFileHelpers.ps1` |
+
+### Status (part one hundred fifty-one)
+
+R610 is a pending generator-infrastructure reduction candidate. Preserve ordinal duplicate detection, array/object recursion, and each generator's distinct schema validation; share only the common `JsonElement` property walk.
