@@ -6882,3 +6882,27 @@ R825 is `deferred`: it has no material runtime cost, but the current positive
 R826 is `deferred`: the duplicated expression is only a few operations, but it
   is part of identity semantics and a future change to one hash mix could make
   otherwise analogous scoped IDs behave inconsistently in dictionaries.
+
+## Second survey, part three hundred thirty-eight: R827 - internal replay compatibility shim
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R827 | **`CallableCounterexampleReplayer` retains an internal overload that only re-filters clauses and forwards.** The compatibility partial method accepts a target, claim ordinal, and model, materializes `target.Clauses.Where(clause => clause.Kind == Ensures).ToArray()`, and immediately calls the full overload. All production callers in `CallableVerifier` and `VerificationCache` already maintain a prepared ensures array and call the five-argument overload directly; the short overload is reached by the replayer unit tests and one worker edge-case test. Because the replayer is internal, removing the shim and updating those test fixtures to pass their prepared clause arrays would eliminate a second entry path and avoid a full clause scan whenever the convenience overload is used. | `SharpProof.Worker/CallableCounterexampleReplayer.Compatibility.cs:3-19`; `SharpProof.Worker/CallableVerifier.cs:261-268`; `SharpProof.Worker/VerificationCache.cs:633-646`; test-only callers in `SharpProof.Worker.Test/CallableCounterexampleReplayerTests.cs` and `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs` |
+
+### Checked and not proposed (part three hundred thirty-eight)
+
+- The full overload must retain its prepared-clause input because production
+  verification already performs that projection once and reuses it across
+  claims.
+- The ensures filter is not removed from the system: callers that construct a
+  target from raw clauses still need the same kind/ordinal ordering before
+  replay.
+- Test readability is the main tradeoff; the short overload is convenient for
+  fixtures, but it is not a public compatibility contract and has no distinct
+  replay semantics.
+
+### Status (part three hundred thirty-eight)
+
+R827 is `deferred`: the extra scan is bounded by one callable's clause list,
+  but an internal compatibility shim adds API surface and a second caller path
+  without serving production code.
