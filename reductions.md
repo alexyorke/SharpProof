@@ -4233,14 +4233,6 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disposal resolver intentionally use different roots and reachability/unwinding rules. A shared walk could alter direct-witness recording, constructor entry selection, disposal order, or fail-closed effect joins; keep the independent passes until reusable per-operation facts can be proven equivalent.
 
-## Second survey, part two hundred seven: R668 - redundant MSBuild dependency edge
-
-| R668 | **`SharpProof.Verifier.targets` declares `_SharpProofInitializeVerify` twice in the verification target graph.** `_SharpProofVerifyCore` already depends on `_SharpProofInitializeVerify;ResolveReferences`, while the public `SharpProofVerify` target repeats `_SharpProofInitializeVerify` alongside `_SharpProofVerifyCore`. MSBuild normally de-duplicates the executed target, so the extra edge adds no work but obscures the actual dependency graph and creates another place to edit when initialization changes. Removing the direct edge from `SharpProofVerify` preserves the `AfterTargets="CoreCompile"` hook because `_SharpProofVerifyCore` still brings initialization in first. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:158-160,249-253` |
-
-### Status (part two hundred seven)
-
-R668 is a pending MSBuild graph simplification. Preserve `_SharpProofVerifyCore` ordering, the `CoreCompile` hook, and initialization/cleanup error behavior; remove only the redundant dependency declaration.
-
 ## Second survey, part two hundred eight: R669 - repeated release artifact path resolution
 
 | R669 | **`Publish-SharpProofRelease.Get-ValidatedRelease` resolves each package artifact path twice.** The first artifact loop calls `Get-ArtifactPath` for all six package/symbol files to check existence and manifest byte counts; the later package loop calls `Get-ArtifactPath` again for each package's main and symbol file before parsing identities and validating payloads. The first pass can retain a case-sensitive filename-to-path/size record and the second pass can consume it, preserving the path-safety, existence, and byte checks while removing repeated full-path construction and artifact lookup. | `scripts/Publish-SharpProofRelease.ps1:241-281,306-346` |
@@ -4265,3 +4257,29 @@ R670-R671 are pending package-test scheduler reductions. Preserve separate class
 ### Status (part two hundred ten)
 
 R672 is a pending changed-test selection reduction candidate. Preserve project-file parsing, props blind-spot behavior documented by R301, transitive impact, and the architecture/package fallback rules; share only the immutable project graph traversal.
+
+## Second survey, part two hundred eleven: R673-R674 - repeated release/PDB path preparation
+
+| R673 | **`Invoke-SharpProofReleaseContainer.ps1` repeats annotated-tag identity checks in two modes.** `ValidateTag` calls `cat-file -t` and `rev-parse <tag>^{commit}` to prove an annotated tag resolves to the checkout commit, and `WriteQualificationEvidence` repeats the same two Git queries after its own version/tag checks. A helper that validates the tag object and resolved commit can serve both modes; `ValidateTag` can retain its additional `origin/master` ancestry check and mode-specific environment/ref diagnostics. | `scripts/Invoke-SharpProofReleaseContainer.ps1:60-68,128-133` |
+| R674 | **`Get-SharpProofProductionInventory.Get-PortablePdbModule` canonicalizes repeated PDB document identities once per sequence point.** The sequence-point loop obtains a document handle/name and calls `Resolve-RepositoryPath` for every visible point, while a portable PDB commonly reuses the same document across many methods and points. A per-module document-handle or source-name cache can validate each document path once and reuse the canonical relative path; line/range validation, compile-membership checks, and compiler-generated filtering remain per point. | `scripts/Get-SharpProofProductionInventory.ps1:243-270` |
+
+### Status (part two hundred eleven)
+
+R673-R674 are pending preparation reductions. Preserve release tag object type and commit binding, the extra ancestry guard, PDB document containment and canonicality, per-point source/range checks, and fail-closed errors; share only repeated identity/path preparation.
+
+## Second survey, part two hundred twelve: R675 - eager tooling-image build
+
+| R675 | **`build.ps1` builds the tooling image before profile preflight.** `Build-ToolingImage` runs unconditionally before the switch that rejects missing `-ComparisonRef` for `coverage` or missing `-PackageSource` for package-consumer, pilot, and release-plan profiles. Those invalid invocations can therefore perform a full Docker build before reporting a local argument error; the same ordering also makes any future profile validation pay the image-build cost first. Move pure parameter/profile validation ahead of image setup, while retaining the image build immediately before the first container invocation. | `build.ps1:40-42,61,74-106` |
+
+### Status (part two hundred twelve)
+
+R675 is a pending build-orchestration reduction candidate. Preserve `ValidateSet`/configuration rules, exact comparison-ref resolution, package-source requirements, environment propagation, and the one required tooling-image build for valid profiles; defer only that build until preflight succeeds.
+
+## Second survey, part two hundred thirteen: R676-R677 - repeated acceptance inventory preparation
+
+| R676 | **`Verify.ps1.Measure-RepositoryCSharpSyntax` discards validated full paths and rebuilds them.** The helper first calls `Assert-RepositoryPaths`, which canonicalizes each relative path, checks repository containment, and verifies the leaf exists; it then reconstructs the same source path with `Join-Path` before reading it. Returning the validated path records, or letting the measurement helper own the single validation/read pass, removes repeated path resolution while preserving duplicate checks, containment errors, and source parsing. | `eng/acceptance/Verify.ps1:370-401,416-437` |
+| R677 | **Acceptance static validation derives the full production inventory twice.** `eng/acceptance/Verify.ps1` invokes `Get-SharpProofProductionInventory.ps1` before TCB and coordinator checks, then calls `Test-ProductionCSharpComplexity.ps1`; that script independently invokes the same inventory generator, reparsing every project MSBuild query and rebuilding compile/options records. Pass the first inventory through a file/object seam or combine the two consumers, while retaining the complexity script's intentional Release configuration if it differs from the acceptance configuration. | `eng/acceptance/Verify.ps1:237-245,624`; `scripts/Test-ProductionCSharpComplexity.ps1:76-82` |
+
+### Status (part two hundred thirteen)
+
+R676-R677 are pending acceptance-preparation reductions. Preserve path containment and leaf checks, production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only validated paths and inventory data.
