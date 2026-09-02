@@ -210,27 +210,16 @@ public sealed class StaticFieldTypeInitializationTests
             compilation,
             "Sample",
             "CatchInitializationFailure");
-        var catchClause = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<CatchClauseSyntax>().Single();
         var session = new EffectAnalysisSession(compilation);
-        var reachability = new ExceptionHandlerReachability(
-            compilation: compilation,
-            caller: method,
-            abstractFlow: null,
-            canCompleteNormally: static _ => true,
-            canMethodCompleteNormally: static _ => true,
-            canCompoundValueComplete: static _ => true,
-            canIncrementValueComplete: static _ => true,
-            canWithCloneComplete: static _ => true,
-            conversionEffects: new ConversionEffectClassifier(
-                session,
-                abstractFlow: null),
-            getReachableListPatternMembers: static _ => [],
-            apiSpecs: session.ApiSpecs,
-            knownSymbols: session.KnownSymbols,
-            isKnownNonThrowing: static _ => true);
+        var reachability = EffectTestHost.CreateHandlerReachability(
+            compilation,
+            method,
+            session,
+            isKnownNonThrowing: true);
 
-        Assert.That(reachability.IsReachable(catchClause, inFilter: false),
+        Assert.That(reachability.IsReachable(
+                EffectTestHost.CatchClauseIn(method),
+                inFilter: false),
             Is.True);
     }
 }

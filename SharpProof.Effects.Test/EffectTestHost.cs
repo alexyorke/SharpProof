@@ -239,6 +239,40 @@ internal static class EffectTestHost
             .Summary.Writes.Contains(EffectRegionId.Static());
     }
 
+    internal static CatchClauseSyntax CatchClauseIn(IMethodSymbol method)
+    {
+        return method.DeclaringSyntaxReferences.Single().GetSyntax()
+            .DescendantNodes()
+            .OfType<CatchClauseSyntax>()
+            .Single();
+    }
+
+    internal static ExceptionHandlerReachability CreateHandlerReachability(
+        Compilation compilation,
+        IMethodSymbol caller,
+        EffectAnalysisSession session,
+        bool isKnownNonThrowing = false)
+    {
+        return new(
+            compilation: compilation,
+            caller: caller,
+            abstractFlow: null,
+            canCompleteNormally: static _ => true,
+            canMethodCompleteNormally: static _ => true,
+            canCompoundValueComplete: static _ => true,
+            canIncrementValueComplete: static _ => true,
+            canWithCloneComplete: static _ => true,
+            conversionEffects: new ConversionEffectClassifier(
+                session,
+                abstractFlow: null),
+            getReachableListPatternMembers: static _ => [],
+            apiSpecs: session.ApiSpecs,
+            knownSymbols: session.KnownSymbols,
+            isKnownNonThrowing: isKnownNonThrowing
+                ? static _ => true
+                : static _ => false);
+    }
+
     internal static INamedTypeSymbol RequireType(
         Compilation compilation,
         string metadataName)

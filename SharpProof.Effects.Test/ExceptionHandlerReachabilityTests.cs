@@ -63,28 +63,13 @@ public sealed class ExceptionHandlerReachabilityTests
                 compilation,
                 "Sample",
                 methodName);
-            var declaration = (MethodDeclarationSyntax)method
-                .DeclaringSyntaxReferences.Single().GetSyntax();
-            var catchClause = declaration.DescendantNodes()
-                .OfType<CatchClauseSyntax>()
-                .Single();
-            var reachability = new ExceptionHandlerReachability(
-                compilation: compilation,
-                caller: method,
-                abstractFlow: null,
-                canCompleteNormally: static _ => true,
-                canMethodCompleteNormally: static _ => true,
-                canCompoundValueComplete: static _ => true,
-                canIncrementValueComplete: static _ => true,
-                canWithCloneComplete: static _ => true,
-                conversionEffects: new ConversionEffectClassifier(
-                    session,
-                    abstractFlow: null),
-                getReachableListPatternMembers: static _ => [],
-                apiSpecs: session.ApiSpecs,
-                knownSymbols: session.KnownSymbols,
-                isKnownNonThrowing: static _ => false);
-            return reachability.IsReachable(catchClause, inFilter: false);
+            return EffectTestHost.CreateHandlerReachability(
+                    compilation,
+                    method,
+                    session)
+                .IsReachable(
+                    EffectTestHost.CatchClauseIn(method),
+                    inFilter: false);
         }
     }
 
@@ -141,28 +126,13 @@ public sealed class ExceptionHandlerReachabilityTests
                 compilation,
                 "Sample",
                 methodName);
-            var declaration = (MethodDeclarationSyntax)method
-                .DeclaringSyntaxReferences.Single().GetSyntax();
-            var catchClause = declaration.DescendantNodes()
-                .OfType<CatchClauseSyntax>()
-                .Single();
-            var reachability = new ExceptionHandlerReachability(
-                compilation: compilation,
-                caller: method,
-                abstractFlow: null,
-                canCompleteNormally: static _ => true,
-                canMethodCompleteNormally: static _ => true,
-                canCompoundValueComplete: static _ => true,
-                canIncrementValueComplete: static _ => true,
-                canWithCloneComplete: static _ => true,
-                conversionEffects: new ConversionEffectClassifier(
-                    session,
-                    abstractFlow: null),
-                getReachableListPatternMembers: static _ => [],
-                apiSpecs: session.ApiSpecs,
-                knownSymbols: session.KnownSymbols,
-                isKnownNonThrowing: static _ => false);
-            return reachability.IsReachable(catchClause, inFilter: false);
+            return EffectTestHost.CreateHandlerReachability(
+                    compilation,
+                    method,
+                    session)
+                .IsReachable(
+                    EffectTestHost.CatchClauseIn(method),
+                    inFilter: false);
         }
     }
 }
