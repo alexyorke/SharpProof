@@ -446,6 +446,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             HashSet<IMethodSymbol> reachable,
             HashSet<IMethodSymbol> scannedAnonymous)
         {
+            var anonymousFunctions = new List<
+                IFlowAnonymousFunctionOperation>();
             foreach (var operation in ReachableOperations(graph))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -470,8 +472,12 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                         reachable.Add(referenced);
                     }
                 }
+                if (operation is IFlowAnonymousFunctionOperation anonymous)
+                {
+                    anonymousFunctions.Add(anonymous);
+                }
             }
-            foreach (var anonymous in GetAnonymousFunctions(graph))
+            foreach (var anonymous in anonymousFunctions)
             {
                 if (IsExpressionTree(anonymous.Syntax) ||
                     !IsAnonymousExecutableOrEscaped(

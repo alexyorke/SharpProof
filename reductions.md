@@ -4233,14 +4233,6 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 R663 is a pending effect-method traversal reduction candidate. Preserve CFG reachability, lexical control-effect coverage, using-disposal unwinding, constructor-entry selection, summary join order, and scanner state; combine only safely reusable operation visits/facts.
 
-## Second survey, part two hundred five: R664 - duplicate local-function CFG walk
-
-| R664 | **`RequiresCallSiteTreeAnalyzer.TryCollectLocalReferences` walks each CFG twice for related facts.** It first enumerates `ReachableOperations(graph)` to find invocation and method-reference targets, then immediately calls `GetAnonymousFunctions(graph)`, which enumerates the same reachable operations again to find anonymous functions before recursively scanning their child CFGs. One traversal can collect both target references and eligible anonymous functions while preserving the recursive child-graph queue, expression-tree filtering, escape checks, and fallback-to-all-candidates behavior. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:443-509,1533-1587` |
-
-### Status (part two hundred five)
-
-R664 is a pending requires-tree CFG traversal reduction candidate. Preserve operation ordering, local-reference and anonymous-function classification, recursive child-CFG discovery, cancellation, exception fallback, and candidate-set semantics; share only the per-graph reachable-operation enumeration.
-
 ## Second survey, part two hundred six: R665-R667 - repeated cache/replay preparation
 
 | R665 | **`VerificationCache.TryReadAsync` duplicates capacity-maintenance commit cleanup on a normal miss and malformed-read catch.** The missing-file branch and the handled-exception branch both call `TryStageCapacity(path, staged, cancellationToken)`, set `committed = true`, and discard the staged entries when maintenance succeeds. A small helper can centralize only this successful maintenance transition while leaving the catch's `LastReadUnavailable` state and exception swallowing separate. | `SharpProof.Worker/VerificationCache.cs:50-57,123-145` |
@@ -4250,3 +4242,28 @@ R664 is a pending requires-tree CFG traversal reduction candidate. Preserve oper
 ### Status (part two hundred six)
 
 R665-R667 are pending cache/replay preparation reduction candidates. Preserve cache transaction commit/rollback ownership, unavailable-read reporting, claim-id first-match semantics, cancellation, and fail-closed counterexample replay behavior; share only repeated declaration and capacity-maintenance preparation.
+
+## Second survey, part two hundred seven: R668 - redundant MSBuild dependency edge
+
+| R668 | **`SharpProof.Verifier.targets` declares `_SharpProofInitializeVerify` twice in the verification target graph.** `_SharpProofVerifyCore` already depends on `_SharpProofInitializeVerify;ResolveReferences`, while the public `SharpProofVerify` target repeats `_SharpProofInitializeVerify` alongside `_SharpProofVerifyCore`. MSBuild normally de-duplicates the executed target, so the extra edge adds no work but obscures the actual dependency graph and creates another place to edit when initialization changes. Removing the direct edge from `SharpProofVerify` preserves the `AfterTargets="CoreCompile"` hook because `_SharpProofVerifyCore` still brings initialization in first. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:158-160,249-253` |
+
+### Status (part two hundred seven)
+
+R668 is a pending MSBuild graph simplification. Preserve `_SharpProofVerifyCore` ordering, the `CoreCompile` hook, and initialization/cleanup error behavior; remove only the redundant dependency declaration.
+
+## Second survey, part two hundred eight: R669 - repeated release artifact path resolution
+
+| R669 | **`Publish-SharpProofRelease.Get-ValidatedRelease` resolves each package artifact path twice.** The first artifact loop calls `Get-ArtifactPath` for all six package/symbol files to check existence and manifest byte counts; the later package loop calls `Get-ArtifactPath` again for each package's main and symbol file before parsing identities and validating payloads. The first pass can retain a case-sensitive filename-to-path/size record and the second pass can consume it, preserving the path-safety, existence, and byte checks while removing repeated full-path construction and artifact lookup. | `scripts/Publish-SharpProofRelease.ps1:241-281,306-346` |
+
+### Status (part two hundred eight)
+
+R669 is a pending release-validation preparation reduction. Preserve filename safety, manifest byte matching, package/symbol pairing, and all package payload checks; share only the already-validated artifact path records.
+
+## Second survey, part two hundred nine: R670-R671 - repeated package-test discovery
+
+| R670 | **`Invoke-SharpProofPackageTests.ps1.Get-TestMethodTimings` reparses every TRX file once per class.** The script calls the helper separately for `WorkerMsBuildIntegrationTests` and `PackageLayoutSmokeTests`; each invocation rereads every result file, recreates the XML namespace manager, rebuilds test-definition maps, and scans all results. A single parse can project timings for both class names (or return a class-keyed map), preserving method-name extraction, duration aggregation, and sorting while removing a full XML pass. | `scripts/Invoke-SharpProofPackageTests.ps1:108-167,709-715` |
+| R671 | **`Invoke-SharpProofPackageTests.ps1.Get-DiscoveredTestMethods` launches `vstest /ListTests` twice for one assembly.** The worker-method and package-layout discovery calls pass different class filters, but both start the same test assembly and parse the complete textual listing with the same regular expression and uniqueness logic. One unfiltered listing can be parsed into class-keyed method sets and checked against both minimum counts, preserving the separate filters and diagnostics without two child-process launches. | `scripts/Invoke-SharpProofPackageTests.ps1:169-195,374-424` |
+
+### Status (part two hundred nine)
+
+R670-R671 are pending package-test scheduler reductions. Preserve separate class minimums, method-name parsing, timing aggregation, filter semantics, and test-process diagnostics; share only the assembly discovery and TRX parsing work.
