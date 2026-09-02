@@ -186,50 +186,36 @@ public sealed class ReleaseCoverageBaselineTests
                         sha256 = new string((char)('a' + index), 64)
                     })
                     .ToArray();
+                string Evidence(object packageArtifacts)
+                {
+                    return JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        status = "passed",
+                        commit = head,
+                        packageArtifacts
+                    });
+                }
                 return
                 [
-                (JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    status = "passed",
-                    commit = head,
-                    packageArtifacts = packages
-                }), true),
-                (JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    status = "passed",
-                    commit = head,
-                    packageArtifacts = packages.Take(5).ToArray()
-                }), false),
-                (JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    status = "passed",
-                    commit = head,
-                    packageArtifacts = packages.Select((item, index) => index == 5
-                    ? new
-                    {
-                        fileName = packages[0].fileName,
-                        item.bytes,
-                        item.sha256
-                    }
-                    : item).ToArray()
-                }), false),
-                (JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    status = "passed",
-                    commit = head,
-                    packageArtifacts = packages.Select((item, index) => index == 5
-                    ? new
-                    {
-                        item.fileName,
-                        item.bytes,
-                        sha256 = "not-a-digest"
-                    }
-                    : item).ToArray()
-                }), false)
+                    (Evidence(packages), true),
+                    (Evidence(packages.Take(5).ToArray()), false),
+                    (Evidence(packages.Select((item, index) => index == 5
+                        ? new
+                        {
+                            fileName = packages[0].fileName,
+                            item.bytes,
+                            item.sha256
+                        }
+                        : item).ToArray()), false),
+                    (Evidence(packages.Select((item, index) => index == 5
+                        ? new
+                        {
+                            item.fileName,
+                            item.bytes,
+                            sha256 = "not-a-digest"
+                        }
+                        : item).ToArray()), false)
                 ];
             });
     }
