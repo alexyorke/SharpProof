@@ -5208,8 +5208,9 @@ third-party surface actually is - reads as accident rather than decision.
 
 ### Status (part two hundred sixty-five)
 
-R751 is `pending` and is a test-fixture reduction candidate; no implementation
-code was changed while recording it.
+R751 is `complete`: the two identity-boundary tests now share one encoded call
+graph fixture while retaining their distinct documentation-id mutations,
+serialization boundary, and decoder assertions.
 
 ## Second survey, part two hundred sixty-six: R752 - the one ungated authority file
 
@@ -5752,4 +5753,22 @@ implementation or build file was changed.
 ### Status (part two hundred eighty-eight)
 
 R777 is `pending` and limited to effect-call propagation helper extraction. No
+implementation or build file was changed.
+
+## Second survey, part two hundred eighty-nine: R778 - repeated callable-attribute enumeration
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R778 | **`ContractSelectionInventory.Select` enumerates the same callable attributes twice.** The method first calls `GetCallableAttributes(method).Any(IsEffectContract)` and then calls `GetRejectedSelectionFeatures(method)`, whose `GetRejectedCallableSelectionFeatures` loop calls `GetCallableAttributes(method)` again. That second pass repeats method and associated-property attribute retrieval and rejected-feature classification for the same immutable symbols. Materializing the callable attributes once in `Select` and passing the snapshot into the rejected-feature helper can remove the duplicate enumeration while retaining the separate effect-selection and rejected-feature policies, plus the existing parameter, return, containing-type, and assembly scans. | `SharpProof.Contracts/ContractSelectionInventory.cs:146-196,249-267` |
+
+### Checked and not proposed (part two hundred eighty-nine)
+
+- The parameter and return attribute loops are not folded into this snapshot:
+  they are separate selection inputs and must retain their current scope.
+- `GetRejectedSelectionFeatures` remains independently callable; only the
+  `Select` call path needs an overload or private snapshot-aware helper.
+
+### Status (part two hundred eighty-nine)
+
+R778 is `pending` and limited to callable-attribute enumeration sharing. No
 implementation or build file was changed.
