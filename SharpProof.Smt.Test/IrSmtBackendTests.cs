@@ -315,21 +315,10 @@ public sealed class IrSmtBackendTests
             IrBinaryOperator.GreaterThan,
             factory.Length(factory.Variable(variable)),
             factory.Integer(0));
-        var query = new VerificationQuery(
+        await AssertUnsupportedEncoding(
             factory,
-            [],
-            new Goal(
-                factory,
-                goal,
-                ProofDiagnosticKind.Precondition,
-                new SourceLocationId(0)));
-
-        using var backend = new IrSmtBackend();
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
-
-        Assert.That(
-            ((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+            goal,
+            ProofDiagnosticKind.Precondition);
     }
 
     [Test]
@@ -341,18 +330,10 @@ public sealed class IrSmtBackendTests
             IrBinaryOperator.Equal,
             factory.String("left\0right"),
             factory.Variable(variable));
-        var query = new VerificationQuery(
+        await AssertUnsupportedEncoding(
             factory,
-            [],
-            new Goal(factory, goal, ProofDiagnosticKind.Precondition,
-                new SourceLocationId(0)));
-
-        using var backend = new IrSmtBackend();
-        var outcome = await new ProofKernel(backend).VerifyAsync(query);
-
-        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
-        Assert.That(((UnknownOutcome)outcome).Reason,
-            Is.EqualTo(AbstentionReason.UnsupportedEncoding));
+            goal,
+            ProofDiagnosticKind.Precondition);
     }
 
     [Test]
@@ -368,18 +349,30 @@ public sealed class IrSmtBackendTests
             IrBinaryOperator.Equal,
             concatenated,
             factory.Variable(variable));
+        await AssertUnsupportedEncoding(
+            factory,
+            goal,
+            ProofDiagnosticKind.Postcondition);
+    }
+
+    private static async Task AssertUnsupportedEncoding(
+        IrFactory factory,
+        IrTerm goal,
+        ProofDiagnosticKind diagnosticKind)
+    {
         var query = new VerificationQuery(
             factory,
             [],
             new Goal(
                 factory,
                 goal,
-                ProofDiagnosticKind.Postcondition,
+                diagnosticKind,
                 new SourceLocationId(0)));
 
         using var backend = new IrSmtBackend();
         var outcome = await new ProofKernel(backend).VerifyAsync(query);
 
+        Assert.That(outcome, Is.TypeOf<UnknownOutcome>());
         Assert.That(
             ((UnknownOutcome)outcome).Reason,
             Is.EqualTo(AbstentionReason.UnsupportedEncoding));
