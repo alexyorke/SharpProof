@@ -2477,16 +2477,35 @@ public sealed class CompilerManifestArtifactTests
         string source = "internal sealed class Subject {}\n// line two\n// line three\n",
         ImmutableArray<string> specificationPacks = default)
     {
-        var compilation = CreateCompilation(
+        return CreateArtifactCore(
             parse ?? new CSharpParseOptions(LanguageVersion.CSharp12),
             source,
-            includeContractReference: false);
+            includeContractReference: false,
+            features: WorkerFeatureSet.All,
+            specificationPacks: specificationPacks);
+    }
+
+    private static CompilerManifestArtifact CreateArtifactCore(
+        CSharpParseOptions parse,
+        string source,
+        bool includeContractReference,
+        WorkerFeatureSet features,
+        ImmutableArray<string> specificationPacks = default)
+    {
+        var compilation = CreateCompilation(
+            parse,
+            source,
+            includeContractReference);
+        var discovery = new ClaimManifestBuilder(
+            compilation,
+            features,
+            CancellationToken.None).Build();
         return CompilerManifestArtifactProducer.Create(
             compilation,
             TestContext.CurrentContext.WorkDirectory,
             "net8.0",
-            WorkerFeatureSet.All,
-            new ClaimManifestBuilder(compilation).Build(),
+            features,
+            discovery,
             WorkerBudgets.DefaultMaximumExpressionDepth,
             CancellationToken.None,
             specificationPacks: specificationPacks);
@@ -2503,10 +2522,8 @@ public sealed class CompilerManifestArtifactTests
 
     private static CompilerManifestArtifact CreateContractArtifact(string? source = null)
     {
-        var parse = new CSharpParseOptions(
-            LanguageVersion.CSharp12);
-        var compilation = CreateCompilation(
-            parse,
+        return CreateArtifactCore(
+            new CSharpParseOptions(LanguageVersion.CSharp12),
             source ?? """
             using SharpProof.Attributes;
             internal static class Subject {
@@ -2516,42 +2533,19 @@ public sealed class CompilerManifestArtifactTests
                 }
             }
             """,
-            includeContractReference: true);
-        var discovery = new ClaimManifestBuilder(
-            compilation,
-            WorkerFeatureSet.All,
-            CancellationToken.None).Build();
-        return CompilerManifestArtifactProducer.Create(
-            compilation,
-            TestContext.CurrentContext.WorkDirectory,
-            "net8.0",
-            WorkerFeatureSet.All,
-            discovery,
-            WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+            includeContractReference: true,
+            features: WorkerFeatureSet.All);
     }
 
     private static CompilerManifestArtifact CreateFeatureArtifact(
         WorkerFeatureSet features,
         string source)
     {
-        var parse = new CSharpParseOptions(LanguageVersion.CSharp12);
-        var compilation = CreateCompilation(
-            parse,
+        return CreateArtifactCore(
+            new CSharpParseOptions(LanguageVersion.CSharp12),
             source,
-            includeContractReference: true);
-        var discovery = new ClaimManifestBuilder(
-            compilation,
-            features,
-            CancellationToken.None).Build();
-        return CompilerManifestArtifactProducer.Create(
-            compilation,
-            TestContext.CurrentContext.WorkDirectory,
-            "net8.0",
-            features,
-            discovery,
-            WorkerBudgets.DefaultMaximumExpressionDepth,
-            CancellationToken.None);
+            includeContractReference: true,
+            features: features);
     }
 
     private static CompilerManifestArtifact CreateEffectArtifact()

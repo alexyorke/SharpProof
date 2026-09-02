@@ -181,6 +181,7 @@ the smallest relevant containerized test target passes.
 | R565 | Reuse sorted package-build statistic arrays for medians and P95 | `SharpProof.Gates.Test`: PackageBuildEstimator tests, 6 passed; 27 other PerformanceGateTests passed (2 pre-existing policy failures) |
 | R571 | Share collectible runtime assembly test lifetime and resolver setup | `SharpProof.Analyzer.Test`: RuntimeFlagshipOracleTests and RuntimeRequiresOracleTests passed; `SharpProof.Effects.Test`: RuntimeEffectOracleTests, 7 passed |
 | R585 | Share the parameterized Worker throwing-backend fixture | `SharpProof.Worker.Test`: AcyclicBlockPredicateExecutorTests 14; CompilerCallableLowererTests 20; WorkerTcbEdgeCaseTests 44 passed |
+| R586 | Share Worker compiler-manifest compilation, discovery, and artifact construction | `SharpProof.Worker.Test`: CompilerManifestArtifactTests, 91 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3860,7 +3861,10 @@ counter while preserving each malformed-input and zero-claim assertion.
 
 ### Status (part one hundred twenty-seven)
 
-R586 is a pending Worker test-infrastructure reduction candidate. Preserve the separate malformed-capture and feature-selection scenarios; centralize only the repeated artifact-construction pipeline.
+R586 is `applied`: `CreateArtifactCore` now owns the shared compilation,
+feature-aware discovery, and manifest-artifact construction while the wrappers
+retain their source defaults, contract-reference selection, feature sets, and
+optional specification packs. CompilerManifestArtifactTests passed (91).
 
 ## Second survey, part one hundred twenty-eight: R587 - duplicate bounded postcondition replay engines
 
