@@ -17,8 +17,8 @@ public sealed record LinuxWorkerCompletion(
 public sealed partial class LinuxWorkerProcess : IDisposable
 {
     public const string StartMessage = "SharpProof.Start/1";
-    private const int SignalKill = 9;
-    private const int SignalTerminate = 15;
+    internal const string ArmedMessage = "SharpProof.Armed/1";
+    internal const string CleanupMessage = "SharpProof.Cleanup/1";
     private const int PollMilliseconds = 25;
     private Process? _process;
     private long _terminationDeadlineTimestamp;
@@ -117,7 +117,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
         EnsureLinux();
         if (NativeMethods.ControlProcess(
                 LinuxProcessControlConstants.ParentDeathSignal,
-                SignalKill,
+                LinuxProcessControlConstants.SignalKill,
                 0,
                 0,
                 0) != 0)
@@ -178,7 +178,9 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             return false;
         }
         var descendants = CaptureDescendants(process.Id);
-        if (NativeMethods.Kill(process.Id, SignalTerminate) != 0)
+        if (NativeMethods.Kill(
+                process.Id,
+                LinuxProcessControlConstants.SignalTerminate) != 0)
         {
             if (Marshal.GetLastPInvokeError() == 3 &&
                 process.WaitForExit(0))
@@ -260,7 +262,9 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             {
                 continue;
             }
-            if (NativeMethods.Kill(processId, SignalKill) != 0 &&
+            if (NativeMethods.Kill(
+                    processId,
+                    LinuxProcessControlConstants.SignalKill) != 0 &&
                 Marshal.GetLastPInvokeError() != 3)
             {
                 throw NativeFailure(
@@ -356,4 +360,8 @@ internal static class LinuxProcessControlConstants
     internal const int ParentDeathSignal = 1;
     internal const int PidFdOpenSystemCall = 434;
     internal const int PidFdSendSignalSystemCall = 424;
+    internal const int SignalNone = 0;
+    internal const int SignalKill = 9;
+    internal const int SignalTerminate = 15;
+    internal const int SignalStop = 19;
 }

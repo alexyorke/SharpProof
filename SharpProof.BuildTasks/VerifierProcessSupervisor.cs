@@ -9,13 +9,7 @@ internal static partial class VerifierProcessSupervisor
 {
     private const int ChildSubreaper = 36;
     private const int SetDumpable = 4;
-    private const int SignalKill = 9;
-    private const int SignalNone = 0;
-    private const int SignalStop = 19;
     private const int ProcessNotFound = 3;
-    private const string StartMessage = "SharpProof.Start/1";
-    private const string ArmedMessage = "SharpProof.Armed/1";
-    private const string CleanupMessage = "SharpProof.Cleanup/1";
     private const int CleanupMilliseconds = 750;
     private const int RetryCleanupMilliseconds = 100;
     private const int MaximumCleanupRetries = 8;
@@ -56,7 +50,7 @@ internal static partial class VerifierProcessSupervisor
             if (cleanupDescriptorReserves[index] < 0 ||
                 SendPidFdSignal(
                     cleanupDescriptorReserves[index],
-                    SignalNone) != 0)
+                    LinuxProcessControlConstants.SignalNone) != 0)
             {
                 CloseDescriptors(cleanupDescriptorReserves);
                 return 125;
@@ -82,15 +76,15 @@ internal static partial class VerifierProcessSupervisor
         {
             var gate = Console.In.ReadLine();
             var nonce = gate != null &&
-                gate.StartsWith(StartMessage + " ",
+                gate.StartsWith(LinuxWorkerProcess.StartMessage + " ",
                     StringComparison.Ordinal)
-                ? gate[(StartMessage.Length + 1)..]
+                ? gate[(LinuxWorkerProcess.StartMessage.Length + 1)..]
                 : string.Empty;
             if (!IsValidNonce(nonce))
             {
                 return 125;
             }
-            Console.Out.WriteLine(ArmedMessage + " " + nonce);
+            Console.Out.WriteLine(LinuxWorkerProcess.ArmedMessage + " " + nonce);
             Console.Out.Flush();
 
             using var process = new Process
@@ -175,7 +169,7 @@ internal static partial class VerifierProcessSupervisor
         // runs after every writer has exited, so this separator gives the
         // authenticated record an unambiguous frame on the shared stream.
         Console.Out.WriteLine();
-        Console.Out.WriteLine(CleanupMessage + " " + nonce);
+        Console.Out.WriteLine(LinuxWorkerProcess.CleanupMessage + " " + nonce);
         Console.Out.Flush();
     }
 
@@ -187,7 +181,7 @@ internal static partial class VerifierProcessSupervisor
         // the whole inherited launch chain instead.
         if (NativeMethods.ControlProcess(
                 LinuxProcessControlConstants.ParentDeathSignal,
-                SignalKill,
+                LinuxProcessControlConstants.SignalKill,
                 0,
                 0,
                 0) != 0)
@@ -237,8 +231,11 @@ internal static partial class VerifierProcessSupervisor
             // do not scan that PID's descendants: it may have been recycled
             // for an unrelated process.
             if (supervisorPidFd >= 0 &&
-                (sendSignal?.Invoke(supervisorPidFd, SignalNone) ??
-                 SendPidFdSignal(supervisorPidFd, SignalNone)) != 0)
+                (sendSignal?.Invoke(supervisorPidFd,
+                    LinuxProcessControlConstants.SignalNone) ??
+                 SendPidFdSignal(
+                     supervisorPidFd,
+                     LinuxProcessControlConstants.SignalNone)) != 0)
             {
                 return new DescendantStopResult(
                     foundAny,
@@ -283,8 +280,10 @@ internal static partial class VerifierProcessSupervisor
                     }
                     if ((sendSignal?.Invoke(
                              descriptor,
-                             SignalStop) ??
-                         SendPidFdSignal(descriptor, SignalStop)) != 0)
+                             LinuxProcessControlConstants.SignalStop) ??
+                         SendPidFdSignal(
+                             descriptor,
+                             LinuxProcessControlConstants.SignalStop)) != 0)
                     {
                         if (Marshal.GetLastPInvokeError() != ProcessNotFound)
                         {
@@ -294,8 +293,10 @@ internal static partial class VerifierProcessSupervisor
                     }
                     if ((sendSignal?.Invoke(
                              descriptor,
-                             SignalKill) ??
-                         SendPidFdSignal(descriptor, SignalKill)) != 0 &&
+                             LinuxProcessControlConstants.SignalKill) ??
+                         SendPidFdSignal(
+                             descriptor,
+                             LinuxProcessControlConstants.SignalKill)) != 0 &&
                         Marshal.GetLastPInvokeError() != ProcessNotFound)
                     {
                         Thread.Sleep(1);
@@ -317,8 +318,12 @@ internal static partial class VerifierProcessSupervisor
         // scanning the numeric PID here could otherwise inspect an unrelated
         // process. Only use the process table while the identity is verified.
         var supervisorGone = supervisorPidFd >= 0 &&
-            (sendSignal?.Invoke(supervisorPidFd, SignalNone) ??
-             SendPidFdSignal(supervisorPidFd, SignalNone)) != 0;
+            (sendSignal?.Invoke(
+                supervisorPidFd,
+                LinuxProcessControlConstants.SignalNone) ??
+             SendPidFdSignal(
+                 supervisorPidFd,
+                 LinuxProcessControlConstants.SignalNone)) != 0;
         var complete = supervisorGone ||
             DescendantProcessIds(supervisorId).Count == 0;
         return new DescendantStopResult(foundAny, complete);

@@ -31,13 +31,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     internal const int MaximumCapturedOutputCharacters = 1_048_576;
     internal const int OutputDrainPollingMilliseconds = 25;
     private const int MaximumProtocolLineCharacters = 160;
-    private const int SignalTerminate = 15;
-    private const int SignalStop = 19;
-    private const int SignalKill = 9;
     private const string ProcessGroupLauncher = "/usr/bin/setsid";
-    private const string ProcessGateStartMessage = "SharpProof.Start/1";
-    private const string SupervisorArmedMessage = "SharpProof.Armed/1";
-    private const string SupervisorCleanupMessage = "SharpProof.Cleanup/1";
     private static readonly ConcurrentDictionary<long, CleanupAnchor>
         RetainedCleanupAnchors = new();
     private static long _nextCleanupAnchor;
@@ -224,7 +218,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     _outputLimitSignal);
                 _supervisorOutputCompletion = standardOutput;
                 process.StandardInput.WriteLine(
-                    ProcessGateStartMessage + " " + supervisorNonce);
+                    LinuxWorkerProcess.StartMessage + " " + supervisorNonce);
                 process.StandardInput.Close();
             }
             var processStopwatch = Stopwatch.StartNew();
@@ -563,7 +557,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                         }
                         var armedRecord = string.Equals(
                             line,
-                            SupervisorArmedMessage + " " + supervisorNonce,
+                            LinuxWorkerProcess.ArmedMessage + " " + supervisorNonce,
                             StringComparison.Ordinal);
                         supervisorArmed |= armedRecord;
                         if (armedRecord)
@@ -572,7 +566,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                         }
                         var cleanupRecord = string.Equals(
                             line,
-                            SupervisorCleanupMessage + " " + supervisorNonce,
+                            LinuxWorkerProcess.CleanupMessage + " " + supervisorNonce,
                             StringComparison.Ordinal);
                         cleanupAuthenticated |= cleanupRecord;
                         if (cleanupRecord)
@@ -665,12 +659,12 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             SupervisorArmed: supervisorNonce != null &&
                 HasSupervisorProtocolRecord(
                     text,
-                    SupervisorArmedMessage,
+                    LinuxWorkerProcess.ArmedMessage,
                     supervisorNonce),
             CleanupAuthenticated: supervisorNonce != null &&
                 HasSupervisorProtocolRecord(
                     text,
-                    SupervisorCleanupMessage,
+                    LinuxWorkerProcess.CleanupMessage,
                     supervisorNonce));
     }
 
@@ -1009,7 +1003,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
 
             var terminateSent = SendPidFdSignal(
                 _processGroupPidFd,
-                SignalTerminate) == 0;
+                LinuxProcessControlConstants.SignalTerminate) == 0;
             var boundedWait = Math.Min(
                 RemainingMilliseconds(
                     terminationStopwatch,
@@ -1036,16 +1030,24 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     terminationWaitMilliseconds),
                     LauncherProcessReserveMilliseconds),
                 supervisorPidFd: _processGroupPidFd);
-            if (SendPidFdSignal(_processGroupPidFd, SignalStop) == 0)
+            if (SendPidFdSignal(
+                    _processGroupPidFd,
+                    LinuxProcessControlConstants.SignalStop) == 0)
             {
                 // The stopped session leader keeps this process-group identity
                 // live while the group-directed signal is delivered.
-                _ = NativeMethods.Kill(-processGroupId, SignalKill);
-                _ = SendPidFdSignal(_processGroupPidFd, SignalKill);
+                _ = NativeMethods.Kill(
+                    -processGroupId,
+                    LinuxProcessControlConstants.SignalKill);
+                _ = SendPidFdSignal(
+                    _processGroupPidFd,
+                    LinuxProcessControlConstants.SignalKill);
             }
             else if (Marshal.GetLastPInvokeError() != 3)
             {
-                _ = SendPidFdSignal(_processGroupPidFd, SignalKill);
+                _ = SendPidFdSignal(
+                    _processGroupPidFd,
+                    LinuxProcessControlConstants.SignalKill);
             }
             return cleanup.Complete;
         }

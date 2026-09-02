@@ -591,8 +591,10 @@ nothing validated, all `pending`.
 
 ### Status (part three)
 
-R277 through R284 are `pending`. R277, R278, R280, and R283 are mechanical and
-low-risk. R279 is the one to weigh first: it is not a line-count reduction at all
+R277 and R278 are applied: process-handshake strings and POSIX signal numbers
+now use the host-owned constants. R280 and R283 remain pending because they
+cross generated/protocol and corpus-compilation boundaries. R279 is the one to
+weigh first: it is not a line-count reduction at all
 but a missing authority over a runtime handshake, and closing it would probably
 add lines while removing a class of silent failure. R281 and R282 need per-site
 triage rather than a sweep, and R284 may turn out to be an intentional split that
