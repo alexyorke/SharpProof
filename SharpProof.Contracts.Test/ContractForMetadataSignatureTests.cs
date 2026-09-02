@@ -51,7 +51,7 @@ public sealed class ContractForMetadataSignatureTests
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
-        AssertNoErrors(compilation);
+        ContractTestCompilation.AssertNoErrors(compilation);
         var target = compilation.GetTypeByMetadataName("MetadataTarget")!
             .GetMembers(methodName)
             .OfType<IMethodSymbol>()
@@ -203,17 +203,4 @@ public sealed class ContractForMetadataSignatureTests
         return peImage.ToImmutableArray();
     }
 
-    private static void AssertNoErrors(Compilation compilation)
-    {
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToImmutableArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic => diagnostic.ToString())));
-    }
 }

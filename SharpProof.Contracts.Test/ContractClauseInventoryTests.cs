@@ -445,30 +445,11 @@ public sealed class ContractClauseInventoryTests
         bool includeSharpProofReference,
         OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(
+        return ContractTestCompilation.Create(
+            "ClauseInventory",
             source,
-            new CSharpParseOptions(
-                LanguageVersion.CSharp12,
-                preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]));
-        var compilation = CSharpCompilation.Create(
-            "ClauseInventory_" + Guid.NewGuid().ToString("N"),
-            [syntaxTree],
-            includeSharpProofReference
-                ? TestMetadataReferences.WithSharpProof
-                : TestMetadataReferences.Platform,
-            new CSharpCompilationOptions(
-                outputKind,
-                nullableContextOptions: NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-                errors,
-            Is.Empty,
-            string.Join(Environment.NewLine, errors.Select(
-                static diagnostic => diagnostic.ToString())));
-        return compilation;
+            outputKind: outputKind,
+            includeSharpProofReference: includeSharpProofReference);
     }
 
 }

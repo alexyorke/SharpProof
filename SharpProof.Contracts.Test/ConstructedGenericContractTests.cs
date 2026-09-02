@@ -593,31 +593,10 @@ public sealed class ConstructedGenericContractTests
 
     private static CSharpCompilation CreateCompilation(string source)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(
+        return ContractTestCompilation.Create(
+            "ConstructedContracts",
             source,
-            new CSharpParseOptions(
-                LanguageVersion.CSharp12,
-                preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]));
-        var compilation = CSharpCompilation.Create(
-            "ConstructedContracts_" + Guid.NewGuid().ToString("N"),
-            [syntaxTree],
-            TestMetadataReferences.WithSharpProof,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable,
-                allowUnsafe: true));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic =>
-                    diagnostic.ToString())));
-        return compilation;
+            allowUnsafe: true);
     }
 
 }

@@ -82,27 +82,9 @@ public sealed class ContractIntrinsicValidationTests
         string typeName,
         string methodName)
     {
-        var tree = CSharpSyntaxTree.ParseText(
-            source,
-            new CSharpParseOptions(
-                LanguageVersion.CSharp12,
-                preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]));
-        var compilation = CSharpCompilation.Create(
-            "ContractIntrinsicValidation_" + Guid.NewGuid().ToString("N"),
-            [tree],
-            TestMetadataReferences.WithSharpProof,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(Environment.NewLine, errors.Select(
-                static diagnostic => diagnostic.ToString())));
+        var compilation = ContractTestCompilation.Create(
+            "ContractIntrinsicValidation",
+            source);
 
         var method = compilation.GetTypeByMetadataName(typeName)!
             .GetMembers(methodName)

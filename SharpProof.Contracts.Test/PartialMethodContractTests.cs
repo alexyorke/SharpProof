@@ -462,31 +462,10 @@ public sealed class PartialMethodContractTests
     private static CSharpCompilation CreateCompilation(
         params (string FileName, string Source)[] sources)
     {
-        var parseOptions = new CSharpParseOptions(
-            LanguageVersion.Preview,
-            preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]);
-        var compilation = CSharpCompilation.Create(
-            "PartialContracts_" + Guid.NewGuid().ToString("N"),
-            sources.Select(source => CSharpSyntaxTree.ParseText(
-                source.Source,
-                parseOptions,
-                source.FileName)),
-            TestMetadataReferences.WithSharpProof,
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary,
-                nullableContextOptions: NullableContextOptions.Enable));
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic =>
-                    diagnostic.ToString())));
-        return compilation;
+        return ContractTestCompilation.Create(
+            "PartialContracts",
+            sources,
+            LanguageVersion.Preview);
     }
 
 }

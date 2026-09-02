@@ -96,7 +96,7 @@ public sealed class ContractApiIdentityTests
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
-        AssertNoErrors(compilation);
+        ContractTestCompilation.AssertNoErrors(compilation);
         return compilation;
     }
 
@@ -141,7 +141,7 @@ public sealed class ContractApiIdentityTests
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
-        AssertNoErrors(compilation);
+        ContractTestCompilation.AssertNoErrors(compilation);
         using var stream = new MemoryStream();
         var result = compilation.Emit(stream);
         Assert.That(
@@ -171,18 +171,4 @@ public sealed class ContractApiIdentityTests
             .Select(static path => MetadataReference.CreateFromFile(path))];
     }
 
-    private static void AssertNoErrors(Compilation compilation)
-    {
-        var errors = compilation.GetDiagnostics()
-            .Where(static diagnostic =>
-                diagnostic.Severity == DiagnosticSeverity.Error)
-            .ToImmutableArray();
-        Assert.That(
-            errors,
-            Is.Empty,
-            string.Join(
-                Environment.NewLine,
-                errors.Select(static diagnostic =>
-                    diagnostic.ToString())));
-    }
 }

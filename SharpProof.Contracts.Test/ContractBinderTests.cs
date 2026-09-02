@@ -1653,28 +1653,10 @@ public sealed class ContractBinderTests
             string source,
             bool allowUnsafe = false)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(
+            var compilation = ContractTestCompilation.Create(
+                "Contracts",
                 source,
-                new CSharpParseOptions(
-                    LanguageVersion.CSharp12,
-                    preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]));
-            var compilation = CSharpCompilation.Create(
-                "Contracts_" + Guid.NewGuid().ToString("N"),
-                [syntaxTree],
-                TestMetadataReferences.WithSharpProof,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary,
-                    nullableContextOptions: NullableContextOptions.Enable,
-                    allowUnsafe: allowUnsafe));
-            var errors = compilation.GetDiagnostics()
-                .Where(static diagnostic =>
-                    diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToArray();
-            Assert.That(
-                errors,
-                Is.Empty,
-                string.Join(Environment.NewLine, errors.Select(
-                    static diagnostic => diagnostic.ToString())));
+                allowUnsafe);
             return new ContractSubject(compilation);
         }
 
