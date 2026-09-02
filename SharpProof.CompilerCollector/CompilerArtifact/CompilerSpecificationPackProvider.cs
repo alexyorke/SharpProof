@@ -708,11 +708,20 @@ internal sealed class CompilerSpecificationPackProvider
         var expected = new HashSet<string>(
             properties,
             StringComparer.Ordinal);
-        var actual = element.EnumerateObject().ToArray();
-        if (actual.Length != expected.Count ||
-            actual.Any(property => !expected.Contains(property.Name)) ||
-            actual.Select(static property => property.Name)
-                .Distinct(StringComparer.Ordinal).Count() != actual.Length)
+        var actual = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in element.EnumerateObject())
+        {
+            if (expected.Contains(property.Name) &&
+                actual.Add(property.Name))
+            {
+                continue;
+            }
+
+            throw new InvalidDataException(
+                context + " has an invalid property set.");
+        }
+
+        if (actual.Count != expected.Count)
         {
             throw new InvalidDataException(
                 context + " has an invalid property set.");
