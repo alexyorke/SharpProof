@@ -191,6 +191,7 @@ the smallest relevant containerized test target passes.
 | R471 | Inherit effect-summary equivalence from the closed-domain base while retaining Widen forwarding | `SharpProof.Effects.Test`: 323 passed |
 | R473 | Share method/property/type/assembly scope enumeration across analyzer, collector, and effects policies | `SharpProof.Analyzer.Test`: 476; `SharpProof.Effects.Test`: 323 |
 | R475 | Share direct by-value call admission checks between spec and summary lowering | `SharpProof.Worker.Test`: 23 focused compiler-call tests |
+| R478 | Share bounded JSON file opening between hashing and UTF-8 readers | `SharpProof.Worker.Test`: ProtocolJsonTests 108; full Worker.Test 695 |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2436,8 +2437,10 @@ resolution.
 
 ### Status (part fifty-three)
 
-R477-R478 are `pending` review-only candidates. No implementation or build files
-were edited.
+R477 remains a `pending` review-only candidate because changing a synchronous
+implementation behind an async API needs a separate scheduling decision. R478
+is applied: hashing and UTF-8 readers share size, race, sequential-open, and
+bounded-stream checks while retaining distinct empty-file errors and consumers.
 
 
 ## Second survey, part fifty-five: R480 - a check left behind by applied R243
@@ -3566,3 +3569,11 @@ R571 is a pending test-infrastructure reduction candidate. Preserve collectible 
 ### Status (part one hundred thirteen)
 
 R572 is a pending test-infrastructure reduction candidate. Preserve the root-specific safety check and the refusal to delete an unexpected path; only centralize the already-identical guard and recursive-delete operation.
+
+## Second survey, part one hundred fourteen: R573 - incomplete baseline identity preflight
+
+| R573 | **`Test-CompleteBaseline` computes a canonical invocation and discards it.** The parallel mutation driver calls `Get-SharpProofMutationBaselineInvocation` for every saved baseline row, but never compares the returned `Identity` with the row's persisted `invocation` field. The baseline writer does persist that field, and the child `Test-SharpProofTrustedMutations.ps1` later performs the real identity comparison, so the outer preflight adds only a non-empty-field check and defers a malformed or tampered identity failure until shard startup. Compare the saved identity in this preflight (or remove the unused result if this layer is intentionally only a shape check) and keep the child validation as the direct-entrypoint boundary. | `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1:218-256`; `scripts/Test-SharpProofTrustedMutations.ps1:2492-2543,2640-2646` |
+
+### Status (part one hundred fourteen)
+
+R573 is a pending release/evidence-pipeline reduction and validation candidate. Preserve the child-side check; the outer check should either validate the field it reads or stop constructing an unused identity object.

@@ -38,21 +38,8 @@ public static partial class WorkerProtocolJson
 
     internal static string ComputeFileSha256(string path)
     {
-        var expectedLength = new FileInfo(path).Length;
-        if (expectedLength <= 0 || expectedLength > MaximumJsonBytes)
-        {
-            throw new InvalidDataException(
-                $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
-        }
-
-        using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
-            bufferSize: 81920, options: FileOptions.SequentialScan);
-        if (file.Length != expectedLength)
-        {
-            throw new InvalidDataException("The JSON file changed while it was opened.");
-        }
-
-        using var bounded = new BoundedReadStream(file, MaximumJsonBytes,
+        using var bounded = OpenBoundedJsonFile(
+            path,
             $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
         using var buffer = new MemoryStream();
         bounded.CopyTo(buffer);
@@ -97,6 +84,18 @@ public static partial class WorkerProtocolJson
 
     private static StreamReader OpenJsonReader(string path)
     {
+        return new StreamReader(
+            OpenBoundedJsonFile(
+                path,
+                "The JSON file must be a nonempty regular file."),
+            s_strictUtf8,
+            detectEncodingFromByteOrderMarks: false);
+    }
+
+    private static BoundedReadStream OpenBoundedJsonFile(
+        string path,
+        string emptyFileMessage)
+    {
         // Inspect the directory entry before FileStream opens it. On Unix,
         // opening a FIFO for reading waits for a writer, so a zero-length
         // non-file must fail before the potentially blocking open.
@@ -104,7 +103,7 @@ public static partial class WorkerProtocolJson
         if (fileLength <= 0)
         {
             throw new InvalidDataException(
-                "The JSON file must be a nonempty regular file.");
+                emptyFileMessage);
         }
         if (fileLength > MaximumJsonBytes)
         {
@@ -126,13 +125,10 @@ public static partial class WorkerProtocolJson
                 "The JSON file changed while it was opened.");
         }
 
-        return new StreamReader(
-            new BoundedReadStream(
-                stream,
-                MaximumJsonBytes,
-                $"The JSON file exceeds the {MaximumJsonBytes} byte limit."),
-            s_strictUtf8,
-            detectEncodingFromByteOrderMarks: false);
+        return new BoundedReadStream(
+            stream,
+            MaximumJsonBytes,
+            $"The JSON file exceeds the {MaximumJsonBytes} byte limit.");
     }
 
     public static string SerializeResponse(WorkerVerifyResponse response)
