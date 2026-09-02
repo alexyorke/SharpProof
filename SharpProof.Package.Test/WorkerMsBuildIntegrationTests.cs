@@ -2983,6 +2983,11 @@ public sealed class WorkerMsBuildIntegrationTests
             .Single(static target =>
                 target.Attribute("Name")?.Value ==
                 "_SharpProofInitializeVerify");
+        var resolvePaths = targets
+            .Descendants("Target")
+            .Single(static target =>
+                target.Attribute("Name")?.Value ==
+                "_SharpProofResolveVerificationPaths");
         var verifyCore = targets
             .Descendants("Target")
             .Single(static target =>
@@ -3066,7 +3071,7 @@ public sealed class WorkerMsBuildIntegrationTests
                     "_SharpProofCompilationTargetFramework"),
                 Is.Not.Empty);
             Assert.That(
-                initialize.Descendants(
+                resolvePaths.Descendants(
                     "SharpProofCompilerManifestFile"),
                 Is.Not.Empty);
             Assert.That(

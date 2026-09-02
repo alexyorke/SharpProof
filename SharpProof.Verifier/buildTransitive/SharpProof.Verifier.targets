@@ -38,9 +38,7 @@
            Text="SharpProof verifier package native payload is missing from its build-tool closure." />
   </Target>
 
-  <Target Name="_SharpProofInitializeVerify"
-          DependsOnTargets="_SharpProofValidateRuntimeClosure"
-          BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile">
+  <Target Name="_SharpProofResolveVerificationPaths">
     <PropertyGroup>
       <_SharpProofVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofVerifyDirectory>
       <_SharpProofConfiguredRequestFile>$(SharpProofVerifyRequestFile)</_SharpProofConfiguredRequestFile>
@@ -61,6 +59,13 @@
       <_SharpProofEffectiveSarifFile>$(SharpProofVerifySarifFile)</_SharpProofEffectiveSarifFile>
       <_SharpProofConfiguredSarifFullPath Condition="'$(SharpProofVerifySarifFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::GetFullPath('$(SharpProofVerifySarifFile)'))</_SharpProofConfiguredSarifFullPath>
       <_SharpProofEffectiveSarifFile Condition="'$(SharpProofVerifySarifFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName('$(_SharpProofConfiguredSarifFullPath)')), '$(TargetFramework)', $([System.IO.Path]::GetFileName('$(_SharpProofConfiguredSarifFullPath)'))))</_SharpProofEffectiveSarifFile>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="_SharpProofInitializeVerify"
+          DependsOnTargets="_SharpProofValidateRuntimeClosure;_SharpProofResolveVerificationPaths"
+          BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile">
+    <PropertyGroup>
       <_SharpProofVerifyCacheDirectoryNormalized>$([System.String]::Copy('$(SharpProofVerifyCacheDirectory)').Trim())</_SharpProofVerifyCacheDirectoryNormalized>
       <_SharpProofVerifyCacheEnabledNormalized>$([System.String]::Copy('$(SharpProofVerifyCacheEnabled)').Trim().ToLowerInvariant())</_SharpProofVerifyCacheEnabledNormalized>
       <_SharpProofEffectiveCacheDirectory Condition="'$(_SharpProofVerifyCacheDirectoryNormalized)' == ''">$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'cache'))</_SharpProofEffectiveCacheDirectory>
@@ -250,25 +255,15 @@
 
   <Target Name="SharpProofResetPublishedVerification"
           BeforeTargets="Clean"
+          DependsOnTargets="_SharpProofResolveVerificationPaths"
           Condition="'$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true'">
     <PropertyGroup>
-      <_SharpProofCleanVerifyDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)SharpProof'))))</_SharpProofCleanVerifyDirectory>
+      <_SharpProofCleanVerifyDirectory>$(_SharpProofVerifyDirectory)</_SharpProofCleanVerifyDirectory>
       <_SharpProofCleanCompilerManifestStagingPath>$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'compiler-manifest.staging.json'))</_SharpProofCleanCompilerManifestStagingPath>
-      <_SharpProofCleanRequestFile Condition="'$(SharpProofVerifyRequestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'request.json'))</_SharpProofCleanRequestFile>
-      <_SharpProofCleanRequestFile Condition="'$(SharpProofVerifyRequestFile)' != ''">$(SharpProofVerifyRequestFile)</_SharpProofCleanRequestFile>
-      <_SharpProofCleanConfiguredRequestFullPath Condition="'$(SharpProofVerifyRequestFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::GetFullPath('$(SharpProofVerifyRequestFile)'))</_SharpProofCleanConfiguredRequestFullPath>
-      <_SharpProofCleanRequestFile Condition="'$(SharpProofVerifyRequestFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName('$(_SharpProofCleanConfiguredRequestFullPath)')), '$(TargetFramework)', $([System.IO.Path]::GetFileName('$(_SharpProofCleanConfiguredRequestFullPath)'))))</_SharpProofCleanRequestFile>
-      <_SharpProofCleanResultFile Condition="'$(SharpProofVerifyResultFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'result.json'))</_SharpProofCleanResultFile>
-      <_SharpProofCleanResultFile Condition="'$(SharpProofVerifyResultFile)' != ''">$(SharpProofVerifyResultFile)</_SharpProofCleanResultFile>
-      <_SharpProofCleanConfiguredResultFullPath Condition="'$(SharpProofVerifyResultFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::GetFullPath('$(SharpProofVerifyResultFile)'))</_SharpProofCleanConfiguredResultFullPath>
-      <_SharpProofCleanResultFile Condition="'$(SharpProofVerifyResultFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName('$(_SharpProofCleanConfiguredResultFullPath)')), '$(TargetFramework)', $([System.IO.Path]::GetFileName('$(_SharpProofCleanConfiguredResultFullPath)'))))</_SharpProofCleanResultFile>
-      <_SharpProofCleanManifestFile Condition="'$(SharpProofCompilerManifestFile)' == ''">$([System.IO.Path]::Combine('$(_SharpProofCleanVerifyDirectory)', 'compiler-manifest.json'))</_SharpProofCleanManifestFile>
-      <_SharpProofCleanManifestFile Condition="'$(SharpProofCompilerManifestFile)' != ''">$(SharpProofCompilerManifestFile)</_SharpProofCleanManifestFile>
-      <_SharpProofCleanConfiguredManifestFullPath Condition="'$(SharpProofCompilerManifestFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::GetFullPath('$(SharpProofCompilerManifestFile)'))</_SharpProofCleanConfiguredManifestFullPath>
-      <_SharpProofCleanManifestFile Condition="'$(SharpProofCompilerManifestFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName('$(_SharpProofCleanConfiguredManifestFullPath)')), '$(TargetFramework)', $([System.IO.Path]::GetFileName('$(_SharpProofCleanConfiguredManifestFullPath)'))))</_SharpProofCleanManifestFile>
-      <_SharpProofCleanSarifFile>$(SharpProofVerifySarifFile)</_SharpProofCleanSarifFile>
-      <_SharpProofCleanConfiguredSarifFullPath Condition="'$(SharpProofVerifySarifFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::GetFullPath('$(SharpProofVerifySarifFile)'))</_SharpProofCleanConfiguredSarifFullPath>
-      <_SharpProofCleanSarifFile Condition="'$(SharpProofVerifySarifFile)' != '' AND '$(TargetFrameworks)' != ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetDirectoryName('$(_SharpProofCleanConfiguredSarifFullPath)')), '$(TargetFramework)', $([System.IO.Path]::GetFileName('$(_SharpProofCleanConfiguredSarifFullPath)'))))</_SharpProofCleanSarifFile>
+      <_SharpProofCleanRequestFile>$(_SharpProofEffectiveRequestFile)</_SharpProofCleanRequestFile>
+      <_SharpProofCleanResultFile>$(_SharpProofEffectiveResultFile)</_SharpProofCleanResultFile>
+      <_SharpProofCleanManifestFile>$(_SharpProofEffectiveCompilerManifestFile)</_SharpProofCleanManifestFile>
+      <_SharpProofCleanSarifFile>$(_SharpProofEffectiveSarifFile)</_SharpProofCleanSarifFile>
     </PropertyGroup>
     <SharpProof.BuildTasks.ResetPublishedVerification
         RequestPath="$(_SharpProofCleanRequestFile)"
