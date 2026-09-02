@@ -5,10 +5,6 @@ param(
     [string]$Configuration = 'Release',
 
     [Parameter()]
-    [ValidateSet('Required')]
-    [string]$ExpectedSmt = 'Required',
-
-    [Parameter()]
     [string]$PackageSource
 )
 
@@ -432,8 +428,7 @@ try {
             'Unsupported-host strict library build'
     }
 
-    Write-Host (
-        "SharpProof package-backed samples passed ($ExpectedSmt host policy).")
+    Write-Host 'SharpProof package-backed samples passed.'
 }
 finally {
     $resolvedTemporaryRoot = Resolve-SharpProofContainedPath `

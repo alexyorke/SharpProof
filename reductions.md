@@ -3136,13 +3136,13 @@ their metadata, source-location, and effect semantics differ at more
 boundaries.
 
 
-## Second survey, part sixty-seven: coverage configuration - no findings
+## Second survey, part sixty-seven (continued): coverage configuration - no findings
 
 Cross-checking the coverage baseline and runsettings against the project set.
 No new finding; three applied items confirmed, and one earlier conclusion
 strengthened.
 
-### Checked and not proposed (part sixty-seven)
+### Checked and not proposed (part sixty-seven, continued)
 
 - **The coverage baseline exactly matches the production classification.** All 23
   entries in `eng/coverage/baseline.json` resolve to tracked projects, **no**
@@ -3171,7 +3171,7 @@ strengthened.
   R231, R232, and R245. R480 remains the single exception across twelve checked
   removals, not the leading edge of a pattern.
 
-### Status (part sixty-seven)
+### Status (part sixty-seven, continued)
 
 No new `pending` item. Recorded to close the coverage-configuration area and to
 add a twelfth data point to the applied-removal audit begun in part forty-nine and
@@ -4267,9 +4267,7 @@ R697 completed: actual arguments are filled in one mutable array and frozen once
 
 ### Status (part two hundred thirty-one)
 
-| R698 | **`ExpectedSmt` is a dead configuration surface in the sample/package-consumer runners.** `scripts/Test-SharpProofSamples.ps1` and `scripts/Test-SharpProofPackageConsumers.ps1` both declare `[ValidateSet('Required')] [string]$ExpectedSmt = 'Required'`; every repository call site supplies the same literal, and the value only appears in the final success message rather than selecting or checking an SMT backend. Remove the one-value parameter and its plumbing, or make it control a real policy, while preserving the existing host guard and verification behavior. | `scripts/Test-SharpProofSamples.ps1:1-10,435-436`; `scripts/Test-SharpProofPackageConsumers.ps1:1-11,566` |
-
-R698 is a pending build/test-runner dead-configuration reduction candidate. Preserve canonical-host enforcement, package/sample validation, and the actual SMT/worker behavior; do not weaken the required backend policy if it is intended to become explicit.
+R698 completed: the unused one-value `ExpectedSmt` parameter and all call-site plumbing are removed; canonical-host guards and actual sample/package verification remain unchanged.
 
 ### Status (part two hundred thirty-two)
 
@@ -4386,3 +4384,70 @@ R719 is a pending runtime-oracle duplicate-execution reduction candidate. Preser
 | R720 | **`ApiSpecRuntimeOracleTests` duplicates dynamic-constructor-invoker emission.** `CreateParameterlessConstructorInvoker` and `CreateStringConstructorInvoker` each construct a `DynamicMethod`, obtain a constructor, emit receiver/argument loads plus `Call` and `Ret`, and create a delegate; only the signature, constructor lookup, and extra string argument differ. A parameterized IL-emission helper can centralize the dynamic-method lifecycle while keeping the two strongly typed delegate factories and their constructor-shape diagnostics. | `SharpProof.Specs.Test/ApiSpecRuntimeOracleTests.cs:1166-1205` |
 
 R720 is a pending runtime-oracle IL-harness reduction candidate. Preserve visibility/module settings, argument order, constructor lookup failure messages, and the exact delegate types.
+
+### Status (part two hundred forty-six)
+
+| R721 | **`EffectRegionSet.Create` sends singleton region sets through the full general normalization pipeline.** The 19 current `EffectRegionSet.Create(EffectRegionId.X)` call sites allocate/iterate a params array, run `Distinct().OrderBy().ToImmutableArray()`, and then scan the resulting one-element array for `Unknown`, even though singleton regions are the dominant construction shape. Add a singleton overload or a fast path that still canonicalizes `Unknown`, retaining the general enumerable overload's duplicate removal and ordering semantics. | `SharpProof.Effects/EffectRegions.cs:82-98`; singleton call sites in `SharpProof.Effects/ConversionOwnershipClassifier.cs`, `ExternalEffectResolver.cs`, and `OperationEffectScanner.cs` |
+
+R721 is a pending effect-region singleton allocation reduction candidate. Preserve unknown-region absorption, sorted/deduplicated multi-region behavior, default/empty representation, and value equality.
+
+| R722 | **`OperationSubsetClassifier.GetKnownOperationKinds` recomputes an invariant enum snapshot on every call.** Each invocation reflects over `OperationKind`, casts, deduplicates, sorts, and materializes a new immutable array; `CreateSnapshot` immediately calls the same method before classifying every entry. Cache one immutable known-kind array per process (returning the immutable value directly) while preserving the numeric ordering and duplicate handling used by the public snapshot. | `SharpProof.Frontend/OperationSubsetClassifier.cs:37-60` |
+
+R722 is a pending operation-kind snapshot allocation reduction candidate. Preserve enum-version behavior, numeric ordering, invalid-kind handling, and the exact snapshot text.
+
+| R723 | **`InvocationEmissionPolicy.IsElided` decodes conditional attributes afresh for every invocation of a target.** The normalized target method, its `[Conditional]` symbol names, and the conditional-attribute identity are invariant across calls, but the current path re-enumerates and filters `target.GetAttributes()` for each invocation before consulting the already cached per-tree preprocessor symbols. Add a symbol-keyed conditional-name cache, retaining empty-result caching, reduced-method normalization, and the per-tree symbol lookup. | `SharpProof.Effects/InvocationEmissionPolicy.cs:14-54` |
+
+R723 is a pending conditional-invocation metadata cache reduction candidate. Preserve partial-method elision, malformed conditional attributes, syntax-tree-specific symbol sets, and ordinal symbol matching.
+
+## Second survey, part two hundred forty-seven: R724-R725 - the unshared process runner
+
+A census of every tracked, non-`obj` C# file that starts a child process. This is
+the largest single duplication cluster remaining in the repository, it spans four
+assemblies, and unlike most items in this ledger the copies **already disagree on
+what their result type means**.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R724 | **"Run a child process and capture its output" is written 55 times across 43 files, and the result type is redeclared 16 times in five incompatible shapes.** Of the 55 `new ProcessStartInfo` sites, 52 set `UseShellExecute = false`, 48 set `RedirectStandardOutput = true`, and 16 files repeat the identical `foreach (var argument in arguments) { startInfo.ArgumentList.Add(argument); }` loop verbatim. Six of those files carry a near-identical ~28-line private runner (`RunAsync` in `SharpProof.ArchitectureTest`, `RunProcessAsync` in `SharpProof.Package.Test`) that differ only in the name and the result shape. The shapes are: `(int ExitCode, string Output, string Error)` (8 declarations); `(int ExitCode, string Output)` where `Output` is `stdout + Environment.NewLine + stderr` (4); `(int ExitCode, string StandardOutput, string StandardError)` - same three fields, different member names (1); `(string Output)`, whose runner asserts `ExitCode == 0` internally so it cannot express a negative test (1); plus `GateProcessResult` and `PackageProcessResult` as separately named variants. **The divergence is semantic, not cosmetic: `result.Output` means stdout in the `SharpProof.ArchitectureTest` family and stdout-concatenated-with-stderr in the `SharpProof.Package.Test` family.** An assertion of the form `Assert.That(result.Output, Does.Not.Contain(x))` therefore searches stderr in one assembly and not in the other, and moving a test between the two assemblies silently changes what it checks. The split falls exactly on assembly lines, which is how it arose: each assembly grew its own copy. Two of the shapes also drop `CreateNoWindow = true`, present at only 27 of the 55 sites. | 43 files; runners at `SharpProof.ArchitectureTest/AcceptanceScriptTests.cs:266-293`, `CoverageScriptTests.cs:1615-1642`, `ProductionInventoryAuthorityTests.cs:291-318`; `SharpProof.Package.Test/DependencyAuditScriptTests.cs:625-652`, `ReleasePublicationScriptTests.cs:898-925`, `PackageLayoutSmokeTests.cs:2402-2431`; result types at `ChangedTestSelectionTests.cs:163`, `ContainerAuthorityScriptTests.cs:299`, `ContainerSourceCleanlinessTests.cs:409`, `FuzzRunnerEvidenceTests.cs:138`, `PackageDependencyAuthorityTests.cs:484`, `ReleaseCoverageBaselineTests.cs:604`, `FinalCompilationProbeTests.cs:1012`, `PackageLayoutSmokeTests.cs:3339`, `Gates/Performance/WorkerPerformanceProbe.cs:539`, `Gates/GateProcess.cs:50`, `Package.Test/PackagedProductFeed.cs:367` |
+| R725 | **The canonical implementation already exists, in production code, and no test uses it.** `SharpProof.Gates/GateProcess.cs` is a 46-line `internal static` helper with exactly the shape the 16 private copies approximate: `RunCapturedAsync(ProcessStartInfo, CancellationToken)` returning `GateProcessResult(int ExitCode, string Output, string Error)`. It is strictly better than every private copy in three respects the copies all lack - it threads a `CancellationToken` into both `ReadToEndAsync` calls and `WaitForExitAsync`, it `KillTree(entireProcessTree: true)` on cancellation and re-awaits before rethrowing, and it throws a described `InvalidOperationException` rather than `Process.Start(startInfo)!` null-forgiving. Every private copy uses the bare `!`, so a process that fails to start surfaces as a `NullReferenceException` with no indication of which executable was missing. **The sharing mechanism is also already in place and already targets the right projects**: `Directory.Build.props:76-81` links `eng/testing/TempDirectory.cs` into exactly `SharpProof.Package.Test`, `SharpProof.ArchitectureTest`, `SharpProof.Gates.Test`, and `SharpProof.Worker.Test` - a superset of the assemblies holding all six full runner copies. An `eng/testing/ProcessRunner.cs` added to that same `ItemGroup` needs no new reference, no visibility change, and no new convention. `AssertSuccessAsync` should move with it: it is byte-identical at `AcceptanceScriptTests.cs:258-264` and `CoverageScriptTests.cs:1607-1613`, with a third `Task`-returning variant at `ProductionInventoryAuthorityTests.cs:285`. | `SharpProof.Gates/GateProcess.cs:1-53`; `Directory.Build.props:68-81`; `eng/testing/` (6 existing shared test sources) |
+
+### Checked and not proposed (part two hundred forty-seven)
+
+- **The portable-IR shadow model is correctly gated and is not duplication.**
+  `SharpProof.CompilerArtifact/PortableIrModel.generated.cs` mirrors the storage
+  shape of `SharpProof.Ir/IrModel.generated.cs`, but it reuses the IR vocabulary
+  enums rather than redeclaring them - `IrTypeKind`, `IrTermKind`,
+  `IrLocationKind`, and `IrInstructionKind` all resolve to `SharpProof.Ir` through
+  the existing `ProjectReference` and an implicit global using. More importantly the
+  correspondence is machine-checked:
+  `SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs:171-201` reflects the
+  real enum out of the `SharpProof.Ir` assembly and asserts
+  `Enum.GetNames(enumType) == expectedKinds` in order against the schema's
+  hard-coded `kinds` list. Adding an `IrTermKind` member without updating
+  `CompilerArtifactModel.schema.json` fails that test. The same test also pins slot
+  counts, slot roles, metadata-row argument lists, and encoder return types. This is
+  a model worth citing when other cross-schema correspondences in this ledger are
+  argued about; it is the strongest such gate found in the survey.
+- The `portableIrSlotDomains` / `portableIrSlotMappings` key sets are additionally
+  cross-checked inside the generator itself
+  (`scripts/Generate-CompilerArtifactModel.ps1:547-557`), in both directions - a
+  declared domain with no mapping and a mapping with no declared domain are each an
+  error. No gap.
+- `SharpProof.Host/LinuxWorkerProcess.cs`, `SharpProof.BuildTasks/RunVerifier.cs`,
+  and `SharpProof.BuildTasks/VerifierProcessSupervisor.cs` also start processes but
+  are **not** proposed for the shared runner. They are TCB or build-task code with
+  their own supervision, timeout, and kill semantics, they ship to consumers, and
+  folding them into a test helper would move product behaviour into `eng/testing`.
+  R724 and R725 are scoped to test and gate code only.
+
+### Status (part two hundred forty-seven)
+
+R724 is `pending` and is the largest remaining mechanical duplication in the
+repository by file count. R725 is `pending` and is the actionable half: it names
+an existing in-repository implementation that is already better than all 16 copies
+and an existing sharing mechanism that already reaches the affected projects, so
+the work is consolidation rather than design. They should be actioned together, and
+R724's semantic split - `Output` meaning two different things - should be
+resolved deliberately when they are, because collapsing the two families without
+choosing a meaning would silently change what a number of existing assertions
+inspect.

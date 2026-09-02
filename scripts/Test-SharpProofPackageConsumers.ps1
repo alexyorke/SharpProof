@@ -5,10 +5,6 @@ param(
     [string]$Configuration = 'Release',
 
     [Parameter()]
-    [ValidateSet('Required')]
-    [string]$ExpectedSmt = 'Required',
-
-    [Parameter()]
     [string]$PackageSource,
 
     [Parameter()]
@@ -563,4 +559,4 @@ $workerScope = if ($isSupportedWorkerHost) {
 else {
     'analyzer (packaged worker is not supported on this host)'
 }
-Write-Host "SharpProof packaged $workerScope consumer passed ($ExpectedSmt host policy)."
+Write-Host "SharpProof packaged $workerScope consumer passed."

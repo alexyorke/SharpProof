@@ -235,7 +235,7 @@ switch ($Command) {
         # the disposable checkout, which would violate the pilot clean guard.
         Invoke-RequiredScript 'scripts/Test-SharpProofSamples.ps1' `
             'SharpProof self-application sample validation failed.' `
-            @{ Configuration = $Configuration; ExpectedSmt = 'Required' }
+            @{ Configuration = $Configuration }
     }
     'check' {
         & (Join-Path $repositoryRoot 'scripts/Invoke-SharpProofDevCheck.ps1') `
@@ -357,7 +357,7 @@ switch ($Command) {
         }
         Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         $consumerArguments = @{
-            Configuration = $Configuration; ExpectedSmt = 'Required'
+            Configuration = $Configuration
             PackageSource = $PackageSource
         }
         Invoke-RequiredScript 'scripts/Test-SharpProofPackageConsumers.ps1' `
@@ -409,7 +409,7 @@ switch ($Command) {
     'samples' {
         Invoke-RequiredScript 'scripts/Test-SharpProofSamples.ps1' `
             'Sample validation failed.' `
-            @{ Configuration = $Configuration; ExpectedSmt = 'Required'; PackageSource = $PackageSource }
+            @{ Configuration = $Configuration; PackageSource = $PackageSource }
     }
     { $_ -in @('corpus', 'corpus-update', 'gates', 'performance-smoke') } {
         $gateMode = if ($Command -ceq 'gates') { 'all' } else { $Command }
