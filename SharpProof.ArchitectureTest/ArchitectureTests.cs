@@ -1761,7 +1761,11 @@ public sealed class ArchitectureTests
         Assert.That(
             coverageContainerCommands,
             Does.Contain(
-                "'build', 'SharpProof.sln', '--configuration', 'Release'"));
+                "function Invoke-SharpProofSolutionBuild"));
+        Assert.That(
+            coverageContainerCommands,
+            Does.Contain(
+                "Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'"));
         var gateEvidence = File.ReadAllText(Path.Combine(
             root,
             "scripts",

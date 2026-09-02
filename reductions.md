@@ -4217,14 +4217,6 @@ R652 is deferred: envelope equality and compilation-shape validation are intenti
 
 R654 is deferred: replay validation and the separate operation/evidence digest domains are analyzer-integrity boundaries. Their independent event walks make the field ordering, null normalization, and fail-closed checks auditable; combine them only with a proof that cannot alter those semantics.
 
-## Second survey, part two hundred one: R660 - repeated solution prerequisite blocks
-
-| R660 | **`Invoke-SharpProofContainer.ps1` repeats the locked solution restore and Release build preamble across qualifying commands.** `pr-gates`, `performance`, `coverage`, and `fuzz-nightly` each open-code some or all of the same `restore SharpProof.sln --locked-mode` plus `build SharpProof.sln --configuration Release --no-restore` sequence, while `package` carries a near-identical build with only package-specific properties. A narrowly scoped prerequisite helper can accept the configuration and optional build properties, preserving each lane's follow-up command, Release enforcement, and output semantics while reducing drift in the shared restore/build contract. | `scripts/Invoke-SharpProofContainer.ps1:217-227,428-451,493-500,535-560` |
-
-### Status (part two hundred one)
-
-R660 is a pending container orchestration factoring candidate. Preserve locked restore, configuration selection, package-build properties, per-profile ordering, and error propagation; share only the common solution prerequisite construction.
-
 ## Second survey, part two hundred two: R661 - repeated requires call discovery
 
 | R661 | **The requires analyzer performs a full call-site screen and then repeats call extraction for the actual analysis.** `RequiresCallSiteAnalyzer.Analysis.Run` calls `HasPotentialCallSite` before binding contracts; that screen traverses executable operations and invokes `GetCalls` for each operation. When the screen succeeds, `RequiresCallSiteDiscovery.Get` builds flow state and walks the reachable CFG, invoking `GetCalls` again over the same declaration, with a further traversal for special constructs. Cache a declaration-scoped discovery result or make the screen consume the later candidate walk, while retaining the early not-applicable fast path, flow-sensitive filtering, ownership policy, and special-case handling. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:14-94,96-315`; `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:236-250` |

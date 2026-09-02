@@ -114,6 +114,17 @@ function Invoke-TestProject([string]$ProjectPath) {
     Invoke-DotNet $arguments
 }
 
+function Invoke-SharpProofSolutionBuild(
+    [string]$BuildConfiguration,
+    [string[]]$AdditionalBuildArguments = @()) {
+    Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
+    $buildArguments = @(
+        'build', 'SharpProof.sln', '--configuration', $BuildConfiguration,
+        '--no-restore')
+    $buildArguments += $AdditionalBuildArguments
+    Invoke-DotNet $buildArguments
+}
+
 switch ($Command) {
     'quick' {
         Invoke-PipelineCommand 'test-changed' 'Debug' @('-Fast')
@@ -237,10 +248,7 @@ switch ($Command) {
         }
         & (Join-Path $repositoryRoot `
             'scripts/Test-SharpProofContainerContract.ps1')
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
-        Invoke-DotNet @(
-            'build', 'SharpProof.sln', '--configuration', $Configuration,
-            '--no-restore')
+        Invoke-SharpProofSolutionBuild -BuildConfiguration $Configuration
 
         $performanceOutput = Join-Path $repositoryRoot (
             'artifacts/ci/performance.json')
@@ -413,11 +421,7 @@ switch ($Command) {
             '--no-restore', '--', $gateMode)
     }
     'performance' {
-        Invoke-DotNet @(
-            'restore', 'SharpProof.sln', '--locked-mode')
-        Invoke-DotNet @(
-            'build', 'SharpProof.sln', '--configuration', 'Release',
-            '--no-restore')
+        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
         $output = Join-Path $repositoryRoot 'artifacts/ci/performance.json'
         Invoke-RequiredScript 'scripts/Invoke-SharpProofGateEvidence.ps1' `
             'Performance validation failed.' `
@@ -431,11 +435,7 @@ switch ($Command) {
                 'changed-TCB coverage enforcement.')
         }
         $comparisonRef = $env:SHARPPROOF_COVERAGE_COMPARISON_REF
-        Invoke-DotNet @(
-            'restore', 'SharpProof.sln', '--locked-mode')
-        Invoke-DotNet @(
-            'build', 'SharpProof.sln', '--configuration', 'Release',
-            '--no-restore')
+        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
         $coverageRoot = Join-Path $repositoryRoot (
             'artifacts/coverage/container-' + [Guid]::NewGuid().ToString('N'))
         $coverageCollectionArguments = @{
@@ -481,10 +481,7 @@ switch ($Command) {
         if ($Configuration -ne 'Release') {
             throw 'fuzz-nightly requires -Configuration Release.'
         }
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
-        Invoke-DotNet @(
-            'build', 'SharpProof.sln', '--configuration', 'Release',
-            '--no-restore')
+        Invoke-SharpProofSolutionBuild -BuildConfiguration 'Release'
         Invoke-RequiredScript 'scripts/Invoke-SharpProofFuzzCampaign.ps1' `
             'Nightly fuzz campaign failed.' `
             @{ OutputDirectory = 'artifacts/fuzz/nightly' }
@@ -521,7 +518,6 @@ switch ($Command) {
     }
     'pack' {
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofReadme.ps1')
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
         $output = Join-Path $repositoryRoot 'artifacts/container-packages'
         $artifactsRoot = [IO.Path]::GetFullPath(
             (Join-Path $repositoryRoot 'artifacts'))
@@ -541,10 +537,11 @@ switch ($Command) {
             throw 'Could not resolve the repository commit for package provenance.'
         }
         $repositoryCommitProperty = "/p:RepositoryCommit=$repositoryCommit"
-        Invoke-DotNet @(
-            'build', 'SharpProof.sln', '--configuration', 'Release',
-            '--no-restore', '/p:GeneratePackageOnBuild=false',
-            $repositoryCommitProperty)
+        Invoke-SharpProofSolutionBuild `
+            -BuildConfiguration 'Release' `
+            -AdditionalBuildArguments @(
+                '/p:GeneratePackageOnBuild=false',
+                $repositoryCommitProperty)
         foreach ($project in @($manifest.projects)) {
             Invoke-DotNet @(
                 'pack', [string]$project, '--configuration', 'Release',
