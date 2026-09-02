@@ -41,137 +41,107 @@ public sealed class ContainerSourceCleanlinessTests
     [TestCase("untracked")]
     public async Task PackRejectsDirtyProductionSource(string state)
     {
-        var repository = await CreateRepositoryAsync();
-        try
-        {
-            await MakeDirtyAsync(repository, state);
+        using var repositoryWorkspace = await CreateRepositoryAsync();
+        var repository = repositoryWorkspace.FullName;
+        await MakeDirtyAsync(repository, state);
 
-            var result = await RunEntrypointAsync(repository, "pack");
+        var result = await RunEntrypointAsync(repository, "pack");
 
-            Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
-            Assert.That(
-                result.Error,
-                Does.Contain("requires clean exact-commit source"));
-        }
-        finally
-        {
-            Directory.Delete(repository, recursive: true);
-        }
+        Assert.That(result.ExitCode, Is.Not.Zero, result.Output);
+        Assert.That(
+            result.Error,
+            Does.Contain("requires clean exact-commit source"));
     }
 
     [TestCaseSource(nameof(s_exactCommitCommands))]
     public async Task EveryExactCommitCommandRejectsUntrackedProductionSource(
         string command)
     {
-        var repository = await CreateRepositoryAsync();
-        try
-        {
-            await MakeDirtyAsync(repository, "untracked");
+        using var repositoryWorkspace = await CreateRepositoryAsync();
+        var repository = repositoryWorkspace.FullName;
+        await MakeDirtyAsync(repository, "untracked");
 
-            var result = await RunEntrypointAsync(repository, command);
+        var result = await RunEntrypointAsync(repository, command);
 
-            Assert.That(result.ExitCode, Is.Not.Zero, command);
-        }
-        finally
-        {
-            Directory.Delete(repository, recursive: true);
-        }
+        Assert.That(result.ExitCode, Is.Not.Zero, command);
     }
 
     [Test]
     public async Task CleanAndDevelopmentInputsRemainAdmissible()
     {
-        var clean = await CreateRepositoryAsync();
-        var development = await CreateRepositoryAsync();
-        var releaseInput = await CreateRepositoryAsync();
-        try
-        {
-            await MakeDirtyAsync(development, "untracked");
-            var packageInput = Path.Combine(releaseInput, "nupkgs");
-            Directory.CreateDirectory(packageInput);
-            await File.WriteAllTextAsync(
-                Path.Combine(packageInput, "SharpProof.1.0.0.nupkg"),
-                "fixture");
+        using var cleanWorkspace = await CreateRepositoryAsync();
+        using var developmentWorkspace = await CreateRepositoryAsync();
+        using var releaseInputWorkspace = await CreateRepositoryAsync();
+        var clean = cleanWorkspace.FullName;
+        var development = developmentWorkspace.FullName;
+        var releaseInput = releaseInputWorkspace.FullName;
+        await MakeDirtyAsync(development, "untracked");
+        var packageInput = Path.Combine(releaseInput, "nupkgs");
+        Directory.CreateDirectory(packageInput);
+        await File.WriteAllTextAsync(
+            Path.Combine(packageInput, "SharpProof.1.0.0.nupkg"),
+            "fixture");
 
-            var cleanResult = await RunEntrypointAsync(clean, "pack");
-            var developmentResult = await RunEntrypointAsync(
-                development,
-                "build");
-            var releaseInputResult = await RunEntrypointAsync(
-                releaseInput,
-                "release-plan");
+        var cleanResult = await RunEntrypointAsync(clean, "pack");
+        var developmentResult = await RunEntrypointAsync(
+            development,
+            "build");
+        var releaseInputResult = await RunEntrypointAsync(
+            releaseInput,
+            "release-plan");
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(cleanResult.ExitCode, Is.Zero, cleanResult.Error);
-                Assert.That(
-                    developmentResult.ExitCode,
-                    Is.Zero,
-                    developmentResult.Error);
-                Assert.That(
-                    releaseInputResult.ExitCode,
-                    Is.Zero,
-                    releaseInputResult.Error);
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(clean, recursive: true);
-            Directory.Delete(development, recursive: true);
-            Directory.Delete(releaseInput, recursive: true);
+            Assert.That(cleanResult.ExitCode, Is.Zero, cleanResult.Error);
+            Assert.That(
+                developmentResult.ExitCode,
+                Is.Zero,
+                developmentResult.Error);
+            Assert.That(
+                releaseInputResult.ExitCode,
+                Is.Zero,
+                releaseInputResult.Error);
         }
     }
 
     [Test]
     public async Task GitBoundCommandAcceptsRepositoryWithDifferentOwner()
     {
-        var repository = await CreateRepositoryAsync();
-        try
-        {
-            var result = await RunEntrypointAsync(
-                repository,
-                "package-consumers",
-                assumeDifferentOwner: true);
+        using var repositoryWorkspace = await CreateRepositoryAsync();
+        var repository = repositoryWorkspace.FullName;
+        var result = await RunEntrypointAsync(
+            repository,
+            "package-consumers",
+            assumeDifferentOwner: true);
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(result.ExitCode, Is.Zero, result.Error);
-                Assert.That(
-                    result.Output,
-                    Does.Contain("executed:package-consumers"));
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(repository, recursive: true);
+            Assert.That(result.ExitCode, Is.Zero, result.Error);
+            Assert.That(
+                result.Output,
+                Does.Contain("executed:package-consumers"));
         }
     }
 
     [Test]
     public async Task GitBoundCommandPreservesIgnoredPackageInputs()
     {
-        var repository = await CreateRepositoryAsync();
-        try
-        {
-            var packageDirectory = Path.Combine(repository, "nupkgs");
-            Directory.CreateDirectory(packageDirectory);
-            await File.WriteAllTextAsync(
-                Path.Combine(packageDirectory, "SharpProof.1.0.0.nupkg"),
-                "fixture");
+        using var repositoryWorkspace = await CreateRepositoryAsync();
+        var repository = repositoryWorkspace.FullName;
+        var packageDirectory = Path.Combine(repository, "nupkgs");
+        Directory.CreateDirectory(packageDirectory);
+        await File.WriteAllTextAsync(
+            Path.Combine(packageDirectory, "SharpProof.1.0.0.nupkg"),
+            "fixture");
 
-            var result = await RunEntrypointAsync(
-                repository,
-                "package-consumers");
+        var result = await RunEntrypointAsync(
+            repository,
+            "package-consumers");
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(result.ExitCode, Is.Zero, result.Error);
-                Assert.That(result.Output, Does.Contain("package:fixture"));
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(repository, recursive: true);
+            Assert.That(result.ExitCode, Is.Zero, result.Error);
+            Assert.That(result.Output, Does.Contain("package:fixture"));
         }
     }
 
@@ -179,88 +149,82 @@ public sealed class ContainerSourceCleanlinessTests
     [TestCase("build")]
     public async Task FiniteCommandsRunFromAnArchiveWithoutGit(string command)
     {
-        var repository = await CreateRepositoryAsync();
-        var archive = await CreateArchiveSnapshotAsync(repository);
-        try
-        {
-            var result = await RunEntrypointAsync(archive, command);
+        using var repositoryWorkspace = await CreateRepositoryAsync();
+        using var archiveWorkspace = await CreateArchiveSnapshotAsync(
+            repositoryWorkspace.FullName);
+        var archive = archiveWorkspace.FullName;
+        var result = await RunEntrypointAsync(archive, command);
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(result.ExitCode, Is.Zero, result.Error);
-                Assert.That(result.Output, Does.Contain("executed:" + command));
-                Assert.That(result.Output, Does.Contain("executable:True"));
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(repository, recursive: true);
-            Directory.Delete(archive, recursive: true);
+            Assert.That(result.ExitCode, Is.Zero, result.Error);
+            Assert.That(result.Output, Does.Contain("executed:" + command));
+            Assert.That(result.Output, Does.Contain("executable:True"));
         }
     }
 
     [TestCaseSource(nameof(s_gitSourceCommands))]
     public async Task GitBoundCommandsRejectArchiveSource(string command)
     {
-        var repository = await CreateRepositoryAsync();
-        var archive = await CreateArchiveSnapshotAsync(repository);
-        try
-        {
-            var result = await RunEntrypointAsync(archive, command);
+        using var repositoryWorkspace = await CreateRepositoryAsync();
+        using var archiveWorkspace = await CreateArchiveSnapshotAsync(
+            repositoryWorkspace.FullName);
+        var archive = archiveWorkspace.FullName;
+        var result = await RunEntrypointAsync(archive, command);
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(result.ExitCode, Is.Not.Zero, command);
-                Assert.That(
-                    result.Error,
-                    Does.Contain("requires a Git checkout with an exact commit"),
-                    command);
-                Assert.That(result.Output, Does.Not.Contain("executed:"));
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(repository, recursive: true);
-            Directory.Delete(archive, recursive: true);
+            Assert.That(result.ExitCode, Is.Not.Zero, command);
+            Assert.That(
+                result.Error,
+                Does.Contain("requires a Git checkout with an exact commit"),
+                command);
+            Assert.That(result.Output, Does.Not.Contain("executed:"));
         }
     }
 
     [Test]
     public async Task DevelopmentSnapshotPreservesDirtyDeletedAndUntrackedFiles()
     {
-        var repository = await CreateRepositoryAsync();
-        try
-        {
-            await File.WriteAllTextAsync(
-                Path.Combine(repository, "Project", "Production.cs"),
-                "dirty\n");
-            File.Delete(Path.Combine(repository, "Project", "Deleted.cs"));
-            await File.WriteAllTextAsync(
-                Path.Combine(repository, "Project", "Untracked.cs"),
-                "untracked\n");
+        using var repositoryWorkspace = await CreateRepositoryAsync();
+        var repository = repositoryWorkspace.FullName;
+        await File.WriteAllTextAsync(
+            Path.Combine(repository, "Project", "Production.cs"),
+            "dirty\n");
+        File.Delete(Path.Combine(repository, "Project", "Deleted.cs"));
+        await File.WriteAllTextAsync(
+            Path.Combine(repository, "Project", "Untracked.cs"),
+            "untracked\n");
 
-            var result = await RunEntrypointAsync(repository, "build");
+        var result = await RunEntrypointAsync(repository, "build");
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(result.ExitCode, Is.Zero, result.Error);
-                Assert.That(result.Output, Does.Contain("production:dirty"));
-                Assert.That(result.Output, Does.Contain("deleted:False"));
-                Assert.That(result.Output, Does.Contain("untracked:True"));
-                Assert.That(result.Output, Does.Contain("executable:True"));
-            }
-        }
-        finally
+        using (Assert.EnterMultipleScope())
         {
-            Directory.Delete(repository, recursive: true);
+            Assert.That(result.ExitCode, Is.Zero, result.Error);
+            Assert.That(result.Output, Does.Contain("production:dirty"));
+            Assert.That(result.Output, Does.Contain("deleted:False"));
+            Assert.That(result.Output, Does.Contain("untracked:True"));
+            Assert.That(result.Output, Does.Contain("executable:True"));
         }
     }
 
-    private static async Task<string> CreateRepositoryAsync()
+    private static async Task<TempDirectory> CreateRepositoryAsync()
     {
-        var repository = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.CleanSource." + Guid.NewGuid().ToString("N"));
+        var workspace = new TempDirectory("SharpProof.CleanSource.");
+        try
+        {
+            await InitializeRepositoryAsync(workspace.FullName);
+            return workspace;
+        }
+        catch
+        {
+            workspace.Dispose();
+            throw;
+        }
+    }
+
+    private static async Task InitializeRepositoryAsync(string repository)
+    {
         Directory.CreateDirectory(Path.Combine(repository, "scripts"));
         Directory.CreateDirectory(Path.Combine(repository, "Project"));
         await File.WriteAllTextAsync(
@@ -311,26 +275,30 @@ public sealed class ContainerSourceCleanlinessTests
             "--quiet",
             "-m",
             "fixture");
-        return repository;
     }
 
-    private static async Task<string> CreateArchiveSnapshotAsync(
+    private static async Task<TempDirectory> CreateArchiveSnapshotAsync(
         string repository)
     {
-        var archive = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.ArchiveSource." + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(archive);
-        var copy = await RunAsync(
-            repository,
-            environment: null,
-            "bash",
-            "-c",
-            "tar --exclude=./.git -cf - . | tar -C \"$1\" -xf -",
-            "copy-archive",
-            archive);
-        Assert.That(copy.ExitCode, Is.Zero, copy.Error);
-        return archive;
+        var workspace = new TempDirectory("SharpProof.ArchiveSource.");
+        try
+        {
+            var copy = await RunAsync(
+                repository,
+                environment: null,
+                "bash",
+                "-c",
+                "tar --exclude=./.git -cf - . | tar -C \"$1\" -xf -",
+                "copy-archive",
+                workspace.FullName);
+            Assert.That(copy.ExitCode, Is.Zero, copy.Error);
+            return workspace;
+        }
+        catch
+        {
+            workspace.Dispose();
+            throw;
+        }
     }
 
     private static async Task MakeDirtyAsync(

@@ -4251,9 +4251,7 @@ R692-R693 completed: report execution now shares one formatting/output helper, a
 
 ### Status (part two hundred twenty-seven)
 
-| R694 | **`ContainerSourceCleanlinessTests` repeats temporary repository/archive disposal.** Eight scenarios call `CreateRepositoryAsync` (and, for archive cases, `CreateArchiveSnapshotAsync`) and then hand-write `try/finally` cleanup with `Directory.Delete(..., recursive: true)`, including repeated multi-root deletion. A disposable test-workspace fixture or scoped cleanup helper can own repository/archive lifetime while preserving each test's distinct dirty-source, archive, owner, and package-input setup. | `SharpProof.ArchitectureTest/ContainerSourceCleanlinessTests.cs:35-226` |
-
-R694 is a pending container-source test lifecycle reduction candidate. Preserve cleanup on failures, repository/archive ownership, and all distinct scenario setup.
+R694 completed: container-source fixtures now own repository and archive roots with scoped `TempDirectory` lifetimes, including cleanup when fixture creation fails.
 
 ### Status (part two hundred twenty-eight)
 
