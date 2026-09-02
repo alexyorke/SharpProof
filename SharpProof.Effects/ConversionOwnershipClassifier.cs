@@ -156,8 +156,7 @@ internal sealed class ConversionOwnershipClassifier
                 : EffectRegionSet.Unknown;
         }
 
-        var ordinal = local.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Start ?? 0;
-        return EffectRegionSet.Create(EffectRegionId.Captured(ordinal));
+        return ClassifyCapturedLocal(local);
     }
 
     private EffectRegionSet ClassifyManagedValueReachability(
@@ -548,8 +547,7 @@ internal sealed class ConversionOwnershipClassifier
             return EffectRegionSet.Empty;
         }
 
-        var ordinal = local.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Start ?? 0;
-        return EffectRegionSet.Create(EffectRegionId.Captured(ordinal));
+        return ClassifyCapturedLocal(local);
     }
 
     private static bool TryGetRefLocalAliasSource(
@@ -850,6 +848,11 @@ internal sealed class ConversionOwnershipClassifier
                 : EffectRegionSet.Unknown;
         }
 
+        return ClassifyCapturedLocal(local);
+    }
+
+    private static EffectRegionSet ClassifyCapturedLocal(ILocalSymbol local)
+    {
         var ordinal = local.DeclaringSyntaxReferences.FirstOrDefault()?.Span.Start ?? 0;
         return EffectRegionSet.Create(EffectRegionId.Captured(ordinal));
     }

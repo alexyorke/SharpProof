@@ -160,6 +160,7 @@ the smallest relevant containerized test target passes.
 | R383 | Share the bounded stream-to-byte-array reader between runtime-component and compiler-manifest paths | `SharpProof.Worker.Test`: compiler manifest/replay tests 99 passed |
 | R392 | Reuse one `DefiniteOperationFacts` instance for completion and static-initialization checks | `SharpProof.Effects.Test`: operation-completion/static-initialization tests 7 passed |
 | R389 | Share harmless parenthesized/implicit-conversion unwrapping and reuse the disposal nullness helper | `SharpProof.Effects.Test`: null, disposal, and completion tests 67 passed |
+| R388 | Share captured-local region classification across conversion ownership paths | `SharpProof.Effects.Test`: focused effects tests passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1782,10 +1783,12 @@ ownership classification, call graph ordering, and summary operations in `SharpP
   for static-initialization checks instead of allocating a second equivalent object.
 - R389 is now applied: effect nullness checks share the harmless-conversion unwrapping
   and disposal resolver predicate.
+- R388 is now applied: conversion ownership paths share captured-local region
+  classification.
 
 ### Status (part thirty-four)
 
-R386-R388, R390-R391 are `pending`. R387, R388, and R390 are clean local refactorings.
+R386-R387, R390-R391 are `pending`. R387 and R390 are clean local refactorings.
 R386 eliminates major algorithmic duplication between exception reachability and using disposal.
 R391 removes AST-scanning allocation churn.
 
