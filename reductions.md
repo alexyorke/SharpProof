@@ -4223,7 +4223,7 @@ R654 is deferred: replay validation and the separate operation/evidence digest d
 
 ### Status (part two hundred two)
 
-R661 is a pending analyzer discovery traversal reduction candidate. Preserve the screening short-circuit, graph/flow analysis boundaries, cancellation checks, call-target resolution, and special initializer/pattern handling; share only reusable operation/call discovery where the same declaration and semantic model are analyzed.
+R661 is deferred: the applicability screen and candidate discovery intentionally run with different flow, ownership, initializer, and special-pattern semantics. Sharing their call extraction without a declaration-scoped proof could remove the early not-applicable short-circuit or admit/reject a call site differently; keep both fail-closed traversals until their boundaries can be proven equivalent.
 
 ## Second survey, part two hundred four: R663 - serial effect-body rescans
 
