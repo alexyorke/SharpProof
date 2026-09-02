@@ -284,6 +284,7 @@ status document.
 | R299 | Refuted against the current tree: the contract now pins the 248-entry mutation catalog, the registration script checks that count before execution, and checksum identity was intentionally removed from the package/inventory pipeline. |
 | R270 | Refuted against the current tree: the SPDX/SBOM release-evidence producer and validator, including `Get-SpdxPackageId`, were removed with the package-integrity pipeline; package layout and dependency checks remain separate. |
 | R303 | Refuted with R270: the SBOM producer/validator comparison no longer exists after the package-integrity pipeline removal. |
+| R738 | Refuted/stale: `PreviewConfigurationInterfaceMatchesFrozenSnapshot` already compares both dogfood compiler-visible property lists with the shipping union. |
 
 ## Deferred
 
@@ -4752,12 +4753,9 @@ negative results worth recording; the census produces one finding.
 
 ### Status (part two hundred fifty-four)
 
-R738 is `pending` and is small. Its interest is that it is the fourth
-independent instance this session of the shape named in R730 - an authority that is
-correct and gated, with an ungated second declaration of the same fact beside it -
-and the first where the ungated copy is the repository's own dogfooding
-configuration, so a drift would degrade the evidence the project produces about
-itself rather than break a build.
+R738 is `refuted/stale`: the current architecture test already enforces the
+proposed dogfood-to-shipping compiler-visible-property equality for both
+internal consumer configurations. The focused test passed.
 
 ## Second survey, part two hundred fifty-five: R739 - duplicate substitution snapshots
 
