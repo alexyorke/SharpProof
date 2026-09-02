@@ -75,7 +75,8 @@
 
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.ArchitectureTest' OR
-                        '$(MSBuildProjectName)' == 'SharpProof.Gates.Test'">
+                        '$(MSBuildProjectName)' == 'SharpProof.Gates.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Worker.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TempDirectory.cs"
              Link="TempDirectory.cs" />
   </ItemGroup>

@@ -10,10 +10,9 @@ public sealed class WorkerBinaryIdentityTests
     [Test]
     public void StagedComponentConsistencyIsFailClosed()
     {
-        var temporaryDirectory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.StagedComponent." + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(temporaryDirectory);
+        var temporaryWorkspace = new TempDirectory(
+            "SharpProof.StagedComponent.");
+        var temporaryDirectory = temporaryWorkspace.FullName;
         try
         {
             var source = Path.Combine(temporaryDirectory, "source.dll");
@@ -31,7 +30,7 @@ public sealed class WorkerBinaryIdentityTests
         }
         finally
         {
-            Directory.Delete(temporaryDirectory, recursive: true);
+            temporaryWorkspace.Dispose();
         }
     }
 
@@ -39,10 +38,9 @@ public sealed class WorkerBinaryIdentityTests
     public void RuntimeComponentReadsRetainTheDeclaredSizeBoundary()
     {
         const int aboveManifestLimit = 16 * 1024 * 1024 + 1;
-        var temporaryDirectory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.RuntimeComponentLimit." + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(temporaryDirectory);
+        var temporaryWorkspace = new TempDirectory(
+            "SharpProof.RuntimeComponentLimit.");
+        var temporaryDirectory = temporaryWorkspace.FullName;
         try
         {
             var path = Path.Combine(temporaryDirectory, "runtime.dll");
@@ -61,7 +59,7 @@ public sealed class WorkerBinaryIdentityTests
         }
         finally
         {
-            Directory.Delete(temporaryDirectory, recursive: true);
+            temporaryWorkspace.Dispose();
         }
     }
 
@@ -138,10 +136,9 @@ public sealed class WorkerBinaryIdentityTests
     public void MalformedRuntimeDependencyManifestsFailClosed()
     {
         var sourceWorker = typeof(SharpProofWorker).Assembly.Location;
-        var temporaryDirectory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.MalformedWorkerDeps." + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(temporaryDirectory);
+        var temporaryWorkspace = new TempDirectory(
+            "SharpProof.MalformedWorkerDeps.");
+        var temporaryDirectory = temporaryWorkspace.FullName;
         try
         {
             var worker = Path.Combine(temporaryDirectory, "SharpProof.Worker.dll");
@@ -190,7 +187,7 @@ public sealed class WorkerBinaryIdentityTests
         }
         finally
         {
-            Directory.Delete(temporaryDirectory, recursive: true);
+            temporaryWorkspace.Dispose();
         }
     }
 
@@ -231,10 +228,9 @@ public sealed class WorkerBinaryIdentityTests
     [Platform("Linux")]
     public void IdentityDistinguishesLinuxComponentNameCase()
     {
-        var temporaryDirectory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.ComponentCase." + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(temporaryDirectory);
+        var temporaryWorkspace = new TempDirectory(
+            "SharpProof.ComponentCase.");
+        var temporaryDirectory = temporaryWorkspace.FullName;
         try
         {
             static string WriteClosure(string directory, string workerName)
@@ -264,7 +260,7 @@ public sealed class WorkerBinaryIdentityTests
         }
         finally
         {
-            Directory.Delete(temporaryDirectory, recursive: true);
+            temporaryWorkspace.Dispose();
         }
     }
 
@@ -278,10 +274,9 @@ public sealed class WorkerBinaryIdentityTests
 
         var sourceDirectory = Path.GetDirectoryName(
             typeof(SharpProofWorker).Assembly.Location)!;
-        var temporaryDirectory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.WorkerBinaryIdentity." + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(temporaryDirectory);
+        var temporaryWorkspace = new TempDirectory(
+            "SharpProof.WorkerBinaryIdentity.");
+        var temporaryDirectory = temporaryWorkspace.FullName;
         try
         {
             foreach (var source in Directory.GetFiles(
@@ -503,7 +498,7 @@ public sealed class WorkerBinaryIdentityTests
         }
         finally
         {
-            Directory.Delete(temporaryDirectory, recursive: true);
+            temporaryWorkspace.Dispose();
         }
     }
 

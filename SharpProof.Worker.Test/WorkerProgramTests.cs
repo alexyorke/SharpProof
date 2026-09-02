@@ -34,36 +34,27 @@ public sealed class WorkerProgramTests
     [Test]
     public async Task DirectInvocationRejectsRequestResultAliasBeforeStartBarrier()
     {
-        var directory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.Worker.Test",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        using var temporaryDirectory = new TempDirectory(
+            "SharpProof.Worker.Test-");
+        var directory = temporaryDirectory.FullName;
         var requestAndResultPath = Path.Combine(directory, "request.json");
         const string sentinel = "request-sentinel";
         await File.WriteAllTextAsync(requestAndResultPath, sentinel);
-        try
-        {
-            var exitCode = await Program.Main([
-                "verify",
-                "--request",
-                requestAndResultPath,
-                "--result",
-                requestAndResultPath,
-                "--start-stdin",
-                "--parent-pid",
-                "1"
-            ]);
+        var exitCode = await Program.Main([
+            "verify",
+            "--request",
+            requestAndResultPath,
+            "--result",
+            requestAndResultPath,
+            "--start-stdin",
+            "--parent-pid",
+            "1"
+        ]);
 
-            Assert.That(exitCode, Is.EqualTo(2));
-            Assert.That(
-                await File.ReadAllTextAsync(requestAndResultPath),
-                Is.EqualTo(sentinel));
-        }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
+        Assert.That(exitCode, Is.EqualTo(2));
+        Assert.That(
+            await File.ReadAllTextAsync(requestAndResultPath),
+            Is.EqualTo(sentinel));
     }
 
     [Test]
@@ -87,10 +78,9 @@ public sealed class WorkerProgramTests
             Assert.Ignore("The direct worker is supported only in the Linux container.");
         }
 
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SharpProof-worker-malformed-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        var temporaryDirectory = new TempDirectory(
+            "SharpProof-worker-malformed-");
+        var directory = temporaryDirectory.FullName;
         var requestPath = Path.Combine(directory, "request.json");
         var resultPath = Path.Combine(directory, "result.json");
         try
@@ -123,10 +113,7 @@ public sealed class WorkerProgramTests
         }
         finally
         {
-            if (Directory.Exists(directory))
-            {
-                Directory.Delete(directory, recursive: true);
-            }
+            temporaryDirectory.Dispose();
         }
     }
 
@@ -138,10 +125,9 @@ public sealed class WorkerProgramTests
             Assert.Ignore("The direct worker is supported only in the Linux container.");
         }
 
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SharpProof-worker-parent-death-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        using var temporaryDirectory = new TempDirectory(
+            "SharpProof-worker-parent-death-");
+        var directory = temporaryDirectory.FullName;
         var requestPath = Path.Combine(directory, "request.json");
         var resultPath = Path.Combine(directory, "result.json");
         var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ??
@@ -217,7 +203,6 @@ public sealed class WorkerProgramTests
                 child.Kill();
                 await child.WaitForExitAsync();
             }
-            Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -230,10 +215,9 @@ public sealed class WorkerProgramTests
             Assert.Ignore("The direct worker is supported only in the Linux container.");
         }
 
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "SharpProof-worker-timeout-descendant-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        using var temporaryDirectory = new TempDirectory(
+            "SharpProof-worker-timeout-descendant-");
+        var directory = temporaryDirectory.FullName;
         var pidPath = Path.Combine(directory, "descendant.pid");
         const string script =
             "sleep 300 & child=$!; printf '%s\\n' \"$child\" > \"$1\"; " +
@@ -276,10 +260,6 @@ public sealed class WorkerProgramTests
                 descendant.Kill();
                 await descendant.WaitForExitAsync();
             }
-            if (Directory.Exists(directory))
-            {
-                Directory.Delete(directory, recursive: true);
-            }
         }
     }
 
@@ -287,11 +267,9 @@ public sealed class WorkerProgramTests
     [NonParallelizable]
     public async Task InvalidProjectedRequestDisposesRuntimeSnapshotBeforeReturning()
     {
-        var directory = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.Worker.Test",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        var temporaryDirectory = new TempDirectory(
+            "SharpProof.Worker.Test-");
+        var directory = temporaryDirectory.FullName;
         var manifestPath = Path.Combine(directory, "compiler-manifest.json");
         var requestPath = Path.Combine(directory, "request.json");
         var resultPath = Path.Combine(directory, "result.json");
@@ -352,7 +330,7 @@ public sealed class WorkerProgramTests
         }
         finally
         {
-            Directory.Delete(directory, recursive: true);
+            temporaryDirectory.Dispose();
         }
     }
 

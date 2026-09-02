@@ -977,106 +977,79 @@ public sealed class WorkerTcbEdgeCaseTests
     [Test]
     public async Task CacheRejectsAHashedPayloadWithNullCallableResults()
     {
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "worker-cache-edge-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-        try
-        {
-            var manifest = new WorkerClaimManifest();
-            WorkerProtocolJson.SealManifest(manifest);
-            var inputHash = new string('a', 64);
-            await WriteCacheEnvelopeAsync(
-                directory,
-                inputHash,
-                manifest.Hash,
-                callableResults: null,
-                []);
-            var cache = new VerificationCache(directory, 1024 * 1024);
+        using var temporaryDirectory = new TempDirectory("worker-cache-edge-");
+        var directory = temporaryDirectory.FullName;
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
+        var inputHash = new string('a', 64);
+        await WriteCacheEnvelopeAsync(
+            directory,
+            inputHash,
+            manifest.Hash,
+            callableResults: null,
+            []);
+        var cache = new VerificationCache(directory, 1024 * 1024);
 
-            var response = await cache.TryReadAsync(
-                inputHash,
-                manifest,
-                [],
-                new WorkerBudgets(),
-                CancellationToken.None);
+        var response = await cache.TryReadAsync(
+            inputHash,
+            manifest,
+            [],
+            new WorkerBudgets(),
+            CancellationToken.None);
 
-            Assert.That(response, Is.Null);
-        }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
+        Assert.That(response, Is.Null);
     }
 
     [Test]
     public async Task CacheRejectsPayloadSealedForADifferentManifest()
     {
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "worker-cache-manifest-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-        try
-        {
-            var manifest = new WorkerClaimManifest();
-            WorkerProtocolJson.SealManifest(manifest);
-            var inputHash = new string('b', 64);
-            await WriteCacheEnvelopeAsync(
-                directory,
-                inputHash,
-                new string('c', 64),
-                [],
-                []);
-            var cache = new VerificationCache(directory, 1024 * 1024);
+        using var temporaryDirectory = new TempDirectory("worker-cache-manifest-");
+        var directory = temporaryDirectory.FullName;
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
+        var inputHash = new string('b', 64);
+        await WriteCacheEnvelopeAsync(
+            directory,
+            inputHash,
+            new string('c', 64),
+            [],
+            []);
+        var cache = new VerificationCache(directory, 1024 * 1024);
 
-            var response = await cache.TryReadAsync(
-                inputHash,
-                manifest,
-                [],
-                new WorkerBudgets(),
-                CancellationToken.None);
+        var response = await cache.TryReadAsync(
+            inputHash,
+            manifest,
+            [],
+            new WorkerBudgets(),
+            CancellationToken.None);
 
-            Assert.That(response, Is.Null);
-        }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
+        Assert.That(response, Is.Null);
     }
 
     [Test]
     public async Task CacheRejectsOversizedJsonBeforeDeserialization()
     {
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "worker-cache-size-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-        try
-        {
-            var inputHash = new string('d', 64);
-            var path = Path.Combine(
-                directory,
-                inputHash + CacheFileSuffix);
-            await File.WriteAllBytesAsync(
-                path, new byte[WorkerProtocolJson.MaximumJsonBytes + 1]);
-            var cache = new VerificationCache(
-                directory, WorkerProtocolJson.MaximumJsonBytes * 2L);
-            var manifest = new WorkerClaimManifest();
-            WorkerProtocolJson.SealManifest(manifest);
+        using var temporaryDirectory = new TempDirectory("worker-cache-size-");
+        var directory = temporaryDirectory.FullName;
+        var inputHash = new string('d', 64);
+        var path = Path.Combine(
+            directory,
+            inputHash + CacheFileSuffix);
+        await File.WriteAllBytesAsync(
+            path, new byte[WorkerProtocolJson.MaximumJsonBytes + 1]);
+        var cache = new VerificationCache(
+            directory, WorkerProtocolJson.MaximumJsonBytes * 2L);
+        var manifest = new WorkerClaimManifest();
+        WorkerProtocolJson.SealManifest(manifest);
 
-            var response = await cache.TryReadAsync(
-                inputHash,
-                manifest,
-                [],
-                new WorkerBudgets(),
-                CancellationToken.None);
+        var response = await cache.TryReadAsync(
+            inputHash,
+            manifest,
+            [],
+            new WorkerBudgets(),
+            CancellationToken.None);
 
-            Assert.That(response, Is.Null);
-        }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
+        Assert.That(response, Is.Null);
     }
 
     [Test]
@@ -1098,40 +1071,30 @@ public sealed class WorkerTcbEdgeCaseTests
             (long)WorkerProtocolJson.MaximumJsonBytes * 2
         })
         {
-            var directory = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "worker-cache-write-size-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(directory);
-            try
-            {
-                var cache = new VerificationCache(directory, maximumBytes);
-                Assert.That(
-                    await cache.TryWriteAsync(
-                        response,
-                        inputHash,
-                        manifest,
-                        CancellationToken.None),
-                    Is.False,
-                    maximumBytes.ToString(CultureInfo.InvariantCulture));
-                Assert.That(
-                    Directory.GetFiles(directory, "*" + CacheFileSuffix),
-                    Is.Empty,
-                    maximumBytes.ToString(CultureInfo.InvariantCulture));
-            }
-            finally
-            {
-                Directory.Delete(directory, recursive: true);
-            }
+            using var temporaryDirectory = new TempDirectory(
+                "worker-cache-write-size-");
+            var directory = temporaryDirectory.FullName;
+            var cache = new VerificationCache(directory, maximumBytes);
+            Assert.That(
+                await cache.TryWriteAsync(
+                    response,
+                    inputHash,
+                    manifest,
+                    CancellationToken.None),
+                Is.False,
+                maximumBytes.ToString(CultureInfo.InvariantCulture));
+            Assert.That(
+                Directory.GetFiles(directory, "*" + CacheFileSuffix),
+                Is.Empty,
+                maximumBytes.ToString(CultureInfo.InvariantCulture));
         }
     }
 
     [Test]
     public void CacheWriteRollsBackPublicationWhenPostValidationIsCanceled()
     {
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "worker-cache-cancel-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        using var temporaryDirectory = new TempDirectory("worker-cache-cancel-");
+        var directory = temporaryDirectory.FullName;
         using var cancellation = new CancellationTokenSource();
         try
         {
@@ -1167,7 +1130,6 @@ public sealed class WorkerTcbEdgeCaseTests
         finally
         {
             VerificationCache.PathValidationOverride = null;
-            Directory.Delete(directory, recursive: true);
         }
     }
 
@@ -1175,10 +1137,9 @@ public sealed class WorkerTcbEdgeCaseTests
     public void CacheCapacityScanStopsAfterCancellation()
     {
         const string suffix = CacheFileSuffix;
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "worker-cache-capacity-cancel-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        using var temporaryDirectory = new TempDirectory(
+            "worker-cache-capacity-cancel-");
+        var directory = temporaryDirectory.FullName;
         using var cancellation = new CancellationTokenSource();
         try
         {
@@ -1228,17 +1189,15 @@ public sealed class WorkerTcbEdgeCaseTests
         finally
         {
             VerificationCache.PathValidationOverride = null;
-            Directory.Delete(directory, recursive: true);
         }
     }
 
     [Test]
     public async Task CacheWriteRollbackRestoresPreExistingExactKeyBytes()
     {
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "worker-cache-existing-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        using var temporaryDirectory = new TempDirectory(
+            "worker-cache-existing-");
+        var directory = temporaryDirectory.FullName;
         try
         {
             var inputHash = new string('9', 64);
@@ -1285,17 +1244,15 @@ public sealed class WorkerTcbEdgeCaseTests
         finally
         {
             VerificationCache.PathValidationOverride = null;
-            Directory.Delete(directory, recursive: true);
         }
     }
 
     [Test]
     public async Task CacheRollbackRemainsLockedUntilAttemptOwnedStateIsRemoved()
     {
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "worker-cache-locked-rollback-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        using var temporaryDirectory = new TempDirectory(
+            "worker-cache-locked-rollback-");
+        var directory = temporaryDirectory.FullName;
         using var rollbackEntered = new ManualResetEventSlim();
         using var allowRollback = new ManualResetEventSlim();
         try
@@ -1370,17 +1327,15 @@ public sealed class WorkerTcbEdgeCaseTests
             allowRollback.Set();
             VerificationCache.TransactionRollbackOverride = null;
             VerificationCache.PathValidationOverride = null;
-            Directory.Delete(directory, recursive: true);
         }
     }
 
     [Test]
     public void CacheLockDisposesHandleWhenPostOpenValidationFails()
     {
-        var directory = Path.Combine(
-            TestContext.CurrentContext.WorkDirectory,
-            "worker-cache-lock-validation-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        using var temporaryDirectory = new TempDirectory(
+            "worker-cache-lock-validation-");
+        var directory = temporaryDirectory.FullName;
         try
         {
             var calls = 0;
@@ -1417,7 +1372,6 @@ public sealed class WorkerTcbEdgeCaseTests
         finally
         {
             VerificationCache.PathValidationOverride = null;
-            Directory.Delete(directory, recursive: true);
         }
     }
 

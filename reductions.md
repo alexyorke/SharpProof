@@ -4177,10 +4177,34 @@ R632 is a pending fixture-infrastructure reduction candidate. Preserve cleanup i
 
 R633 is a pending fuzz-oracle infrastructure reduction candidate. Preserve collectible unloading, image ownership/disposal, runtime-type lookup failures, and distinct batch versus semantic-edge result handling; share only the assembly lifetime scaffold.
 
-## Second survey, part one hundred seventy-eight: R637 - Worker test temp-fixture boilerplate
+## Second survey, part one hundred seventy-nine: R638 - repeated trusted-boundary traversal
 
-| R637 | **Nineteen Worker tests manually create and recursively delete temporary directories despite the linked `TempDirectory` helper.** Nine cache edge-case methods in `WorkerTcbEdgeCaseTests`, five process/launcher methods in `WorkerProgramTests`, and five runtime-closure methods in `WorkerBinaryIdentityTests` each assemble a temp path with `Path.GetTempPath()` or the test work directory, call `Directory.CreateDirectory`, and repeat `try/finally` cleanup with `Directory.Delete`; the binary tests also repeat this around fixture trees. Replacing these local lifetimes with `TempDirectory` (or a shared Worker-test wrapper where a specific root is required) removes fixture cleanup boilerplate and gives all three suites one failure-safe disposal policy. Preserve each suite's path-prefix assumptions, Linux/process cleanup, file fixture contents, and test-specific cleanup ordering. | `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:977-1421`; `SharpProof.Worker.Test/WorkerProgramTests.cs:34-357`; `SharpProof.Worker.Test/WorkerBinaryIdentityTests.cs:10-195,230-506`; `Directory.Build.props:68-81`; `eng/testing/TempDirectory.cs:1-19` |
+| R638 | **`ClaimManifestBuilder.BuildTarget` traverses trusted-boundary attributes twice.** `SelectFeatures` calls `TrustedAttributes(method).Any()` to decide whether trusted evidence exists, and `CreateAssumptions` immediately enumerates `TrustedAttributes(target)` again to materialize the same scope/attribute pairs. Each enumeration walks `CompilerMethodScopes.Enumerate` and every scope's attributes with the same predicate. Materializing the trusted attributes once at the build-target boundary, or passing the materialized sequence through the two helpers, removes the repeated symbol/attribute traversal while preserving the separate feature-selection and assumption-evidence policies. | `SharpProof.CompilerCollector/CompilerArtifact/ClaimManifestBuilder.cs:65-69,239-258,261-315,455-467` |
 
-### Status (part one hundred seventy-eight)
+### Status (part one hundred seventy-nine)
 
-R637 is a pending Worker-test fixture-lifetime reduction candidate and extends the manually scoped cases listed in R428. Preserve process termination and mutation-specific cleanup before directory disposal; share only temporary-directory creation and safe recursive cleanup.
+R638 is a pending compiler-collector traversal reduction candidate. Preserve scope order, trusted-attribute filtering, selected-feature behavior, and assumption ID/rank ordering; share only the one per-target trusted-attribute enumeration.
+
+## Second survey, part one hundred eighty: R639 - repeated specification-pack admission validation
+
+| R639 | **A specification-pack call is fully validated once during admission and again during summary construction.** `CompilerRelationalSummaryProvider.IsAdmissiblePureCall` asks `CompilerSpecificationPackProvider.CanResolve`, which delegates to `TryResolve` and performs identity, method-shape, assembly, return-type, and parameter-type checks. If source and IL summaries do not handle the call, `TryGet` later calls `CompilerSpecificationPackProvider.TryBuild`, whose first operation is the same `TryResolve` before constructing the summary. A cached resolved definition or a cheap identity-only admission predicate can remove the duplicate validation without weakening the full `TryResolve` gate required before building a summary; source/IL admissibility and the distinct summary-building order remain explicit. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:78-85,123-146`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:123-145,214-256` |
+
+### Status (part one hundred eighty)
+
+R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
+
+## Second survey, part one hundred eighty-one: R640 - skeletal snapshot adapter
+
+| R640 | **`CompilerEffectReplayLowerer.TryResolveSource` allocates a skeletal compilation snapshot solely to call a syntax-tree lookup.** After obtaining the cached `CompilerSyntaxTreeSnapshot[]`, it creates `new CompilerCompilationSnapshot { SyntaxTrees = capturedTrees }` and passes that object to `CompilerSourceLocationAuthority.FindUniqueTree`; the authority reads no other snapshot field. A narrow overload accepting the captured tree collection, or a source-tree resolver that takes the collection directly, removes this per-replay adapter object while retaining the authority's remembered-ordinal fast path, geometry checks, and ambiguity rejection. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:418-433`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:108-142` |
+
+### Status (part one hundred eighty-one)
+
+R640 is a pending replay-source allocation/adapter reduction candidate. Preserve unique-tree resolution, cancellation, remembered-tree validation, and the distinction between operation-tree and source-tree identities; remove only the wrapper created to satisfy the current parameter shape.
+
+## Second survey, part one hundred eighty-two: R641 - repeated source-tree hashing
+
+| R641 | **`CompilerRelationalSummaryProvider.CreateAuthority` rehashes a source tree already captured for the same compilation.** `CompilerManifestArtifactProducer.Create` captures all syntax trees before lowering, and `CompilerCompilationCapture.CaptureTree` computes each tree's full-text SHA. Later, for every source summary authority, `CreateAuthority` calls `declaration.SyntaxTree.GetText` and `CompilerCompilationCapture.ComputeTextSha256` again for the same full tree, even though the authority only needs the captured tree hash. Passing the captured snapshot/tree-hash lookup into the provider, or reusing the capture cache, removes repeated text materialization and SHA-256 work while keeping the declaration-span evidence hash separate. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerManifestArtifactProducer.cs:14-18,45-58`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:204-215`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:351-389` |
+
+### Status (part one hundred eighty-two)
+
+R641 is a pending compiler-summary evidence hashing reduction candidate. Preserve the full source-tree hash versus declaration-span evidence distinction, source-path normalization, and authority construction; reuse only the already-captured full-tree hash.
