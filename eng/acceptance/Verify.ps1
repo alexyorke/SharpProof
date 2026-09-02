@@ -381,6 +381,7 @@ function Assert-RepositoryPaths {
     }
     $seenPaths = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
+    $resolvedPaths = [Collections.Generic.List[string]]::new()
     foreach ($untypedRelativePath in $Paths) {
         $relativePath = [string]$untypedRelativePath
         if ([string]::IsNullOrWhiteSpace($relativePath) -or
@@ -398,7 +399,9 @@ function Assert-RepositoryPaths {
         if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
             throw "Invalid $Scope path: $relativePath"
         }
+        [void]$resolvedPaths.Add($fullPath)
     }
+    return @($resolvedPaths)
 }
 
 function Measure-RepositoryCSharpSyntax {
@@ -413,17 +416,17 @@ function Measure-RepositoryCSharpSyntax {
         $ProductionInventory
     )
 
-    Assert-RepositoryPaths -Paths $Paths -Scope $Scope
+    $resolvedPaths = @(Assert-RepositoryPaths -Paths $Paths -Scope $Scope)
     $expressionNodes = 0
     $decisionPoints = 0
-    foreach ($untypedRelativePath in $Paths) {
-        $relativePath = [string]$untypedRelativePath
+    for ($index = 0; $index -lt $Paths.Count; $index++) {
+        $relativePath = [string]$Paths[$index]
         if (-not $relativePath.EndsWith(
                 '.cs',
                 [StringComparison]::OrdinalIgnoreCase)) {
             throw "$Scope contains a non-C# source path: $relativePath"
         }
-        $fullPath = Join-Path $repositoryRoot $relativePath
+        $fullPath = $resolvedPaths[$index]
         $parseOptions = $null
         if ($null -ne $ProductionInventory) {
             $optionMatches = @($ProductionInventory.projects | Where-Object {
@@ -550,7 +553,7 @@ try {
     if ($kernelPaths.Count -eq 0) {
         throw 'The trusted-kernel contract must declare paths.'
     }
-    Assert-RepositoryPaths `
+    $null = Assert-RepositoryPaths `
         -Paths $kernelPaths `
         -Scope 'trusted-kernel'
     Write-Host "Trusted-kernel paths: $($kernelPaths.Count)"
@@ -576,7 +579,7 @@ try {
     foreach ($component in $tcbComponents) {
         $name = [string]$component.name
         $paths = @($component.paths)
-        Assert-RepositoryPaths -Paths $paths -Scope "trusted-computing-base component '$name'"
+        $null = Assert-RepositoryPaths -Paths $paths -Scope "trusted-computing-base component '$name'"
         Write-Host "Trusted-computing-base $name paths: $($paths.Count)"
     }
     Write-Host "Trusted-computing-base union paths: $($canonicalTcbPaths.Count)"

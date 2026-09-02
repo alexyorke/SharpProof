@@ -4233,14 +4233,11 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disposal resolver intentionally use different roots and reachability/unwinding rules. A shared walk could alter direct-witness recording, constructor entry selection, disposal order, or fail-closed effect joins; keep the independent passes until reusable per-operation facts can be proven equivalent.
 
-## Second survey, part two hundred thirteen: R676-R677 - repeated acceptance inventory preparation
-
-| R676 | **`Verify.ps1.Measure-RepositoryCSharpSyntax` discards validated full paths and rebuilds them.** The helper first calls `Assert-RepositoryPaths`, which canonicalizes each relative path, checks repository containment, and verifies the leaf exists; it then reconstructs the same source path with `Join-Path` before reading it. Returning the validated path records, or letting the measurement helper own the single validation/read pass, removes repeated path resolution while preserving duplicate checks, containment errors, and source parsing. | `eng/acceptance/Verify.ps1:370-401,416-437` |
 | R677 | **Acceptance static validation derives the full production inventory twice.** `eng/acceptance/Verify.ps1` invokes `Get-SharpProofProductionInventory.ps1` before TCB and coordinator checks, then calls `Test-ProductionCSharpComplexity.ps1`; that script independently invokes the same inventory generator, reparsing every project MSBuild query and rebuilding compile/options records. Pass the first inventory through a file/object seam or combine the two consumers, while retaining the complexity script's intentional Release configuration if it differs from the acceptance configuration. | `eng/acceptance/Verify.ps1:237-245,624`; `scripts/Test-ProductionCSharpComplexity.ps1:76-82` |
 
 ### Status (part two hundred thirteen)
 
-R676-R677 are pending acceptance-preparation reductions. Preserve path containment and leaf checks, production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only validated paths and inventory data.
+R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
 
 ### Status (part two hundred fourteen)
 
@@ -4315,3 +4312,10 @@ R690 is a pending API-spec generation-test reduction candidate. Preserve JSON fi
 | R691 | **`IrRelationalSummaryTests` duplicates identity-summary construction.** `BuildIdentitySummary` and the local `CreateCallee` function in `DependencyProvenanceIdentityComponentsAreDeduplicatedStructurally` each create a body variable, one-block return program, identity-style summary signature, variable environment, and `IrRelationalSummaryBuilder.Build` call; the local version adds only a caller-supplied member name/provenance and success assertion. A parameterized identity-summary helper can serve both tests while preserving their distinct fixture names and provenance scenarios. | `SharpProof.Summaries.Test/IrRelationalSummaryTests.cs:1000-1070,1099-1117` |
 
 R691 is a pending summary-test fixture reduction candidate. Preserve factory ownership, body-to-parameter binding, return-operation identity, and the separate success/error assertions at each call site.
+
+### Status (part two hundred twenty-six)
+
+| R692 | **`DependencyAuditWorkspace.RunAsync` and `RunWithOutputAsync` duplicate report execution setup.** Both serialize a `JsonObject` to `ReportPath` and then call `RunScriptAsync`; they differ only in indentation and whether the output path is the workspace default or a caller-supplied path, and whether a stale output sentinel is created. A single execution helper with explicit formatting, output-path, and stale-output parameters can preserve those test distinctions while removing the duplicated write/dispatch wrapper. | `SharpProof.Package.Test/DependencyAuditScriptTests.cs:445-467` |
+| R693 | **`DependencyAuditWorkspace.AssertRejectedAsync` and `AssertRawRejectedAsync` duplicate rejection assertions.** Both run the audit script, require a nonzero exit, require an expected message, and assert that the evidence output is absent; only the report input write path differs (`JsonObject` serialization versus raw text). A shared rejection helper accepting a report-writing callback can retain the raw-JSON and object-report cases while centralizing the failure contract. | `SharpProof.Package.Test/DependencyAuditScriptTests.cs:469-503` |
+
+R692-R693 are pending dependency-audit test-fixture reductions. Preserve report serialization modes, stale-output setup, caller-selected output paths, nonzero exits, expected diagnostics, and output non-publication.
