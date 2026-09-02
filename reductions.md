@@ -3844,9 +3844,11 @@ it removes; the original identity-preserving behavior is retained.
 
 ### Status (part one hundred thirty-five)
 
-R594 is applied: increment and compound-assignment lowering now share one
-`LowerMutationResult` helper, while the compound path still evaluates its value
-and both paths retain their existing mutation/result types.
+R594 remains deferred: the shared mutation-result helper preserved behavior but
+raised `RoslynProgramLowerer` above its architecture expression-node ceiling
+(2,341 versus 2,329). Retaining the current ceiling is more valuable than
+removing this small duplicated result construction, so the original paths stay
+in place.
 
 ## Second survey, part one hundred thirty-six: R595 - unbounded nested-operation recursion
 
@@ -4180,3 +4182,11 @@ R631 is a pending script-infrastructure reduction candidate. Preserve the build-
 ### Status (part one hundred seventy-three)
 
 R632 is a pending fixture-infrastructure reduction candidate. Preserve cleanup in `finally`, per-script environment restoration, recursive deletion, and ownership safety; share only the common temporary-directory disposal protocol.
+
+## Second survey, part one hundred seventy-four: R633 - duplicate fuzz assembly lifetime
+
+| R633 | **`FrontendDifferentialOracle` repeats collectible generated-assembly lifetime management.** `CompareBatch` and `CompareSemanticEdges` each reset an emitted image, create a collectible `AssemblyLoadContext`, load the stream, resolve a generated runtime type, run a case loop, and unload the context in `finally`; only the assembly/type name and callback-specific work differ. A private `WithLoadedGeneratedAssembly` callback helper can own the stream-position, collectible-context, load, and unload protocol while preserving each path's method-shape checks, runtime method selection, result assembly, and cancellation behavior. | `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:982-1051`; `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1161-1189` |
+
+### Status (part one hundred seventy-four)
+
+R633 is a pending fuzz-oracle infrastructure reduction candidate. Preserve collectible unloading, image ownership/disposal, runtime-type lookup failures, and distinct batch versus semantic-edge result handling; share only the assembly lifetime scaffold.
