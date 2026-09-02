@@ -524,6 +524,95 @@ function New-SharpProofParallelProcessStartInfo {
     return $startInfo
 }
 
+function New-SharpProofCoverageContext {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [AllowEmptyString()]
+        [string]$CoverageSettings = '',
+
+        [AllowEmptyString()]
+        [string]$CoverageResultsDirectory = '',
+
+        [switch]$CreateResultsDirectory
+    )
+
+    $enabled =
+        -not [string]::IsNullOrWhiteSpace($CoverageSettings) -or
+        -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory)
+    if ($enabled -and
+        ([string]::IsNullOrWhiteSpace($CoverageSettings) -or
+         [string]::IsNullOrWhiteSpace($CoverageResultsDirectory))) {
+        throw (
+            'CoverageSettings and CoverageResultsDirectory must be supplied ' +
+            'together.')
+    }
+    $settings = if ($enabled) {
+        (Resolve-Path -LiteralPath $CoverageSettings -ErrorAction Stop).Path
+    }
+    else {
+        ''
+    }
+    $results = if ($enabled) {
+        [IO.Path]::GetFullPath($CoverageResultsDirectory)
+    }
+    else {
+        ''
+    }
+    if ($CreateResultsDirectory -and $enabled) {
+        [IO.Directory]::CreateDirectory($results) | Out-Null
+    }
+    return [pscustomobject]@{
+        Enabled = $enabled
+        Settings = $settings
+        Results = $results
+        IsolatedOutputRoot = if ($enabled) {
+            Join-Path $RepositoryRoot (
+                '.sharpproof-coverage-output-' +
+                [Guid]::NewGuid().ToString('N'))
+        }
+        else {
+            ''
+        }
+    }
+}
+
+function Remove-SharpProofCoverageOutput {
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()]
+        [string]$Directory
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Directory) -and
+        [IO.Directory]::Exists($Directory)) {
+        [IO.Directory]::Delete($Directory, $true)
+    }
+}
+
+function Add-SharpProofCoverageArguments {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [bool]$Enabled,
+
+        [AllowEmptyString()]
+        [string]$Settings = ''
+    )
+
+    if (-not $Enabled) {
+        return $Arguments
+    }
+    return @($Arguments) + @(
+        '--settings', $Settings,
+        '--collect', 'Code Coverage;Format=Cobertura')
+}
+
 function New-SharpProofIsolatedTestOutput {
     [CmdletBinding()]
     param(
@@ -591,6 +680,9 @@ Export-ModuleMember -Function @(
     'Invoke-SharpProofCheckedCommand',
     'Invoke-SharpProofParallelDotnetBuilds',
     'New-SharpProofParallelProcessStartInfo',
+    'New-SharpProofCoverageContext',
+    'Remove-SharpProofCoverageOutput',
+    'Add-SharpProofCoverageArguments',
     'Invoke-SharpProofRequiredDotnet',
     'New-SharpProofIsolatedTestOutput',
     'Stop-SharpProofCompilerServer')

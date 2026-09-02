@@ -44,41 +44,21 @@ $semanticSolution = Get-Content -LiteralPath $semanticSolutionFilter -Raw |
     ConvertFrom-Json
 $semanticProjects = @($semanticSolution.solution.projects |
         ForEach-Object { ([string]$_).Replace('\', '/') })
-$coverageEnabled =
+$coverageRequested =
     -not [string]::IsNullOrWhiteSpace($CoverageSettings) -or
     -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory)
-if ($coverageEnabled -and
-    ([string]::IsNullOrWhiteSpace($CoverageSettings) -or
-     [string]::IsNullOrWhiteSpace($CoverageResultsDirectory))) {
-    throw (
-        'CoverageSettings and CoverageResultsDirectory must be supplied ' +
-        'together.')
-}
-if ($ArchitectureOnly -and $coverageEnabled) {
+if ($ArchitectureOnly -and $coverageRequested) {
     throw 'Architecture-only sharding does not support coverage collection.'
 }
-$resolvedCoverageSettings = if ($coverageEnabled) {
-    (Resolve-Path -LiteralPath $CoverageSettings -ErrorAction Stop).Path
-}
-else {
-    ''
-}
-$resolvedCoverageResults = if ($coverageEnabled) {
-    [IO.Path]::GetFullPath($CoverageResultsDirectory)
-}
-else {
-    ''
-}
-if ($coverageEnabled) {
-    [IO.Directory]::CreateDirectory($resolvedCoverageResults) | Out-Null
-}
-$isolatedOutputRoot = if ($coverageEnabled) {
-    Join-Path $repositoryRoot (
-        '.sharpproof-coverage-output-' + [Guid]::NewGuid().ToString('N'))
-}
-else {
-    ''
-}
+$coverage = New-SharpProofCoverageContext `
+    -RepositoryRoot $repositoryRoot `
+    -CoverageSettings $CoverageSettings `
+    -CoverageResultsDirectory $CoverageResultsDirectory `
+    -CreateResultsDirectory
+$coverageEnabled = [bool]$coverage.Enabled
+$resolvedCoverageSettings = [string]$coverage.Settings
+$resolvedCoverageResults = [string]$coverage.Results
+$isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 
 if (-not $NoBuild) {
     $semanticBuildProjects = if ($ArchitectureOnly) {
@@ -474,11 +454,10 @@ try {
                 if ($task.ProjectParallelism -gt 0) {
                     $arguments += "/m:$($task.ProjectParallelism)"
                 }
-                if ($coverageEnabled) {
-                    $arguments += @(
-                        '--settings', $resolvedCoverageSettings,
-                        '--collect', 'Code Coverage;Format=Cobertura')
-                }
+                $arguments = Add-SharpProofCoverageArguments `
+                    -Arguments $arguments `
+                    -Enabled $coverageEnabled `
+                    -Settings $resolvedCoverageSettings
             }
             $startInfo = New-SharpProofParallelProcessStartInfo `
                 -FileName 'dotnet' `
@@ -558,10 +537,7 @@ finally {
     if ($temporaryResults -and [IO.Directory]::Exists($resultsRoot)) {
         [IO.Directory]::Delete($resultsRoot, $true)
     }
-    if ($coverageEnabled -and
-        [IO.Directory]::Exists($isolatedOutputRoot)) {
-        [IO.Directory]::Delete($isolatedOutputRoot, $true)
-    }
+    Remove-SharpProofCoverageOutput -Directory $isolatedOutputRoot
 }
 
 $campaign.Stop()

@@ -56,28 +56,13 @@ if (-not [IO.Path]::IsPathRooted($resolvedDotnetHost) -or
 }
 $testProject = Join-Path `
     $repositoryRoot 'SharpProof.Package.Test/SharpProof.Package.Test.csproj'
-$coverageEnabled =
-    -not [string]::IsNullOrWhiteSpace($CoverageSettings) -or
-    -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory)
-if ($coverageEnabled -and
-    ([string]::IsNullOrWhiteSpace($CoverageSettings) -or
-     [string]::IsNullOrWhiteSpace($CoverageResultsDirectory))) {
-    throw (
-        'CoverageSettings and CoverageResultsDirectory must be supplied ' +
-        'together.')
-}
-$resolvedCoverageSettings = if ($coverageEnabled) {
-    (Resolve-Path -LiteralPath $CoverageSettings -ErrorAction Stop).Path
-}
-else {
-    ''
-}
-$resolvedCoverageResults = if ($coverageEnabled) {
-    [IO.Path]::GetFullPath($CoverageResultsDirectory)
-}
-else {
-    ''
-}
+$coverage = New-SharpProofCoverageContext `
+    -RepositoryRoot $repositoryRoot `
+    -CoverageSettings $CoverageSettings `
+    -CoverageResultsDirectory $CoverageResultsDirectory
+$coverageEnabled = [bool]$coverage.Enabled
+$resolvedCoverageSettings = [string]$coverage.Settings
+$resolvedCoverageResults = [string]$coverage.Results
 $testAssembly = if ($NoBuild -and -not $coverageEnabled) {
     Get-SharpProofTestAssemblyPath `
         -ProjectPath $testProject `
@@ -86,13 +71,7 @@ $testAssembly = if ($NoBuild -and -not $coverageEnabled) {
 else {
     ''
 }
-$isolatedOutputRoot = if ($coverageEnabled) {
-    Join-Path $repositoryRoot (
-        '.sharpproof-coverage-output-' + [Guid]::NewGuid().ToString('N'))
-}
-else {
-    ''
-}
+$isolatedOutputRoot = [string]$coverage.IsolatedOutputRoot
 
 function Invoke-RequiredBuilds {
     param([Parameter(Mandatory = $true)][object[]]$Builds)
@@ -658,11 +637,10 @@ try {
                     '--logger', "trx;LogFileName=$($shard.Name).trx",
                     '--results-directory', (Join-Path $results $shard.Name))
             }
-            if ($coverageEnabled) {
-                $arguments += @(
-                    '--settings', $resolvedCoverageSettings,
-                    '--collect', 'Code Coverage;Format=Cobertura')
-            }
+            $arguments = Add-SharpProofCoverageArguments `
+                -Arguments $arguments `
+                -Enabled $coverageEnabled `
+                -Settings $resolvedCoverageSettings
             $startInfo = New-SharpProofParallelProcessStartInfo `
                 -FileName 'dotnet' `
                 -WorkingDirectory $repositoryRoot `
@@ -827,8 +805,5 @@ finally {
     if ([IO.Directory]::Exists($root)) {
         [IO.Directory]::Delete($root, $true)
     }
-    if ($coverageEnabled -and
-        [IO.Directory]::Exists($isolatedOutputRoot)) {
-        [IO.Directory]::Delete($isolatedOutputRoot, $true)
-    }
+    Remove-SharpProofCoverageOutput -Directory $isolatedOutputRoot
 }
