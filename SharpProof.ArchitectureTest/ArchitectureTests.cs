@@ -990,10 +990,13 @@ public sealed class ArchitectureTests
             Assert.That(script, Does.Contain("microsoft.aspnetcore.app.ref"));
             Assert.That(
                 script,
-                Does.Contain("<package pattern=\"Microsoft.NETCore.App.Ref\" />"));
+                Does.Contain("Pattern = 'Microsoft.NETCore.App.Ref'"));
             Assert.That(
                 script,
-                Does.Contain("<package pattern=\"Microsoft.AspNetCore.App.Ref\" />"));
+                Does.Contain("Pattern = 'Microsoft.AspNetCore.App.Ref'"));
+            Assert.That(
+                script,
+                Does.Contain("Select-Object -ExpandProperty Pattern -Unique"));
         }
     }
 

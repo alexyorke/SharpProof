@@ -141,19 +141,43 @@ function New-FrameworkPackageSource {
         throw "The container test runtime version is invalid: '$testRuntimeVersion'."
     }
     $frameworkPackages = @(
-        @('netstandard.library', '2.0.3'),
-        @('microsoft.netcore.platforms', '1.1.0'),
-        @('microsoft.netframework.referenceassemblies', '1.0.3'),
-        @('microsoft.netframework.referenceassemblies.net472', '1.0.3'),
-        @('microsoft.netcore.app.ref', $testRuntimeVersion),
-        @('microsoft.aspnetcore.app.ref', $testRuntimeVersion)
+        [pscustomobject]@{
+            Id = 'netstandard.library'
+            Version = '2.0.3'
+            Pattern = 'NETStandard.Library'
+        }
+        [pscustomobject]@{
+            Id = 'microsoft.netcore.platforms'
+            Version = '1.1.0'
+            Pattern = 'Microsoft.NETCore.Platforms'
+        }
+        [pscustomobject]@{
+            Id = 'microsoft.netcore.app.ref'
+            Version = $testRuntimeVersion
+            Pattern = 'Microsoft.NETCore.App.Ref'
+        }
+        [pscustomobject]@{
+            Id = 'microsoft.aspnetcore.app.ref'
+            Version = $testRuntimeVersion
+            Pattern = 'Microsoft.AspNetCore.App.Ref'
+        }
+        [pscustomobject]@{
+            Id = 'microsoft.netframework.referenceassemblies'
+            Version = '1.0.3'
+            Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
+        }
+        [pscustomobject]@{
+            Id = 'microsoft.netframework.referenceassemblies.net472'
+            Version = '1.0.3'
+            Pattern = 'Microsoft.NETFramework.ReferenceAssemblies*'
+        }
     )
     foreach ($package in $frameworkPackages) {
-        $fileName = "$($package[0]).$($package[1]).nupkg"
+        $fileName = "$($package.Id).$($package.Version).nupkg"
         $source = [IO.Path]::Combine(
             $globalPackages,
-            [string]$package[0],
-            [string]$package[1],
+            [string]$package.Id,
+            [string]$package.Version,
             $fileName)
         if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
             throw (
@@ -345,11 +369,11 @@ function Test-SharpProofFrameworkConsumers {
             '      <package pattern="SharpProof*" />'
             '    </packageSource>'
             '    <packageSource key="FrameworkOffline">'
-            '      <package pattern="NETStandard.Library" />'
-            '      <package pattern="Microsoft.NETCore.Platforms" />'
-            '      <package pattern="Microsoft.NETCore.App.Ref" />'
-            '      <package pattern="Microsoft.AspNetCore.App.Ref" />'
-            '      <package pattern="Microsoft.NETFramework.ReferenceAssemblies*" />'
+            $frameworkPackages |
+                Select-Object -ExpandProperty Pattern -Unique |
+                ForEach-Object {
+                    "      <package pattern=`"$_`" />"
+                }
             '    </packageSource>'
             '  </packageSourceMapping>'
             '</configuration>'
