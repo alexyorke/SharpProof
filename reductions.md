@@ -4347,7 +4347,7 @@ R712 completed: invocation tree, loop, and nested-callable facts are computed on
 
 | R713 | **`RequiresCallSiteDiscovery.GetListPatternCalls` scans the same pattern list three times before its main loop.** `Count` computes non-slice items, `Any` detects a slice, and a separate indexed loop finds `sliceIndex`; the subsequent loop then traverses all patterns again to emit calls. Fuse the count/flag/index preparation into one indexed pass, retaining the known-length short-circuits, slice index arithmetic, and emitted-call order. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1421-1455` |
 
-R713 is a pending list-pattern preparation reduction candidate. Preserve empty/sliced pattern behavior, known-length rejection, and the distinction between indexer and slice members.
+R713 completed: list-pattern length, slice presence, and slice index are prepared in one pass, preserving empty/sliced behavior, known-length rejection, and indexer-versus-slice member selection.
 
 ### Status (part two hundred forty-four)
 

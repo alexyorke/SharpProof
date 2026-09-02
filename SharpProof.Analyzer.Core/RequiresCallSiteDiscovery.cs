@@ -1450,10 +1450,21 @@ internal sealed partial class RequiresCallSiteDiscovery(
             }
         }
 
-        var requiredLength = pattern.Patterns.Count(
-            static item => item is not ISlicePatternOperation);
-        var hasSlice = pattern.Patterns.Any(
-            static item => item is ISlicePatternOperation);
+        var requiredLength = 0;
+        var hasSlice = false;
+        var sliceIndex = -1;
+        for (var index = 0; index < pattern.Patterns.Length; index++)
+        {
+            if (pattern.Patterns[index] is ISlicePatternOperation)
+            {
+                hasSlice = true;
+                sliceIndex = sliceIndex < 0 ? index : sliceIndex;
+            }
+            else
+            {
+                requiredLength++;
+            }
+        }
         long knownLength = 0;
         var hasKnownLength = compilation != null &&
             TryGetKnownListLength(
@@ -1468,16 +1479,6 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 : knownLength != requiredLength))
         {
             return calls.ToImmutable();
-        }
-
-        var sliceIndex = -1;
-        for (var index = 0; index < pattern.Patterns.Length; index++)
-        {
-            if (pattern.Patterns[index] is ISlicePatternOperation)
-            {
-                sliceIndex = index;
-                break;
-            }
         }
 
         for (var itemIndex = 0;
