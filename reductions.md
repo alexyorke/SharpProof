@@ -189,6 +189,7 @@ the smallest relevant containerized test target passes.
 | R419 | Remove the redundant `BackendCheckResult` forwarding constructor | `SharpProof.Verify.Test`: 14 passed |
 | R425 | Centralize the diagnostic descriptor assertion test link | `SharpProof.Analyzer.Test`: 476; `SharpProof.ContractForGenerator.Test`: 121; `SharpProof.Meta.Analyzers.Test`: 163 |
 | R414 | Fuse model-variable validation and Z3 symbol construction | `SharpProof.Smt.Test`: 30 passed |
+| R418 | Reuse encoded arithmetic operands across SMT binary operators | `SharpProof.Smt.Test`: 30 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1950,9 +1951,9 @@ cancellation handling, and unsat core validation across `SharpProof.Smt` and `Sh
 
 ### Status (part thirty-eight)
 
-R413, R415-R418 remain `pending`; R414 and R419 are applied and validated by
-the SMT and Verify test suites.
-R413 and R418 are clean code and AST simplifications.
+R413, R415-R417 remain `pending`; R414, R418, and R419 are applied and
+validated by the SMT and Verify test suites.
+R413 is the remaining clean public-model simplification.
 R415, R416, and R417 eliminate native handle allocations, cancellation clutter, and redundant LINQ passes.
 
 ## Second survey, part thirty-nine: R420-R426

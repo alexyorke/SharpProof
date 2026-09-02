@@ -576,30 +576,38 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             }
 
             var defined = _owner.Own(_context.MkAnd(left.Defined, right.Defined));
+            if (binary.Operator == IrBinaryOperator.Equal)
+            {
+                return new EncodedValue(_owner.Own(_context.MkEq(left.Value, right.Value)), defined);
+            }
+
+            if (binary.Operator == IrBinaryOperator.NotEqual)
+            {
+                return new EncodedValue(
+                    _owner.Own(_context.MkNot(_owner.Own(_context.MkEq(left.Value, right.Value)))), defined);
+            }
+
+            var leftInteger = Integer(left);
+            var rightInteger = Integer(right);
             return binary.Operator switch
             {
-                IrBinaryOperator.Add => Bounded(_owner.Own(_context.MkAdd(Integer(left), Integer(right))), defined),
-                IrBinaryOperator.Subtract => Bounded(_owner.Own(_context.MkSub(Integer(left), Integer(right))), defined),
-                IrBinaryOperator.Multiply => Bounded(_owner.Own(_context.MkMul(Integer(left), Integer(right))), defined),
+                IrBinaryOperator.Add => Bounded(_owner.Own(_context.MkAdd(leftInteger, rightInteger)), defined),
+                IrBinaryOperator.Subtract => Bounded(_owner.Own(_context.MkSub(leftInteger, rightInteger)), defined),
+                IrBinaryOperator.Multiply => Bounded(_owner.Own(_context.MkMul(leftInteger, rightInteger)), defined),
                 IrBinaryOperator.Divide or IrBinaryOperator.Remainder =>
-                    EncodeDivision(binary.Operator, left, right, defined),
-                IrBinaryOperator.Equal => new EncodedValue(_owner.Own(_context.MkEq(left.Value, right.Value)), defined),
-                IrBinaryOperator.NotEqual => new EncodedValue(
-                    _owner.Own(_context.MkNot(_owner.Own(_context.MkEq(left.Value, right.Value)))), defined),
-                IrBinaryOperator.LessThan => new EncodedValue(_owner.Own(_context.MkLt(Integer(left), Integer(right))), defined),
-                IrBinaryOperator.LessThanOrEqual => new EncodedValue(_owner.Own(_context.MkLe(Integer(left), Integer(right))), defined),
-                IrBinaryOperator.GreaterThan => new EncodedValue(_owner.Own(_context.MkGt(Integer(left), Integer(right))), defined),
-                IrBinaryOperator.GreaterThanOrEqual => new EncodedValue(_owner.Own(_context.MkGe(Integer(left), Integer(right))), defined),
+                    EncodeDivision(binary.Operator, leftInteger, rightInteger, defined),
+                IrBinaryOperator.LessThan => new EncodedValue(_owner.Own(_context.MkLt(leftInteger, rightInteger)), defined),
+                IrBinaryOperator.LessThanOrEqual => new EncodedValue(_owner.Own(_context.MkLe(leftInteger, rightInteger)), defined),
+                IrBinaryOperator.GreaterThan => new EncodedValue(_owner.Own(_context.MkGt(leftInteger, rightInteger)), defined),
+                IrBinaryOperator.GreaterThanOrEqual => new EncodedValue(_owner.Own(_context.MkGe(leftInteger, rightInteger)), defined),
                 _ => throw new UnsupportedIrEncodingException()
             };
         }
 
         private EncodedValue EncodeDivision(
-            IrBinaryOperator @operator, EncodedValue left,
-            EncodedValue right, BoolExpr defined)
+            IrBinaryOperator @operator, ArithExpr leftInteger,
+            ArithExpr rightInteger, BoolExpr defined)
         {
-            var leftInteger = Integer(left);
-            var rightInteger = Integer(right);
             var quotient = DivideTowardZero(leftInteger, rightInteger);
             var result = @operator == IrBinaryOperator.Divide
                 ? quotient
