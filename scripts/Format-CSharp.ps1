@@ -25,6 +25,22 @@ function Invoke-DotnetFormat {
     }
 }
 
+function Invoke-DotnetFormatForGenerated {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [Parameter(Mandatory = $true)]
+        [string[]]$GeneratedPaths
+    )
+
+    Invoke-DotnetFormat -Arguments @(
+        $Arguments +
+        '--include-generated' +
+        '--include' +
+        $GeneratedPaths
+    )
+}
+
 Push-Location $repositoryRoot
 try {
     $whitespaceArguments = @(
@@ -53,20 +69,12 @@ try {
         throw 'git ls-files failed while resolving generated C# sources.'
     }
     if ($generatedPaths.Count -ne 0) {
-        $generatedWhitespaceArguments = @(
-            $whitespaceArguments +
-            '--include-generated' +
-            '--include' +
-            $generatedPaths
-        )
-        $generatedStyleArguments = @(
-            $styleArguments +
-            '--include-generated' +
-            '--include' +
-            $generatedPaths
-        )
-        Invoke-DotnetFormat -Arguments $generatedWhitespaceArguments
-        Invoke-DotnetFormat -Arguments $generatedStyleArguments
+        Invoke-DotnetFormatForGenerated `
+            -Arguments $whitespaceArguments `
+            -GeneratedPaths $generatedPaths
+        Invoke-DotnetFormatForGenerated `
+            -Arguments $styleArguments `
+            -GeneratedPaths $generatedPaths
     }
 }
 finally {

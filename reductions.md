@@ -171,6 +171,7 @@ the smallest relevant containerized test target passes.
 | R617 | Share managed-effect walk-depth entry/exit bookkeeping | `SharpProof.Effects.Test`: ManagedAbstractFlowTests, 34 passed |
 | R626 | Share Effects test compilation construction and diagnostics | `SharpProof.Effects.Test`: ManagedAbstractFlowTests 34; EffectAnalysisTests 147 passed |
 | R858 | Reuse the canonical IR variable collector in fuzz tests | `SharpProof.Fuzz.Test`: FuzzRunnerTests passed |
+| R854 | Share generated-source argument augmentation in C# formatting | PowerShell parser validation passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7520,8 +7521,11 @@ R852 is `deferred`: the candidate concerns trap lifetime and duplicated cleanup
 
 ### Status (part three hundred sixty-four)
 
-R853 and R854 are `deferred`: both are ledger-only observations, and no
-implementation or build-file changes were made during this audit.
+R853 remains `deferred`: its static-initializer paths have intentionally
+different operation-vs-presence requirements.
+
+R854 is `applied`: the generated-source suffix and invocation now flow through
+one helper while whitespace and style passes retain distinct arguments.
 
 ## Second survey, part three hundred sixty-five: R855 - paired release-JSON fixture assertions
 
