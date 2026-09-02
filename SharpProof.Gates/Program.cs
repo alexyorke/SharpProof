@@ -30,35 +30,31 @@ internal static class Program
             var command = args.Length == 0 ? "all" : args[0];
             if (command == "all")
             {
-                var corpus = await CorpusGate.RunAsync(root)
+                var corpus = await RunNamedGateAsync("corpus", root)
                     .ConfigureAwait(false);
-                var performance = await PerformanceGate.RunAsync(root)
+                var performance = await RunNamedGateAsync("performance", root)
                     .ConfigureAwait(false);
                 Console.WriteLine(
                     JsonSerializer.Serialize(
                         new
                         {
-                            corpus,
-                            performance
+                            corpus = corpus.Result,
+                            performance = performance.Result
                         },
                         JsonDefaults.Indented));
                 return corpus.Passed && performance.Passed ? 0 : 1;
             }
             if (command is "corpus" or "performance")
             {
-                object result = command == "corpus"
-                    ? await CorpusGate.RunAsync(root).ConfigureAwait(false)
-                    : await PerformanceGate.RunAsync(root).ConfigureAwait(false);
-                var passed = result switch
-                {
-                    CorpusGateResult corpus => corpus.Passed,
-                    PerformanceGateResult performance => performance.Passed,
-                    _ => false
-                };
+                var gate = await RunNamedGateAsync(command, root)
+                    .ConfigureAwait(false);
                 Console.WriteLine(JsonSerializer.Serialize(
-                    CreateStandaloneEnvelope(command, passed, result),
+                    CreateStandaloneEnvelope(
+                        command,
+                        gate.Passed,
+                        gate.Result),
                     JsonDefaults.Indented));
-                return passed ? 0 : 1;
+                return gate.Passed ? 0 : 1;
             }
             if (command == "corpus-print")
             {
@@ -93,6 +89,21 @@ internal static class Program
             Console.Error.WriteLine(exception);
             return 1;
         }
+    }
+
+    private static async Task<GateRun> RunNamedGateAsync(
+        string command,
+        string root)
+    {
+        if (command == "corpus")
+        {
+            var result = await CorpusGate.RunAsync(root).ConfigureAwait(false);
+            return new(result, result.Passed);
+        }
+
+        var performance = await PerformanceGate.RunAsync(root)
+            .ConfigureAwait(false);
+        return new(performance, performance.Passed);
     }
 
     private static object CreateStandaloneEnvelope(
@@ -142,6 +153,8 @@ internal static class Program
             Result = result
         };
     }
+
+    private readonly record struct GateRun(object Result, bool Passed);
 }
 
 internal static class JsonDefaults
