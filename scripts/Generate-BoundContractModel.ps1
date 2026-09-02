@@ -28,18 +28,6 @@ function Get-RequiredProperty([object]$Object, [string]$Name, [string]$Context) 
     return $property.Value
 }
 
-function Assert-Identifier([string]$Value, [string]$Context) {
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
-        throw "$Context is not a C# identifier: '$Value'."
-    }
-}
-
-function Assert-TypeName([string]$Value, [string]$Context) {
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_?.<>, \[\]]*$') {
-        throw "$Context is not an approved C# type: '$Value'."
-    }
-}
-
 if ([int](Get-RequiredProperty $schema 'schemaVersion' 'Bound contract model') -ne 1) {
     throw 'Bound contract model schema version must be 1.'
 }

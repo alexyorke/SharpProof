@@ -26,22 +26,6 @@ if (-not [IO.File]::Exists($SchemaPath))
     throw "IR model schema not found: $SchemaPath"
 }
 
-function Get-RequiredMember
-{
-    param(
-        [Parameter(Mandatory = $true)][object]$Object,
-        [Parameter(Mandatory = $true)][string]$Name,
-        [Parameter(Mandatory = $true)][string]$Context
-    )
-
-    $member = $Object.PSObject.Properties[$Name]
-    if ($null -eq $member -or $null -eq $member.Value)
-    {
-        throw "$Context must define '$Name'."
-    }
-    return $member.Value
-}
-
 function Get-OptionalArray
 {
     param(
@@ -89,19 +73,6 @@ function Get-OptionalBoolean
         throw "'$Name' must be a Boolean."
     }
     return [bool]$member.Value
-}
-
-function Assert-Identifier
-{
-    param(
-        [Parameter(Mandatory = $true)][string]$Value,
-        [Parameter(Mandatory = $true)][string]$Context
-    )
-
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*$')
-    {
-        throw "$Context is not a C# identifier: '$Value'."
-    }
 }
 
 function Assert-TypeName

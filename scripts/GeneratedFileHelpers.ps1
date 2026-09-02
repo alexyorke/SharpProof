@@ -1,5 +1,78 @@
 . (Join-Path $PSScriptRoot 'CSharpSourceMetrics.ps1')
 
+function Get-RequiredMember
+{
+    param(
+        [Parameter(Mandatory = $true)][object]$Object,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Context
+    )
+
+    $member = $Object.PSObject.Properties[$Name]
+    if ($null -eq $member -or $null -eq $member.Value)
+    {
+        throw "$Context must define '$Name'."
+    }
+    return $member.Value
+}
+
+function Assert-Identifier
+{
+    param([string]$Value, [string]$Context)
+
+    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*$')
+    {
+        throw "$Context is not a C# identifier: '$Value'."
+    }
+}
+
+function Assert-TypeName
+{
+    param([string]$Value, [string]$Context)
+
+    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_?.<>, \[\]]*$')
+    {
+        throw "$Context is not an approved C# type: '$Value'."
+    }
+}
+
+function Required([object]$Object, [string]$Name, [string]$Context)
+{
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property -or $null -eq $property.Value)
+    {
+        throw "$Context must define '$Name'."
+    }
+    return $property.Value
+}
+
+function Identifier([string]$Value, [string]$Context)
+{
+    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*$')
+    {
+        throw "$Context is not a C# identifier: '$Value'."
+    }
+    return $Value
+}
+
+function TypeName([string]$Value, [string]$Context)
+{
+    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_?.<>, \[\]]*$')
+    {
+        throw "$Context is not an approved C# type: '$Value'."
+    }
+    return $Value
+}
+
+function NamespaceName([string]$Value, [string]$Context)
+{
+    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$')
+    {
+        throw "$Context is not a C# namespace: '$Value'."
+    }
+    return $Value
+}
+
 function ConvertTo-CSharpString
 {
     param(

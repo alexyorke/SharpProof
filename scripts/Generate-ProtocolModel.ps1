@@ -31,15 +31,6 @@ if (-not [IO.File]::Exists($SchemaPath)) {
     throw "Protocol schema not found: $SchemaPath"
 }
 
-function Get-RequiredMember {
-    param([object]$Object, [string]$Name, [string]$Context)
-    $member = $Object.PSObject.Properties[$Name]
-    if ($null -eq $member -or $null -eq $member.Value) {
-        throw "$Context must define '$Name'."
-    }
-    return $member.Value
-}
-
 function Get-MemberArray {
     param([object]$Object, [string]$Name)
     $member = $Object.PSObject.Properties[$Name]
@@ -47,13 +38,6 @@ function Get-MemberArray {
         return @()
     }
     return @($member.Value)
-}
-
-function Assert-Identifier {
-    param([string]$Value, [string]$Context)
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
-        throw "$Context is not a C# identifier: '$Value'."
-    }
 }
 
 function Add-WrappedAlternatives {

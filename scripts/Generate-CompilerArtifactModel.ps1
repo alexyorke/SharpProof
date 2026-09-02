@@ -52,16 +52,6 @@ if (-not [IO.File]::Exists($ProtocolSchemaPath)) {
     throw "Protocol schema not found: $ProtocolSchemaPath"
 }
 
-function Get-RequiredMember {
-    param([object]$Object, [string]$Name, [string]$Context)
-
-    $member = $Object.PSObject.Properties[$Name]
-    if ($null -eq $member -or $null -eq $member.Value) {
-        throw "$Context must define '$Name'."
-    }
-    return $member.Value
-}
-
 function Get-MemberArray {
     param([object]$Object, [string]$Name)
 
@@ -88,14 +78,6 @@ function Assert-Properties {
         if ($name -notin $actual) {
             throw "$Context is missing required property '$name'."
         }
-    }
-}
-
-function Assert-Identifier {
-    param([string]$Value, [string]$Context)
-
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
-        throw "$Context is not a C# identifier: '$Value'."
     }
 }
 

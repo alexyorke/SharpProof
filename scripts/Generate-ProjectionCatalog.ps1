@@ -16,28 +16,6 @@ if ([string]::IsNullOrWhiteSpace($CatalogPath)) {
 $CatalogPath = [IO.Path]::GetFullPath($CatalogPath)
 $catalog = Get-Content -LiteralPath $CatalogPath -Raw | ConvertFrom-Json -Depth 100
 
-function Required([object]$Object, [string]$Name, [string]$Context) {
-    $property = $Object.PSObject.Properties[$Name]
-    if ($null -eq $property -or $null -eq $property.Value) {
-        throw "$Context must define '$Name'."
-    }
-    return $property.Value
-}
-
-function Identifier([string]$Value, [string]$Context) {
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
-        throw "$Context is not a C# identifier: '$Value'."
-    }
-    return $Value
-}
-
-function NamespaceName([string]$Value, [string]$Context) {
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$') {
-        throw "$Context is not a C# namespace: '$Value'."
-    }
-    return $Value
-}
-
 function TypeName([string]$Value, [string]$Context) {
     if ($Value -notmatch '^[A-Za-z_(][A-Za-z0-9_?.<>, \[\]()]*$') {
         throw "$Context is not an approved C# type: '$Value'."

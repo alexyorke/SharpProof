@@ -20,16 +20,6 @@ if (-not [IO.File]::Exists($CatalogPath)) {
     throw "Diagnostic catalog not found: $CatalogPath"
 }
 
-function Get-RequiredMember {
-    param([object]$Object, [string]$Name, [string]$Context)
-
-    $member = $Object.PSObject.Properties[$Name]
-    if ($null -eq $member -or $null -eq $member.Value) {
-        throw "$Context must define '$Name'."
-    }
-    return $member.Value
-}
-
 function Assert-ExactMembers {
     param(
         [object]$Object,
@@ -41,14 +31,6 @@ function Assert-ExactMembers {
     $expected = @($Names | Sort-Object)
     if (($actual -join '|') -ne ($expected -join '|')) {
         throw "$Context must define exactly: $($Names -join ', ')."
-    }
-}
-
-function Assert-Identifier {
-    param([string]$Value, [string]$Context)
-
-    if ($Value -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
-        throw "$Context is not a C# identifier: '$Value'."
     }
 }
 
