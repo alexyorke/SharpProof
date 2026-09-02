@@ -65,20 +65,15 @@ internal sealed class ContractIntrinsicValidator
         IInvocationOperation invocation, IMethodSymbol owner, IntrinsicContext context,
         bool isResult)
     {
-        if (context.Clause != BoundContractKind.Ensures)
+        var contextViolation = ClassifyContext(context, isResult);
+        if (contextViolation.HasValue &&
+            (isResult || context.Clause != BoundContractKind.Ensures))
         {
-            return isResult
-                ? ContractIntrinsicViolationKind.ResultOutsideEnsures
-                : ContractIntrinsicViolationKind.OldOutsideEnsures;
+            return contextViolation;
         }
 
         if (isResult)
         {
-            if (context.InsideOld)
-            {
-                return ContractIntrinsicViolationKind.ResultInsideOld;
-            }
-
             return invocation.Arguments.Length == 0 && !owner.ReturnsVoid &&
                    owner.MethodKind != MethodKind.Constructor &&
                    invocation.Type != null &&
@@ -93,12 +88,20 @@ internal sealed class ContractIntrinsicValidator
             return ContractIntrinsicViolationKind.InvalidOldSignature;
         }
 
-        return context.InsideOld
-            ? ContractIntrinsicViolationKind.OldInsideOld
-            : null;
+        return contextViolation;
     }
 
     private static ContractIntrinsicViolationKind ClassifyMethodReference(
+        IntrinsicContext context,
+        bool isResult)
+    {
+        return ClassifyContext(context, isResult) ??
+            (isResult
+                ? ContractIntrinsicViolationKind.InvalidResultSignature
+                : ContractIntrinsicViolationKind.InvalidOldSignature);
+    }
+
+    private static ContractIntrinsicViolationKind? ClassifyContext(
         IntrinsicContext context,
         bool isResult)
     {
@@ -108,15 +111,14 @@ internal sealed class ContractIntrinsicValidator
                 ? ContractIntrinsicViolationKind.ResultOutsideEnsures
                 : ContractIntrinsicViolationKind.OldOutsideEnsures;
         }
+
         if (context.InsideOld)
         {
             return isResult
                 ? ContractIntrinsicViolationKind.ResultInsideOld
                 : ContractIntrinsicViolationKind.OldInsideOld;
         }
-        return isResult
-            ? ContractIntrinsicViolationKind.InvalidResultSignature
-            : ContractIntrinsicViolationKind.InvalidOldSignature;
+        return null;
     }
 
     private IntrinsicContext GetContext(IOperation operation, IMethodSymbol owner)

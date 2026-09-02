@@ -4239,12 +4239,6 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
 
-### Status (part two hundred fifteen)
-
-| R680 | **`ContractIntrinsicValidator` duplicates the same context-only violation classification.** `Classify` and `ClassifyMethodReference` independently implement the identical `outside Ensures` decision and the identical `inside Old` decision for Result versus Old; the invocation-specific method then continues with argument/signature checks, while the method-reference path always rejects the reference signature. A shared context-classification helper can preserve those distinct signature tails and the current violation kinds while removing the repeated policy branches. | `SharpProof.Contracts/ContractIntrinsicValidator.cs:64-116` |
-
-R680 is a pending analysis-boundary reduction. Preserve context-sensitive intrinsic diagnostics and the invocation/reference-specific signature rules.
-
 ### Status (part two hundred sixteen)
 
 | R681 | **`Generate-ProtocolModel.ps1.ConvertTo-ValidationConditionSource` duplicates the `all` and `any` condition renderer.** Both branches enumerate nested `conditions`, recursively render each condition with the same root type, reject an empty list with the same shape of error, and join the parts inside parentheses; only the join token changes from `&&` to `||`. A small operator-parameterized renderer can preserve the generated expression and schema-specific diagnostics while removing the duplicated recursion and empty-list handling. | `scripts/Generate-ProtocolModel.ps1:143-167` |
