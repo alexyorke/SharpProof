@@ -407,56 +407,22 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateContractAssumeWitness()
     {
-        return Row(
-            effects: Effect(
-                "false and true compiler-bound conditions",
-                ObserveContractAssumeEffect,
-                SpecEffect.WritesAmbientState),
-            allocation: Allocation(
-                "false and true compiler-bound conditions",
-                [
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedAssumeFalse),
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedAssumeTrue)
-                ],
-                SpecAllocationBehavior.MayAllocate),
-            throws: Throws(
-                "false and true compiler-bound conditions",
-                [
-                    ThrowEdge.For(InvokeAssumeFalseDirectly),
-                    ThrowEdge.For(InvokeAssumeTrueDirectly)
-                ],
-                DoesNotThrowMutation));
+        return ContractConditionRow(
+            ObserveContractAssumeEffect,
+            InvokePreparedAssumeFalse,
+            InvokePreparedAssumeTrue,
+            InvokeAssumeFalseDirectly,
+            InvokeAssumeTrueDirectly);
     }
 
     private static RowWitness CreateContractEnsuresWitness()
     {
-        return Row(
-            effects: Effect(
-                "false and true compiler-bound conditions",
-                ObserveContractEnsuresEffect,
-                SpecEffect.WritesAmbientState),
-            allocation: Allocation(
-                "false and true compiler-bound conditions",
-                [
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedEnsuresFalse),
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedEnsuresTrue)
-                ],
-                SpecAllocationBehavior.MayAllocate),
-            throws: Throws(
-                "false and true compiler-bound conditions",
-                [
-                    ThrowEdge.For(InvokeEnsuresFalseDirectly),
-                    ThrowEdge.For(InvokeEnsuresTrueDirectly)
-                ],
-                DoesNotThrowMutation));
+        return ContractConditionRow(
+            ObserveContractEnsuresEffect,
+            InvokePreparedEnsuresFalse,
+            InvokePreparedEnsuresTrue,
+            InvokeEnsuresFalseDirectly,
+            InvokeEnsuresTrueDirectly);
     }
 
     private static RowWitness CreateContractOldWitness()
@@ -488,29 +454,12 @@ public sealed partial class ApiSpecRuntimeOracleTests
 
     private static RowWitness CreateContractRequiresWitness()
     {
-        return Row(
-            effects: Effect(
-                "false and true compiler-bound conditions",
-                ObserveContractRequiresEffect,
-                SpecEffect.WritesAmbientState),
-            allocation: Allocation(
-                "false and true compiler-bound conditions",
-                [
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedRequiresFalse),
-                    new AllocationEdge(
-                        PrepareGhostProbe,
-                        InvokePreparedRequiresTrue)
-                ],
-                SpecAllocationBehavior.MayAllocate),
-            throws: Throws(
-                "false and true compiler-bound conditions",
-                [
-                    ThrowEdge.For(InvokeRequiresFalseDirectly),
-                    ThrowEdge.For(InvokeRequiresTrueDirectly)
-                ],
-                DoesNotThrowMutation));
+        return ContractConditionRow(
+            ObserveContractRequiresEffect,
+            InvokePreparedRequiresFalse,
+            InvokePreparedRequiresTrue,
+            InvokeRequiresFalseDirectly,
+            InvokeRequiresTrueDirectly);
     }
 
     private static RowWitness CreateContractResultWitness()
@@ -576,6 +525,32 @@ public sealed partial class ApiSpecRuntimeOracleTests
             effectMutation,
             [new AllocationEdge(prepare, invoke)],
             [new ThrowEdge(prepare, invoke)]);
+    }
+
+    private static RowWitness ContractConditionRow(
+        Func<SpecEffect> observeEffect,
+        Action preparedFalse,
+        Action preparedTrue,
+        Action directFalse,
+        Action directTrue)
+    {
+        const string edgeInputs = "false and true compiler-bound conditions";
+        return Row(
+            effects: Effect(
+                edgeInputs,
+                observeEffect,
+                SpecEffect.WritesAmbientState),
+            allocation: Allocation(
+                edgeInputs,
+                [
+                    new AllocationEdge(PrepareGhostProbe, preparedFalse),
+                    new AllocationEdge(PrepareGhostProbe, preparedTrue)
+                ],
+                SpecAllocationBehavior.MayAllocate),
+            throws: Throws(
+                edgeInputs,
+                [ThrowEdge.For(directFalse), ThrowEdge.For(directTrue)],
+                DoesNotThrowMutation));
     }
 
     private static RowWitness ConstructorRow(
