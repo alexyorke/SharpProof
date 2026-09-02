@@ -393,7 +393,15 @@ function Test-SharpProofFrameworkConsumers {
                 "selected '$($actualSdk.Trim())'.")
         }
 
-        $frameworks = @('netstandard2.0', 'net8.0', 'net472')
+        $contract = Get-Content -LiteralPath (Join-Path `
+            $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
+            ConvertFrom-Json
+        $frameworks = @($contract.supportedTargetFrameworks | ForEach-Object {
+                [string]$_
+            })
+        if ($frameworks.Count -eq 0) {
+            throw 'The acceptance contract must declare supported target frameworks.'
+        }
 
         $escapedVersion = [Security.SecurityElement]::Escape($Version)
         foreach ($framework in $frameworks) {
