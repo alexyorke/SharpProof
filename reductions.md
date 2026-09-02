@@ -6460,3 +6460,26 @@ R808 is `deferred`: the scans are cheap relative to effect evidence decoding,
 and retaining an independent decoder defense may be intentional. A future
 change should only fuse them after documenting the manifest-validation
 precondition or after introducing a shared identity accumulator.
+
+## Second survey, part three hundred twenty: R809 - per-claim rebuilding of proof-label sets
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R809 | **`CompilerResponseEvidenceAuthority` rebuilds target-invariant proof-label sets for every claim.** `Validate` creates one `AssumptionShape` per target and reuses it across the target's claims, but `ValidateProofCore` calls `EntryLabels(target)` or `AllLabels(target)` afresh for each claim that needs proof-core validation. `HasAdmissibleEntryCore` independently calls `EntryLabels(target)` for the same contradictory-precondition result, so the later entry-only `ValidateProofCore` call can rebuild the identical set again. A per-target proof-label projection, containing the all-label and entry-label sets, can be created alongside `AssumptionShape` and passed through the claim validators while keeping proof-core membership, entry-only policy, and result-specific checks unchanged. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:42-79,98-166,353-440` |
+
+### Checked and not proposed (part three hundred twenty)
+
+- Proof-core membership remains claim-specific: the proposed cache contains
+  only the allowed label vocabulary, not a shared verdict for any response
+  result.
+- `ClauseLabels` and domain/summary/body label rules remain intact; the
+  candidate only reuses their target-derived projection across claims.
+- Assumption usage, effect witnesses, model canonicalization, and replay are
+  separate response-evidence policies and are not folded into this cache.
+
+### Status (part three hundred twenty)
+
+R809 is `deferred`: caching the label vocabulary is a clean seam, but it would
+  thread another target-specific object through several private validation
+  methods. The repeated work becomes more material for callables with many
+  claims; until then, the current local construction remains easy to audit.
