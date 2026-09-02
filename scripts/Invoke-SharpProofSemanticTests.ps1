@@ -504,11 +504,17 @@ try {
                     $active.StartedUtc).TotalMilliseconds)
             if (-not $Quiet -or $exitCode -ne 0) {
                 Write-Host "--- Semantic test $($active.Task.Name) ---"
-                if (-not [string]::IsNullOrWhiteSpace($stdout)) {
-                    Write-Host $stdout.TrimEnd()
+                if ($Quiet) {
+                    Write-SharpProofFailureOutput (
+                        [string]$stdout + [string]$stderr)
                 }
-                if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-                    Write-Host $stderr.TrimEnd()
+                else {
+                    if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                        Write-Host $stdout.TrimEnd()
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                        Write-Host $stderr.TrimEnd()
+                    }
                 }
             }
             $timings.Add([pscustomobject]@{

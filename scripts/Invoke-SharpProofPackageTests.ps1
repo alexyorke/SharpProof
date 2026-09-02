@@ -670,11 +670,17 @@ try {
             $exitCode = $active.Process.ExitCode
             if (-not $Quiet -or $exitCode -ne 0) {
                 Write-Host "--- Package test $($active.Shard.Name) ---"
-                if (-not [string]::IsNullOrWhiteSpace($stdout)) {
-                    Write-Host $stdout.TrimEnd()
+                if ($Quiet) {
+                    Write-SharpProofFailureOutput (
+                        [string]$stdout + [string]$stderr)
                 }
-                if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-                    Write-Host $stderr.TrimEnd()
+                else {
+                    if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                        Write-Host $stdout.TrimEnd()
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                        Write-Host $stderr.TrimEnd()
+                    }
                 }
             }
             if ($exitCode -ne 0) {

@@ -34,6 +34,27 @@ function Invoke-SharpProofDotnetInvocation {
     $ExitCode.Value = $LASTEXITCODE
 }
 
+function Write-SharpProofFailureOutput {
+    param(
+        [AllowEmptyString()]
+        [string]$Output
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Output)) {
+        return
+    }
+
+    $maximumLength = 8000
+    if ($Output.Length -gt $maximumLength) {
+        $headLength = [int]($maximumLength / 2)
+        $tailLength = $maximumLength - $headLength
+        $Output = $Output.Substring(0, $headLength) +
+            "`n... failure output truncated ...`n" +
+            $Output.Substring($Output.Length - $tailLength)
+    }
+    Write-Host $Output.TrimEnd()
+}
+
 function Invoke-SharpProofRequiredDotnet {
     param(
         [Parameter(Mandatory = $true)]
@@ -62,17 +83,7 @@ function Invoke-SharpProofRequiredDotnet {
             if ($Quiet -and
                 (Test-Path -LiteralPath $outputPath -PathType Leaf)) {
                 $output = Get-Content -LiteralPath $outputPath -Raw
-                if (-not [string]::IsNullOrWhiteSpace($output)) {
-                    $maximumFailureOutputLength = 12000
-                    if ($output.Length -gt $maximumFailureOutputLength) {
-                        $headLength = 6000
-                        $tailLength = $maximumFailureOutputLength - $headLength
-                        $output = $output.Substring(0, $headLength) +
-                            "`n... output truncated ...`n" +
-                            $output.Substring($output.Length - $tailLength)
-                    }
-                    Write-Host $output.TrimEnd()
-                }
+                Write-SharpProofFailureOutput $output
             }
             throw "dotnet $($Arguments -join ' ') failed with exit code $exitCode."
         }
@@ -584,11 +595,17 @@ function Invoke-SharpProofParallelDotnetBuilds {
             $exitCode = $active.Process.ExitCode
             if (-not $Quiet -or $exitCode -ne 0) {
                 Write-Host "--- Build $($active.Name) ---"
-                if (-not [string]::IsNullOrWhiteSpace($stdout)) {
-                    Write-Host $stdout.TrimEnd()
+                if ($Quiet) {
+                    Write-SharpProofFailureOutput (
+                        [string]$stdout + [string]$stderr)
                 }
-                if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-                    Write-Host $stderr.TrimEnd()
+                else {
+                    if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                        Write-Host $stdout.TrimEnd()
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                        Write-Host $stderr.TrimEnd()
+                    }
                 }
             }
             if ($exitCode -ne 0) {
@@ -803,6 +820,7 @@ Export-ModuleMember -Function @(
     'Get-SharpProofTestAssemblyPath',
     'Get-SharpProofDotnetWrapperPath',
     'Invoke-SharpProofCheckedCommand',
+    'Write-SharpProofFailureOutput',
     'Invoke-SharpProofGitText',
     'Invoke-SharpProofTimedPhase',
     'Invoke-SharpProofParallelDotnetBuilds',
