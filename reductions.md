@@ -7089,3 +7089,25 @@ R834 is `deferred`: the duplicate pass is linear and bounded by manifest size,
 R835 is `deferred`: the duplicate validation is small and probe-only, but both
   predicates run on performance-gate responses and can share one explicit
   authority precondition without weakening either measurement.
+
+## Second survey, part three hundred forty-seven: R836 - duplicate manifest materialization during response validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R836 | **`ProtocolJson.ValidateResponse` scans the response manifest twice to obtain the same callable and claim rows.** `ValidateManifestCore` calls `Present` for `manifest.Callables` and `manifest.Claims`, validates those filtered arrays, builds the callable-ID set and claim lookup, and walks both collections. After that returns, `ValidateResponse` constructs `ManifestIdentityIndexes`, which again filters the same two manifest arrays with `OfType` and walks them to build `CallablesById` and `ClaimsById` before validating results. A validation snapshot containing the filtered rows and reusable ordinal indexes can flow from the first pass into result/run/coverage validation; the expected-manifest path can retain its independent validation because it has no response-result joins. | `SharpProof.Worker.Protocol/ProtocolJson.cs:342-357,503-545,991-1005` |
+
+### Checked and not proposed (part three hundred forty-seven)
+
+- The snapshot must retain malformed-row filtering and the existing validation
+  errors; sharing arrays must not make an invalid manifest appear valid.
+- Expected manifests still require an independent validation because they are
+  a separate binding input and are compared only after the actual manifest is
+  valid.
+- Result, run-state, unknown-coverage, and summary policies remain separate;
+  only their common manifest rows/indexes are candidates for reuse.
+
+### Status (part three hundred forty-seven)
+
+R836 is `deferred`: response validation is a high-frequency boundary and the
+  duplicate manifest walk is broader than a single identity projection, but a
+  snapshot API needs careful error-order and malformed-input compatibility.
