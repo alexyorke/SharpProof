@@ -253,6 +253,7 @@ the smallest relevant containerized test target passes.
 | R798 | Validate launcher path topology once before snapshot/request projection, then retain only the manifest-dependent final pass | `SharpProof.Package.Test`: `LauncherArgumentTests`, 75 passed |
 | R801 | Merge incoming-environment completeness and difference checks into one forward scan | `SharpProof.Worker.Test`: `AcyclicBlockPredicateExecutorTests`, 14 passed with `-Fast` |
 | R802 | Let the shared release-bundle topology helper own the six-artifact/cardinality precondition | PowerShell parse; `ReleaseJsonAuthorityTests` fixture coverage |
+| R803 | Partition sorted manifest claims in one pass for postconditions and effects | `SharpProof.Package.Test`: focused compiler-manifest tests with `-Fast` |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -6333,6 +6334,5 @@ already owns that admission check; package-specific assertions remain local.
 
 ### Status (part three hundred fourteen)
 
-R803 is `deferred` pending a local one-pass partition loop that keeps the
-  current readable outputs without adding more validation indirection. No
-  implementation or build file was changed.
+R803 is `applied`: the sorted claim snapshot now fills the postcondition and
+effect partitions in one pass, preserving both arrays and their order.

@@ -332,10 +332,21 @@ internal static class CompilerManifestArtifactJson
         internal ClaimPartitions(IEnumerable<WorkerClaimManifestEntry> claims)
         {
             Claims = [.. claims.OrderBy(static claim => claim.Ordinal)];
-            Postconditions = [.. Claims.Where(static claim =>
-                claim.Kind == WorkerClaimKind.Postcondition)];
-            Effects = [.. Claims.Where(static claim =>
-                claim.Kind == WorkerClaimKind.Effect)];
+            var postconditions = new List<WorkerClaimManifestEntry>();
+            var effects = new List<WorkerClaimManifestEntry>();
+            foreach (var claim in Claims)
+            {
+                if (claim.Kind == WorkerClaimKind.Postcondition)
+                {
+                    postconditions.Add(claim);
+                }
+                else if (claim.Kind == WorkerClaimKind.Effect)
+                {
+                    effects.Add(claim);
+                }
+            }
+            Postconditions = [.. postconditions];
+            Effects = [.. effects];
         }
 
         internal WorkerClaimManifestEntry[] Claims { get; }
