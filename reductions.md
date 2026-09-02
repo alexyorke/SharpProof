@@ -186,6 +186,7 @@ the smallest relevant containerized test target passes.
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
+| R419 | Remove the redundant `BackendCheckResult` forwarding constructor | `SharpProof.Verify.Test`: 14 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1947,7 +1948,8 @@ cancellation handling, and unsat core validation across `SharpProof.Smt` and `Sh
 
 ### Status (part thirty-eight)
 
-R413-R419 are `pending`. R413, R414, R418, and R419 are clean code and AST simplifications.
+R413-R418 remain `pending`; R419 is applied and validated by the Verify test suite.
+R413, R414, and R418 are clean code and AST simplifications.
 R415, R416, and R417 eliminate native handle allocations, cancellation clutter, and redundant LINQ passes.
 
 ## Second survey, part thirty-nine: R420-R426
@@ -3254,3 +3256,13 @@ handled after the primary projection.
 R541-R543 are `pending` reduction candidates. R542 deliberately calls for a
 policy seam rather than a blind merge, and R543 preserves the current project
 dependency direction as part of the proposed design constraint.
+
+## Second survey, part eighty-six: R544 - finite-domain enumeration
+
+| R544 | **`FiniteDomainSmtDifferentialOracle` duplicates the recursive finite-assignment walk.** `IsDefinedForAllAssignments` and `IsSatisfiableByEnumeration` independently enumerate Boolean and integer variable values into the same mutable environment, perform the same variable-type lookup, cancellation check, unsupported-type fallback, and cleanup. Only the leaf condition (any non-exception Boolean value versus a true Boolean value) and the resulting short-circuit polarity differ. A shared assignment-search helper with a leaf predicate or an enumeration callback can remove the duplicated recursion while preserving the two oracle meanings and their early-exit behavior. | `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs:32-103,249-312` |
+
+### Status (part eighty-six)
+
+R544 is a `pending` reduction candidate. The shared helper should retain the
+current cancellation and mutable-environment cleanup semantics; it should not
+collapse the definedness and satisfiability predicates into one policy.
