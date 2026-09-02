@@ -6336,3 +6336,28 @@ already owns that admission check; package-specific assertions remain local.
 
 R803 is `applied`: the sorted claim snapshot now fills the postcondition and
 effect partitions in one pass, preserving both arrays and their order.
+
+## Second survey, part three hundred fifteen: R804 - repeated feature-scope assumption scan
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R804 | **`CompilerManifestArtifactJson.HasFeatureScopeParity` re-queries the same callable-assumption facts in separate policy checks.** The method first runs an `Any` predicate over `callable.Assumptions` to reject contract assumptions when contracts are not selected or allowed, then immediately runs the same kind of `Any` predicate to derive `hasContractAssumptions` for the selection-reason invariant. It also reads `callable.Assumptions.Length == 0` in both sides of that invariant. A small local assumption summary, computed once per callable, can preserve the null filtering and kind classification while removing the repeated scans and making the two policy checks share one stated fact. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:601-628` |
+
+### Checked and not proposed (part three hundred fifteen)
+
+- The selected-effects and selected-contracts flags remain separate because
+  they govern different feature gates; this finding concerns only the shared
+  assumption facts.
+- The later ordered assumption projection is retained: it compares declared
+  assumptions with lowered clauses and needs the full IDs and kinds, not just
+  the contract-assumption presence bit.
+- Null assumptions remain rejected/ignored exactly as the current predicates
+  specify; the reduction is a cached summary, not a change to malformed-input
+  policy.
+
+### Status (part three hundred fifteen)
+
+R804 is `deferred`: no implementation change is authorized in this audit, and
+the repeated scan is small and bounded by one callable's assumptions. It is a
+straightforward local cleanup if this validation path is being refactored, but
+it does not justify editing the implementation solely to remove a few scans.
