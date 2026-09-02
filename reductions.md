@@ -5873,3 +5873,23 @@ production complexity ratchet (members 5811/5808), unrelated to this helper.
 
 R782 is `pending` and limited to Testing.Test fixture plumbing. No implementation
 or build file was changed.
+
+## Second survey, part two hundred ninety-four: R783 - duplicated portable PDB reader setup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R783 | **Release symbol validation and production-coverage inventory duplicate the low-level portable CodeView/PDB reader lifecycle.** `SharpProof.SymbolPackageValidator.ValidatePair` opens an assembly image, constructs a `PEReader`, selects the CodeView debug entries, requires one portable entry, reads its CodeView data, opens the paired PDB with `MetadataReaderProvider.FromPortablePdbStream`, obtains a `MetadataReader`, and disposes the provider and streams around semantic checks. `Get-SharpProofProductionInventory.Get-PortablePdbModule` repeats the same assembly/PDB existence and `PEReader`/CodeView/portable-PDB setup, including `ReadCodeViewDebugDirectoryData`, `FromPortablePdbStream`, and a `finally` block that disposes every native reader and stream. The policies after that boundary are intentionally different: symbol validation checks CodeView age, PDB identity, and Source Link; coverage inventory projects source documents and sequence points. A shared compiled reader returning the pair's CodeView/PDB identity and owning disposal, or a common PowerShell/C# adapter with an explicit lifetime contract, can remove the duplicated resource and format plumbing while preserving those separate release and coverage validations. This is distinct from R292's package-entry pairing and R426's package-source enumeration. | `scripts/SharpProof.SymbolPackageValidator.cs:190-245`; `scripts/Get-SharpProofProductionInventory.ps1:218-305`; `scripts/Test-SharpProofSymbolPackages.ps1:1-32` |
+
+### Checked and not proposed (part two hundred ninety-four)
+
+- The two consumers must retain separate semantic checks: the symbol package
+  requires one CodeView record, age, PDB identity, and canonical Source Link,
+  while coverage needs assembly metadata and per-document sequence-point output.
+- This is a cross-language infrastructure candidate, so a direct call from one
+  script to the other would not be a suitable reduction; the shared boundary
+  needs an explicit ownership and dependency decision.
+
+### Status (part two hundred ninety-four)
+
+R783 is `pending` and limited to release/coverage reader plumbing. No
+implementation or build file was changed.
