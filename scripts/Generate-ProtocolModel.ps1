@@ -56,11 +56,6 @@ function Assert-Identifier {
     }
 }
 
-function ConvertTo-CSharpString {
-    param([string]$Value)
-    return '"' + $Value.Replace('\', '\\').Replace('"', '\"') + '"'
-}
-
 function Add-WrappedAlternatives {
     param(
         [Collections.Generic.List[string]]$Lines,

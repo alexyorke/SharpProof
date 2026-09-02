@@ -107,12 +107,6 @@ function Assert-TypeName {
     }
 }
 
-function ConvertTo-CSharpString {
-    param([string]$Value)
-
-    return '"' + $Value.Replace('\', '\\').Replace('"', '\"') + '"'
-}
-
 function Get-MetadataRowExpression {
     param([string]$Role, [string]$Member)
 

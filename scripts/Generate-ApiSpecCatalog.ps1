@@ -287,21 +287,6 @@ function Assert-EnumValue {
     return $text
 }
 
-function ConvertTo-CSharpString {
-    param(
-        [Parameter(Mandatory = $true)]
-        [AllowEmptyString()]
-        [string]$Value
-    )
-
-    $escaped = $Value.Replace('\', '\\').
-        Replace('"', '\"').
-        Replace("`r", '\r').
-        Replace("`n", '\n').
-        Replace("`t", '\t')
-    return '"' + $escaped + '"'
-}
-
 function ConvertTo-PascalIdentifier {
     param(
         [Parameter(Mandatory = $true)]

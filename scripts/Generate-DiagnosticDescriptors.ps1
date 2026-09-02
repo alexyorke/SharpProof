@@ -52,17 +52,6 @@ function Assert-Identifier {
     }
 }
 
-function ConvertTo-CSharpString {
-    param([AllowNull()][string]$Value)
-
-    if ($null -eq $Value) {
-        return 'null'
-    }
-    $escaped = $Value.Replace('\', '\\').Replace('"', '\"')
-    $escaped = $escaped.Replace("`r", '\r').Replace("`n", '\n')
-    return '"' + $escaped + '"'
-}
-
 function Resolve-RepositoryOutputPath {
     param([string]$RelativePath)
 

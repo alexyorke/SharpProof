@@ -26,10 +26,6 @@ function Assert-Identifier([string]$value, [string]$context) {
     }
 }
 
-function ConvertTo-CSharpString([string]$value) {
-    return '"' + $value.Replace('\', '\\').Replace('"', '\"') + '"'
-}
-
 function Assert-TypeName([string]$value, [string]$context) {
     if ($value -notmatch '^[A-Za-z_][A-Za-z0-9_?.<>, \[\]]*$') {
         throw "$context is not an approved C# type: '$value'."

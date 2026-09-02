@@ -1,5 +1,26 @@
 . (Join-Path $PSScriptRoot 'CSharpSourceMetrics.ps1')
 
+function ConvertTo-CSharpString
+{
+    param(
+        [AllowNull()]
+        [AllowEmptyString()]
+        [string]$Value
+    )
+
+    if ($null -eq $Value)
+    {
+        return 'null'
+    }
+
+    $escaped = $Value.Replace('\', '\\').
+        Replace('"', '\"').
+        Replace("`r", '\r').
+        Replace("`n", '\n').
+        Replace("`t", '\t')
+    return '"' + $escaped + '"'
+}
+
 function ConvertTo-SharpProofGeneratedText
 {
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Text)

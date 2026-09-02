@@ -128,17 +128,6 @@ function Assert-EnumValue {
     return [string]$Value
 }
 
-function ConvertTo-CSharpStringLiteral {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Value
-    )
-
-    return '"' +
-        $Value.Replace('\', '\\').Replace('"', '\"') +
-        '"'
-}
-
 $catalogJson = Get-Content -LiteralPath $CatalogPath -Raw
 $catalogDocument = [System.Text.Json.JsonDocument]::Parse($catalogJson)
 try {
@@ -338,17 +327,17 @@ $lines.Add('internal static class ContractApiCatalog')
 $lines.Add('{')
 $lines.Add(
     '    internal const string AttributesNamespace = ' +
-    (ConvertTo-CSharpStringLiteral ([string]$catalog.namespace)) + ';')
+    (ConvertTo-CSharpString ([string]$catalog.namespace)) + ';')
 $lines.Add(
     '    internal const string ConditionalSymbol = ' +
-    (ConvertTo-CSharpStringLiteral ([string]$catalog.conditionalSymbol)) + ';')
+    (ConvertTo-CSharpString ([string]$catalog.conditionalSymbol)) + ';')
 $lines.Add(
     '    internal const string Contract = AttributesNamespace + ".' +
     $contractType + '";')
 foreach ($method in $methods) {
     $lines.Add(
         '    internal const string ' + $method.Id + 'MethodName = ' +
-        (ConvertTo-CSharpStringLiteral $method.Name) + ';')
+        (ConvertTo-CSharpString $method.Name) + ';')
 }
 foreach ($attribute in $attributes) {
     $lines.Add(
@@ -371,7 +360,7 @@ $lines.Add('        [')
 foreach ($attribute in $attributes) {
     $lines.Add('            new(')
     $lines.Add('                ' + $attribute.Id + ',')
-    $lines.Add('                ' + (ConvertTo-CSharpStringLiteral $attribute.TypeName) + ',')
+    $lines.Add('                ' + (ConvertTo-CSharpString $attribute.TypeName) + ',')
     $lines.Add('                ContractApiAttributeCategory.' + $attribute.Category + ',')
     $lines.Add('                ContractApiSelectionFeature.' + $attribute.Selection + '),')
 }
@@ -382,7 +371,7 @@ $lines.Add('        [')
 foreach ($method in $methods) {
     $lines.Add(
         '            ' +
-        (ConvertTo-CSharpStringLiteral $method.Name) + ',')
+        (ConvertTo-CSharpString $method.Name) + ',')
 }
 $lines.Add('        ];')
 $lines.Add('')

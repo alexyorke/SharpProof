@@ -66,10 +66,6 @@ function Assert-UniqueJsonProperties {
     }
 }
 
-function Quote-CSharpString([string]$Value) {
-    return '"' + $Value.Replace('\', '\\').Replace('"', '\"') + '"'
-}
-
 function Assert-Choice(
     [object]$Value,
     [string[]]$Allowed,
@@ -260,17 +256,17 @@ $required = @($catalog.options | Where-Object category -eq 'required')
 $publication = @($catalog.options | Where-Object category -eq 'publication')
 $lines.Add('    private static readonly string[] s_required = [')
 foreach ($entry in $required) {
-    $lines.Add("        $(Quote-CSharpString $entry.key),")
+    $lines.Add("        $(ConvertTo-CSharpString $entry.key),")
 }
 $lines.Add('    ];')
 $lines.Add('    private static readonly string[] s_publication = [')
 foreach ($entry in $publication) {
-    $lines.Add("        $(Quote-CSharpString $entry.key),")
+    $lines.Add("        $(ConvertTo-CSharpString $entry.key),")
 }
 $lines.Add('    ];')
 $lines.Add('    private static readonly HashSet<string> s_allowed = [')
 foreach ($entry in @($catalog.options)) {
-    $lines.Add("        $(Quote-CSharpString $entry.key),")
+    $lines.Add("        $(ConvertTo-CSharpString $entry.key),")
 }
 $lines.Add('    ];')
 $lines.Add('')
@@ -284,7 +280,7 @@ $lines.Add('                path,')
 foreach ($extension in $runtimeCompanionExtensions) {
     $lines.Add(
         "                System.IO.Path.ChangeExtension(path, " +
-        "$(Quote-CSharpString $extension)),")
+        "$(ConvertTo-CSharpString $extension)),")
 }
 foreach ($file in $runtimeCompanionFiles) {
     $assemblyProperty = $runtimeCompanionAssemblyTypes.PSObject.Properties[
@@ -299,7 +295,7 @@ foreach ($file in $runtimeCompanionFiles) {
         "System.IO.Path.GetFileName(typeof($assemblyType).Assembly.Location)"
     }
     else {
-        Quote-CSharpString $file
+        ConvertTo-CSharpString $file
     }
     $lines.Add(
         "                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, " +
@@ -311,7 +307,7 @@ $lines.Add('        }')
 $lines.Add('    }')
 $lines.Add('')
 foreach ($entry in @($catalog.options | Where-Object accessor -ne 'none')) {
-    $key = Quote-CSharpString $entry.key
+    $key = ConvertTo-CSharpString $entry.key
     $declaration = switch ($entry.accessor) {
         'fullPath' { "internal string $($entry.property) => FullPath($key);" }
         'optionalFullPath' {
@@ -346,7 +342,7 @@ $lines.Add('        return new()')
 $lines.Add('        {')
 foreach ($entry in @($catalog.budgets)) {
     $lines.Add("            $($entry.property) = Number(" +
-        "$(Quote-CSharpString $entry.key), " +
+        "$(ConvertTo-CSharpString $entry.key), " +
         "$($budgetDefaults[[string]$entry.property])),")
 }
 $lines[$lines.Count - 1] = $lines[$lines.Count - 1].TrimEnd(',')
@@ -358,7 +354,7 @@ $lines.Add('    {')
 $lines.Add('        return new()')
 $lines.Add('        {')
 foreach ($entry in @($catalog.cache)) {
-    $key = Quote-CSharpString $entry.key
+    $key = ConvertTo-CSharpString $entry.key
     $value = switch ($entry.projection) {
         'boolean' { "Boolean($key, true)" }
         'optional' { "Optional($key)" }
@@ -387,7 +383,7 @@ $buildTaskLines.Add('internal static class LauncherRuntimeCompanionInventory')
 $buildTaskLines.Add('{')
 $buildTaskLines.Add('    internal static string[] FileNames { get; } = [')
 foreach ($file in $runtimeCompanionFiles) {
-    $buildTaskLines.Add("        $(Quote-CSharpString $file),")
+    $buildTaskLines.Add("        $(ConvertTo-CSharpString $file),")
 }
 $buildTaskLines.Add('    ];')
 $buildTaskLines.Add('}')
