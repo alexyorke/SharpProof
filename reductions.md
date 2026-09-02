@@ -147,6 +147,7 @@ the smallest relevant containerized test target passes.
 | R831 | Use logical boolean operators for launcher policy predicates | `SharpProof.Package.Test`: LauncherArgumentTests 75 passed |
 | R833 | Reuse the result identity snapshot for protocol uniqueness and exact-set validation | `SharpProof.Worker.Test`: ProtocolJsonTests passed |
 | R834 | Reuse the manifest callable identity snapshot for membership validation | `SharpProof.Worker.Test`: ProtocolJsonTests passed |
+| R835 | Share the clean-response precondition in worker performance probes | `SharpProof.Gates.Test`: CooperativeTimeoutProbeRejectsPartialProtocolEvidence passed; broader PerformanceGateTests had 27 passed and 2 pre-existing package-policy failures |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7087,9 +7088,9 @@ R834 is `applied`: callable IDs materialized for uniqueness now also populate
 
 ### Status (part three hundred forty-six)
 
-R835 is `deferred`: the duplicate validation is small and probe-only, but both
-  predicates run on performance-gate responses and can share one explicit
-  authority precondition without weakening either measurement.
+R835 is `applied`: cancellation and project-timeout probes share one clean
+  response predicate while retaining their distinct status, result-shape, and
+  witness checks.
 
 ## Second survey, part three hundred forty-seven: R836 - duplicate manifest materialization during response validation
 
@@ -7155,3 +7156,26 @@ R837 is `deferred`: the extra owner map is linear and bounded, but it repeats
 R838 is `deferred`: the duplicate request validation is deterministic boundary
   work on every bound response check, but preserving the public envelope API's
   fail-closed contract requires a deliberate internal split.
+
+## Second survey, part three hundred fifty: R839 - magic rule partition around nested budget validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R839 | **Request and summary validation partition generated rule arrays with positional `Take(2)`/`Skip(2)` calls.** `Validate(WorkerVerifyRequest)` applies the first two `RequestRules`, validates the nested budgets, then applies the remainder; `ValidateSummary` repeats the same shape over `SummaryRules`. The split is encoded only by the current array ordering, so inserting or reordering a direct rule silently changes which checks run before or after budget validation, while each call also enumerates the rule array separately. Generated phase-specific rule groups or an explicit nested-validation seam can preserve error ordering without this positional coupling and repeated partition ceremony. | `SharpProof.Worker.Protocol/ProtocolJson.cs:152-163,770-793`; generated `RequestRules` and `SummaryRules` at `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:809-821,892-898` |
+
+### Checked and not proposed (part three hundred fifty)
+
+- The budget checks remain a separate nested validation boundary because they
+  use a different model and error prefix; this candidate does not merge their
+  policies into request or summary rules.
+- Rule ordering may be part of the protocol's diagnostic contract, so the
+  proposed cleanup must retain the current before/after order rather than
+  simply concatenating all checks.
+- The finding is about positional partitioning and its repeated ceremony, not
+  about replacing the generated rule metadata with handwritten validation.
+
+### Status (part three hundred fifty)
+
+R839 is `deferred`: the arrays are tiny and the two phases make diagnostic
+  ordering explicit at the call site, but their positional coupling is brittle
+  generated-code plumbing that could be made self-describing.

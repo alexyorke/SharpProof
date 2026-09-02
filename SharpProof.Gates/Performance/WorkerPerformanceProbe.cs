@@ -121,7 +121,6 @@ internal static class WorkerPerformanceProbe
     {
         return response.RunStatus == WorkerRunStatus.Canceled &&
         response.FailureReason == WorkerRunFailureReason.None &&
-        response.Errors.Length == 0 &&
         response.Manifest.Callables.Length > 0 &&
         response.Manifest.Claims.Length > 0 &&
         response.CallableResults.All(static result =>
@@ -136,7 +135,7 @@ internal static class WorkerPerformanceProbe
                 Outcome: WorkerClaimOutcome.Unknown,
                 Reason: WorkerClaimReason.Canceled
             }) &&
-        WorkerProtocolJson.Validate(response).IsValid;
+        IsValidCleanResponse(response);
     }
 
     private static async Task VerifyCooperativeLauncherCancellationAsync(
@@ -189,14 +188,19 @@ internal static class WorkerPerformanceProbe
     internal static bool IsCompleteProjectTimeout(
         WorkerVerifyResponse response)
     {
-        return response.Errors.Length == 0 &&
-            response.RunStatus == WorkerRunStatus.TimedOut &&
-            WorkerProtocolJson.Validate(response).IsValid &&
+        return response.RunStatus == WorkerRunStatus.TimedOut &&
             (response.ClaimResults.Any(static result =>
                 result.Reason == WorkerClaimReason.ProjectTimeout) ||
             response.CallableResults.Any(static result =>
                 result.Reason ==
-                WorkerCallableCoverageReason.ProjectTimeout));
+                WorkerCallableCoverageReason.ProjectTimeout)) &&
+            IsValidCleanResponse(response);
+    }
+
+    private static bool IsValidCleanResponse(WorkerVerifyResponse response)
+    {
+        return response.Errors.Length == 0 &&
+            WorkerProtocolJson.Validate(response).IsValid;
     }
 
     private static async Task<double> MeasureForcedTerminationCoreAsync(
