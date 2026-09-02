@@ -4,6 +4,7 @@ namespace SharpProof.Worker;
 
 internal sealed partial class VerificationCache(string directory, long maximumBytes)
 {
+    internal const string CacheFileSuffix = ".sharp-proof-cache.json";
     private static readonly ConcurrentDictionary<string, SemaphoreSlim>
         ProcessLocks = new(StringComparer.Ordinal);
     private readonly string _directory = Path.GetFullPath(
@@ -393,7 +394,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 CapacityPriorityComparer);
         long total = 0;
         foreach (var file in new DirectoryInfo(_directory).EnumerateFiles(
-                     "*.sharp-proof-cache.json",
+                     "*" + CacheFileSuffix,
                      SearchOption.TopDirectoryOnly))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -521,9 +522,8 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private static bool IsOwnedCacheEntry(string fileName)
     {
-        const string suffix = ".sharp-proof-cache.json";
-        return fileName.Length == 64 + suffix.Length &&
-            fileName.EndsWith(suffix, StringComparison.Ordinal) &&
+        return fileName.Length == 64 + CacheFileSuffix.Length &&
+            fileName.EndsWith(CacheFileSuffix, StringComparison.Ordinal) &&
             fileName.Take(64).All(static character =>
                 character is >= '0' and <= '9' or >= 'a' and <= 'f');
     }
@@ -552,7 +552,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             throw new ArgumentException("A SHA-256 input hash is required.", nameof(inputHash));
         }
 
-        return Path.Combine(_directory, inputHash + ".sharp-proof-cache.json");
+        return Path.Combine(_directory, inputHash + CacheFileSuffix);
     }
 
     private static string HashText(string value)

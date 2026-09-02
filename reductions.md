@@ -136,6 +136,7 @@ the smallest relevant containerized test target passes.
 | R333 | Reuse one class-level valid supervisor nonce fixture across the five BuildTaskTests methods that exercise it | `SharpProof.Package.Test`: 141 BuildTask, supervisor, and launcher tests passed |
 | R334 | Reuse one class-level schema-3 corpus snapshot header fixture across the corpus format tests | `SharpProof.Gates.Test`: 23 corpus gate tests passed |
 | R335 | Reuse one class-level valid input-hash fixture across the three LauncherArgumentTests methods that exercise it | `SharpProof.Package.Test`: LauncherArgumentTests passed |
+| R336 | Share the verification-cache filename suffix between production path generation/validation and worker edge-case fixtures | `SharpProof.Worker.Test`: WorkerTcbEdgeCaseTests 44 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1424,7 +1425,6 @@ maintenance seams rather than style preferences.
 | ID | Finding | Evidence |
 |---|---|---|
 | R331 | **The two custom-nuspec project files copy the same packaging skeleton.** `SharpProof.Package.csproj` and `SharpProof.Verifier.csproj` each import `SharpProof.PackageMetadata.props` and repeat the same `Nullable=disable`, `ImplicitUsings=disable`, `TargetFramework=netstandard2.0`, `IncludeBuildOutput=false`, `GeneratePackageOnBuild=false`, `NuspecBasePath`, `NU5128` suppression, `Copyright`, and `NoPackageAnalysis` settings. Their `_SharpProofPrepareNuspecProperties` targets also share the same name, timing, and `version/configuration/repositorycommit` property prefix. A shared custom-nuspec props/target fragment could own this stable skeleton while leaving package IDs, nuspec filenames, native-root validation, and project references explicit. This refines R291's metadata duplication at the project-file layer. | `SharpProof.Package/SharpProof.Package.csproj:1-20,42-45`; `SharpProof.Verifier/SharpProof.Verifier.csproj:1-20,47-52` |
-| R336 | **The cache filename suffix has a local authority that production does not reuse.** `VerificationCache.IsOwnedCacheEntry` defines `suffix = ".sharp-proof-cache.json"` for length and ownership checks, but `GetPath` types the same suffix as a separate literal. `WorkerTcbEdgeCaseTests` then repeats the suffix in its own local constant, globs, and path assertions. A class/internal cache-name constant or a test-facing pattern helper could make the writer, scanner, and edge-case fixtures consume one storage convention; this is complementary to R325's hash-format validation. | `SharpProof.Worker/VerificationCache.cs:522-528,548-556`; `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:30,33,49,1176-1189,1144-1145,1260-1262,1311-1312,1361-1364,1455` |
 | R337 | **The stable Roslyn additional-text implementation type name is repeated beside the duplicated guard from R323.** Both `CompilerCompilationCapture` and `CompilerProbeSnapshot` privately declare `CommandLineAdditionalTextTypeName = "Microsoft.CodeAnalysis.AdditionalTextFile"` and compare against it with ordinal equality. R323 already records the larger `GetStableAdditionalText` algorithm duplication; even if the methods remain separate because the probe has no collector project reference, the exact type-name value is a second independent drift point and should be included in that sharing decision. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:58-59,437-442`; `SharpProof.CompilerProbe.TestAsset/CompilerProbeSnapshot.cs:7-8,563-573`; R323 |
 | R338 | **Three analyzer components repeat the same `NoWarn` suppression bundle.** `SharpProof.Analyzer.Core`, `SharpProof.Analyzer`, and `SharpProof.CompilerCollector` each append exactly `RS2002;RS2003` to `NoWarn`. These projects share generated diagnostic-descriptor/analyzer infrastructure, while the other Roslyn components use different suppression sets (`RS2008`, `RS1035`, or none). A narrowly scoped analyzer-component property or shared props fragment could remove the three repeated lines, but the reason for suppressing each rule must be confirmed before centralization; this is not evidence that the warnings themselves are unnecessary. | `SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj:8`; `SharpProof.Analyzer/SharpProof.Analyzer.csproj:8`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:9` |
 | R339 | **Every project that marks itself `IsRoslynAnalyzer=true` also repeats `EnforceExtendedAnalyzerRules=true`.** The five projects are `SharpProof.CompilerProbe.TestAsset`, `SharpProof.CompilerCollector`, `SharpProof.ContractForGenerator`, `SharpProof.Analyzer`, and `SharpProof.Meta.Analyzers`; the pair is a stable role policy rather than five independent choices. Keeping the marker local but deriving the second property from it in `Directory.Build.props` would remove repeated policy lines while preserving the test asset's deliberate analyzer identity. | `SharpProof.CompilerProbe.TestAsset/SharpProof.CompilerProbe.TestAsset.csproj:7-8`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:4-5`; `SharpProof.ContractForGenerator/SharpProof.ContractForGenerator.csproj:5-6`; `SharpProof.Analyzer/SharpProof.Analyzer.csproj:4-5`; `SharpProof.Meta.Analyzers/SharpProof.Meta.Analyzers.csproj:4-5` |
@@ -1443,6 +1443,9 @@ maintenance seams rather than style preferences.
   `CorpusSnapshotHeader` fixture for all schema-3 format cases.
 - R335 is now applied: `LauncherArgumentTests` uses one class-level
   `ValidInputHash` fixture for its repeated response-validation cases.
+- R336 is now applied: `VerificationCache.CacheFileSuffix` is the single
+  production/test authority for cache filenames, including wildcard scans and
+  path-validation fixtures.
 - The repeated `SHARPPROOF_CONTRACTS` string spans the public conditional symbol,
   compilation fingerprinting, and synthetic source fixtures. The fixture copies
   are part of R309, while the fingerprint intentionally has a separate
@@ -1461,8 +1464,8 @@ maintenance seams rather than style preferences.
 
 ### Status (part twenty-six)
 
-R331, R336-R339 are `pending`. R331, R336, and R337 touch packaging or storage
-authorities and need boundary-aware implementations. R333-R335 and R338-R339
+R331, R337-R339 are `pending`. R331 and R337 touch packaging
+authorities and need boundary-aware implementations. R338-R339
 are smaller, mechanically testable build/test reductions.
 
 ## Second survey, part twenty-seven: R340-R349
@@ -2776,3 +2779,42 @@ individually with `git check-ignore`.
 R503 is `pending` and is four lines. It is filed despite its size because
 negation rules are the part of an ignore file where being wrong is silent, and
 three of these four point at paths that do not exist in the repository.
+
+
+## Second survey, part sixty-four: R504 - Dockerfile layer boundaries
+
+Layer-level analysis of the container build, distinct from the toolchain-version
+audit in part sixty-one. Two boundaries are drawn in places that cost more than
+they need to.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R504 | **The 31.5 MB Z3 download shares a cache layer with a trivial JSON projection, and is invalidated by an unrelated script.** Lines 40-42 copy `toolchain.json`, `Prepare-NativePayload.ps1`, and `New-ContainerContract.ps1`; line 43 then runs *both* payload preparation - which calls `Invoke-WebRequest` on the Z3 archive (`Prepare-NativePayload.ps1:37`) - and container-contract generation, a 35-line pure JSON transform, in a single `RUN`. That layer's cache key covers all three copied files, so **editing `New-ContainerContract.ps1` forces a full re-download of the Z3 archive** even though the two operations share nothing but a catalog input. Splitting the contract generation into its own `COPY` plus `RUN` after the payload step makes edits to it free, and costs one extra layer. Separately, lines 50-58 copy four shell scripts and then `RUN chmod 0755` over the same four paths; BuildKit's `COPY --chmod=0755` expresses this inline, removing six lines and one layer. This compounds with R497: because CI builds this image five times per event with no cache, a needlessly wide cache key is paid repeatedly rather than once. | `eng/container/Dockerfile:40-48,50-58`; `eng/container/Prepare-NativePayload.ps1:37` |
+
+### Checked and not proposed (part sixty-four)
+
+- **The multi-stage structure is efficient and correct.** Four extraction stages
+  (`powershell`, `test-runtime`, `minimum-sdk`, `minimum-framework`) exist purely
+  to `COPY --from`, so none of their layers ship in the final image - only the
+  copied directories do. That is the right shape for assembling a toolchain from
+  several base images, and applied R244 removed the one stage that was not pulling
+  its weight.
+- **Applied R243 reached the Dockerfile too.** Line 48 now writes the contract to
+  `"${SHARPPROOF_CONTAINER_CONTRACT}"` rather than the hardcoded
+  `/etc/sharpproof/container-contract.json`, consistent with the env-var
+  resolution that item introduced. Only the assertion in
+  `Test-SharpProofContainerContract.ps1` was left behind, which is R480.
+- The platform guard on line 25 (`RUN test "${TARGETOS}" = "linux" && test
+  "${TARGETARCH}" = "amd64"`) is its own layer, but it is near-free and placed
+  first so it fails fast before any expensive step. Correct as written.
+- Ordering is otherwise sound: the volatile repository-owned scripts are copied
+  *after* the expensive base-image assembly and payload download, so editing them
+  does not invalidate the costly layers. The only inversion is the one in the
+  finding above.
+
+### Status (part sixty-four)
+
+R504 is `pending`. Like R497 its payoff is build time rather than
+maintainability, and the two should be considered together - caching the image
+addresses the repetition, while splitting the layer addresses why a cache miss
+costs more than it should.

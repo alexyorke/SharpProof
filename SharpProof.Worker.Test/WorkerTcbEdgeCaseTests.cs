@@ -18,6 +18,8 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class WorkerTcbEdgeCaseTests
 {
+    private const string CacheFileSuffix = VerificationCache.CacheFileSuffix;
+
     [Test]
     public async Task OrdinaryCacheMissReconcilesReducedCapacity()
     {
@@ -27,10 +29,10 @@ public sealed class WorkerTcbEdgeCaseTests
         {
             var oldest = Path.Combine(
             directory.FullName,
-            new string('a', 64) + ".sharp-proof-cache.json");
+            new string('a', 64) + CacheFileSuffix);
             var newest = Path.Combine(
             directory.FullName,
-            new string('b', 64) + ".sharp-proof-cache.json");
+            new string('b', 64) + CacheFileSuffix);
             await File.WriteAllTextAsync(oldest, new string('x', 100));
             await File.WriteAllTextAsync(newest, new string('y', 100));
             File.SetLastWriteTimeUtc(oldest, DateTime.UtcNow.AddMinutes(-1));
@@ -46,7 +48,7 @@ public sealed class WorkerTcbEdgeCaseTests
 
             Assert.That(result, Is.Null);
             Assert.That(
-                Directory.GetFiles(directory.FullName, "*.sharp-proof-cache.json"),
+                Directory.GetFiles(directory.FullName, "*" + CacheFileSuffix),
                 Is.EqualTo(new[] { newest }));
         }
         finally
@@ -1055,7 +1057,7 @@ public sealed class WorkerTcbEdgeCaseTests
             var inputHash = new string('d', 64);
             var path = Path.Combine(
                 directory,
-                inputHash + ".sharp-proof-cache.json");
+                inputHash + CacheFileSuffix);
             await File.WriteAllBytesAsync(
                 path, new byte[WorkerProtocolJson.MaximumJsonBytes + 1]);
             var cache = new VerificationCache(
@@ -1113,7 +1115,7 @@ public sealed class WorkerTcbEdgeCaseTests
                     Is.False,
                     maximumBytes.ToString(CultureInfo.InvariantCulture));
                 Assert.That(
-                    Directory.GetFiles(directory, "*.sharp-proof-cache.json"),
+                    Directory.GetFiles(directory, "*" + CacheFileSuffix),
                     Is.Empty,
                     maximumBytes.ToString(CultureInfo.InvariantCulture));
             }
@@ -1141,7 +1143,7 @@ public sealed class WorkerTcbEdgeCaseTests
             VerificationCache.PathValidationOverride = (_, path) =>
             {
                 if (path.EndsWith(
-                        ".sharp-proof-cache.json",
+                        CacheFileSuffix,
                         StringComparison.Ordinal) &&
                     File.Exists(path))
                 {
@@ -1160,7 +1162,7 @@ public sealed class WorkerTcbEdgeCaseTests
             };
             Assert.ThrowsAsync<OperationCanceledException>(write);
             Assert.That(
-                Directory.GetFiles(directory, "*.sharp-proof-cache.json"),
+                Directory.GetFiles(directory, "*" + CacheFileSuffix),
                 Is.Empty);
         }
         finally
@@ -1173,7 +1175,7 @@ public sealed class WorkerTcbEdgeCaseTests
     [Test]
     public void CacheCapacityScanStopsAfterCancellation()
     {
-        const string suffix = ".sharp-proof-cache.json";
+        const string suffix = CacheFileSuffix;
         var directory = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             "worker-cache-capacity-cancel-" + Guid.NewGuid().ToString("N"));
@@ -1253,12 +1255,12 @@ public sealed class WorkerTcbEdgeCaseTests
                 Is.True);
             var path = Directory.GetFiles(
                 directory,
-                "*.sharp-proof-cache.json").Single();
+                ("*" + CacheFileSuffix)).Single();
             var original = await File.ReadAllBytesAsync(path);
             VerificationCache.PathValidationOverride = (_, candidate) =>
             {
                 if (candidate.EndsWith(
-                        ".sharp-proof-cache.json",
+                        CacheFileSuffix,
                         StringComparison.Ordinal) &&
                     File.Exists(candidate))
                 {
@@ -1308,7 +1310,7 @@ public sealed class WorkerTcbEdgeCaseTests
             VerificationCache.PathValidationOverride = (_, candidate) =>
             {
                 if (candidate.EndsWith(
-                        ".sharp-proof-cache.json",
+                        CacheFileSuffix,
                         StringComparison.Ordinal) &&
                     File.Exists(candidate) &&
                     Interlocked.CompareExchange(
@@ -1358,10 +1360,10 @@ public sealed class WorkerTcbEdgeCaseTests
                     CancellationToken.None),
                 Is.True);
             Assert.That(
-                Directory.GetFiles(directory, "*.sharp-proof-cache.json")
+                Directory.GetFiles(directory, "*" + CacheFileSuffix)
                     .Select(Path.GetFileName),
                 Is.EqualTo(new[] {
-                    secondHash + ".sharp-proof-cache.json"
+                    secondHash + CacheFileSuffix
                 }));
         }
         finally
@@ -1452,7 +1454,7 @@ public sealed class WorkerTcbEdgeCaseTests
         return File.WriteAllTextAsync(
             Path.Combine(
                 directory,
-                inputHash + ".sharp-proof-cache.json"),
+                inputHash + CacheFileSuffix),
             envelope);
     }
 
