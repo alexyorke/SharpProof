@@ -226,20 +226,23 @@ public sealed class CompilerEffectReplayArtifactCodecTests
     private static void AssertRejected(
         Action<CompilerEffectClaimArtifact> mutate)
     {
-        var evidence = RefutedEvidence();
-        mutate(evidence);
-        CompilerEffectClaimArtifactCodec.Seal(evidence);
-
-        Assert.Throws<InvalidDataException>(
-            (Action)(() =>
-                CompilerEffectClaimArtifactCodec.Validate(evidence)));
+        AssertRejected(mutate, null);
     }
 
     private static void AssertRejected(
         CompilerEffectReplayEventKind kind,
         Action<CompilerEffectClaimArtifact> mutate)
     {
-        var evidence = RefutedEvidence(kind);
+        AssertRejected(mutate, kind);
+    }
+
+    private static void AssertRejected(
+        Action<CompilerEffectClaimArtifact> mutate,
+        CompilerEffectReplayEventKind? kind)
+    {
+        var evidence = kind.HasValue
+            ? RefutedEvidence(kind.Value)
+            : RefutedEvidence();
         mutate(evidence);
         CompilerEffectClaimArtifactCodec.Seal(evidence);
 

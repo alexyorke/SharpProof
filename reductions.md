@@ -4192,11 +4192,3 @@ R637 is a pending Worker-test fixture-lifetime reduction candidate and extends t
 ### Status (part one hundred seventy-nine)
 
 R638 is a pending compiler-artifact test-fixture reduction candidate. Preserve the distinct contract-reference, output-kind, source-location, and diagnostic-classification scenarios; share only the common artifact production call.
-
-## Second survey, part one hundred eighty: R639 - duplicate replay rejection wrapper
-
-| R639 | **`CompilerEffectReplayArtifactCodecTests` duplicates its mutate/seal/validate rejection wrapper.** The two `AssertRejected` overloads both build an evidence fixture, apply a mutation, seal it, and assert `InvalidDataException`; the overload accepting `CompilerEffectReplayEventKind` changes only which `RefutedEvidence` factory is called. Delegating the simpler overload to the kind-aware core (or making the factory selection an optional seam) removes the duplicate assertion plumbing while keeping the event-kind fixture construction and malformed-codec assertion explicit. | `SharpProof.Worker.Test/CompilerEffectReplayArtifactCodecTests.cs:226-249` |
-
-### Status (part one hundred eighty)
-
-R639 is a pending replay-codec test helper cleanup. Preserve the seal-before-validate ordering, exception type, and distinct event-kind evidence; share only the repeated rejection harness.
