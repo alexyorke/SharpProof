@@ -7376,3 +7376,24 @@ R847 is `applied`: the six resource-claim mutations now reuse one canonical
 R848 is `applied`: supported-diagnostics lists now use the ordered symbols
   captured during validation, avoiding a second raw catalog projection while
   preserving source order and uniqueness checks.
+
+## Second survey, part three hundred sixty: R849 - duplicated IR tag-to-alias mapping
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R849 | **`Generate-IrModel.ps1` hardcodes the same nine identifier mappings twice.** The first literal list drives generation of `IrIdentityTag`, `IrTermTag`, `IrVariableTag`, `IrTypeTag`, `IrMemberTag`, `IrStringTag`, `IrOperationTag`, `IrBlockTag`, and `IrInstructionTag` records. Later, a separate literal block emits `IrIdentityId` through `IrInstructionId` aliases whose names correspond one-for-one to those tags and whose generic arguments use the same tag types. Retaining the tag descriptors and projecting the alias name/type from them can keep the two generated files synchronized without repeating the mapping list. | `scripts/Generate-IrModel.ps1:166-181,537-567` |
+
+### Checked and not proposed (part three hundred sixty)
+
+- The tags and aliases remain separate generated artifacts because their
+  consumers need distinct declarations and source-file placement.
+- The alias names are part of the public/internal identifier vocabulary and
+  must not be inferred from arbitrary source text; only the generator's own
+  descriptor list is a candidate source.
+- The identifier prefixes are intentionally retained as tag data and are not
+  conflated with alias names.
+
+### Status (part three hundred sixty)
+
+R849 is `deferred`: the mapping is stable and small, but deriving aliases from
+  the tag descriptors would remove a same-generator drift surface.
