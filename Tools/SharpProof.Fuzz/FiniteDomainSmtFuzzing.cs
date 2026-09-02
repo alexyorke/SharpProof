@@ -497,7 +497,8 @@ public static class IrStructuralShrinker
             }
         }
 
-        foreach (var child in Children(term))
+        var children = Children(term);
+        foreach (var child in children)
         {
             if (child.Type == term.Type)
             {
@@ -516,7 +517,6 @@ public static class IrStructuralShrinker
             Add(factory.Integer(1));
         }
 
-        var children = Children(term);
         for (var index = 0; index < children.Length; index++)
         {
             foreach (var childCandidate in GetCandidates(
