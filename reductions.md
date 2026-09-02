@@ -4022,7 +4022,10 @@ the truth-operator short-circuit cases without the unreachable null disjunct.
 
 ### Status (part one hundred fifty-six)
 
-R615 is a pending local Effects infrastructure candidate. Preserve the null-terminated enclosing-region walk and each caller's distinct filtering/mapping; remove only the duplicate iterator declarations.
+R615 is applied: `CreateFinallyEntries` and
+`CreateExceptionalRegionOperations` now share one class-level
+`EnclosingRegions` iterator, preserving the null-terminated walk and each
+builder's distinct filtering and mapping.
 
 ## Second survey, part one hundred fifty-seven: R616 - reuse static-initializable member predicate
 

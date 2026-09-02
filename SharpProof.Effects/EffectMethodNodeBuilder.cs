@@ -1014,15 +1014,6 @@ internal sealed class EffectMethodNodeBuilder
             }
         }
         return result;
-
-        static IEnumerable<ControlFlowRegion> EnclosingRegions(
-            ControlFlowRegion? region)
-        {
-            for (; region != null; region = region.EnclosingRegion)
-            {
-                yield return region;
-            }
-        }
     }
 
     private static Dictionary<ControlFlowRegion, IOperation>
@@ -1071,13 +1062,14 @@ internal sealed class EffectMethodNodeBuilder
             }
         }
 
-        static IEnumerable<ControlFlowRegion> EnclosingRegions(
-            ControlFlowRegion? region)
+    }
+
+    private static IEnumerable<ControlFlowRegion> EnclosingRegions(
+        ControlFlowRegion? region)
+    {
+        for (; region != null; region = region.EnclosingRegion)
         {
-            for (; region != null; region = region.EnclosingRegion)
-            {
-                yield return region;
-            }
+            yield return region;
         }
     }
 
