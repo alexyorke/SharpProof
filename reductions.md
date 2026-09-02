@@ -180,6 +180,7 @@ the smallest relevant containerized test target passes.
 | R602, R608 | Share Worker compiler-test compilation setup across five suites | `SharpProof.Worker.Test`: CompilerCallableLowererTests 20; CompilerRelationalSummaryProviderTests 3; CompilerCallableLowererWaveSixRegressionTests 3; ClaimManifestBuilderTests 50; CompilerRuntimeSymbolArtifactTests 2 passed |
 | R565 | Reuse sorted package-build statistic arrays for medians and P95 | `SharpProof.Gates.Test`: PackageBuildEstimator tests, 6 passed; 27 other PerformanceGateTests passed (2 pre-existing policy failures) |
 | R571 | Share collectible runtime assembly test lifetime and resolver setup | `SharpProof.Analyzer.Test`: RuntimeFlagshipOracleTests and RuntimeRequiresOracleTests passed; `SharpProof.Effects.Test`: RuntimeEffectOracleTests, 7 passed |
+| R585 | Share the parameterized Worker throwing-backend fixture | `SharpProof.Worker.Test`: AcyclicBlockPredicateExecutorTests 14; CompilerCallableLowererTests 20; WorkerTcbEdgeCaseTests 44 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -3849,7 +3850,9 @@ independent. Worker and package integration suites pass.
 
 ### Status (part one hundred twenty-six)
 
-R585 is a pending Worker test-infrastructure reduction candidate. Keep the message and counter behavior configurable so tests still prove that malformed or unsupported inputs never reach the backend.
+R585 is `applied`: the three Worker suites now share one parameterized
+`ThrowingBackend` that retains the per-scenario message and interlocked call
+counter while preserving each malformed-input and zero-claim assertion.
 
 ## Second survey, part one hundred twenty-seven: R586 - duplicate compiler-artifact factory setup
 

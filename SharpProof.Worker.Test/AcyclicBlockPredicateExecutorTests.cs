@@ -221,7 +221,8 @@ public sealed class AcyclicBlockPredicateExecutorTests
         builder.Goto(entry, factory.CreateOperation(), entry);
         var program = builder.Build();
         var execution = Execute(factory, program, []);
-        var backend = new UnexpectedBackend();
+        var backend = new ThrowingBackend(
+            "A cyclic body reached the backend.");
         var verifier = new CallableVerifier(backend, WorkerBudgets.DefaultMaximumExpressionDepth);
 
         var results = await verifier.VerifyAsync(
@@ -858,16 +859,4 @@ public sealed class AcyclicBlockPredicateExecutorTests
         }
     }
 
-    private sealed class UnexpectedBackend : ISmtBackend
-    {
-        private int _callCount;
-        internal int CallCount => Volatile.Read(ref _callCount);
-        public Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query,
-            CancellationToken cancellationToken)
-        {
-            Interlocked.Increment(ref _callCount);
-            throw new AssertionException("A cyclic body reached the backend.");
-        }
-    }
 }

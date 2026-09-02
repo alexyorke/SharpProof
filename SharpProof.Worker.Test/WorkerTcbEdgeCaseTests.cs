@@ -122,7 +122,7 @@ public sealed class WorkerTcbEdgeCaseTests
     public async Task MalformedProgramBodiesFailClosedBeforeBackendInvocation(
         MalformedBodyKind kind)
     {
-        var backend = new UnexpectedBackend();
+        var backend = new ThrowingBackend("Malformed input reached the backend.");
         var verifier = new CallableVerifier(
             backend,
             WorkerBudgets.DefaultMaximumExpressionDepth);
@@ -165,7 +165,7 @@ public sealed class WorkerTcbEdgeCaseTests
             [],
             WorkerClaimReason.None,
             CompilerPreparedBody.Trivial());
-        var backend = new UnexpectedBackend();
+        var backend = new ThrowingBackend("Malformed input reached the backend.");
 
         var results = await new CallableVerifier(
             backend,
@@ -215,7 +215,7 @@ public sealed class WorkerTcbEdgeCaseTests
             [],
             WorkerClaimReason.None,
             CompilerPreparedBody.Trivial());
-        var backend = new UnexpectedBackend();
+        var backend = new ThrowingBackend("Malformed input reached the backend.");
 
         var results = await new CallableVerifier(
             backend,
@@ -251,7 +251,7 @@ public sealed class WorkerTcbEdgeCaseTests
             factory.Boolean(true),
             [],
             body: null);
-        var backend = new UnexpectedBackend();
+        var backend = new ThrowingBackend("Malformed input reached the backend.");
 
         var results = await new CallableVerifier(
             backend,
@@ -300,7 +300,7 @@ public sealed class WorkerTcbEdgeCaseTests
                 null,
                 "value")],
             CompilerPreparedBody.Trivial());
-        var backend = new UnexpectedBackend();
+        var backend = new ThrowingBackend("Malformed input reached the backend.");
 
         var results = await new CallableVerifier(
             backend,
@@ -333,7 +333,7 @@ public sealed class WorkerTcbEdgeCaseTests
                 new CompilerIntegerInterval(1, 0),
                 "value")],
             CompilerPreparedBody.Trivial());
-        var backend = new UnexpectedBackend();
+        var backend = new ThrowingBackend("Malformed input reached the backend.");
 
         var results = await new CallableVerifier(
             backend,
@@ -708,7 +708,7 @@ public sealed class WorkerTcbEdgeCaseTests
 
         Func<Task> action =
             () => new CallableVerifier(
-                new UnexpectedBackend(),
+                new ThrowingBackend("Malformed input reached the backend."),
                 WorkerBudgets.DefaultMaximumExpressionDepth).VerifyAsync(
                     target,
                     CreateResourceBudget(),
@@ -1699,22 +1699,6 @@ public sealed class WorkerTcbEdgeCaseTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_result);
-        }
-    }
-
-    private sealed class UnexpectedBackend : ISmtBackend
-    {
-        private int _callCount;
-
-        internal int CallCount => Volatile.Read(ref _callCount);
-
-        public Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query,
-            CancellationToken cancellationToken)
-        {
-            Interlocked.Increment(ref _callCount);
-            throw new AssertionException(
-                "Malformed input reached the backend.");
         }
     }
 

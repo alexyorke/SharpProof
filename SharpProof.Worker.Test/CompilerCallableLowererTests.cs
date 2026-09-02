@@ -636,7 +636,8 @@ public sealed class CompilerCallableLowererTests
     private static async Task<CallableVerificationResult> VerifyCoverageAsync(
         CompilerCallablePreparation preparation)
     {
-        var backend = new UnexpectedBackend();
+        var backend = new ThrowingBackend(
+            "A zero-claim callable reached the SMT backend.");
         using var projectBoundary = new CancellationTokenSource();
         var verification = await CallableVerificationPolicy.VerifyTargetAsync(
             new CallableVerifier(
@@ -671,22 +672,6 @@ public sealed class CompilerCallableLowererTests
         return WorkerTestCompilation.Create(
             "CompilerCallableLowererTests",
             ("Subject.cs", source));
-    }
-
-    private sealed class UnexpectedBackend : ISmtBackend
-    {
-        private int _callCount;
-
-        internal int CallCount => Volatile.Read(ref _callCount);
-
-        public Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query,
-            CancellationToken cancellationToken)
-        {
-            Interlocked.Increment(ref _callCount);
-            throw new AssertionException(
-                "A zero-claim callable reached the SMT backend.");
-        }
     }
 
     private sealed class UnsignaledCancellationBackend : ISmtBackend
