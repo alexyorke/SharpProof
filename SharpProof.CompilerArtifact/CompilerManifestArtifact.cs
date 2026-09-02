@@ -210,24 +210,10 @@ internal static class WorkerBinaryIdentity
                 "The worker runtime component exceeds the byte limit.");
         }
 
-        var bytes = new byte[checked((int)stream.Length)];
-        var offset = 0;
-        while (offset < bytes.Length)
-        {
-            var read = stream.Read(bytes, offset, bytes.Length - offset);
-            if (read == 0)
-            {
-                throw new InvalidDataException(
-                    "A worker runtime component changed while it was read.");
-            }
-            offset += read;
-        }
-        if (stream.ReadByte() >= 0)
-        {
-            throw new InvalidDataException(
-                "A worker runtime component changed while it was read.");
-        }
-        return bytes;
+        return CompilerManifestArtifactFile.ReadExact(
+            stream,
+            checked((int)stream.Length),
+            "A worker runtime component changed while it was read.");
     }
 
     private static SortedDictionary<string, string> RuntimeComponents(
@@ -985,6 +971,19 @@ internal static class CompilerManifestArtifactFile
         cancellationToken.ThrowIfCancellationRequested();
         using var stream = Open(path, out var length, maximumBytes);
         cancellationToken.ThrowIfCancellationRequested();
+        return ReadExact(
+            stream,
+            length,
+            "The compiler manifest changed while it was read.",
+            cancellationToken);
+    }
+
+    internal static byte[] ReadExact(
+        FileStream stream,
+        int length,
+        string changedMessage,
+        CancellationToken cancellationToken = default)
+    {
         var bytes = new byte[length];
         var offset = 0;
         while (offset < bytes.Length)
@@ -996,8 +995,7 @@ internal static class CompilerManifestArtifactFile
                 Math.Min(64 * 1024, bytes.Length - offset));
             if (read == 0)
             {
-                throw new InvalidDataException(
-                    "The compiler manifest changed while it was read.");
+                throw new InvalidDataException(changedMessage);
             }
 
             offset += read;

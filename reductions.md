@@ -157,6 +157,7 @@ the smallest relevant containerized test target passes.
 | R381 | Reuse `CompilerCallableArtifactReasonCatalog` from the collector instead of emitting a duplicate generated catalog | `SharpProof.Analyzer.Test`: FinalCompilationCollectorTests 55 passed; generator verification passed |
 | R384 | Reuse `HashEncoding.ToLowerHex` for compiler checksum bytes instead of manual nibble formatting | `SharpProof.Worker.Test`: CompilerManifestArtifactTests 91 passed |
 | R382 | Delegate compiler effect replay source-tree uniqueness to `CompilerSourceLocationAuthority.FindUniqueTree` | `SharpProof.Worker.Test`: source-location and effect-replay tests 44 passed |
+| R383 | Share the bounded stream-to-byte-array reader between runtime-component and compiler-manifest paths | `SharpProof.Worker.Test`: compiler manifest/replay tests 99 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1733,7 +1734,6 @@ stream readers, and location authority helpers across `SharpProof.CompilerArtifa
 | ID | Finding | Evidence |
 |---|---|---|
 | R380 | **`CompilerDiagnosticArtifactOrdering` duplicates an 11-stage comparison ladder between LINQ `Canonicalize` and imperative `Compare`.** `SharpProof.CompilerArtifact/CompilationFingerprint.cs:438-453` applies an 11-level chained LINQ sort (`OrderBy(Code).ThenBy(Message)...ThenBy(SourceLineMapSha256)`). Lines 463-521 re-implement the identical 11-stage comparison ladder across 58 lines of manual `StringComparer.Ordinal.Compare` and field-by-field branching in `Compare`. Unifying both paths on a single `IComparer<CompilerDiagnosticArtifact>` eliminates 58 lines of redundant ladder code and prevents ordering divergence. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:438-453, 463-521` |
-| R383 | **`CompilerManifestArtifact.cs` implements duplicate chunked stream-to-byte-array readers.** `WorkerBinaryIdentity.ReadSnapshotBytes` (`SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:205-231`) and `CompilerManifestArtifactFile.ReadAllBytes` (`SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:980-1009`) implement near-identical bounded buffer-filling loops with EOF checks (`throw new InvalidDataException("... changed while it was read.")`) and trailing-byte verification. Extracting a single bounded stream reader helper eliminates 25+ lines of duplicate buffer-reading boilerplate. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:205-231, 980-1009` |
 | R385 | **`ReplayEventComparer` manually inlines location hashing and comparison instead of reusing `CompilerSourceLocationAuthority`.** `SharpProof.CompilerArtifact/CompilerEffectAuthority.cs:365-371` manually hashes all five fields of `WorkerSourceLocation` (`Path`, `Start`, `Length`, `Line`, `Column`) with bespoke null checks instead of using `CompilerSourceLocationAuthority.GetLocationHashCode` (`CompilerSourceLocationAuthority.cs:228-241`). Reusing the authority keeps location equality and hash distribution centralized. | `SharpProof.CompilerArtifact/CompilerEffectAuthority.cs:365-371`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:228-241` |
 
 ### Checked and not proposed (part thirty-three)
@@ -1749,10 +1749,12 @@ stream readers, and location authority helpers across `SharpProof.CompilerArtifa
   the shared `HashEncoding` implementation.
 - R382 is now applied: effect replay uses the shared source-location authority
   for unique physical-tree binding and retains its existing hash projection.
+- R383 is now applied: runtime-component and compiler-manifest reads share one
+  bounded exact-reader while retaining their distinct failure messages.
 
 ### Status (part thirty-three)
 
-R380, R383, R385 are `pending`.
+R380, R385 are `pending`.
 R380, R383, and R385 unify comparison, streaming I/O, and location hashing authorities.
 
 ## Second survey, part thirty-four: R386-R392
@@ -3105,3 +3107,13 @@ duplicated sentinel encoding.
 R529-R530 are `pending` reduction candidates. R529 is a local generic-helper
 deduplication. R530 preserves the intentional canonical-wire check and targets
 only the repeated validation work around it.
+
+## Second survey, part seventy-eight: R531 - replay identity authority
+
+| R531 | **`EffectCounterexampleReplayer` reimplements the compiler replay identity hashes.** Its `ComputeConstraintIdentity` repeats the codec's domain/version, contract kind, allowed-effect/capability, and ordinal-sorted exception-type hashing, while `ComputeOperationIdentity` repeats the codec's replay-operation field sequence, array loops, and location hashing. The worker spells the domain/version literals again and does not apply the codec's `MemberIdentity ?? string.Empty` and nullable-array normalization, so malformed or newly added replay fields can make the two authorities diverge before a compiler-produced artifact is replayed. Reusing the codec's internal identity methods (or moving the shared hash builder to the artifact layer) leaves replay validation in the worker but gives sealing, validation, and replay one canonical digest definition. | `SharpProof.Worker/EffectCounterexampleReplayer.cs:326-390`; `SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs:229-254,292-329`; `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:495-499` |
+
+### Status (part seventy-eight)
+
+R531 is a `pending` reduction candidate with correctness implications beyond
+line-count reduction. The proposed seam preserves the worker's validation and
+interpretation policy while centralizing only the digest construction.
