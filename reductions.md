@@ -4239,12 +4239,6 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
 
-### Status (part two hundred fourteen)
-
-| R678 | **`RunVerifier.ConvertTestOutputAsync` scans completed output twice for supervisor records.** After awaiting the same captured stdout, it calls `HasSupervisorProtocolRecord` once for the Armed message and once for the Cleanup message; each helper splits and scans the full text while matching the same nonce. One authenticated-record pass can return both flags, preserving nonce validation and the separate bounded streaming path used elsewhere. | `SharpProof.BuildTasks/RunVerifier.cs:647-665` |
-
-R678 is a pending output-parsing reduction candidate. Preserve exact nonce matching, both supervisor-state flags, and the existing streaming/bounded-output behavior.
-
 ### Status (part two hundred fifteen)
 
 | R679 | **`IrRelationalSummaryBuilder.Run.Supported` traverses each term twice for admission.** `Supported` first calls `Charge`, whose explicit-stack walk visits the complete reachable term DAG and charges each unseen node, then calls `IrTermAnalysis.GetDepth`, which performs a second bottom-up traversal with a separate memo dictionary over that same DAG. Carrying the maximum depth through the charged walk, or reusing a bounded depth memo, can retain both the global symbolic-operation budget and stack-safe depth check without repeating term enumeration. | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:773-829`; `SharpProof.Ir/IrSemanticTerms.cs:134-163` |

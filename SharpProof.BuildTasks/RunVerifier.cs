@@ -491,6 +491,39 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 StringComparison.Ordinal));
     }
 
+    internal static (bool Armed, bool Cleanup) FindSupervisorProtocolRecords(
+        string output,
+        string nonce)
+    {
+        var armedExpected = LinuxWorkerProcess.ArmedMessage + " " + nonce;
+        var cleanupExpected = LinuxWorkerProcess.CleanupMessage + " " + nonce;
+        var armed = false;
+        var cleanup = false;
+        foreach (var line in output.Split('\n'))
+        {
+            var normalized = line.EndsWith('\r') ? line[..^1] : line;
+            if (string.Equals(
+                    normalized,
+                    armedExpected,
+                    StringComparison.Ordinal))
+            {
+                armed = true;
+            }
+            else if (string.Equals(
+                         normalized,
+                         cleanupExpected,
+                         StringComparison.Ordinal))
+            {
+                cleanup = true;
+            }
+            if (armed && cleanup)
+            {
+                break;
+            }
+        }
+        return (armed, cleanup);
+    }
+
     internal static bool ShouldDeferSupervisorAuthentication(
         bool authenticationRequired,
         bool outputCompleted)
@@ -650,19 +683,14 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             string? supervisorNonce)
     {
         var text = await output.ConfigureAwait(false);
+        var records = supervisorNonce == null
+            ? (Armed: false, Cleanup: false)
+            : FindSupervisorProtocolRecords(text, supervisorNonce);
         return new BoundedProcessOutput(
             text,
             LimitExceeded: false,
-            SupervisorArmed: supervisorNonce != null &&
-                HasSupervisorProtocolRecord(
-                    text,
-                    LinuxWorkerProcess.ArmedMessage,
-                    supervisorNonce),
-            CleanupAuthenticated: supervisorNonce != null &&
-                HasSupervisorProtocolRecord(
-                    text,
-                    LinuxWorkerProcess.CleanupMessage,
-                    supervisorNonce));
+            SupervisorArmed: records.Armed,
+            CleanupAuthenticated: records.Cleanup);
     }
 
     private static void RetainCleanupAnchor(
