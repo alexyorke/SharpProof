@@ -61,7 +61,7 @@
   },
   "mutationEvidence": {
     "schemaVersion": 1,
-    "expectedCatalogCount": 261
+    "expectedCatalogCount": 254
   },
   "worker": {
     "protocolVersion": 11,

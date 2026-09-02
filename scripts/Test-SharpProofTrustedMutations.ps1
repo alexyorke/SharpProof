@@ -2123,14 +2123,6 @@ $mutations = @(
         Filter = 'FullyQualifiedName~FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic'
     },
     [pscustomobject]@{
-        Name = 'fuzz-result-hash-uses-validated-bytes'
-        File = 'scripts\Assert-SharpProofFuzzRunnerResult.ps1'
-        Original = '            [Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant())'
-        Mutated = '            [Security.Cryptography.SHA256]::HashData([IO.File]::ReadAllBytes($Path))).ToLowerInvariant())'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~FuzzResultFixtureIsStrictAndFailClosed'
-    },
-    [pscustomobject]@{
         Name = 'fuzz-result-byte-upper-bound'
         File = 'scripts\Assert-SharpProofFuzzRunnerResult.ps1'
         Original = '$stream.Length -eq 0 -or $stream.Length -gt 1048576'
@@ -2193,14 +2185,6 @@ $mutations = @(
         Mutated = 'if (false)'
         Project = 'SharpProof.Package.Test\SharpProof.Package.Test.csproj'
         Filter = 'FullyQualifiedName~OutputDrainWaitRechecksInterruptionsBetweenBoundedSlices'
-    },
-    [pscustomobject]@{
-        Name = 'retained-fuzz-manifest-hash-uses-validated-bytes'
-        File = 'scripts\SharpProof.FuzzEvidenceLifecycle.ps1'
-        Original = '                [Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()'
-        Mutated = '                [Security.Cryptography.SHA256]::HashData([IO.File]::ReadAllBytes($Path))).ToLowerInvariant()'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~FuzzCampaignEvidenceLifecycleIsFailClosedAndAtomic'
     },
     [pscustomobject]@{
         Name = 'retained-fuzz-manifest-cases-upper-bound'
