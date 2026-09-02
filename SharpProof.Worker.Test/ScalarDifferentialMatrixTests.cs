@@ -230,16 +230,10 @@ public sealed class ScalarDifferentialMatrixTests
         }
 
         using var runtime = project.EmitRuntimeAssembly();
-        var subject = runtime.Assembly.GetType(
-            "ScalarDifferentialSubject",
-            throwOnError: true)!;
+        var subject = RequireRuntimeSubject(runtime.Assembly);
         foreach (var item in SupportedCases)
         {
-            var method = subject.GetMethod(
-                item.MethodName,
-                BindingFlags.Public | BindingFlags.Static) ??
-                throw new InvalidOperationException(
-                    $"Runtime method '{item.MethodName}' is missing.");
+            var method = RequireRuntimeMethod(subject, item.MethodName);
             var target = project.FindCallable(item.MethodName);
             foreach (var input in item.BoundaryValues)
             {
@@ -272,11 +266,7 @@ public sealed class ScalarDifferentialMatrixTests
                     ClaimOrdinal(response, result) == 4).Outcome,
                 Is.EqualTo(WorkerClaimOutcome.Refuted),
                 comparisonName);
-            var comparison = subject.GetMethod(
-                comparisonName,
-                BindingFlags.Public | BindingFlags.Static) ??
-                throw new InvalidOperationException(
-                    $"Runtime method '{comparisonName}' is missing.");
+            var comparison = RequireRuntimeMethod(subject, comparisonName);
             var comparisonTarget = project.FindCallable(comparisonName);
             foreach (var left in item.BoundaryValues)
             {
@@ -333,16 +323,10 @@ public sealed class ScalarDifferentialMatrixTests
         }
 
         using var runtime = project.EmitRuntimeAssembly();
-        var subject = runtime.Assembly.GetType(
-            "ScalarDifferentialSubject",
-            throwOnError: true)!;
+        var subject = RequireRuntimeSubject(runtime.Assembly);
         foreach (var item in WideningCases)
         {
-            var method = subject.GetMethod(
-                item.MethodName,
-                BindingFlags.Public | BindingFlags.Static) ??
-                throw new InvalidOperationException(
-                    $"Runtime method '{item.MethodName}' is missing.");
+            var method = RequireRuntimeMethod(subject, item.MethodName);
             var target = project.FindCallable(item.MethodName);
             foreach (var input in item.BoundaryValues)
             {
@@ -396,20 +380,14 @@ public sealed class ScalarDifferentialMatrixTests
         }
 
         using var runtime = project.EmitRuntimeAssembly();
-        var subject = runtime.Assembly.GetType(
-            "ScalarDifferentialSubject",
-            throwOnError: true)!;
+        var subject = RequireRuntimeSubject(runtime.Assembly);
         foreach (var item in ArithmeticCases)
         {
             var result = response.ClaimResults.Single(candidate =>
                 CallableId(response, candidate).Contains(
                     "." + item.MethodName + "(",
                     StringComparison.Ordinal));
-            var method = subject.GetMethod(
-                item.MethodName,
-                BindingFlags.Public | BindingFlags.Static) ??
-                throw new InvalidOperationException(
-                    $"Runtime method '{item.MethodName}' is missing.");
+            var method = RequireRuntimeMethod(subject, item.MethodName);
             var target = project.FindCallable(item.MethodName);
             var execution = ExecuteIr(target, item.Inputs);
             if (item.ExpectedException == null)
@@ -693,6 +671,22 @@ public sealed class ScalarDifferentialMatrixTests
             ? ((int)character).ToString(CultureInfo.InvariantCulture)
             : Convert.ToString(value, CultureInfo.InvariantCulture) ??
               string.Empty;
+    }
+
+    private static Type RequireRuntimeSubject(Assembly assembly)
+    {
+        return assembly.GetType(
+            "ScalarDifferentialSubject",
+            throwOnError: true)!;
+    }
+
+    private static MethodInfo RequireRuntimeMethod(Type subject, string name)
+    {
+        return subject.GetMethod(
+                name,
+                BindingFlags.Public | BindingFlags.Static) ??
+            throw new InvalidOperationException(
+                $"Runtime method '{name}' is missing.");
     }
 
     private static IrProgramExecutionResult ExecuteIr(

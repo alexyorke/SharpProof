@@ -4177,14 +4177,6 @@ R632 is a pending fixture-infrastructure reduction candidate. Preserve cleanup i
 
 R633 is a pending fuzz-oracle infrastructure reduction candidate. Preserve collectible unloading, image ownership/disposal, runtime-type lookup failures, and distinct batch versus semantic-edge result handling; share only the assembly lifetime scaffold.
 
-## Second survey, part one hundred seventy-seven: R636 - repeated runtime method lookup
-
-| R636 | **`ScalarDifferentialMatrixTests` repeats the same emitted-subject reflection lookup.** The supported, widening, and arithmetic test paths each resolve `ScalarDifferentialSubject` with `GetType(..., throwOnError: true)`, and four loops then call `GetMethod` with `BindingFlags.Public | BindingFlags.Static` followed by the same missing-method exception. A private `RequireRuntimeMethod` helper (and, optionally, a subject-type accessor) can own this reflection contract while preserving each matrix's separate invocation arity, input enumeration, expected-result logic, and exception assertions. | `SharpProof.Worker.Test/ScalarDifferentialMatrixTests.cs:232-242,275-279,335-345,398-412` |
-
-### Status (part one hundred seventy-seven)
-
-R636 is a pending differential-test fixture reduction candidate. Preserve the fixed generated type name, public-static binding flags, descriptive failures, and all matrix-specific runtime/IR comparisons; share only the repeated reflection lookup.
-
 ## Second survey, part one hundred seventy-eight: R637 - Worker test temp-fixture boilerplate
 
 | R637 | **Nineteen Worker tests manually create and recursively delete temporary directories despite the linked `TempDirectory` helper.** Nine cache edge-case methods in `WorkerTcbEdgeCaseTests`, five process/launcher methods in `WorkerProgramTests`, and five runtime-closure methods in `WorkerBinaryIdentityTests` each assemble a temp path with `Path.GetTempPath()` or the test work directory, call `Directory.CreateDirectory`, and repeat `try/finally` cleanup with `Directory.Delete`; the binary tests also repeat this around fixture trees. Replacing these local lifetimes with `TempDirectory` (or a shared Worker-test wrapper where a specific root is required) removes fixture cleanup boilerplate and gives all three suites one failure-safe disposal policy. Preserve each suite's path-prefix assumptions, Linux/process cleanup, file fixture contents, and test-specific cleanup ordering. | `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs:977-1421`; `SharpProof.Worker.Test/WorkerProgramTests.cs:34-357`; `SharpProof.Worker.Test/WorkerBinaryIdentityTests.cs:10-195,230-506`; `Directory.Build.props:68-81`; `eng/testing/TempDirectory.cs:1-19` |
