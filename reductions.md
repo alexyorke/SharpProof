@@ -206,6 +206,7 @@ the smallest relevant containerized test target passes.
 | R547 | Parameterize implicit-conversion unwrapping for reference-only callers | `SharpProof.Frontend.Test`: 121 passed |
 | R501 | Resolve closed-contract attribute symbols once per analyzer compilation | `SharpProof.Analyzer.Test`: 476 passed |
 | R499 | Share unsupported-value abstention classification in the Roslyn lowerer | `SharpProof.Frontend.Test`: 121 passed |
+| R500 | Reuse the supported-unknown count during corpus outcome validation | `SharpProof.Gates.Test`: CorpusGateTests 23 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -2927,7 +2928,10 @@ R498, R499, and R501 are applied: binary string-concatenation resolution now
 uses the existing admission predicate, unsupported value-type classification is
 shared between default and field visits, and closed-contract attribute symbols
 are resolved once per analyzer compilation instead of once per source reference.
-R500 and R502 remain pending review-only candidates; any sharing must retain
+R500 is applied: corpus outcome validation accepts the count already computed
+for result metrics, avoiding a second dictionary build and predicate pass while
+its standalone test helper still computes the count when called directly.
+R502 remains a pending review-only candidate; any sharing must retain
 fail-closed behavior and the analyzer's distinct diagnostic and
 semantic-evaluation responsibilities.
 
@@ -3666,3 +3670,19 @@ R580 is a pending specification-pack schema reduction candidate. Preserve catalo
 ### Status (part one hundred twenty-two)
 
 R581 is a pending compiler-artifact validation defect. Preserve the stricter authority-mode checks and canonical summary ordering; ensure malformed nullable fields fail closed with the intended validation exception rather than a null dereference.
+
+## Second survey, part one hundred twenty-three: R582 - duplicate proof-core traversal
+
+| R582 | **`CallableClaimResultAssembler.FromOutcome` walks a proven core twice.** The first loop resolves every `ProofJustification` through `assumptionLabels` and builds the sorted proof-core labels, then a second loop over the same `proven.Core` collects user-assumption IDs. The second pass can be folded into the successful first pass (after the label lookup succeeds), preserving the malformed-evidence short-circuit and the separate label/assumption projections while removing a repeated traversal of each backend proof core. | `SharpProof.Worker/CallableClaimResultAssembler.cs:17-45` |
+
+### Status (part one hundred twenty-three)
+
+R582 is a pending worker-result reduction candidate. Keep the current fail-closed behavior when a justification has no label; only combine the independent per-justification work once that lookup succeeds.
+
+## Second survey, part one hundred twenty-four: R583 - unreachable contradictory-vacuity branches
+
+| R583 | **`CallableVerifier.VerifyPostconditionsAsync` retains contradictory-entry branches after returning for that state.** The method handles `entryFeasibility.IsContradictory` at lines 103-109 by returning `ContradictoryPostconditions`; therefore the later `!entryFeasibility.IsContradictory` condition around the normal-completion probe and the `ContradictoryPreconditions` arm in the per-record vacuity selection can never be reached in this method. Removing those dead alternatives simplifies the state machine while leaving the dedicated contradictory-postcondition path intact. | `SharpProof.Worker/CallableVerifier.cs:103-109,153-155,266-268` |
+
+### Status (part one hundred twenty-four)
+
+R583 is a pending callable-verification reduction candidate. Preserve the early contradictory-entry return and its proof-core/assumption handling; simplify only branches proven unreachable after that return.

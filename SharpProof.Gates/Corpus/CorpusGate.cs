@@ -207,7 +207,8 @@ internal static class CorpusGate
             ValidateSupportedOutcomes(
                 cases,
                 [.. immutableObservations.Select(static observation =>
-                    (observation.CaseId, observation.Verdict))]));
+                    (observation.CaseId, observation.Verdict))],
+                supportedUnknownCount));
 
         var unknownReasons = CountUnknownReasons(immutableObservations);
         ValidateUnknownReasonRatchet(
@@ -253,23 +254,33 @@ internal static class CorpusGate
 
     internal static ImmutableArray<string> ValidateSupportedOutcomes(
         ImmutableArray<CorpusCase> cases,
+        ImmutableArray<(string CaseId, CorpusVerdict Verdict)> observations,
+        int? supportedUnknownCount = null)
+    {
+        var count = supportedUnknownCount ?? CountSupportedUnknown(
+            cases,
+            observations);
+        return count == 0
+            ? []
+            : [
+                $"{count} supported corpus cases produced " +
+                "Unknown; supported cases must have an accountable Proven " +
+                "or Refuted result."
+            ];
+    }
+
+    private static int CountSupportedUnknown(
+        ImmutableArray<CorpusCase> cases,
         ImmutableArray<(string CaseId, CorpusVerdict Verdict)> observations)
     {
         var casesById = cases.ToImmutableDictionary(
             static item => item.Id,
             StringComparer.Ordinal);
-        var supportedUnknownCount = observations.Count(observation =>
+        return observations.Count(observation =>
             casesById.TryGetValue(observation.CaseId, out var item) &&
             item.Support == CorpusSupport.Supported &&
             observation.Verdict is
                 CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown);
-        return supportedUnknownCount == 0
-            ? []
-            : [
-                $"{supportedUnknownCount} supported corpus cases produced " +
-                "Unknown; supported cases must have an accountable Proven " +
-                "or Refuted result."
-            ];
     }
 
     internal static ImmutableArray<string> ValidateMetamorphicConsistency(
