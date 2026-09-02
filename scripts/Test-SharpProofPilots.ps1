@@ -241,20 +241,12 @@ foreach ($pilot in $catalog.pilots) {
     }
     $response = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
     $claims = @($response.claimResults)
-    $claimEvidence = @($response.manifest.claims | ForEach-Object {
-            $manifestClaim = $_
-            $matches = @($claims | Where-Object {
-                    [string]$_.claimId -ceq [string]$manifestClaim.claimId
-                })
-            if ($matches.Count -ne 1) {
-                throw "Pilot '$($pilot.id)' has an incoherent manifest/result claim set."
-            }
-            [pscustomobject]@{
-                claimId = [string]$manifestClaim.claimId
-                kind = [string]$manifestClaim.kind
-                outcome = [string]$matches[0].outcome
-            }
-        } | Sort-Object claimId)
+    $manifestClaims = @($response.manifest.claims)
+    $claimEvidence = ConvertTo-SharpProofPilotClaimEvidence `
+        -ManifestClaims $manifestClaims `
+        -ClaimResults $claims `
+        -ThrowOnMismatch `
+        -MismatchMessage "Pilot '$($pilot.id)' has an incoherent manifest/result claim set."
     $unknownReasons = @($claims |
         Where-Object { [string]$_.outcome -eq 'Unknown' } |
         Group-Object reason |

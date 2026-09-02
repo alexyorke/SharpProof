@@ -1,3 +1,44 @@
+function ConvertTo-SharpProofPilotClaimEvidence {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$ManifestClaims,
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$ClaimResults,
+        [switch]$ThrowOnMismatch,
+        [string]$MismatchMessage = 'Pilot manifest/result claim set is incoherent.'
+    )
+
+    $claimResultIndex = [Collections.Generic.Dictionary[string, object]]::new(
+        [StringComparer]::Ordinal)
+    $duplicateClaimResultIds = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($claimResult in $ClaimResults) {
+        $claimId = [string]$claimResult.claimId
+        if ($claimResultIndex.ContainsKey($claimId)) {
+            [void]$duplicateClaimResultIds.Add($claimId)
+        } else {
+            $claimResultIndex.Add($claimId, $claimResult)
+        }
+    }
+    return @($ManifestClaims | ForEach-Object {
+            $manifestClaim = $_
+            $claimId = [string]$manifestClaim.claimId
+            if ($duplicateClaimResultIds.Contains($claimId) -or
+                -not $claimResultIndex.ContainsKey($claimId)) {
+                if ($ThrowOnMismatch) { throw $MismatchMessage }
+                return $null
+            }
+            [pscustomobject]@{
+                claimId = $claimId
+                kind = [string]$manifestClaim.kind
+                outcome = [string]$claimResultIndex[$claimId].outcome
+            }
+        } | Sort-Object claimId)
+}
+
 function Test-SharpProofPilotReport {
     [CmdletBinding()]
     param(
@@ -115,25 +156,9 @@ function Test-SharpProofPilotReport {
         catch { return $false }
         $manifestClaims = @($response.manifest.claims)
         $claimResults = @($response.claimResults)
-        $claimResultIndex = [Collections.Generic.Dictionary[string, object]]::new(
-            [StringComparer]::Ordinal)
-        $duplicateClaimResultIds = [Collections.Generic.HashSet[string]]::new(
-            [StringComparer]::Ordinal)
-        foreach ($claimResult in $claimResults) {
-            $claimId = [string]$claimResult.claimId
-            if ($claimResultIndex.ContainsKey($claimId)) {
-                [void]$duplicateClaimResultIds.Add($claimId)
-            } else {
-                $claimResultIndex.Add($claimId, $claimResult)
-            }
-        }
-        $actual = @($manifestClaims | ForEach-Object {
-                $claim = $_
-                $claimId = [string]$claim.claimId
-                if ($duplicateClaimResultIds.Contains($claimId) -or
-                    -not $claimResultIndex.ContainsKey($claimId)) { return $null }
-                [pscustomobject]@{ claimId=$claimId; kind=[string]$claim.kind; outcome=[string]$claimResultIndex[$claimId].outcome }
-            } | Sort-Object claimId)
+        $actual = @(ConvertTo-SharpProofPilotClaimEvidence `
+            -ManifestClaims $manifestClaims `
+            -ClaimResults $claimResults)
         $reported = @($pilot.claimEvidence | Sort-Object claimId)
         if ($actual.Count -eq 0 -or $actual.Count -ne $reported.Count -or
             @($actual.claimId | Select-Object -Unique).Count -ne $actual.Count) { return $false }
