@@ -34,7 +34,6 @@ Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 $parallelism = Get-SharpProofSemanticTestParallelism `
     -RepositoryRoot $repositoryRoot
-$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 $architectureParallelRunSettings = Join-Path `
     $repositoryRoot 'eng/test/architecture-parallel.runsettings'
 $semanticSolutionFilter = Join-Path `
@@ -79,15 +78,6 @@ else {
     ''
 }
 
-function Invoke-RequiredDotnet {
-    param([Parameter(Mandatory = $true)][string[]]$Arguments)
-
-    & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
-}
-
 if (-not $NoBuild) {
     $semanticBuildProjects = if ($ArchitectureOnly) {
         @('SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj')
@@ -109,15 +99,18 @@ if (-not $NoBuild) {
             Set-Content `
                 -LiteralPath $semanticBuildFilter `
                 -Encoding utf8NoBOM
-        Invoke-RequiredDotnet @(
-            'restore', $semanticBuildFilter, '--locked-mode')
+        Invoke-SharpProofRequiredDotnet `
+            -Arguments @('restore', $semanticBuildFilter, '--locked-mode') `
+            -TimeoutSeconds $TimeoutSeconds
         $buildArguments = @(
             'build', $semanticBuildFilter,
             '-c', $Configuration, '--no-restore')
         if ($Fast) {
             $buildArguments += '-p:RunAnalyzersDuringBuild=false'
         }
-        Invoke-RequiredDotnet $buildArguments
+        Invoke-SharpProofRequiredDotnet `
+            -Arguments $buildArguments `
+            -TimeoutSeconds $TimeoutSeconds
     }
     finally {
         if (Test-Path -LiteralPath $semanticBuildFilter) {

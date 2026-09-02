@@ -22,6 +22,8 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Resolve-SharpProofContainedPath.ps1')
 . (Join-Path $PSScriptRoot 'Assert-SharpProofFuzzRunnerResult.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.FuzzEvidenceLifecycle.ps1')
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 $resolvedOutput = Resolve-SharpProofContainedPath `
     -Root $repositoryRoot -Path $OutputDirectory `
     -ParameterName 'OutputDirectory'
@@ -78,8 +80,7 @@ $requestedCampaignCases = Assert-SharpProofFuzzCampaignBudget `
     -RetainedCases $effectiveRetainedCases `
     -RetainedRunCount $retainedRunSeeds.Count `
     -MaximumCases $maximumCampaignCases
-$dotnetWrapper = Join-Path `
-    $repositoryRoot 'scripts\Invoke-SharpProofDotnet.ps1'
+$dotnetWrapper = Get-SharpProofDotnetWrapperPath
 $fuzzProject = Join-Path `
     $repositoryRoot 'Tools\SharpProof.Fuzz\SharpProof.Fuzz.csproj'
 

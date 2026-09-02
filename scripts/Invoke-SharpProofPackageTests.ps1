@@ -36,7 +36,6 @@ $parallelism = Get-SharpProofPackageTestParallelism `
     -RepositoryRoot $repositoryRoot
 $buildParallelism = Get-SharpProofBuildParallelism `
     -RepositoryRoot $repositoryRoot
-$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 $dotnetCommand = Get-Command `
     dotnet `
     -CommandType Application `
@@ -91,15 +90,6 @@ $isolatedOutputRoot = if ($coverageEnabled) {
 }
 else {
     ''
-}
-
-function Invoke-RequiredDotnet {
-    param([Parameter(Mandatory = $true)][string[]]$Arguments)
-
-    & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
 }
 
 function Invoke-RequiredBuilds {
@@ -316,9 +306,11 @@ foreach ($priorTimingPath in $(if ($Fast) {
 try {
     if (-not $NoBuild) {
         Invoke-TimedPhase -Name 'restore' -Action {
-            Invoke-RequiredDotnet @(
-                'restore', 'SharpProof.sln', '--locked-mode',
-                '/nodeReuse:false')
+            Invoke-SharpProofRequiredDotnet `
+                -Arguments @(
+                    'restore', 'SharpProof.sln', '--locked-mode',
+                    '/nodeReuse:false') `
+                -TimeoutSeconds $TimeoutSeconds
         }
     }
 
@@ -363,11 +355,13 @@ try {
             ConvertFrom-Json
         Invoke-TimedPhase -Name 'pack' -Action {
             foreach ($project in @($packageManifest.projects)) {
-                Invoke-RequiredDotnet @(
-                    'pack', [string]$project, '-c', 'Release',
-                    '--no-restore', '--no-build', '--nologo',
-                    '/nodeReuse:false', '--output', $feed,
-                    '/p:GeneratePackageOnBuild=false')
+                Invoke-SharpProofRequiredDotnet `
+                    -Arguments @(
+                        'pack', [string]$project, '-c', 'Release',
+                        '--no-restore', '--no-build', '--nologo',
+                        '/nodeReuse:false', '--output', $feed,
+                        '/p:GeneratePackageOnBuild=false') `
+                    -TimeoutSeconds $TimeoutSeconds
             }
         }
     }

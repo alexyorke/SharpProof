@@ -122,6 +122,7 @@ the smallest relevant containerized test target passes.
 | R266 | Remove the undefined `SHARPPROOF_PORTABLE_ARGUMENT_GUARD` preprocessor term | Ir.Test: 114; Dataflow.Test: 50; Smt.Test: 30 |
 | R267 | Forward the duplicate `ArgumentNullGuard` `int` overloads to their `long` implementations | Ir.Test: 114; Dataflow.Test: 50; Smt.Test: 30 |
 | R268 | Consolidate residual generator schema-reading helpers in `GeneratedFileHelpers.ps1`, retaining compatibility wrappers and schema-specific validators | Five generator `-Verify` checks; `test-changed`: ArchitectureTest 389 and 36 package shards passed |
+| R269 | Centralize the dotnet-wrapper path and checked external-command invocation in `SharpProof.ContainerExecution.psm1`, while retaining the existing timeout, argument, and static-graph behavior | ArchitectureTest: 389 passed; `test-changed`: ArchitectureTest 389 and 36 package shards passed |
 | R271 | Reuse `Test-SharpProofReleaseVersionSyntax` from the publication-plan identity module instead of carrying a duplicate SemVer predicate | Publication-plan identity fixtures (`version-syntax`); release/publication tests passed |
 | R289 | Replace the private ordinal string-sequence helper with framework `SequenceEqual` | `Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 | R297 | Reuse the shared `DictionaryAnalyzerConfigOptions` in `FinalCompilationCollectorTests` and remove its duplicate private options class | `SharpProof.Analyzer.Test`: 476 passed |
@@ -336,7 +337,6 @@ files. Same rules as part one: nothing implemented, nothing validated, all
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R269 | `Invoke-RequiredDotnet` is byte-identical in three test-invocation scripts, and `$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'` is repeated in six. `SharpProof.ContainerExecution.psm1` already exports eleven shared functions to these same scripts and is the obvious home. `Invoke-DotNet` in the container dispatcher and `Invoke-Docker` in `build.ps1` are the same run-check-`$LASTEXITCODE`-throw shape again. | `Invoke-SharpProofChangedTests.ps1:32,44`; `Invoke-SharpProofPackageTests.ps1:39,96`; `Invoke-SharpProofSemanticTests.ps1:37,82`; `Invoke-SharpProofCoverage.ps1:64`; `Invoke-SharpProofDevCheck.ps1:19`; `Invoke-SharpProofFuzzCampaign.ps1:81` |
 | R272 | "Resolve HEAD and require an exact 40-hex commit" is open-coded in roughly seventeen places across scripts, `build.ps1`, and a workflow, most of them also repeating the `$LASTEXITCODE -ne 0 -or` guard. Fourteen use case-insensitive `-notmatch '^[0-9a-f]{40}$'` and three use case-sensitive `-cnotmatch`/`-cmatch`. The case-insensitive form accepts an uppercase SHA, which then will not compare `Ordinal`-equal to the lowercase form used elsewhere in the same evidence chain. Worth treating as a correctness inconsistency first and a duplication second: one `Get-SharpProofExactCommit` helper fixes both. | `scripts/Get-SharpProofProductionInventory.ps1:316`; `scripts/Invoke-SharpProofGateEvidence.ps1:22`; `scripts/New-SharpProofReleaseEvidence.ps1:550`; `scripts/Publish-SharpProofRelease.ps1:78,232`; `scripts/Resolve-SharpProofReleaseCoverageBaseline.ps1:73`; `scripts/SharpProof.FuzzEvidenceLifecycle.ps1:27`; `scripts/Test-SharpProof*.ps1`; `build.ps1:82`; `.github/workflows/coverage.yml:40,51` |
 
 ### Diagnostic release tracking
@@ -390,7 +390,7 @@ files. Same rules as part one: nothing implemented, nothing validated, all
 
 ### Status (part two)
 
-R263-R265 and R269-R270, R272-R276 are `pending` and extend the same follow-up queue. R263, R265,
+R263-R265 and R270, R272-R276 are `pending` and extend the same follow-up queue. R263, R265,
 R270, R272, R273, and R274 each carry a stated constraint - a security check that
 must survive, a possibly deliberate belt-and-braces item, release-evidence
 caution under R110-R112, a correctness inconsistency to settle first, a policy
@@ -1376,3 +1376,29 @@ valid. R326 is `pending` and is the more interesting of the two, because unlike
 most items in this ledger the two copies **already disagree** rather than merely
 being able to; it belongs with R287 and R322 in the set of duplications with an
 observed divergence rather than a hypothetical one.
+
+## Second survey, part twenty-five: R327-R329
+
+This pass returned to the build graph after checking current MSBuild evaluation,
+not just source text. The three items below are pending reduction candidates. R327
+is deliberately narrower than the earlier broad warning-policy proposals: it
+targets only exact project-local declarations that the central policy already
+provides, while preserving the projects that the central classification excludes.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R327 | **24 project files set `TreatWarningsAsErrors` to `true` locally.** `Directory.Build.props` first defaults the property to `false`, then sets it to `true` for every project classified as `SharpProofProductionProject`. Of the 24 local `true` declarations, 22 are ordinary production projects that satisfy that central condition, so their declarations do not change evaluated behavior and can drift away from the central policy. The two exceptions are `SharpProof.Testing` and `SharpProof.CompilerProbe.TestAsset`, both deliberately excluded by the project-name condition and therefore still need their local declaration. This is an exact 22-line reduction candidate, not a proposal to remove the two exceptions or the separate sample/test policy. | `Directory.Build.props:21-36,109-112`; 24 matching `*.csproj` files; canonical-container `dotnet msbuild -getProperty` evaluation reports `SharpProof.Analyzer`: `SharpProofProductionProject=true`, `TreatWarningsAsErrors=true`, and `SharpProof.Testing`: `SharpProofProductionProject=""`, `TreatWarningsAsErrors=true` |
+| R328 | **The nine-name `CompilerVisibleProperty` vocabulary is declared through four build entry points.** `SharpProof.AnalyzerConsumer.props` and the self-application props each spell all nine names in the same order. The package props separately spells the profile/features/specification-pack subset, while the verifier props spells the other six names, yielding 27 item declarations for nine distinct names. The differing import conditions are meaningful, so this is not a safe blind file merge; a shared item-list fragment or another single source of truth could preserve those conditions while removing declaration drift between normal package consumption, self-application, and verifier consumption. | `SharpProof.AnalyzerConsumer.props:11-21`; `eng/self-application/SharpProof.SelfApplication.props:29-41`; `SharpProof.Package/buildTransitive/SharpProof.props:13-17`; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:30-37` |
+| R329 | **Refines R264: verifier path re-rooting is duplicated in the cleanup target.** The initialize target derives effective request, result, compiler-manifest, and SARIF paths, including configured-path normalization and `TargetFramework` re-rooting. `SharpProofResetPublishedVerification` repeats the same four default/configured/full-path/re-root sequences for its `_SharpProofClean*` properties. There are therefore eight copies of the path-selection algorithm across two target lifecycles; a shared target/property helper could reduce the repeated MSBuild expressions while retaining the distinct initialize and cleanup property names and timing. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:45-63` and `:255-271`; R264 currently records only the initialize-side copies |
+
+### Checked and not proposed (part twenty-five)
+
+- R269 is now applied: the shared container-execution module owns the dotnet
+  wrapper path and checked-command body, while the existing process and timeout
+  behavior remains in the callers.
+
+### Status (part twenty-five)
+
+R327, R328, and R329 are `pending`. R327 has the clearest low-risk payoff because
+the central property evaluation proves which 22 declarations are behaviorally
+redundant. R328 and R329 need care around import conditions and target ordering.

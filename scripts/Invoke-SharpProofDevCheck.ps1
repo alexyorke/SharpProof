@@ -16,10 +16,10 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
     throw 'The developer check requires the canonical Linux container.'
 }
-$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 $planScript = Join-Path $PSScriptRoot 'Get-SharpProofDevCheckPlan.ps1'
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+$dotnetWrapper = Get-SharpProofDotnetWrapperPath
 $buildParallelism = Get-SharpProofBuildParallelism `
     -RepositoryRoot $repositoryRoot
 $commandPlanJson = & $planScript -Configuration $Configuration

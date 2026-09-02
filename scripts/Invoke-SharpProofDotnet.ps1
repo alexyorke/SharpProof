@@ -19,7 +19,7 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
 }
 
 Import-Module (Join-Path `
-    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
 $effectiveArguments = @(
     Add-SharpProofStaticGraphArgument -Arguments $DotnetArgs
 )

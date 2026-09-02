@@ -63,12 +63,9 @@ function Invoke-DotNet([string[]]$Arguments) {
     $effectiveArguments = @(
         Add-SharpProofStaticGraphArgument -Arguments $Arguments
     )
-    & dotnet @effectiveArguments
-    if ($LASTEXITCODE -ne 0) {
-        throw (
-            "dotnet $($effectiveArguments -join ' ') failed with exit " +
-            "code $LASTEXITCODE.")
-    }
+    Invoke-SharpProofCheckedCommand `
+        -Command 'dotnet' `
+        -Arguments $effectiveArguments
 }
 
 function New-TestInvocationArguments([hashtable]$Additional = @{}) {

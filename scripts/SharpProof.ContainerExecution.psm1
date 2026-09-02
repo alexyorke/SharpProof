@@ -1,6 +1,43 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-SharpProofDotnetWrapperPath {
+    param()
+
+    return Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
+}
+
+function Invoke-SharpProofRequiredDotnet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [int]$TimeoutSeconds
+    )
+
+    & (Get-SharpProofDotnetWrapperPath) `
+        -TimeoutSeconds $TimeoutSeconds @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Invoke-SharpProofCheckedCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Command,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    & $Command @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Command $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    }
+}
+
 function Add-SharpProofStaticGraphArgument {
     [CmdletBinding()]
     param(
@@ -454,5 +491,9 @@ Export-ModuleMember -Function @(
     'Get-SharpProofSemanticTestParallelism',
     'Get-SharpProofTestProjectParallelism',
     'Get-SharpProofTestAssemblyPath',
+    'Get-SharpProofDotnetWrapperPath',
+    'Invoke-SharpProofCheckedCommand',
     'Invoke-SharpProofParallelDotnetBuilds',
-    'New-SharpProofIsolatedTestOutput')
+    'Invoke-SharpProofRequiredDotnet',
+    'New-SharpProofIsolatedTestOutput',
+    'Stop-SharpProofCompilerServer')

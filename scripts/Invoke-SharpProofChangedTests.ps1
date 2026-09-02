@@ -29,7 +29,6 @@ Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 $parallelism = Get-SharpProofSemanticTestParallelism `
     -RepositoryRoot $repositoryRoot
-$dotnetWrapper = Join-Path $PSScriptRoot 'Invoke-SharpProofDotnet.ps1'
 
 function Invoke-GitLines {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
@@ -39,15 +38,6 @@ function Invoke-GitLines {
         throw "git $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
     }
     return @($lines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-}
-
-function Invoke-RequiredDotnet {
-    param([Parameter(Mandatory = $true)][string[]]$Arguments)
-
-    & $dotnetWrapper -TimeoutSeconds $TimeoutSeconds @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
 }
 
 if ([string]::IsNullOrWhiteSpace($ComparisonRef)) {
@@ -238,8 +228,9 @@ if ($selectedRelative.Count -gt 0) {
             else {
                 $filterPath
             }
-            Invoke-RequiredDotnet @(
-                'restore', $restoreTarget, '--locked-mode')
+            Invoke-SharpProofRequiredDotnet `
+                -Arguments @('restore', $restoreTarget, '--locked-mode') `
+                -TimeoutSeconds $TimeoutSeconds
         }
         $semanticFilter =
             'TestCategory!=Performance&TestCategory!=Coverage&TestCategory!=Corpus'
@@ -255,7 +246,9 @@ if ($selectedRelative.Count -gt 0) {
                     $changedProjectBuildArguments +=
                         '-p:RunAnalyzersDuringBuild=false'
                 }
-                Invoke-RequiredDotnet $changedProjectBuildArguments
+                Invoke-SharpProofRequiredDotnet `
+                    -Arguments $changedProjectBuildArguments `
+                    -TimeoutSeconds $TimeoutSeconds
             }
             if ($directChangedProjectIsArchitecture) {
                 & (Join-Path $PSScriptRoot `
@@ -292,7 +285,9 @@ if ($selectedRelative.Count -gt 0) {
             }
         }
         if ($testArguments.Count -gt 0) {
-            Invoke-RequiredDotnet $testArguments
+            Invoke-SharpProofRequiredDotnet `
+                -Arguments $testArguments `
+                -TimeoutSeconds $TimeoutSeconds
         }
     }
     finally {

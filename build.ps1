@@ -28,12 +28,13 @@ Set-StrictMode -Version Latest
 
 $repositoryRoot = (Resolve-Path $PSScriptRoot).Path
 Set-Location $repositoryRoot
+Import-Module (Join-Path `
+    $repositoryRoot 'scripts/SharpProof.ContainerExecution.psm1') -Force
 
 function Invoke-Docker([string[]]$Arguments) {
-    & docker @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "docker $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
+    Invoke-SharpProofCheckedCommand `
+        -Command 'docker' `
+        -Arguments $Arguments
 }
 
 function Build-ToolingImage {

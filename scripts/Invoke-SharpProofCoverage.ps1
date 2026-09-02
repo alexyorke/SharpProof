@@ -61,9 +61,7 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Coverage authority derivation failed before collection.'
 }
 
-$dotnetWrapper = Join-Path `
-    $repositoryRoot `
-    'scripts\Invoke-SharpProofDotnet.ps1'
+$dotnetWrapper = Get-SharpProofDotnetWrapperPath
 $managedSettings = Join-Path `
     $repositoryRoot `
     'eng\coverage\SharpProof.Managed.runsettings'
