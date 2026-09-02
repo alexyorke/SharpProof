@@ -213,41 +213,14 @@ public sealed class SpecResultDomainProjectionTests
         SpecCardinality cardinality,
         IEnumerable<SpecTermDeclaration>? postconditions = null)
     {
-        var evidence = new SpecEvidence(
-            SpecEvidenceKind.Documented,
-            "worker-domain-projection-test");
-        return ApiSpecTable.Create([
-            new ApiSpecDeclaration(
-                new ApiSpecTarget(
-                    "test.result",
-                    "M:Test.Result",
-                    "Test",
-                    SpecTargetMemberKind.Method,
-                    "Result",
-                    true,
-                    0,
-                    null,
-                    [],
-                    resultType,
-                    [new ApiSpecAssemblyIdentity("Test", string.Empty)]),
-                new ApiSpecFacets(
-                    new SpecEffectFacet(SpecEffect.None, evidence),
-                    new SpecAllocationFacet(
-                        SpecAllocationBehavior.Unknown,
-                        evidence),
-                    new SpecThrowFacet(
-                        SpecThrowBehavior.DoesNotThrow,
-                        [],
-                        evidence),
-                    new SpecNullnessFacet(nullness, evidence),
-                    new SpecCardinalityFacet(
-                        cardinality,
-                        null,
-                        evidence)),
-                [.. (postconditions ?? []).Select(
-                    condition => new SpecPostconditionDeclaration(
-                        condition,
-                        evidence))])
-        ]).Templates.Single();
+        return WorkerApiSpecTestFixtures.CreateTemplate(
+            "test.result",
+            "M:Test.Result",
+            "Test",
+            "worker-domain-projection-test",
+            resultType,
+            nullness,
+            cardinality,
+            postconditions);
     }
 }

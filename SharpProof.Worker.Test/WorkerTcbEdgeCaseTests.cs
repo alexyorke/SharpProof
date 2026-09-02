@@ -1677,39 +1677,14 @@ public sealed class WorkerTcbEdgeCaseTests
         SpecNullness nullness,
         SpecCardinality cardinality)
     {
-        var evidence = new SpecEvidence(
-            SpecEvidenceKind.Documented,
-            "worker-tcb-edge-test");
-        return ApiSpecTable.Create([
-            new ApiSpecDeclaration(
-                new ApiSpecTarget(
-                    "test.tcb.result",
-                    "M:Test.Tcb.Result",
-                    "Test.Tcb",
-                    SpecTargetMemberKind.Method,
-                    "Result",
-                    true,
-                    0,
-                    null,
-                    [],
-                    resultType,
-                    [new ApiSpecAssemblyIdentity("Test", string.Empty)]),
-                new ApiSpecFacets(
-                    new SpecEffectFacet(SpecEffect.None, evidence),
-                    new SpecAllocationFacet(
-                        SpecAllocationBehavior.Unknown,
-                        evidence),
-                    new SpecThrowFacet(
-                        SpecThrowBehavior.DoesNotThrow,
-                        [],
-                        evidence),
-                    new SpecNullnessFacet(nullness, evidence),
-                    new SpecCardinalityFacet(
-                        cardinality,
-                        null,
-                        evidence)),
-                [])
-        ]).Templates.Single();
+        return WorkerApiSpecTestFixtures.CreateTemplate(
+            "test.tcb.result",
+            "M:Test.Tcb.Result",
+            "Test.Tcb",
+            "worker-tcb-edge-test",
+            resultType,
+            nullness,
+            cardinality);
     }
 
     private sealed class FixedBackend(BackendCheckResult result)
