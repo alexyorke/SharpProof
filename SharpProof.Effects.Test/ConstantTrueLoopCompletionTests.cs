@@ -3,11 +3,18 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class ConstantTrueLoopCompletionTests
 {
-    [TestCase("DoForever", "RunAfterDoForever")]
-    [TestCase("ForForever", "RunAfterForForever")]
-    public void NonexitingConstantTrueLoopsSuppressCallerSuffix(
+    [TestCase("DoForever", "RunAfterDoForever", false)]
+    [TestCase("ForForever", "RunAfterForForever", false)]
+    [TestCase("DoBreak", "RunAfterDoBreak", true)]
+    [TestCase("ForBreak", "RunAfterForBreak", true)]
+    [TestCase("BreakThroughFinally", "RunAfterFinally", false)]
+    [TestCase("ReturnFromLoop", "RunAfterReturn", true)]
+    [TestCase("GotoOutOfLoop", "RunAfterGoto", true)]
+    [TestCase("RootBreak", "RunAfterBreak", true)]
+    public void ConstantLoopCompletionControlsCallerSuffix(
         string helperName,
-        string callerName)
+        string callerName,
+        bool expectedCompletion)
     {
         var (compilation, helper, caller) = CreateCase(
             helperName,
@@ -23,40 +30,11 @@ public sealed class ConstantTrueLoopCompletionTests
         {
             Assert.That(
                 completion.MethodCanCompleteNormally(helper),
-                Is.False,
+                Is.EqualTo(expectedCompletion),
                 helperName);
             Assert.That(
                 summary.Writes.Contains(EffectRegionId.Static()),
-                Is.False,
-                callerName);
-        }
-    }
-
-    [TestCase("DoBreak", "RunAfterDoBreak")]
-    [TestCase("ForBreak", "RunAfterForBreak")]
-    public void ExitingConstantTrueLoopsRetainCallerSuffix(
-        string helperName,
-        string callerName)
-    {
-        var (compilation, helper, caller) = CreateCase(
-            helperName,
-            callerName);
-        var completion = new DefiniteOperationFacts(
-            compilation,
-            CancellationToken.None);
-        var summary = new EffectAnalysisSession(compilation)
-            .Analyze(caller)
-            .Summary;
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                completion.MethodCanCompleteNormally(helper),
-                Is.True,
-                helperName);
-            Assert.That(
-                summary.Writes.Contains(EffectRegionId.Static()),
-                Is.True,
+                Is.EqualTo(expectedCompletion),
                 callerName);
         }
     }
@@ -72,6 +50,11 @@ public sealed class ConstantTrueLoopCompletionTests
             """
             public static class Sample {
                 private static int s_state;
+
+                private static void Spin() {
+                    while (true) {
+                    }
+                }
 
                 private static void DoForever() {
                     do {
@@ -95,6 +78,37 @@ public sealed class ConstantTrueLoopCompletionTests
                     }
                 }
 
+                private static void BreakThroughFinally() {
+                    while (true) {
+                        try {
+                            break;
+                        }
+                        finally {
+                            Spin();
+                        }
+                    }
+                }
+
+                private static void ReturnFromLoop() {
+                    while (true) {
+                        return;
+                    }
+                }
+
+                private static void GotoOutOfLoop() {
+                    while (true) {
+                        goto Exit;
+                    }
+
+                Exit:
+                    return;
+                }
+
+                private static void RootBreak() {
+                    while (true)
+                        break;
+                }
+
                 public static void RunAfterDoForever() {
                     DoForever();
                     s_state++;
@@ -112,6 +126,26 @@ public sealed class ConstantTrueLoopCompletionTests
 
                 public static void RunAfterForBreak() {
                     ForBreak();
+                    s_state++;
+                }
+
+                public static void RunAfterFinally() {
+                    BreakThroughFinally();
+                    s_state++;
+                }
+
+                public static void RunAfterReturn() {
+                    ReturnFromLoop();
+                    s_state++;
+                }
+
+                public static void RunAfterGoto() {
+                    GotoOutOfLoop();
+                    s_state++;
+                }
+
+                public static void RunAfterBreak() {
+                    RootBreak();
                     s_state++;
                 }
             }
