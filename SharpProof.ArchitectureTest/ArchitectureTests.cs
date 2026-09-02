@@ -351,11 +351,11 @@ public sealed class ArchitectureTests
             .SelectMany(ProductionSourceFiles)
             .Where(file =>
                 !string.Equals(
-                    Relative(file),
+                    TestRepository.Relative(file),
                     "SharpProof.Frontend/ContractApiMetadataRuntime.cs",
                     StringComparison.Ordinal) &&
                 !string.Equals(
-                    Relative(file),
+                    TestRepository.Relative(file),
                     "SharpProof.Frontend/ContractApiMetadata.generated.cs",
                     StringComparison.Ordinal))
             .SelectMany(file => CSharpSyntaxTree.ParseText(
@@ -375,7 +375,7 @@ public sealed class ArchitectureTests
                     var line = literal.GetLocation()
                         .GetLineSpan()
                         .StartLinePosition.Line + 1;
-                    return $"{Relative(file)}:{line}: " +
+                    return $"{TestRepository.Relative(file)}:{line}: " +
                         literal.Token.ValueText;
                 }))
             .OrderBy(static value => value, StringComparer.Ordinal)
@@ -2184,7 +2184,7 @@ public sealed class ArchitectureTests
             .Where(file => File.ReadAllText(file).Contains(
                 pattern,
                 StringComparison.Ordinal))
-            .Select(Relative)
+            .Select(TestRepository.Relative)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static value => value, StringComparer.Ordinal)];
     }
@@ -2256,11 +2256,6 @@ public sealed class ArchitectureTests
                 Does.Contain("contract.fuzz.pullRequestCases")
                     .And.Not.Contain("contract.fuzz.nightlyCases"));
         }
-    }
-
-    private static string Relative(string path)
-    {
-        return Path.GetRelativePath(TestRepository.FindRoot(), path).Replace('\\', '/');
     }
 
     [SuppressMessage(

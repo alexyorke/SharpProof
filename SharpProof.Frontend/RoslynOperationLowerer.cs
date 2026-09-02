@@ -721,26 +721,9 @@ public sealed class RoslynOperationLowerer
                 return OpaqueBinary(operation, FrontendAbstention.LiftedOperator);
             }
 
-            if (TryGetNullComparisonValue(operation, out var compared))
+            if (GetNullComparison(operation) is { } nullComparison)
             {
-                var value = _owner.LowerCore(compared);
-                if (!value.Classification.IsExact)
-                {
-                    return OpaqueBinary(operation, value.Classification.Abstention);
-                }
-
-                try
-                {
-                    var kind = operation.OperatorKind == BinaryOperatorKind.Equals
-                        ? IrBinaryOperator.Equal
-                        : IrBinaryOperator.NotEqual;
-                    return LoweredExpression.Exact(_owner._factory.Binary(
-                        kind, value.Term, _owner._factory.Null(value.Term.Type)));
-                }
-                catch (ArgumentException)
-                {
-                    return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
-                }
+                return nullComparison;
             }
             var leftOperand = operation.LeftOperand;
             var rightOperand = operation.RightOperand;
@@ -1047,6 +1030,34 @@ public sealed class RoslynOperationLowerer
             return _owner.Opaque(operation, FrontendAbstention.UnsupportedInvocationShape,
                 operation.TargetMethod, operation.Instance,
                 operation.Arguments);
+        }
+
+        private LoweredExpression? GetNullComparison(
+            IBinaryOperation operation)
+        {
+            if (!TryGetNullComparisonValue(operation, out var compared))
+            {
+                return null;
+            }
+
+            var value = _owner.LowerCore(compared);
+            if (!value.Classification.IsExact)
+            {
+                return OpaqueBinary(operation, value.Classification.Abstention);
+            }
+
+            try
+            {
+                var kind = operation.OperatorKind == BinaryOperatorKind.Equals
+                    ? IrBinaryOperator.Equal
+                    : IrBinaryOperator.NotEqual;
+                return LoweredExpression.Exact(_owner._factory.Binary(
+                    kind, value.Term, _owner._factory.Null(value.Term.Type)));
+            }
+            catch (ArgumentException)
+            {
+                return OpaqueBinary(operation, FrontendAbstention.UnsupportedType);
+            }
         }
 
         private static FrontendAbstention FirstAbstention(

@@ -1,5 +1,10 @@
 internal static class TestRepository
 {
+    internal static string Relative(string path)
+    {
+        return Path.GetRelativePath(FindRoot(), path).Replace('\\', '/');
+    }
+
     internal static string FindRoot(string? start = null)
     {
         var directory = new DirectoryInfo(start ?? AppContext.BaseDirectory);

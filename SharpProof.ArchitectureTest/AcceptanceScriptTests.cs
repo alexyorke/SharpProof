@@ -48,7 +48,7 @@ public sealed class AcceptanceScriptTests
         var started = verify.IndexOf(
             "$timingStartedUtc =", StringComparison.Ordinal);
         var dotnetWrapper = verify.IndexOf(
-            "function Invoke-SharpProofDotnet", StringComparison.Ordinal);
+            "SharpProof.ContainerExecution.psm1", StringComparison.Ordinal);
         var restore = verify.IndexOf(
             "Start-AcceptanceTimingPhase -Name 'restore'",
             StringComparison.Ordinal);
@@ -63,7 +63,8 @@ public sealed class AcceptanceScriptTests
             Assert.That(staticValidation, Is.GreaterThan(restore));
             Assert.That(
                 verify,
-                Does.Contain("Test-AcceptanceTimingTimeline"));
+                Does.Contain("Test-AcceptanceTimingTimeline")
+                    .And.Contain("Invoke-SharpProofRequiredDotnet"));
         }
 
         var dispatcher = await File.ReadAllTextAsync(Path.Combine(
@@ -182,6 +183,11 @@ public sealed class AcceptanceScriptTests
                 root, "scripts", "SharpProof.FuzzEvidenceLifecycle.ps1"),
             Path.Combine(
                 fixtureScripts, "SharpProof.FuzzEvidenceLifecycle.ps1"));
+        File.Copy(
+            Path.Combine(
+                root, "scripts", "SharpProof.ContainerExecution.psm1"),
+            Path.Combine(
+                fixtureScripts, "SharpProof.ContainerExecution.psm1"));
         var harnessPath = Path.Combine(acceptance, "VerifyHarness.ps1");
         var setup = """
             $contract = Get-Content -LiteralPath $contractPath -Raw |

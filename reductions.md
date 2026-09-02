@@ -3605,7 +3605,9 @@ R567 is a pending reduction candidate. The current implementations agree for the
 
 ### Status (part one hundred nine)
 
-R568 is a pending reduction candidate. Preserve the acceptance-specific timing phases and timeout values; only replace the local process-forwarding shim.
+R568 is applied: `Verify.ps1` now imports `SharpProof.ContainerExecution.psm1` and
+uses `Invoke-SharpProofRequiredDotnet` directly, preserving the acceptance-specific
+timing phases and timeout values without a local process-forwarding shim.
 
 ## Second survey, part one hundred ten: R569 - acceptance timing record duplication
 
@@ -3875,7 +3877,9 @@ R598 is a pending frontend-fuzzing infrastructure reduction candidate. Preserve 
 
 ### Status (part one hundred forty)
 
-R599 is a pending architecture-test maintenance candidate. Preserve the repository-root lookup and slash normalization; share only the identical formatting helper.
+R599 is applied: `ArchitectureTests` and `BoundaryEnforcementTests` now use the
+shared `TestRepository.Relative` helper, preserving repository-root lookup and
+slash normalization without local copies.
 
 ## Second survey, part one hundred forty-one: R600 - duplicate lifted-nullable operation lookup
 
@@ -4036,3 +4040,27 @@ R618 is a pending test-infrastructure reduction candidate. Preserve the generate
 ### Status (part one hundred sixty)
 
 R619 is a pending Meta-analyzer cleanup candidate. Preserve the current fail-closed behavior for missing catch locals and unknown outcomes, and preserve the opposite semantics for absent, constant-true, and constant-false filters; consolidate only the shared binding/evaluation setup.
+
+## Second survey, part one hundred sixty-one: R620 - duplicate local-write traversal
+
+| R620 | **`CacheSoundnessRules` repeats the local-write traversal and state update.** `TransferLocalValues` and `GetExceptionalLocalValues` both enumerate `BlockOperations(block).SelectMany(InEvaluationOrder(...))`, extract `GetLocalWriteValue(candidate, local)`, and replace the reaching-value set with the newly written value; the exceptional variant additionally snapshots the state before operations that may throw. A shared local-write traversal or update callback can remove the repeated enumeration and replacement protocol while keeping exceptional snapshots and the two dataflow results separate. | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1120-1185` |
+
+### Status (part one hundred sixty-one)
+
+R620 is a pending Meta-analyzer dataflow cleanup candidate. Preserve evaluation order, cancellation checks, throw snapshots, and the distinct input/output sets; share only the common candidate enumeration and local-write replacement seam.
+
+## Second survey, part one hundred sixty-two: R621 - duplicate artifact-authority test baseline
+
+| R621 | **`WorkerTests` repeats the artifact-authority verification baseline.** Four mutation tests each create a temporary `TestProject`, build a request, run `SharpProofWorker.VerifyAsync`, create a `CompilerResponseEvidenceAuthority`, and assert that the unmutated response passes `WorkerProtocolJson.Validate`, including the formatted validation errors. Their fixture sources, backend fakes, and mutations remain intentionally different. A shared test helper that returns the validated response/authority pair can remove only this common setup and leave each authority-forgery assertion focused on its mutation. | `SharpProof.Worker.Test/WorkerTests.cs:6910-7101` |
+
+### Status (part one hundred sixty-two)
+
+R621 is a pending Worker test-harness reduction candidate. Preserve each test's source, backend, cache mode, authority construction, and post-baseline mutation; share only the repeated successful-run and validation prelude.
+
+## Second survey, part one hundred sixty-three: R622 - duplicate durable corpus write
+
+| R622 | **`CorpusFileTransaction` implements durable file writing twice.** `WriteDurablyAsync` creates a new write-through file, writes all bytes, and flushes to disk; `Restore` repeats the same create-new/write/flush sequence for each backup, differing mainly because recovery is synchronous and has no cancellation token. A shared low-level durable-write core with asynchronous and synchronous adapters can remove the duplicate filesystem protocol while preserving staging cancellation and recovery behavior. | `SharpProof.Gates/Corpus/CorpusFileTransaction.cs:179-224` |
+
+### Status (part one hundred sixty-three)
+
+R622 is a pending corpus-transaction cleanup candidate. Preserve create-new semantics, write-through durability, backup restoration, and the separate async cancellation boundary; share only the common byte-write/flush protocol.

@@ -192,14 +192,14 @@ public sealed class BoundaryEnforcementTests
                         ".GetSemanticModel(",
                         StringComparison.Ordinal))
                 {
-                    directCallFiles.Add(Relative(file));
+                    directCallFiles.Add(TestRepository.Relative(file));
                 }
 
                 if (source.Contains(
                         "#pragma warning disable RS0030",
                         StringComparison.Ordinal))
                 {
-                    suppressionFiles.Add(Relative(file));
+                    suppressionFiles.Add(TestRepository.Relative(file));
                 }
             }
         }
@@ -321,7 +321,7 @@ public sealed class BoundaryEnforcementTests
                 Assert.That(
                     source,
                     Does.Not.Contain("AnalyzerDiagnosticCatalog.Get("),
-                    Relative(file));
+                    TestRepository.Relative(file));
                 if (Path.GetFileName(file).EndsWith(
                         "DiagnosticDescriptors.generated.cs",
                         StringComparison.Ordinal))
@@ -334,7 +334,7 @@ public sealed class BoundaryEnforcementTests
                         source,
                         @"new\s+DiagnosticDescriptor\s*\("),
                     Is.False,
-                    Relative(file));
+                    TestRepository.Relative(file));
             }
         }
 
@@ -356,7 +356,7 @@ public sealed class BoundaryEnforcementTests
                 File.ReadAllText(file),
                 @"SyntaxFactory\s*\.\s*Parse" +
                 @"(?:Expression|Statement|TypeName)\s*\("))
-            .Select(Relative)
+            .Select(TestRepository.Relative)
             .ToArray();
 
         Assert.That(parserCallers, Is.Empty);
@@ -489,11 +489,6 @@ public sealed class BoundaryEnforcementTests
                 Does.Not.Contain(forbidden),
                 forbidden);
         }
-    }
-
-    private static string Relative(string path)
-    {
-        return Path.GetRelativePath(TestRepository.FindRoot(), path).Replace('\\', '/');
     }
 
     private static int Count(string text, string value)

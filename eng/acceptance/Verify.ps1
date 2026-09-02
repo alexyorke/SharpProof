@@ -16,7 +16,6 @@ $repositoryRoot = (Resolve-Path (Join-Path $acceptanceRoot '..\..')).Path
 $contractPath = Join-Path $acceptanceRoot 'contract.json'
 $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
 . (Join-Path $repositoryRoot 'scripts\SharpProof.FuzzEvidenceLifecycle.ps1')
-Import-Module (Join-Path $repositoryRoot 'scripts\SharpProof.ContainerExecution.psm1') -Force
 $pullRequestCases = Assert-SharpProofFuzzCaseBudget `
     -Value $contract.fuzz.pullRequestCases `
     -Name 'contract.fuzz.pullRequestCases'
@@ -226,6 +225,8 @@ trap {
         -Failure $_.Exception.Message
     throw $_.Exception.Message
 }
+
+Import-Module (Join-Path $repositoryRoot 'scripts\SharpProof.ContainerExecution.psm1') -Force
 
 Start-AcceptanceTimingPhase -Name 'restore'
 Invoke-SharpProofRequiredDotnet -Arguments @(
