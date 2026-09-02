@@ -4239,12 +4239,6 @@ R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disp
 
 R677 is a pending acceptance-preparation reduction. Preserve production-inventory authority, TCB/coordinator scope, and any intentional Release-versus-acceptance configuration distinction; share only inventory data.
 
-### Status (part two hundred twenty-one)
-
-| R687 | **`LauncherArgumentTests` repeats the base verification argument vector across collision cases.** The directory-result, I/O-collision, nested-cache, worker-output, worker-runtime, and launcher-runtime tests each spell out the same `verify`, worker, request, result, compiler-manifest, verify-policy, and assumption-policy flags before varying only the paths or cache setting. A small `CreateProjectionArguments` helper with named path/cache parameters can remove the repeated argument plumbing while leaving every collision topology explicit at the call site. | `SharpProof.Package.Test/LauncherArgumentTests.cs:462-850` |
-
-R687 is a pending launcher-test data-construction reduction candidate. Preserve the exact flag order, relative/absolute path variants, cache-enabled cases, and each test's distinct pre-manifest validation assertion.
-
 ### Status (part two hundred twenty-two)
 
 | R688 | **`PortableIrGraphCodecTests` repeats negative-decoder setup and failure assertions.** The metadata, canonical-slot, unknown-enum, and malformed-graph test groups each create the same comprehensive fixture, encode it, mutate one wire field, and assert `InvalidDataException`; the groups differ only in mutation location (with the slot group adding a serialize/deserialize boundary). A shared mutation harness, optionally applying the JSON boundary, can own fixture encoding and the common decode-failure assertion while retaining each enum's explicit mutation switch and specialized message check. | `SharpProof.Worker.Test/PortableIrGraphCodecTests.cs:483-815` |

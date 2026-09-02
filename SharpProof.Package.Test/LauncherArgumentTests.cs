@@ -470,17 +470,13 @@ public sealed class LauncherArgumentTests
         Directory.CreateDirectory(resultDirectory);
         try
         {
-            string[] arguments = [
-                "verify",
-                "--worker", Path.Combine(workerDirectory, "worker.dll"),
-                "--request", Path.Combine(ioDirectory, "request.json"),
-                "--result", resultDirectory,
-                "--compiler-manifest", Path.Combine(
+            var arguments = ProjectionArguments(
+                worker: Path.Combine(workerDirectory, "worker.dll"),
+                request: Path.Combine(ioDirectory, "request.json"),
+                result: resultDirectory,
+                compilerManifest: Path.Combine(
                     ioDirectory,
-                    "missing-compiler-manifest.json"),
-                "--verify-policy", "advisory",
-                "--assumption-policy", "allow"
-            ];
+                    "missing-compiler-manifest.json"));
             AssertRequestProjectionRejects(arguments);
         }
         finally
@@ -518,15 +514,11 @@ public sealed class LauncherArgumentTests
                 Assert.Ignore("The test host does not support directory links: " + exception.Message);
             }
 
-            string[] arguments = [
-                "verify",
-                "--worker", Path.Combine(root, "worker.dll"),
-                "--request", Path.Combine(root, "request.json"),
-                "--result", Path.Combine(alias, "result.json"),
-                "--compiler-manifest", Path.Combine(root, "missing.json"),
-                "--verify-policy", "advisory",
-                "--assumption-policy", "allow"
-            ];
+            var arguments = ProjectionArguments(
+                worker: Path.Combine(root, "worker.dll"),
+                request: Path.Combine(root, "request.json"),
+                result: Path.Combine(alias, "result.json"),
+                compilerManifest: Path.Combine(root, "missing.json"));
             Assert.That(
                 LauncherArguments.TryParse(arguments, out var parsed),
                 Is.True);
@@ -551,15 +543,8 @@ public sealed class LauncherArgumentTests
     [Platform("Linux")]
     public void RequestProjectionRejectsCollidingIoPathsBeforeManifestRead()
     {
-        string[] arguments = [
-            "verify",
-            "--worker", "worker.dll",
-            "--request", "request.json",
-            "--result", Path.Combine(".", "request.json"),
-            "--compiler-manifest", "missing-compiler-manifest.json",
-            "--verify-policy", "advisory",
-            "--assumption-policy", "allow"
-        ];
+        var arguments = ProjectionArguments(
+            result: Path.Combine(".", "request.json"));
         AssertRequestProjectionRejects(arguments);
     }
 
@@ -570,18 +555,12 @@ public sealed class LauncherArgumentTests
         var requestPath = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             "request.json");
-        string[] arguments = [
-            "verify",
-            "--worker", "worker.dll",
-            "--request", requestPath,
-            "--result", Path.Combine(
+        var arguments = ProjectionArguments(
+            request: requestPath,
+            result: Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
                 "result.json"),
-            "--compiler-manifest", "missing-compiler-manifest.json",
-            "--cache-directory", requestPath,
-            "--verify-policy", "advisory",
-            "--assumption-policy", "allow"
-        ];
+            cacheDirectory: requestPath);
         AssertRequestProjectionRejects(arguments);
     }
 
@@ -596,21 +575,16 @@ public sealed class LauncherArgumentTests
             var requestPath = Path.Combine(
                 outputRoot.FullName,
                 "disabled-cache-request.json");
-            string[] arguments = [
-                "verify",
-                "--worker", "worker.dll",
-                "--request", requestPath,
-                "--result", Path.Combine(
+            var arguments = ProjectionArguments(
+                request: requestPath,
+                result: Path.Combine(
                     outputRoot.FullName,
                     "disabled-cache-result.json"),
-                "--compiler-manifest", Path.Combine(
+                compilerManifest: Path.Combine(
                     outputRoot.FullName,
                     "missing-compiler-manifest.json"),
-                "--cache-enabled", "false",
-                "--cache-directory", requestPath,
-                "--verify-policy", "advisory",
-                "--assumption-policy", "allow"
-            ];
+                cacheDirectory: requestPath,
+                cacheEnabled: false);
             Assert.That(
                 LauncherArguments.TryParse(arguments, out var parsed),
                 Is.True);
@@ -640,17 +614,11 @@ public sealed class LauncherArgumentTests
         {
             result = Path.Combine(cache, "result.json");
         }
-        string[] arguments = [
-            "verify",
-            "--worker", "worker.dll",
-            "--request", Path.Combine(root, "nested-cache-request.json"),
-            "--result", result,
-            "--compiler-manifest", "missing-compiler-manifest.json",
-            "--cache-enabled", "true",
-            "--cache-directory", cache,
-            "--verify-policy", "advisory",
-            "--assumption-policy", "allow"
-        ];
+        var arguments = ProjectionArguments(
+            request: Path.Combine(root, "nested-cache-request.json"),
+            result: result,
+            cacheDirectory: cache,
+            cacheEnabled: true);
         AssertRequestProjectionRejects(arguments);
     }
 
@@ -661,19 +629,14 @@ public sealed class LauncherArgumentTests
         var worker = Path.Combine(
             TestContext.CurrentContext.WorkDirectory,
             "worker-tree-worker.dll");
-        string[] arguments = [
-            "verify",
-            "--worker", worker,
-            "--request", Path.Combine(
+        var arguments = ProjectionArguments(
+            worker: worker,
+            request: Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
                 "worker-tree-request.json"),
-            "--result", Path.Combine(
+            result: Path.Combine(
                 Path.GetDirectoryName(worker)!,
-                "worker-tree-output.json"),
-            "--compiler-manifest", "missing-compiler-manifest.json",
-            "--verify-policy", "advisory",
-            "--assumption-policy", "allow"
-        ];
+                "worker-tree-output.json"));
         AssertRequestProjectionRejects(arguments);
     }
 
@@ -681,15 +644,8 @@ public sealed class LauncherArgumentTests
     [Platform("Linux")]
     public void RequestProjectionRejectsWorkerPathCollisionBeforeManifestRead()
     {
-        string[] arguments = [
-            "verify",
-            "--worker", "request.json",
-            "--request", "request.json",
-            "--result", "result.json",
-            "--compiler-manifest", "missing-compiler-manifest.json",
-            "--verify-policy", "advisory",
-            "--assumption-policy", "allow"
-        ];
+        var arguments = ProjectionArguments(
+            worker: "request.json");
         AssertRequestProjectionRejects(arguments);
     }
 
@@ -714,15 +670,7 @@ public sealed class LauncherArgumentTests
     public void RequestProjectionRejectsWorkerRuntimeCompanionCollisionBeforeManifestRead(
         string resultPath)
     {
-        string[] arguments = [
-            "verify",
-            "--worker", "worker.dll",
-            "--request", "request.json",
-            "--result", resultPath,
-            "--compiler-manifest", "missing-compiler-manifest.json",
-            "--verify-policy", "advisory",
-            "--assumption-policy", "allow"
-        ];
+        var arguments = ProjectionArguments(result: resultPath);
         AssertRequestProjectionRejects(arguments);
     }
 
@@ -738,19 +686,13 @@ public sealed class LauncherArgumentTests
             Is.EqualTo(LauncherRuntimeCompanionInventory.FileNames));
         foreach (var resultPath in LauncherArguments.LauncherRuntimePaths)
         {
-            string[] arguments = [
-                "verify",
-                "--worker", Path.Combine(
+            var arguments = ProjectionArguments(
+                worker: Path.Combine(
                     Path.GetTempPath(),
                     "SharpProof-isolated-worker-" +
                     Guid.NewGuid().ToString("N"),
                     "worker.dll"),
-                "--request", "request.json",
-                "--result", resultPath,
-                "--compiler-manifest", "missing-compiler-manifest.json",
-                "--verify-policy", "advisory",
-                "--assumption-policy", "allow"
-            ];
+                result: resultPath);
             Assert.That(
                 LauncherArguments.TryParse(arguments, out var parsed),
                 Is.True,
@@ -770,18 +712,12 @@ public sealed class LauncherArgumentTests
         var protocol = Path.Combine(
             Path.GetDirectoryName(launcher)!,
             "SharpProof.Worker.Protocol.dll");
-        string[] arguments = [
-            "verify",
-            "--worker", Path.Combine(
+        var arguments = ProjectionArguments(
+            worker: Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof-isolated-worker-" + Guid.NewGuid().ToString("N"),
                 "worker.dll"),
-            "--request", "request.json",
-            "--result", protocol,
-            "--compiler-manifest", "missing-compiler-manifest.json",
-            "--verify-policy", "advisory",
-            "--assumption-policy", "allow"
-        ];
+            result: protocol);
         Assert.That(
             LauncherArguments.TryParse(arguments, out var parsed),
             Is.True);
@@ -809,16 +745,15 @@ public sealed class LauncherArgumentTests
             [runtimeAsset],
             "snapshot",
             Array.Empty<FileStream>());
-        string[] arguments = [
-            "verify",
-            "--worker", worker,
-            "--request", Path.Combine(testRoot, "SharpProof-safe-request-" + testId + ".json"),
-            "--result", runtimeAsset,
-            "--compiler-manifest", Path.Combine(
-                testRoot, "SharpProof-safe-missing-manifest-" + testId + ".json"),
-            "--verify-policy", "advisory",
-            "--assumption-policy", "allow"
-        ];
+        var arguments = ProjectionArguments(
+            worker: worker,
+            request: Path.Combine(
+                testRoot,
+                "SharpProof-safe-request-" + testId + ".json"),
+            result: runtimeAsset,
+            compilerManifest: Path.Combine(
+                testRoot,
+                "SharpProof-safe-missing-manifest-" + testId + ".json"));
         var nonCollidingArguments = arguments.ToArray();
         nonCollidingArguments[6] = Path.Combine(
             testRoot, "SharpProof-safe-result-" + testId + ".json");
@@ -2112,6 +2047,35 @@ public sealed class LauncherArgumentTests
         Assert.That(
             (Action)(() => parsed.CreateRequest(out _, out _)),
             Throws.TypeOf<ArgumentException>());
+    }
+
+    private static string[] ProjectionArguments(
+        string worker = "worker.dll",
+        string request = "request.json",
+        string result = "result.json",
+        string compilerManifest = "missing-compiler-manifest.json",
+        string? cacheDirectory = null,
+        bool? cacheEnabled = null)
+    {
+        string[] cacheArguments = cacheDirectory == null
+            ? []
+            : cacheEnabled.HasValue
+                ? [
+                    "--cache-enabled",
+                    cacheEnabled.Value ? "true" : "false",
+                    "--cache-directory", cacheDirectory
+                ]
+                : ["--cache-directory", cacheDirectory];
+        return [
+            "verify",
+            "--worker", worker,
+            "--request", request,
+            "--result", result,
+            "--compiler-manifest", compilerManifest,
+            ..cacheArguments,
+            "--verify-policy", "advisory",
+            "--assumption-policy", "allow"
+        ];
     }
 
     private static string[] ValidArguments()
