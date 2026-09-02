@@ -102,68 +102,68 @@ if requires_clean_exact_commit_source "${command_name}"; then
   assert_clean_exact_commit_source
 fi
 
-    task_root="$(mktemp -d /tmp/sharpproof-task.XXXXXXXX)"
-    mkdir -p "${repo_root}/artifacts"
-    if [[ "${source_has_git}" = "true" ]]; then
-      git clone --quiet --shared --no-checkout "${repo_root}" "${task_root}"
-      git config --global --add safe.directory "${task_root}"
-      source_origin="$(git -C "${repo_root}" remote get-url origin 2>/dev/null || true)"
-      if [[ -n "${source_origin}" ]]; then
-        git -C "${task_root}" remote set-url origin "${source_origin}"
-      fi
-      git -C "${task_root}" checkout --quiet --detach \
-        "$(git -C "${repo_root}" rev-parse HEAD)"
-      # Docker Desktop bind mounts do not preserve meaningful Git executable
-      # bits. Ignore their synthetic working-tree modes in the disposable clone;
-      # real mode changes committed between Git trees remain part of comparisons.
-      git -C "${task_root}" config core.filemode false
-      if ! git -C "${repo_root}" diff --quiet HEAD --; then
-        git -C "${repo_root}" diff \
-          --binary --full-index --no-ext-diff HEAD -- . |
-          git -C "${task_root}" apply \
-            --binary --whitespace=nowarn -
-      fi
-      while IFS= read -r -d '' untracked_path; do
-        mkdir -p -- "${task_root}/$(dirname -- "${untracked_path}")"
-        cp -a -- \
-          "${repo_root}/${untracked_path}" \
-          "${task_root}/${untracked_path}"
-      done < <(git -C "${repo_root}" ls-files \
-        --others --exclude-standard -z --)
-      # Package jobs download nupkg/snupkg inputs under nupkgs/. Those file
-      # extensions are intentionally ignored by Git, so the general untracked
-      # copy above cannot see them. Preserve only ignored package-job inputs;
-      # do not broaden the snapshot to other ignored build output.
-      while IFS= read -r -d '' package_path; do
-        mkdir -p -- "${task_root}/$(dirname -- "${package_path}")"
-        cp -a -- \
-          "${repo_root}/${package_path}" \
-          "${task_root}/${package_path}"
-      done < <(git -C "${repo_root}" ls-files \
-        --others --ignored --exclude-standard -z -- nupkgs/)
-    else
-      tar \
-        --exclude='./artifacts' \
-        --exclude='./.git' \
-        --exclude='*/bin' \
-        --exclude='*/bin/*' \
-        --exclude='*/obj' \
-        --exclude='*/obj/*' \
-        --exclude='./.vs' \
-        --exclude='./.baseline-check' \
-        --exclude='./.claude' \
-        --exclude='./.claude/*' \
-        -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
-    fi
-    ln -s "${repo_root}/artifacts" "${task_root}/artifacts"
-    if [[ "${source_has_git}" = "true" ]] &&
-      [[ -d "${task_root}/.git" ]]; then
-      # The disposable clone uses a symlink so evidence lands in the host
-      # artifact mount. A trailing-slash ignore rule matches directories but
-      # not this symlink, so exclude the exact task-local link explicitly.
-      printf '/artifacts\n' >> "${task_root}/.git/info/exclude"
-    fi
-    export SHARPPROOF_REPO_ROOT="${task_root}"
-    cd "${task_root}"
-    exec pwsh -NoLogo -NoProfile -File ./scripts/Invoke-SharpProofContainer.ps1 \
-      -Command "${command_name}" "$@"
+task_root="$(mktemp -d /tmp/sharpproof-task.XXXXXXXX)"
+mkdir -p "${repo_root}/artifacts"
+if [[ "${source_has_git}" = "true" ]]; then
+  git clone --quiet --shared --no-checkout "${repo_root}" "${task_root}"
+  git config --global --add safe.directory "${task_root}"
+  source_origin="$(git -C "${repo_root}" remote get-url origin 2>/dev/null || true)"
+  if [[ -n "${source_origin}" ]]; then
+    git -C "${task_root}" remote set-url origin "${source_origin}"
+  fi
+  git -C "${task_root}" checkout --quiet --detach \
+    "$(git -C "${repo_root}" rev-parse HEAD)"
+  # Docker Desktop bind mounts do not preserve meaningful Git executable
+  # bits. Ignore their synthetic working-tree modes in the disposable clone;
+  # real mode changes committed between Git trees remain part of comparisons.
+  git -C "${task_root}" config core.filemode false
+  if ! git -C "${repo_root}" diff --quiet HEAD --; then
+    git -C "${repo_root}" diff \
+      --binary --full-index --no-ext-diff HEAD -- . |
+      git -C "${task_root}" apply \
+        --binary --whitespace=nowarn -
+  fi
+  while IFS= read -r -d '' untracked_path; do
+    mkdir -p -- "${task_root}/$(dirname -- "${untracked_path}")"
+    cp -a -- \
+      "${repo_root}/${untracked_path}" \
+      "${task_root}/${untracked_path}"
+  done < <(git -C "${repo_root}" ls-files \
+    --others --exclude-standard -z --)
+  # Package jobs download nupkg/snupkg inputs under nupkgs/. Those file
+  # extensions are intentionally ignored by Git, so the general untracked
+  # copy above cannot see them. Preserve only ignored package-job inputs;
+  # do not broaden the snapshot to other ignored build output.
+  while IFS= read -r -d '' package_path; do
+    mkdir -p -- "${task_root}/$(dirname -- "${package_path}")"
+    cp -a -- \
+      "${repo_root}/${package_path}" \
+      "${task_root}/${package_path}"
+  done < <(git -C "${repo_root}" ls-files \
+    --others --ignored --exclude-standard -z -- nupkgs/)
+else
+  tar \
+    --exclude='./artifacts' \
+    --exclude='./.git' \
+    --exclude='*/bin' \
+    --exclude='*/bin/*' \
+    --exclude='*/obj' \
+    --exclude='*/obj/*' \
+    --exclude='./.vs' \
+    --exclude='./.baseline-check' \
+    --exclude='./.claude' \
+    --exclude='./.claude/*' \
+    -C "${repo_root}" -cf - . | tar -C "${task_root}" -xf -
+fi
+ln -s "${repo_root}/artifacts" "${task_root}/artifacts"
+if [[ "${source_has_git}" = "true" ]] &&
+  [[ -d "${task_root}/.git" ]]; then
+  # The disposable clone uses a symlink so evidence lands in the host
+  # artifact mount. A trailing-slash ignore rule matches directories but
+  # not this symlink, so exclude the exact task-local link explicitly.
+  printf '/artifacts\n' >> "${task_root}/.git/info/exclude"
+fi
+export SHARPPROOF_REPO_ROOT="${task_root}"
+cd "${task_root}"
+exec pwsh -NoLogo -NoProfile -File ./scripts/Invoke-SharpProofContainer.ps1 \
+  -Command "${command_name}" "$@"
