@@ -199,6 +199,7 @@ the smallest relevant containerized test target passes.
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
 | R524 | Share callable proof-label normalization | `SharpProof.Worker.Test`: 695 passed |
 | R526 | Share order-insensitive assumption comparison across protocol layers | `SharpProof.Worker.Test`: 695 passed |
+| R539 | Aggregate trusted-boundary assumption flags in one protocol pass | `SharpProof.Worker.Test`: 695 passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -3246,9 +3247,9 @@ model-specific rebuild and minimization policy intact.
 
 ### Status (part eighty-three)
 
-R538-R539 are `pending` reduction candidates. R538 removes duplicated traversal
-scaffolding without merging the reachability-specific dispatcher; R539 keeps
-the two evidence flags distinct while avoiding repeated array work.
+R538 remains `pending`; R539 keeps the two evidence flags distinct while
+avoiding repeated assumption-array scans. R538 removes duplicated traversal
+scaffolding without merging the reachability-specific dispatcher.
 
 ## Second survey, part eighty-four: R540 - callable projection scans
 
@@ -3331,3 +3332,13 @@ the intentionally smaller C# literal subset if the corpus is centralized.
 R549 is a `pending` reduction candidate. Do not remove the qualification-time
 identity guarantee unless the package artifact and the exact checkout identity
 are bound by an equivalent immutable receipt.
+
+## Second survey, part ninety-two: R550 - publication URI validation
+
+| R550 | **`SharpProof.PublicationPlanIdentity` bypasses the shared HTTPS destination validator.** Its registry branch independently checks both destinations and the package base address for an absolute HTTPS URI with a nonblank host and no user info, query, or fragment. `SharpProof.PublicationDestination.Resolve-SharpProofPublicationHttpsDestination` already owns the same URI predicate and is used when creating the authority; the plan validator's package-base branch adds only the separate canonical trailing-slash comparison. Calling the shared validator and retaining that canonical-form check would remove a second URI-policy implementation while preserving the plan-specific schema and normalization requirements. | `scripts/SharpProof.PublicationPlanIdentity.psm1:89-131`; `scripts/SharpProof.PublicationDestination.ps1:8-24,191-195,321-323` |
+
+### Status (part ninety-two)
+
+R550 is a `pending` reduction candidate. Preserve the registry plan's
+canonical package-base-address check and its existing fail-closed schema errors
+when reusing the shared HTTPS predicate.

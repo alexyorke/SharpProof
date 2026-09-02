@@ -620,6 +620,21 @@ public static partial class WorkerProtocolJson
         errors.Rules(value, WorkerProtocolMetadata.ClaimResultRules);
         var claim = claimsById.Find(value.ClaimId);
         var effectClaim = claim?.Kind == WorkerClaimKind.Effect;
+        var hasTrustedBoundary = false;
+        var hasUsedTrustedBoundary = false;
+        if (effectClaim)
+        {
+            foreach (var assumption in value.Assumptions ?? [])
+            {
+                if (assumption?.Kind != WorkerAssumptionKind.TrustedBoundary)
+                {
+                    continue;
+                }
+
+                hasTrustedBoundary = true;
+                hasUsedTrustedBoundary |= assumption.Used;
+            }
+        }
         errors.Check(claim != null &&
                 WorkerProtocolMetadata.MatchesClaimKindOutcome(
                     claim.Kind, value.Outcome, value.Reason),
@@ -634,13 +649,8 @@ public static partial class WorkerProtocolJson
                 value.EffectCertainty,
                 value.Vacuity,
                 value.ProofCore is { Length: > 0 },
-                (value.Assumptions ?? []).Any(static assumption =>
-                    assumption != null &&
-                    assumption.Kind == WorkerAssumptionKind.TrustedBoundary),
-                (value.Assumptions ?? []).Any(static assumption =>
-                    assumption != null &&
-                    assumption.Kind == WorkerAssumptionKind.TrustedBoundary &&
-                    assumption.Used)),
+                hasTrustedBoundary,
+                hasUsedTrustedBoundary),
                 "response.effect_evidence")
             .Check(effectClaim && value.Outcome == WorkerClaimOutcome.Refuted
                 ? HasValidEffectWitness(value.EffectWitness)
