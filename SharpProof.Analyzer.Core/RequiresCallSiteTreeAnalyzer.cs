@@ -682,7 +682,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     var killed = false;
                     var exceptionalStateSurvivesKill = false;
                     var pendingWriteOnlyOutCommit = -1;
-                    foreach (var reference in BlockOperations(block)
+                    foreach (var entry in BlockOperations(block)
                                  .SelectMany(static operation =>
                                      operation.DescendantsAndSelf())
                                  .OfType<ILocalReferenceOperation>()
@@ -690,10 +690,14 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                                      SymbolEqualityComparer.Default.Equals(
                                          reference.Local,
                                          local))
-                                 .OrderBy(GetReferenceOrder))
+                                 .Select(static reference =>
+                                     (Reference: reference,
+                                         Order: GetReferenceOrder(reference)))
+                                 .OrderBy(static item => item.Order))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var order = GetReferenceOrder(reference);
+                        var reference = entry.Reference;
+                        var order = entry.Order;
                         if (order <= after || reference.IsDeclaration)
                         {
                             continue;

@@ -4365,7 +4365,7 @@ R716 completed: local-function reachability now tracks scheduled symbols to prev
 
 | R717 | **`TreeAnalysis.CanReachConsumption` computes each local-reference ordering key twice.** The reference sequence is sorted with `OrderBy(GetReferenceOrder)`, then the loop immediately calls `GetReferenceOrder(reference)` again before applying the `after` boundary. Project each reference with its order once, sort the pair, and consume the cached key while keeping the assignment-end ordering rule unchanged. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:682-704,1234-1242` |
 
-R717 is a pending CFG-reference ordering reduction candidate. Preserve assignment-span ordering, declaration filtering, and the fail-closed treatment of references in every block.
+R717 completed: each local-reference ordering key is projected once before sorting and then reused for filtering, preserving assignment-span ordering, declaration filtering, and fail-closed treatment across all blocks.
 
 | R718 | **`BlockMayThrowBeforeAssignmentCommit` rescans the entire CFG for each qualifying assignment reference.** Once a tracked value is killed, the helper walks the reference's ancestors to find the owning simple assignment and then scans every block and descendant operation bounded by the same `after`/commit span; multiple qualifying references or repeated paths can repeat that full graph walk. Cache the bounded throw result by graph/assignment interval (or pre-index throwing operations) while retaining the current span bounds and `RoslynCfgThrowFacts` predicate. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1202-1232` |
 
