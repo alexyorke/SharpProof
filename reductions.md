@@ -4193,14 +4193,6 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred eighty-three: R642 - repeated assumption-shape validation
-
-| R642 | **`CompilerResponseEvidenceAuthority` validates the same assumption declarations once per callable and once per claim.** `Validate` first calls `ValidateCallableAssumptions`, which runs `ValidateAssumptionShape` against the callable result, and `ValidateClaim` calls the same helper for every claim result. The expected used-set differs by result - callable-level assumptions must all be unused, while a claim may mark proof-core or trusted-boundary assumptions used - but `SameAssumptionDeclarations` and canonical ordering are invariant and are recomputed for every claim. Split declaration/order validation from used-flag validation so the per-callable shape check is shared and each claim retains only its result-specific usage check. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:43-59,65-75,101-134,220-241`; `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:575-590` |
-
-### Status (part one hundred eighty-three)
-
-R642 is a pending response-authority validation reduction candidate. Preserve the separate callable-versus-claim used-set policies, error codes, canonical assumption order, and declaration equality; share only the invariant shape comparison.
-
 ## Second survey, part one hundred eighty-four: R643 - repeated manifest JSON preparse
 
 | R643 | **`CompilerManifestArtifactJson.Deserialize` parses the complete manifest JSON twice before deserialization.** `RequireSpecificationPackAuthorityProperties` creates one `JsonDocument`, and `RequireDiagnosticClassificationProperties` creates a second `JsonDocument` over the same input; both then inspect a small set of required properties before `JsonSerializer.Deserialize` parses the payload again. A single compatibility-property pass can retain both presence contracts and cancellation boundaries while removing one full preliminary parse; the typed deserialization and canonical reserialization checks remain separate concerns. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:372-395,705-736` |
@@ -4240,3 +4232,43 @@ R646 is a pending source-location validation reduction candidate. Preserve senti
 ### Status (part one hundred eighty-eight)
 
 R647 is a pending portable-IR codec allocation reduction candidate. Preserve schema catalog lookup, slot-count checks, default-value rules, and malformed-graph rejection; replace only the temporary object-array/boxing machinery.
+
+## Second survey, part one hundred eighty-nine: R648 - recovered skeletal snapshot adapter
+
+| R648 | **`CompilerEffectReplayLowerer.TryResolveSource` allocates a skeletal compilation snapshot solely to call a syntax-tree lookup.** After obtaining the cached `CompilerSyntaxTreeSnapshot[]`, it creates `new CompilerCompilationSnapshot { SyntaxTrees = capturedTrees }` and passes that object to `CompilerSourceLocationAuthority.FindUniqueTree`; the authority reads no other snapshot field. A narrow overload accepting the captured tree collection, or a source-tree resolver that takes the collection directly, removes this per-replay adapter object while retaining the authority's remembered-ordinal fast path, geometry checks, and ambiguity rejection. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:418-433`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:108-142` |
+
+### Status (part one hundred eighty-nine)
+
+R648 is a pending replay-source allocation/adapter reduction candidate. Preserve unique-tree resolution, cancellation, remembered-tree validation, and the distinction between operation-tree and source-tree identities; remove only the wrapper created to satisfy the current parameter shape.
+
+## Second survey, part one hundred ninety: R649 - duplicate lowered-program walks
+
+| R649 | **`CompilerLoweredArtifact.DecodeBody` walks the decoded program twice for separate checks.** It first calls `ValidateExecutableBody`, which recursively visits reachable blocks to enforce terminators, cycles, reachability limits, and return types, then calls `CollectProgramVariables`, which scans the program's blocks and instructions again to collect every referenced variable for parameter-binding and summary-free-variable checks. A shared program-analysis pass can return the required reachability/terminator state and variable set, or at least reuse one instruction traversal, while explicitly retaining the current all-block variable collection if unreachable blocks remain part of the malformed-input policy. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:647-657,928-1002,1004-1083` |
+
+### Status (part one hundred ninety)
+
+R649 is a pending lowered-artifact validation traversal reduction candidate. Preserve reachable-block cycle/return checks, all-block variable collection semantics, instruction bounds, and fail-closed errors; combine only traversal state that has identical scope and purpose.
+
+## Second survey, part one hundred ninety-one: R650 - repeated summary-evidence scans
+
+| R650 | **`CompilerLoweredArtifact.DecodeBody` rescans the full compilation summary-evidence table for every summary and dependency row.** Each summary call invokes `ValidSummaryEvidence`, which filters `compilation.SummaryEvidence` and materializes a match array; `ValidDependencyEvidence` invokes the same lookup once per dependency entry. The evidence table is immutable for the decode, so a canonical key dictionary built once per body can replace repeated O(summary rows x evidence rows) scans while retaining the exact-one-match rule and the subsequent `ValidSummaryEvidenceRow` authority check. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:754-820,1111-1174` |
+
+### Status (part one hundred ninety-one)
+
+R650 is a pending lowered-summary evidence lookup reduction candidate. Preserve duplicate/missing-row rejection, origin/call/identity/hash matching, canonical dependency order, and authority-mode validation; share only the immutable evidence indexing.
+
+## Second survey, part one hundred ninety-two: R651 - effect evidence validation twice
+
+| R651 | **Effect evidence is validated once directly and again through authority matching.** `CompilerLoweredArtifact.DecodeEffects` calls `CompilerEffectClaimArtifactCodec.Validate(evidence, compilation)` before `CompilerEffectAuthority.Matches`, while `Matches` rebuilds the authority payload and `HasValidAuthorityPayload` seals and validates that copied evidence again. `CompilerManifestArtifactJson.HasFeatureScopeParity` repeats the same sequence with its effect rows. An internal matched-authority path can accept a caller-proven validated evidence row, or a combined routine can return the validation result, removing the duplicate codec hash/shape/replay work without weakening the independent authority-copy comparison. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:500-520`; `SharpProof.CompilerArtifact/CompilerEffectAuthority.cs:65-143`; `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:613-646` |
+
+### Status (part one hundred ninety-two)
+
+R651 is a pending compiler-effect authority validation reduction candidate. Preserve independent authority-copy validation, replay geometry checks, evidence/authority field equality, and fail-closed exception handling; bypass only the repeated validation of an evidence object already checked by the caller.
+
+## Second survey, part one hundred ninety-three: R652 - repeated pack-authority validation
+
+| R652 | **Full manifest validation checks the same compilation pack authority through two paths.** `CompilerManifestArtifactJson.HasValidEnvelope` calls `CompilerSpecificationPackAuthorityValidation.Matches`, which validates the artifact-level and compilation-level pack authorities; the later `CompilationFingerprint.ValidateShape` call runs `ValidSnapshot`, which validates the compilation pack authority again before checking its other captured fields. A validation result passed through the manifest-validation pipeline, or a shape validator that can rely on the already-checked authority, removes the repeated catalog-version, catalog-hash, canonical-ID, and known-pack checks while preserving the outer-versus-compilation equality assertion. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:429-457,494-515`; `SharpProof.CompilerArtifact/CompilationFingerprint.cs:66-107`; `SharpProof.CompilerArtifact/CompilerSpecificationPackAuthority.cs:28-75` |
+
+### Status (part one hundred ninety-three)
+
+R652 is a pending compiler-manifest authority-validation reduction candidate. Preserve both authority equality and compilation-shape validation boundaries, catalog integrity, canonical pack ordering, and fail-closed behavior; share only the repeated compilation authority result.

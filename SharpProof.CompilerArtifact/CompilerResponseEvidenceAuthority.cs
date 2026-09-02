@@ -11,6 +11,21 @@ internal sealed class CompilerResponseEvidenceAuthority :
 {
     private readonly ImmutableArray<CompilerCallablePreparation> _targets;
 
+    private sealed class AssumptionShape
+    {
+        internal AssumptionShape(
+            ImmutableArray<(string Id, WorkerAssumptionKind Kind)> byId,
+            ImmutableArray<(string Id, WorkerAssumptionKind Kind)> canonical)
+        {
+            ById = byId;
+            Canonical = canonical;
+        }
+
+        internal ImmutableArray<(string Id, WorkerAssumptionKind Kind)> ById { get; }
+
+        internal ImmutableArray<(string Id, WorkerAssumptionKind Kind)> Canonical { get; }
+    }
+
     internal CompilerResponseEvidenceAuthority(
         ImmutableArray<CompilerCallablePreparation> targets)
     {
@@ -48,13 +63,19 @@ internal sealed class CompilerResponseEvidenceAuthority :
                 continue;
             }
 
-            ValidateCallableAssumptions(target, callable, errors);
+            var assumptionShape = CreateAssumptionShape(target.Entry.Assumptions);
+            ValidateCallableAssumptions(callable, assumptionShape, errors);
             foreach (var claimId in target.Entry.ClaimIds)
             {
                 if (claims.TryGetValue(claimId, out var claim))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    ValidateClaim(target, claim, errors, cancellationToken);
+                    ValidateClaim(
+                        target,
+                        claim,
+                        assumptionShape,
+                        errors,
+                        cancellationToken);
                 }
             }
         }
@@ -63,13 +84,13 @@ internal sealed class CompilerResponseEvidenceAuthority :
     }
 
     private static void ValidateCallableAssumptions(
-        CompilerCallablePreparation target,
         WorkerCallableResult result,
+        AssumptionShape assumptionShape,
         HashSet<string> errors)
     {
         ValidateAssumptionShape(
             result.Assumptions,
-            target.Entry.Assumptions,
+            assumptionShape,
             [],
             errors);
     }
@@ -77,12 +98,13 @@ internal sealed class CompilerResponseEvidenceAuthority :
     private static void ValidateClaim(
         CompilerCallablePreparation target,
         WorkerClaimResult result,
+        AssumptionShape assumptionShape,
         HashSet<string> errors,
         CancellationToken cancellationToken)
     {
         if (!target.IsSuccess)
         {
-            ValidateFailedTargetClaim(target, result, errors);
+            ValidateFailedTargetClaim(target, result, assumptionShape, errors);
             return;
         }
 
@@ -129,7 +151,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
         ValidateAssumptionShape(
             result.Assumptions,
-            target.Entry.Assumptions,
+            assumptionShape,
             expectedUsed,
             errors);
 
@@ -146,6 +168,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
     private static void ValidateFailedTargetClaim(
         CompilerCallablePreparation target,
         WorkerClaimResult result,
+        AssumptionShape assumptionShape,
         HashSet<string> errors)
     {
         var effect = target.EffectClaims.FirstOrDefault(
@@ -153,7 +176,12 @@ internal sealed class CompilerResponseEvidenceAuthority :
         if (effect != null &&
             target.FailureReason != WorkerClaimReason.UnsupportedCallable)
         {
-            ValidateFailedTargetEffectClaim(target, effect, result, errors);
+            ValidateFailedTargetEffectClaim(
+                target,
+                effect,
+                result,
+                assumptionShape,
+                errors);
             return;
         }
 
@@ -174,7 +202,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
         ValidateAssumptionShape(
             result.Assumptions,
-            target.Entry.Assumptions,
+            assumptionShape,
             [],
             errors);
     }
@@ -183,6 +211,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
         CompilerCallablePreparation target,
         CompilerEffectClaimArtifact evidence,
         WorkerClaimResult result,
+        AssumptionShape assumptionShape,
         HashSet<string> errors)
     {
         var replayFailed = evidence.Outcome == WorkerClaimOutcome.Refuted &&
@@ -211,7 +240,7 @@ internal sealed class CompilerResponseEvidenceAuthority :
                     : [];
         ValidateAssumptionShape(
             result.Assumptions,
-            target.Entry.Assumptions,
+            assumptionShape,
             expectedUsed,
             errors);
         ValidateEffectClaim(target, evidence, result, errors);
@@ -219,12 +248,11 @@ internal sealed class CompilerResponseEvidenceAuthority :
 
     private static void ValidateAssumptionShape(
         WorkerAssumptionEvidence[]? actual,
-        WorkerAssumptionEvidence[]? expected,
+        AssumptionShape expected,
         IEnumerable<string> expectedUsed,
         HashSet<string> errors)
     {
-        if (!WorkerProtocolJson.SameAssumptionDeclarations(actual, expected) ||
-            !IsCanonicalAssumptions(actual, expected))
+        if (!HasValidAssumptionShape(actual, expected))
         {
             errors.Add("response.assumption_usage_authority");
             return;
@@ -238,6 +266,35 @@ internal sealed class CompilerResponseEvidenceAuthority :
                 errors.Add("response.assumption_usage_authority");
             }
         }
+    }
+
+    private static AssumptionShape CreateAssumptionShape(
+        WorkerAssumptionEvidence[]? expected)
+    {
+        var declarations = (expected ?? [])
+            .Where(static value => value != null)
+            .Select(static value => (value.Id, value.Kind))
+            .ToArray();
+        return new AssumptionShape(
+            [.. declarations.OrderBy(
+                static value => value.Id,
+                StringComparer.Ordinal)],
+            [.. declarations.OrderBy(
+                    static value => WorkerProtocolMetadata.GetAssumptionOrder(
+                        value.Kind))
+                .ThenBy(static value => value.Id, StringComparer.Ordinal)]);
+    }
+
+    private static bool HasValidAssumptionShape(
+        WorkerAssumptionEvidence[]? actual,
+        AssumptionShape expected)
+    {
+        var declarations = (actual ?? [])
+            .Where(static value => value != null)
+            .Select(static value => (value.Id, value.Kind))
+            .ToArray();
+        return declarations.SequenceEqual(expected.ById) &&
+            declarations.SequenceEqual(expected.Canonical);
     }
 
     private static void ValidateEffectClaim(
@@ -570,23 +627,6 @@ internal sealed class CompilerResponseEvidenceAuthority :
         return target.Clauses.Any(static clause =>
             clause.Kind == CompilerContractKind.Requires &&
             clause.Condition is IrBooleanTerm { Value: false });
-    }
-
-    private static bool IsCanonicalAssumptions(
-        WorkerAssumptionEvidence[]? actual,
-        WorkerAssumptionEvidence[]? expected)
-    {
-        var canonical = (expected ?? [])
-            .Where(static value => value != null)
-            .OrderBy(static value => WorkerProtocolMetadata.GetAssumptionOrder(value.Kind))
-            .ThenBy(static value => value.Id, StringComparer.Ordinal)
-            .Select(static value => (value.Id, value.Kind))
-            .ToArray();
-        var actualShape = (actual ?? [])
-            .Where(static value => value != null)
-            .Select(static value => (value.Id, value.Kind))
-            .ToArray();
-        return actualShape.SequenceEqual(canonical);
     }
 
     private static bool IsCanonicalProofCore(string[]? values)
