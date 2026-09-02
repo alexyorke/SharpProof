@@ -4537,3 +4537,152 @@ rather than another instance of one, and it applies retroactively to R724-R728. 
 only one thing from parts two hundred forty-seven, forty-eight and this one is
 actioned, it should be the check described in R730, because the three
 duplications will otherwise regrow after being collapsed.
+
+## Second survey, part two hundred fifty: R731 - IsPackable is a second, ungated statement of what ships
+
+Turning from test code to build configuration: a census of `IsPackable` across all
+60 `.csproj` files against the manifest that actually decides what is packaged.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R731 | **`IsPackable` is declared 24 times across the 60 projects, it decides nothing, and its default runs the wrong way.** The authority on what ships is `scripts/package-projects.json` - three projects, pinned in `eng/acceptance/contract.json` at two places, read by six scripts, and asserted by `PackagedProductFeed.cs:296-322` ("package-projects.json must list the three product ...") and `ArchitectureTests.cs:1924-1969`. Every pack invocation in the repository is manifest-driven and per-project: `Invoke-SharpProofContainer.ps1:534-550`, `Invoke-SharpProofPackageTests.ps1:389-395`, and `Test-SharpProofSamples.ps1:233-252` each read the manifest and run `dotnet pack <project>` in a loop. **Nothing ever packs the solution**, so `IsPackable` has no live effect at all. Against that, `Directory.Build.props:26-28` sets `IsPackable=false` only for `SharpProofTestProject`, which is a `Test$` regex on the project name and covers 19 projects. The remaining 41 default to *packable*, so **23 non-test projects each hand-write `<IsPackable>false</IsPackable>`** - and **15 non-test, non-shipping projects do not**, leaving them silently packable: `SharpProof.Analyzer`, `SharpProof.CompilerCollector`, the 5 `eng/pilots/` projects, and the 8 `samples/` projects. **No test asserts anything about `IsPackable`**; outside the csproj files and this ledger the identifier appears only in `Directory.Build.props`. The result is 24 declarations of a fact that is already stated once, authoritatively and under gate, elsewhere - inconsistent across 15 projects, and with the inconsistency invisible because the property is inert. Setting `IsPackable=false` centrally and letting the three manifest projects opt in removes 23 lines, makes the default match the 57-of-60 case, and makes the property agree with the manifest instead of shadowing it. | `scripts/package-projects.json`; `Directory.Build.props:26-28`; 23 opt-outs incl. `SharpProof.Analyzer.Core`, `SharpProof.BuildTasks`, `SharpProof.CompilerArtifact`, `SharpProof.Contracts`, `SharpProof.Effects`, `SharpProof.Frontend`, `SharpProof.Gates`, `SharpProof.Host`, `SharpProof.Ir`, `SharpProof.Smt`, `SharpProof.Specs`, `SharpProof.Worker`, `SharpProof.Worker.Protocol`; silent at `SharpProof.Analyzer/SharpProof.Analyzer.csproj`, `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj`, `eng/pilots/*/`, `samples/*/`; `SharpProof.ArchitectureTest/ArchitectureTests.cs:1951-1968`; `SharpProof.Package.Test/PackagedProductFeed.cs:296-322` |
+
+### Checked and not proposed (part two hundred fifty)
+
+- **The `GeneratePackageOnBuild` gate is correct and should not be touched.**
+  `ArchitectureTests.PackageFeedConstructionIsDemandDriven` loads each manifest
+  project's XML and requires `GeneratePackageOnBuild` to be absent or `false`, with
+  a message explaining that package creation is reserved for the explicit container
+  `pack` command. That is the check `IsPackable` looks like it should be and is
+  not. If R731 is actioned, the natural place for an `IsPackable` assertion is
+  this same test.
+- **No project both appears in the manifest and declares `IsPackable=false`.** The
+  two statements do not currently contradict each other; the finding is that
+  nothing prevents them from doing so, and that 15 projects have no statement at
+  all. Recorded so this is not later reported as a live defect.
+- **The three `DiagnosticDescriptorCatalogTests.cs` files are exemplary, not
+  duplication.** `SharpProof.Analyzer.Test`, `SharpProof.ContractForGenerator.Test`,
+  and `SharpProof.Meta.Analyzers.Test` each hold a 16-17 line file whose entire body
+  is one `DiagnosticDescriptorCatalogAssertions.AssertOutput(<name>, <assembly>)`
+  call. They share a name and a shape but cannot be merged: each names its own
+  project's assembly, which is only referencable from that project. This is the
+  correct end state for the shared-source pattern - a per-project entry point over
+  one shared implementation - and is worth citing as the target shape for R724-R725,
+  R726-R728, and R729-R730. Do not propose collapsing them.
+- The other three `eng/testing` sources are **fully adopted**: every project that
+  links `ApiSpecTestFacets`, `DiagnosticDescriptorCatalogAssertions`, or
+  `DictionaryAnalyzerConfigOptions` uses it, and no project re-implements one. The
+  low-adoption problem in R730 is specific to `TestMetadataReferences` and
+  `TempDirectory`; it is not a property of the mechanism.
+
+### Status (part two hundred fifty)
+
+R731 is `pending`. It is cheap, it is confined to build configuration, and it
+has no behavioural risk because the property is inert today - which is also the
+reason to treat it as tidying rather than as a defect. It belongs with R730: both
+describe a correct authority being shadowed by a second, ungated declaration that
+drifts because nothing compares the two.
+
+## Second survey, part two hundred fifty-one: R732-R733 - the analyzer project preamble
+
+Six projects are Roslyn analyzer assemblies. Comparing their `.csproj` files
+side by side against the marker property the build already defines for them.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R732 | **`SharpProof.Analyzer.Core` is the only one of the six analyzer projects without `IsRoslynAnalyzer`, so the analyzer-hosting rules are off for the assembly that holds the analysis.** `Directory.Build.targets:25-27` turns on `EnforceExtendedAnalyzerRules` for `'$(IsRoslynAnalyzer)' == 'true'`. Five projects set it - `SharpProof.Analyzer`, `SharpProof.CompilerCollector`, `SharpProof.CompilerProbe.TestAsset`, `SharpProof.ContractForGenerator`, `SharpProof.Meta.Analyzers`. `SharpProof.Analyzer.Core` does not, although it is `netstandard2.0`, carries the same `Microsoft.CodeAnalysis.Analyzers` reference, suppresses the same `RS2002;RS2003`, and is what `SharpProof.Analyzer` is a thin wrapper over. **The repository's other banned-API mechanism does not cover the gap**: `BannedSymbols.txt` bans compilation mutation, speculative binding, `GetSymbolsWithName`, source reparsing, and `ToDisplayString` - soundness concerns - and contains nothing about the analyzer-hosting APIs (file and directory access, `Environment`, wall-clock time, process creation) that the extended rules exist to catch. The gap is **latent, not live**: a scan of `SharpProof.Analyzer.Core` finds no use of any such API today. But that is exactly the state in which a guard is worth having, and the rule is demonstrably active elsewhere - `SharpProof.CompilerProbe.TestAsset` explicitly suppresses `RS1035` to permit it. | `Directory.Build.targets:25-27`; `SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj:1-9`; `SharpProof.Analyzer/SharpProof.Analyzer.csproj:4`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:4`; `SharpProof.CompilerProbe.TestAsset/SharpProof.CompilerProbe.TestAsset.csproj:7,10`; `SharpProof.ContractForGenerator/SharpProof.ContractForGenerator.csproj:5`; `SharpProof.Meta.Analyzers/SharpProof.Meta.Analyzers.csproj:4`; `BannedSymbols.txt` |
+| R733 | **The same six projects repeat one four-line package block and take three different positions on analyzer release tracking, with no rule distinguishing them.** All six carry a byte-identical `<PackageReference Include="Microsoft.CodeAnalysis.Analyzers">` with `<PrivateAssets>all</PrivateAssets>` and the same six-token `<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>` - 24 lines expressing one fact, when `Directory.Build.props` already conditions five `ItemGroup`s on marker properties and `IsRoslynAnalyzer` is the marker for exactly this set. Five of the six also reference `Microsoft.CodeAnalysis.CSharp`. The release-tracking suppressions then split three ways: `$(NoWarn);RS2002;RS2003` in `SharpProof.Analyzer.Core`, `SharpProof.Analyzer`, and `SharpProof.CompilerCollector`; `$(NoWarn);RS2008` in `SharpProof.ContractForGenerator` and `SharpProof.Meta.Analyzers`; and `$(NoWarn);RS1035;RS2008` in `SharpProof.CompilerProbe.TestAsset`. The RS2002/RS2003 group is the notable one, because **`SharpProof.Analyzer` is the only project that actually carries `AnalyzerReleases.Shipped.md` and `AnalyzerReleases.Unshipped.md`** as `AdditionalFiles`, and it is in that group - so the release-tracking rules are suppressed on the one assembly whose release files they exist to check, while two other projects suppress the different rule that asks for tracking to be enabled at all. Six projects, three answers, nothing recording which is intended. | `SharpProof.Analyzer/SharpProof.Analyzer.csproj:8-19`; the identical block in the other five csproj files; `Directory.Build.props:26-107` for the existing marker-driven `ItemGroup` pattern |
+
+### Checked and not proposed (part two hundred fifty-one)
+
+- **`IsRoslynAnalyzer` is not a dead property.** It is read once, at
+  `Directory.Build.targets:25`. An earlier reading of this data treated it as
+  declared-but-unused; that is wrong and is recorded here so it is not filed later.
+- **The 23 `IsPackable=false` opt-outs and this preamble are the same shape but
+  should not be merged into one item.** R731 is about a property that decides
+  nothing; R733 is about a package reference that decides what compiles. Both
+  are candidates for the marker-driven `ItemGroup` treatment
+  `Directory.Build.props` already uses six times, which is the common fix, but they
+  fail differently if got wrong.
+- `Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj:12` lists
+  `CA1515;CA2007;CA5394` in its `NoWarn`, which also appear at
+  `Directory.Build.targets:22`. This is **not** redundant: the central line is
+  conditioned on `'$(IsTestProject)' == 'true'`, which the SDK sets from the test
+  package reference, and `SharpProof.Fuzz` is a tool project rather than a test
+  project. Checked and correct as written.
+
+### Status (part two hundred fifty-one)
+
+R732 is `pending` and is the one worth acting on: it is a one-line change that
+brings the largest analyzer assembly under the same rules as the five smaller ones,
+and it is cheap to verify because nothing in that assembly currently violates them
+- so the change should be a no-op at head and a guard thereafter. R733 is
+`pending`. Its release-tracking half deserves a decision rather than a
+consolidation: pick one position for the six projects, then express it once.
+
+## Second survey, part two hundred fifty-two: R734-R735 - the ungated half of the assembly boundary
+
+The project-reference graph is one of the most heavily gated things in this
+repository. Its counterpart - which assemblies may see another's internals - has
+78 declarations and no assertion of any kind.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R734 | **Three `InternalsVisibleTo` grants are provably dead: the grantee cannot reference the granter at all.** Computing the transitive `ProjectReference` closure of all 60 projects shows `SharpProof.CompilerArtifact` reaches exactly `{SharpProof.Ir, SharpProof.Meta.Analyzers, SharpProof.Worker.Protocol}` and `SharpProof.Worker` reaches nine projects not including `SharpProof.Contracts`. Against that: `SharpProof.Contracts` grants internals to `SharpProof.CompilerArtifact` and to `SharpProof.Worker`, and `SharpProof.Frontend` grants internals to `SharpProof.CompilerArtifact`. None of the three grantees can see the granting assembly, so none of the three grants can ever take effect. This is not an artefact of the measurement: `Directory.Build.props` and `Directory.Build.targets` inject no `ProjectReference`, no source file under `SharpProof.CompilerArtifact/` names `SharpProof.Contracts` or `SharpProof.Frontend`, and neither appears in that project's generated global usings. **The grants are residue from a structure the architecture tests now forbid.** `BoundaryEnforcementTests.ThinAnalyzerHasOnlyCurrentFrontendDependencies:226-240` asserts that `SharpProof.Analyzer`'s transitive closure `Does.Not.Contain("SharpProof.CompilerArtifact")` - a separation actively defended in one direction while three csproj files still hand out internals access across it in the other. | `SharpProof.Contracts/SharpProof.Contracts.csproj:19,24`; `SharpProof.Frontend/SharpProof.Frontend.csproj:22`; `SharpProof.CompilerArtifact/SharpProof.CompilerArtifact.csproj:10-18`; `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:226-240` |
+| R735 | **`InternalsVisibleTo` is the only part of the assembly boundary with no gate.** The reference graph is pinned hard: `BoundaryEnforcementTests` asserts `SharpProof.Analyzer`'s direct references by exact set equality, asserts a forbidden member of its transitive closure, requires every soundness-critical project to reference the meta-analyzer, checks the meta-analyzer does not reference itself, and pins the solution's project list literally (`:379-453`). `DependencyAutomationTests` pins automation budgets by count. Against 78 `InternalsVisibleTo` declarations across 18 projects, **nothing asserts anything** - outside the csproj files, the identifier appears in one archived note (`eng/agent-notes/archive/queue.md`) and this ledger. That asymmetry is what let R734 happen and what will let it happen again: a `ProjectReference` cannot be added without a test noticing, but internals access can be granted to any assembly, or left behind when a reference is removed, silently. The grant list is also the more consequential of the two, because it is what actually widens an assembly's API surface to another assembly. The existing shape applies directly - an exact-set assertion over the 78 grants in the same file that already pins the project list - and it would have caught all three dead grants. | 78 grants in 18 csproj files; `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:226-301,379-453`; `SharpProof.ArchitectureTest/DependencyAutomationTests.cs`; `eng/agent-notes/archive/queue.md` |
+
+### Checked and not proposed (part two hundred fifty-two)
+
+- **The other 75 grants all have a reference path** and are not proposed for
+  removal. This part's check is the decidable one - can the grantee see the granter
+  at all - not the stronger question of whether each grantee actually touches an
+  `internal` member of its granter. That second question would need a compile and
+  a symbol walk; it is worth doing once if R735 is actioned, since a grant that
+  is reachable but unused is exactly as invisible as a dead one, but it is not
+  claimed here and none of the 75 is asserted to be unnecessary.
+- The three dead grants are **harmless today**, not a soundness hole: an
+  `InternalsVisibleTo` to an assembly that cannot reference you grants nothing.
+  R734 is about removing residue and about what its survival says, which is
+  R735.
+- `SharpProof.Contracts` also grants to `SharpProof.ContractForGenerator`,
+  `SharpProof.Analyzer`, `SharpProof.Analyzer.Core`, and
+  `SharpProof.CompilerCollector`, all of which do reference it. Only entries 19 and
+  24 of that six-line block are dead, so this is not a case of a whole block being
+  stale.
+
+### Status (part two hundred fifty-two)
+
+R734 is `pending` and is three line deletions. R735 is `pending` and is the
+reason to bother: it names a gap in a boundary this repository otherwise gates more
+carefully than almost anything else, and the fix reuses a pattern already present
+in the same test file. It belongs with R730 and R731 - a correct authority existing
+while a second, ungated declaration of the same fact drifts beside it.
+
+## Second survey, part two hundred fifty-three: R736-R737 - repeated fixture metadata work
+
+The next pass returns to small production helpers that are not themselves
+authorities, but repeatedly recompute data that is stable for one operation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R736 | **`AnalyzerSession.GetUnrecordedSelectedSemicolonAccessors` asks Roslyn for the first declaring syntax reference twice per sort key.** After filtering the concurrent set, its `OrderBy` key calls `method.DeclaringSyntaxReferences.FirstOrDefault()` to obtain the file path and its `ThenBy` key calls the same property and search again to obtain the span. The result is stable for a given normalized method, so a single projection to `(method, firstReference)` before sorting can preserve the null-path and `int.MaxValue` ordering while removing the repeated symbol/reference lookup and making the sort's metadata dependency explicit. This is a small end-of-analysis cost, not a semantic defect; it is worth reducing because the method is already materializing a new ordered array. | `SharpProof.Analyzer.Core/AnalyzerSession.cs:262-278` |
+| R737 | **`CorpusCatalog.CreateCases(CorpusSeed)` materializes every variant, then scans the materialized array once to find the baseline and again to suppress one duplicate.** `Variants.Select(...).ToArray()` creates all cases; `First` performs a second traversal to locate the baseline source; and the returned `Where` performs another traversal when `CreateSyntheticCases` consumes it. The baseline case can be created once up front and the remaining variants appended directly to a builder, comparing only the alpha-renamed case against the already-known baseline. That keeps variant order and the deliberate duplicate suppression while removing the temporary array plus two whole-array passes per seed. | `SharpProof.Gates/Corpus/CorpusCatalog.cs:24-35,264-274`; `SharpProof.Gates/Corpus/CorpusCatalog.cs:276-344` |
+
+### Checked and not proposed (part two hundred fifty-three)
+
+- R736 is not a proposal to cache `DeclaringSyntaxReferences` across the
+  compilation. The cache would cross Roslyn lifetime and normalization boundaries;
+  the proposed projection is local to one sort only.
+- R737 is not a proposal to remove the alpha-renaming variant. Effect seeds
+  intentionally produce an identical source for that variant, and the existing
+  filter is the test corpus's explicit way to avoid duplicating that case. The
+  reduction is only in how the baseline and filter are carried out.
+- `CorpusCatalog.CreatePrelude` intentionally repeats the input expression in the
+  `IfTrue` and reorder variants. Those strings are the metamorphic transformations
+  being tested, not accidental duplicate computation in the catalog implementation.
+
+### Status (part two hundred fifty-three)
+
+R736 is `pending` and is a localized allocation/lookup cleanup. R737 is `pending`
+and is lower priority than the authority and boundary findings, but it is a
+straightforward way to make synthetic corpus construction single-pass per seed.
