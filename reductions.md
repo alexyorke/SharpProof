@@ -137,6 +137,7 @@ the smallest relevant containerized test target passes.
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
+| R402 | Reuse the owning `IrFactory` Boolean-term guard across semantic-term and program-builder validation, retaining their diagnostics | `SharpProof.Ir.Test`: 114 passed |
 | R327 | Remove 22 project-local `TreatWarningsAsErrors` declarations now supplied by the central production policy, retaining the two excluded-project declarations | `test-changed`: 2,846 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
@@ -1977,8 +1978,9 @@ and program builders across `SharpProof.Ir`, `SharpProof.Contracts`, and `SharpP
 
 ### Status (part thirty-six)
 
-R402 is `pending`. R400, R401, R403-R406 are applied direct refactoring
-simplifications.
+R402 is now applied: semantic-term and program-builder Boolean validation reuse
+the owning `IrFactory` guard while retaining their existing diagnostics. R400,
+R401, and R403-R406 are applied direct refactoring simplifications.
 R401, R402, and R404 streamline contract resolution flow and IR validation.
 R423 is now applied: release scripts use `Get-SharpProofReleaseVersion` rather
 than parsing the props file independently.

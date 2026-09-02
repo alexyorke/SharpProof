@@ -610,8 +610,9 @@ public sealed class IrFactory
 
     internal static IrTerm RequireBooleanTerm(
         IrFactory factory,
-        IrTerm term,
-        string parameterName)
+        IrTerm? term,
+        string parameterName,
+        string message = "A Boolean IR term is required.")
     {
         factory = ArgumentNullGuard.NotNull(factory, nameof(factory));
         term = ArgumentNullGuard.NotNull(term, parameterName);
@@ -619,8 +620,7 @@ public sealed class IrFactory
         factory.EnsureTerm(term, parameterName);
         if (term.Type != factory.BooleanType)
         {
-            throw new ArgumentException(
-                "A Boolean IR term is required.", parameterName);
+            throw new ArgumentException(message, parameterName);
         }
 
         return term;

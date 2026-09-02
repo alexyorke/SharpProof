@@ -301,13 +301,11 @@ public sealed class IrProgramBuilder(IrFactory factory)
 
     private void ValidateBoolean(IrTerm condition, string parameterName)
     {
-        ValidateTerm(condition, parameterName);
-        if (condition.Type != _factory.BooleanType)
-        {
-            throw new ArgumentException(
-                "The condition must be boolean.",
-                parameterName);
-        }
+        _ = IrFactory.RequireBooleanTerm(
+            _factory,
+            condition,
+            parameterName,
+            "The condition must be boolean.");
     }
 
     private IrTypeId ValidateTerm(IrTerm term, string parameterName)

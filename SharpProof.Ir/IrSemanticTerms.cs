@@ -28,7 +28,11 @@ public static class IrSemanticTerms
 
         if (!RequiresDefinednessWitness(evaluated))
         {
-            return ValidateBooleanTerm(factory, predicate, nameof(predicate));
+            return IrFactory.RequireBooleanTerm(
+                factory,
+                predicate,
+                nameof(predicate),
+                "The term must be boolean.");
         }
 
         var successfulEvaluation = factory.Binary(
@@ -90,7 +94,11 @@ public static class IrSemanticTerms
         {
             if (count == 1)
             {
-                return ValidateBooleanTerm(factory, terms[start], nameof(terms));
+                return IrFactory.RequireBooleanTerm(
+                    factory,
+                    terms[start],
+                    nameof(terms),
+                    "The term must be boolean.");
             }
 
             var leftCount = count / 2;
@@ -101,22 +109,6 @@ public static class IrSemanticTerms
         }
     }
 
-    private static IrTerm ValidateBooleanTerm(
-        IrFactory factory,
-        IrTerm? term,
-        string parameterName)
-    {
-        term = ArgumentNullGuard.NotNull(term, parameterName);
-        factory.EnsureTerm(term, parameterName);
-        if (term.Type != factory.BooleanType)
-        {
-            throw new ArgumentException(
-                "The term must be boolean.",
-                parameterName);
-        }
-
-        return term;
-    }
 }
 
 public static class IrTermAnalysis
