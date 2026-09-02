@@ -7,12 +7,9 @@ public sealed class SharpProofTrustedAttribute : Attribute
 {
     public SharpProofTrustedAttribute(string reason)
     {
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            throw new ArgumentException("A trust reason is required.", nameof(reason));
-        }
-
-        Reason = reason;
+        Reason = SharpProofAttributeValidation.RequireReason(
+            reason,
+            "A trust reason is required.");
     }
 
     public string Reason

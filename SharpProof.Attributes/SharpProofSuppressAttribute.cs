@@ -8,12 +8,9 @@ public sealed class SharpProofSuppressAttribute : Attribute
 {
     public SharpProofSuppressAttribute(string reason)
     {
-        if (string.IsNullOrWhiteSpace(reason))
-        {
-            throw new ArgumentException("A suppression reason is required.", nameof(reason));
-        }
-
-        Reason = reason;
+        Reason = SharpProofAttributeValidation.RequireReason(
+            reason,
+            "A suppression reason is required.");
     }
 
     public string Reason

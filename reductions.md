@@ -216,6 +216,7 @@ the smallest relevant containerized test target passes.
 | R576 | Centralize package integration verification-target MSBuild arguments | `SharpProof.Package.Test`: WorkerMsBuildIntegrationTests 75 passed, 1 expected skip |
 | R509 | Share callable assumption-evidence projection | `SharpProof.Worker.Test`: 695 passed |
 | R515 | Reuse canonical IR child enumeration in charged summary walks | `SharpProof.Summaries.Test`: 14 passed |
+| R517 | Share required-reason validation across public attributes | `SharpProof.Attributes.Test`: 11 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3176,9 +3177,11 @@ methods and operators, preserving the operator-only harmless-discard policy.
 
 ### Status (part sixty-nine)
 
-R515 is applied: charged summary traversal now uses `IrTraversal.GetChildren`
-in reverse push order, preserving the prior visit/budget order. R514, R516, and
-R517 remain pending; validation and traversal changes must retain their security,
+R515 and R517 are applied: charged summary traversal now uses
+`IrTraversal.GetChildren` in reverse push order, preserving the prior
+visit/budget order, and both public attributes share required-reason validation
+while keeping their distinct messages and metadata. R514 and R516 remain
+pending; validation and traversal changes must retain their security,
 resource-limit, and constructor semantics.
 
 ## Second survey, part seventy: R518-R520 - effect-scanner phases and native-loader cleanup
@@ -3762,3 +3765,27 @@ R589 is a pending IR interpreter reduction candidate. Keep instruction-specific 
 ### Status (part one hundred thirty-one)
 
 R590 is a pending IR factory reduction candidate. Preserve the existing interning key and the optimization of not materializing a display name for an already-interned element type; remove only the duplicate dictionary probe.
+
+## Second survey, part one hundred thirty-two: R591 - recursive differential-oracle traversal
+
+| R591 | **`IrCSharpDifferentialOracle.TryCollectTerms` recursively traverses arbitrary IR terms even though the IR layer provides an explicit-stack traversal seam.** Its visited-set walk calls itself for every child before appending the postorder term list, so a deeply nested or adversarial term can overflow the test process before the differential comparison reports a mismatch; the production interpreter and substitution code explicitly avoid this failure mode. An explicit-stack postorder walk, or a small extension of `IrTraversal.FoldBottomUp` that carries the oracle's validation and variable collection, can preserve declaration order and early-abstention reasons without maintaining a second recursive traversal. | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:201-247`; `SharpProof.Ir/IrTraversal.cs:55-96` |
+
+### Status (part one hundred thirty-two)
+
+R591 is a pending differential-testing reduction candidate. Preserve the current fail-fast checks for unsupported terms and missing/ill-typed variables, and preserve child-before-parent declaration order; remove only the unbounded recursive walk.
+
+## Second survey, part one hundred thirty-three: R592 - duplicate differential type projections
+
+| R592 | **`IrCSharpDifferentialOracle` maintains two copies of the executable IR type policy.** `TryGetCSharpType` maps boolean, integer, string, the factory's object type, and recursively supported sequences to source-language names, while `TryGetRuntimeType` repeats the same kind checks and recursive sequence admission to produce `System.Type` values. The projections have different return types but share the supported-type boundary, so a canonical type-shape/helper can own admission and recursion while the two callers retain their string-versus-runtime representations. | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:349-365,451-470` |
+
+### Status (part one hundred thirty-three)
+
+R592 is a pending differential-testing reduction candidate. Keep the factory-specific object-type check and recursive array behavior identical; centralize only the shared supported-type policy, not the final projection format.
+
+## Second survey, part one hundred thirty-four: R593 - repeated generator sequence interning
+
+| R593 | **`WellSortedIrGenerator` interns the same integer-sequence type twice during field initialization.** `_integerSequence` already stores `factory.GetOrCreateSequenceType(factory.IntegerType)`, but `_values` immediately invokes the same factory call again instead of using `_integerSequence`; the factory's interning makes the second call return the same ID after repeating lookup work. Reusing the earlier field removes the redundant call and makes the shared variable/value type relationship explicit. | `SharpProof.Testing/WellSortedIrGenerator.cs:60-63` |
+
+### Status (part one hundred thirty-four)
+
+R593 is a pending differential-generator reduction candidate. Preserve the field initialization order and the existing sequence type identity; replace only the second equivalent interning request.
