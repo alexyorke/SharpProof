@@ -128,6 +128,7 @@ the smallest relevant containerized test target passes.
 | R317 | Correct the active bug/status figures and include both documents in the maintained-document gate | `Test-SharpProofReadme.ps1` passed |
 | R324 | Centralize the two repeated `AttributeTargets` masks used by the eight public attributes | `SharpProof.Attributes.Test`: 11; `SharpProof.Package.Test`: 295 passed, 1 skipped |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
+| R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -1219,7 +1220,6 @@ every type. The result is one finding and a strong negative.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R320 | `scripts/Format-CSharp.ps1` (89 lines) is **the only script in `scripts/` with no code or build reference anywhere in the repository**. It is not in `Invoke-SharpProofContainer.ps1`'s 37-command `ValidateSet`, not invoked by any workflow, test, `.csproj`, `.props`, `.targets`, or other script, and not named in any acceptance-contract path list. Its only two mentions are prose: the code-usefulness audit, which retained it "after MSBuild import, workflow, package, release, or dynamic invocation review", and a soundness note describing what it does. There is no dynamic invocation - the audit's retention rationale does not hold for this file. More pointedly, the script carries a `-Verify` switch that appends `--verify-no-changes` to `dotnet format whitespace` and `dotnet format style --severity warn`, which is unmistakably a CI formatting gate, and **nothing runs it in either mode**. The likely reason nothing runs it is that its `-Verify` mode is redundant: `Directory.Build.props` sets `EnforceCodeStyleInBuild=true`, `.editorconfig` sets `dotnet_diagnostic.IDE0055.severity = warning`, and production and test projects set `TreatWarningsAsErrors=true`, so formatting violations already fail the build. That makes the verify half genuinely surplus and the fix half a developer convenience that is fine to keep - but the current state, an unreferenced script containing an unwired gate, is worth resolving deliberately rather than leaving as an open question for the next reader. | `scripts/Format-CSharp.ps1`; `scripts/Invoke-SharpProofContainer.ps1:3`; `Directory.Build.props:20`; `.editorconfig:14`; `docs/code-usefulness-audit.md:939`; `docs/soundness-notes/2026-07-29-formatting-neutral-source-metrics.md:45` |
 
 ### Checked and not proposed (part twenty-one)
 
@@ -1244,11 +1244,9 @@ every type. The result is one finding and a strong negative.
 
 ### Status (part twenty-one)
 
-R320 is `pending` and is a decision rather than a deletion: keep the fix mode as a
-developer tool and drop the redundant `-Verify` mode, or wire the whole thing into
-a profile. Either resolves it. The finding is recorded mainly because an
-unreferenced script that contains a working but unwired gate is exactly the kind
-of thing that reads as intentional to one reader and as an oversight to the next.
+R320 is applied: the unreferenced developer formatter keeps its apply mode while
+dropping the redundant `-Verify` branch and its duplicate whitespace pass. The
+build remains the authoritative formatting gate.
 
 ## Second survey, part twenty-two: R321 - the documentation gate
 

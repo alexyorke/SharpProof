@@ -1,8 +1,5 @@
 [CmdletBinding()]
-param(
-    [Parameter()]
-    [switch]$Verify
-)
+param()
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -18,9 +15,6 @@ function Invoke-DotnetFormat {
 
     $effectiveArguments =
         [Collections.Generic.List[string]]::new($Arguments)
-    if ($Verify) {
-        $effectiveArguments.Add('--verify-no-changes')
-    }
     & $wrapperPath `
         -TimeoutSeconds 900 `
         @effectiveArguments
@@ -53,9 +47,6 @@ try {
     )
     Invoke-DotnetFormat -Arguments $whitespaceArguments
     Invoke-DotnetFormat -Arguments $styleArguments
-    if (-not $Verify) {
-        Invoke-DotnetFormat -Arguments $whitespaceArguments
-    }
 
     $generatedPaths = @(git ls-files '*.generated.cs')
     if ($LASTEXITCODE -ne 0) {
@@ -76,14 +67,10 @@ try {
         )
         Invoke-DotnetFormat -Arguments $generatedWhitespaceArguments
         Invoke-DotnetFormat -Arguments $generatedStyleArguments
-        if (-not $Verify) {
-            Invoke-DotnetFormat -Arguments $generatedWhitespaceArguments
-        }
     }
 }
 finally {
     Pop-Location
 }
 
-$verb = if ($Verify) { 'Verified' } else { 'Applied' }
-Write-Host "$verb standard dotnet C# formatting."
+Write-Host 'Applied standard dotnet C# formatting.'
