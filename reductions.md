@@ -164,6 +164,7 @@ the smallest relevant containerized test target passes.
 | R589 | Share IR program condition evaluation and boolean validation | `SharpProof.Ir.Test`: IrProgramTests, 22 passed |
 | R590 | Reuse the validated sequence-type key when adding an IR type | `SharpProof.Ir.Test`: IrFactoryInvariantRegressionTests, 9 passed |
 | R596 | Reuse one materialized child list across direct and recursive IR shrinker candidates | `SharpProof.Fuzz.Test`: IrShrinkerIsDeterministicAndPreservesMismatch, 1 passed |
+| R603 | Share Roslyn expression-operation wrapper recovery across frontend test suites | `SharpProof.Frontend.Test`: FrontendLoweringTests 37; UnaryAndDefaultLoweringCoverageTests 22 passed |
 | R606 | Share schema-file path resolution and JSON loading across conformance suites | `SharpProof.Ir.Test`: 3; `SharpProof.Worker.Test`: 9 schema tests passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
@@ -3994,7 +3995,8 @@ R602 is a pending Worker-test harness reduction candidate. Preserve the contract
 
 ### Status (part one hundred forty-four)
 
-R603 is a pending Frontend-test harness reduction candidate. Preserve the two wrapper-unwrapping cases and each suite's error detail; share only the common operation lookup and recovery.
+R603 is `applied`: both frontend test suites now share the wrapper-aware
+operation lookup while retaining their suite-specific failure messages.
 
 ## Second survey, part one hundred forty-five: R604 - duplicate package-test XML escaping
 

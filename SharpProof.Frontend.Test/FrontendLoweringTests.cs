@@ -1352,22 +1352,12 @@ public sealed class FrontendLoweringTests
             SemanticModel model,
             ExpressionSyntax expression)
         {
-            var operation = model.GetOperation(expression);
-            if (operation != null)
-            {
-                return operation;
-            }
-
-            return expression switch
-            {
-                CheckedExpressionSyntax checkedExpression =>
-                    GetExpressionOperation(model, checkedExpression.Expression),
-                ParenthesizedExpressionSyntax parenthesized =>
-                    GetExpressionOperation(model, parenthesized.Expression),
-                _ => throw new InvalidOperationException(
+            return FrontendTestHelpers.TryGetExpressionOperation(
+                    model,
+                    expression) ??
+                throw new InvalidOperationException(
                     "Roslyn did not expose an operation for expression kind " +
-                    expression.Kind() + ".")
-            };
+                    expression.Kind() + ".");
         }
 
         private static IrValue CreateValue(

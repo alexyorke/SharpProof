@@ -258,25 +258,11 @@ public sealed class UnaryAndDefaultLoweringCoverageTests
         SemanticModel model,
         ExpressionSyntax expression)
     {
-        var operation = model.GetOperation(expression);
-        if (operation != null)
-        {
-            return operation;
-        }
-
-        return expression switch
-        {
-            CheckedExpressionSyntax checkedExpression =>
-                GetExpressionOperation(
-                    model,
-                    checkedExpression.Expression),
-            ParenthesizedExpressionSyntax parenthesized =>
-                GetExpressionOperation(
-                    model,
-                    parenthesized.Expression),
-            _ => throw new InvalidOperationException(
-                "Roslyn did not expose the target expression.")
-        };
+        return FrontendTestHelpers.TryGetExpressionOperation(
+                model,
+                expression) ??
+            throw new InvalidOperationException(
+                "Roslyn did not expose the target expression.");
     }
 
     private static ImmutableArray<MetadataReference>
