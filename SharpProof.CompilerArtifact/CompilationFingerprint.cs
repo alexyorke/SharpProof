@@ -130,7 +130,8 @@ internal static class CompilationFingerprint
                     snapshot.SpecificationPackIds) &&
                 row.Origin == CompilerSummaryOrigin.SpecificationPack ||
                 row.Origin != CompilerSummaryOrigin.SpecificationPack &&
-                row.EvidenceIdentity.Length != 0)
+                (row.EvidenceIdentity is null ||
+                 row.EvidenceIdentity.Length != 0))
             {
                 return false;
             }

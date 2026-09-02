@@ -209,6 +209,7 @@ the smallest relevant containerized test target passes.
 | R500 | Reuse the supported-unknown count during corpus outcome validation | `SharpProof.Gates.Test`: CorpusGateTests 23 passed |
 | R504 | Express container script modes with `COPY --chmod` | `SharpProof.ArchitectureTest`: ContainerAuthorityScriptTests 15; `docker compose build tooling` passed |
 | R505 | Keep ignored `nupkgs/` inputs in the persistent loop snapshot and workspace | `SharpProof.ArchitectureTest`: HostLoopSnapshotAvoidsBindMountGitDiffScanning 1 passed; shell/PowerShell parses passed |
+| R581 | Reject null non-pack summary evidence identities without dereferencing them | `SharpProof.Worker.Test`: CompilerManifestArtifactTests 91 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3672,7 +3673,9 @@ R580 is a pending specification-pack schema reduction candidate. Preserve catalo
 
 ### Status (part one hundred twenty-two)
 
-R581 is a pending compiler-artifact validation defect. Preserve the stricter authority-mode checks and canonical summary ordering; ensure malformed nullable fields fail closed with the intended validation exception rather than a null dereference.
+R581 is fixed: non-pack summary evidence now rejects a null identity before
+checking its length, preserving the stricter authority-mode checks and canonical
+summary ordering. The focused compiler-manifest suite passes.
 
 ## Second survey, part one hundred twenty-three: R582 - duplicate proof-core traversal
 
