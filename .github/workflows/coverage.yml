@@ -54,8 +54,9 @@ jobs:
           }
           echo "SHARPPROOF_COVERAGE_COMPARISON_REF=${comparison}" >> "$GITHUB_ENV"
 
-      - name: Build the pinned toolchain
-        run: docker compose build tooling
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
 
       - name: Collect and enforce container coverage
         run: >-

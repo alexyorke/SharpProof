@@ -26,8 +26,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build the pinned Linux amd64 toolchain
-        run: docker compose build tooling
+      - uses: ./.github/actions/prepare-qualified-packages
+        with:
+          download-packages: "false"
 
       - name: Run the single-build PR gate
         run: docker compose run --rm tooling pr

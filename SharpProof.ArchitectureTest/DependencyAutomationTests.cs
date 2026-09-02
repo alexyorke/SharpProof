@@ -7,6 +7,14 @@ namespace SharpProof.ArchitectureTest;
 [TestFixture]
 public sealed class DependencyAutomationTests
 {
+    private static readonly string[] s_localBuildWorkflowPaths =
+    [
+        ".github/workflows/ci.yml",
+        ".github/workflows/nightly.yml",
+        ".github/workflows/coverage.yml",
+        ".github/workflows/security-reusable.yml"
+    ];
+
     [Test]
     public void LocalProfilesMatchTheWorkflowCommands()
     {
@@ -274,8 +282,12 @@ public sealed class DependencyAutomationTests
     public void RepositoryWorkflowsUseOnlyThePinnedContainerSdk()
     {
         var root = TestRepository.FindRoot();
-        var workflows = string.Join("\n", WorkflowFiles()
-            .Select(File.ReadAllText));
+        var workflows = string.Join("\n", WorkflowFiles().Select(File.ReadAllText));
+        var localBuildWorkflows = s_localBuildWorkflowPaths.Select(relativePath =>
+            File.ReadAllText(Path.Combine(
+                root,
+                relativePath.Replace('/', Path.DirectorySeparatorChar))))
+            .ToArray();
         using var toolchain = JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,
             "eng",
@@ -306,8 +318,15 @@ public sealed class DependencyAutomationTests
             Assert.That(workflows, Does.Not.Contain("dotnet-version:"));
             Assert.That(
                 workflows,
-                Does.Contain("docker compose build tooling")
+                Does.Not.Contain("docker compose build tooling")
                     .And.Not.Contain("uses: ./.github/actions/build-tooling"));
+            foreach (var workflow in localBuildWorkflows)
+            {
+                Assert.That(
+                    workflow,
+                    Does.Contain("uses: ./.github/actions/prepare-qualified-packages")
+                        .And.Contain("download-packages: \"false\""));
+            }
             Assert.That(
                 packageAction,
                 Does.Contain("docker compose build tooling")
