@@ -4389,7 +4389,7 @@ R721 completed: singleton region creation now uses a direct overload (including 
 
 | R722 | **`OperationSubsetClassifier.GetKnownOperationKinds` recomputes an invariant enum snapshot on every call.** Each invocation reflects over `OperationKind`, casts, deduplicates, sorts, and materializes a new immutable array; `CreateSnapshot` immediately calls the same method before classifying every entry. Cache one immutable known-kind array per process (returning the immutable value directly) while preserving the numeric ordering and duplicate handling used by the public snapshot. | `SharpProof.Frontend/OperationSubsetClassifier.cs:37-60` |
 
-R722 is a pending operation-kind snapshot allocation reduction candidate. Preserve enum-version behavior, numeric ordering, invalid-kind handling, and the exact snapshot text.
+R722 completed: known operation kinds are reflected, deduplicated, and sorted once per process, preserving enum ordering, invalid-kind handling, and exact snapshot text.
 
 | R723 | **`InvocationEmissionPolicy.IsElided` decodes conditional attributes afresh for every invocation of a target.** The normalized target method, its `[Conditional]` symbol names, and the conditional-attribute identity are invariant across calls, but the current path re-enumerates and filters `target.GetAttributes()` for each invocation before consulting the already cached per-tree preprocessor symbols. Add a symbol-keyed conditional-name cache, retaining empty-result caching, reduced-method normalization, and the per-tree symbol lookup. | `SharpProof.Effects/InvocationEmissionPolicy.cs:14-54` |
 

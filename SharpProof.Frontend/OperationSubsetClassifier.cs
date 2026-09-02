@@ -2,6 +2,12 @@ namespace SharpProof.Frontend;
 
 public static class OperationSubsetClassifier
 {
+    private static readonly ImmutableArray<OperationKind> s_knownOperationKinds =
+        [.. Enum.GetValues(typeof(OperationKind))
+            .Cast<OperationKind>()
+            .Distinct()
+            .OrderBy(static kind => (int)kind)];
+
     public static FrontendSubsetClassification Classify(OperationKind kind)
     {
         return Classify(
@@ -36,10 +42,7 @@ public static class OperationSubsetClassifier
 
     public static ImmutableArray<OperationKind> GetKnownOperationKinds()
     {
-        return [.. Enum.GetValues(typeof(OperationKind))
-            .Cast<OperationKind>()
-            .Distinct()
-            .OrderBy(static kind => (int)kind)];
+        return s_knownOperationKinds;
     }
 
     public static string CreateSnapshot()
