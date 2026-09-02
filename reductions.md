@@ -7553,3 +7553,20 @@ build-file changes were made during this audit.
 
 R856 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred sixty-seven: R857 - duplicated interval bound restriction
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R857 | **`IntervalDomain.AssumeAtLeast` and `AssumeAtMost` duplicate the same restriction wrapper.** Both first return `Bottom` for a bottom input, clamp one optional bound with `Math.Max` or `Math.Min`, and call `Create` with the retained opposite bound, modulus, and remainder. A small private bound-restriction helper can own the shared bottom handling and canonical reconstruction while the two public names continue to express the distinct lower- and upper-bound operations. This is a low-priority reduction: the duplicated bodies are short, and the helper should not obscure the useful directional API. | `SharpProof.Dataflow/IntervalDomain.cs:170-195` |
+
+### Checked and not proposed (part three hundred sixty-seven)
+
+- R857 is separate from R461/R462 and the later interval-normalization changes: it targets the two public assumption wrappers, not modular-distance normalization or extreme-bound canonicalization inside `Create`.
+- `AssumeAtLeast` and `AssumeAtMost` should remain separate public entry points because callers need to state which bound is being imposed; only their common reconstruction and bottom path are candidates for sharing.
+- The existing `IntervalValue.Range` and `Congruent` factories are value-construction APIs, not replacements for these operations, because the assumption methods preserve the input's congruence and opposite bound.
+
+### Status (part three hundred sixty-seven)
+
+R857 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
