@@ -6791,3 +6791,26 @@ R821 is `deferred`: the duplicate join is deterministic and cheap in current
 R822 is `deferred`: the extra hashes are confined to a small test fixture, but
   the helper's hidden sealing makes the setup order harder to reason about and
   adds avoidable work to every malformed-shape case.
+
+## Second survey, part three hundred thirty-four: R823 - repeated specification-pack JSON invocation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R823 | **`CompilerSpecificationPackProviderTests` repeats the JSON-document/reflection invocation wrapper three times.** `ParseTerm`, `ParseMethod`, and `ParsePack` each parse the input string into a `JsonDocument`, pass its root element to `Invoke`, and rely on the same exception-unwrapping path; only the reflected parser and the term-depth argument differ. A small `ParseJson(MethodInfo, string, params object?[] extra)` helper can own document lifetime and root-element forwarding, leaving the test names as readable semantic entry points while removing the repeated disposal and reflection plumbing. | `SharpProof.Worker.Test/CompilerSpecificationPackProviderTests.cs:374-399` |
+
+### Checked and not proposed (part three hundred thirty-four)
+
+- The three named wrappers still communicate which private production parser a
+  test is exercising; the proposed helper would be beneath those names rather
+  than replacing the test intent with string-based dispatch.
+- `Instantiate` is not folded into the parser helper: it creates a factory,
+  provider, and parameter variable and invokes an instance method, so its
+  setup has different ownership and lifecycle semantics.
+- The shared `Invoke` exception-unwrapping routine remains useful for all
+  reflection calls, including the non-JSON type and term instantiation tests.
+
+### Status (part three hundred thirty-four)
+
+R823 is `deferred`: the duplication is confined to test plumbing and the
+  current three methods are short, but centralizing document lifetime would
+  reduce copy/paste drift if another specification-pack parser is covered.
