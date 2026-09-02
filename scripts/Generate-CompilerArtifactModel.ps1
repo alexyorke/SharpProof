@@ -1491,21 +1491,6 @@ $modelLines.Add('    internal static bool IsFailureReason(WorkerClaimReason reas
 $modelLines.Add('        Array.IndexOf(FailureReasons, reason) >= 0;')
 $modelLines.Add('}')
 
-$collectorLines.Add('')
-$collectorLines.Add('internal static class CompilerCallableProducerReasonCatalog {')
-$collectorLines.Add(
-    "    internal const WorkerClaimReason SuccessReason = WorkerClaimReason.$callableSuccessReason;")
-$collectorLines.Add(
-    "    internal const WorkerClaimReason DiagnosticFailureReason = WorkerClaimReason.$callableDiagnosticFailure;")
-$collectorLines.Add('    internal static readonly WorkerClaimReason[] FailureReasons = [')
-foreach ($reason in $callableFailureReasons) {
-    $collectorLines.Add("        WorkerClaimReason.$reason,")
-}
-$collectorLines.Add('    ];')
-$collectorLines.Add('    internal static bool IsFailureReason(WorkerClaimReason reason) =>')
-$collectorLines.Add('        Array.IndexOf(FailureReasons, reason) >= 0;')
-$collectorLines.Add('}')
-
 $outputs = [ordered]@{
     $ModelOutputPath = $modelLines
     $PortableOutputPath = $portableLines

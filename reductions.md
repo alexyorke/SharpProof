@@ -154,6 +154,7 @@ the smallest relevant containerized test target passes.
 | R461 | Replace the interval modular-distance branch ladder with the existing `Normalize` helper | `SharpProof.Dataflow.Test`: 50 passed |
 | R462 | Remove the shadowed `modulus.IsOne` boundary normalization branch from `IntervalDomain.Create` | `SharpProof.Dataflow.Test`: 50 passed |
 | R376 | Avoid re-sorting adjacency lists that are already ordered by the graph's canonical edge sort | `SharpProof.Dataflow.Test`: 50 passed |
+| R381 | Reuse `CompilerCallableArtifactReasonCatalog` from the collector instead of emitting a duplicate generated catalog | `SharpProof.Analyzer.Test`: FinalCompilationCollectorTests 55 passed; generator verification passed |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1730,7 +1731,6 @@ stream readers, and location authority helpers across `SharpProof.CompilerArtifa
 | ID | Finding | Evidence |
 |---|---|---|
 | R380 | **`CompilerDiagnosticArtifactOrdering` duplicates an 11-stage comparison ladder between LINQ `Canonicalize` and imperative `Compare`.** `SharpProof.CompilerArtifact/CompilationFingerprint.cs:438-453` applies an 11-level chained LINQ sort (`OrderBy(Code).ThenBy(Message)...ThenBy(SourceLineMapSha256)`). Lines 463-521 re-implement the identical 11-stage comparison ladder across 58 lines of manual `StringComparer.Ordinal.Compare` and field-by-field branching in `Compare`. Unifying both paths on a single `IComparer<CompilerDiagnosticArtifact>` eliminates 58 lines of redundant ladder code and prevents ordering divergence. | `SharpProof.CompilerArtifact/CompilationFingerprint.cs:438-453, 463-521` |
-| R381 | **`Generate-CompilerArtifactModel.ps1` emits duplicate reason catalog classes into two generated files.** `scripts/Generate-CompilerArtifactModel.ps1:1488-1515` generates verbatim duplicate classes: `CompilerCallableArtifactReasonCatalog` in `CompilerArtifactModel.generated.cs:562-574` and `CompilerCallableProducerReasonCatalog` in `CompilerWireMappings.generated.cs:311-323`. Both define identical constants, failure reason arrays, and lookup methods in the same namespace `SharpProof.CompilerArtifact`. Because `SharpProof.CompilerCollector` already accesses internal types in `SharpProof.CompilerArtifact` via `InternalsVisibleTo`, `CompilerCallableProducerReasonCatalog` is completely redundant. | `scripts/Generate-CompilerArtifactModel.ps1:1488-1515`; `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs:562-574`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerWireMappings.generated.cs:311-323` |
 | R382 | **`CompilerEffectReplayLowerer.TryResolveSource` duplicates the syntax tree loop from `CompilerSourceLocationAuthority.FindUniqueTree`.** `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:426-455` manually loops over `capturedTrees`, checks `CompilerSourceLocationAuthority.HasValidLocationGeometry`, and verifies single-match uniqueness across 30 lines. `CompilerSourceLocationAuthority.FindUniqueTree` (`CompilerSourceLocationAuthority.cs:115-150`) already implements this exact tree-resolution and ambiguity-checking loop. Delegating `TryResolveSource` to `FindUniqueTree` removes 30 lines of duplicate loop logic. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:426-455`; `SharpProof.CompilerArtifact/CompilerSourceLocationAuthority.cs:115-150` |
 | R383 | **`CompilerManifestArtifact.cs` implements duplicate chunked stream-to-byte-array readers.** `WorkerBinaryIdentity.ReadSnapshotBytes` (`SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:205-231`) and `CompilerManifestArtifactFile.ReadAllBytes` (`SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:980-1009`) implement near-identical bounded buffer-filling loops with EOF checks (`throw new InvalidDataException("... changed while it was read.")`) and trailing-byte verification. Extracting a single bounded stream reader helper eliminates 25+ lines of duplicate buffer-reading boilerplate. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:205-231, 980-1009` |
 | R384 | **`CompilerCompilationCapture.LowerHex` re-implements lowercase hex byte formatting.** `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:230-241` defines a private `LowerHex` method performing manual character array allocation and bit-shift arithmetic to format Roslyn checksums. `SharpProof.Ir/HashEncoding.cs:33-46` already provides `HashEncoding.ToLowerHex(ReadOnlySpan<byte>)`, which `CompilerCompilationCapture.cs` already references elsewhere. Replacing `LowerHex` with `HashEncoding.ToLowerHex` eliminates 12 lines of manual nibble arithmetic. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:213, 230-241`; `SharpProof.Ir/HashEncoding.cs:33-46` |
@@ -1742,10 +1742,13 @@ stream readers, and location authority helpers across `SharpProof.CompilerArtifa
   line endings and culture settings; canonical serialization order is required for verifiable builds.
 - `CompilerModelValues.cs` contains low-level value packers for compiler wire formats. These are
   isolated for fast serialization and decoupled from Roslyn symbols.
+- R381 is now applied: the compiler collector uses the artifact assembly's
+  generated callable-reason catalog, so the wire-mapping output no longer emits
+  a duplicate catalog.
 
 ### Status (part thirty-three)
 
-R380-R385 are `pending`. R381, R382, and R384 are immediate code and script generator cleanups.
+R380, R382-R385 are `pending`. R382 and R384 are immediate code and script generator cleanups.
 R380, R383, and R385 unify comparison, streaming I/O, and location hashing authorities.
 
 ## Second survey, part thirty-four: R386-R392
@@ -3065,3 +3068,25 @@ the cache transaction or filename-shape policy.
 R524-R525 are `pending` candidates. The proposed helpers preserve the distinct
 label-failure and response-state policies around their common normalization and
 coverage mapping.
+
+## Second survey, part seventy-five: R526-R527 - protocol normalization and result classification
+
+| R526 | **Compiler and worker protocol layers duplicate order-insensitive assumption comparison.** `CompilerResponseEvidenceAuthority.SameAssumptions` and `WorkerProtocolJson.SameAssumptionDeclarations` each filter null entries, sort by assumption ID with ordinal comparison, project `(Id, Kind)`, and call `SequenceEqual`. The only visible difference is `StringComparer.Ordinal` versus the protocol's cached ordinal comparer. A shared protocol-level comparison helper can remove the two private normalization authorities while leaving canonical output ordering (`IsCanonicalAssumptions`) separate. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:575-589`; `SharpProof.Worker.Protocol/ProtocolJson.cs:961-973` |
+| R527 | **`WorkerResultAssembler.Classify` rescans each materialized reason array for every classification flag.** Callable reasons are traversed separately for infrastructure failure, missing claim, cancellation, and timeout; claim reasons are traversed separately for four failure precedences, cancellation, and timeout. A single aggregation pass or small flags helper can preserve the existing callable/claim failure precedence and status ordering while avoiding repeated full-array scans. | `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:133-169` |
+
+### Status (part seventy-five)
+
+R526-R527 are `pending` reduction candidates. R526 targets only duplicate
+order-insensitive comparison plumbing; canonical serialization remains distinct.
+R527 targets enumeration mechanics, not the deliberate failure and status
+precedence.
+
+## Second survey, part seventy-six: R528 - allocation sentinel reuse
+
+| R528 | **Effect allocation uncertainty is recognized by the same magic bit in two places.** `EffectSummary.ValidateAllocation` derives the unknown marker as the third bit of `EffectAllocationKind` and rejects mixed values, while `EffectSummaryProjector.Project` independently tests `(EffectAllocationKind)(1 << 2)` to suppress the `Allocates` projection and completeness. The generated enum currently defines `Unknown = 7` after the known values `0..3`, so the checks agree today, but the literal is a second authority. Exposing one enum-derived `UnknownMarker` or `IsUnknown` predicate and reusing it in validation and projection keeps the sentinel tied to the generated catalog. | `SharpProof.Effects/EffectSummary.cs:134-145`; `SharpProof.Effects/EffectProjection.cs:12-21`; `SharpProof.Effects/EffectContractMappings.generated.cs:11-18` |
+
+### Status (part seventy-six)
+
+R528 is a `pending` reduction candidate. The suggested reuse keeps the
+allocation lattice and projection policy unchanged; it removes only the
+duplicated sentinel encoding.

@@ -599,7 +599,7 @@ public sealed class FinalCompilationCollectorTests
         Assert.That(artifact.CompilerDiagnostics, Is.Empty);
         Assert.That(
             artifact.Callables.Single().FailureReason,
-            Is.Not.EqualTo(CompilerCallableProducerReasonCatalog.DiagnosticFailureReason));
+            Is.Not.EqualTo(CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason));
     }
 
     [TestCase("?", "first.cs")]

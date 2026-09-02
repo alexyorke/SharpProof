@@ -34,7 +34,7 @@ internal static class CompilerManifestArtifactProducer
             callables = [.. targets.Select(item => new CompilerCallableArtifact {
                 CallableId = item.Entry.CallableId,
                 FailureReason =
-                    CompilerCallableProducerReasonCatalog.DiagnosticFailureReason,
+                    CompilerCallableArtifactReasonCatalog.DiagnosticFailureReason,
                 EffectClaims = [.. item.EffectClaims.Select(static claim => claim.Evidence)],
                 EffectAuthorities = [.. item.EffectClaims.Select(claim =>
                 {
