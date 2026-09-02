@@ -149,28 +149,41 @@ if ($globalImpact) {
     }
 }
 else {
-    foreach ($testProject in $testProjects) {
-        $visited = [Collections.Generic.HashSet[string]]::new(
-            [StringComparer]::Ordinal)
-        $pending = [Collections.Generic.Stack[string]]::new()
-        $pending.Push($testProject.FullPath)
-        $matches = $false
-        while ($pending.Count -gt 0 -and -not $matches) {
-            $candidate = $pending.Pop()
-            if (-not $visited.Add($candidate)) {
-                continue
+    $reverseReferences = @{}
+    foreach ($project in $projects.Values) {
+        if (-not $reverseReferences.ContainsKey($project.FullPath)) {
+            $reverseReferences[$project.FullPath] =
+                [Collections.Generic.List[string]]::new()
+        }
+        foreach ($reference in $project.References) {
+            if (-not $reverseReferences.ContainsKey($reference)) {
+                $reverseReferences[$reference] =
+                    [Collections.Generic.List[string]]::new()
             }
-            if ($changedProjectPaths.Contains($candidate)) {
-                $matches = $true
-                break
-            }
-            if ($projects.ContainsKey($candidate)) {
-                foreach ($reference in $projects[$candidate].References) {
-                    $pending.Push($reference)
-                }
+            $reverseReferences[$reference].Add($project.FullPath)
+        }
+    }
+    $affectedProjects = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $pending = [Collections.Generic.Stack[string]]::new()
+    foreach ($changedProject in $changedProjectPaths) {
+        if ($affectedProjects.Add($changedProject)) {
+            $pending.Push($changedProject)
+        }
+    }
+    while ($pending.Count -gt 0) {
+        $candidate = $pending.Pop()
+        if (-not $reverseReferences.ContainsKey($candidate)) {
+            continue
+        }
+        foreach ($dependent in $reverseReferences[$candidate]) {
+            if ($affectedProjects.Add($dependent)) {
+                $pending.Push($dependent)
             }
         }
-        if ($matches) {
+    }
+    foreach ($testProject in $testProjects) {
+        if ($affectedProjects.Contains($testProject.FullPath)) {
             [void]$selected.Add($testProject.FullPath)
         }
     }

@@ -4233,14 +4233,6 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disposal resolver intentionally use different roots and reachability/unwinding rules. A shared walk could alter direct-witness recording, constructor entry selection, disposal order, or fail-closed effect joins; keep the independent passes until reusable per-operation facts can be proven equivalent.
 
-## Second survey, part two hundred ten: R672 - repeated changed-project graph walks
-
-| R672 | **`Invoke-SharpProofChangedTests.ps1` walks the same project-reference graph once per test project.** After building one `$projects` table, the selector creates a new visited set and stack for every test project and searches toward its references until it reaches a changed project. With many test projects sharing the same dependency graph, this repeats the same edge traversal and bookkeeping; a reverse-dependency map can start from changed projects and mark all impacted test projects in one traversal. Preserve the current transitive reference semantics, global/script-impact overrides, cycle protection, and deterministic selected-project ordering while removing repeated per-test graph searches. | `scripts/Invoke-SharpProofChangedTests.ps1:74-106,144-176` |
-
-### Status (part two hundred ten)
-
-R672 is a pending changed-test selection reduction candidate. Preserve project-file parsing, props blind-spot behavior documented by R301, transitive impact, and the architecture/package fallback rules; share only the immutable project graph traversal.
-
 ## Second survey, part two hundred eleven: R673-R674 - repeated release/PDB path preparation
 
 | R673 | **`Invoke-SharpProofReleaseContainer.ps1` repeats annotated-tag identity checks in two modes.** `ValidateTag` calls `cat-file -t` and `rev-parse <tag>^{commit}` to prove an annotated tag resolves to the checkout commit, and `WriteQualificationEvidence` repeats the same two Git queries after its own version/tag checks. A helper that validates the tag object and resolved commit can serve both modes; `ValidateTag` can retain its additional `origin/master` ancestry check and mode-specific environment/ref diagnostics. | `scripts/Invoke-SharpProofReleaseContainer.ps1:60-68,128-133` |
@@ -4298,3 +4290,21 @@ R682 is a pending architecture-test efficiency reduction candidate. Preserve the
 | R684 | **`PerformanceContractIsIsolatedFromBroadTestAndCoverageRuns` reads the container dispatcher twice.** The test loads `Invoke-SharpProofContainer.ps1` into `containerCommands` for ordering and exclusion checks, then later loads the identical path again into `coverageContainerCommands` for coverage/performance assertions. Reusing the first string would retain those independent assertions while removing the duplicate file I/O. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:1654-1657,1751-1754` |
 
 R683-R684 are pending architecture-test I/O reductions. Preserve the structural-versus-lexical configuration checks and the separate performance, coverage, and ordering assertions.
+
+### Status (part two hundred nineteen)
+
+| R685 | **`WorkerAndLauncherRuntimeClosuresAreCompilerNeutral` repeats project discovery and file reads across overlapping closures.** The test walks the Worker and Launcher dependency closures separately, and `TransitiveProjectClosure` reparses each project file while the per-project assertions then parse that same project file through `ProjectPackages` and read it again for `RoslynTargetsPath`; shared dependencies therefore incur the same graph and source/project-file I/O more than once. Materializing a shared closure and caching each project's parsed XML/source text would preserve the two root-specific closure assertions and all package/source/target checks while reducing repeated traversal and reads. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:232-255`; `SharpProof.ArchitectureTest/ArchitectureRepository.cs:27-78` |
+
+R685 is a pending architecture-test repository-cache reduction candidate. Preserve root-specific closure membership checks and the independent package, source, and project-file policy assertions.
+
+### Status (part two hundred twenty)
+
+| R686 | **`ReleasePublicationScriptTests` duplicates archive-entry replacement scaffolding.** `RewriteRepositoryCommit` and `RewriteEntry` both delete an existing `ZipArchiveEntry`, create a replacement at a supplied name with `CompressionLevel.Optimal`, open its stream, and write replacement content; only the writer is text/document serialization versus raw bytes. A small replacement helper accepting a write callback can centralize the archive mutation protocol while preserving the two content encodings and their callers' distinct transformations. | `SharpProof.Package.Test/ReleasePublicationScriptTests.cs:927-970` |
+
+R686 is a pending release-test fixture reduction candidate. Preserve archive compression, entry-name replacement, UTF-8-without-BOM document output, and raw-byte mutation behavior.
+
+### Status (part two hundred twenty-one)
+
+| R687 | **`LauncherArgumentTests` repeats the base verification argument vector across collision cases.** The directory-result, I/O-collision, nested-cache, worker-output, worker-runtime, and launcher-runtime tests each spell out the same `verify`, worker, request, result, compiler-manifest, verify-policy, and assumption-policy flags before varying only the paths or cache setting. A small `CreateProjectionArguments` helper with named path/cache parameters can remove the repeated argument plumbing while leaving every collision topology explicit at the call site. | `SharpProof.Package.Test/LauncherArgumentTests.cs:462-850` |
+
+R687 is a pending launcher-test data-construction reduction candidate. Preserve the exact flag order, relative/absolute path variants, cache-enabled cases, and each test's distinct pre-manifest validation assertion.
