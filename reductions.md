@@ -157,6 +157,7 @@ the smallest relevant containerized test target passes.
 | R848 | Reuse the ordered validated diagnostic symbols for supported-list emission | diagnostic generator `-Verify` passed |
 | R849 | Project IR identifier aliases from the validated tag descriptor list | IR model generator `-Verify` passed |
 | R850 | Group compiler-artifact mappings once before owner-specific emission | compiler-artifact generator `-Verify` passed |
+| R851 | Resolve bound-contract assignments through a validated parameter map | bound-contract generator `-Verify` passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -7437,5 +7438,6 @@ R850 is `applied`: validated collector mappings are grouped once in first-seen
 
 ### Status (part three hundred sixty-two)
 
-R851 is `deferred`: the parameter lookup is a small build-time optimization and
-  clarity improvement, with no implementation change made during this audit.
+R851 is `applied`: constructor parameters are indexed during validation and
+  assignments resolve through that map, preserving lower-camel matching and
+  generated output while removing repeated scans.

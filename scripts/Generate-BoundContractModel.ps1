@@ -79,12 +79,18 @@ foreach ($class in @($schema.classes)) {
     $lines.Add("public sealed class $name")
     $lines.Add('{')
     $lines.Add("    $access $name(")
+    $parametersByName =
+        [Collections.Generic.Dictionary[string, object]]::new(
+            [StringComparer]::OrdinalIgnoreCase)
     for ($index = 0; $index -lt $parameters.Count; $index++) {
         $parameter = $parameters[$index]
         $type = [string](Get-RequiredProperty $parameter 'type' "class '$name' parameter")
         $parameterName = [string](Get-RequiredProperty $parameter 'name' "class '$name' parameter")
         Assert-TypeName $type "class '$name' parameter type"
         Assert-Identifier $parameterName "class '$name' parameter name"
+        if (-not $parametersByName.TryAdd($parameterName, $parameter)) {
+            throw "class '$name' constructor parameters must be unique."
+        }
         $comma = if ($index -lt $parameters.Count - 1) { ',' } else { '' }
         $lines.Add("        $type $parameterName$comma")
     }
@@ -93,13 +99,13 @@ foreach ($class in @($schema.classes)) {
     foreach ($assignment in $assignments) {
         $propertyName = [string]$assignment
         Assert-Identifier $propertyName "class '$name' assignment"
-        $parameter = @($parameters | Where-Object {
-            [string]$_.name -eq ($propertyName.Substring(0, 1).ToLowerInvariant() + $propertyName.Substring(1))
-        })
-        if ($parameter.Count -ne 1) {
+        $parameterName =
+            $propertyName.Substring(0, 1).ToLowerInvariant() +
+            $propertyName.Substring(1)
+        if (-not $parametersByName.ContainsKey($parameterName)) {
             throw "class '$name' assignment '$propertyName' has no matching parameter."
         }
-        $lines.Add("        $propertyName = $($parameter[0].name);")
+        $lines.Add("        $propertyName = $parameterName;")
     }
     $lines.Add('    }')
     foreach ($property in @(Get-RequiredProperty $class 'properties' "class '$name'")) {
