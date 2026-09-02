@@ -183,6 +183,7 @@ the smallest relevant containerized test target passes.
 | R585 | Share the parameterized Worker throwing-backend fixture | `SharpProof.Worker.Test`: AcyclicBlockPredicateExecutorTests 14; CompilerCallableLowererTests 20; WorkerTcbEdgeCaseTests 44 passed |
 | R586 | Share Worker compiler-manifest compilation, discovery, and artifact construction | `SharpProof.Worker.Test`: CompilerManifestArtifactTests, 91 passed |
 | R619 | Share cancellation-filter evaluation prelude | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests, 162 passed |
+| R620 | Share Meta-analyzer local-write candidate enumeration | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests, 162 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4209,7 +4210,11 @@ fail-closed outcome interpretation. SharpProofSoundnessAnalyzerTests passed
 
 ### Status (part one hundred sixty-one)
 
-R620 is a pending Meta-analyzer dataflow cleanup candidate. Preserve evaluation order, cancellation checks, throw snapshots, and the distinct input/output sets; share only the common candidate enumeration and local-write replacement seam.
+R620 is `applied`: `TransferLocalValues` and
+`GetExceptionalLocalValues` now share `LocalWriteCandidates` for block
+operation ordering and cancellation checks; their state replacement and
+exceptional snapshots remain separate. SharpProofSoundnessAnalyzerTests passed
+(162).
 
 ## Second survey, part one hundred sixty-two: R621 - duplicate artifact-authority test baseline
 

@@ -1126,12 +1126,10 @@ internal static class CacheSoundnessRules
         CancellationToken cancellationToken)
     {
         var result = new HashSet<IOperation>(input);
-        foreach (var candidate in BlockOperations(block)
-                     .SelectMany(operation =>
-                         InEvaluationOrder(
-                             operation,
-                             root,
-                             cancellationToken)))
+        foreach (var candidate in LocalWriteCandidates(
+                     block,
+                     root,
+                     cancellationToken))
         {
             if (before != null &&
                 IsSameLocalReference(candidate, before))
@@ -1160,12 +1158,10 @@ internal static class CacheSoundnessRules
     {
         var state = new HashSet<IOperation>(input);
         var exceptional = new HashSet<IOperation>();
-        foreach (var candidate in BlockOperations(block)
-                     .SelectMany(operation =>
-                         InEvaluationOrder(
-                             operation,
-                             root,
-                             cancellationToken)))
+        foreach (var candidate in LocalWriteCandidates(
+                     block,
+                     root,
+                     cancellationToken))
         {
             if (RoslynCfgThrowFacts.OperationMayThrow(candidate))
             {
@@ -1182,6 +1178,18 @@ internal static class CacheSoundnessRules
             state.Add(value);
         }
         return exceptional;
+    }
+
+    private static IEnumerable<IOperation> LocalWriteCandidates(
+        BasicBlock block,
+        IOperation root,
+        CancellationToken cancellationToken)
+    {
+        return BlockOperations(block).SelectMany(operation =>
+            InEvaluationOrder(
+                operation,
+                root,
+                cancellationToken));
     }
 
     private static IEnumerable<IOperation> InEvaluationOrder(
