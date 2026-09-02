@@ -222,13 +222,13 @@ function Test-SharpProofPackagePayload {
                     throw "Package '$PackageId' native payload size is invalid: '$($entry.FullName)'."
                 }
                 $actualThirdParty.Add($entry.FullName)
-                $assemblyName = Get-SharpProofArchiveAssemblyName -Entry $entry
             }
             elseif ($entry.FullName -eq 'tools/net9/Microsoft.Z3.dll') {
                 if ($entry.Length -ne [int64]$toolchain.z3.managedAssemblyBytes) {
                     throw "Package '$PackageId' managed Z3 payload size is invalid."
                 }
                 $actualThirdParty.Add($entry.FullName)
+                $assemblyName = Get-SharpProofArchiveAssemblyName -Entry $entry
             }
             else {
                 $sourcePath = [string]$specification.Source

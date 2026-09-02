@@ -534,11 +534,6 @@ try {
                     Write-Host $stderr.TrimEnd()
                 }
             }
-            else {
-                Write-Host (
-                    "Semantic test {0}: passed ({1:0.0}s)" -f
-                    $active.Task.Name, ($elapsed / 1000.0))
-            }
             $timings.Add([pscustomobject]@{
                 name = $active.Task.Name
                 elapsedMilliseconds = $elapsed

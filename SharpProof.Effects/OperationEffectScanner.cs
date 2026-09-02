@@ -1225,16 +1225,6 @@ internal sealed partial class OperationEffectScanner
             value, origin, FrameworkTypeMetadataNames.ArgumentNullException);
     }
 
-    private EffectSummary PotentialNullAccess(
-        IOperation? value,
-        IOperation origin,
-        string exceptionType)
-    {
-        return _nullnessEvaluator.IsProvenNonNull(value, origin)
-            ? EffectSummary.Empty
-            : Throw(exceptionType);
-    }
-
     private EffectSummary ArrayCreationExceptions(
         IArrayCreationOperation creation)
     {

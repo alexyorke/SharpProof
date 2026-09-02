@@ -941,7 +941,7 @@ public sealed class PackageLayoutSmokeTests
             workspace.ConsumerDirectory,
             "msbuild",
             workspace.ConsumerProject,
-            "-target:_SharpProofValidateSourceTreeConfiguration",
+            "-target:_SharpProofValidateConsumerConfiguration",
             "--nologo");
 
         Assert.That(validation.ExitCode, Is.Not.Zero, validation.Output);

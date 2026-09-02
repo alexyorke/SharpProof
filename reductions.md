@@ -3441,3 +3441,60 @@ and validation before the regular-file scan.
 R559 is a `pending` reduction candidate. Keep validation before both destructive
 or copying operations and preserve the distinct target/source error context; only
 share the path predicate.
+
+## Second survey, part one hundred two: R560 - production inventory path validation
+
+| R560 | **`Get-SharpProofProductionInventory` repeats canonical path and file checks.** `Resolve-RepositoryPath` validates blank/rooted/relative input, repository containment, and canonical relative segments; `Get-GeneratedManifest` manually repeats the blank/rooted/`//`/dot-segment predicate before joining the root and checking a leaf; `Get-CanonicalFileRecord` then repeats the root-relative join and leaf existence check for evaluated compile files. A shared canonical-relative-path/file-record seam can preserve the manifest's duplicate-set check and context-specific errors while removing this drift-prone validation triplication. | `scripts/Get-SharpProofProductionInventory.ps1:34-50,118-129` |
+
+### Status (part one hundred two)
+
+R560 is a `pending` reduction candidate. Keep manifest-specific uniqueness and approved-output semantics; only centralize common path normalization and existence checks without weakening repository containment.
+
+## Second survey, part one hundred three: R561 - exact JSON property validators
+
+| R561 | **The standalone-gate and fuzz-result validators each implement an exact JSON-object property-set assertion.** `Assert-ExactJsonProperties` enumerates `PSObject.Properties.Name`, compares count, and rejects unexpected names, while `Assert-ExactJsonObjectProperties` enumerates `JsonElement` properties, also rejects duplicate names, and rejects unexpected names. The representations and strictness differ, but a shared adapter or common helper with explicit options could own the property-set comparison instead of maintaining two nearly identical contracts; retain the fuzz validator's duplicate-name and JSON-value-kind checks. | `scripts/Assert-SharpProofStandaloneGateResult.ps1:3-15`; `scripts/Assert-SharpProofFuzzRunnerResult.ps1:3-20` |
+
+### Status (part one hundred three)
+
+R561 is a `pending` reduction candidate. Preserve the JsonElement-only duplicate-property protection and the distinct error/typing behavior; centralize only the common expected-name comparison if the abstraction stays clearer than the two small local helpers.
+
+## Second survey, part one hundred four: R562-R563 - qualification artifacts and corpus sizing
+
+| R562 | **The pilots qualification receipt revalidates package-artifact records that its report validator has just validated more completely.** `Write-SharpProofQualificationReceipt` projects every `packageArtifacts` row, checks leaf names, `.nupkg`/`.snupkg` suffixes, positive sizes, and six unique names, then the `pilots` branch calls `Test-SharpProofPilotReport`, whose package-artifact pass checks the same six records plus package IDs, version, repository commit, and exact expected names. A report-validation result that returns the normalized package rows, or a receipt path that relies on the stronger validator for pilots, can remove the repeated scan while keeping the lighter generic checks for other package-backed gates. | `scripts/Write-SharpProofQualificationReceipt.ps1:31-50,90-95`; `scripts/Test-SharpProofPilotReport.ps1:58-81` |
+| R563 | **The OSS importer and corpus validator maintain the same method-count boundary as separate literals.** `OpenSourceCorpusImporter` selects exactly `TargetMethodCount = 200` candidates, while `OpenSourceCorpusCatalog` accepts a checked-in document only when its method count is at least `MinimumMethodCount = 200` (and at most 500). If the minimum coverage policy changes, these authorities can drift: an import can keep producing the old count while validation expects another minimum. Reuse the catalog's lower-bound constant for the default import target, or make the importer target an explicit policy input, while retaining the catalog's independent upper bound. | `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:27,142-148`; `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:15-17,128-133` |
+
+### Status (part one hundred four)
+
+R562-R563 are `pending` reduction candidates. For R562 preserve the report validator's stronger package identity and pilot checks; for R563 keep the 500-method upper bound and change importer sizing only through an explicit corpus policy.
+
+## Second survey, part one hundred five: R564 - performance policy overload defect
+
+| R564 | **Defect, not a reduction: the four-document `ValidateAdvisoryPackagePolicy` overload passes the wrong document.** The overload taking `portableProps`, `portableTargets`, `verifierProps`, and `verifierTargets` forwards `portableTargets` as the `portableContract` argument to the five-document implementation. That implementation then searches the targets document for the contract's default `SharpProofProfile`, `SharpProofFeatures`, and `SharpProofVerify` properties, so the canonical four-document call cannot validate the intended policy and mutation tests can pass only because they throw for this unrelated reason. The forwarding call should supply a real `portableContract`, or the overload should be removed if all callers can use the five-document form. | `SharpProof.Gates/Performance/PerformanceGate.cs:1513-1524,1527-1547`; `SharpProof.Gates.Test/PerformanceGateTests.cs:749-818` |
+
+### Status (part one hundred five)
+
+R564 is an unimplemented defect finding. Do not fold it into a generic helper reduction until the four-document test contract has a valid canonical success case and the mutation tests demonstrate that their failures target the requested mutations.
+
+## Second survey, part one hundred six: R565 - package-build statistic re-sorting
+
+| R565 | **Potential redundant validation and sorting in `PackageBuildEstimator.Estimate`.** The estimator derives `baselineFirst`, `unannotatedAdvisoryFirst`, `balancedRatios`, and `ratios` from `PackageBuildSample` values, then calls `Median` on three of those collections and `NearestRankPercentile` on `ratios`. Each call runs `ValidateAndSort`, so the same already-positive, finite values are re-enumerated and sorted; the full `ratios` collection is sorted twice for the raw median and P95. A private normalized-statistics path could validate/sort each derived collection once or calculate the median and percentile from one sorted full-ratio array, while leaving the public `Median` input validation intact. Keep the sample index/order-balance checks and the geometric pair construction separate because they enforce different invariants. | `SharpProof.Gates/Performance/PackageBuildEstimator.cs:8-49,102-159,162-213` |
+
+### Status (part one hundred six)
+
+R565 is a pending reduction candidate. Its payoff is small for the current sample sizes, but the repeated full-array work adds avoidable complexity and would scale with package-build repetitions.
+
+## Second survey, part one hundred seven: R566 - duplicate percentile algorithms
+
+| R566 | **`PerformanceGate` and `PackageBuildEstimator` duplicate nearest-rank percentile selection.** `PerformanceGate.Percentile` sorts an enumerable, checks that it is nonempty, clamps `ceil(rank * count) - 1`, and returns that element; `PackageBuildEstimator.NearestRankPercentile` repeats the same sort/index/clamp algorithm through `ValidateAndSort`, adding the estimator's finite-positive checks. Move the common nearest-rank selection into one shared helper (or expose a validated statistics utility with an explicit validation boundary) so changes to percentile semantics cannot drift. Preserve the stricter estimator input validation and the existing empty-input behavior. | `SharpProof.Gates/Performance/PerformanceGate.cs:173-182,1089-1102`; `SharpProof.Gates/Performance/PackageBuildEstimator.cs:158,184-193` |
+
+### Status (part one hundred seven)
+
+R566 is a pending reduction candidate. The two call sites currently use the same 95th-percentile rule, so the duplicated algorithm is maintenance surface even though the sampled arrays are small.
+
+## Second survey, part one hundred eight: R567 - duplicate mutation-ledger comparison
+
+| R567 | **`Invoke-SharpProofTrustedMutationsParallel.ps1` reimplements the module's ordinal sequence comparison.** Its local `Test-ExactStringSequence` counts two string arrays and loops through them with case-sensitive `-cne`, while `SharpProof.MutationEvidence.psm1` already uses `[Linq.Enumerable]::SequenceEqual(..., [StringComparer]::Ordinal)` for the same expected-versus-actual mutation-ledger comparison. The local helper is used only for the shard checks, so calling the shared ordinal comparison (or exporting one small helper) removes a second definition of the ledger equality contract. Preserve the explicit count/duplicate checks around the comparison and verify null/empty-array behavior before changing the call sites. | `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1:82-97,170-177,197-204`; `scripts/SharpProof.MutationEvidence.psm1:535-545` |
+
+### Status (part one hundred eight)
+
+R567 is a pending reduction candidate. The current implementations agree for the non-null string arrays produced by these evidence paths, but the local copy can drift from the shared ordinal contract.

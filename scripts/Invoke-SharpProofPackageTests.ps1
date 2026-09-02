@@ -674,9 +674,6 @@ try {
             $stdout = $active.StandardOutput.GetAwaiter().GetResult()
             $stderr = $active.StandardError.GetAwaiter().GetResult()
             $exitCode = $active.Process.ExitCode
-            $elapsedSeconds = (
-                $active.Process.ExitTime.ToUniversalTime() -
-                $active.StartedUtc).TotalSeconds
             if (-not $Quiet -or $exitCode -ne 0) {
                 Write-Host "--- Package test $($active.Shard.Name) ---"
                 if (-not [string]::IsNullOrWhiteSpace($stdout)) {
@@ -685,11 +682,6 @@ try {
                 if (-not [string]::IsNullOrWhiteSpace($stderr)) {
                     Write-Host $stderr.TrimEnd()
                 }
-            }
-            else {
-                Write-Host (
-                    "Package test {0}: passed ({1:0.0}s)" -f
-                    $active.Shard.Name, $elapsedSeconds)
             }
             if ($exitCode -ne 0) {
                 $failures.Add(
