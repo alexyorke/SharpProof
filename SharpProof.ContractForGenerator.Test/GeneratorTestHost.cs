@@ -124,8 +124,6 @@ internal static class GeneratorTestHost
                 StringComparer.Ordinal)
             .ToImmutableArray();
         return new GeneratorRun(
-            compilation,
-            (CSharpCompilation)outputCompilation,
             driver,
             runResult,
             diagnostics);
@@ -228,14 +226,10 @@ internal static class GeneratorTestHost
 }
 
 internal sealed class GeneratorRun(
-    CSharpCompilation inputCompilation,
-    CSharpCompilation outputCompilation,
     GeneratorDriver driver,
     GeneratorDriverRunResult runResult,
     ImmutableArray<Diagnostic> diagnostics)
 {
-    internal CSharpCompilation InputCompilation { get; } = inputCompilation;
-    internal CSharpCompilation OutputCompilation { get; } = outputCompilation;
     internal GeneratorDriver Driver { get; } = driver;
     internal GeneratorDriverRunResult RunResult { get; } = runResult;
     internal ImmutableArray<Diagnostic> Diagnostics { get; } = diagnostics;
