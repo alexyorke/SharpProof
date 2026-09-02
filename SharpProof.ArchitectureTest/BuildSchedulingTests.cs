@@ -59,7 +59,7 @@ public sealed class BuildSchedulingTests
             Assert.That(packageTests, Does.Contain("'package-layout-'"));
             Assert.That(
                 packageTests,
-                Does.Contain("-MinimumCount 15"));
+                Does.Contain("$packageLayoutClass = 15"));
             Assert.That(
                 packageTests,
                 Does.Not.Contain("'PackageLayoutSmokeTests',"));

@@ -105,58 +105,72 @@ function Invoke-RequiredBuilds {
         -Quiet:$Quiet
 }
 
+$script:SharpProofTrxTimingRowsCache = @{}
+
 function Get-TestMethodTimings {
     param(
         [Parameter(Mandatory = $true)][string]$ResultsRoot,
         [Parameter(Mandatory = $true)][string]$ClassName
     )
 
-    $milliseconds = @{}
-    foreach ($trx in Get-ChildItem `
-            -LiteralPath $ResultsRoot -Recurse -Filter *.trx) {
-        [xml]$document = Get-Content -LiteralPath $trx.FullName -Raw
-        $namespace = [Xml.XmlNamespaceManager]::new($document.NameTable)
-        $namespace.AddNamespace(
-            'trx',
-            'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
-        $definitions = @{}
-        foreach ($definition in @($document.SelectNodes(
-                '//trx:UnitTest', $namespace))) {
-            $method = $definition.SelectSingleNode(
-                'trx:TestMethod', $namespace)
-            if ($null -ne $method) {
-                $definitions[[string]$definition.id] = [pscustomobject]@{
-                    ClassName = [string]$method.className
-                    MethodName = [string]$method.name
+    if (-not $script:SharpProofTrxTimingRowsCache.ContainsKey($ResultsRoot)) {
+        $rows = [Collections.Generic.List[object]]::new()
+        foreach ($trx in Get-ChildItem `
+                -LiteralPath $ResultsRoot -Recurse -Filter *.trx) {
+            [xml]$document = Get-Content -LiteralPath $trx.FullName -Raw
+            $namespace = [Xml.XmlNamespaceManager]::new($document.NameTable)
+            $namespace.AddNamespace(
+                'trx',
+                'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
+            $definitions = @{}
+            foreach ($definition in @($document.SelectNodes(
+                    '//trx:UnitTest', $namespace))) {
+                $method = $definition.SelectSingleNode(
+                    'trx:TestMethod', $namespace)
+                if ($null -ne $method) {
+                    $definitions[[string]$definition.id] = [pscustomobject]@{
+                        ClassName = [string]$method.className
+                        MethodName = [string]$method.name
+                    }
                 }
             }
+            foreach ($result in @($document.SelectNodes(
+                    '//trx:UnitTestResult', $namespace))) {
+                $testId = [string]$result.testId
+                if (-not $definitions.ContainsKey($testId)) {
+                    continue
+                }
+                $definition = $definitions[$testId]
+                $rows.Add([pscustomobject]@{
+                    ClassName = $definition.ClassName
+                    MethodName = $definition.MethodName
+                    Duration = [string]$result.duration
+                })
+            }
         }
-        foreach ($result in @($document.SelectNodes(
-                '//trx:UnitTestResult', $namespace))) {
-            $testId = [string]$result.testId
-            if (-not $definitions.ContainsKey($testId)) {
-                continue
-            }
-            $definition = $definitions[$testId]
-            if ($definition.ClassName -cne $ClassName) {
-                continue
-            }
-            $match = [regex]::Match(
-                $definition.MethodName,
-                '^(?<name>[A-Za-z_][A-Za-z0-9_]*)')
-            if (-not $match.Success) {
-                continue
-            }
-            $name = $match.Groups['name'].Value
-            $elapsed = [TimeSpan]::Parse(
-                [string]$result.duration,
-                [Globalization.CultureInfo]::InvariantCulture)
-            if (-not $milliseconds.ContainsKey($name)) {
-                $milliseconds[$name] = 0L
-            }
-            $milliseconds[$name] += [long][Math]::Ceiling(
-                $elapsed.TotalMilliseconds)
+        $script:SharpProofTrxTimingRowsCache[$ResultsRoot] = $rows
+    }
+
+    $milliseconds = @{}
+    foreach ($row in @($script:SharpProofTrxTimingRowsCache[$ResultsRoot])) {
+        if ($row.ClassName -cne $ClassName) {
+            continue
         }
+        $match = [regex]::Match(
+            $row.MethodName,
+            '^(?<name>[A-Za-z_][A-Za-z0-9_]*)')
+        if (-not $match.Success) {
+            continue
+        }
+        $name = $match.Groups['name'].Value
+        $elapsed = [TimeSpan]::Parse(
+            $row.Duration,
+            [Globalization.CultureInfo]::InvariantCulture)
+        if (-not $milliseconds.ContainsKey($name)) {
+            $milliseconds[$name] = 0L
+        }
+        $milliseconds[$name] += [long][Math]::Ceiling(
+            $elapsed.TotalMilliseconds)
     }
     return @($milliseconds.GetEnumerator() | ForEach-Object {
             [pscustomobject]@{
@@ -169,30 +183,47 @@ function Get-TestMethodTimings {
 function Get-DiscoveredTestMethods {
     param(
         [Parameter(Mandatory = $true)][string]$Assembly,
-        [Parameter(Mandatory = $true)][string]$ClassName,
-        [Parameter(Mandatory = $true)][int]$MinimumCount,
-        [Parameter(Mandatory = $true)][string]$Description
+        [Parameter(Mandatory = $true)][string[]]$ClassNames,
+        [Parameter(Mandatory = $true)][hashtable]$MinimumCounts,
+        [Parameter(Mandatory = $true)][hashtable]$Descriptions
     )
 
-    $list = & dotnet vstest $Assembly `
-        /ListTests `
-        "/TestCaseFilter:FullyQualifiedName~$ClassName" 2>&1 |
-        Out-String
+    $list = & dotnet vstest $Assembly /ListTests 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
-        throw "Could not discover $Description tests."
+        throw 'Could not discover package test methods.'
     }
-    $methods = @(
+    $listedMethods = @(
         [regex]::Matches(
             $list,
             '(?m)^\s{4}(?<method>[A-Za-z_][A-Za-z0-9_]*)(?:\(|\s*$)') |
             ForEach-Object { $_.Groups['method'].Value } |
             Sort-Object -Unique)
-    if ($methods.Count -lt $MinimumCount) {
-        throw (
-            "$Description discovery returned only " +
-            "$($methods.Count) test methods.")
+    $testAssembly = [Reflection.Assembly]::LoadFrom($Assembly)
+    $bindingFlags = [Reflection.BindingFlags]::Instance -bor
+        [Reflection.BindingFlags]::Static -bor
+        [Reflection.BindingFlags]::Public -bor
+        [Reflection.BindingFlags]::NonPublic
+    $methodsByClass = @{}
+    foreach ($className in $ClassNames) {
+        $type = $testAssembly.GetType($className, $false, $false)
+        $methods = if ($null -eq $type) {
+            @()
+        }
+        else {
+            @($type.GetMethods($bindingFlags) |
+                Where-Object { $listedMethods -contains $_.Name } |
+                ForEach-Object { $_.Name } |
+                Sort-Object -Unique)
+        }
+        if ($methods.Count -lt [int]$MinimumCounts[$className]) {
+            $description = [string]$Descriptions[$className]
+            throw (
+                "$description discovery returned only " +
+                "$($methods.Count) test methods.")
+        }
+        $methodsByClass[$className] = $methods
     }
-    return $methods
+    return $methodsByClass
 }
 
 $root = Join-Path ([IO.Path]::GetTempPath()) (
@@ -373,16 +404,25 @@ try {
 
     $workerClass =
         'SharpProof.Package.Test.WorkerMsBuildIntegrationTests'
+    $packageLayoutClass =
+        'SharpProof.Package.Test.PackageLayoutSmokeTests'
     if ([string]::IsNullOrWhiteSpace($testAssembly)) {
         $testAssembly = Get-SharpProofTestAssemblyPath `
             -ProjectPath $testProject `
             -Configuration $Configuration
     }
-    $workerMethods = @(Get-DiscoveredTestMethods `
+    $discoveredMethods = Get-DiscoveredTestMethods `
         -Assembly $testAssembly `
-        -ClassName $workerClass `
-        -MinimumCount 40 `
-        -Description 'Worker MSBuild integration')
+        -ClassNames @($workerClass, $packageLayoutClass) `
+        -MinimumCounts @{
+            $workerClass = 40
+            $packageLayoutClass = 15
+        } `
+        -Descriptions @{
+            $workerClass = 'Worker MSBuild integration'
+            $packageLayoutClass = 'package-layout'
+        }
+    $workerMethods = @($discoveredMethods[$workerClass])
     $workerBuckets = @(
         for ($index = 0; $index -lt $parallelism; $index++) {
             [pscustomobject]@{
@@ -415,13 +455,7 @@ try {
                 1L
             })
     }
-    $packageLayoutClass =
-        'SharpProof.Package.Test.PackageLayoutSmokeTests'
-    $packageLayoutMethods = @(Get-DiscoveredTestMethods `
-        -Assembly $testAssembly `
-        -ClassName $packageLayoutClass `
-        -MinimumCount 15 `
-        -Description 'package-layout')
+    $packageLayoutMethods = @($discoveredMethods[$packageLayoutClass])
     $packageLayoutFilter =
         "FullyQualifiedName~$packageLayoutClass"
     $defaultPackageLayoutMethodMilliseconds =

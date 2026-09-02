@@ -4233,15 +4233,6 @@ R661 is deferred: the applicability screen and candidate discovery intentionally
 
 R663 is deferred: the ordinary CFG scan, lexical lock/throw scan, and using-disposal resolver intentionally use different roots and reachability/unwinding rules. A shared walk could alter direct-witness recording, constructor entry selection, disposal order, or fail-closed effect joins; keep the independent passes until reusable per-operation facts can be proven equivalent.
 
-## Second survey, part two hundred nine: R670-R671 - repeated package-test discovery
-
-| R670 | **`Invoke-SharpProofPackageTests.ps1.Get-TestMethodTimings` reparses every TRX file once per class.** The script calls the helper separately for `WorkerMsBuildIntegrationTests` and `PackageLayoutSmokeTests`; each invocation rereads every result file, recreates the XML namespace manager, rebuilds test-definition maps, and scans all results. A single parse can project timings for both class names (or return a class-keyed map), preserving method-name extraction, duration aggregation, and sorting while removing a full XML pass. | `scripts/Invoke-SharpProofPackageTests.ps1:108-167,709-715` |
-| R671 | **`Invoke-SharpProofPackageTests.ps1.Get-DiscoveredTestMethods` launches `vstest /ListTests` twice for one assembly.** The worker-method and package-layout discovery calls pass different class filters, but both start the same test assembly and parse the complete textual listing with the same regular expression and uniqueness logic. One unfiltered listing can be parsed into class-keyed method sets and checked against both minimum counts, preserving the separate filters and diagnostics without two child-process launches. | `scripts/Invoke-SharpProofPackageTests.ps1:169-195,374-424` |
-
-### Status (part two hundred nine)
-
-R670-R671 are pending package-test scheduler reductions. Preserve separate class minimums, method-name parsing, timing aggregation, filter semantics, and test-process diagnostics; share only the assembly discovery and TRX parsing work.
-
 ## Second survey, part two hundred ten: R672 - repeated changed-project graph walks
 
 | R672 | **`Invoke-SharpProofChangedTests.ps1` walks the same project-reference graph once per test project.** After building one `$projects` table, the selector creates a new visited set and stack for every test project and searches toward its references until it reaches a changed project. With many test projects sharing the same dependency graph, this repeats the same edge traversal and bookkeeping; a reverse-dependency map can start from changed projects and mark all impacted test projects in one traversal. Preserve the current transitive reference semantics, global/script-impact overrides, cycle protection, and deterministic selected-project ordering while removing repeated per-test graph searches. | `scripts/Invoke-SharpProofChangedTests.ps1:74-106,144-176` |
@@ -4281,3 +4272,29 @@ R676-R677 are pending acceptance-preparation reductions. Preserve path containme
 | R678 | **`RunVerifier.ConvertTestOutputAsync` scans completed output twice for supervisor records.** After awaiting the same captured stdout, it calls `HasSupervisorProtocolRecord` once for the Armed message and once for the Cleanup message; each helper splits and scans the full text while matching the same nonce. One authenticated-record pass can return both flags, preserving nonce validation and the separate bounded streaming path used elsewhere. | `SharpProof.BuildTasks/RunVerifier.cs:647-665` |
 
 R678 is a pending output-parsing reduction candidate. Preserve exact nonce matching, both supervisor-state flags, and the existing streaming/bounded-output behavior.
+
+### Status (part two hundred fifteen)
+
+| R679 | **`IrRelationalSummaryBuilder.Run.Supported` traverses each term twice for admission.** `Supported` first calls `Charge`, whose explicit-stack walk visits the complete reachable term DAG and charges each unseen node, then calls `IrTermAnalysis.GetDepth`, which performs a second bottom-up traversal with a separate memo dictionary over that same DAG. Carrying the maximum depth through the charged walk, or reusing a bounded depth memo, can retain both the global symbolic-operation budget and stack-safe depth check without repeating term enumeration. | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:773-829`; `SharpProof.Ir/IrSemanticTerms.cs:134-163` |
+| R680 | **`ContractIntrinsicValidator` duplicates the same context-only violation classification.** `Classify` and `ClassifyMethodReference` independently implement the identical `outside Ensures` decision and the identical `inside Old` decision for Result versus Old; the invocation-specific method then continues with argument/signature checks, while the method-reference path always rejects the reference signature. A shared context-classification helper can preserve those distinct signature tails and the current violation kinds while removing the repeated policy branches. | `SharpProof.Contracts/ContractIntrinsicValidator.cs:64-116` |
+
+R679-R680 are pending analysis-boundary reductions. Preserve stack-safe traversal, symbolic-operation charging, context-sensitive intrinsic diagnostics, and the invocation/reference-specific signature rules.
+
+### Status (part two hundred sixteen)
+
+| R681 | **`Generate-ProtocolModel.ps1.ConvertTo-ValidationConditionSource` duplicates the `all` and `any` condition renderer.** Both branches enumerate nested `conditions`, recursively render each condition with the same root type, reject an empty list with the same shape of error, and join the parts inside parentheses; only the join token changes from `&&` to `||`. A small operator-parameterized renderer can preserve the generated expression and schema-specific diagnostics while removing the duplicated recursion and empty-list handling. | `scripts/Generate-ProtocolModel.ps1:143-167` |
+
+R681 is a pending generator-complexity reduction candidate. Preserve recursive condition validation, empty-condition rejection, generated line wrapping, and the distinct conjunction/disjunction semantics.
+
+### Status (part two hundred seventeen)
+
+| R682 | **`PreviewConfigurationInterfaceMatchesFrozenSnapshot` reparses each build file repeatedly.** For every text in `buildFiles`, `actualPublicProperties` parses the same XML once for `PropertyGroup` elements and a second time for `CompilerVisibleProperty` elements, then the separate `compilerVisible` projection parses that XML a third time. Parsing each build file once into an `XDocument` and sharing the projections would retain the independent property-surface and compiler-visible checks while removing repeated XML parsing in this architecture test. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:733-771` |
+
+R682 is a pending architecture-test efficiency reduction candidate. Preserve the distinct frozen-property, compiler-visible-property, and text-regex checks; only share the per-file XML parse.
+
+### Status (part two hundred eighteen)
+
+| R683 | **`DevContainerIsNonRootPinnedAndDoesNotNestDocker` reads `devcontainer.json` twice.** It parses one `File.ReadAllText` result into `JsonDocument`, then opens the same path again to obtain `rawConfiguration` for the text-level `pwsh` assertion. Keeping the raw text in a local and parsing that string would preserve both structural and lexical checks without a second file read. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:1318-1326` |
+| R684 | **`PerformanceContractIsIsolatedFromBroadTestAndCoverageRuns` reads the container dispatcher twice.** The test loads `Invoke-SharpProofContainer.ps1` into `containerCommands` for ordering and exclusion checks, then later loads the identical path again into `coverageContainerCommands` for coverage/performance assertions. Reusing the first string would retain those independent assertions while removing the duplicate file I/O. | `SharpProof.ArchitectureTest/ArchitectureTests.cs:1654-1657,1751-1754` |
+
+R683-R684 are pending architecture-test I/O reductions. Preserve the structural-versus-lexical configuration checks and the separate performance, coverage, and ordering assertions.
