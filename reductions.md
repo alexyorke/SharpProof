@@ -135,6 +135,7 @@ the smallest relevant containerized test target passes.
 | R816 | Restore the security solution once, then run audit and build with `--no-restore` | `SharpProof.ArchitectureTest`: DependencyAutomationTests, 8 passed |
 | R817 | Reuse the container restore for the final package-consumer test invocation | `SharpProof.ArchitectureTest`: ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed, 1 passed |
 | R819 | Reuse the canonical pilot-project path set instead of rescanning relative paths for uniqueness | `SharpProof.ArchitectureTest`: PilotAuthorityTests passed |
+| R820 | Remove two outcome-family assertions implied by exact concrete outcome checks | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -6746,8 +6747,8 @@ independent.
 
 ### Status (part three hundred thirty-one)
 
-R820 is `deferred`: the assertions are completely implied, but the cleanup is
-  limited to two low-cost test lines.
+R820 is `applied`: the two redundant outcome-family assertions were removed;
+the exact concrete outcome and payload assertions remain.
 
 ## Second survey, part three hundred thirty-two: R821 - duplicate generated-domain join
 

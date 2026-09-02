@@ -32,7 +32,6 @@ public sealed class ProofKernelTests
         Assert.That(
             ((LoweredJustification)((ProvenOutcome)outcome).Core[0]).Operation,
             Is.EqualTo(secondOperation));
-        Assert.That(outcome is ProvenOutcome or RefutedOutcome, Is.True);
     }
 
     [Test]
@@ -50,7 +49,6 @@ public sealed class ProofKernelTests
         Assert.That(
             ((RefutedOutcome)outcome).Model.Assignments[fixture.Variable].Integer,
             Is.Zero);
-        Assert.That(outcome is ProvenOutcome or RefutedOutcome, Is.True);
     }
 
     [Test]
