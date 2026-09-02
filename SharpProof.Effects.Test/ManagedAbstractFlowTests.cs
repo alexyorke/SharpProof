@@ -23,19 +23,11 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var (_, root, _, analysis) = AnalyzeCalls(compilation);
         Assert.That(
             root.Descendants().OfType<IVariableDeclaratorOperation>()
                 .Any(static declarator => declarator.Initializer == null),
             Is.True);
-
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
     }
@@ -177,12 +169,7 @@ public sealed class ManagedAbstractFlowTests
                 public static string? Calls(object value) => value?.ToString();
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var graph = ControlFlowGraph.Create(root);
+        var (method, root, graph) = GetCallsContext(compilation);
         var operation = graph.Blocks
             .SelectMany(static block => block.Operations.Append(block.BranchValue)
                 .Where(static operation => operation != null)!)
@@ -274,15 +261,9 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var (_, root, _, analysis) = AnalyzeCalls(compilation);
         var assignment = root.Descendants()
             .OfType<ISimpleAssignmentOperation>().Single();
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
         Assert.That(
@@ -352,15 +333,7 @@ public sealed class ManagedAbstractFlowTests
             "public static class Sample { public static void Calls() { int value = 0;" +
             statements +
             "} }");
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-        var graph = ControlFlowGraph.Create(root);
-
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, graph, null, default);
+        var (_, _, graph, analysis) = AnalyzeCalls(compilation);
 
         Assert.That(graph.Blocks.Length, Is.LessThanOrEqualTo(ManagedAbstractFlow.MaxAnalyzedBlocks));
         using (Assert.EnterMultipleScope())
@@ -385,15 +358,7 @@ public sealed class ManagedAbstractFlowTests
             " public static void Calls(bool condition) { int value = 0;" +
             branches +
             "} }");
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-        var graph = ControlFlowGraph.Create(root);
-
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, graph, null, default);
+        var (_, _, graph, analysis) = AnalyzeCalls(compilation);
 
         Assert.That(graph.Blocks.Length, Is.GreaterThan(ManagedAbstractFlow.MaxAnalyzedBlocks));
         using (Assert.EnterMultipleScope())
@@ -418,14 +383,7 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+        var (_, _, _, analysis) = AnalyzeCalls(compilation);
 
         using (Assert.EnterMultipleScope())
         {
@@ -457,14 +415,7 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+        var (_, root, _, analysis) = AnalyzeCalls(compilation);
         var flow = analysis.Result;
         var calls = root.Descendants().OfType<IInvocationOperation>()
             .OrderBy(static call => call.Syntax.SpanStart).ToArray();
@@ -604,11 +555,7 @@ public sealed class ManagedAbstractFlowTests
                 public static bool Calls() => new Token() == null;
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var (_, root, _) = GetCallsContext(compilation);
         var binary = root.Descendants().OfType<IBinaryOperation>().Single();
 
         var value = ManagedAbstractFlow.ForCompilation(compilation)
@@ -633,16 +580,8 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var (method, root, _, analysis) = AnalyzeCalls(compilation);
         var call = root.Descendants().OfType<IInvocationOperation>().Single();
-
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
         var flow = analysis.Result;
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
@@ -667,17 +606,9 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var (method, root, _, analysis) = AnalyzeCalls(compilation);
         var sink = root.Descendants().OfType<IInvocationOperation>()
             .Single(static invocation => invocation.TargetMethod.Name == "Sink");
-
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
         Assert.That(
@@ -704,12 +635,7 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var (method, root, _) = GetCallsContext(compilation);
         var requires = root.Descendants().OfType<IInvocationOperation>()
             .Single(static invocation => invocation.TargetMethod.Name == "Requires");
         var state = ManagedAbstractFlow.ForCompilation(compilation)
@@ -737,12 +663,7 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var (method, root, _) = GetCallsContext(compilation);
         var requires = root.Descendants().OfType<IInvocationOperation>()
             .Single(static invocation => invocation.TargetMethod.Name == "Requires");
         var state = ManagedAbstractFlow.ForCompilation(compilation)
@@ -775,18 +696,10 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var (method, root, _, analysis) = AnalyzeCalls(compilation);
         var sinks = root.Descendants().OfType<IInvocationOperation>()
             .Where(static invocation => invocation.TargetMethod.Name == "Sink")
             .ToArray();
-
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
         Assert.That(sinks, Has.Length.EqualTo(2));
@@ -820,18 +733,10 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var (method, root, _, analysis) = AnalyzeCalls(compilation);
         var sinks = root.Descendants().OfType<IInvocationOperation>()
             .Where(static invocation => invocation.TargetMethod.Name == "Sink")
             .ToArray();
-
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
         Assert.That(sinks, Has.Length.EqualTo(2));
@@ -870,18 +775,10 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var (method, root, _, analysis) = AnalyzeCalls(compilation);
         var sink = root.Descendants().OfType<IInvocationOperation>()
             .Single(static invocation =>
                 invocation.TargetMethod.Name == "Sink");
-
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
         Assert.That(
@@ -965,15 +862,8 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var (method, root, _, analysis) = AnalyzeCalls(compilation);
         var sink = root.Descendants().OfType<IInvocationOperation>().Single();
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
         Assert.That(
@@ -1028,16 +918,8 @@ public sealed class ManagedAbstractFlowTests
                 }
                 """,
                 contractReference);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Calls");
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        var (method, root, _, analysis) = AnalyzeCalls(compilation);
         var sink = root.Descendants().OfType<IInvocationOperation>().Single();
-
-        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
         Assert.That(
@@ -1050,19 +932,37 @@ public sealed class ManagedAbstractFlowTests
         Assert.That(nullness, Is.EqualTo(NullnessValue.MaybeNull));
     }
 
-    private static (ManagedFlowAnalysis Analysis, IInvocationOperation Call)
-        AnalyzeSingleCall(string source)
+    private static (IMethodSymbol Method, IMethodBodyOperation Root,
+        ControlFlowGraph Graph)
+        GetCallsContext(CSharpCompilation compilation)
     {
-        var compilation = EffectTestHost.CreateCompilation(source);
         var syntax = compilation.SyntaxTrees.Single().GetRoot()
             .DescendantNodes().OfType<MethodDeclarationSyntax>()
             .Single(static method => method.Identifier.ValueText == "Calls");
         var model = compilation.GetSemanticModel(syntax.SyntaxTree);
         var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
         var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
+        return (method, root, ControlFlowGraph.Create(root));
+    }
+
+    private static (IMethodSymbol Method, IMethodBodyOperation Root,
+        ControlFlowGraph Graph, ManagedFlowAnalysis Analysis)
+        AnalyzeCalls(CSharpCompilation compilation)
+    {
+        var (method, root, graph) = GetCallsContext(compilation);
+        var analysis = ManagedAbstractFlow.ForCompilation(compilation)
+            .Analyze(method, graph, null, default);
+        return (method, root, graph, analysis);
+    }
+
+    private static (ManagedFlowAnalysis Analysis, IInvocationOperation Call)
+        AnalyzeSingleCall(string source)
+    {
+        var compilation = EffectTestHost.CreateCompilation(source);
+        var (method, root, graph) = GetCallsContext(compilation);
         var call = root.Descendants().OfType<IInvocationOperation>().Single();
         var analysis = ManagedAbstractFlow.ForCompilation(compilation)
-            .Analyze(method, ControlFlowGraph.Create(root), null, default);
+            .Analyze(method, graph, null, default);
         return (analysis, call);
     }
 
@@ -1140,11 +1040,7 @@ public sealed class ManagedAbstractFlowTests
                 }
             }
             """);
-        var syntax = compilation.SyntaxTrees.Single().GetRoot()
-            .DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        var model = compilation.GetSemanticModel(syntax.SyntaxTree);
-        var method = (IMethodSymbol)model.GetDeclaredSymbol(syntax)!;
-        var root = (IMethodBodyOperation)model.GetOperation(syntax)!;
+        var (method, root, graph) = GetCallsContext(compilation);
 
         // The body must be ACYCLIC: a loop is rejected by the IsAcyclic gate
         // before the solver ever runs, so a cyclic fixture would report Cyclic
@@ -1153,7 +1049,7 @@ public sealed class ManagedAbstractFlowTests
         var analysis = ManagedAbstractFlow.ForCompilation(compilation)
             .AnalyzeWithIterationLimitForTesting(
                 method,
-                ControlFlowGraph.Create(root),
+                graph,
                 null,
                 maxIterations: 1,
                 default);

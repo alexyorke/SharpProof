@@ -170,6 +170,7 @@ the smallest relevant containerized test target passes.
 | R618 | Share Meta-analyzer test compilation and diagnostic setup | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests passed |
 | R617 | Share managed-effect walk-depth entry/exit bookkeeping | `SharpProof.Effects.Test`: ManagedAbstractFlowTests, 34 passed |
 | R626 | Share Effects test compilation construction and diagnostics | `SharpProof.Effects.Test`: ManagedAbstractFlowTests 34; EffectAnalysisTests 147 passed |
+| R627 | Share ManagedAbstractFlow test method/operation/CFG analysis setup | `SharpProof.Effects.Test`: ManagedAbstractFlowTests, 34 passed |
 | R858 | Reuse the canonical IR variable collector in fuzz tests | `SharpProof.Fuzz.Test`: FuzzRunnerTests passed |
 | R854 | Share generated-source argument augmentation in C# formatting | PowerShell parser validation passed |
 | R855 | Share release-JSON accepted/rejected fixture assertion plumbing | `SharpProof.ArchitectureTest`: ReleaseJsonAuthorityTests passed |
@@ -4288,7 +4289,10 @@ their reference sets, assembly/source names, and typed compile failures.
 
 ### Status (part one hundred sixty-eight)
 
-R627 is a pending Effects-test harness cleanup candidate. Preserve each fixture's custom references, selected operation, entry state, convergence/budget parameters, and assertion-specific analysis; share only the repeated method/operation/CFG plumbing.
+R627 is `applied`: Effects flow tests now share method, body-operation, and CFG
+construction through `GetCallsContext` and `AnalyzeCalls`; custom references,
+selected operations, entry states, and the iteration-limit test remain local.
+ManagedAbstractFlowTests passed (34).
 
 ## Second survey, part one hundred sixty-nine: R628 - duplicated bounded-stream overflow probes
 
