@@ -198,6 +198,7 @@ the smallest relevant containerized test target passes.
 | R889 | Validate specification-pack options while collecting them, then sort once | `SharpProof.Analyzer.Test`: FinalCompilationCollectorTests passed |
 | R894 | Validate specification-pack object property sets in one pass | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R677 | Reuse acceptance’s Release production inventory in the complexity gate | `SharpProof.ArchitectureTest`: ProductionConsumersUseOneInventoryAuthority passed |
+| R638 | Share trusted-boundary attribute traversal between features and assumptions | `SharpProof.Worker.Test`: ClaimManifestBuilderTests, 50 passed |
 | R368 | Inline cacheability type checks and remove the unused `OutcomeCachePolicy` wrapper | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R369 | Move Boolean IR-term validation into the owning `IrFactory` and remove `FactoryGuards` | `SharpProof.Verify.Test`: ProofKernelTests, 14 passed |
 | R370 | Use Roslyn `LanguageVersionFacts.TryParse` for evaluated C# language versions | `SharpProof.ArchitectureTest`: Production inventory authority checks passed; parser exercised by production-complexity inventory |
@@ -4362,7 +4363,9 @@ R633 is a pending fuzz-oracle infrastructure reduction candidate. Preserve colle
 
 ### Status (part one hundred seventy-nine)
 
-R638 is a pending compiler-collector traversal reduction candidate. Preserve scope order, trusted-attribute filtering, selected-feature behavior, and assumption ID/rank ordering; share only the one per-target trusted-attribute enumeration.
+R638 is `applied`: each claim-manifest target now materializes its trusted
+attributes once and reuses that ordered sequence for feature selection and
+assumption evidence, preserving filtering and rank ordering. ClaimManifestBuilderTests passed (50).
 
 ## Second survey, part one hundred eighty: R639 - repeated specification-pack admission validation
 

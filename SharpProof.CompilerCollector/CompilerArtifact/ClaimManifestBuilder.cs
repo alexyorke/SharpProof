@@ -64,9 +64,15 @@ internal sealed partial class ClaimManifestBuilder(
         var usesCompanion = resolution.UsesCompanion;
         var postconditions = CreatePostconditions(
             target, source, inventory, usesCompanion, callableId);
-        var selected = SelectFeatures(target, resolution);
+        var trustedAttributes = TrustedAttributes(target).ToImmutableArray();
+        var selected = SelectFeatures(target, resolution, trustedAttributes);
         var assumptions = CreateAssumptions(
-            target, source, inventory, usesCompanion, callableId);
+            target,
+            source,
+            inventory,
+            usesCompanion,
+            callableId,
+            trustedAttributes);
         if (postconditions.IsDefaultOrEmpty && selected.IsDefaultOrEmpty && assumptions.IsDefaultOrEmpty)
         {
             return null;
@@ -238,12 +244,13 @@ internal sealed partial class ClaimManifestBuilder(
 
     private ImmutableArray<WorkerSelectedFeature> SelectFeatures(
         IMethodSymbol method,
-        EffectiveContractSourceResolution resolution)
+        EffectiveContractSourceResolution resolution,
+        ImmutableArray<(ISymbol Scope, AttributeData Attribute)> trustedAttributes)
     {
         var selected = _attributes.Select(
             method,
             resolution.HasSelectedContractIntent,
-            TrustedAttributes(method).Any());
+            !trustedAttributes.IsDefaultOrEmpty);
         var result = ImmutableArray.CreateBuilder<WorkerSelectedFeature>(2);
         if (EffectsEnabled && (selected & ContractSelectionFeatures.Effects) != 0)
         {
@@ -263,7 +270,8 @@ internal sealed partial class ClaimManifestBuilder(
         IMethodSymbol source,
         ContractClauseInventory inventory,
         bool usesCompanion,
-        string callableId)
+        string callableId,
+        ImmutableArray<(ISymbol Scope, AttributeData Attribute)> trustedAttributes)
     {
         var candidates = ImmutableArray.CreateBuilder<AssumptionCandidate>();
         if (ContractsEnabled)
@@ -294,7 +302,7 @@ internal sealed partial class ClaimManifestBuilder(
                 }
             }
         }
-        foreach (var (scope, attribute) in TrustedAttributes(target))
+        foreach (var (scope, attribute) in trustedAttributes)
         {
             candidates.Add(new AssumptionCandidate(
                 WorkerAssumptionKind.TrustedBoundary,
