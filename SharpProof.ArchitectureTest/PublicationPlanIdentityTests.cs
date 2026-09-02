@@ -11,7 +11,6 @@ public sealed class PublicationPlanIdentityTests
     [TestCase("two-bundle", true)]
     [TestCase("changed-symbol", false)]
     [TestCase("stale-manifest", false)]
-    [TestCase("stale-sbom", false)]
     [TestCase("missing-identity", false)]
     [TestCase("duplicate-identity", false)]
     [TestCase("version-syntax", true)]

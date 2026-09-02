@@ -57,8 +57,8 @@ reference packages.
 
 Each `.nupkg` is PDB-free and has one matching `.snupkg`; together the release
 set is exactly three main packages and three symbol packages at one version.
-Release evidence includes SPDX 2.3, the release manifest, container-toolchain
-identity, and exact source commit. Publication promotes
+Release evidence includes the release manifest, container-toolchain identity,
+and exact source commit. Publication promotes
 the tested bytes in dependency order:
 `SharpProof.Attributes -> SharpProof -> SharpProof.Verifier`.
 Every main package must be absent before publication, and duplicate skipping is

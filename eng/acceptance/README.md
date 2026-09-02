@@ -78,7 +78,7 @@ are implemented for the admitted subset, and package validation covers the
 exact Attributes -> portable analyzer -> Linux container verifier dependency
 chain.
 The release workflow validates and promotes the already-tested bytes with
-SBOM, repository, package-version, and tag checks. Optional SARIF 2.1.0
+repository, package-version, and tag checks. Optional SARIF 2.1.0
 projects only validated worker responses. Owner-enforced
 branch/tag/environment protection and exact-candidate publication remain owner
 release gates.

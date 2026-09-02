@@ -241,8 +241,8 @@ function Get-ValidatedRelease {
     $artifacts = @(
         Get-RequiredProperty $manifest 'artifacts' 'Release manifest'
     )
-    if ($artifacts.Count -ne 7) {
-        throw 'Release manifest must contain exactly seven artifacts.'
+    if ($artifacts.Count -ne 6) {
+        throw 'Release manifest must contain exactly six artifacts.'
     }
     Test-SharpProofReleaseBundleTopology `
         -Directory $Directory `
@@ -264,7 +264,7 @@ function Get-ValidatedRelease {
             'bytes' `
             "Release artifact '$fileName'")
         if (-not $seenFileNames.Add($fileName) -or
-            $kind -notin @('package', 'symbols', 'sbom') -or
+            $kind -notin @('package', 'symbols') -or
             $bytes -lt 0) {
             throw "Release artifact metadata is invalid: '$fileName'."
         }
@@ -286,14 +286,8 @@ function Get-ValidatedRelease {
                 [string]$_.kind -in @('package', 'symbols')
             }
     )
-    $sbomArtifacts = @(
-        $artifacts |
-            Where-Object { [string]$_.kind -eq 'sbom' }
-    )
-    if ($packageArtifacts.Count -ne 6 -or
-        $sbomArtifacts.Count -ne 1 -or
-        [string]$sbomArtifacts[0].fileName -ne 'SharpProof.spdx.json') {
-        throw 'Release manifest has an invalid package, symbol, or SBOM graph.'
+    if ($packageArtifacts.Count -ne 6) {
+        throw 'Release manifest has an invalid package or symbol graph.'
     }
 
     $packages = [Collections.Generic.List[object]]::new()
@@ -400,77 +394,6 @@ function Get-ValidatedRelease {
         (@($packageOrder | Sort-Object) -join '|')) {
         throw 'Release manifest contains an unexpected package ID.'
     }
-
-    $dependencyGraph = @(Get-SharpProofPackageDependencyGraph `
-        -PackagePaths @($packages | ForEach-Object {
-            $_.mainPath
-            $_.symbolsPath
-        }))
-    $licenseGraph = @(Get-SharpProofPackageLicenseGraph `
-        -PackagePaths @($packages | ForEach-Object {
-            $_.mainPath
-            $_.symbolsPath
-        }))
-    $sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
-        -PackageLicenseGraph $licenseGraph `
-        -PackageVersion $version `
-        -ThirdPartyComponents $catalogComponents)
-    $sbomPath = Get-ArtifactPath `
-        -Directory $Directory `
-        -FileName ([string]$sbomArtifacts[0].fileName)
-    $sbom = Read-SharpProofCanonicalReleaseJson `
-        -Path $sbomPath `
-        -DocumentType Spdx
-    if ($null -eq $sbom.PSObject.Properties['relationships'] -or
-        $null -eq $sbom.PSObject.Properties['documentDescribes'] -or
-        $null -eq $sbom.PSObject.Properties['packages']) {
-        throw 'Release SBOM has no complete package topology.'
-    }
-    Test-SharpProofSbomReleaseIdentity `
-        -Sbom $sbom `
-        -RepositoryRoot $repositoryRoot `
-        -Version $version `
-        -RepositoryCommit $RepositoryCommit
-    foreach ($packageId in $packageOrder) {
-        $sbomPackages = @($sbom.packages | Where-Object {
-            [string]$_.name -ceq $packageId -and
-            [string]$_.versionInfo -ceq $version
-        })
-        $manifestPackages = @($packageArtifacts | Where-Object {
-            [string]$_.kind -ceq 'package' -and
-            [string]$_.packageId -ceq $packageId
-        })
-        if ($sbomPackages.Count -ne 1 -or $manifestPackages.Count -ne 1) {
-            throw "Release SBOM package identity is invalid: $packageId"
-        }
-    }
-    Test-SharpProofSbomTopology `
-        -SbomPackages @($sbom.packages) `
-        -DocumentDescribes @($sbom.documentDescribes) `
-        -Relationships @($sbom.relationships) `
-        -FirstPartyPackageIds $packageOrder `
-        -PackageVersion $version `
-        -Components $catalogComponents `
-        -DependencyGraph $dependencyGraph
-    Test-SharpProofSbomArtifactScope `
-        -Artifacts $packageArtifacts `
-        -SbomPackages @($sbom.packages) `
-        -DocumentDescribes @($sbom.documentDescribes) `
-        -FirstPartyPackageIds $packageOrder `
-        -PackageVersion $version
-    Test-SharpProofSbomAttestationWorkflow -Workflow (
-        Get-Content -LiteralPath (Join-Path `
-            $repositoryRoot '.github/workflows/package-consumers.yml') -Raw)
-    Test-SharpProofSbomDependencyGraph `
-        -Relationships @($sbom.relationships) `
-        -DependencyGraph $dependencyGraph
-    Test-SharpProofSbomComponentGraph `
-        -SbomPackages @($sbom.packages) `
-        -Relationships @($sbom.relationships) `
-        -Components $catalogComponents
-    Test-SharpProofSbomLicenseGraph `
-        -SbomPackages @($sbom.packages) `
-        -LicenseGraph $sbomLicenseGraph
 
     return [pscustomobject][ordered]@{
         version = $version

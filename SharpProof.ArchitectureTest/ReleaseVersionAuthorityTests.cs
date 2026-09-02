@@ -11,7 +11,6 @@ public sealed class ReleaseVersionAuthorityTests
     [TestCase("case-only-prerelease", false)]
     [TestCase("mixed-package", false)]
     [TestCase("stale-manifest", false)]
-    [TestCase("stale-sbom", false)]
     [TestCase("stale-plan", false)]
     public async Task ReleaseVersionProjectionIsOwnedByReleaseProps(
         string mutation,

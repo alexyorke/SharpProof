@@ -16,7 +16,7 @@ images, verified Z3 payload layout, and package identities.
 | Verifier cancellation | Before-start, startup, active verification, and publication cancellation tests pass with no surviving worker |
 | Native SMT closure | Packaged `libz3.so` path and size match the toolchain catalog and hostile ambient library paths cannot redirect loading |
 | Package graph | Exactly `SharpProof.Attributes`, `SharpProof`, and `SharpProof.Verifier`, with one analyzer and one collector entry point |
-| Release gates | Debug, Release, acceptance, coverage, mutation, fuzz, corpus, performance, package, SBOM, pilots, and publication dry run pass in-container |
+| Release gates | Debug, Release, acceptance, coverage, mutation, fuzz, corpus, performance, package, pilots, and publication dry run pass in-container |
 
 Portable analyzer packages remain operating-system-neutral, but their declared
 framework consumers are restored and built only inside the canonical

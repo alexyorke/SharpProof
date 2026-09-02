@@ -388,8 +388,7 @@ path. The worker is isolated in
 `SharpProof.Verifier`; the portable `SharpProof` package contains only
 analyzer/generator assets and depends exactly on `SharpProof.Attributes`. Each
 package has a portable-PDB symbol package with SourceLink, and the package
-workflow records exact package identities, an SPDX SBOM, and GitHub
-provenance/SBOM attestations. The corpus reports explicit, silent, and total
+workflow records exact package identities. The corpus reports explicit, silent, and total
 semantic Unknown rates. A `Supported` case producing `Unknown` or
 `SilentUnknown` fails with zero tolerance. The supported-case and supported
 OSS-method floors cannot decrease, while total and per-reason Unknown counts

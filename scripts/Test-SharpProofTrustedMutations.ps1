@@ -1714,34 +1714,6 @@ $mutations = @(
         Filter = 'FullyQualifiedName~BareRethrowBelongsOnlyToItsNearestCatch'
     },
     [pscustomobject]@{
-        Name = 'release-sbom-exact-license-authority'
-        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
-        Original = '            [string]$matches[0].licenseDeclared -cne'
-        Mutated = '            $false -and [string]$matches[0].licenseDeclared -cne'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~SbomLicensesMatchTheExactPackageAuthority'
-    },
-    [pscustomobject]@{
-        Name = 'release-sbom-exact-release-identity'
-        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
-        Original = '        [string]$Sbom.name -cne [string]$expected.Name -or'
-        Mutated = '        [string]$Sbom.name -ceq [string]$expected.Name -and'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~SbomReleaseIdentityIsExact'
-    },
-    [pscustomobject]@{
-        Name = 'release-third-party-component-projection'
-        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
-        Original = (@'
-    if ($actual.Count -ne $expected.Count -or
-        ($actual | ConvertTo-Json -Depth 4 -Compress) -cne
-            ($expected | ConvertTo-Json -Depth 4 -Compress)) {
-'@).TrimEnd()
-        Mutated = '    if ($false) {'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~ThirdPartyInventoryMatchesCatalogPayloadAndSbomOwnership'
-    },
-    [pscustomobject]@{
         Name = 'protocol-request-bound-cache-state'
         File = 'SharpProof.Worker.Protocol\ProtocolJson.cs'
         Original = '        var inactive = !request.Cache.Enabled ||'
@@ -1801,32 +1773,6 @@ $mutations = @(
         Mutated = '            true,'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~DecoderRejectsMetadataOutsideTheCanonicalEncoderImage'
-    },
-    [pscustomobject]@{
-        Name = 'release-exact-spdx-topology'
-        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
-        Original = (@'
-    if ($actualRelationships.Count -ne $expectedRelationships.Count -or
-        ($actualRelationships | ConvertTo-Json -Compress) -cne
-            ($expectedRelationships | ConvertTo-Json -Compress)) {
-'@).TrimEnd()
-        Mutated = '    if ($false) {'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~SbomTopologyIsTheExactAuthenticatedProjection'
-    },
-    [pscustomobject]@{
-        Name = 'release-exact-nuget-purl-authority'
-        File = 'scripts\Test-SharpProofPackageDependencies.ps1'
-        Original = (@'
-            [string]$row.referenceLocator -cne
-                (Get-SharpProofNuGetPurl `
-'@).TrimEnd()
-        Mutated = (@'
-            $false -and [string]$row.referenceLocator -cne
-                (Get-SharpProofNuGetPurl `
-'@).TrimEnd()
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~SymbolPackagesAreProvenanceArtifactsButNotSbomSubjects'
     },
     [pscustomobject]@{
         Name = 'worker-cache-post-publish-rollback'
@@ -1936,14 +1882,6 @@ $mutations = @(
         Mutated = '            true &&'
         Project = 'SharpProof.Worker.Test\SharpProof.Worker.Test.csproj'
         Filter = 'FullyQualifiedName~CompilerDiagnosticCodesRequireTheExactReservedNamespace'
-    },
-    [pscustomobject]@{
-        Name = 'publication-plan-strict-sbom-semantics'
-        File = 'scripts\Publish-SharpProofRelease.ps1'
-        Original = '    Test-SharpProofSbomTopology `'
-        Mutated = '    # strict SBOM topology validation removed'
-        Project = 'SharpProof.ArchitectureTest\SharpProof.ArchitectureTest.csproj'
-        Filter = 'FullyQualifiedName~PublicationPlanConsumesStrictReleaseSemanticsBeforeActions'
     },
     [pscustomobject]@{
         Name = 'documentation-support-contract-disconnected'

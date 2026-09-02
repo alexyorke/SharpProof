@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet(
         'valid-disjoint','existing-output','main-package','symbol-package',
-        'manifest','sbom','fixture-input','relative-dot-alias',
+        'manifest','fixture-input','relative-dot-alias',
         'absolute-alias','symlink-alias','hardlink-alias','reserved-name',
         'writer-failure','post-write-mutation')]
     [string]$Mutation
@@ -28,7 +28,7 @@ try {
             'SharpProof.Attributes.1.0.0-preview.1.snupkg',
             'SharpProof.Verifier.1.0.0-preview.1.nupkg',
             'SharpProof.Verifier.1.0.0-preview.1.snupkg',
-            'SharpProof.release.json','SharpProof.spdx.json')) {
+            'SharpProof.release.json')) {
         [IO.File]::WriteAllText((Join-Path $packages $name), "input:$name")
     }
     $fixtureInput = Join-Path $fixture 'remote.json'
@@ -41,7 +41,6 @@ try {
         'main-package' { $planPath = Join-Path $packages 'SharpProof.1.0.0-preview.1.nupkg' }
         'symbol-package' { $planPath = Join-Path $packages 'SharpProof.1.0.0-preview.1.snupkg' }
         'manifest' { $planPath = Join-Path $packages 'SharpProof.release.json' }
-        'sbom' { $planPath = Join-Path $packages 'SharpProof.spdx.json' }
         'fixture-input' { $planPath = $fixtureInput }
         'relative-dot-alias' {
             $planPath = Join-Path $packages './SharpProof.release.json'
@@ -53,7 +52,7 @@ try {
             $planPath = Join-Path $outputRoot 'link.json'
             [IO.File]::CreateSymbolicLink(
                 $planPath,
-                (Join-Path $packages 'SharpProof.spdx.json')) | Out-Null
+                (Join-Path $packages 'SharpProof.release.json')) | Out-Null
         }
         'hardlink-alias' {
             $planPath = Join-Path $outputRoot 'hard.json'

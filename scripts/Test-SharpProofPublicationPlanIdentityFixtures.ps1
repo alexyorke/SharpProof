@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('canonical','changed-symbol','stale-manifest','stale-sbom',
+    [ValidateSet('canonical','changed-symbol','stale-manifest',
         'missing-identity','duplicate-identity',
         'version-syntax','commit-syntax','string-schema','decimal-bytes',
         'array-version','array-commit','array-artifact-text',
@@ -82,13 +82,6 @@ try {
             })
         }
     }
-    $sbom = Join-Path $root 'SharpProof.spdx.json'
-    [IO.File]::WriteAllText($sbom, '{"spdxVersion":"SPDX-2.3"}')
-    $sbomFile = Get-Item $sbom
-    $artifactRows.Add([pscustomobject][ordered]@{
-        fileName = $sbomFile.Name
-        bytes = [int64]$sbomFile.Length
-    })
     $manifestPath = Join-Path $root 'SharpProof.release.json'
     $manifest = [pscustomobject][ordered]@{
         packageVersion = $version
@@ -193,7 +186,6 @@ try {
     switch ($Mutation) {
         'changed-symbol' { [IO.File]::AppendAllText($packages[0].symbolsPath, 'changed') }
         'stale-manifest' { [IO.File]::AppendAllText($manifestPath, 'changed') }
-        'stale-sbom' { [IO.File]::AppendAllText($sbom, 'changed') }
         'missing-identity' { $plan.artifacts = @($plan.artifacts | Select-Object -Skip 1) }
         'duplicate-identity' { $plan.artifacts[1].path = $plan.artifacts[0].path }
         'string-schema' { $plan.schemaVersion = '2' }

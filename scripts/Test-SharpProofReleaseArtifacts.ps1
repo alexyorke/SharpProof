@@ -16,25 +16,6 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseBundle.ps1')
 . (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 
-function Get-SpdxPackageId {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Name,
-
-        [Parameter()]
-        [string]$Version
-    )
-
-    $suffix = if ([string]::IsNullOrWhiteSpace($Version)) {
-        $Name
-    }
-    else {
-        "$Name-$Version"
-    }
-    return 'SPDXRef-Package-' + (
-        $suffix -replace '[^A-Za-z0-9.-]', '-')
-}
-
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $releaseVersion = Get-SharpProofReleaseVersion `
     -RepositoryRoot $repositoryRoot
@@ -80,11 +61,10 @@ if ([string]$manifest.repository.type -ne 'git' -or
 }
 
 $artifacts = @($manifest.artifacts)
-if ($artifacts.Count -ne 7 -or
+if ($artifacts.Count -ne 6 -or
     @($artifacts | Where-Object { $_.kind -eq 'package' }).Count -ne 3 -or
-    @($artifacts | Where-Object { $_.kind -eq 'symbols' }).Count -ne 3 -or
-    @($artifacts | Where-Object { $_.kind -eq 'sbom' }).Count -ne 1) {
-    throw 'Release evidence must contain three packages, three symbol packages, and one SBOM.'
+    @($artifacts | Where-Object { $_.kind -eq 'symbols' }).Count -ne 3) {
+    throw 'Release evidence must contain three packages and three symbol packages.'
 }
 Test-SharpProofReleaseBundleTopology `
     -Directory $resolvedSource `
@@ -113,8 +93,7 @@ $expectedNames = @($artifacts |
 $actualNames = @(
     Get-ChildItem -LiteralPath $resolvedSource -File |
         Where-Object {
-            $_.Extension -in @('.nupkg', '.snupkg') -or
-            $_.Name -eq 'SharpProof.spdx.json'
+            $_.Extension -in @('.nupkg', '.snupkg')
         } |
         ForEach-Object { $_.Name } |
         Sort-Object
@@ -181,133 +160,6 @@ foreach ($packageId in $expectedPackageIds) {
         -PackageVersion $expectedVersion `
         -RepositoryCommit $head
 }
-$dependencyGraph = @(Get-SharpProofPackageDependencyGraph `
-    -PackagePaths @(
-        $artifacts |
-            Where-Object { [string]$_.kind -in @('package', 'symbols') } |
-            ForEach-Object {
-                Join-Path $resolvedSource ([string]$_.fileName)
-            }
-    ))
-$licenseGraph = @(Get-SharpProofPackageLicenseGraph `
-    -PackagePaths @(
-        $artifacts |
-            Where-Object { [string]$_.kind -in @('package', 'symbols') } |
-            ForEach-Object {
-                Join-Path $resolvedSource ([string]$_.fileName)
-            }
-    ))
-$sbomLicenseGraph = @(Get-SharpProofSbomLicenseGraph `
-    -PackageLicenseGraph $licenseGraph `
-    -PackageVersion $expectedVersion `
-    -ThirdPartyComponents $catalogComponents)
-$sbomArtifact = @(
-    $artifacts |
-        Where-Object { [string]$_.kind -eq 'sbom' }
-)
-$sbomPath = Join-Path $resolvedSource ([string]$sbomArtifact[0].fileName)
-$sbom = Read-SharpProofCanonicalReleaseJson `
-    -Path $sbomPath `
-    -DocumentType Spdx
-if ($null -eq $sbom.PSObject.Properties['spdxVersion'] -or
-    [string]$sbom.spdxVersion -ne 'SPDX-2.3' -or
-    $null -eq $sbom.PSObject.Properties['dataLicense'] -or
-    [string]$sbom.dataLicense -ne 'CC0-1.0' -or
-    $null -eq $sbom.PSObject.Properties['packages'] -or
-    $null -eq $sbom.PSObject.Properties['documentDescribes'] -or
-    $null -eq $sbom.PSObject.Properties['relationships']) {
-    throw 'Release SBOM is not a complete supported SPDX 2.3 document.'
-}
-Test-SharpProofSbomReleaseIdentity `
-    -Sbom $sbom `
-    -RepositoryRoot $repositoryRoot `
-    -Version $expectedVersion `
-    -RepositoryCommit $head
-$sbomPackages = @($sbom.packages)
-$documentDescribes = @($sbom.documentDescribes)
-$relationships = @($sbom.relationships)
-Test-SharpProofSbomTopology `
-    -SbomPackages $sbomPackages `
-    -DocumentDescribes $documentDescribes `
-    -Relationships $relationships `
-    -FirstPartyPackageIds $expectedPackageIds `
-    -PackageVersion $expectedVersion `
-    -Components $catalogComponents `
-    -DependencyGraph $dependencyGraph
-Test-SharpProofSbomArtifactScope `
-    -Artifacts $artifacts `
-    -SbomPackages $sbomPackages `
-    -DocumentDescribes $documentDescribes `
-    -FirstPartyPackageIds $expectedPackageIds `
-    -PackageVersion $expectedVersion
-Test-SharpProofSbomAttestationWorkflow -Workflow (
-    Get-Content -LiteralPath (Join-Path `
-        $repositoryRoot '.github/workflows/package-consumers.yml') -Raw)
-$componentKeys = @(
-    $catalogComponents |
-        ForEach-Object {
-            [string]$_.id + "`0" + [string]$_.version
-        } |
-        Sort-Object -Unique
-)
-if ($sbomPackages.Count -ne
-    ($expectedPackageIds.Count + $componentKeys.Count) -or
-    $documentDescribes.Count -ne $expectedPackageIds.Count) {
-    throw 'Release SBOM does not contain the exact package/component graph.'
-}
-foreach ($packageId in $expectedPackageIds) {
-    $matches = @(
-        $sbomPackages |
-            Where-Object {
-                [string]$_.name -eq $packageId -and
-                [string]$_.versionInfo -eq $expectedVersion
-            }
-    )
-    if ($matches.Count -ne 1) {
-        throw "Release SBOM package identity is invalid: $packageId"
-    }
-    $spdxId = [string]$matches[0].SPDXID
-    if (@($documentDescribes |
-            Where-Object { [string]$_ -eq $spdxId }).Count -ne 1) {
-        throw "Release SBOM does not describe '$packageId'."
-    }
-}
-foreach ($key in $componentKeys) {
-    $parts = $key.Split("`0")
-    if (@($sbomPackages |
-            Where-Object {
-                [string]$_.name -eq $parts[0] -and
-                [string]$_.versionInfo -eq $parts[1]
-            }).Count -ne 1) {
-        throw "Release SBOM component identity is invalid: $($parts[0])"
-    }
-}
-foreach ($component in $catalogComponents) {
-    $containerId = Get-SpdxPackageId -Name ([string]$component.packageId)
-    $componentId = Get-SpdxPackageId `
-        -Name ([string]$component.id) `
-        -Version ([string]$component.version)
-    if (@($relationships |
-            Where-Object {
-                [string]$_.spdxElementId -eq $containerId -and
-                [string]$_.relationshipType -eq 'CONTAINS' -and
-                [string]$_.relatedSpdxElement -eq $componentId
-            }).Count -ne 1) {
-        throw (
-            "Release SBOM containment is invalid: " +
-            "$($component.packageId)/$($component.id)")
-    }
-}
-Test-SharpProofSbomDependencyGraph `
-    -Relationships $relationships `
-    -DependencyGraph $dependencyGraph
-Test-SharpProofSbomComponentGraph `
-    -SbomPackages $sbomPackages `
-    -Relationships $relationships `
-    -Components $catalogComponents
-Test-SharpProofSbomLicenseGraph `
-    -SbomPackages $sbomPackages `
-    -LicenseGraph $sbomLicenseGraph
 if (@($manifest.thirdPartyComponents).Count -eq 0 -or
     @($manifest.thirdPartyComponents |
         Where-Object { [string]$_.license -ne 'MIT' }).Count -ne 0) {

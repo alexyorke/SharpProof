@@ -303,17 +303,14 @@ from compiler-produced IR, and candidate refutations receive independent
 whole-body replay. The three-package split is complete. Each package has a
 matching portable-PDB `.snupkg` with SourceLink bound to the package repository
 commit, and package builds run SDK package validation. The package workflow
-publishes the six NuGet artifacts with an SPDX 2.3 package/component SBOM and
-SLSA build-provenance and SBOM
-attestations for canonical `master` builds. Pull requests do not receive OIDC
-or attestation-write permission.
+publishes the six NuGet artifacts for canonical `master` builds.
 
 The remaining integration limits are owner configuration of protected tags
 and the private/public NuGet environments, the first publications, and broader
 host qualification. Deterministic SARIF 2.1.0 is available as an opt-in
 projection of the validated worker response. The workflow already promotes
 only the tested bytes after revalidating tag, version, master ancestry,
-predecessor-tag order, SBOM, repository identity, and package
+predecessor-tag order, repository identity, and package
 inventory. Before publication, each of the three target V3 main-package
 identities at the release version must be absent. Main and symbol packages are
 published separately in dependency order without duplicate skipping. The
@@ -322,7 +319,7 @@ collision is detected by the push and fails the release. Any partial or
 conflicting publication requires a new version. These limits are not
 worker-side compilation reconstruction, postcondition-counterexample replay,
 the admitted allocation/capability/exception effect replay, package separation,
-SARIF, or release-artifact provenance work. Replay support for receiver-field,
+SARIF, or external release-artifact attestation work. Replay support for receiver-field,
 user-exception, conditional, and other effect events remains an explicit
 preview.2 blocker.
 

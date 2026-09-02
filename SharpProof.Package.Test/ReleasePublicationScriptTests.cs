@@ -620,7 +620,6 @@ public sealed class ReleasePublicationScriptTests
     }
 
     [TestCase("foreign")]
-    [TestCase("z3-byte")]
     [TestCase("duplicate-first-party")]
     [TestCase("missing-managed")]
     [TestCase("missing-native")]

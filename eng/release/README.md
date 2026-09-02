@@ -21,7 +21,7 @@ qualification to:
 - base image, SDK, PowerShell, Z3 archive, managed Z3, and `libz3.so` inputs;
 - the exact three-package graph and package/symbol-package identities;
 - deterministic Debug/Release, acceptance, fuzz, corpus, performance,
-  coverage, mutation, dependency, SBOM, and publication-plan evidence; and
+  coverage, mutation, dependency, and publication-plan evidence; and
 - five reviewed pilot reports from the same tested package bytes.
 
 All verifier and portable-consumer gates execute in the canonical container.

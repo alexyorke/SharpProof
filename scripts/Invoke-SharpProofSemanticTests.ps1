@@ -194,7 +194,6 @@ $architectureFixtures = @(
     'ProductionInventoryAuthorityTests',
     'PublicationDestinationAuthorityTests',
     'PublicationPlanIdentityTests',
-    'PublicationPlanSemanticAuthorityTests',
     'PublicationPlanTopologyTests',
     'ReleaseAuthorityClosureTests',
     'ReleaseConfigurationScriptTests',
@@ -203,8 +202,6 @@ $architectureFixtures = @(
     'ReleaseQualificationMatrixTests',
     'ReleaseTagValidationTests',
     'ReleaseVersionAuthorityTests',
-    'SbomReleaseIdentityTests',
-    'SbomSymbolArtifactScopeTests',
     'StandaloneGateEvidenceTests',
     'VerifierPublicationTransactionTests'
 )

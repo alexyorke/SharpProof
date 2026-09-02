@@ -143,8 +143,7 @@ effect candidates still fail closed as typed `Unknown`, and effect results
 remain noncacheable. Worker protocol 11, cache schema 13, relational-summary
 schema version 2, and specification-pack schema version 1 carry the current
 wire contract. The three-package split, portable SourceLink symbols,
-package validation, SPDX 2.3 package/component SBOM
-generation, separately permissioned GitHub build/SBOM attestations, immutable
+package validation, immutable
 tagged-byte validation, trusted-publishing workflow, package-backed sample
 matrix, and exact public API XML coverage are implemented. The tag workflow
 requires checked-in version equality, master ancestry, and predecessor-tag

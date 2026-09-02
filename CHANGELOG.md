@@ -17,13 +17,11 @@ contain documented breaking changes.
 - Three exact-version packages for the contract API, portable analyzer and
   generator, and container-only Linux amd64 verifier.
 - Portable-PDB symbol packages with SourceLink bound to the packaged commit.
-- Deterministic SHA-256 release manifests, SPDX 2.3 package/component SBOM
-  generation, restored-dependency version checks, and separately permissioned
-  GitHub build-provenance and SBOM attestations.
+- Deterministic release manifests and restored-dependency version checks.
 - Central package versions, dependency auditing, coverage baselines,
   changed-TCB coverage enforcement, retained/rotating fuzz campaigns, and
   scheduled security and acceptance workflows.
-- Immutable tag/package/version/hash, master-ancestry, predecessor-order, and
+- Immutable tag/package/version, master-ancestry, predecessor-order, and
   full-release-delta coverage validation plus an owner-gated NuGet
   promotion workflow that sends `1.0.0-preview.1` to a protected private feed,
   then uses trusted publishing for public `preview.2`, `rc.1`, and `1.0.0`

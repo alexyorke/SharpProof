@@ -16,12 +16,12 @@ Current architecture:
   `SharpProof.Verifier`.
 
 Static acceptance is green for deterministic generation, schema/catalog pins,
-the 254-entry trusted mutation catalog, the 348-path TCB inventory, frozen
+the 248-entry trusted mutation catalog, the 348-path TCB inventory, frozen
 preview interface, and structural complexity. Broad Debug and full Release
 acceptance are also green.
 
 The audit document fixes its baseline and records completed cleanup rather than
-acting as an active queue. Exact-commit mutation, package, pilot, SBOM, and
+acting as an active queue. Exact-commit mutation, package, pilot, and
 publication-plan results are generated after the final source commit and remain
 external evidence so that documenting them does not invalidate the commit they
 qualify. NuGet credentials, protected tags, release environments, publication,

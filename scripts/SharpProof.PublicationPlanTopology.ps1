@@ -54,9 +54,8 @@ function New-SharpProofPublicationInputSnapshot {
     }
     $files = [Collections.Generic.List[IO.FileInfo]]::new()
     foreach ($file in Get-ChildItem -LiteralPath $packageRoot -File) {
-        if ($file.Extension -in @('.nupkg', '.snupkg') -or
-            $file.Name -in @(
-                'SharpProof.release.json','SharpProof.spdx.json')) {
+            if ($file.Extension -in @('.nupkg', '.snupkg') -or
+            $file.Name -in @('SharpProof.release.json')) {
             $files.Add($file)
         }
     }
@@ -92,7 +91,7 @@ function Assert-SharpProofPublicationPlanTopology {
         [Parameter(Mandatory = $true)][object]$InputSnapshot
     )
 
-    $reserved = @('SharpProof.release.json','SharpProof.spdx.json')
+    $reserved = @('SharpProof.release.json')
     if ($reserved -ccontains [IO.Path]::GetFileName($OutputPath)) {
         throw 'PlanOutputPath uses a reserved release-evidence filename.'
     }

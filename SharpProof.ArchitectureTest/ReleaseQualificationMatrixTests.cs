@@ -100,8 +100,7 @@ public sealed partial class ReleaseQualificationMatrixTests
         var packages = Enumerable.Range(0, 6).Select(index => new
         {
             fileName = $"package-{index}.nupkg",
-            bytes = 1,
-            sha256 = new string((char)('a' + index), 64)
+            bytes = 1
         }).ToArray();
 
         async Task<int> WriteAsync(string commit, string osFamily, int count)
@@ -180,8 +179,7 @@ public sealed partial class ReleaseQualificationMatrixTests
         var packages = Enumerable.Range(0, 6).Select(index => new
         {
             fileName = $"package-{index}.nupkg",
-            bytes = 1,
-            sha256 = new string((char)('a' + index), 64)
+            bytes = 1
         }).ToArray();
 
         async Task<int> WriteAsync(string reviewStatus)

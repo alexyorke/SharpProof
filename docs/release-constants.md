@@ -35,7 +35,7 @@ The acceptance script reads the MSBuild XML and rejects drift.
 ## Derived measurements
 
 Source complexity, TCB inventory structure, generated-output shape, package
-layout, SBOM structure, and release evidence are computed. They are never
+layout, and release evidence are computed. They are never
 copied into production behavior. Checked-in ratchets are reviewed upper bounds
 or expected structural values, and their scripts recompute the current value
 before a gate can pass.

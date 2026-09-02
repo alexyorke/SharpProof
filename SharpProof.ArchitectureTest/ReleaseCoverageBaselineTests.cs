@@ -14,8 +14,7 @@ public sealed class ReleaseCoverageBaselineTests
     [
         "      - package",
         "      - container-verifier",
-        "      - security",
-        "      - attest"
+        "      - security"
     ];
 
     [Test]
@@ -30,7 +29,7 @@ public sealed class ReleaseCoverageBaselineTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(workflow, Does.Not.Contain("always() &&"));
-            Assert.That(workflow, Does.Contain("- attest"));
+            Assert.That(workflow, Does.Not.Contain("actions/attest"));
             foreach (var job in s_upstreamJobs)
             {
                 Assert.That(workflow, Does.Contain(job), job);

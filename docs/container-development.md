@@ -48,8 +48,8 @@ Git to resolve its comparison ref to an exact commit:
 ```
 
 The workflows add only GitHub-hosted concerns such as event-to-comparison-ref
-selection, cache transport, artifact upload, provenance attestation, OIDC, and
-protected publication environments. Gate selection and ordering live in the
+selection, cache transport, artifact upload, and protected publication
+environments. Gate selection and ordering live in the
 container pipeline profiles, so reproducing CI does not require translating
 workflow YAML.
 

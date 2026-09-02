@@ -95,51 +95,6 @@ try {
         "  `"packageVersion`": `"1.0.0-preview.1`",`n  `"schemaVersion`": 2,")) ReleaseManifest
     Assert-Rejected manifest-whitespace ($manifestJson.Replace('  "schemaVersion"', '    "schemaVersion"')) ReleaseManifest
 
-    $spdx = [pscustomobject][ordered]@{
-        spdxVersion = 'SPDX-2.3'; dataLicense = 'CC0-1.0'; SPDXID = 'SPDXRef-DOCUMENT'
-        name = 'SharpProof-1.0.0-preview.1'; documentNamespace = 'https://example.invalid/sbom'
-        creationInfo = [pscustomobject][ordered]@{
-            created = '2026-01-01T00:00:00Z'; creators = @('Tool: SharpProof release evidence')
-            comment = 'Timestamp is derived from the source commit for reproducibility.'
-        }
-        documentDescribes = @('SPDXRef-Package-SharpProof')
-        packages = @([pscustomobject][ordered]@{
-            name = 'SharpProof'; SPDXID = 'SPDXRef-Package-SharpProof'
-            versionInfo = '1.0.0-preview.1'; downloadLocation = 'NOASSERTION'
-            filesAnalyzed = $false
-            licenseConcluded = 'MIT'; licenseDeclared = 'MIT'; copyrightText = 'NOASSERTION'
-            externalRefs = @([pscustomobject][ordered]@{
-                referenceCategory = 'PACKAGE-MANAGER'; referenceType = 'purl'
-                referenceLocator = 'pkg:nuget/SharpProof@1.0.0-preview.1'
-            })
-        })
-        relationships = @([pscustomobject][ordered]@{
-            spdxElementId = 'SPDXRef-DOCUMENT'; relationshipType = 'DESCRIBES'
-            relatedSpdxElement = 'SPDXRef-Package-SharpProof'
-        })
-    }
-    $spdxJson = (($spdx | ConvertTo-Json -Depth 10) -replace "`r`n", "`n") + "`n"
-    Assert-Accepted spdx-canonical $spdxJson Spdx
-    Assert-Rejected spdx-duplicate-top ($spdxJson.Replace(
-        '  "spdxVersion": "SPDX-2.3",',
-        "  `"spdxVersion`": `"SPDX-9.9`",`n  `"spdxVersion`": `"SPDX-2.3`",")) Spdx
-    Assert-Rejected spdx-duplicate-nested ($spdxJson.Replace(
-        '    "created": "2026-01-01T00:00:00Z",',
-        "    `"created`": `"forged`",`n    `"created`": `"2026-01-01T00:00:00Z`",")) Spdx
-    Assert-Rejected spdx-case-field ($spdxJson.Replace('"SPDXID":', '"spdxId":')) Spdx
-    Assert-Rejected spdx-vocabulary-case ($spdxJson.Replace('"spdxVersion": "SPDX-2.3"', '"spdxVersion": "spdx-2.3"')) Spdx
-    Assert-Rejected spdx-relationship-case ($spdxJson.Replace('"relationshipType": "DESCRIBES"', '"relationshipType": "describes"')) Spdx
-    Assert-Rejected spdx-scalar-array ($spdxJson.Replace(
-        '"documentDescribes": [', '"documentDescribes": "SPDXRef-Package-SharpProof", "discarded": [')) Spdx
-    Assert-Rejected spdx-nested-array ($spdxJson.Replace(
-        '"relationships": [', '"relationships": [[').Replace("  ]`n}", "  ]]`n}")) Spdx
-    Assert-Rejected spdx-unknown-row ($spdxJson.Replace(
-        '      "relationshipType": "DESCRIBES",',
-        "      `"relationshipType`": `"DESCRIBES`",`n      `"foreign`": true,")) Spdx
-    Assert-Rejected spdx-reordered ($spdxJson.Replace(
-        "  `"spdxVersion`": `"SPDX-2.3`",`n  `"dataLicense`": `"CC0-1.0`",",
-        "  `"dataLicense`": `"CC0-1.0`",`n  `"spdxVersion`": `"SPDX-2.3`",")) Spdx
-    Assert-Rejected spdx-whitespace ($spdxJson.Replace('  "spdxVersion"', '    "spdxVersion"')) Spdx
 
     [pscustomobject][ordered]@{ passed = $passed; total = $total } |
         ConvertTo-Json -Compress

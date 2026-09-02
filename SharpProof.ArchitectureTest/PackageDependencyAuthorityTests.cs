@@ -127,79 +127,13 @@ public sealed class PackageDependencyAuthorityTests
     }
 
     [TestCase("canonical", true)]
-    [TestCase("first-noassertion", false)]
-    [TestCase("first-wrong", false)]
-    [TestCase("first-case", false)]
-    [TestCase("first-missing", false)]
-    [TestCase("first-extra", false)]
-    [TestCase("third-noassertion", false)]
-    [TestCase("third-wrong", false)]
-    [TestCase("third-case", false)]
-    [TestCase("third-missing", false)]
-    [TestCase("third-extra", false)]
-    [TestCase("unknown-component", false)]
-    [TestCase("duplicate-component", false)]
-    [TestCase("wrong-download", false)]
-    [TestCase("files-analyzed", false)]
-    public async Task SbomLicensesMatchTheExactPackageAuthority(
-        string mutation,
-        bool expectedSuccess)
-    {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "sharpproof-sbom-license-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            var result = await RunSbomLicenseAuthorityAsync(root, mutation);
-            Assert.That(
-                result.ExitCode == 0,
-                Is.EqualTo(expectedSuccess),
-                result.Output);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
-    }
-
-    [TestCase("canonical", true)]
-    [TestCase("missing", false)]
-    [TestCase("extra", false)]
-    [TestCase("fabricated", false)]
-    [TestCase("wrong-direction", false)]
-    public async Task SbomRelationshipsMustMatchDerivedGraph(
-        string mutation,
-        bool expectedSuccess)
-    {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "sharpproof-sbom-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            var result = await RunSbomAuthorityAsync(root, mutation);
-            Assert.That(
-                result.ExitCode == 0,
-                Is.EqualTo(expectedSuccess),
-                result.Output);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
-    }
-
-    [TestCase("canonical", true)]
     [TestCase("fabricated", false)]
     [TestCase("missing", false)]
     [TestCase("duplicate", false)]
     [TestCase("swapped-owner", false)]
     [TestCase("foreign-entry", false)]
     [TestCase("self-consistent-rewrite", false)]
-    [TestCase("missing-containment", false)]
-    [TestCase("extra-containment", false)]
-    public async Task ThirdPartyInventoryMatchesCatalogPayloadAndSbomOwnership(
+    public async Task ThirdPartyInventoryMatchesCatalogPayload(
         string mutation,
         bool expectedSuccess)
     {
@@ -218,60 +152,6 @@ public sealed class PackageDependencyAuthorityTests
         finally
         {
             Directory.Delete(root, recursive: true);
-        }
-    }
-
-    [TestCase("canonical", true)]
-    [TestCase("extra-contains", false)]
-    [TestCase("extra-depends", false)]
-    [TestCase("other-type", false)]
-    [TestCase("missing", false)]
-    [TestCase("reversed", false)]
-    [TestCase("duplicate", false)]
-    [TestCase("wrong-spdx", false)]
-    [TestCase("self-consistent-spdx", false)]
-    [TestCase("id-collision", false)]
-    [TestCase("extra-package", false)]
-    [TestCase("extra-describes", false)]
-    public async Task SbomTopologyIsTheExactAuthenticatedProjection(
-        string mutation,
-        bool expectedSuccess)
-    {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "sharpproof-sbom-topology-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            var result = await RunSbomTopologyAuthorityAsync(root, mutation);
-            Assert.That(
-                result.ExitCode == 0,
-                Is.EqualTo(expectedSuccess),
-                result.Output);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
-    }
-
-    [Test]
-    public async Task EveryReleaseAuthorityUsesTheExactSbomTopology()
-    {
-        var root = TestRepository.FindRoot();
-        foreach (var scriptName in new[]
-                 {
-                     "New-SharpProofReleaseEvidence.ps1",
-                     "Test-SharpProofReleaseArtifacts.ps1",
-                     "Publish-SharpProofRelease.ps1"
-                 })
-        {
-            var script = await File.ReadAllTextAsync(
-                Path.Combine(root, "scripts", scriptName));
-            Assert.That(
-                script,
-                Does.Contain("Test-SharpProofSbomTopology"),
-                scriptName);
         }
     }
 
@@ -535,98 +415,6 @@ public sealed class PackageDependencyAuthorityTests
             (await output) + Environment.NewLine + (await error));
     }
 
-    private static async Task<ProcessResult> RunSbomAuthorityAsync(
-        string root,
-        string mutation)
-    {
-        var repositoryRoot = TestRepository.FindRoot();
-        var runner = Path.Combine(root, "run-sbom-authority.ps1");
-        await File.WriteAllTextAsync(
-            runner,
-            "param([string]$Helper, [string]$Mutation)\n" +
-            ". $Helper\n" +
-            "$graph = @(\n" +
-            "  [pscustomobject]@{FromId='SharpProof';" +
-            "ToId='SharpProof.Attributes'},\n" +
-            "  [pscustomobject]@{FromId='SharpProof.Verifier';" +
-            "ToId='SharpProof'}\n" +
-            ")\n" +
-            "$rows = @($graph | ForEach-Object { " +
-            "[pscustomobject]@{spdxElementId=" +
-            "(Get-SharpProofDependencySpdxId $_.FromId);" +
-            "relationshipType='DEPENDS_ON';relatedSpdxElement=" +
-            "(Get-SharpProofDependencySpdxId $_.ToId)} })\n" +
-            "switch ($Mutation) {\n" +
-            "  'missing' {$rows=@($rows[0])}\n" +
-            "  'extra' {$rows+= [pscustomobject]@{" +
-            "spdxElementId='SPDXRef-Package-Extra';" +
-            "relationshipType='DEPENDS_ON';" +
-            "relatedSpdxElement='SPDXRef-Package-SharpProof'}}\n" +
-            "  'fabricated' {$rows[0].relatedSpdxElement=" +
-            "'SPDXRef-Package-Fabricated.Dependency'}\n" +
-            "  'wrong-direction' {$value=$rows[0].spdxElementId;" +
-            "$rows[0].spdxElementId=$rows[0].relatedSpdxElement;" +
-            "$rows[0].relatedSpdxElement=$value}\n" +
-            "}\n" +
-            "Test-SharpProofSbomDependencyGraph " +
-            "-Relationships $rows -DependencyGraph $graph\n",
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        return await RunPowerShellAsync(repositoryRoot, runner, mutation);
-    }
-
-    private static async Task<ProcessResult> RunSbomLicenseAuthorityAsync(
-        string root,
-        string mutation)
-    {
-        var repositoryRoot = TestRepository.FindRoot();
-        var runner = Path.Combine(root, "run-sbom-license-authority.ps1");
-        await File.WriteAllTextAsync(
-            runner,
-            "param([string]$Helper, [string]$Mutation)\n" +
-            ". $Helper\n" +
-            "$packages=@('SharpProof.Attributes','SharpProof'," +
-            "'SharpProof.Verifier') | ForEach-Object {" +
-            "[pscustomobject]@{PackageId=$_;LicenseExpression='MIT'}}\n" +
-            "$components=@([pscustomobject]@{id='Microsoft.Z3';" +
-            "version='4.12.2';license='MIT'})\n" +
-            "$graph=@(Get-SharpProofSbomLicenseGraph " +
-            "-PackageLicenseGraph $packages -PackageVersion '1.0.0' " +
-            "-ThirdPartyComponents $components)\n" +
-            "$rows=@($graph | ForEach-Object {" +
-            "[pscustomobject]@{name=$_.Name;versionInfo=$_.Version;" +
-            "downloadLocation='NOASSERTION';filesAnalyzed=$false;" +
-            "licenseDeclared='MIT';licenseConcluded='MIT'}})\n" +
-            "$first=@($rows | Where-Object name -eq 'SharpProof')[0]\n" +
-            "$third=@($rows | Where-Object name -eq 'Microsoft.Z3')[0]\n" +
-            "switch ($Mutation) {\n" +
-            " 'first-noassertion' {$first.licenseDeclared='NOASSERTION'}\n" +
-            " 'first-wrong' {$first.licenseConcluded='Apache-2.0'}\n" +
-            " 'first-case' {$first.licenseDeclared='mit'}\n" +
-            " 'first-missing' {$first.PSObject.Properties.Remove(" +
-            "'licenseDeclared')}\n" +
-            " 'first-extra' {$first | Add-Member NoteProperty " +
-            "licenseComments extra}\n" +
-            " 'third-noassertion' {$third.licenseConcluded='NOASSERTION'}\n" +
-            " 'third-wrong' {$third.licenseDeclared='BSD-3-Clause'}\n" +
-            " 'third-case' {$third.licenseConcluded='mit'}\n" +
-            " 'third-missing' {$third.PSObject.Properties.Remove(" +
-            "'licenseConcluded')}\n" +
-            " 'third-extra' {$third | Add-Member NoteProperty " +
-            "licenseInfoFromFiles @('MIT')}\n" +
-            " 'unknown-component' {$rows += [pscustomobject]@{" +
-            "name='Foreign';versionInfo='1';downloadLocation='NOASSERTION';" +
-            "filesAnalyzed=$false;licenseDeclared='MIT';" +
-            "licenseConcluded='MIT'}}\n" +
-            " 'duplicate-component' {$rows += $third}\n" +
-            " 'wrong-download' {$rows[0].downloadLocation='https://invalid'}\n" +
-            " 'files-analyzed' {$rows[0].filesAnalyzed=$true}\n" +
-            "}\n" +
-            "Test-SharpProofSbomLicenseGraph " +
-            "-SbomPackages $rows -LicenseGraph $graph\n",
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        return await RunPowerShellAsync(repositoryRoot, runner, mutation);
-    }
-
     private static async Task<ProcessResult> RunComponentAuthorityAsync(
         string root,
         string mutation)
@@ -643,88 +431,16 @@ public sealed class PackageDependencyAuthorityTests
             "[pscustomobject]@{packageId='SharpProof.Verifier';id='Component.B';" +
             "version='2.0';license='MIT';entries=@('tools/b.so')})\n" +
             "$actual=@($expected | ConvertTo-Json -Depth 4 | ConvertFrom-Json)\n" +
-            "$packages=@($expected | ForEach-Object {[pscustomobject]@{" +
-            "name=$_.id;versionInfo=$_.version}})\n" +
-            "$relationships=@($expected | ForEach-Object {[pscustomobject]@{" +
-            "spdxElementId=(Get-SharpProofDependencySpdxId $_.packageId);" +
-            "relationshipType='CONTAINS';relatedSpdxElement=" +
-            "(Get-SharpProofDependencySpdxId ($_.id+'-'+$_.version))}})\n" +
             "switch ($Mutation) {\n" +
             " 'fabricated' {$actual[0].id='Fabricated'}\n" +
             " 'missing' {$actual=@($actual[0])}\n" +
             " 'duplicate' {$actual+= $actual[0]}\n" +
             " 'swapped-owner' {$actual[0].packageId='SharpProof.Verifier'}\n" +
             " 'foreign-entry' {$actual[0].entries=@('tools/foreign.dll')}\n" +
-            " 'self-consistent-rewrite' {$actual[0].id='Fabricated';" +
-            "$packages[0].name='Fabricated';$relationships[0].relatedSpdxElement=" +
-            "(Get-SharpProofDependencySpdxId 'Fabricated-1.0')}\n" +
-            " 'missing-containment' {$relationships=@($relationships[0])}\n" +
-            " 'extra-containment' {$relationships+= $relationships[0]}\n" +
+            " 'self-consistent-rewrite' {$actual[0].id='Fabricated'}\n" +
             "}\n" +
             "Test-SharpProofThirdPartyComponentProjection " +
-            "-ActualComponents $actual -ExpectedComponents $expected\n" +
-            "Test-SharpProofSbomComponentGraph -SbomPackages $packages " +
-            "-Relationships $relationships -Components $expected\n",
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        return await RunPowerShellAsync(repositoryRoot, runner, mutation);
-    }
-
-    private static async Task<ProcessResult> RunSbomTopologyAuthorityAsync(
-        string root,
-        string mutation)
-    {
-        var repositoryRoot = TestRepository.FindRoot();
-        var runner = Path.Combine(root, "run-sbom-topology-authority.ps1");
-        await File.WriteAllTextAsync(
-            runner,
-            "param([string]$Helper,[string]$Mutation)\n" +
-            ". $Helper\n" +
-            "$ids=@('SharpProof.Attributes','SharpProof','SharpProof.Verifier')\n" +
-            "$version='1.0.0-preview.1'\n" +
-            "$components=@(" +
-            "[pscustomobject]@{packageId='SharpProof';id='Component.A';version='1'}," +
-            "[pscustomobject]@{packageId='SharpProof.Verifier';id='Component.B';version='2'})\n" +
-            "$graph=@(" +
-            "[pscustomobject]@{FromId='SharpProof';ToId='SharpProof.Attributes'}," +
-            "[pscustomobject]@{FromId='SharpProof.Verifier';ToId='SharpProof'})\n" +
-            "$packages=@($ids|ForEach-Object{[pscustomobject]@{" +
-            "name=$_;versionInfo=$version;SPDXID=(Get-SharpProofDependencySpdxId $_);" +
-            "externalRefs=@([pscustomobject][ordered]@{referenceCategory='PACKAGE-MANAGER';" +
-            "referenceType='purl';referenceLocator=(Get-SharpProofNuGetPurl $_ $version)})}})\n" +
-            "$packages+=@($components|ForEach-Object{[pscustomobject]@{" +
-            "name=$_.id;versionInfo=$_.version;SPDXID=" +
-            "(Get-SharpProofDependencySpdxId ($_.id+'-'+$_.version));" +
-            "externalRefs=@([pscustomobject][ordered]@{referenceCategory='PACKAGE-MANAGER';" +
-            "referenceType='purl';referenceLocator=(Get-SharpProofNuGetPurl $_.id $_.version)})}})\n" +
-            "$describes=@($ids|ForEach-Object{Get-SharpProofDependencySpdxId $_})\n" +
-            "$rows=@($ids|ForEach-Object{[pscustomobject]@{" +
-            "spdxElementId='SPDXRef-DOCUMENT';relationshipType='DESCRIBES';" +
-            "relatedSpdxElement=(Get-SharpProofDependencySpdxId $_)}})\n" +
-            "$rows+=@($components|ForEach-Object{[pscustomobject]@{" +
-            "spdxElementId=(Get-SharpProofDependencySpdxId $_.packageId);" +
-            "relationshipType='CONTAINS';relatedSpdxElement=" +
-            "(Get-SharpProofDependencySpdxId ($_.id+'-'+$_.version))}})\n" +
-            "$rows+=@($graph|ForEach-Object{[pscustomobject]@{" +
-            "spdxElementId=(Get-SharpProofDependencySpdxId $_.FromId);" +
-            "relationshipType='DEPENDS_ON';relatedSpdxElement=" +
-            "(Get-SharpProofDependencySpdxId $_.ToId)}})\n" +
-            "switch($Mutation){\n" +
-            " 'extra-contains' {$rows+=[pscustomobject]@{spdxElementId=$rows[3].spdxElementId;relationshipType='CONTAINS';relatedSpdxElement=$rows[4].relatedSpdxElement}}\n" +
-            " 'extra-depends' {$rows+=[pscustomobject]@{spdxElementId=$rows[5].spdxElementId;relationshipType='DEPENDS_ON';relatedSpdxElement=$rows[6].relatedSpdxElement}}\n" +
-            " 'other-type' {$rows[0].relationshipType='GENERATED_FROM'}\n" +
-            " 'missing' {$rows=@($rows[1..($rows.Count-1)])}\n" +
-            " 'reversed' {$v=$rows[5].spdxElementId;$rows[5].spdxElementId=$rows[5].relatedSpdxElement;$rows[5].relatedSpdxElement=$v}\n" +
-            " 'duplicate' {$rows+=$rows[0]}\n" +
-            " 'wrong-spdx' {$packages[0].SPDXID='SPDXRef-Package-Wrong'}\n" +
-            " 'self-consistent-spdx' {$packages[3].SPDXID='SPDXRef-Package-Fabricated';$rows[3].relatedSpdxElement='SPDXRef-Package-Fabricated'}\n" +
-            " 'id-collision' {$packages[3].SPDXID=$packages[0].SPDXID}\n" +
-            " 'extra-package' {$packages+=[pscustomobject]@{name='Extra';versionInfo='1';SPDXID='SPDXRef-Package-Extra'}}\n" +
-            " 'extra-describes' {$describes+='SPDXRef-Package-Extra'}\n" +
-            "}\n" +
-            "Test-SharpProofSbomTopology -SbomPackages $packages " +
-            "-DocumentDescribes $describes -Relationships $rows " +
-            "-FirstPartyPackageIds $ids -PackageVersion $version " +
-            "-Components $components -DependencyGraph $graph\n",
+            "-ActualComponents $actual -ExpectedComponents $expected\n",
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         return await RunPowerShellAsync(repositoryRoot, runner, mutation);
     }

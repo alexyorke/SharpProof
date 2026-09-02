@@ -606,8 +606,7 @@ public sealed class FinalCompilationProbeTests
         {
             _root = root;
             _sharedCompilationServerId = CreateSharedCompilationServerId(
-                "direct",
-                root);
+                "direct");
             ProjectPath = Path.Combine(root, "Consumer.csproj");
             ArtifactDirectory = Path.Combine(root, "probe");
             PackageCache = Path.Combine(root, "package-cache");
@@ -683,8 +682,7 @@ public sealed class FinalCompilationProbeTests
             bool designTimeBuild = false)
         {
             _sharedCompilationServerId = CreateSharedCompilationServerId(
-                "direct",
-                _root);
+                "direct");
             File.WriteAllText(
                 SubjectPath,
                 """
@@ -713,8 +711,7 @@ public sealed class FinalCompilationProbeTests
         internal void WritePackedConsumer(string packageVersion)
         {
             _sharedCompilationServerId = CreateSharedCompilationServerId(
-                "packed",
-                _root);
+                "packed");
             File.WriteAllText(
                 SubjectPath,
                 """
@@ -858,17 +855,10 @@ public sealed class FinalCompilationProbeTests
                 (await standardError));
         }
 
-        private static string CreateSharedCompilationServerId(
-            string role,
-            string root)
+        private static string CreateSharedCompilationServerId(string role)
         {
-            var identity =
-                typeof(FinalCompilationProbeTests).Assembly.ManifestModule
-                    .ModuleVersionId.ToString("N") + "\n" +
-                Path.GetFullPath(root);
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
             return "sharpproof-final-probe-" + role + "-" +
-                Convert.ToHexString(hash.AsSpan(0, 16));
+                Guid.NewGuid().ToString("N");
         }
 
         internal string[] GetArtifactPaths()

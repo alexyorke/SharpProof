@@ -108,7 +108,7 @@ function Assert-SharpProofReleaseManifestShape {
             Assert-SharpProofJsonKind $row.GetProperty($name) String "Release manifest artifacts[$index].$name"
         }
         Assert-SharpProofJsonStringValue $row.GetProperty('kind') @(
-            'package', 'symbols', 'sbom') "Release manifest artifacts[$index].kind"
+            'package', 'symbols') "Release manifest artifacts[$index].kind"
         $packageIdKind = $row.GetProperty('packageId').ValueKind
         if ($packageIdKind -notin @([Text.Json.JsonValueKind]::String, [Text.Json.JsonValueKind]::Null)) {
             throw "Release manifest artifacts[$index].packageId has an invalid JSON token type."
@@ -158,76 +158,11 @@ function Assert-SharpProofReleaseManifestShape {
     }
 }
 
-function Assert-SharpProofSpdxShape {
-    param($Root)
-    Assert-SharpProofJsonObject $Root @(
-        'spdxVersion', 'dataLicense', 'SPDXID', 'name', 'documentNamespace',
-        'creationInfo', 'documentDescribes', 'packages', 'relationships') 'SPDX document'
-    foreach ($name in @('spdxVersion', 'dataLicense', 'SPDXID', 'name', 'documentNamespace')) {
-        Assert-SharpProofJsonKind $Root.GetProperty($name) String "SPDX document $name"
-    }
-    Assert-SharpProofJsonStringValue $Root.GetProperty('spdxVersion') @('SPDX-2.3') 'SPDX document spdxVersion'
-    Assert-SharpProofJsonStringValue $Root.GetProperty('dataLicense') @('CC0-1.0') 'SPDX document dataLicense'
-    Assert-SharpProofJsonStringValue $Root.GetProperty('SPDXID') @('SPDXRef-DOCUMENT') 'SPDX document SPDXID'
-    $creation = $Root.GetProperty('creationInfo')
-    Assert-SharpProofJsonObject $creation @('created', 'creators', 'comment') 'SPDX creationInfo'
-    Assert-SharpProofJsonKind $creation.GetProperty('created') String 'SPDX creationInfo.created'
-    Assert-SharpProofJsonArray $creation.GetProperty('creators') String 'SPDX creationInfo.creators'
-    Assert-SharpProofJsonKind $creation.GetProperty('comment') String 'SPDX creationInfo.comment'
-    Assert-SharpProofJsonArray $Root.GetProperty('documentDescribes') String 'SPDX documentDescribes'
-
-    $packages = $Root.GetProperty('packages')
-    Assert-SharpProofJsonArray $packages Object 'SPDX packages'
-    $index = 0
-    foreach ($package in $packages.EnumerateArray()) {
-        $expected = @('name', 'SPDXID', 'versionInfo', 'downloadLocation', 'filesAnalyzed')
-        $expected += @('licenseConcluded', 'licenseDeclared', 'copyrightText', 'externalRefs')
-        Assert-SharpProofJsonObject $package $expected "SPDX packages[$index]"
-        foreach ($name in @('name', 'SPDXID', 'versionInfo', 'downloadLocation', 'licenseConcluded', 'licenseDeclared', 'copyrightText')) {
-            Assert-SharpProofJsonKind $package.GetProperty($name) String "SPDX packages[$index].$name"
-        }
-        Assert-SharpProofJsonStringValue $package.GetProperty('downloadLocation') @(
-            'NOASSERTION') "SPDX packages[$index].downloadLocation"
-        Assert-SharpProofJsonStringValue $package.GetProperty('copyrightText') @(
-            'NOASSERTION') "SPDX packages[$index].copyrightText"
-        Assert-SharpProofJsonKind $package.GetProperty('filesAnalyzed') False "SPDX packages[$index].filesAnalyzed"
-        $refs = $package.GetProperty('externalRefs')
-        Assert-SharpProofJsonArray $refs Object "SPDX packages[$index].externalRefs"
-        $refIndex = 0
-        foreach ($ref in $refs.EnumerateArray()) {
-            Assert-SharpProofJsonObject $ref @(
-                'referenceCategory', 'referenceType', 'referenceLocator') "SPDX packages[$index].externalRefs[$refIndex]"
-            foreach ($name in @('referenceCategory', 'referenceType', 'referenceLocator')) {
-                Assert-SharpProofJsonKind $ref.GetProperty($name) String "SPDX packages[$index].externalRefs[$refIndex].$name"
-            }
-            Assert-SharpProofJsonStringValue $ref.GetProperty('referenceCategory') @(
-                'PACKAGE-MANAGER') "SPDX packages[$index].externalRefs[$refIndex].referenceCategory"
-            Assert-SharpProofJsonStringValue $ref.GetProperty('referenceType') @(
-                'purl') "SPDX packages[$index].externalRefs[$refIndex].referenceType"
-            $refIndex++
-        }
-        $index++
-    }
-    $relationships = $Root.GetProperty('relationships')
-    Assert-SharpProofJsonArray $relationships Object 'SPDX relationships'
-    $index = 0
-    foreach ($relationship in $relationships.EnumerateArray()) {
-        Assert-SharpProofJsonObject $relationship @(
-            'spdxElementId', 'relationshipType', 'relatedSpdxElement') "SPDX relationships[$index]"
-        foreach ($name in @('spdxElementId', 'relationshipType', 'relatedSpdxElement')) {
-            Assert-SharpProofJsonKind $relationship.GetProperty($name) String "SPDX relationships[$index].$name"
-        }
-        Assert-SharpProofJsonStringValue $relationship.GetProperty('relationshipType') @(
-            'DESCRIBES', 'CONTAINS', 'DEPENDS_ON') "SPDX relationships[$index].relationshipType"
-        $index++
-    }
-}
-
 function Read-SharpProofCanonicalReleaseJson {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)]
-        [ValidateSet('ReleaseManifest', 'Spdx')][string]$DocumentType
+        [ValidateSet('ReleaseManifest')][string]$DocumentType
     )
     $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
     $bytes = [IO.File]::ReadAllBytes($resolved)
@@ -244,14 +179,8 @@ function Read-SharpProofCanonicalReleaseJson {
         throw "$DocumentType JSON is not strict JSON: $($_.Exception.Message)"
     }
     try {
-        if ($DocumentType -eq 'ReleaseManifest') {
-            Assert-SharpProofReleaseManifestShape $document.RootElement
-            $depth = 8
-        }
-        else {
-            Assert-SharpProofSpdxShape $document.RootElement
-            $depth = 10
-        }
+        Assert-SharpProofReleaseManifestShape $document.RootElement
+        $depth = 8
     }
     finally {
         $document.Dispose()

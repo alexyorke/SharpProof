@@ -358,7 +358,7 @@ public sealed class PackageLayoutSmokeTests
     public async Task ReleaseEvidenceIsDeterministicAndComplete()
     {
         var feed = await PackagedProductFeed.GetAsync();
-        using var workspace = ReleaseEvidenceWorkspace.Create(feed.Version);
+        using var workspace = ReleaseEvidenceWorkspace.Create();
         var script = Path.Combine(
             TestRepository.FindRoot(),
             "scripts",
@@ -373,19 +373,6 @@ public sealed class PackageLayoutSmokeTests
             "-OutputDirectory",
             workspace.OutputDirectory
         };
-        var invalidSbom = await RunProcessAsync(
-            TestRepository.FindRoot(),
-            "pwsh",
-            [
-                .. arguments,
-                "-SbomPath",
-                workspace.InvalidSbomPath
-            ]);
-        Assert.That(invalidSbom.ExitCode, Is.Not.Zero, invalidSbom.Output);
-        Assert.That(
-            invalidSbom.Output,
-            Does.Contain(
-                "SPDX document does not have the exact canonical property set and order"));
         var firstRun = await RunProcessAsync(
             TestRepository.FindRoot(),
             "pwsh",
@@ -393,8 +380,6 @@ public sealed class PackageLayoutSmokeTests
         Assert.That(firstRun.ExitCode, Is.Zero, firstRun.Output);
         var firstManifest = await File.ReadAllBytesAsync(
             workspace.ManifestPath);
-        var firstSbom = await File.ReadAllBytesAsync(
-            workspace.SbomPath);
         var secondRun = await RunProcessAsync(
             TestRepository.FindRoot(),
             "pwsh",
@@ -404,13 +389,9 @@ public sealed class PackageLayoutSmokeTests
             await File.ReadAllBytesAsync(workspace.ManifestPath),
             Is.EqualTo(firstManifest));
         Assert.That(
-            await File.ReadAllBytesAsync(workspace.SbomPath),
-            Is.EqualTo(firstSbom));
-        Assert.That(
             firstManifest.Take(3),
             Is.Not.EqualTo(new byte[] { 0xEF, 0xBB, 0xBF }));
         Assert.That(Encoding.UTF8.GetString(firstManifest), Does.Not.Contain('\r'));
-        Assert.That(Encoding.UTF8.GetString(firstSbom), Does.Not.Contain('\r'));
 
         using var document = JsonDocument.Parse(firstManifest);
         var root = document.RootElement;
@@ -423,7 +404,7 @@ public sealed class PackageLayoutSmokeTests
         var artifacts = root.GetProperty("artifacts")
             .EnumerateArray()
             .ToArray();
-        Assert.That(artifacts, Has.Length.EqualTo(7));
+        Assert.That(artifacts, Has.Length.EqualTo(6));
         Assert.That(
             artifacts.Select(static artifact =>
                 artifact.GetProperty("kind").GetString()),
@@ -433,18 +414,14 @@ public sealed class PackageLayoutSmokeTests
                 "package",
                 "symbols",
                 "symbols",
-                "symbols",
-                "sbom"
+                "symbols"
             ]));
         foreach (var artifact in artifacts)
         {
             var fileName = artifact.GetProperty("fileName").GetString() ??
                 throw new InvalidDataException(
                     "Release artifact fileName is null.");
-            var kind = artifact.GetProperty("kind").GetString();
-            var path = kind == "sbom"
-                ? workspace.SbomPath
-                : Path.Combine(feed.Source, fileName);
+            var path = Path.Combine(feed.Source, fileName);
             Assert.That(
                 artifact.GetProperty("bytes").GetInt64(),
                 Is.EqualTo(new FileInfo(path).Length),
@@ -1508,8 +1485,6 @@ public sealed class PackageLayoutSmokeTests
             "first-input",
             "first-global",
             "first-metadata");
-        var firstChecksum = SnapshotChecksum(firstBytes);
-
         var noOp = await RebuildProbeAsync(
             workspace,
             "first-global",
@@ -1533,8 +1508,8 @@ public sealed class PackageLayoutSmokeTests
             "first-global",
             "first-metadata");
         Assert.That(
-            SnapshotChecksum(inputBytes),
-            Is.Not.EqualTo(firstChecksum));
+            inputBytes,
+            Is.Not.EqualTo(firstBytes));
 
         var changedConfiguration = await RebuildProbeAsync(
             workspace,
@@ -1552,8 +1527,8 @@ public sealed class PackageLayoutSmokeTests
             "second-global",
             "second-metadata");
         Assert.That(
-            SnapshotChecksum(configuredBytes),
-            Is.Not.EqualTo(SnapshotChecksum(inputBytes)));
+            configuredBytes,
+            Is.Not.EqualTo(inputBytes));
     }
 
     private static Task<ProcessResult> RestoreConsumerAsync(
@@ -1714,11 +1689,6 @@ public sealed class PackageLayoutSmokeTests
                 CompilerProbeContract.GlobalValuePropertyName,
                 globalValue),
             ("SharpProofProbeAdditionalMetadata", metadataValue));
-    }
-
-    private static string SnapshotChecksum(byte[] snapshot)
-    {
-        return Convert.ToHexString(SHA256.HashData(snapshot));
     }
 
     private static void VerifyProbeSnapshot(
@@ -2448,7 +2418,7 @@ public sealed class PackageLayoutSmokeTests
             startInfo.ArgumentList.Add(argument);
         }
         startInfo.Environment["SharedCompilationId"] =
-            CreateSharedCompilationServerId(workingDirectory);
+            CreateSharedCompilationServerId();
 
         using var process = Process.Start(startInfo)!;
         var standardOutput = process.StandardOutput.ReadToEndAsync();
@@ -2460,16 +2430,10 @@ public sealed class PackageLayoutSmokeTests
             (await standardError));
     }
 
-    private static string CreateSharedCompilationServerId(
-        string workingDirectory)
+    private static string CreateSharedCompilationServerId()
     {
-        var identity =
-            typeof(PackageLayoutSmokeTests).Assembly.ManifestModule
-                .ModuleVersionId.ToString("N") + "\n" +
-            Path.GetFullPath(workingDirectory);
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
         return "sharpproof-package-layout-" +
-            Convert.ToHexString(hash.AsSpan(0, 16));
+            Guid.NewGuid().ToString("N");
     }
 
     private static PackagedAnalyzerItem[]
@@ -3264,60 +3228,16 @@ public sealed class PackageLayoutSmokeTests
     {
         private readonly string _root;
 
-        private ReleaseEvidenceWorkspace(string root, string version)
+        private ReleaseEvidenceWorkspace(string root)
         {
             _root = root;
             OutputDirectory = Path.Combine(root, "output");
-            SbomPath = Path.Combine(
-                OutputDirectory,
-                "SharpProof.spdx.json");
-            InvalidSbomPath = Path.Combine(root, "invalid.spdx.json");
             ManifestPath = Path.Combine(
                 OutputDirectory,
                 "SharpProof.release.json");
-            File.WriteAllText(
-                InvalidSbomPath,
-                """
-                {
-                  "spdxVersion": "SPDX-2.3",
-                  "dataLicense": "CC0-1.0",
-                  "SPDXID": "SPDXRef-DOCUMENT",
-                  "name": "SharpProof package test",
-                  "documentNamespace": "https://github.com/alexyorke/SharpProof/test",
-                  "packages": [
-                    {
-                      "SPDXID": "SPDXRef-SharpProof",
-                      "name": "SharpProof",
-                      "versionInfo": "0.2.0-preview.1"
-                    },
-                    {
-                      "SPDXID": "SPDXRef-SharpProof-Attributes",
-                      "name": "SharpProof.Attributes",
-                      "versionInfo": "0.2.0-preview.1"
-                    },
-                    {
-                      "SPDXID": "SPDXRef-SharpProof-Verifier",
-                      "name": "SharpProof.Verifier",
-                      "versionInfo": "0.2.0-preview.1"
-                    }
-                  ]
-                }
-                """.Replace(
-                    "0.2.0-preview.1",
-                    version,
-                    StringComparison.Ordinal),
-                new UTF8Encoding(false));
         }
 
         internal string OutputDirectory
-        {
-            get;
-        }
-        internal string SbomPath
-        {
-            get;
-        }
-        internal string InvalidSbomPath
         {
             get;
         }
@@ -3325,14 +3245,14 @@ public sealed class PackageLayoutSmokeTests
         {
             get;
         }
-        internal static ReleaseEvidenceWorkspace Create(string version)
+        internal static ReleaseEvidenceWorkspace Create()
         {
             var root = Path.Combine(
                 Path.GetTempPath(),
                 "SharpProof.ReleaseEvidence.Test",
                 Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
-            return new ReleaseEvidenceWorkspace(root, version);
+            return new ReleaseEvidenceWorkspace(root);
         }
 
         public void Dispose()

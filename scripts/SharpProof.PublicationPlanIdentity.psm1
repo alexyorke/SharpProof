@@ -200,9 +200,9 @@ function Test-SharpProofPublicationPlanIdentity {
     $artifacts = @($Plan.artifacts)
     $expectedRoles = @(
         'main','symbols','main','symbols','main','symbols',
-        'release-manifest','sbom')
+        'release-manifest')
     if ($artifacts.Count -ne $expectedRoles.Count) {
-        throw 'Publication plan must bind exactly eight release files.'
+        throw 'Publication plan must bind exactly seven release files.'
     }
     $seen = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
@@ -401,7 +401,7 @@ function Test-SharpProofPublicationPlanIdentity {
             throw 'Publication plan release manifest schema is invalid.'
         }
     }
-    foreach ($artifact in @($artifacts[0..5]) + @($artifacts[7])) {
+    foreach ($artifact in $artifacts[0..5]) {
         $row = @($manifestArtifacts | Where-Object {
             [string]$_.fileName -ceq [string]$artifact.fileName })
         if ($row.Count -ne 1 -or
@@ -431,8 +431,7 @@ function New-SharpProofPublicationPlanIdentities {
         }
     }
     foreach ($pair in @(
-            [pscustomobject]@{ Path = Join-Path $Directory 'SharpProof.release.json'; Role = 'release-manifest' },
-            [pscustomobject]@{ Path = Join-Path $Directory 'SharpProof.spdx.json'; Role = 'sbom' })) {
+            [pscustomobject]@{ Path = Join-Path $Directory 'SharpProof.release.json'; Role = 'release-manifest' })) {
         $rows.Add((New-SharpProofPublicationPlanFileIdentity `
             -Path $pair.Path -Role $pair.Role -Version $Version `
             -RepositoryCommit $RepositoryCommit))

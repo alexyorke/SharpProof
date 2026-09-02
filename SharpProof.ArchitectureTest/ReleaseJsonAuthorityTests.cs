@@ -33,7 +33,7 @@ public sealed class ReleaseJsonAuthorityTests
         Assert.That(result.RootElement.GetProperty("passed").GetInt32(),
             Is.EqualTo(result.RootElement.GetProperty("total").GetInt32()));
         Assert.That(result.RootElement.GetProperty("total").GetInt32(),
-            Is.GreaterThanOrEqualTo(20));
+            Is.GreaterThanOrEqualTo(10));
     }
 
     [Test]
