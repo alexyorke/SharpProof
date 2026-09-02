@@ -58,7 +58,10 @@ internal static class Program
             runtimeSnapshot = WorkerBinaryIdentity.CreateSnapshot(
                 arguments.WorkerPath);
             request = arguments.CreateRequest(
-                runtimeSnapshot, out artifact, out artifactBytes);
+                runtimeSnapshot,
+                out artifact,
+                out artifactBytes,
+                pathsAlreadyValidated: true);
             var workerVersion = ReadWorkerVersion(runtimeSnapshot);
             expectedInputHash = ComputeExpectedInputHash(
                 request,
@@ -980,13 +983,18 @@ internal sealed partial class LauncherArguments
 
     internal WorkerVerifyRequest CreateRequest(
         WorkerRuntimeClosureSnapshot? runtimeSnapshot,
-        out CompilerManifestArtifact artifact, out byte[] artifactBytes)
+        out CompilerManifestArtifact artifact,
+        out byte[] artifactBytes,
+        bool pathsAlreadyValidated = false)
     {
         var cacheEnabled = Boolean("cache-enabled", true);
         var configuredCacheDirectory = cacheEnabled
             ? OptionalFullPath("cache-directory")
             : null;
-        ValidateDistinctPaths(runtimeSnapshot, configuredCacheDirectory);
+        if (!pathsAlreadyValidated)
+        {
+            ValidateDistinctPaths(runtimeSnapshot, configuredCacheDirectory);
+        }
         var compilerManifest = CreateCompilerManifestReference(
             out artifact,
             out artifactBytes);
@@ -1005,6 +1013,10 @@ internal sealed partial class LauncherArguments
         WorkerRuntimeClosureSnapshot? runtimeSnapshot,
         string? cacheDirectory = null)
     {
+        if (cacheDirectory is null && Boolean("cache-enabled", true))
+        {
+            cacheDirectory = OptionalFullPath("cache-directory");
+        }
         var workerPath = WorkerPath;
         if (Directory.Exists(ResultPath))
         {

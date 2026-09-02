@@ -250,6 +250,7 @@ the smallest relevant containerized test target passes.
 | R793 | Share repository-scoped Git text execution between inventory and coverage scripts | PowerShell parses; Git helper behavior; authority tests: 36 passed (1 pre-existing complexity-cap failure) |
 | R790 | Drive package-consumer framework coverage from the acceptance contract | PowerShell parse; `ContainerPackageConsumersRestoreBeforeBuildingOfflineFeed`: 1 passed |
 | R797 | Share the staged-worker version projection between launcher input-hash and response-version calculations | `SharpProof.Package.Test`: `LauncherArgumentTests`, 75 passed |
+| R798 | Validate launcher path topology once before snapshot/request projection, then retain only the manifest-dependent final pass | `SharpProof.Package.Test`: `LauncherArgumentTests`, 75 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -6213,9 +6214,9 @@ standalone helper overloads and digest/provenance fields remain unchanged.
 
 ### Status (part three hundred nine)
 
-R798 is `pending` and limited to separating stable launcher topology validation
-from the manifest-dependent cache-path check. No implementation or build file
-was changed.
+R798 is `applied`: the preflight validates the configured cache path with the
+stable topology, and request construction skips only that already-completed
+pass while retaining the manifest-dependent final validation.
 
 ## Second survey, part three hundred ten: R799 - repeated canonicalization inside launcher path validation
 
@@ -6235,5 +6236,8 @@ was changed.
 
 ### Status (part three hundred ten)
 
-R799 is `pending` and limited to per-call canonical-path reuse in launcher
-  topology validation. No implementation or build file was changed.
+R799 is `deferred`: canonicalization is the security boundary for the public
+Linux path-identity API, and the conflict check also detects hard-link aliases.
+Bypassing those public calls would require a new canonical-only API or a
+second security-sensitive implementation for a small validation loop, so the
+review risk outweighs the line-count saving.
