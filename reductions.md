@@ -7857,3 +7857,124 @@ build-file changes were made during this audit.
 
 R868 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part three hundred seventy-nine: R869 - duplicate sequence-value enumeration
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R869 | **`IrFactory.CreateSequenceValue` materializes sequence elements and then traverses the materialized array again for validation.** `elements.ToImmutableArray()` first enumerates the caller-supplied sequence to build the final immutable payload, and `values.Any(...)` then walks that payload a second time to check null elements and element-type identity. A single builder loop can snapshot and validate each element while appending, preserving one-shot enumerable behavior, the immutable result, and the existing null/type exception while removing the second pass. | `SharpProof.Ir/IrFactory.cs:327-349` |
+
+### Status (part three hundred seventy-nine)
+
+R869 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred eighty: R870 - redundant location type lookup
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R870 | **`IrProgramBuilder.ValidateLocation` performs an unconditional type-table lookup that its branch validators already subsume.** `_factory.GetTypeInfo(location.Type)` validates the location type before the switch; the member branch then validates the member and call shape and compares the member return type with `member.Type`, while the sequence branch validates the sequence/index and compares the validated element type with `sequence.Type`. Those exact comparisons already reject foreign or out-of-range location type IDs, so the standalone lookup adds a lock/table access without an independent invariant. Keep the branch-specific checks and unknown-location rejection. | `SharpProof.Ir/IrProgramBuilder.cs:271-299` |
+
+### Status (part three hundred eighty)
+
+R870 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred eighty-one: R871 - repeated builder location validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R871 | **Builder-created locations are validated once at construction and again when attached to an instruction.** `MemberLocation` calls `ValidateCallShape`, and `SequenceLocation` calls `ValidateSequenceTerms`; later `Load` or `Store` insertion calls `ValidateInstruction`, whose `ValidateLocation` repeats the corresponding member/call or sequence/term validation. The second pass cannot simply be deleted because a location returned by another builder may be supplied, so a validated factory/builder token or an equivalent checked-location wrapper is needed to carry the proof across the insertion boundary without weakening cross-factory and malformed-location rejection. | `SharpProof.Ir/IrProgramBuilder.cs:38-67,66-80,148-157,271-299` |
+
+### Status (part three hundred eighty-one)
+
+R871 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred eighty-two: R872 - duplicate semantic-term guards
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R872 | **`IrSemanticTerms.Conjoin` and `Disjoin` repeat known-non-null validation through `Combine`.** Each public wrapper guards `factory` and `terms`, then immediately calls the private `Combine`, which guards both values again; every leaf of the recursive combine also calls `IrFactory.RequireBooleanTerm`, whose general-purpose helper rechecks the already-validated factory reference. A guarded public entry point plus an unchecked private combine path can retain per-leaf factory/term ownership and Boolean-type validation while removing wrapper and recursion-level null checks. | `SharpProof.Ir/IrSemanticTerms.cs:60-109`; `SharpProof.Ir/IrFactory.cs:615-630` |
+
+### Status (part three hundred eighty-two)
+
+R872 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred eighty-three: R873 - duplicate public depth guard
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R873 | **`IrTermAnalysis.GetDepth(IrTerm)` checks the same root twice on its public path.** The public overload validates `root` and then calls the internal memoized overload, which immediately calls `ArgumentNullGuard.NotNull(root, ...)` again. The internal overload still needs its own guard because compiler and summary callers pass a shared memo, but the public wrapper can call a private unchecked core or use a separately guarded internal entry point to preserve that contract without duplicate work. | `SharpProof.Ir/IrSemanticTerms.cs:126-150`; internal callers include `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:555` and `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:780` |
+
+### Status (part three hundred eighty-three)
+
+R873 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred eighty-four: R874 - opaque child-array allocation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R874 | **`IrTraversal.GetChildren` allocates a new immutable array for every opaque term with a receiver.** The receiver-first result is produced with `opaque.Arguments.Insert(0, opaque.Receiver)`, even though the traversal, variable collection, depth fold, summary charge, and SMT walk only need to enumerate the children. An allocation-free receiver-first enumeration or push helper can serve those hot paths while retaining the immutable-array API for callers that index or reverse the child list and preserving receiver-before-argument order. | `SharpProof.Ir/IrTraversal.cs:4-18,41-43,74-76,104-112`; indexed/reversed consumers at `SharpProof.Testing/IrCSharpDifferentialOracle.cs:248-251` and `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:805-807` |
+
+### Status (part three hundred eighty-four)
+
+R874 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred eighty-five: R875 - repeated bottom-up child fetch
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R875 | **`IrTraversal.FoldBottomUp` fetches the same child array twice for every composite term.** The first frame calls `GetChildren` to decide whether to suspend and push children; the resumed `ChildrenReady` frame calls `GetChildren` again before invoking `combine`. Carrying the child collection in the pending frame, or using a state that records the already-observed child count, preserves postorder and memo semantics while removing one enumeration per non-leaf term; it also avoids compounding the opaque receiver allocation in R874. | `SharpProof.Ir/IrTraversal.cs:91-120` |
+
+### Status (part three hundred eighty-five)
+
+R875 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred eighty-six: R876 - unchanged substitution-node rebuilding
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R876 | **`IrSubstitution.RewriteNode` reconstructs every composite term even when all rewritten children are unchanged.** The bottom-up walk visits the whole reachable DAG, and each opaque, unary, binary, conditional, cast, length, or sequence-access case calls an `IrFactory` constructor with rewritten children; the factory then revalidates and re-interns a node that is already the original hash-consed term when no replacement reached that node. Comparing rewritten children and receiver identity with the original and returning the original term for unchanged nodes can keep replacement ancestors rebuilt while removing unnecessary validation, locking, and structural-key work in unaffected branches. | `SharpProof.Ir/IrSubstitution.cs:68-111`; factory reconstruction paths at `SharpProof.Ir/IrFactory.cs:424-605` |
+
+### Status (part three hundred eighty-six)
+
+R876 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred eighty-seven: R877 - repeated null-cast validation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R877 | **`IrFactory.Cast` repeats target validation when folding a null cast.** The method already retrieves `target` under the factory lock and checks that the target is nullable; when the operand is an `IrNullTerm`, it calls `Null(targetType)`, which reacquires the lock, looks up the same type, repeats the nullable-type guard, and then interns the null term. A private `NullCore` that consumes the validated type, or direct interning in the existing lock, preserves canonical null identity while removing the duplicate lookup and admission check on this path. | `SharpProof.Ir/IrFactory.cs:521-556`; repeated null construction validation at `SharpProof.Ir/IrFactory.cs:390-401` |
+
+### Status (part three hundred eighty-seven)
+
+R877 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred eighty-eight: R878 - duplicate atomic-write path normalization
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R878 | **`AtomicFile.WriteUtf8` and `WriteBytesAsync` normalize their destination path twice.** Each method first calls `Path.GetFullPath(path)` and then passes that already-normalized value to `PrepareStaged`, whose first action is another `Path.GetFullPath`. A full-path-only staging helper or a private normalized overload can remove the duplicate normalization while leaving direct `PrepareStaged` callers, including launcher paths and tests, on the existing accepting-relative-path contract. | `SharpProof.Ir/AtomicFile.cs:6-15,67-78,88-111`; direct `PrepareStaged` callers include `SharpProof.Worker.Launcher/Program.cs:643,679,729` |
+
+### Status (part three hundred eighty-eight)
+
+R878 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part three hundred eighty-nine: R879 - duplicated atomic publication skeleton
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R879 | **`AtomicFile.WriteUtf8` and `WriteBytesAsync` duplicate the staged-publication transaction skeleton.** Both normalize a destination, allocate a staging path, enter `try`, write the temporary file, publish it, and invoke `TryDeleteStaged` in `finally`; only the sync text writer versus async byte-stream writer differs. A small staged-operation scope or shared cleanup/publish helper can centralize the lifecycle while keeping separate sync/async write implementations and preserving the atomic replacement and best-effort cleanup behavior. | `SharpProof.Ir/AtomicFile.cs:67-78,88-111` |
+
+### Status (part three hundred eighty-nine)
+
+R879 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
