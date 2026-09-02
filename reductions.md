@@ -128,6 +128,7 @@ status document.
 | R215 | Rejected after implementation and 695 Worker tests: the helper adds three formatted lines. |
 | R216 | Rejected after implementation: the all-unknown helper adds ten formatted lines. |
 | R057 | Refuted against the current tree: only three tests retain the single-invocation shape; the remaining flow tests select distinct operations or assert graph-specific state. |
+| R204 | Rejected by canonical pack validation: removing the project-side `PackageId` changes restore identity, causing the locked Verifier dependency graph to fail with NU1004 before packing. |
 
 ## Deferred
 
@@ -187,7 +188,7 @@ Merged IDs are not separate work items and must not be counted twice.
 ## Pending queue
 
 The active follow-up queue is R058, R060, R073, R087-R094, R096, R104-R105,
-R107, R149, R165, R169, R171-R185, R194, R204, R211, R217-R218, and R221.
+R107, R149, R165, R169, R171-R185, R194, R211, R217-R218, and R221.
 Each still requires current-tree validation before implementation. The other
 items in the Deferred table are intentional behavior, public API, release
 authority, security, or soundness decisions and remain deferred under the
