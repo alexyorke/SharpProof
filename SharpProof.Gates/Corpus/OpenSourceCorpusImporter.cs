@@ -24,7 +24,8 @@ internal static class OpenSourceCorpusImporter
         "https://github.com/aalhour/C-Sharp-Algorithms";
     private const string LicenseRelativePath =
         "third-party/aalhour-C-Sharp-Algorithms-LICENSE.txt";
-    private const int TargetMethodCount = 200;
+    private const int TargetMethodCount =
+        OpenSourceCorpusCatalog.MinimumMethodCount;
     private const string ReviewedMitLicense = """
 The MIT License (MIT)
 

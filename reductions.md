@@ -3556,7 +3556,10 @@ R561 is a `pending` reduction candidate. Preserve the JsonElement-only duplicate
 
 ### Status (part one hundred four)
 
-R562-R563 are `pending` reduction candidates. For R562 preserve the report validator's stronger package identity and pilot checks; for R563 keep the 500-method upper bound and change importer sizing only through an explicit corpus policy.
+R562 remains pending because pilot-report validation is intentionally stronger
+than the generic receipt checks. R563 is applied: the importer now derives its
+200-method target from `OpenSourceCorpusCatalog.MinimumMethodCount`, while the
+catalog's independent 500-method upper bound remains explicit.
 
 ## Second survey, part one hundred five: R564 - performance policy overload defect
 
