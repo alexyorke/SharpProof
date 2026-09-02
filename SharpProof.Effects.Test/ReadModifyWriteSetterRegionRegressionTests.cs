@@ -50,10 +50,7 @@ public sealed class ReadModifyWriteSetterRegionRegressionTests
         Compilation compilation,
         string methodName)
     {
-        var summary = session.Analyze(EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            methodName)).Summary;
+        var summary = session.Analyze(EffectTestHost.SampleMethod(compilation, methodName)).Summary;
 
         Assert.That(
             summary.Writes.IsUnknown,

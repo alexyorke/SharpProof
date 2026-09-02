@@ -46,14 +46,8 @@ public sealed class NullablePatternCompletionRegressionTests
                 }
             }
             """);
-        var helper = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            helperName);
-        var caller = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            callerName);
+        var helper = EffectTestHost.SampleMethod(compilation, helperName);
+        var caller = EffectTestHost.SampleMethod(compilation, callerName);
         var completion = new DefiniteOperationFacts(
             compilation,
             CancellationToken.None);

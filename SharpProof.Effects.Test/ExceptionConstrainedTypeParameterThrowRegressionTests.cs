@@ -24,10 +24,7 @@ public sealed class ExceptionConstrainedTypeParameterThrowRegressionTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Handle");
+        var method = EffectTestHost.SampleMethod(compilation, "Handle");
 
         var result = new EffectAnalysisSession(compilation).Analyze(method);
 

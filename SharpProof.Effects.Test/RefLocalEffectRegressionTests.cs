@@ -28,18 +28,9 @@ public sealed class RefLocalEffectRegressionTests
             }
             """);
         var session = new EffectAnalysisSession(compilation);
-        var assign = session.Analyze(EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Assign"));
-        var add = session.Analyze(EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Add"));
-        var rebind = session.Analyze(EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Rebind"));
+        var assign = session.Analyze(EffectTestHost.SampleMethod(compilation, "Assign"));
+        var add = session.Analyze(EffectTestHost.SampleMethod(compilation, "Add"));
+        var rebind = session.Analyze(EffectTestHost.SampleMethod(compilation, "Rebind"));
 
         using (Assert.EnterMultipleScope())
         {

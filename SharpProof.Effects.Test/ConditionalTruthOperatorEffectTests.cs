@@ -83,10 +83,7 @@ public sealed class ConditionalTruthOperatorEffectTests
                     NonReturningGate value) => value;
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            methodName);
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
 
         var result = new EffectAnalysisSession(compilation).Analyze(method);
 
@@ -161,10 +158,7 @@ public sealed class ConditionalTruthOperatorEffectTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            methodName);
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
         var result = new EffectAnalysisSession(compilation).Analyze(method);
 
         using (Assert.EnterMultipleScope())

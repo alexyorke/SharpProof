@@ -98,10 +98,7 @@ public sealed class MetadataApiSpecTypeInitializationTests
         foreach (var methodName in new[] { "Call", "Construct" })
         {
             var result = session.Analyze(
-                EffectTestHost.RequireMethod(
-                    compilation,
-                    "Sample",
-                    methodName));
+                EffectTestHost.SampleMethod(compilation, methodName));
 
             using (Assert.EnterMultipleScope())
             {

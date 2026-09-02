@@ -23,7 +23,7 @@ public sealed class CompositeOperationCompletionRegressionTests
                 }
             }
             """);
-        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
         var initializer = EffectTestHost.RootOperation(compilation, run)
             .DescendantsAndSelf()
             .OfType<IArrayInitializerOperation>()
@@ -52,7 +52,7 @@ public sealed class CompositeOperationCompletionRegressionTests
                 }
             }
             """);
-        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
         var interpolation = EffectTestHost.RootOperation(compilation, run)
             .DescendantsAndSelf()
             .OfType<IInterpolatedStringOperation>()

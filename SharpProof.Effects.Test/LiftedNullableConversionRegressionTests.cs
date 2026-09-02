@@ -58,14 +58,8 @@ public sealed class LiftedNullableConversionRegressionTests
                 }
             }
             """);
-        var divergingMethod = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "SkipDiverging");
-        var throwingMethod = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "SkipThrowing");
+        var divergingMethod = EffectTestHost.SampleMethod(compilation, "SkipDiverging");
+        var throwingMethod = EffectTestHost.SampleMethod(compilation, "SkipThrowing");
         var conversion = Operation(compilation, divergingMethod)
             .DescendantsAndSelf()
             .OfType<IConversionOperation>()

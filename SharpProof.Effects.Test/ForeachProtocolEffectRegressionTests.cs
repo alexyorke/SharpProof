@@ -54,10 +54,7 @@ public sealed class ForeachProtocolEffectRegressionTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Run");
+        var method = EffectTestHost.SampleMethod(compilation, "Run");
 
         var result = new EffectAnalysisSession(compilation).Analyze(method);
 

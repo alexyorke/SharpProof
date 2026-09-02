@@ -23,11 +23,8 @@ public sealed class OperationCompletionWaveFiveRegressionTests
                 }
             }
             """);
-        var choose = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Choose");
-        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var choose = EffectTestHost.SampleMethod(compilation, "Choose");
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
         var facts = new DefiniteOperationFacts(
             compilation,
             System.Threading.CancellationToken.None);
@@ -58,11 +55,8 @@ public sealed class OperationCompletionWaveFiveRegressionTests
                 }
             }
             """);
-        var countDown = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "CountDown");
-        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var countDown = EffectTestHost.SampleMethod(compilation, "CountDown");
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
         var facts = new DefiniteOperationFacts(
             compilation,
             System.Threading.CancellationToken.None);
@@ -102,7 +96,7 @@ public sealed class OperationCompletionWaveFiveRegressionTests
                 }
             }
             """);
-        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
         var conversion = EffectTestHost.RootOperation(compilation, run)
             .DescendantsAndSelf()
             .OfType<IConversionOperation>()
@@ -146,7 +140,7 @@ public sealed class OperationCompletionWaveFiveRegressionTests
                 }
             }
             """);
-        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
         var conversion = EffectTestHost.RootOperation(compilation, run)
             .DescendantsAndSelf()
             .OfType<IConversionOperation>()
@@ -191,18 +185,9 @@ public sealed class OperationCompletionWaveFiveRegressionTests
                 }
             }
             """);
-        var binary = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Binary");
-        var compound = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Compound");
-        var unknown = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Unknown");
+        var binary = EffectTestHost.SampleMethod(compilation, "Binary");
+        var compound = EffectTestHost.SampleMethod(compilation, "Compound");
+        var unknown = EffectTestHost.SampleMethod(compilation, "Unknown");
         var binaryOperation = EffectTestHost.RootOperation(compilation, binary)
             .DescendantsAndSelf()
             .OfType<IBinaryOperation>()

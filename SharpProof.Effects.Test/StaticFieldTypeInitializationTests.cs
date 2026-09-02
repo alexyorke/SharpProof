@@ -28,10 +28,7 @@ public sealed class StaticFieldTypeInitializationTests
                     GenericInitialization<int>.Value;
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Read");
+        var method = EffectTestHost.SampleMethod(compilation, "Read");
 
         var result = new EffectAnalysisSession(compilation).Analyze(method);
 
@@ -160,7 +157,7 @@ public sealed class StaticFieldTypeInitializationTests
                 public static int Read() => FailingInitialization.Value;
             }
             """);
-        var method = EffectTestHost.RequireMethod(compilation, "Sample", "Read");
+        var method = EffectTestHost.SampleMethod(compilation, "Read");
 
         var result = new EffectAnalysisSession(compilation).Analyze(method);
 
@@ -206,10 +203,7 @@ public sealed class StaticFieldTypeInitializationTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "CatchInitializationFailure");
+        var method = EffectTestHost.SampleMethod(compilation, "CatchInitializationFailure");
         var session = new EffectAnalysisSession(compilation);
         var reachability = EffectTestHost.CreateHandlerReachability(
             compilation,

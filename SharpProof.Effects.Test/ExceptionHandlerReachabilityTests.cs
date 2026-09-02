@@ -59,10 +59,7 @@ public sealed class ExceptionHandlerReachabilityTests
 
         bool IsCatchReachable(string methodName)
         {
-            var method = EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                methodName);
+            var method = EffectTestHost.SampleMethod(compilation, methodName);
             return EffectTestHost.CreateHandlerReachability(
                     compilation,
                     method,
@@ -122,10 +119,7 @@ public sealed class ExceptionHandlerReachabilityTests
 
         bool IsCatchReachable(string methodName)
         {
-            var method = EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                methodName);
+            var method = EffectTestHost.SampleMethod(compilation, methodName);
             return EffectTestHost.CreateHandlerReachability(
                     compilation,
                     method,

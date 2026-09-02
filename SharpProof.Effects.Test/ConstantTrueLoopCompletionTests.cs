@@ -152,13 +152,7 @@ public sealed class ConstantTrueLoopCompletionTests
             """);
         return (
             compilation,
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                helperName),
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                callerName));
+            EffectTestHost.SampleMethod(compilation, helperName),
+            EffectTestHost.SampleMethod(compilation, callerName));
     }
 }

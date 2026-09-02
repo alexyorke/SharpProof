@@ -27,10 +27,7 @@ public sealed class ReducedRefExtensionFlowRegressionTests
             }
             """,
             mutations);
-        var divide = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Divide");
+        var divide = EffectTestHost.SampleMethod(compilation, "Divide");
         var call = Operation(compilation, divide)
             .DescendantsAndSelf()
             .OfType<IInvocationOperation>()

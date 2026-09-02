@@ -140,10 +140,7 @@ public sealed class ExceptionConstructionThrowRegressionTests
         ]);
 
         var result = new EffectAnalysisSession(compilation, table).Analyze(
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                "Construct"));
+            EffectTestHost.SampleMethod(compilation, "Construct"));
 
         using (Assert.EnterMultipleScope())
         {

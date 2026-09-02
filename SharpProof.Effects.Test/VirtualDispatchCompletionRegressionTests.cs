@@ -38,10 +38,7 @@ public sealed class VirtualDispatchCompletionRegressionTests
             compilation,
             "ReturningDerived",
             "Invoke");
-        var caller = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Run");
+        var caller = EffectTestHost.SampleMethod(compilation, "Run");
         var invocation = GetInvocation(compilation, caller);
         var completion = new DefiniteOperationFacts(
             compilation,

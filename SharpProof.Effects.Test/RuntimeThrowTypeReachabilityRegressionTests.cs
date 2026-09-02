@@ -53,10 +53,7 @@ public sealed class RuntimeThrowTypeReachabilityRegressionTests
         EffectSummary Analyze(string methodName)
         {
             return session.Analyze(
-                EffectTestHost.RequireMethod(
-                    compilation,
-                    "Sample",
-                    methodName)).Summary;
+                EffectTestHost.SampleMethod(compilation, methodName)).Summary;
         }
     }
 }

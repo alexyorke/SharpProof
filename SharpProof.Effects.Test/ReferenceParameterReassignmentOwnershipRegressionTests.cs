@@ -29,15 +29,9 @@ public sealed class ReferenceParameterReassignmentOwnershipRegressionTests
             """);
         var session = new EffectAnalysisSession(compilation);
         var reassignment = session.Analyze(
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                "ReassignThenMutate"));
+            EffectTestHost.SampleMethod(compilation, "ReassignThenMutate"));
         var invocation = session.Analyze(
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                "Invoke"));
+            EffectTestHost.SampleMethod(compilation, "Invoke"));
 
         using (Assert.EnterMultipleScope())
         {

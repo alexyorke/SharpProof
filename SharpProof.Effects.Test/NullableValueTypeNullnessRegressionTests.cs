@@ -16,11 +16,7 @@ public sealed class NullableValueTypeNullnessRegressionTests
             }
             """);
 
-        var summary = new EffectAnalysisSession(compilation)
-            .Analyze(EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                "Coalesce"))
+        var summary = EffectTestHost.AnalyzeSample(compilation, "Coalesce")
             .Summary;
 
         Assert.That(

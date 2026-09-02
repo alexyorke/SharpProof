@@ -26,11 +26,8 @@ public sealed class UnreachableTerminalCompletionRegressionTests
                 }
             }
             """);
-        var returnValue = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "ReturnValue");
-        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var returnValue = EffectTestHost.SampleMethod(compilation, "ReturnValue");
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
         var completion = new DefiniteOperationFacts(
             compilation,
             CancellationToken.None);

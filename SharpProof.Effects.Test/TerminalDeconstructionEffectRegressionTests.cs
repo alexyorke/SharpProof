@@ -24,10 +24,7 @@ public sealed class TerminalDeconstructionEffectRegressionTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Assign");
+        var method = EffectTestHost.SampleMethod(compilation, "Assign");
 
         var result = new EffectAnalysisSession(compilation).Analyze(method);
         var exceptionNames = result.Summary.Throws.Types.Select(

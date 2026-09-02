@@ -45,10 +45,7 @@ public sealed class DelegateArgumentFlowRegressionTests
 
         var session = new EffectAnalysisSession(compilation);
         var result = session.Analyze(
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                "Evaluate"));
+            EffectTestHost.SampleMethod(compilation, "Evaluate"));
 
         using (Assert.EnterMultipleScope())
         {

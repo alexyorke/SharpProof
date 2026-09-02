@@ -38,8 +38,7 @@ public sealed class LockImplicitInvocationEffectTests
             }
             """);
 
-        var result = new EffectAnalysisSession(compilation).Analyze(
-            EffectTestHost.RequireMethod(compilation, "Sample", "Run"));
+        var result = EffectTestHost.AnalyzeSample(compilation, "Run");
 
         using (Assert.EnterMultipleScope())
         {

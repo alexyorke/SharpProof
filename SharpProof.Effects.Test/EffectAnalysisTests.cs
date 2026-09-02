@@ -54,7 +54,7 @@ public sealed class EffectAnalysisTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var method = EffectTestHost.SampleMethod(compilation, "Run");
         var syntax = method.DeclaringSyntaxReferences.Single().GetSyntax();
         var operation = compilation.GetSemanticModel(syntax.SyntaxTree)
             .GetOperation(syntax);
@@ -2648,9 +2648,9 @@ public sealed class EffectAnalysisTests
         var session = new EffectAnalysisSession(compilation);
 
         var receiver = session.Analyze(
-            EffectTestHost.RequireMethod(compilation, "Sample", "WriteReceiver"));
+            EffectTestHost.SampleMethod(compilation, "WriteReceiver"));
         var @static = session.Analyze(
-            EffectTestHost.RequireMethod(compilation, "Sample", "WriteStatic"));
+            EffectTestHost.SampleMethod(compilation, "WriteStatic"));
 
         Assert.That(
             receiver.Summary.Writes.Contains(EffectRegionId.Receiver),
@@ -2806,10 +2806,7 @@ public sealed class EffectAnalysisTests
 
         foreach (var (methodName, region) in cases)
         {
-            var method = EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                methodName);
+            var method = EffectTestHost.SampleMethod(compilation, methodName);
             var result = session.Analyze(method);
             using (Assert.EnterMultipleScope())
             {
@@ -3328,8 +3325,7 @@ public sealed class EffectAnalysisTests
             """,
             externalReference);
 
-        var result = new EffectAnalysisSession(compilation).Analyze(
-            EffectTestHost.RequireMethod(compilation, "Sample", "Invoke"));
+        var result = EffectTestHost.AnalyzeSample(compilation, "Invoke");
 
         Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
         Assert.That(
@@ -8369,7 +8365,7 @@ public sealed class EffectAnalysisTests
         Compilation compilation,
         string methodName)
     {
-        return EffectTestHost.RequireMethod(compilation, "Sample", methodName);
+        return EffectTestHost.SampleMethod(compilation, methodName);
     }
 
     private static IMethodSymbol RequireGetter(

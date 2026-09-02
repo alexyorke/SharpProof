@@ -19,10 +19,7 @@ public sealed class ModuleInitializerOrderingRegressionTests
             compilation,
             "Startup",
             "ASecond"));
-        var entry = session.Analyze(EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Entry"));
+        var entry = session.Analyze(EffectTestHost.SampleMethod(compilation, "Entry"));
 
         AssertOnlyFirstInitializerEffects(first);
         AssertOnlyFirstInitializerEffects(second);
@@ -75,10 +72,7 @@ public sealed class ModuleInitializerOrderingRegressionTests
             compilation,
             "Startup",
             "ASecond"));
-        var entry = session.Analyze(EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Entry"));
+        var entry = session.Analyze(EffectTestHost.SampleMethod(compilation, "Entry"));
 
         using (Assert.EnterMultipleScope())
         {

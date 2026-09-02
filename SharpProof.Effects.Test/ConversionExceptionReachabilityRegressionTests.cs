@@ -38,10 +38,7 @@ public sealed class ConversionExceptionReachabilityRegressionTests
                      "NullUnbox"
                  })
         {
-            var result = session.Analyze(EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                methodName));
+            var result = session.Analyze(EffectTestHost.SampleMethod(compilation, methodName));
 
             Assert.That(
                 result.Summary.Writes.Contains(EffectRegionId.Static()),

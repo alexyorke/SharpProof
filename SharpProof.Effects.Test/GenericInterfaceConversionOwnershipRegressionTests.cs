@@ -38,11 +38,7 @@ public sealed class GenericInterfaceConversionOwnershipRegressionTests
             """,
             externalReference);
 
-        var result = new EffectAnalysisSession(compilation).Analyze(
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                "Invoke"));
+        var result = EffectTestHost.AnalyzeSample(compilation, "Invoke");
 
         using (Assert.EnterMultipleScope())
         {

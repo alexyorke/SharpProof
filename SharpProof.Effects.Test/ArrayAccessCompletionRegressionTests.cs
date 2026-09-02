@@ -10,10 +10,7 @@ public sealed class ArrayAccessCompletionRegressionTests
         bool expected)
     {
         var compilation = CreateCompilation();
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            methodName);
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
 
         Assert.That(
             EffectTestHost.HasStaticWrite(compilation, method),

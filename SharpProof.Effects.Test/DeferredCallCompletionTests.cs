@@ -72,7 +72,7 @@ public sealed class DeferredCallCompletionTests
                 }
             }
             """);
-        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
         var root = EffectTestHost.RootOperation(compilation, run);
         var awaitOperation = root.DescendantsAndSelf()
             .OfType<IAwaitOperation>()
@@ -96,7 +96,7 @@ public sealed class DeferredCallCompletionTests
     private static void AssertCallReturnsBeforeSuffix(string source)
     {
         var compilation = EffectTestHost.CreateCompilation(source);
-        var run = EffectTestHost.RequireMethod(compilation, "Sample", "Run");
+        var run = EffectTestHost.SampleMethod(compilation, "Run");
         var root = EffectTestHost.RootOperation(compilation, run);
         var invocation = root.DescendantsAndSelf()
             .OfType<IInvocationOperation>()

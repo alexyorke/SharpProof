@@ -23,8 +23,7 @@ public sealed class ModuleInitializerEffectTests
             }
             """);
 
-        var result = new EffectAnalysisSession(compilation).Analyze(
-            EffectTestHost.RequireMethod(compilation, "Sample", "Entry"));
+        var result = EffectTestHost.AnalyzeSample(compilation, "Entry");
 
         Assert.That(
             result.Summary.Throws.Types.Select(static type => type.ToDisplayString()),
@@ -64,10 +63,7 @@ public sealed class ModuleInitializerEffectTests
         foreach (var methodName in new[] { "Entry", "CallsHelper" })
         {
             var result = session.Analyze(
-                EffectTestHost.RequireMethod(
-                    compilation,
-                    "Sample",
-                    methodName));
+                EffectTestHost.SampleMethod(compilation, methodName));
 
             using (Assert.EnterMultipleScope())
             {
@@ -113,11 +109,7 @@ public sealed class ModuleInitializerEffectTests
             }
             """);
 
-        var result = new EffectAnalysisSession(compilation).Analyze(
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                "Allocate"));
+        var result = EffectTestHost.AnalyzeSample(compilation, "Allocate");
 
         using (Assert.EnterMultipleScope())
         {
@@ -151,10 +143,7 @@ public sealed class ModuleInitializerEffectTests
             """);
         var session = new EffectAnalysisSession(compilation);
         var unrelated = session.Analyze(
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                "Entry"));
+            EffectTestHost.SampleMethod(compilation, "Entry"));
         var triggering = session.Analyze(
             EffectTestHost.RequireMethod(
                 compilation,

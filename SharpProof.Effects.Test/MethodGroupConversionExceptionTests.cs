@@ -93,10 +93,7 @@ public sealed class MethodGroupConversionExceptionTests
 
         EffectSummary Analyze(string methodName)
         {
-            return session.Analyze(EffectTestHost.RequireMethod(
-                    compilation,
-                    "Sample",
-                    methodName))
+            return session.Analyze(EffectTestHost.SampleMethod(compilation, methodName))
                 .Summary;
         }
     }

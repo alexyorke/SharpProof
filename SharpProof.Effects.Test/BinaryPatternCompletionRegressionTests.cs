@@ -30,10 +30,7 @@ public sealed class BinaryPatternCompletionRegressionTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            methodName);
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
         var completion = new DefiniteOperationFacts(
             compilation,
             CancellationToken.None);

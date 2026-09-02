@@ -45,8 +45,7 @@ public sealed class NestedLocalListPatternEffectTests
             }
             """);
 
-        var result = new EffectAnalysisSession(compilation).Analyze(
-            EffectTestHost.RequireMethod(compilation, "Sample", "Run"));
+        var result = EffectTestHost.AnalyzeSample(compilation, "Run");
 
         using (Assert.EnterMultipleScope())
         {

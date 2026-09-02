@@ -27,11 +27,7 @@ public sealed class IndirectLocalMutationNullnessRegressionTests
                 }
             }
             """);
-        var result = new EffectAnalysisSession(compilation).Analyze(
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                methodName));
+        var result = EffectTestHost.AnalyzeSample(compilation, methodName);
 
         using (Assert.EnterMultipleScope())
         {
@@ -84,11 +80,7 @@ public sealed class IndirectLocalMutationNullnessRegressionTests
                 }
             }
             """);
-        var result = new EffectAnalysisSession(compilation).Analyze(
-            EffectTestHost.RequireMethod(
-                compilation,
-                "Sample",
-                methodName));
+        var result = EffectTestHost.AnalyzeSample(compilation, methodName);
 
         using (Assert.EnterMultipleScope())
         {

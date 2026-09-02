@@ -27,10 +27,7 @@ public sealed class InvocationEvaluationOrderRegressionTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Invoke");
+        var method = EffectTestHost.SampleMethod(compilation, "Invoke");
 
         var summary = new EffectAnalysisSession(compilation)
             .Analyze(method)

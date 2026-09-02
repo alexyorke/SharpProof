@@ -80,10 +80,7 @@ public sealed class FalseSwitchGuardPatternRegressionTests
                     };
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            methodName);
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
 
         var summary = new EffectAnalysisSession(compilation)
             .Analyze(method)

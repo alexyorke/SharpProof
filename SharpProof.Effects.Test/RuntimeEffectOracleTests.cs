@@ -160,8 +160,7 @@ public sealed class RuntimeEffectOracleTests
             }
             """,
             fixture.Reference);
-        var result = new EffectAnalysisSession(compilation).Analyze(
-            EffectTestHost.RequireMethod(compilation, "Sample", "Invoke"));
+        var result = EffectTestHost.AnalyzeSample(compilation, "Invoke");
         var originalOutput = Console.Out;
         using var observedOutput = new StringWriter();
 

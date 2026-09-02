@@ -19,14 +19,8 @@ public sealed class NullableBoxingRoundTripRegressionTests
             }
             """);
         var session = new EffectAnalysisSession(compilation);
-        var unknown = session.Analyze(EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Unknown"));
-        var present = session.Analyze(EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Present"));
+        var unknown = session.Analyze(EffectTestHost.SampleMethod(compilation, "Unknown"));
+        var present = session.Analyze(EffectTestHost.SampleMethod(compilation, "Present"));
 
         using (Assert.EnterMultipleScope())
         {

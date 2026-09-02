@@ -51,10 +51,7 @@ public sealed class AssignableRecursivePatternCompletionRegressionTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            methodName);
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
         var pattern = EffectTestHost.RootOperation(compilation, method)
             .DescendantsAndSelf()
             .OfType<ISwitchExpressionOperation>()

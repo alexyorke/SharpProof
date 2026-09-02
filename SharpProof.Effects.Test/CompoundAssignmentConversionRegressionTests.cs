@@ -206,9 +206,6 @@ public sealed class CompoundAssignmentConversionRegressionTests
         Compilation compilation,
         string methodName)
     {
-        return EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            methodName);
+        return EffectTestHost.SampleMethod(compilation, methodName);
     }
 }

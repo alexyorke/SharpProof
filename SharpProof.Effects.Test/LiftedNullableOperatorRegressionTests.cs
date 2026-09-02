@@ -58,22 +58,10 @@ public sealed class LiftedNullableOperatorRegressionTests
                 }
             }
             """);
-        var binaryMethod = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "SkipBinary");
-        var unaryMethod = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "SkipUnary");
-        var incrementMethod = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "SkipIncrement");
-        var compoundMethod = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "SkipCompound");
+        var binaryMethod = EffectTestHost.SampleMethod(compilation, "SkipBinary");
+        var unaryMethod = EffectTestHost.SampleMethod(compilation, "SkipUnary");
+        var incrementMethod = EffectTestHost.SampleMethod(compilation, "SkipIncrement");
+        var compoundMethod = EffectTestHost.SampleMethod(compilation, "SkipCompound");
         var binaryOperation = Operation(compilation, binaryMethod)
             .DescendantsAndSelf()
             .OfType<IBinaryOperation>()

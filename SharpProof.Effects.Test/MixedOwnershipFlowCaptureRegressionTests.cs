@@ -20,10 +20,7 @@ public sealed class MixedOwnershipFlowCaptureRegressionTests
                 }
             }
             """);
-        var method = EffectTestHost.RequireMethod(
-            compilation,
-            "Sample",
-            "Mutate");
+        var method = EffectTestHost.SampleMethod(compilation, "Mutate");
         var result = new EffectAnalysisSession(compilation).Analyze(method);
 
         using (Assert.EnterMultipleScope())

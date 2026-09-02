@@ -207,6 +207,21 @@ internal static class EffectTestHost
                    .Single(static method => method.MethodKind == MethodKind.Ordinary);
     }
 
+    internal static IMethodSymbol SampleMethod(
+        Compilation compilation,
+        string methodName)
+    {
+        return RequireMethod(compilation, "Sample", methodName);
+    }
+
+    internal static EffectMethodResult AnalyzeSample(
+        Compilation compilation,
+        string methodName)
+    {
+        return new EffectAnalysisSession(compilation)
+            .Analyze(SampleMethod(compilation, methodName));
+    }
+
     internal static IOperation RootOperation(
         Compilation compilation,
         IMethodSymbol method)
