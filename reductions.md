@@ -2622,11 +2622,12 @@ consistent leak.
 
 ### Status (part fifty-six-b)
 
-R482 is `pending` and splits naturally: the three `Analyzer.Core` sites are a
-direct fix requiring no new reference, and the `IDisposable` one is a strict
-duplication of an existing constant. The five `Meta.Analyzers` sites inherit
-R306's open question about that assembly's deliberate isolation and should be
-decided with it, not separately. The `Monitor` declaration is a one-word change.
+R482 is partially applied: the `System.IDisposable` site now uses the existing
+spec-layer constant, and `Monitor` was already a `const` on the current tree.
+The `System.Delegate`/`System.IAsyncDisposable` names have no existing
+constants, while the five Meta.Analyzers sites inherit R306's deliberate
+standalone-isolation question; those remain deferred rather than adding a new
+reference or vocabulary solely for line reduction.
 
 ## Second survey, part fifty-seven: R483-R485 - publication-path identity plumbing
 
@@ -3880,3 +3881,27 @@ R601 refines R600's scope. Preserve the existing lookup and diagnostic semantics
 ### Status (part one hundred forty-three)
 
 R602 is a pending Worker-test harness reduction candidate. Preserve the contract preprocessor symbol, nullable context, metadata-reference set, diagnostic assertion, and suite-specific assembly/subject names; share only the common compilation setup.
+
+## Second survey, part one hundred forty-four: R603 - duplicated frontend expression-operation recovery
+
+| R603 | **`FrontendLoweringTests` and `UnaryAndDefaultLoweringCoverageTests` duplicate the same Roslyn expression-operation recovery.** Both call `SemanticModel.GetOperation`, retry through `CheckedExpressionSyntax` and `ParenthesizedExpressionSyntax` when Roslyn returns no operation, and fail for any other expression shape. The only meaningful difference is the fallback message (generic in one suite and including `expression.Kind()` in the other). A shared frontend-test helper with a caller-provided failure-message factory can remove the duplicate recursion without changing either suite's diagnostics or lowering assertions. | `SharpProof.Frontend.Test/FrontendLoweringTests.cs:1351-1369`; `SharpProof.Frontend.Test/UnaryAndDefaultLoweringCoverageTests.cs:257-279` |
+
+### Status (part one hundred forty-four)
+
+R603 is a pending Frontend-test harness reduction candidate. Preserve the two wrapper-unwrapping cases and each suite's error detail; share only the common operation lookup and recovery.
+
+## Second survey, part one hundred forty-five: R604 - duplicate package-test XML escaping
+
+| R604 | **Two package-test helpers duplicate the same XML escaping and failure guard.** `FinalCompilationProbeTests.Escape` and `IsolatedPackageFeedConfiguration.Escape` both return `SecurityElement.Escape(value)` or throw an `InvalidOperationException` when escaping unexpectedly returns null; only the context-specific message differs. A shared `EscapeOrThrow` test utility accepting the message can remove the duplicate while retaining useful diagnostics at both call sites. | `SharpProof.Package.Test/FinalCompilationProbeTests.cs:1004-1009`; `SharpProof.Package.Test/IsolatedPackageFeedConfiguration.cs:67-72` |
+
+### Status (part one hundred forty-five)
+
+R604 is a pending package-test maintenance candidate. Preserve XML escaping and each contextual exception message; share only the common null-result guard.
+
+## Second survey, part one hundred forty-six: R605 - duplicate packaged-container test guard
+
+| R605 | **Two package-integration suites duplicate the canonical-container admission guard.** `PackageLayoutSmokeTests.RequireContainerWorker` and `WorkerMsBuildIntegrationTests.RequireContainerWorker` both require Linux, process and OS architecture `X64`, and `SHARPPROOF_CONTAINER=1`, then issue the same `Assert.Ignore` message. The Worker MSBuild suite additionally calls `ContainerContract.ValidateRequired()` after admission. A shared test helper can own the platform/marker predicate while leaving that extra contract validation at its existing boundary. | `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:1565-1580`; `SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs:3451-3467` |
+
+### Status (part one hundred forty-six)
+
+R605 is a pending package-test infrastructure reduction candidate. Preserve all three platform checks, the environment marker, and the Worker MSBuild suite's post-guard contract validation; share only the common admission logic and message.

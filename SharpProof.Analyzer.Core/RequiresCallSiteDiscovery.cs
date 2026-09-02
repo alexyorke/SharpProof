@@ -1322,7 +1322,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
         var interfaceName = isAsynchronous
             ? "System.IAsyncDisposable"
-            : "System.IDisposable";
+            : FrameworkTypeMetadataNames.IDisposable;
         var methodName = isAsynchronous
             ? "DisposeAsync"
             : "Dispose";
