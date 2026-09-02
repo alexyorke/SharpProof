@@ -1,49 +1,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Get-SharpProofMutationCatalogSha256 {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object[]]$Mutations
-    )
-
-    $frames = [Collections.Generic.List[string]]::new()
-    foreach ($mutation in $Mutations) {
-        $filterProperty = $mutation.PSObject.Properties['Filter']
-        $filter = if ($null -ne $filterProperty) {
-            [string]$filterProperty.Value
-        }
-        else {
-            [string]$mutation.Test
-        }
-        $fields = @(
-            [string]$mutation.Name,
-            ([string]$mutation.File).Replace('\', '/'),
-            ([string]$mutation.Project).Replace('\', '/'),
-            $filter,
-            [string]$mutation.Original,
-            [string]$mutation.Mutated
-        )
-        foreach ($field in $fields) {
-            $frames.Add(
-                $field.Length.ToString(
-                    [Globalization.CultureInfo]::InvariantCulture) +
-                ':' + $field)
-        }
-    }
-
-    $canonical = [string]::Concat($frames)
-    $hasher = [Security.Cryptography.SHA256]::Create()
-    try {
-        $bytes = [Text.UTF8Encoding]::new($false).GetBytes($canonical)
-        return [Convert]::ToHexString(
-            $hasher.ComputeHash($bytes)).ToLowerInvariant()
-    }
-    finally {
-        $hasher.Dispose()
-    }
-}
-
 function Test-NUnitMultipleAssertionLines {
     param(
         [Parameter(Mandatory = $true)]
@@ -238,42 +195,6 @@ function Test-NUnitAssertionErrorInfo {
             }).Count -eq 0 -and
         (Test-NUnitAssertionMessage -Message $messages[0].InnerText) -and
         (Test-NUnitAssertionStack -StackTrace $stacks[0].InnerText)
-}
-
-function Get-AssertionProvenanceSha256 {
-    param(
-        [Parameter(Mandatory = $true)][object[]]$Results,
-        [Parameter(Mandatory = $true)][Xml.XmlNamespaceManager]$NamespaceManager
-    )
-
-    $frames = [Collections.Generic.List[string]]::new()
-    foreach ($result in @($Results | Sort-Object {
-                $_.GetAttribute('testId')
-            })) {
-        foreach ($value in @(
-                $result.GetAttribute('testId'),
-                $result.GetAttribute('executionId'),
-                $result.SelectSingleNode(
-                    'trx:Output/trx:ErrorInfo/trx:Message',
-                    $NamespaceManager).InnerText,
-                $result.SelectSingleNode(
-                    'trx:Output/trx:ErrorInfo/trx:StackTrace',
-                    $NamespaceManager).InnerText)) {
-            $frames.Add($value.Length.ToString(
-                    [Globalization.CultureInfo]::InvariantCulture) + ':' +
-                $value)
-        }
-    }
-    $hasher = [Security.Cryptography.SHA256]::Create()
-    try {
-        $bytes = [Text.UTF8Encoding]::new($false).GetBytes(
-            [string]::Concat($frames))
-        return [Convert]::ToHexString(
-            $hasher.ComputeHash($bytes)).ToLowerInvariant()
-    }
-    finally {
-        $hasher.Dispose()
-    }
 }
 
 function Test-NUnitMethodIdentity {
@@ -680,20 +601,9 @@ function Read-SharpProofMutationTestEvidence {
         executedCount = $results.Count
         failedCount = $failedResults.Count
         assertionFailureCount = $assertionFailures.Count
-        assertionProvenanceSha256 = $(if ($assertionFailures.Count -eq 0) {
-                $null
-            }
-            else {
-                Get-AssertionProvenanceSha256 `
-                    -Results $assertionFailures `
-                    -NamespaceManager $namespaceManager
-            })
         testLedger = $ledger
         testLedgers = $ledgerByMethod
     }
 }
 
-Export-ModuleMember -Function @(
-    'Get-SharpProofMutationCatalogSha256',
-    'Read-SharpProofMutationTestEvidence'
-)
+Export-ModuleMember -Function 'Read-SharpProofMutationTestEvidence'

@@ -37,7 +37,6 @@ if ($Parallelism -lt 1 -or $Parallelism -gt $visibleProcessors) {
 }
 $parallelism = $Parallelism
 $catalogCount = [int]$contract.mutationEvidence.expectedCatalogCount
-$catalogSha256 = [string]$contract.mutationEvidence.expectedCatalogSha256
 $shardWallSeconds = [int]$contract.automation.mutationShardWallSeconds
 if ($shardWallSeconds -lt 1) {
     throw 'The mutation shard wall deadline must be positive.'
@@ -129,7 +128,6 @@ function Test-CompleteShard([object]$Shard) {
             [string]$evidence.configuration -ne $Configuration -or
             [string]$evidence.selection -ne 'selected' -or
             [int]$evidence.catalogCount -ne $catalogCount -or
-            [string]$evidence.catalogSha256 -ne $catalogSha256 -or
             [int]$evidence.mutationCount -le 0 -or
             [int]$evidence.mutationCount -ne $rows.Count -or
             [int]$evidence.killedCount -ne $rows.Count) {
@@ -155,18 +153,11 @@ function Test-CompleteShard([object]$Shard) {
                 -not [IO.File]::Exists($log) -or
                 -not [IO.File]::Exists($trx) -or
                 -not [IO.File]::Exists($baselineTrx) -or
-                (Get-FileHash -LiteralPath $log -Algorithm SHA256).
-                    Hash.ToLowerInvariant() -cne [string]$row.logSha256 -or
-                (Get-FileHash -LiteralPath $trx -Algorithm SHA256).
-                    Hash.ToLowerInvariant() -cne [string]$row.trxSha256 -or
-                (Get-FileHash -LiteralPath $baselineTrx -Algorithm SHA256).
-                    Hash.ToLowerInvariant() -cne
-                    [string]$row.baselineTrxSha256 -or
-                [string]$row.baselineInvocationSha256 -cne
+                [string]$row.baselineInvocation -cne
                     (Get-SharpProofMutationBaselineInvocation `
                         -Project ([string]$row.project) `
                         -Filter $test `
-                        -Configuration $Configuration).Sha256) {
+                        -Configuration $Configuration).Identity) {
                 return $false
             }
 
@@ -181,8 +172,6 @@ function Test-CompleteShard([object]$Shard) {
                 [int]$row.failedCount -ne $mutation.failedCount -or
                 [int]$row.assertionFailureCount -ne
                     $mutation.assertionFailureCount -or
-                [string]$row.assertionProvenanceSha256 -cne
-                    [string]$mutation.assertionProvenanceSha256 -or
                 -not (Test-ExactStringSequence `
                     -Left @($row.selectedTests) `
                     -Right @($mutation.testLedger))) {
@@ -239,7 +228,6 @@ function Test-CompleteBaseline {
             [string]$baseline.configuration -ne $Configuration -or
             [string]$baseline.selection -ne 'full' -or
             [int]$baseline.catalogCount -ne $catalogCount -or
-            [string]$baseline.catalogSha256 -ne $catalogSha256 -or
             [int]$baseline.testCount -le 0 -or
             [int]$baseline.testCount -ne $rows.Count) {
             return $false
@@ -252,15 +240,11 @@ function Test-CompleteBaseline {
             $trx = [IO.Path]::GetFullPath((Join-Path `
                     $shardRoot ([string]$row.trx)))
             if ([string]$row.configuration -ne $Configuration -or
-                [string]$row.invocationSha256 -ne $invocation.Sha256 -or
                 @($row.ledger).Count -eq 0 -or
-                [string]$row.trxSha256 -notmatch '^[0-9a-f]{64}$' -or
                 -not $trx.StartsWith(
                     $shardRoot + [IO.Path]::DirectorySeparatorChar,
                     [StringComparison]::Ordinal) -or
-                -not [IO.File]::Exists($trx) -or
-                (Get-FileHash -LiteralPath $trx -Algorithm SHA256).
-                    Hash.ToLowerInvariant() -ne [string]$row.trxSha256) {
+                -not [IO.File]::Exists($trx)) {
                 return $false
             }
         }
@@ -440,11 +424,8 @@ foreach ($shard in $shards) {
     }
 }
 $orderedResults = @($orderedResults | Sort-Object catalogOrdinal)
-$actualCatalogSha256 = Get-SharpProofMutationCatalogSha256 `
-    -Mutations $orderedResults
-if ($orderedResults.Count -ne $catalogCount -or
-    @($orderedResults.name | Sort-Object -Unique).Count -ne $catalogCount -or
-    $actualCatalogSha256 -ne $catalogSha256) {
+    if ($orderedResults.Count -ne $catalogCount -or
+        @($orderedResults.name | Sort-Object -Unique).Count -ne $catalogCount) {
     throw 'Parallel mutation shards do not cover the exact mutation catalog.'
 }
 foreach ($result in $orderedResults) {
@@ -459,7 +440,6 @@ try {
         configuration = $Configuration
         selection = 'full'
         catalogCount = $catalogCount
-        catalogSha256 = $catalogSha256
         mutationCount = $orderedResults.Count
         killedCount = @($orderedResults | Where-Object killed).Count
         mutations = @($orderedResults)

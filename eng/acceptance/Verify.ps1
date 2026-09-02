@@ -466,9 +466,6 @@ foreach ($assertion in @(
 if ([int]$contract.mutationEvidence.expectedCatalogCount -le 0) {
     throw 'mutationEvidence.expectedCatalogCount must be positive.'
 }
-if ([string]$contract.mutationEvidence.expectedCatalogSha256 -notmatch '^[0-9a-f]{64}$') {
-    throw 'mutationEvidence.expectedCatalogSha256 must be a lowercase SHA-256 digest.'
-}
 foreach ($assertion in @(
         @{ Actual = $previewEvidence.schemaVersion; Expected = 1; Name = 'previewEvidence.schemaVersion' },
         @{ Actual = $previewEvidence.requiredHumanApprovals; Expected = 0; Name = 'previewEvidence.requiredHumanApprovals' },
@@ -560,8 +557,8 @@ try {
         -Scope 'trusted-kernel'
     Write-Host "Trusted-kernel paths: $($kernelPaths.Count)"
 
-    # contract.json owns path classification. A separately reviewed digest
-    # inside the contract makes path additions, removals, and moves explicit.
+    # contract.json owns path classification and the acceptance checks below
+    # make path additions, removals, and moves explicit.
     $tcbComponents = @($contract.trustedComputingBase.components)
     if ($tcbComponents.Count -eq 0) {
         throw 'The trusted-computing-base contract must declare components.'

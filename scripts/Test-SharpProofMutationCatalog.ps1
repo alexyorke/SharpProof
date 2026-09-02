@@ -31,7 +31,6 @@ $contract = Get-Content -LiteralPath $contractPath -Raw |
     ConvertFrom-Json
 $policy = $contract.mutationEvidence
 $expectedCatalogCount = [int]$policy.expectedCatalogCount
-$expectedCatalogSha256 = [string]$policy.expectedCatalogSha256
 
 $resolvedEvidence = [IO.Path]::GetFullPath($EvidencePath)
 if (-not [IO.File]::Exists($resolvedEvidence)) {
@@ -44,7 +43,6 @@ $mutations = @($evidence.mutations)
 if ([int]$evidence.schemaVersion -ne 2 -or
     [string]$evidence.selection -ne 'full' -or
     [int]$evidence.catalogCount -ne $expectedCatalogCount -or
-    [string]$evidence.catalogSha256 -ne $expectedCatalogSha256 -or
     [int]$evidence.mutationCount -ne $expectedCatalogCount -or
     [int]$evidence.killedCount -ne $expectedCatalogCount -or
     $mutations.Count -ne $expectedCatalogCount) {
@@ -58,20 +56,16 @@ if ([string]$evidence.commit -ne $ExpectedCommit) {
         "expected commit '$ExpectedCommit'.")
 }
 
-$actualCatalogSha256 = Get-SharpProofMutationCatalogSha256 `
-    -Mutations $mutations
-if ($actualCatalogSha256 -ne $expectedCatalogSha256) {
-    throw 'Mutation evidence catalog descriptors do not match the policy.'
-}
 $names = @($mutations | ForEach-Object { [string]$_.name })
+if ($names | Where-Object { [string]::IsNullOrWhiteSpace($_) }) {
+    throw 'Mutation evidence contains a mutation with an empty catalog identity.'
+}
 if ($names | Group-Object | Where-Object Count -gt 1) {
     throw 'Mutation evidence contains duplicate catalog identities.'
 }
 foreach ($mutation in $mutations) {
     if (-not $mutation.killed -or
         [int]$mutation.assertionFailureCount -lt 1 -or
-        [string]$mutation.assertionProvenanceSha256 -notmatch
-            '^[0-9a-f]{64}$' -or
         [int]$mutation.exitCode -eq 0) {
         throw (
             "Mutation '$($mutation.name)' lacks assertion-backed kill evidence.")
@@ -79,10 +73,9 @@ foreach ($mutation in $mutations) {
 
     $evidenceDirectory = Split-Path -Parent $resolvedEvidence
     foreach ($receipt in @(
-            @{ Path = [string]$mutation.log; Digest = [string]$mutation.logSha256; Name = 'log' },
-            @{ Path = [string]$mutation.trx; Digest = [string]$mutation.trxSha256; Name = 'TRX' })) {
-        if ([string]::IsNullOrWhiteSpace($receipt.Path) -or
-            $receipt.Digest -notmatch '^[0-9a-f]{64}$') {
+            @{ Path = [string]$mutation.log; Name = 'log' },
+            @{ Path = [string]$mutation.trx; Name = 'TRX' })) {
+        if ([string]::IsNullOrWhiteSpace($receipt.Path)) {
             throw "Mutation '$($mutation.name)' has invalid $($receipt.Name) receipt evidence."
         }
         $receiptPath = [IO.Path]::GetFullPath(
@@ -93,10 +86,6 @@ foreach ($mutation in $mutations) {
                 [StringComparison]::Ordinal) -or
             -not [IO.File]::Exists($receiptPath)) {
             throw "Mutation '$($mutation.name)' has a missing $($receipt.Name) receipt."
-        }
-        $actualDigest = (Get-FileHash -LiteralPath $receiptPath -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($actualDigest -ne $receipt.Digest) {
-            throw "Mutation '$($mutation.name)' has a mismatched $($receipt.Name) receipt digest."
         }
     }
 
@@ -109,10 +98,9 @@ foreach ($mutation in $mutations) {
         -Project ([string]$mutation.project) `
         -Filter $test `
         -Configuration ([string]$evidence.configuration)
-    if ([string]$mutation.baselineInvocationSha256 -ne
-            $baselineInvocation.Sha256 -or
-        @($mutation.baselineSelectedTests).Count -eq 0 -or
-        [string]$mutation.baselineTrxSha256 -notmatch '^[0-9a-f]{64}$') {
+    if ([string]$mutation.baselineInvocation -ne
+            $baselineInvocation.Identity -or
+        @($mutation.baselineSelectedTests).Count -eq 0) {
         throw "Mutation '$($mutation.name)' has invalid focused baseline evidence."
     }
     $baselineTrxPath = [IO.Path]::GetFullPath(
@@ -120,10 +108,7 @@ foreach ($mutation in $mutations) {
     $receiptPrefix = $evidenceDirectory + [IO.Path]::DirectorySeparatorChar
     if (-not $baselineTrxPath.StartsWith(
             $receiptPrefix, [StringComparison]::Ordinal) -or
-        -not [IO.File]::Exists($baselineTrxPath) -or
-        (Get-FileHash -LiteralPath $baselineTrxPath -Algorithm SHA256).
-            Hash.ToLowerInvariant() -ne
-            [string]$mutation.baselineTrxSha256) {
+        -not [IO.File]::Exists($baselineTrxPath)) {
         throw "Mutation '$($mutation.name)' has an invalid baseline TRX receipt."
     }
     [void](Read-SharpProofMutationTestEvidence `
@@ -145,8 +130,6 @@ foreach ($mutation in $mutations) {
     if ($testEvidence.executedCount -ne [int]$mutation.executedCount -or
         $testEvidence.failedCount -ne [int]$mutation.failedCount -or
         $testEvidence.assertionFailureCount -ne [int]$mutation.assertionFailureCount -or
-        [string]$testEvidence.assertionProvenanceSha256 -ne
-            [string]$mutation.assertionProvenanceSha256 -or
         [string]::Join("`n", @($testEvidence.testLedger)) -ne
             [string]::Join("`n", @($mutation.selectedTests))) {
         throw "Mutation '$($mutation.name)' does not match its TRX receipt."

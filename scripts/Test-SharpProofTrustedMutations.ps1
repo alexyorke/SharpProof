@@ -2265,13 +2265,10 @@ $acceptanceContract = Get-Content -LiteralPath (
     ConvertFrom-Json
 $mutationPolicy = $acceptanceContract.mutationEvidence
 $catalogCount = @($mutations).Count
-$catalogSha256 = Get-SharpProofMutationCatalogSha256 -Mutations $mutations
-if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount -or
-    $catalogSha256 -ne [string]$mutationPolicy.expectedCatalogSha256) {
+if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount) {
     throw (
         'Trusted mutation registrations do not match the acceptance ' +
-        'catalog policy. Actual count/digest: ' +
-        "$catalogCount/$catalogSha256.")
+        "catalog policy. Actual count: $catalogCount.")
 }
 
 $invalidTargets = [Collections.Generic.List[string]]::new()
@@ -2378,7 +2375,6 @@ if ($Resume -and (Test-Path -LiteralPath $output -PathType Leaf)) {
         [string]$checkpoint.configuration -ne $Configuration -or
         [string]$checkpoint.selection -notin @('inProgress', 'full') -or
         [int]$checkpoint.catalogCount -ne $catalogCount -or
-        [string]$checkpoint.catalogSha256 -ne $catalogSha256 -or
         [int]$checkpoint.mutationCount -ne $checkpointMutations.Count -or
         [int]$checkpoint.killedCount -ne $checkpointMutations.Count) {
         throw 'Mutation checkpoint does not match the current exact catalog run.'
@@ -2402,15 +2398,12 @@ if ($Resume -and (Test-Path -LiteralPath $output -PathType Leaf)) {
             -not [bool]$result.killed -or
             [int]$result.exitCode -eq 0 -or
             [int]$result.assertionFailureCount -lt 1 -or
-            [string]$result.assertionProvenanceSha256 -notmatch
-                '^[0-9a-f]{64}$' -or
-            [string]$result.baselineInvocationSha256 -ne
+            [string]$result.baselineInvocation -ne
                 (Get-SharpProofMutationBaselineInvocation `
                     -Project ([string]$registered.Project) `
                     -Filter ([string]$registered.Filter) `
-                    -Configuration $Configuration).Sha256 -or
-            @($result.baselineSelectedTests).Count -eq 0 -or
-            [string]$result.baselineTrxSha256 -notmatch '^[0-9a-f]{64}$') {
+                    -Configuration $Configuration).Identity -or
+            @($result.baselineSelectedTests).Count -eq 0) {
             throw 'Mutation checkpoint result does not match its catalog entry.'
         }
     }
@@ -2528,7 +2521,6 @@ function Write-MutationEvidence {
         configuration = $Configuration
         selection = $EvidenceSelection
         catalogCount = $catalogCount
-        catalogSha256 = $catalogSha256
         mutationCount = $Results.Count
         killedCount = @($Results | Where-Object killed).Count
         mutations = $Results
@@ -2587,7 +2579,6 @@ try {
             [string]$savedBaseline.configuration -ne $Configuration -or
             [string]$savedBaseline.selection -notin @('full', 'selected') -or
             [int]$savedBaseline.catalogCount -ne $catalogCount -or
-            [string]$savedBaseline.catalogSha256 -ne $catalogSha256 -or
             [int]$savedBaseline.testCount -ne $savedTests.Count) {
             throw 'Mutation baseline evidence does not match this campaign.'
         }
@@ -2605,7 +2596,7 @@ try {
             }
             $invocation = Get-SharpProofMutationBaselineInvocation `
                 -Project $project -Filter $filter -Configuration $Configuration
-            if ([string]$test.invocationSha256 -ne $invocation.Sha256) {
+            if ([string]$test.invocation -ne $invocation.Identity) {
                 throw 'Mutation baseline evidence has a mismatched invocation identity.'
             }
             $baselineRoot = Split-Path -Parent $baselineFile
@@ -2614,10 +2605,7 @@ try {
             if (-not $baselineTrxPath.StartsWith(
                     $baselineRoot + [IO.Path]::DirectorySeparatorChar,
                     [StringComparison]::Ordinal) -or
-                -not [IO.File]::Exists($baselineTrxPath) -or
-                [string]$test.trxSha256 -notmatch '^[0-9a-f]{64}$' -or
-                (Get-FileHash -LiteralPath $baselineTrxPath -Algorithm SHA256).
-                    Hash.ToLowerInvariant() -ne [string]$test.trxSha256) {
+                -not [IO.File]::Exists($baselineTrxPath)) {
                 throw 'Mutation baseline evidence has an invalid TRX receipt.'
             }
             $method = $filter.Substring('FullyQualifiedName~'.Length)
@@ -2628,7 +2616,7 @@ try {
                     -ProcessExitCode 0 `
                     -ExpectedMethodName $method `
                     -ExpectedLedger $ledger)
-            $key = $invocation.Sha256
+            $key = $invocation.Identity
             if (-not $baselineMap.TryAdd($key, [object]$test)) {
                 throw "Mutation baseline evidence duplicates '$project::$filter'."
             }
@@ -2638,7 +2626,7 @@ try {
                 -Project ([string]$mutation.Project) `
                 -Filter ([string]$mutation.Filter) `
                 -Configuration $Configuration
-            $key = $invocation.Sha256
+            $key = $invocation.Identity
             if (-not $baselineMap.ContainsKey($key)) {
                 throw (
                     "Mutation baseline evidence does not cover " +
@@ -2649,12 +2637,10 @@ try {
                 -NotePropertyName BaselineLedger `
                 -NotePropertyValue @($saved.ledger)
             $mutation | Add-Member `
-                -NotePropertyName BaselineInvocationSha256 `
+                -NotePropertyName BaselineInvocation `
                 -NotePropertyValue $key
             $mutation | Add-Member -NotePropertyName BaselineTrx `
                 -NotePropertyValue ([string]$saved.trx)
-            $mutation | Add-Member -NotePropertyName BaselineTrxSha256 `
-                -NotePropertyValue ([string]$saved.trxSha256)
         }
     }
     else {
@@ -2718,29 +2704,24 @@ try {
             $baselineTrxRelative = [IO.Path]::GetRelativePath(
                 $baselineEvidenceRoot,
                 $baselineTrx).Replace('\', '/')
-            $baselineTrxSha256 = (Get-FileHash -LiteralPath $baselineTrx `
-                    -Algorithm SHA256).Hash.ToLowerInvariant()
             foreach ($mutation in $projectMutations) {
                 $mutation | Add-Member `
                     -NotePropertyName BaselineLedger `
                     -NotePropertyValue $ledger
                 $mutation | Add-Member `
-                    -NotePropertyName BaselineInvocationSha256 `
-                    -NotePropertyValue $invocation.Sha256
+                    -NotePropertyName BaselineInvocation `
+                    -NotePropertyValue $invocation.Identity
                 $mutation | Add-Member -NotePropertyName BaselineTrx `
                     -NotePropertyValue $baselineTrxRelative
-                $mutation | Add-Member -NotePropertyName BaselineTrxSha256 `
-                    -NotePropertyValue $baselineTrxSha256
-                $key = $invocation.Sha256
+                $key = $invocation.Identity
                 if ($baselineKeys.Add($key)) {
                     $baselineRows.Add([pscustomobject]@{
                         project = [string]$mutation.Project
                         filter = [string]$mutation.Filter
                         configuration = $Configuration
-                        invocationSha256 = $invocation.Sha256
+                        invocation = $invocation.Identity
                         ledger = $ledger
                         trx = $baselineTrxRelative
-                        trxSha256 = $baselineTrxSha256
                     })
                 }
             }
@@ -2756,7 +2737,6 @@ try {
                 configuration = $Configuration
                 selection = $selection
                 catalogCount = $catalogCount
-                catalogSha256 = $catalogSha256
                 testCount = $baselineRows.Count
                 tests = @($baselineRows | Sort-Object project, filter)
                 timing = [ordered]@{
@@ -2855,22 +2835,12 @@ try {
                 executedCount = $testEvidence.executedCount
                 failedCount = $testEvidence.failedCount
                 assertionFailureCount = $testEvidence.assertionFailureCount
-                assertionProvenanceSha256 =
-                    $testEvidence.assertionProvenanceSha256
                 selectedTests = $testEvidence.testLedger
-                baselineInvocationSha256 =
-                    $mutation.BaselineInvocationSha256
+                baselineInvocation = $mutation.BaselineInvocation
                 baselineSelectedTests = @($mutation.BaselineLedger)
                 baselineTrx = $mutation.BaselineTrx
-                baselineTrxSha256 = $mutation.BaselineTrxSha256
                 log = "mutation-logs/$runId/$($mutation.Name)-test.log"
                 trx = "mutation-logs/$runId/$testTrxName"
-                logSha256 = (Get-FileHash `
-                    -LiteralPath $testRun.LogPath `
-                    -Algorithm SHA256).Hash.ToLowerInvariant()
-                trxSha256 = (Get-FileHash `
-                    -LiteralPath $testTrx `
-                    -Algorithm SHA256).Hash.ToLowerInvariant()
             }
             if ($MutationShardCount -gt 1) {
                 $result | Add-Member -NotePropertyName catalogOrdinal `

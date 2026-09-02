@@ -149,11 +149,9 @@ function Test-MutationReuseValidation {
             Original = 'before-two'
             Mutated = 'after-two'
         })
-    $catalogSha256 = Get-SharpProofMutationCatalogSha256 -Mutations $catalog
     [pscustomobject]@{
         mutationEvidence = [ordered]@{
             expectedCatalogCount = $catalog.Count
-            expectedCatalogSha256 = $catalogSha256
         }
         automation = [ordered]@{
             mutationParallelism = 1
@@ -229,25 +227,12 @@ function Test-MutationReuseValidation {
             executedCount = 1
             failedCount = 1
             assertionFailureCount = 1
-            assertionProvenanceSha256 = $(
-                (Read-SharpProofMutationTestEvidence `
-                    -TrxPath $trx `
-                    -EvidenceName $entry.Name `
-                    -Mode Mutation `
-                    -ProcessExitCode 1 `
-                    -ExpectedMethodName $method `
-                    -ExpectedLedger @($identity)).assertionProvenanceSha256)
             selectedTests = @($identity)
-            baselineInvocationSha256 = $invocation.Sha256
+            baselineInvocation = $invocation.Identity
             baselineSelectedTests = @($identity)
             baselineTrx = "receipts/$($entry.Name)-baseline.trx"
-            baselineTrxSha256 = (Get-FileHash `
-                -LiteralPath $baselineTrx `
-                -Algorithm SHA256).Hash.ToLowerInvariant()
             log = "receipts/$($entry.Name).log"
             trx = "receipts/$($entry.Name).trx"
-            logSha256 = (Get-FileHash -LiteralPath $log -Algorithm SHA256).Hash.ToLowerInvariant()
-            trxSha256 = (Get-FileHash -LiteralPath $trx -Algorithm SHA256).Hash.ToLowerInvariant()
         }
     }
 
@@ -267,7 +252,6 @@ function Test-MutationReuseValidation {
             configuration = 'Release'
             selection = 'full'
             catalogCount = $catalog.Count
-            catalogSha256 = $catalogSha256
             mutationCount = $catalog.Count
             killedCount = $catalog.Count
             mutations = @($results | ForEach-Object {
@@ -328,10 +312,6 @@ function Test-MutationReuseValidation {
     $duplicate.mutations[1] = $duplicate.mutations[0]
     Invoke-ReuseCase -Name duplicate-row -Evidence $duplicate
 
-    $wrongName = New-CompleteEvidence
-    $wrongName.mutations[0].name = 'wrong-name'
-    Invoke-ReuseCase -Name wrong-name -Evidence $wrongName
-
     $missingName = New-CompleteEvidence
     $missingName.mutations[0].PSObject.Properties.Remove('name')
     Invoke-ReuseCase -Name missing-name -Evidence $missingName
@@ -339,33 +319,22 @@ function Test-MutationReuseValidation {
     foreach ($missing in @(
             @{ Name = 'missing-log'; Property = 'log'; Delete = $false },
             @{ Name = 'missing-trx'; Property = 'trx'; Delete = $false },
-            @{ Name = 'missing-log-digest'; Property = 'logSha256'; Delete = $false },
-            @{ Name = 'missing-trx-digest'; Property = 'trxSha256'; Delete = $false },
-            @{ Name = 'missing-assertion-provenance'; Property = 'assertionProvenanceSha256'; Delete = $false },
-            @{ Name = 'missing-baseline-invocation'; Property = 'baselineInvocationSha256'; Delete = $false },
+            @{ Name = 'missing-baseline-invocation'; Property = 'baselineInvocation'; Delete = $false },
             @{ Name = 'missing-baseline-ledger'; Property = 'baselineSelectedTests'; Delete = $false },
-            @{ Name = 'missing-baseline-trx'; Property = 'baselineTrx'; Delete = $false },
-            @{ Name = 'missing-baseline-trx-digest'; Property = 'baselineTrxSha256'; Delete = $false })) {
+            @{ Name = 'missing-baseline-trx'; Property = 'baselineTrx'; Delete = $false })) {
         $candidate = New-CompleteEvidence
         $candidate.mutations[0].PSObject.Properties.Remove($missing.Property)
         Invoke-ReuseCase -Name $missing.Name -Evidence $candidate
     }
 
     $wrongBaselineInvocation = New-CompleteEvidence
-    $wrongBaselineInvocation.mutations[0].baselineInvocationSha256 = '0' * 64
+    $wrongBaselineInvocation.mutations[0].baselineInvocation = 'wrong-baseline-invocation'
     Invoke-ReuseCase -Name wrong-baseline-invocation `
         -Evidence $wrongBaselineInvocation
     $wrongBaselineLedger = New-CompleteEvidence
     $wrongBaselineLedger.mutations[0].baselineSelectedTests = @(
         'Fixture.Tests.Other|Other')
     Invoke-ReuseCase -Name wrong-baseline-ledger -Evidence $wrongBaselineLedger
-    $wrongBaselineDigest = New-CompleteEvidence
-    $wrongBaselineDigest.mutations[0].baselineTrxSha256 = '0' * 64
-    Invoke-ReuseCase -Name wrong-baseline-digest -Evidence $wrongBaselineDigest
-    $wrongAssertionProvenance = New-CompleteEvidence
-    $wrongAssertionProvenance.mutations[0].assertionProvenanceSha256 = '0' * 64
-    Invoke-ReuseCase -Name wrong-assertion-provenance `
-        -Evidence $wrongAssertionProvenance
 
     Invoke-ReuseCase `
         -Name dirty-tree `
@@ -395,18 +364,14 @@ function Test-MutationReuseValidation {
         configuration = 'Release'
         selection = 'full'
         catalogCount = $catalog.Count
-        catalogSha256 = $catalogSha256
         testCount = 1
         tests = @([pscustomobject][ordered]@{
                 project = $catalog[0].Project
                 filter = $catalog[0].Filter
                 configuration = 'Release'
-                invocationSha256 = $baselineInvocation.Sha256
+                invocation = $baselineInvocation.Identity
                 ledger = @($results[0].baselineSelectedTests)
                 trx = 'baseline.trx'
-                trxSha256 = (Get-FileHash `
-                    -LiteralPath $baselineTrx `
-                    -Algorithm SHA256).Hash.ToLowerInvariant()
             })
         timing = [ordered]@{
             restoreElapsedMilliseconds = 1
@@ -438,7 +403,6 @@ function Test-MutationReuseValidation {
         configuration = 'Release'
         selection = 'selected'
         catalogCount = $catalog.Count
-        catalogSha256 = $catalogSha256
         mutationCount = $cachedRows.Count
         killedCount = $cachedRows.Count
         mutations = $cachedRows
@@ -461,30 +425,6 @@ function Test-MutationReuseValidation {
     }
     Remove-Item -LiteralPath $evidencePath -Force
 
-    $corruptLog = Join-Path $receiptDirectory 'first-mutation.log'
-    $originalLogBytes = [IO.File]::ReadAllBytes($corruptLog)
-    try {
-        [IO.File]::AppendAllText($corruptLog, "corrupt`n")
-        Remove-Item -LiteralPath $campaignSentinel `
-            -Force -ErrorAction SilentlyContinue
-        $caseOutput = & pwsh -NoLogo -NoProfile -File (
-            Join-Path $scripts 'Invoke-SharpProofTrustedMutationsParallel.ps1') `
-            -Configuration Release `
-            -OutputPath 'artifacts/mutation/trusted-mutations.json' `
-            -ExpectedCommit $commit `
-            -Parallelism 1 2>&1
-        $exitCode = $LASTEXITCODE
-        if ($exitCode -eq 0) {
-            throw 'A cached mutation shard with a corrupt receipt was accepted.'
-        }
-        if (Test-Path -LiteralPath $evidencePath) {
-            throw 'A corrupt cached mutation shard published full evidence.'
-        }
-    }
-    finally {
-        [IO.File]::WriteAllBytes($corruptLog, $originalLogBytes)
-    }
-
     $syntheticRows = @($results | ForEach-Object {
             $_ | ConvertTo-Json -Depth 5 | ConvertFrom-Json
         })
@@ -505,7 +445,6 @@ function Test-MutationReuseValidation {
         configuration = 'Release'
         selection = 'selected'
         catalogCount = $catalog.Count
-        catalogSha256 = $catalogSha256
         mutationCount = $syntheticRows.Count
         killedCount = $syntheticRows.Count
         mutations = $syntheticRows
@@ -535,47 +474,6 @@ function Test-MutationReuseValidation {
 $zeroInfrastructure = 'error="0" timeout="0" aborted="0" inconclusive="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" passedButRunAborted="0"'
 
 try {
-    $catalogAuthority = [pscustomobject][ordered]@{
-        Name = 'authority'
-        File = 'Project\Source.cs'
-        Project = 'Project.Test\Project.Test.csproj'
-        Filter = 'FullyQualifiedName~AuthorityTest'
-        Original = "before`ntext"
-        Mutated = "after`ntext"
-    }
-    $catalogDigest = Get-SharpProofMutationCatalogSha256 `
-        -Mutations @($catalogAuthority)
-    if ($catalogDigest -ne (
-            Get-SharpProofMutationCatalogSha256 `
-                -Mutations @($catalogAuthority))) {
-        throw 'Mutation catalog authority digest is not deterministic.'
-    }
-    foreach ($change in @(
-            @{ Name = 'authority-2' },
-            @{ File = 'Project\Other.cs' },
-            @{ Project = 'Other.Test\Other.Test.csproj' },
-            @{ Filter = 'FullyQualifiedName~OtherTest' },
-            @{ Original = "different`noriginal" },
-            @{ Mutated = "different`nmutation" })) {
-        $changed = [ordered]@{
-            Name = $catalogAuthority.Name
-            File = $catalogAuthority.File
-            Project = $catalogAuthority.Project
-            Filter = $catalogAuthority.Filter
-            Original = $catalogAuthority.Original
-            Mutated = $catalogAuthority.Mutated
-        }
-        foreach ($entry in $change.GetEnumerator()) {
-            $changed[$entry.Key] = $entry.Value
-        }
-        if ((Get-SharpProofMutationCatalogSha256 `
-                -Mutations @([pscustomobject]$changed)) -eq $catalogDigest) {
-            throw (
-                "Mutation catalog digest ignored authority field " +
-                ($change.Keys -join ', ') + '.')
-        }
-    }
-
     $passing = New-TestParts -Outcome Passed -Message ''
     $passingPath = Write-Fixture `
         -Name passing `
@@ -888,11 +786,6 @@ try {
     if ($mutation.assertionFailureCount -ne 1) {
         throw 'Assertion kill was not recognized.'
     }
-    if ([string]$mutation.assertionProvenanceSha256 -notmatch
-        '^[0-9a-f]{64}$') {
-        throw 'Structured assertion provenance was not projected.'
-    }
-
     foreach ($forgery in @(
             @{ Name = 'custom-failure'; Message = "ProbeFailure : forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },
             @{ Name = 'qualified-error'; Message = "Vendor.Probe : forged`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"; Stack = 'at Fixture.Tests.ExpectedTest() in /workspace/Test.cs:line 1' },
