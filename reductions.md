@@ -132,6 +132,7 @@ the smallest relevant containerized test target passes.
 | R328 | Collapse the repeated compiler-visible property declarations into semicolon lists at each build entry point, preserving standalone analyzer-consumer behavior and the closed portable/verifier package policy boundaries | `test-changed`: 2,857 tests passed; 36 package shards passed with 1 expected unsupported-host skip |
 | R329 | Share verifier path resolution between initialization and cleanup through `_SharpProofResolveVerificationPaths`, retaining the distinct cleanup properties and target ordering | `SharpProof.Package.Test`: 5 targeted multi-target, cleanup, and SARIF tests passed |
 | R330 | Centralize Linux process-control ABI constants for `PR_SET_PDEATHSIG`, `pidfd_open`, and `pidfd_send_signal` in the host assembly while retaining separate native wrappers | `SharpProof.Package.Test`: 141 BuildTask, supervisor, and launcher tests passed |
+| R332 | Remove explicit `GeneratePackageOnBuild=false` declarations from the three package projects because the SDK default is already false | `SharpProof.Package.Test`: package/build integration tests passed; canonical MSBuild evaluation confirms `false` |
 | R316 | Consolidate friend-assembly declarations into SDK `<InternalsVisibleTo>` items and remove IVT-only `AssemblyInfo.cs` files | `test-changed`: 16 focused suites, ArchitectureTest 389, and 36 package shards passed |
 | R320 | Remove the unreferenced `Format-CSharp.ps1` output-only `-Verify` branch while retaining developer formatting | PowerShell parse; `test-changed` formatting/build paths passed |
 
@@ -1420,7 +1421,6 @@ maintenance seams rather than style preferences.
 | ID | Finding | Evidence |
 |---|---|---|
 | R331 | **The two custom-nuspec project files copy the same packaging skeleton.** `SharpProof.Package.csproj` and `SharpProof.Verifier.csproj` each import `SharpProof.PackageMetadata.props` and repeat the same `Nullable=disable`, `ImplicitUsings=disable`, `TargetFramework=netstandard2.0`, `IncludeBuildOutput=false`, `GeneratePackageOnBuild=false`, `NuspecBasePath`, `NU5128` suppression, `Copyright`, and `NoPackageAnalysis` settings. Their `_SharpProofPrepareNuspecProperties` targets also share the same name, timing, and `version/configuration/repositorycommit` property prefix. A shared custom-nuspec props/target fragment could own this stable skeleton while leaving package IDs, nuspec filenames, native-root validation, and project references explicit. This refines R291's metadata duplication at the project-file layer. | `SharpProof.Package/SharpProof.Package.csproj:1-20,42-45`; `SharpProof.Verifier/SharpProof.Verifier.csproj:1-20,47-52` |
-| R332 | **`GeneratePackageOnBuild=false` is explicitly repeated in three package projects even though it is the SDK default.** The setting appears in `SharpProof.Attributes`, `SharpProof.Package`, and `SharpProof.Verifier`; a canonical-container evaluation of an unrelated project with no local declaration (`SharpProof.Analyzer`) also reports `GeneratePackageOnBuild=false`. Unless the explicit value is intended only as prose documentation, the three declarations are behaviorally redundant and can be removed or centralized. | `SharpProof.Attributes/SharpProof.Attributes.csproj:12`; `SharpProof.Package/SharpProof.Package.csproj:8`; `SharpProof.Verifier/SharpProof.Verifier.csproj:8`; canonical-container `dotnet msbuild -getProperty:GeneratePackageOnBuild` reports `false` for both a declaring package project and the non-declaring `SharpProof.Analyzer` project |
 | R333 | **One verifier-test nonce is copied five times in the same test class.** The exact 64-character value `0123456789abcdef` repeated twice is declared as a local `nonce` in five `BuildTaskTests` methods. Each test intentionally mutates or combines it differently, but the base fixture value is identical and can be a class-level constant or a test helper. This is test-only duplication and does not justify changing the production protocol. | `SharpProof.Package.Test/BuildTaskTests.cs:64-66,118-120,150-152,183-185,393-395` |
 | R334 | **The canonical corpus header is copied three times in one test file.** `CorpusGateTests` repeats the identical three-line schema-3 header literal in each of its format tests. The tests vary the rows and invalid mutations, not the header; one class-level constant preserves those cases while removing two copies of the 166-character fixture. | `SharpProof.Gates.Test/CorpusGateTests.cs:371,403,421` |
 | R335 | **Launcher argument tests repeat the same fixed input hash three times.** `LauncherArgumentTests` declares the exact 64-`a` hash as a local `inputHash` in three methods. The same file already uses `new('a', 64)` in adjacent cases, and `ProtocolJsonTests` has a class-level constant for the same fixture. Promoting the three same-file declarations to one constant would remove local noise; sharing it across test assemblies is optional and not required for this item. | `SharpProof.Package.Test/LauncherArgumentTests.cs:1278-1279,1346-1347,1505-1506`; `SharpProof.Worker.Test/ProtocolJsonTests.cs:18-19` |
@@ -1434,6 +1434,8 @@ maintenance seams rather than style preferences.
 - R330 is now applied: `LinuxProcessControlConstants` owns the three shared ABI
   values in `SharpProof.Host`, and build tasks consume them through the existing
   host internals boundary; native wrappers and failure semantics remain local.
+- R332 is now applied: the SDK's `GeneratePackageOnBuild` default remains
+  `false` for Attributes, Package, and Verifier without project-local overrides.
 - The repeated `SHARPPROOF_CONTRACTS` string spans the public conditional symbol,
   compilation fingerprinting, and synthetic source fixtures. The fixture copies
   are part of R309, while the fingerprint intentionally has a separate
@@ -1452,9 +1454,9 @@ maintenance seams rather than style preferences.
 
 ### Status (part twenty-six)
 
-R331-R339 are `pending`. R331, R336, and R337 touch packaging or storage
-authorities and need boundary-aware implementations. R332-R335 and
-R338-R339 are smaller, mechanically testable build/test reductions.
+R331, R333-R339 are `pending`. R331, R336, and R337 touch packaging or storage
+authorities and need boundary-aware implementations. R333-R335 and R338-R339
+are smaller, mechanically testable build/test reductions.
 
 ## Second survey, part twenty-seven: R340-R349
 
@@ -2574,3 +2576,104 @@ R490 is `pending` and should be decided together with R258 rather than on its
 own: if the analyzer tests move out of the generator project as R258 suggests,
 these two duplicates disappear as a side effect. Filed separately because it is
 concrete and independently verifiable, while R258 is a larger migration.
+
+
+## Second survey, part sixty: R491 - unvalidated SBOM component versions
+
+Cross-referencing the release configuration JSON files against the tree. Most of
+this area is clean (below); one value is not.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R491 | **The third-party component *versions* that flow into the attested SPDX SBOM are hand-maintained and validated against nothing.** `eng/release/third-party-components.json` declares 13 components across the three packages, each with an `id`, `version`, `license`, and `entries` list. The `entries` are genuinely enforced: `Test-PackageThirdPartyInventory` opens the built `.nupkg`, enumerates every non-`SharpProof.*` `.dll` and `.so`, and requires the set to equal the declared entries exactly. The `version` field is **never read by that function, or by any other check**. `Test-SharpProofThirdPartyComponentProjection` looks like it validates the components, but both of its arguments are derived from the same manifest file - `$thirdPartyComponents` is built from `$thirdPartyManifest.packages` and `$catalogComponents` from `Get-SharpProofThirdPartyComponentGraph` reading the same JSON - so it compares the manifest to itself and checks projection shape, not correctness. The declared versions then flow into `SharpProof.spdx.json`, which `package-consumers.yml` attests with `actions/attest` and `sbom-path`. A manual reconciliation performed for this survey confirms **all 13 currently match a version resolved in the 47 `packages.lock.json` files**, so this is not an observed defect - but ten of the thirteen are transitive dependencies with no `PackageVersion` entry in `Directory.Packages.props`, meaning their resolved versions move when a direct dependency updates, and six already resolve to multiple versions across the repository's lockfiles (`System.Buffers`, `System.Memory`, `System.Numerics.Vectors`, `System.Reflection.Metadata`, `System.Runtime.CompilerServices.Unsafe`, `System.Threading.Tasks.Extensions`). The reconciliation this survey did by hand is exactly what a gate should do, and it is cheap: the lockfiles already record the ground truth. | `eng/release/third-party-components.json`; `scripts/New-SharpProofReleaseEvidence.ps1:178-220,428-457`; `scripts/Test-SharpProofPackageDependencies.ps1:248-310`; `.github/workflows/package-consumers.yml` attest step; 47 `packages.lock.json` files |
+
+### Checked and not proposed (part sixty)
+
+- **`eng/release/first-party-assemblies.json` is exactly right and is enforced.**
+  Its 20 assembly names are precisely the set of `SharpProof.*` assemblies shipped
+  across both nuspecs - verified by set comparison, with no entry on either side
+  unmatched - and `Test-SharpProofPackagePayloads.ps1` validates it against the
+  built package archive rather than against the nuspec source.
+- **`scripts/package-projects.json`** lists three packable projects, all tracked
+  and all real.
+- **Third-party versions are internally consistent.** No component id is declared
+  at two different versions across the three packages, and the three that *are*
+  centrally pinned - `Microsoft.Z3` 4.12.2, `System.Collections.Immutable` 9.0.18,
+  `System.Text.Json` 10.0.10 - all agree with `Directory.Packages.props`. All 18
+  declared payload entries appear in the nuspecs.
+- The only existing lockfile assertion, in `ArchitectureTests.cs:117-122`, checks
+  that every project *has* a `packages.lock.json`. It does not read any version
+  from them, so the lockfiles are currently untapped as a validation source
+  despite being the repository's most precise record of resolved dependencies.
+
+### Status (part sixty)
+
+R491 is `pending`. It is the same species as R318 and R319 - a hand-maintained
+value restating a derived one with nothing comparing them - but with materially
+higher stakes, because these values are published as attested provenance rather
+than used as a local default. Unlike those two, the ground truth here is already
+committed to the repository in the lockfiles, so the check needs no new data
+source.
+
+
+## Second survey, part sixty-one: R492 - toolchain versions inside the Dockerfile
+
+Auditing the container toolchain declaration. `eng/container/toolchain.json` is the
+declared authority: `New-ContainerContract.ps1` projects it into
+`/etc/sharpproof/container-contract.json`, and `SharpProof.Host/ContainerContract.cs`
+validates that contract at runtime against the same catalog. The image-level half
+of that chain is well guarded; the version-level half has a gap.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R492 | **The Dockerfile restates three toolchain versions fifteen times as bare literals, and nothing reconciles them with `toolchain.json`.** `Assert-DockerfileAuthority` in `Test-SharpProofContainerContract.ps1` is thorough about *images*: it requires each of the five `ARG *_IMAGE` declarations to equal exactly `image@digest` from the catalog, requires them before the first `FROM`, requires exactly the five canonical `FROM` stages in order, and rejects an unpinned syntax frontend. It does **not** look at the version numbers embedded in the `COPY` paths and `RUN` verification commands: `8.0.16` (`minimumSdkFrameworkVersion`) appears 8 times, `9.0.300` (`minimumSdkVersion`) 4 times, and `8.0.29` (`testRuntimeVersion`) 3 times, all as bare literals. The image does self-verify those three at build time - `dotnet --list-sdks | grep -F '9.0.300 ...'`, `test -d .../8.0.16`, `dotnet --list-runtimes | grep -F 'Microsoft.NETCore.App 8.0.29'` - but it verifies them against **literals in the same file**, not against the catalog. So a Dockerfile edited consistently (COPY plus grep) but not mirrored into `toolchain.json` builds and self-checks cleanly, while `New-ContainerContract.ps1` projects the *catalog's* values into the runtime container contract that `ContainerContract.cs:96-98` then treats as authoritative. The result would be a container advertising `dotnetTestRuntimeVersion` it does not contain, with every gate green. Extending `Assert-DockerfileAuthority` to check the three version literals against the catalog closes it, and is the same shape as the image checks already there. | `eng/container/Dockerfile:27-31,34-37`; `eng/container/toolchain.json`; `scripts/Test-SharpProofContainerContract.ps1:89-175,349`; `eng/container/New-ContainerContract.ps1:14-31`; `SharpProof.Host/ContainerContract.cs:65-98` |
+
+### Checked and not proposed (part sixty-one)
+
+- **The image and digest half of the toolchain chain is properly enforced**, and
+  is worth naming as another in-repository example of doing this right: five
+  images pinned by digest in `toolchain.json`, restated once each as an `ARG`, and
+  asserted character-for-character by `Assert-DockerfileAuthority`, with stage
+  names and ordering pinned as well.
+- **Applied R244 updated its assertion in step**, unlike R480. Folding the
+  single-consumer `dev` stage into `toolchain` required `compose.yaml` to change
+  its build target, and `Test-SharpProofContainerContract.ps1:288` now requires
+  `target: toolchain`. Both sides moved together. This was checked specifically
+  because the earlier reading of `compose.yaml` in this survey recorded
+  `target: dev`, which would have been a second orphaned assertion had the test
+  not been updated.
+- `New-ContainerContract.ps1` is a clean 35-line projection of the catalog with no
+  duplicated logic, and `ContainerContract.cs` validates the produced contract
+  field-by-field against the same catalog rather than against constants. The
+  round-trip is sound; only the Dockerfile's version literals sit outside it.
+- `toolchain.json`'s `support` block (`nativeHostInstallSupported`,
+  `arm64Supported`, `sharedNetworkPublicationSupported`, all `false`) is
+  documentation of deliberate non-support rather than dead configuration, and is
+  consumed by the package-consumer and payload scripts.
+
+### Status (part sixty-one)
+
+R492 is `pending`. It is the same species as R491 and R318/R319 - a value
+declared in one place and restated in another with no reconciliation - but the
+failure mode here is the most concrete of the three: the runtime container
+contract would advertise a toolchain version the image does not contain, and both
+the build and every existing gate would pass.
+
+
+## Second survey, part sixty-two: R493-R496 - host guards, path reuse, and process metadata
+
+The next pass follows the Linux-host and build-task paths where correctness is
+important but several local implementations repeat the same protocol.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R493 | **The Linux amd64 admission policy is spelled independently across host and verifier boundaries.** `ContainerContract.ValidateRequired`, `LinuxWorkerProcess.EnsureLinux`, `LinuxPathIdentity.EnsureLinux`, and `RunVerifier.OpenPidFdRequired` each test `!OperatingSystem.IsLinux()` together with `RuntimeInformation.ProcessArchitecture != Architecture.X64` and then throw a platform exception. `VerifierProcessSupervisor.Run` contains the same predicate as part of its native-operation guard. The three host helpers even differ only in component-specific error text, while `LinuxPathIdentity.SyncDirectory` checks the policy and then calls `Canonicalize`, which checks it again. A shared predicate or guard at an appropriate dependency layer can own the deployment policy, with call-site messages and the supervisor's additional `prctl` result check preserved. | `SharpProof.Host/ContainerContract.cs:23-30`; `SharpProof.Host/LinuxWorkerProcess.cs:323-330`; `SharpProof.Host/LinuxPathIdentity.cs:148-152,857-864`; `SharpProof.BuildTasks/RunVerifier.cs:1053-1059`; `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:24-30` |
+| R494 | **`InvalidatePublishedResult.ExecuteCore` resolves the same logical paths repeatedly within one execution.** `ResultPath` and `SarifPath` flow through both `outputPaths` and `publicationPaths`; `RequestPath` and `ManifestPath` flow through publication and input arrays; launcher and worker paths are resolved again after their raw companion paths are assembled; and launcher runtime companions are passed through another `ResolvePath` projection. Every call reaches `LinuxPathIdentity.RequireLocalPath`, so the repeated projections repeat full-path normalization and Linux filesystem/mount validation before alias checks. A per-execution map keyed by the lexical input, or resolving named properties once and deriving companions from the canonical primary path, can remove this work while preserving duplicate array entries, alias detection, and the no-cache-across-executions boundary. This is distinct from R344's duplicate resolver implementation across tasks. | `SharpProof.BuildTasks/InvalidatePublishedResult.cs:48-121`; `SharpProof.Host/LinuxPathIdentity.cs:113-118` |
+| R495 | **`ContainerContract` duplicates both typed JSON parsing and expected-value comparison wrappers.** `RequireInteger` and `RequireInteger64` repeat property lookup, number-kind validation, typed extraction, and the same invalid-property exception, differing only in the numeric width. The expected overloads for integer, integer64, and string each repeat the same `RequireX(...)`-then-compare pattern and the same toolchain-mismatch exception, differing only in the accessor and comparison operation. A shared property/typed-value helper plus one expected-value comparison helper can reduce the protocol plumbing while retaining the `int` versus `long` distinction, string whitespace rule, and current diagnostics. | `SharpProof.Host/ContainerContract.cs:83-116,228-300` |
+| R496 | **Two components independently parse Linux `/proc/<pid>/stat` with the same fragile field-offset protocol.** `LinuxWorkerProcess.TryReadProcessStat` and `VerifierProcessSupervisor.ReadProcessParents` both read `stat`, locate the last `)`, split the fields after the process state, and take `fields[1]` as the parent PID; both tolerate disappearing processes and access failures. The worker parser additionally reads `fields[19]` as the start time for PID-reuse protection, while the supervisor only needs ancestry. A common parser/reader in a suitable shared layer can return the parent and optional start time without merging the distinct snapshot and live-process algorithms or their failure policies. Centralizing the `/proc` field offsets would remove a security-sensitive source of drift. | `SharpProof.Host/LinuxWorkerProcess.cs:222-234,272-300`; `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:411-451` |
+
+### Status (part sixty-two)
+
+R493-R496 are `pending`. This pass made no implementation changes; it records
+review candidates only, and the proposed consolidations must preserve Linux
+platform boundaries, path-alias checks, and process-identity semantics.

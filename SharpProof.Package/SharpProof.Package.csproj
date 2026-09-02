@@ -5,7 +5,6 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <TargetFramework>netstandard2.0</TargetFramework>
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <NuspecFile>SharpProof.nuspec</NuspecFile>
     <NuspecBasePath>$(MSBuildProjectDirectory)</NuspecBasePath>
     <NoWarn>$(NoWarn);NU5128</NoWarn>

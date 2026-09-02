@@ -9,7 +9,6 @@
     <PackageTags>SharpProof;Attributes;Contracts;Purity;StaticAnalysis;MethodEffects;Capabilities;ZeroAllocations;Exceptions;Preconditions;Postconditions</PackageTags>
     <Title>SharpProof Attributes</Title>
     <PackageReleaseNotes>Breaking soundness-first preview with compiler-bound Contract APIs, closed contract attributes, explicit suppression and trust declarations, and the effect-contract flagship.</PackageReleaseNotes>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
     <None Include="..\README.md">
