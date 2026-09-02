@@ -19,6 +19,7 @@ internal static class CompilerCompilationCapture
             CSharpCompilation compilation,
             CancellationToken cancellationToken)
         {
+            var seenPaths = new HashSet<string>(StringComparer.Ordinal);
             Trees = [.. compilation.SyntaxTrees.Select((tree, index) =>
             {
                 var snapshot = CaptureTree(tree, cancellationToken);
@@ -29,8 +30,7 @@ internal static class CompilerCompilationCapture
                 {
                     snapshot.Path = $"<compiler-generated:{index}>";
                 }
-                else if (compilation.SyntaxTrees.Take(index).Any(
-                             prior => string.Equals(prior.FilePath, tree.FilePath, StringComparison.Ordinal)))
+                else if (!seenPaths.Add(tree.FilePath))
                 {
                     snapshot.Path = $"{snapshot.Path}#{index}";
                 }

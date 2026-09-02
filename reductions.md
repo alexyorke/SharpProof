@@ -4209,14 +4209,6 @@ R651 is deferred: the apparent duplicate work crosses an intentional trust bound
 
 R652 is deferred: envelope equality and compilation-shape validation are intentional independent trust-boundary checks. Keep both catalog-integrity validations and their fail-closed behavior until a proof that shares results without weakening either boundary is available.
 
-## Second survey, part one hundred ninety-four: R653 - quadratic syntax-tree path detection
-
-| R653 | **`CompilerCompilationCapture.SyntaxTreeCache` rescans every prior syntax tree to detect duplicate paths.** The `Select` callback calls `compilation.SyntaxTrees.Take(index).Any(...)` for each tree, making duplicate-path detection quadratic in the number of syntax trees even though the result only needs an ordinal, path-keyed seen set. A single-pass `HashSet<string>` using the existing ordinal comparison can retain generated-tree identities, the current `#index` suffix convention, and capture order while removing the repeated prefix enumeration. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:16-43` |
-
-### Status (part one hundred ninety-four)
-
-R653 is a pending compiler-capture complexity reduction candidate. Preserve the exact generated-path sentinel, ordinal path comparison, absolute compilation index in duplicate suffixes, cancellation behavior, and stable tree ordering; change only the duplicate-path bookkeeping.
-
 ## Second survey, part one hundred ninety-five: R654 - repeated replay-row hashing
 
 | R654 | **`CompilerEffectClaimArtifactCodec` walks replay events separately for validation and each digest.** `Validate` checks every event with `HasValidReplayEvent` and then calls `ComputeSha256`, whose `AddReplayEvent` loop traverses the same rows and fields again; `Seal` likewise computes each operation identity in one loop before the evidence digest walks the events again. A combined per-event validation/hash accumulator can retain the distinct operation-identity and whole-evidence hash domains, ordinal and nullable-field normalization, and fail-closed validation while removing the repeated replay-row traversal. | `SharpProof.CompilerArtifact/CompilerEffectClaimArtifactCodec.cs:12-40,138-184,229-280` |
