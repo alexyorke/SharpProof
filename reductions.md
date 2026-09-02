@@ -113,6 +113,7 @@ the smallest relevant containerized test target passes.
 | R244 | Fold the single-consumer Dockerfile `dev` stage into the final `toolchain` stage | `docker compose config --quiet`; ContainerAuthorityScriptTests: 15 passed; tooling image rebuilt successfully |
 | R245 | Remove duplicate Dev Container environment overrides and the empty port-forward list | DevContainerIsNonRootPinnedAndDoesNotNestDocker: 1 passed; JSON parse |
 | R246 | Route CI, nightly, coverage, and reusable security image setup through the existing qualified-packages action with downloads disabled | DependencyAutomationTests: 8 passed |
+| R248 | Remove the generic, superseded `.cursorrules` file | `test-changed`: ArchitectureTest 389 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -182,6 +183,7 @@ status document.
 | R120 | Stale build-output directories are not tracked code and do not belong in this branch. |
 | R155 | Trimming generic `.gitignore` boilerplate is not a code reduction and has negligible maintenance value. |
 | R227 | The approximation types are a documented reserved design slot. |
+| R247 | Retain the editor-integration fixture: `.opencode` is explicitly bound by architecture tests and the usefulness audit, so deleting it would remove a user-facing tool rather than product/build duplication. |
 
 ## Merged duplicates
 
@@ -239,8 +241,6 @@ deferred entry say so explicitly and do not lift that deferral.
 | ID | Finding | Evidence |
 |---|---|---|
 | R240 | The command vocabulary is declared in four places that must agree: the `build.ps1` `ValidateSet` (21 profiles), the `Invoke-SharpProofContainer.ps1` `ValidateSet` (37 commands), and the `requires_clean_exact_commit_source` (11) and `requires_git_source` (8) case lists in `entrypoint.sh`. Adding a command means editing between two and four of them, and nothing checks that the sets remain consistent. | `build.ps1:4-10`; `scripts/Invoke-SharpProofContainer.ps1:3`; `eng/container/entrypoint.sh:53-76` |
-| R247 | `.opencode/` contributes 438 tracked lines, of which 431 are an npm lockfile, to support a one-line plugin re-export for a third-party agent tool. It is not part of the product, its build, or its gates, and it is the only npm dependency graph in a repository whose supply-chain controls (`NuGetAudit`, `RestoreLockedMode`, exact-SHA action pinning, `Test-SharpProofDependencyAudit.ps1`) cover NuGet and GitHub Actions only. | `.opencode/package-lock.json`, `.opencode/package.json`, `.opencode/plugins/oh-my-goal.js` |
-| R248 | `.cursorrules` contains only generic advice about comments and commented-out code, with no SharpProof-specific rule, while `AGENTS.md` is the repository's actual agent authority. | `.cursorrules`; `AGENTS.md` |
 
 ### Generators
 
@@ -290,7 +290,7 @@ deferred entry say so explicitly and do not lift that deferral.
 
 ### Status
 
-R229, R233, R240, and R247 through R262 are `pending`, and the active follow-up queue above is
+R229, R233, R240, and R249 through R262 are `pending`, and the active follow-up queue above is
 extended by them; the existing entries in that queue are unchanged. Items that
 refine a deferred entry (R233 under R070, R246 under R069/R132, R259 under
 R027-R031 and R149, R262 under R066-R070) do not lift that deferral. R241, R255,
