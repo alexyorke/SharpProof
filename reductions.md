@@ -4369,7 +4369,7 @@ R717 completed: each local-reference ordering key is projected once before sorti
 
 | R718 | **`BlockMayThrowBeforeAssignmentCommit` rescans the entire CFG for each qualifying assignment reference.** Once a tracked value is killed, the helper walks the reference's ancestors to find the owning simple assignment and then scans every block and descendant operation bounded by the same `after`/commit span; multiple qualifying references or repeated paths can repeat that full graph walk. Cache the bounded throw result by graph/assignment interval (or pre-index throwing operations) while retaining the current span bounds and `RoslynCfgThrowFacts` predicate. | `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1202-1232` |
 
-R718 is a pending assignment-commit exception-scan reduction candidate. Preserve multi-block RHS coverage, exceptional-successor semantics, and the current conservative result when no owning assignment is found.
+R718 completed: cached each bounded assignment throw scan within a reachability query by syntax-tree/span/after interval, preserving multi-block RHS coverage, exceptional-successor semantics, and the existing false result when no owning assignment is found.
 
 ### Status (part two hundred forty-five)
 

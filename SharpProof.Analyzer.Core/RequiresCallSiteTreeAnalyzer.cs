@@ -635,6 +635,11 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 int DefinitionBlock,
                 int DefinitionEnd,
                 string[]? TuplePath)>();
+            var assignmentThrowCache = new Dictionary<(
+                SyntaxTree Tree,
+                int Start,
+                int End,
+                int After), bool>();
             var searched = new Dictionary<
                 ILocalSymbol,
                 HashSet<(
@@ -733,7 +738,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                                         BlockMayThrowBeforeAssignmentCommit(
                                             graph,
                                             after,
-                                            reference);
+                                            reference,
+                                            assignmentThrowCache);
                                     killed = true;
                                     break;
                                 }
@@ -1209,7 +1215,12 @@ internal static partial class RequiresCallSiteTreeAnalyzer
         private static bool BlockMayThrowBeforeAssignmentCommit(
             ControlFlowGraph graph,
             int after,
-            ILocalReferenceOperation reference)
+            ILocalReferenceOperation reference,
+            IDictionary<(
+                SyntaxTree Tree,
+                int Start,
+                int End,
+                int After), bool> cache)
         {
             for (var operation = reference.Parent;
                  operation != null;
@@ -1218,13 +1229,22 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                 if (operation is ISimpleAssignmentOperation assignment)
                 {
                     var commitEnd = assignment.Syntax.Span.End;
+                    var key = (
+                        assignment.Syntax.SyntaxTree,
+                        assignment.Syntax.SpanStart,
+                        commitEnd,
+                        after);
+                    if (cache.TryGetValue(key, out var cached))
+                    {
+                        return cached;
+                    }
 
                     // The assignment's RHS may be lowered across several
                     // basic blocks (e.g. a ternary or coalesce), so the
                     // throwing sub-expression is not necessarily in the
                     // same block as the commit. Scan every block, bounded
                     // by the assignment's own syntax span.
-                    return graph.Blocks
+                    var result = graph.Blocks
                         .SelectMany(BlockOperations)
                         .Where(candidate =>
                             candidate.Syntax.Span.End > after &&
@@ -1233,6 +1253,8 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                             candidate.DescendantsAndSelf())
                         .Any(static candidate =>
                             RoslynCfgThrowFacts.OperationMayThrow(candidate));
+                    cache.Add(key, result);
+                    return result;
                 }
             }
             return false;
