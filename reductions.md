@@ -6037,3 +6037,22 @@ implementation or build file was changed.
 
 R790 is `pending` and limited to the acceptance/package-consumer framework
 matrix. No implementation or build file was changed.
+
+## Second survey, part three hundred two: R791 - duplicated timed phase wrappers
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R791 | **The developer-check and package-test orchestrators duplicate the timed-phase wrapper.** `Invoke-SharpProofDevCheck.ps1` and `Invoke-SharpProofPackageTests.ps1` each start a `Stopwatch`, invoke a supplied scriptblock, stop the timer, and append the same `{ name, elapsedMilliseconds }` record to a local timing list. The package-test variant wraps invocation in `try/finally`, so failed phases still produce timing evidence; the developer-check variant records only successful phases. A shared timing helper that accepts the destination collection and an explicit failure-recording policy, or a callback for recording the result, can remove the repeated stopwatch/object plumbing while preserving those different failure semantics and each command's separate timing-file lifecycle. | `scripts/Invoke-SharpProofDevCheck.ps1:78-91`; `scripts/Invoke-SharpProofPackageTests.ps1:228-245` |
+
+### Checked and not proposed (part three hundred two)
+
+- The failure-recording difference is intentional evidence behavior and must
+  remain explicit; this candidate is the shared timing protocol, not a change
+  to which phases run or whether a failed command aborts.
+- The two scripts retain separate phase names, timing schemas, and output
+  paths; only the local wrapper implementation is duplicated.
+
+### Status (part three hundred two)
+
+R791 is `pending` and limited to timed-phase orchestration helpers. No
+implementation or build file was changed.
