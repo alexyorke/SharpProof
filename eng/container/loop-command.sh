@@ -67,6 +67,17 @@ trust_git_directory() {
   fi
 }
 
+validate_relative_path() {
+  local path="$1"
+  local inventory="$2"
+  case "${path}" in
+    ""|/*|../*|*/../*)
+      echo "Invalid path in the SharpProof loop ${inventory} inventory." >&2
+      exit 125
+      ;;
+  esac
+}
+
 trust_git_directory "${source_root}"
 if ! git -C "${source_root}" rev-parse --is-inside-work-tree \
     >/dev/null 2>&1; then
@@ -168,12 +179,7 @@ git -C "${target_root}" ls-files -z \
   --others --exclude-standard -- > "${target_manifest}"
 git -C "${target_root}" reset --hard --quiet
 while IFS= read -r -d '' relative_path; do
-  case "${relative_path}" in
-    ""|/*|../*|*/../*)
-      echo "Invalid path in the SharpProof loop target inventory." >&2
-      exit 125
-      ;;
-  esac
+  validate_relative_path "${relative_path}" target
   if ! grep -Fzxq -- "${relative_path}" "${source_manifest}"; then
     rm -f -- "${target_root}/${relative_path}"
   fi
@@ -187,12 +193,7 @@ if [[ -s "${source_patch}" ]]; then
     --binary --whitespace=nowarn "${source_patch}"
 fi
 while IFS= read -r -d '' relative_path; do
-  case "${relative_path}" in
-    ""|/*|../*|*/../*)
-      echo "Invalid path in the SharpProof loop source inventory." >&2
-      exit 125
-      ;;
-  esac
+  validate_relative_path "${relative_path}" source
   source_path="${source_files_root}/${relative_path}"
   target_path="${target_root}/${relative_path}"
   mkdir -p -- "$(dirname "${target_path}")"

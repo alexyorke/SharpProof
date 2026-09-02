@@ -200,6 +200,7 @@ the smallest relevant containerized test target passes.
 | R555 | Remove the unread release-authority path local | `SharpProof.ArchitectureTest`: ReleaseConfigurationScript 1 passed |
 | R556 | Remove the misleading release-configuration set-membership forwarder | `SharpProof.ArchitectureTest`: ReleaseConfigurationScript 1 passed |
 | R570 | Remove the unused Docker Compose version probe from the build entry point | `SharpProof.ArchitectureTest`: LocalProfilesMatchTheWorkflowCommands 1 passed |
+| R559 | Share the loop command's relative-path safety guard | `SharpProof.ArchitectureTest`: ContainerSourceCleanlinessTests 39 passed |
 | R447 | Share finite-domain formula validation between oracle entry points | `SharpProof.Fuzz.Test`: 39 passed |
 | R454 | Cache the generated-code decision during analyzer method-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R457 | Reuse one symbol-attribute snapshot during control-attribute validation | `SharpProof.Analyzer.Test`: 476 passed |
@@ -3485,9 +3486,9 @@ and validation before the regular-file scan.
 
 ### Status (part one hundred one)
 
-R559 is a `pending` reduction candidate. Keep validation before both destructive
-or copying operations and preserve the distinct target/source error context; only
-share the path predicate.
+R559 is applied: target reconciliation and source materialization now call one
+relative-path validator, while its inventory-specific diagnostics and validation
+ordering remain distinct.
 
 ## Second survey, part one hundred two: R560 - production inventory path validation
 
@@ -3642,3 +3643,11 @@ R578 is a pending compiler-collector reduction candidate. Keep normalization ins
 ### Status (part one hundred twenty)
 
 R579 is a pending compiler-collector reduction candidate. Preserve the diagnostic-failure and normal-lowering branches and their distinct failure metadata; centralize only the identical effect evidence/authority attachment.
+
+## Second survey, part one hundred twenty-one: R580 - discarded specification-pack evidence
+
+| R580 | **`CompilerSpecificationPackProvider` validates pack-level evidence and then drops it.** `ParsePack` requires the catalog's `evidence` property, but `PackDefinition` stores only `Id`, `Version`, and `Methods`; no provider or artifact path reads the evidence string afterward. The catalog-wide SHA still authenticates the bytes, so changing the field changes the authority digest, but the field contributes no surfaced provenance while imposing a schema and parser obligation. Either carry the evidence into the emitted specification-pack authority/provenance or remove the unused field and validation if it is only stale documentation. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:417-431,799-804`; `SharpProof.Specs/RelationalSpecPackCatalog.json:7-9` |
+
+### Status (part one hundred twenty-one)
+
+R580 is a pending specification-pack schema reduction candidate. Preserve catalog digest binding and method evidence identity; only remove or surface the currently discarded pack-level evidence value.
