@@ -310,37 +310,22 @@ function New-ShardTiming {
     else {
         $null
     }
-    return [pscustomobject]@{
+    $result = [ordered]@{
         index = $Shard.Index
         mutationCount = [int]$Evidence.mutationCount
         elapsedMilliseconds = $ElapsedMilliseconds
         reused = $Reused
-        restoreElapsedMilliseconds =
-            $(if ($null -ne $timing) {
-                [long]$timing.restoreElapsedMilliseconds
-            }
-            else { 0L })
-        baselineElapsedMilliseconds =
-            $(if ($null -ne $timing) {
-                [long]$timing.baselineElapsedMilliseconds
-            }
-            else { 0L })
-        mutationElapsedMilliseconds =
-            $(if ($null -ne $timing) {
-                [long]$timing.mutationElapsedMilliseconds
-            }
-            else { 0L })
-        baselineInvocationCount =
-            $(if ($null -ne $timing) {
-                [int]$timing.baselineInvocationCount
-            }
-            else { 0 })
-        mutationInvocationCount =
-            $(if ($null -ne $timing) {
-                [int]$timing.mutationInvocationCount
-            }
-            else { 0 })
     }
+    foreach ($name in @(
+            'restoreElapsedMilliseconds',
+            'baselineElapsedMilliseconds',
+            'mutationElapsedMilliseconds')) {
+        $result[$name] = if ($null -eq $timing) { 0L } else { [long]$timing.$name }
+    }
+    foreach ($name in @('baselineInvocationCount', 'mutationInvocationCount')) {
+        $result[$name] = if ($null -eq $timing) { 0 } else { [int]$timing.$name }
+    }
+    return [pscustomobject]$result
 }
 
 $running = [Collections.Generic.List[object]]::new()
