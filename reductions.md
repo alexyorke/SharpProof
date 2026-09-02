@@ -654,8 +654,11 @@ observation rather than a reduction, and is filed as such.
 
 ### Status (part four)
 
-R285, R286, and R288 are `pending`. Applied R289 replaces the private sequence
-helper with the ordinal framework comparer. R287 is not a reduction and should not
+R285 and R286 remain `pending` because cross-assembly operation traversal
+sharing would add a dependency seam. R288 is applied: `.gitattributes` retains
+the live LF normalization rule and drops inert template directives. Applied
+R289 replaces the private sequence helper with the ordinal framework comparer.
+R287 is not a reduction and should not
 be treated as one: it is a possible soundness inconsistency between four
 predicates that answer the same question, and merging them would change analysis
 verdicts. It belongs to an owner of the abstract-value semantics, under the same
@@ -3811,3 +3814,27 @@ R594 is a pending Frontend program-lowering reduction candidate. Preserve evalua
 ### Status (part one hundred thirty-six)
 
 R595 is a pending Frontend program-lowering robustness reduction candidate. Preserve the prepass's side-effect ordering and stop-at-boundary rules; replace only the unbounded recursive traversal.
+
+## Second survey, part one hundred thirty-seven: R596 - duplicate IR shrinker child materialization
+
+| R596 | **`IrStructuralShrinker.GetCandidates` materializes the same child list twice.** The method first calls `Children(term)` to offer direct child candidates, then calls `Children(term)` again before recursively shrinking each child; `Children` constructs a fresh immutable array for every IR node. Holding one local child array for both passes preserves candidate order and the complete child set while removing one allocation and traversal of the node-shape switch per shrinker step. | `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs:500-522` |
+
+### Status (part one hundred thirty-seven)
+
+R596 is a pending fuzz-shrinker reduction candidate. Preserve the direct-child candidates before recursively rebuilt candidates; reuse only the already-materialized child array.
+
+## Second survey, part one hundred thirty-eight: R597 - repeated IR shrinker size walks
+
+| R597 | **`IrStructuralShrinker.MinimizeAsync` and `GetCandidates` repeatedly compute the same structural sizes.** Each minimization pass calculates `StructuralSize(current)`, `GetCandidates` recalculates `StructuralSize(term)`, and every candidate is sized once inside `Add` and again by the outer `StructuralSize(candidate) >= currentSize` filter. Because `StructuralSize` walks the whole shared IR DAG, threading the current/original and candidate sizes through the shrinker removes repeated whole-term traversals without changing the strictly-decreasing acceptance rule. | `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs:437-443,480-490` |
+
+### Status (part one hundred thirty-eight)
+
+R597 is a pending fuzz-shrinker performance reduction candidate. Retain the existing size comparison and candidate de-duplication; avoid only recomputing sizes already known to the same shrink iteration.
+
+## Second survey, part one hundred thirty-nine: R598 - duplicated frontend fuzz environment binding
+
+| R598 | **`FrontendDifferentialOracle` duplicates the lowering-variable binding loop for ordinary and semantic-edge fuzz cases.** `CreateEnvironment` and `CreateSemanticEdgeEnvironment` both enumerate `lowering.Variables`, retain only parameters belonging to the generated method, and add an IR-variable binding; they then diverge only in converting fixed `GeneratedCSharpCase` slots versus arbitrary semantic-edge arguments. A shared parameter-binding iterator or callback can own the symbol/ordinal admission and leave those two value-conversion policies separate, removing duplicated Roslyn-symbol traversal and insertion scaffolding. | `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1215-1259,1364-1393` |
+
+### Status (part one hundred thirty-nine)
+
+R598 is a pending frontend-fuzzing infrastructure reduction candidate. Preserve the generated-case slot mapping, arbitrary argument conversion, sequence-origin tracking, and parameter-containing-symbol check; centralize only the common binding traversal.
