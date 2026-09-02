@@ -4193,14 +4193,6 @@ R638 is a pending compiler-collector traversal reduction candidate. Preserve sco
 
 R639 is a pending specification-pack admission/lookup reduction candidate. Preserve pack overlap rejection, method-shape/type checks, source/IL fallback ordering, and fail-closed resolution; share or cache only the repeated pack-definition validation.
 
-## Second survey, part one hundred eighty-five: R644 - duplicate diagnostic-shape pass
-
-| R644 | **`CompilerManifestArtifactJson.Serialize` checks diagnostic shapes before canonicalization and then checks them again inside `Validate`.** The early `HasValidDiagnosticShapes` guard exists at lines 337-340, while `Validate` calls `HasValidDiagnostics`, whose first operation is the same per-item shape predicate before checking canonical ordering and source binding. Canonicalization only reorders the array and does not change item shape, so one shape pass can be retained at the validation boundary while preserving the early JSON-specific failure behavior through a narrower canonicalizer precondition or a shared validation result. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:330-356,429-457,750-772` |
-
-### Status (part one hundred eighty-five)
-
-R644 is a pending compiler-manifest diagnostic-validation reduction candidate. Preserve the early invalid-diagnostic exception, canonical diagnostic ordering, source-tree binding, and error semantics; remove only the duplicate shape predicate.
-
 ## Second survey, part one hundred eighty-six: R645 - repeated claim partitioning
 
 | R645 | **`CompilerManifestArtifactJson.HasFeatureScopeParity` rescans and repartitions the full manifest claim array three times for every callable.** It independently builds `claims`, `postconditions`, and `effects` with three `Where(...).OrderBy(...).ToArray()` pipelines over `manifestClaims` inside the callable loop. A single grouping/partition pass keyed by `CallableId` can supply the three views and avoid O(callables x claims) repeated enumeration while keeping postcondition/effect ordering and all selected-feature checks unchanged. | `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:526-568` |

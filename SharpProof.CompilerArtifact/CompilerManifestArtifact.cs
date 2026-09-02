@@ -352,7 +352,12 @@ internal static class CompilerManifestArtifactJson
                 .ThenBy(static item => item?.OwnerId, StringComparer.Ordinal)
         ];
         cancellationToken.ThrowIfCancellationRequested();
-        Validate(artifact, cancellationToken);
+        Validate(
+            artifact,
+            validateFeatureScope: true,
+            validateDecodability: true,
+            cancellationToken,
+            validateDiagnosticShapes: false);
         cancellationToken.ThrowIfCancellationRequested();
         var json = JsonSerializer.Serialize(
                 artifact,
@@ -428,11 +433,16 @@ internal static class CompilerManifestArtifactJson
         CompilerManifestArtifact value,
         bool validateFeatureScope,
         bool validateDecodability,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool validateDiagnosticShapes = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         RequireValid(
-            HasValidDiagnostics(value.CompilerDiagnostics, value.Compilation, cancellationToken));
+            HasValidDiagnostics(
+                value.CompilerDiagnostics,
+                value.Compilation,
+                cancellationToken,
+                validateDiagnosticShapes));
         cancellationToken.ThrowIfCancellationRequested();
         RequireValid(HasValidEnvelope(value));
         cancellationToken.ThrowIfCancellationRequested();
@@ -744,9 +754,10 @@ internal static class CompilerManifestArtifactJson
     private static bool HasValidDiagnostics(
         CompilerDiagnosticArtifact[]? diagnostics,
         CompilerCompilationSnapshot? compilation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool validateDiagnosticShapes = true)
     {
-        return HasValidDiagnosticShapes(diagnostics) &&
+        return (!validateDiagnosticShapes || HasValidDiagnosticShapes(diagnostics)) &&
             CompilerDiagnosticArtifactOrdering.IsCanonical(diagnostics!) &&
             diagnostics!.All(item => HasValidDiagnosticBinding(item, compilation, cancellationToken));
     }
