@@ -16030,6 +16030,12 @@ WorkerProtocolJson keeps one configured options instance but returns new(s_optio
 |---|---|---|
 | R1333 | **`WorkerProtocolJson.Options` clones the configured `JsonSerializerOptions` on every access. Provide a read-only/shared or internal no-copy path for the many trusted serialization callers, preserving defensive-copy behavior for public consumers if required.** | SharpProof.Worker.Protocol/ProtocolJson.cs:12-16; option construction at ProtocolJsonSupport.cs:216-229; representative repeated callers in SharpProof.Worker/VerificationCache.cs:73,87,189,192 and SharpProof.CompilerArtifact/CompilationFingerprint.cs:30-65 |
 
+### Status (continued)
+
+R1333 is applied: trusted production serialization callers use a shared internal
+options instance, while the public `Options` accessor retains its defensive copy.
+Protocol JSON tests pass (108 passed).
+
 ## Second survey, continued: R1334 - contract placement predicate repeats its public validity check
 
 ContractClauseInventory.HasPlacementErrors evaluates !clause.IsValid and then separately checks clause.Placement != NestedCallable. ContractClauseOccurrence.IsValid is exactly Placement == ValidPrologue, so the inventory predicate can express the same two allowed placements directly as Placement is not ValidPrologue and not NestedCallable. Keeping IsValid as a public occurrence property preserves its independent callers while removing a redundant property evaluation and making the exclusion set explicit.
