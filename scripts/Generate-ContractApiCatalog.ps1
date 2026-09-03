@@ -265,20 +265,10 @@ foreach ($attribute in $attributes) {
 $lines.Add('        ];')
 $lines.Add('')
 $lines.Add('    internal static ImmutableArray<string> ContractMethodCandidateNames { get; } =')
-$lines.Add('        [')
-foreach ($method in $methods) {
-    $lines.Add(
-        '            ' +
-        (ConvertTo-CSharpString $method.Name) + ',')
-}
-$lines.Add('        ];')
+$lines.Add('        Methods.Select(static method => method.Name).ToImmutableArray();')
 $lines.Add('')
 $lines.Add('    internal static ImmutableArray<string> AttributeMetadataNames { get; } =')
-$lines.Add('        [')
-foreach ($attribute in $attributes) {
-    $lines.Add('            ' + $attribute.Id + ',')
-}
-$lines.Add('        ];')
+$lines.Add('        Attributes.Select(static attribute => attribute.MetadataName).ToImmutableArray();')
 $lines.Add('}')
 $lines.Add('')
 $lines.Add('internal static class ContractApiClauseProjection')

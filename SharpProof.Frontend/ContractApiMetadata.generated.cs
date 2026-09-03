@@ -171,29 +171,10 @@ internal static class ContractApiCatalog
         ];
 
     internal static ImmutableArray<string> ContractMethodCandidateNames { get; } =
-        [
-            "Requires",
-            "Ensures",
-            "Assume",
-            "Old",
-            "Result",
-        ];
+        Methods.Select(static method => method.Name).ToImmutableArray();
 
     internal static ImmutableArray<string> AttributeMetadataNames { get; } =
-        [
-            ContractFor,
-            EnforcePure,
-            ZeroAllocations,
-            AllowedCapabilities,
-            DoesNotThrow,
-            AllowedExceptions,
-            EffectContract,
-            NotNull,
-            Positive,
-            InRange,
-            Suppress,
-            Trusted,
-        ];
+        Attributes.Select(static attribute => attribute.MetadataName).ToImmutableArray();
 }
 
 internal static class ContractApiClauseProjection
