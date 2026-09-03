@@ -743,7 +743,8 @@ internal sealed class OperationCompletionEvaluator
             ? CanCompleteInvocation(
                 clone,
                 withOperation.Operand,
-                withOperation)
+                withOperation,
+                instanceAlreadyComplete: true)
             : CanCompleteInvocation(
                 copyConstructor,
                 instance: null,
