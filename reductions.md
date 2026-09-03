@@ -13616,6 +13616,13 @@ non-completing-dimension precedence explicit.
 |---|---|---|
 | R1165 | **`OperationEffectScanner.ScanArrayCreation` traverses every dimension twice.** `ScanSequence(array.DimensionSizes)` scans each dimension operation, while `ArrayCreationExceptions` immediately enumerates `DimensionSizes` again for non-negative proofs; if a dimension does not complete, the latter result is computed but discarded when `dimensions.Summary` is returned. A shared per-dimension accumulator can preserve scan short-circuiting and overflow semantics while removing the duplicate collection traversal. | `SharpProof.Effects/OperationEffectScanner.cs:915-932,1225-1233` |
 
+### Status (part four hundred eighty-seven)
+
+R1165 is applied: array dimension effect scanning and non-negative proof
+accumulation now share one bounded traversal, while a non-completing dimension
+still takes precedence and avoids constructing allocation effects. The Effects
+test suite passes (323/323).
+
 ## Second survey, part four hundred eighty-eight: R1166 - delegate nullness queried twice
 
 `OperationEffectScanner.ScanDelegateCreation` asks whether the delegate
