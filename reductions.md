@@ -15130,3 +15130,35 @@ single-projection API. Contract wire-parity tests pass (19 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1251 | **`LauncherArguments.LauncherRuntimePaths` rebuilds the same runtime-closure array repeatedly.** The generated getter allocates and recomputes all companion paths on each query; `ValidateDistinctPaths` queries it multiple times and once per component in a filter. Cache the stable projection or capture it once per validation while preserving the existing companion inventory and conflict checks. | `SharpProof.Worker.Launcher/LauncherArguments.generated.cs:52-70`; `SharpProof.Worker.Launcher/Program.cs:1037-1067` |
+
+## Second survey, part five hundred seventy-four: R1252 - invocation arguments are lowered and validated in separate scans
+
+`RoslynProgramLowerer.LowerInvocation` first calls `LowerInvocationArguments`, which enumerates every argument, reads its parameter ordinal, lowers its value, sorts the resulting pairs, and materializes the IR terms. It then calls `IsDirectInvocation`, which enumerates the same Roslyn arguments again, rereads the parameter ordinals and parameter count, allocates a `HashSet<int>`, and checks explicit argument shape and ordinal uniqueness. The directness fact is needed for later havoc policy, but it can be accumulated alongside argument lowering or returned with the ordered argument projection, preserving the separate public helper for callers that only need a predicate.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1252 | **`RoslynProgramLowerer.LowerInvocation` walks each invocation's arguments twice.** Argument lowering and direct-invocation validation independently enumerate the same argument list and inspect parameter ordinals. Carry the directness result with the lowered argument projection to remove the second scan and temporary ordinal set without changing argument order or admission rules. | `SharpProof.Frontend/RoslynProgramLowerer.cs:385-395,449-460`; `SharpProof.Frontend/RoslynProgramLowerer.cs:35-56` |
+
+## Second survey, part five hundred seventy-five: R1253 - CFG block selection is followed by another full block scan
+
+`LoweringSession.SelectBlocks` performs a reachability walk and then enumerates the complete graph block collection to materialize the ordered selected array. Immediately afterward, `Lower` enumerates that same graph collection again to find the first reachable catch handler omitted by the selection, using the just-returned reachability set. The ordered selected blocks and the omitted-handler observation can be produced from one post-walk projection, or the omitted handler can be carried out of selection, retaining the explicit ordinal ordering and catch-handler policy while removing one full CFG-block scan.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1253 | **`RoslynProgramLowerer.LoweringSession` scans all CFG blocks twice during selection.** `SelectBlocks` traverses `_graph.Blocks` to build the selected array, then `Lower` traverses it again for the omitted catch-handler check. Return the omitted-handler fact with the selection result or combine the projections while preserving selected ordering and reachability semantics. | `SharpProof.Frontend/RoslynProgramLowerer.cs:80-97`; `SharpProof.Frontend/RoslynProgramLowerer.cs:742-775` |
+
+## Second survey, part five hundred seventy-six: R1254 - nested-operation prewalk repeats the lowering traversal
+
+For non-invocation, non-array-element values, `RoslynProgramLowerer.LowerValue` first calls `LowerNestedOperations`, which recursively walks the value's child-operation tree to find nested calls or array elements and lower their observable effects. If that prewalk finds no special child it still returns only after traversing the entire tree, and the method then calls `RoslynOperationLowerer.Lower`, which visits the same tree again; if it finds special children, the second lowering traversal still visits the whole tree with replacements. The prewalk is intentional for evaluation-order side effects, so the reduction needs a combined scheduling/lowering projection or a cached operation traversal rather than deleting it blindly; the opportunity is distinct from R595's stack-depth safety concern.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1254 | **`RoslynProgramLowerer.LowerValue` prewalks and then lowers the same operation tree.** `LowerNestedOperations` recursively enumerates children before `RoslynOperationLowerer.Lower` performs its own visitor traversal. Combine or cache the two projections while retaining nested-call/element evaluation order and the existing depth guard. | `SharpProof.Frontend/RoslynProgramLowerer.cs:290-351,353-383`; `SharpProof.Frontend/RoslynOperationLowerer.cs:56-109` |
+
+## Second survey, part five hundred seventy-seven: R1255 - null-comparison probing discards a conversion walk
+
+The binary lowerer probes every equality or inequality through `GetNullComparison` before entering the ordinary equality path. `TryGetNullComparisonValue` unwraps both operands with the general implicit-conversion loop, but when neither operand is a null constant it discards those results. The ordinary equality path then unwraps both operands again with the reference-only loop before testing generic string-specialization behavior. A single comparison projection can retain the null-constant recognition and reference-only semantics while avoiding the first walk for non-null comparisons, or reuse the already-unwrapped operands where the conversion kinds coincide.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1255 | **`RoslynOperationLowerer.VisitBinaryOperator` may unwrap equality operands twice.** The preliminary null-comparison probe walks both operands before the later reference-comparison branch repeats conversion unwrapping, even when the probe finds no null constant. Thread one normalized comparison projection through both decisions while preserving the broader unwrapping needed to recognize converted null literals. | `SharpProof.Frontend/RoslynOperationLowerer.cs:742-785`; `SharpProof.Frontend/RoslynOperationLowerer.cs:236-268` |
