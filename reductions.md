@@ -14614,6 +14614,12 @@ passed).
 |---|---|---|
 | R1212 | **`RestorePreviousPublication` materializes an unchanged member list solely for repeated enumeration.** The `members.ToArray()` snapshot is used by two loops and by `CleanupPublicationStaging`, although the method never mutates membership and `PublishMember` changes only per-member temporary state. Iterating the existing private list preserves backup staging, publication order, and cleanup behavior while removing one allocation and copy. | `SharpProof.Worker.Launcher/Program.cs:708-729` |
 
+### Status (part five hundred thirty-four)
+
+R1212 is applied: publication rollback reuses the stable member list instead of
+allocating an array snapshot. Worker MSBuild integration tests pass (75 passed,
+1 host skip).
+
 ## Second survey, part five hundred thirty-five: R1213 - worker target setup traverses the target list twice
 
 `SharpProofWorker.VerifyAsync` first calls `CountSolverTargets(targets)` to count successful lowered callables for lane creation, then calls `targets.OrderBy(...).ToArray()` to build the execution order. `targets` is an immutable preparation array for this request, and lane creation does not depend on target order. A combined ordered projection that also accumulates the successful count, or a single ordered buffer followed by one count over that buffer, can preserve failed-lowering results, deterministic execution order, and the parallelism cap while removing the separate full source traversal.
