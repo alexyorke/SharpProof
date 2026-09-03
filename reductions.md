@@ -13667,3 +13667,20 @@ effects while avoiding a second receiver/index/argument traversal.
 
 | ID | Finding | Evidence |
 |---|---|---|
+| R1167 | **`OperationEffectScanner` re-evaluates effectful assignment targets during the write phase.** `ScanSimpleAssignment` evaluates the target location and then passes the unchanged target to `ScanWriteTarget`; the compound, read-modify-write, and coalesce paths likewise scan a target read before calling that helper. The field, array-element, and property branches of `ScanWriteTarget` re-scan their receiver, indices, or arguments, so the same target expression is traversed twice. Splitting location evaluation from write-state projection, or carrying the first `EffectStep` forward, removes that duplicate while retaining the distinct access summaries and target/value order. | `SharpProof.Effects/OperationEffectScanner.Assignments.cs:5-95,97-170,198-255`; target scanners `SharpProof.Effects/OperationEffectScanner.cs:307-452,474-528` |
+
+## Second survey, part four hundred ninety: R1168 - alias analysis walks one method tree twice
+
+`ConversionOwnershipClassifier.MethodMayIntroduceUnknownRefAlias` obtains an
+operation root for a method and then traverses `root.DescendantsAndSelf()`
+once to inspect ref assignments and again to inspect ref-like invocations. The
+two filters support different policy checks, but they read the same immutable
+operation tree and the assignment pass does not change state used by the
+invocation pass. A single operation walk can retain the assignment source
+validation, recursive invocation analysis, active-method cycle guard, and
+fail-closed depth behavior while removing one full tree enumeration per
+analysis.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1168 | **`ConversionOwnershipClassifier.MethodMayIntroduceUnknownRefAlias` traverses each method operation tree twice.** It separately enumerates all ref assignments and all ref-like invocations from the same `root.DescendantsAndSelf()` sequence, even though both checks only inspect that immutable tree. A combined accumulator walk can preserve the distinct assignment and recursive-invocation policies, including cycle/depth fallbacks, while eliminating the duplicate traversal. | `SharpProof.Effects/ConversionOwnershipClassifier.cs:673-723` |
