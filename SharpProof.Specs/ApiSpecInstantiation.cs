@@ -195,42 +195,15 @@ public static partial class ApiSpecInstantiator
         {
             var isEquality = binary.Operator is
                 IrBinaryOperator.Equal or IrBinaryOperator.NotEqual;
-            TermResult left;
-            TermResult right;
-            if (isEquality &&
-                binary.Left is SpecNullDeclaration leftNull &&
-                binary.Right is not SpecNullDeclaration)
+            var failure = ResolvePair(
+                binary.Left,
+                binary.Right,
+                isEquality,
+                out var left,
+                out var right);
+            if (failure is { } result)
             {
-                right = Term(binary.Right);
-                if (right.Failure != null)
-                {
-                    return right;
-                }
-
-                left = Null(leftNull, right);
-            }
-            else
-            {
-                left = Term(binary.Left);
-                right = default;
-            }
-
-            if (left.Failure != null)
-            {
-                return left;
-            }
-
-            if (right.Term == null)
-            {
-                right = isEquality &&
-                        binary.Right is SpecNullDeclaration rightNull &&
-                        binary.Left is not SpecNullDeclaration
-                    ? Null(rightNull, left)
-                    : Term(binary.Right);
-            }
-            if (right.Failure != null)
-            {
-                return right;
+                return result;
             }
 
             if (isEquality && left.Term!.Type != right.Term!.Type)
@@ -272,41 +245,59 @@ public static partial class ApiSpecInstantiator
                 return condition;
             }
 
-            TermResult whenTrue;
-            TermResult whenFalse;
-            if (conditional.WhenTrue is SpecNullDeclaration trueNull &&
-                conditional.WhenFalse is not SpecNullDeclaration)
+            var failure = ResolvePair(
+                conditional.WhenTrue,
+                conditional.WhenFalse,
+                inferNulls: true,
+                out var whenTrue,
+                out var whenFalse);
+            return failure is { } result
+                ? result
+                : new(factory.Conditional(
+                    condition.Term!, whenTrue.Term!, whenFalse.Term!), null);
+        }
+
+        private TermResult? ResolvePair(
+            SpecTermDeclaration leftDeclaration,
+            SpecTermDeclaration rightDeclaration,
+            bool inferNulls,
+            out TermResult left,
+            out TermResult right)
+        {
+            if (inferNulls &&
+                leftDeclaration is SpecNullDeclaration leftNull &&
+                rightDeclaration is not SpecNullDeclaration)
             {
-                whenFalse = Term(conditional.WhenFalse);
-                if (whenFalse.Failure != null)
+                right = Term(rightDeclaration);
+                if (right.Failure != null)
                 {
-                    return whenFalse;
+                    left = default;
+                    return right;
                 }
 
-                whenTrue = Null(trueNull, whenFalse);
+                left = Null(leftNull, right);
             }
             else
             {
-                whenTrue = Term(conditional.WhenTrue);
-                whenFalse = default;
+                left = Term(leftDeclaration);
+                right = default;
             }
 
-            if (whenTrue.Failure != null)
+            if (left.Failure != null)
             {
-                return whenTrue;
+                return left;
             }
 
-            if (whenFalse.Term == null)
+            if (right.Term == null)
             {
-                whenFalse = conditional.WhenFalse is SpecNullDeclaration falseNull &&
-                            conditional.WhenTrue is not SpecNullDeclaration
-                    ? Null(falseNull, whenTrue)
-                    : Term(conditional.WhenFalse);
+                right = inferNulls &&
+                        rightDeclaration is SpecNullDeclaration rightNull &&
+                        leftDeclaration is not SpecNullDeclaration
+                    ? Null(rightNull, left)
+                    : Term(rightDeclaration);
             }
-            return whenFalse.Failure != null
-                ? whenFalse
-                : new(factory.Conditional(
-                    condition.Term!, whenTrue.Term!, whenFalse.Term!), null);
+
+            return right.Failure != null ? right : null;
         }
 
         private TermResult Child(

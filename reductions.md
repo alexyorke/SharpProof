@@ -11736,6 +11736,8 @@ In `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs`, `RunGenerato
 
 R1094 is deferred: delegate generator script execution to `ProcessRunner.RunCapturedAsync` in API-spec tests.
 
+R1094 is already applied in the current tree: `RunGeneratorAsync` uses the shared `ProcessRunner` start-info and captured-process implementation, so no duplicate process runner remains.
+
 ## Second survey, part three hundred twenty-six: R1095 - duplicated asymmetric-null branch type inference in spec instantiation
 
 In `SharpProof.Specs/ApiSpecInstantiation.cs`, `Instantiation.Binary` and `Instantiation.Conditional` contain duplicate control flow to handle cases where one branch is a `SpecNullDeclaration` whose type must be inferred from the non-null peer. Both methods evaluate whether the first branch is null to instantiate the second branch first, or vice versa, and propagate failures identically. Extracting a shared branch-pair resolution helper consolidates the two-operand null inference logic across binary equality and conditional expressions.
@@ -11747,6 +11749,8 @@ In `SharpProof.Specs/ApiSpecInstantiation.cs`, `Instantiation.Binary` and `Insta
 ### Status (part three hundred twenty-six)
 
 R1095 is deferred: extract a branch-pair resolution helper for null-inferred operands in spec instantiation.
+
+R1095 is applied: binary and conditional spec instantiation now share one asymmetric-null operand resolver while preserving first-failure ordering and expression-specific validation. The instantiation coverage and conditional-null suites pass (15/15).
 
 ## Second survey, part three hundred twenty-seven: R1096 - linear dictionary value searches and repeated array allocations in contract expression binder
 
