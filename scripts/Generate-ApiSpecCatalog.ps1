@@ -114,7 +114,7 @@ function Get-RequiredProperty {
     if ($null -eq $property) {
         throw "$Context is missing required property '$Name'."
     }
-    return $property.Value
+    return ,$property.Value
 }
 
 function Get-OptionalProperty {
