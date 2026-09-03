@@ -14044,3 +14044,19 @@ fail-closed behavior.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1186 | **`ExceptionHandlerReachability` recomputes invocation prerequisites in its exception branch and child scheduler.** The `IInvocationOperation` case checks the instance and all argument values with `canCompleteNormally` before resolving nullness, initialization, and dispatch; after that, `PushChildren(invocation)` reaches the same receiver/argument completion checks before pushing the operation children. A shared prerequisite/scheduling projection can remove the duplicate completion walk without changing which invocation children are visited or which potential exceptions are added. | `SharpProof.Effects/ExceptionHandlerReachability.cs:238-278,1184-1210` |
+
+## Second survey, part five hundred nine: R1187 - assignment child prefixes are scanned twice
+
+The simple-assignment child scheduler materializes the target's receiver,
+index, and argument inputs. It first runs `inputs.All(canCompleteNormally)`
+to decide whether the assigned value is reachable, then passes the same
+sequence to `PushSequentialCore`, which builds the reachable prefix by calling
+`canCompleteNormally` on each input again. The prefix helper already has the
+information needed to report whether every input completed. Returning that
+boolean (or retaining the predicate results alongside the prefix) removes the
+second walk while preserving the current source-order and first-failing-input
+semantics.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1187 | **`ExceptionHandlerReachability.PushChildrenCore` checks simple-assignment target inputs twice.** Its `ISimpleAssignmentOperation` case calls `inputs.All(canCompleteNormally)` and then calls `PushSequentialCore(inputs, remaining)`, whose loop invokes `canCompleteNormally` over the same receiver/index/argument sequence again. A prefix helper that returns both the reachable inputs and the all-complete flag can keep value scheduling and target traversal aligned without repeating completion analysis. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1213-1221,1413-1427` |
