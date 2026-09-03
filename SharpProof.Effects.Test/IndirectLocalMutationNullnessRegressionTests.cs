@@ -43,10 +43,12 @@ public sealed class IndirectLocalMutationNullnessRegressionTests
         }
     }
 
-    [TestCase("ThroughRefAlias")]
-    [TestCase("ThroughLocalFunction")]
+    [TestCase("ThroughRefAlias", true, EffectCompleteness.Complete)]
+    [TestCase("ThroughLocalFunction", null, null)]
     public void IndirectMutationDoesNotSuppressReceiverEffects(
-        string methodName)
+        string methodName,
+        bool? expectedStaticWrite,
+        EffectCompleteness? expectedCompleteness)
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
@@ -89,15 +91,19 @@ public sealed class IndirectLocalMutationNullnessRegressionTests
                     type.ToDisplayString()),
                 Does.Contain("System.ApplicationException"),
                 methodName);
-            if (methodName == "ThroughRefAlias")
+            if (expectedStaticWrite is { } staticWrite)
             {
                 Assert.That(
-                    result.Summary.Writes.Regions,
-                    Does.Contain(EffectRegionId.Static()),
+                    result.Summary.Writes.Regions.Contains(
+                        EffectRegionId.Static()),
+                    Is.EqualTo(staticWrite),
                     methodName);
+            }
+            if (expectedCompleteness is { } completeness)
+            {
                 Assert.That(
                     result.Summary.Completeness,
-                    Is.EqualTo(EffectCompleteness.Complete),
+                    Is.EqualTo(completeness),
                     methodName);
             }
         }

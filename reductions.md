@@ -10831,6 +10831,8 @@ R1026 is applied: the virtual-dispatch tests now share the divergent base declar
 
 R1027 is deferred: make the per-case write/completeness expectations explicit, and retain the shared exception assertion and both aliasing mechanisms.
 
+R1027 is applied: the nullness regression cases now carry explicit optional write/completeness expectations, removing the method-name-coupled assertion branch while preserving the shared exception check. `IndirectLocalMutationNullnessRegressionTests` pass (4/4).
+
 ## Second survey, part two hundred fifty-nine: R1028 - host environment pollution in build container invocation
 
 `build.ps1`'s `Invoke-Container` helper mutates the caller's host environment by calling `[Environment]::SetEnvironmentVariable($name, $value, 'Process')` for each key in `$Environment`, then appends `-e $name` to Docker Compose. In the `finally` block, only `$env:COMPOSE_PROGRESS` is restored, permanently leaking any passed variables (such as `SHARPPROOF_COVERAGE_COMPARISON_REF`) into the host PowerShell session. Docker Compose natively supports setting container environment variables directly via `-e NAME=VALUE`. Passing `$arguments += @('-e', "$name=$value")` directly eliminates the need to mutate the host process environment and prevents variable leakage.
