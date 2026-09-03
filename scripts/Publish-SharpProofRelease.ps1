@@ -749,19 +749,6 @@ foreach ($package in $release.packages) {
         -FixtureSymbolsState $(if ($publicationDestination.mode -ceq 'fixture') {
             $remote.symbolsState
         } else { $null })
-    Test-SharpProofPublicationActionAuthority `
-        -Authority $action `
-        -Mode $publicationDestination.mode `
-        -MainState $(if ($publicationDestination.mode -ceq 'registry') {
-            $remote.state
-        }
-        else { $null }) `
-        -FixtureMainState $(if ($publicationDestination.mode -ceq 'fixture') {
-            $remote.mainState
-        } else { $null }) `
-        -FixtureSymbolsState $(if ($publicationDestination.mode -ceq 'fixture') {
-            $remote.symbolsState
-        } else { $null })
     $entries.Add([pscustomobject][ordered]@{
         packageId = $package.packageId
         version = $package.version
