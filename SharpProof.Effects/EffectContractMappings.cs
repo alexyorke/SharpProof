@@ -37,11 +37,6 @@ internal static class EffectContractMappings
         return ProjectCapabilities(source).Capabilities;
     }
 
-    internal static EffectContractKind ToContractEffects(EffectCapabilityKind source)
-    {
-        return ProjectCapabilities(source).Effects;
-    }
-
     internal static (EffectContractCapabilityKind Capabilities, EffectContractKind Effects)
         ProjectCapabilities(EffectCapabilityKind source)
     {

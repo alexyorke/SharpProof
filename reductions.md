@@ -18796,3 +18796,7 @@ R1655 is applied: the unreferenced `ContractRuntimePolicy.ThrowIfRuntimeEvaluati
 wrapper is removed; active analyzer and collector paths continue using the
 shared predicate and configuration diagnostic. `ContractRuntimePolicyTests`
 pass (3/3).
+
+R1656 is applied: the unreferenced `EffectContractMappings.ToContractEffects`
+wrapper is removed; paired `ProjectCapabilities` remains the sole production
+projection seam. `EffectContractWireParityTests` pass (19/19).
