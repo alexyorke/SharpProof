@@ -21247,3 +21247,8 @@ R1960 is applied: `SharpProofSoundnessAnalyzerTests` now asserts that the
 `KnownType` enum, then constructs the private symbol table and verifies every
 enum entry resolves. The focused test passes (1/1), closing both positional
 drift and silent-null resolution gaps without changing analyzer behavior.
+
+R2006 is applied: removed the obsolete
+`sharpproof_enable_effect_summary_json` assignment from the root global
+configuration. The live profile/features registry remains unchanged, and the
+focused analyzer-configuration tests pass (5/5).
