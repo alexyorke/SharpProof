@@ -10717,6 +10717,8 @@ R1018 is deferred: share the independent region mapping data, but keep direct pr
 
 R1019 is deferred: keep the specific exception assertion and message check, and remove only the inherited-base-type assertion if the test is simplified.
 
+R1019 is applied: the convergence test keeps its specific exception and message assertions without repeating the sealed exception's inherited base type. `ForwardDataflowAnalysisTests` (25/25) pass.
+
 ## Second survey, part two hundred fifty-one: R1020 - duplicated factory-lock comparer fixtures
 
 `ProgressCheckingHashComparer` and `ProgressCheckingEqualityComparer` in the IR factory regression tests duplicate the same comparer class shape and the same `IrFactory` progress helper call. One invokes the helper from `GetHashCode` and returns a constant hash; the other invokes it from `Equals`, returns `true`, and supplies the same constant hash. A single configurable test comparer, or two small callback adapters around one implementation, can retain the separate hash-path and equality-path concurrency coverage while removing the duplicated comparer plumbing.

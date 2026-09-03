@@ -286,9 +286,6 @@ public sealed class ForwardDataflowAnalysisTests
                     widenAfter: int.MaxValue,
                     maxIterations: 8))));
 
-        // Callers that must degrade gracefully catch this specific type rather
-        // than every InvalidOperationException.
-        Assert.That(failure, Is.InstanceOf<InvalidOperationException>());
         Assert.That(failure!.Message, Does.Contain("did not converge"));
     }
 
