@@ -50,8 +50,9 @@ internal sealed class OperationNullnessEvaluator
             return state;
         }
 
-        return value.ConstantValue is { HasValue: true, Value: null } ||
-            IsSourceDefinitelyNull(value, origin)
+        return value != null &&
+            (value.ConstantValue is { HasValue: true, Value: null } ||
+             IsSourceDefinitelyNull(value, origin))
             ? NullState.Null
             : NullState.Unknown;
     }
