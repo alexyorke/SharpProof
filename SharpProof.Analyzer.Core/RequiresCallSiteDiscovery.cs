@@ -846,16 +846,20 @@ internal sealed partial class RequiresCallSiteDiscovery(
             IOperation operation,
             bool isLifted,
             ManagedFlowResult? flowResult,
-            params IOperation[] operands)
+            IOperation firstOperand,
+            IOperation? secondOperand = null)
     {
-        if (isLifted && operands.Any(operand =>
-                DefiniteOperationFacts.IsDefinitelyNull(operand) ||
-                flowResult?.ProvesNull(operation, operand) == true))
+        if (isLifted &&
+            (DefiniteOperationFacts.IsDefinitelyNull(firstOperand) ||
+             flowResult?.ProvesNull(operation, firstOperand) == true ||
+             secondOperand != null &&
+             (DefiniteOperationFacts.IsDefinitelyNull(secondOperand) ||
+              flowResult?.ProvesNull(operation, secondOperand) == true)))
         {
             return [];
         }
 
-        return [CreateImplicitOperatorCall(method, operands)];
+        return [CreateImplicitOperatorCall(method, firstOperand, secondOperand)];
     }
 
     private static bool IsLiftedUserDefinedConversion(
@@ -898,13 +902,17 @@ internal sealed partial class RequiresCallSiteDiscovery(
 
     private static RequiresCallTarget CreateImplicitOperatorCall(
         IMethodSymbol method,
-        params IOperation[] operands)
+        IOperation firstOperand,
+        IOperation? secondOperand = null)
     {
         var arguments = ImmutableDictionary.CreateBuilder<int, IOperation>();
-        var count = Math.Min(method.Parameters.Length, operands.Length);
-        for (var index = 0; index < count; index++)
+        if (method.Parameters.Length > 0)
         {
-            arguments.Add(index, operands[index]);
+            arguments.Add(0, firstOperand);
+        }
+        if (method.Parameters.Length > 1 && secondOperand != null)
+        {
+            arguments.Add(1, secondOperand);
         }
         return new RequiresCallTarget(
             method,
