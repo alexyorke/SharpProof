@@ -21012,3 +21012,9 @@ identical `ArgumentException` and `InvalidOperationException` handlers into a
 single filtered catch without widening cancellation or other exception paths.
 The focused `CallableCounterexampleReplayerTests` suite passes 15/15 with zero
 warnings or errors.
+
+R1990 is applied: `CallableCounterexampleReplayer.Replay` now partitions the
+immutable variable metadata once into result, pre-state, and all-variable
+views, preserving exact-one-result validation, pre-state type checks, order,
+and fail-closed interval validation. The focused replay suite passes 15/15
+with zero warnings or errors.

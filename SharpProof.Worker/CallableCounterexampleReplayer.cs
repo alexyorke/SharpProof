@@ -20,6 +20,23 @@ internal static partial class CallableCounterexampleReplayer
             }
 
             var final = model.ToBuilder();
+            var variables = new List<CompilerCanonicalVariable>(
+                target.Variables.Length);
+            var results = new List<CompilerCanonicalVariable>();
+            var preStateVariables = new List<CompilerCanonicalVariable>();
+            foreach (var variable in target.Variables)
+            {
+                variables.Add(variable);
+                if (variable.Role == CompilerVariableRole.Result)
+                {
+                    results.Add(variable);
+                }
+                else if (variable.Role == CompilerVariableRole.PreState)
+                {
+                    preStateVariables.Add(variable);
+                }
+            }
+
             if (body.Kind == CompilerPreparedBodyKind.Program)
             {
                 if (body.Program is not { } program || !ReferenceEquals(program.Factory, factory))
@@ -62,17 +79,15 @@ internal static partial class CallableCounterexampleReplayer
 
                     final[binding.Value] = value;
                 }
-                var results = target.Variables.Where(static variable =>
-                    variable.Role == CompilerVariableRole.Result).ToArray();
-                if (results.Length == 0 && execution.ReturnValue != null ||
-                    results.Length > 1 || results.Length == 1 &&
+                if (results.Count == 0 && execution.ReturnValue != null ||
+                    results.Count > 1 || results.Count == 1 &&
                     (execution.ReturnValue == null || execution.ReturnValue.Type !=
                      factory.GetVariableInfo(results[0].Variable).Type))
                 {
                     return WorkerClaimReason.CounterexampleReplayFailed;
                 }
 
-                if (results.Length == 1)
+                if (results.Count == 1)
                 {
                     final[results[0].Variable] = execution.ReturnValue!;
                 }
@@ -80,13 +95,12 @@ internal static partial class CallableCounterexampleReplayer
             else if (body.Kind != CompilerPreparedBodyKind.Trivial || body.Program != null ||
                      !body.ParameterBindings.IsEmpty || !body.SpecCalls.IsEmpty ||
                      !body.SummaryCalls.IsEmpty ||
-                     target.Variables.Any(static variable => variable.Role == CompilerVariableRole.Result))
+                     results.Count != 0)
             {
                 return WorkerClaimReason.CounterexampleReplayFailed;
             }
 
-            foreach (var variable in target.Variables.Where(static variable =>
-                         variable.Role == CompilerVariableRole.PreState))
+            foreach (var variable in preStateVariables)
             {
                 if (!variable.CurrentStateVariable.HasValue ||
                     !model.TryGetValue(variable.CurrentStateVariable.Value, out var value) ||
@@ -98,7 +112,7 @@ internal static partial class CallableCounterexampleReplayer
                 final[variable.Variable] = value;
             }
 
-            foreach (var variable in target.Variables)
+            foreach (var variable in variables)
             {
                 if (!final.TryGetValue(variable.Variable, out var value))
                 {
