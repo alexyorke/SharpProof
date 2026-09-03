@@ -13737,3 +13737,19 @@ overwrites, and construction-specific implicit-layer handling.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1170 | **`OperationEffectScanner` projects one call's arguments through three or four independent enumerations.** Invocation and property calls scan values, classify regions, and align actual arguments in separate passes; object creation and external-exception construction also enumerate the same creation arguments for expanded-param-array evidence inside `EffectCallSiteResolver`. A shared argument-facts projection can retain those distinct outputs and fail-closed rules while removing repeated argument-list traversal; this is broader than R942's mutable-to-immutable alignment allocation and separate from R391's summary-join arrays. | `SharpProof.Effects/OperationEffectScanner.cs:406-409,638-724,778-815,880-898,1584-1601`; `SharpProof.Effects/EffectCallSiteResolver.cs:39-66,89-145,189-196` |
+
+## Second survey, part four hundred ninety-three: R1171 - completion nullness ladders repeat one fact
+
+Three completion paths use the same two-step nullness decision for one operand
+and origin. `CanCompleteConditionalAccess` checks proven-null before asking
+whether the operand is proven non-null; `CanCompleteCoalesceAssignment` and
+`CanCompleteCoalesce` ask those same predicates in the reverse order. On an
+unknown or definitely-null value, the second query repeats the evaluator work;
+the result still needs three states because unknown requires the alternate path
+while known null or known non-null can short-circuit it. A shared tri-state
+completion helper can preserve each path's short-circuit order and completion
+semantics while removing repeated nullness analysis.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1171 | **`OperationCompletionEvaluator` repeats the proven-null/proven-non-null ladder in conditional access and coalescing.** `CanCompleteConditionalAccess`, `CanCompleteCoalesceAssignment`, and `CanCompleteCoalesce` query both predicates for the same operation/origin instead of sharing one tri-state result. The helper must retain each construct's branch order and unknown behavior, but can eliminate repeated abstract-flow/nullness work. | `SharpProof.Effects/OperationCompletionEvaluator.cs:884-916,1224-1238` |
