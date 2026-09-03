@@ -73,29 +73,42 @@ internal sealed class AnalyzerConfiguration
         return [.. GetInvalidConfigurationValues(options, null, parseValues: true)];
     }
 
-    private static bool TryGetConflictingAliases(
+    private static (bool Found, string Value, bool HasConflict, string Conflict)
+        ReadOptionAliases(
         AnalyzerConfigOptions options,
-        AnalyzerConfigurationOption option,
-        out string conflict)
+        AnalyzerConfigurationOption option)
     {
         var values = new List<string>();
+        var found = false;
+        var value = string.Empty;
         foreach (var key in new[] {
                      option.Key,
                      "build_property." + option.Key,
                      "build_property." + option.BuildPropertyName
                  })
         {
-            if (options.TryGetValue(key, out var value) &&
-                !string.IsNullOrWhiteSpace(value))
+            if (!options.TryGetValue(key, out var candidate))
             {
-                values.Add(value.Trim());
+                continue;
+            }
+            if (!found)
+            {
+                value = candidate;
+                found = true;
+            }
+            if (!string.IsNullOrWhiteSpace(candidate))
+            {
+                values.Add(candidate.Trim());
             }
         }
 
         var distinct = values.Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        conflict = string.Join(" / ", distinct);
-        return distinct.Length > 1;
+        return (
+            found,
+            value,
+            distinct.Length > 1,
+            string.Join(" / ", distinct));
     }
 
     internal static InvalidAnalyzerConfigurationValue ProviderFailure(
@@ -118,22 +131,26 @@ internal sealed class AnalyzerConfiguration
         GetInvalidConfigurationValues(
             AnalyzerConfigOptions options,
             AnalyzerConfigOptions? globalOptions,
-            bool parseValues)
+        bool parseValues)
     {
         foreach (var option in AnalyzerConfigurationOptionRegistry.All)
         {
-            if (TryGetConflictingAliases(options, option, out var conflict))
+            var aliases = ReadOptionAliases(
+                options,
+                option);
+            if (aliases.HasConflict)
             {
                 yield return new InvalidAnalyzerConfigurationValue(
                     option.Key,
-                    conflict,
+                    aliases.Conflict,
                     "configuration aliases disagree; use one effective value");
                 continue;
             }
-            if (!TryGet(options, option, out var value))
+            if (!aliases.Found)
             {
                 continue;
             }
+            var value = aliases.Value;
 
             if (parseValues)
             {
