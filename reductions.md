@@ -10478,3 +10478,15 @@ capture the manifest identity before the effect mutation.
 ### Status (part two hundred thirty-two)
 
 R1001 is deferred: the adapter is test-only and the source cases are intentionally independent; add the helper if discovery APIs or the number of direct cases grows enough to make constructor/setup drift costly.
+
+## Second survey, part two hundred thirty-three: R1002 - unreachable release payload mutation branch
+
+`ReleaseEvidenceAuthenticatesExactPackagePayloadClosure` declares five NUnit cases: `foreign`, `duplicate-first-party`, `missing-managed`, `missing-native`, and `valid`. Its mutation switch nevertheless contains a sixth `z3-byte` case that is never supplied by any `[TestCase]` attribute, and the method has no other call site. The branch reads and rewrites the native Z3 entry, so it is not merely an alternate spelling of one of the exercised mutations; it is dead test code that can drift while the suite still reports no coverage for that scenario. Either add the missing case (if native-byte corruption is intended coverage) or remove the branch and its associated package-selection assumption. The other payload mutations and their distinct expected failures should remain separate.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1002 | **A release payload test contains an uninvokable `z3-byte` mutation.** The parameterized test exposes five `[TestCase]` values, but its switch has an additional `case "z3-byte"` that is unreachable through NUnit and has no repository call site. This leaves native-library byte corruption logic as untested maintenance surface; adding the missing case or deleting the stale branch would make the intended coverage explicit. | `SharpProof.Package.Test/ReleasePublicationScriptTests.cs:621-626,640-712`; repository-wide search finds only the declaration and the `z3-byte` branch | |
+
+### Status (part two hundred thirty-three)
+
+R1002 is deferred: resolve the intended native-payload coverage before consolidating or removing the branch, since either choice changes the test suite's stated coverage.
