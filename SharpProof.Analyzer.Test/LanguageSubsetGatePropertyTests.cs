@@ -9,16 +9,19 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class LanguageSubsetGatePropertyTests
 {
-    [Test]
-    public void GenericPropertyReadRequiresOnlyGetterApiSpec()
+    [TestCase("Read", MethodKind.PropertyGet)]
+    [TestCase("Write", MethodKind.PropertySet)]
+    public void GenericPropertyAccessRequiresOnlyMatchingAccessorApiSpec(
+        string methodName,
+        MethodKind expectedKind)
     {
         var requests = new List<IMethodSymbol>();
         var decision = Classify(
-            "Read",
+            methodName,
             accessor =>
             {
                 requests.Add(accessor);
-                return accessor.MethodKind == MethodKind.PropertyGet;
+                return accessor.MethodKind == expectedKind;
             });
 
         using (Assert.EnterMultipleScope())
@@ -26,28 +29,7 @@ public sealed class LanguageSubsetGatePropertyTests
             Assert.That(decision.IsSupported, Is.True);
             Assert.That(
                 requests.Select(static accessor => accessor.MethodKind),
-                Is.EqualTo([MethodKind.PropertyGet]));
-        }
-    }
-
-    [Test]
-    public void GenericPropertyWriteRequiresOnlySetterApiSpec()
-    {
-        var requests = new List<IMethodSymbol>();
-        var decision = Classify(
-            "Write",
-            accessor =>
-            {
-                requests.Add(accessor);
-                return accessor.MethodKind == MethodKind.PropertySet;
-            });
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(decision.IsSupported, Is.True);
-            Assert.That(
-                requests.Select(static accessor => accessor.MethodKind),
-                Is.EqualTo([MethodKind.PropertySet]));
+                Is.EqualTo([expectedKind]));
         }
     }
 

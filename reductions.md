@@ -16338,3 +16338,7 @@ converging references never add duplicate queue entries. The focused test passes
 
 R1351 is applied: the immutable lattice-law sample set is initialized once and
 shared by both tests. The focused test passes (3 passed).
+
+R1352 is applied: getter and setter property cases share one parameterized test
+envelope while retaining their distinct method and accessor expectations. The
+focused test passes (2 passed).
