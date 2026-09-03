@@ -14643,3 +14643,11 @@ decision points.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1218 | **`RequiresCallSiteDispatch.ResolveExactTarget` has two callers that duplicate reduced-method normalization.** Both discovery and analysis spell `TargetMethod.ReducedFrom ?? TargetMethod` before the same dispatcher call. Moving that normalization into the dispatcher centralizes one invariant without changing either caller's receiver or cancellation handling. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:61-67`; `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:303-309` |
+
+## Second survey, part five hundred forty-one: R1219 - replayability dispatch repeats one result branch
+
+`RequiresCallSiteDiscovery.HasReplayableCallEvaluation` sends five separate operation-shape branches to the same `HasReplayableAccessorEvaluation(call, operationFacts)` result: accessor/list-pattern, foreach, recursive pattern, indirect delegate invocation, and implicit operation. The `using` branch and the final ordinary-operation fallback have different policies, but the repeated accessor-style branches can be expressed as one predicate before those distinct cases. This removes conditional scaffolding while preserving the exact special handling and short-circuit order.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1219 | **`HasReplayableCallEvaluation` repeats the same accessor-evaluation return across five branches.** Accessor/list-pattern, foreach, recursive-pattern, indirect-delegate, and implicit-operation cases all return `HasReplayableAccessorEvaluation(call, operationFacts)` independently. Combining those shape tests into one branch reduces accidental control-flow duplication without merging the separate `using` or ordinary-prefix rules. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:608-649` |
