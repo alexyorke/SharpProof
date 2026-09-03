@@ -8,14 +8,16 @@ public sealed class IrRelationalSummaryBuildLimits
         int maximumExpressionDepth = 256,
         int maximumSymbolicOperations = 65536)
     {
-        MaximumBlocks = RequirePositive(maximumBlocks, nameof(maximumBlocks));
-        MaximumInstructions = RequirePositive(
+        MaximumBlocks = ArgumentNullGuard.RequirePositive(
+            maximumBlocks,
+            nameof(maximumBlocks));
+        MaximumInstructions = ArgumentNullGuard.RequirePositive(
             maximumInstructions,
             nameof(maximumInstructions));
-        MaximumExpressionDepth = RequirePositive(
+        MaximumExpressionDepth = ArgumentNullGuard.RequirePositive(
             maximumExpressionDepth,
             nameof(maximumExpressionDepth));
-        MaximumSymbolicOperations = RequirePositive(
+        MaximumSymbolicOperations = ArgumentNullGuard.RequirePositive(
             maximumSymbolicOperations,
             nameof(maximumSymbolicOperations));
     }
@@ -30,12 +32,6 @@ public sealed class IrRelationalSummaryBuildLimits
 
     public int MaximumSymbolicOperations { get; }
 
-    private static int RequirePositive(int value, string parameterName)
-    {
-        return value > 0
-            ? value
-            : throw new ArgumentOutOfRangeException(parameterName);
-    }
 }
 
 public static class IrRelationalSummaryBuilder

@@ -13481,12 +13481,11 @@ production assemblies use it, heavily: `SharpProof.Effects` 48 references,
 
 ### Status (part four hundred eighty-one)
 
-R1159 is `pending` and is a mechanical substitution in the three assemblies that
-reference `SharpProof.Ir` directly - delete the private `RequirePositive` and the
-hand-written `if (x == null) throw` blocks, call `ArgumentNullGuard`. It should be
-applied together with R364, which is the same fix in `SharpProof.Worker`, and the
-`Gates` share of it should be sequenced after R951, because `Gates` reaches
-`SharpProof.Ir` only transitively.
+R1159 is partly applied: `SharpProof.Summaries` now uses the shared
+`ArgumentNullGuard.RequirePositive` implementation and its private duplicate is
+gone; the Summary tests pass (14/14). The remaining Worker, Gates, and Testing
+guard substitutions remain open, with the Worker change tracked separately as
+R364 and the transitive Gates references sequenced after R951.
 
 ## Second survey, part four hundred eighty-two: R1160 - per-resource disposal facts recomputed
 
@@ -13509,5 +13508,7 @@ dispatch checks while preserving the separate summary and unwind decisions.
 
 ### Status (part four hundred eighty-two)
 
-R1160 is `pending`: retain the separate summary and unwind outcomes, but share
-the immutable per-resource facts between them.
+R1160 is applied: grouped disposal resolution now computes immutable per-resource
+facts once and shares the disposal method and dispatch uncertainty between the
+summary and unwind decisions, while keeping those outcomes separate. The Effects
+test suite passes (323/323).
