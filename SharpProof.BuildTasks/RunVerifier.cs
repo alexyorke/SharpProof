@@ -484,11 +484,9 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         string nonce)
     {
         var expected = message + " " + nonce;
-        return output.Split('\n').Any(line =>
-            string.Equals(
-                line.EndsWith('\r') ? line[..^1] : line,
-                expected,
-                StringComparison.Ordinal));
+        return NormalizedSupervisorProtocolLines(output).Contains(
+            expected,
+            StringComparer.Ordinal);
     }
 
     internal static (bool Armed, bool Cleanup) FindSupervisorProtocolRecords(
@@ -499,9 +497,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         var cleanupExpected = LinuxWorkerProcess.CleanupMessage + " " + nonce;
         var armed = false;
         var cleanup = false;
-        foreach (var line in output.Split('\n'))
+        foreach (var normalized in NormalizedSupervisorProtocolLines(output))
         {
-            var normalized = line.EndsWith('\r') ? line[..^1] : line;
             if (string.Equals(
                     normalized,
                     armedExpected,
@@ -522,6 +519,15 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             }
         }
         return (armed, cleanup);
+    }
+
+    private static IEnumerable<string> NormalizedSupervisorProtocolLines(
+        string output)
+    {
+        foreach (var line in output.Split('\n'))
+        {
+            yield return line.EndsWith('\r') ? line[..^1] : line;
+        }
     }
 
     internal static bool ShouldDeferSupervisorAuthentication(

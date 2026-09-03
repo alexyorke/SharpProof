@@ -341,6 +341,7 @@ the smallest relevant containerized test target passes.
 | R936 | Avoid the intermediate runtime-component path array | `SharpProof.Worker.Test`: WorkerBinaryIdentityTests, 8 passed |
 | R934 | Compute effect-violation facts only for the selected contract rule | `SharpProof.Worker.Test`: 695 passed |
 | R949 | Share the native `prctl` binding and control constants across Host and BuildTasks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
+| R948 | Share supervisor protocol-line normalization between record checks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -8810,8 +8811,9 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred fifty-eight)
 
-R948 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R948 is `applied`: supervisor protocol checks now share one normalized-line
+iterator while retaining arbitrary-message lookup and early completion for the
+armed/cleanup pair.
 
 ## Second survey, part one hundred thirteen: R949-R950 - native interop, and what one analyzer rule costs
 
