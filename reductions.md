@@ -13975,6 +13975,12 @@ is called without a prior completion check.
 |---|---|---|
 | R1181 | **`ExceptionHandlerReachability` rechecks receiver completion inside `GetPotentialNullReceiver`.** Its invocation, event, property, field, array, `with`, await, and method-group callers already call `canCompleteNormally` on the same instance before entering the helper, while the helper repeats that call before classifying nullness. A prevalidated-instance seam can remove the duplicate completion traversal without changing value-type, definitely-null, or exception-type handling. | `SharpProof.Effects/ExceptionHandlerReachability.cs:238-278,289-302,328-345,366-428,850-990,1040-1060,1134-1162`; helper `:1862-1905` |
 
+### Status (part five hundred three)
+
+R1181 is applied: receiver-complete callers pass a validated-instance flag to
+the null-receiver projection, while standalone references retain the helper's
+original completion guard. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred four: R1182 - formatted-value resolution is repeated for completion
 
 `AddFormattedValuePotential` first calls `GetFormattedValueExceptions`, which
