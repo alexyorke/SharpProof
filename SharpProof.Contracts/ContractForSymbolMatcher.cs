@@ -294,21 +294,35 @@ internal static class ContractForSymbolMatcher
         var signatureTarget = companion.ContractTarget.IsOpen
             ? target.OriginalDefinition
             : target.ConstructedFrom;
-        var named = GetOrdinaryMethods(companion.Type)
-            .Where(candidate => string.Equals(candidate.Name, target.Name, StringComparison.Ordinal))
-            .ToImmutableArray();
-        var matches = named.Where(candidate =>
-            MemberSignaturesMatch(signatureTarget, candidate)).ToImmutableArray();
-        if (matches.Length == 1)
+        var namedCount = 0;
+        var matchCount = 0;
+        IMethodSymbol? matchingMethod = null;
+        foreach (var candidate in GetOrdinaryMethods(companion.Type))
         {
-            return HasUniqueTarget(signatureTarget, matches[0])
-                ? SpecializeCompanion(companion, matches[0], target)
+            if (!string.Equals(candidate.Name, target.Name, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            namedCount++;
+            if (!MemberSignaturesMatch(signatureTarget, candidate))
+            {
+                continue;
+            }
+
+            matchCount++;
+            matchingMethod ??= candidate;
+        }
+        if (matchCount == 1)
+        {
+            return HasUniqueTarget(signatureTarget, matchingMethod!)
+                ? SpecializeCompanion(companion, matchingMethod!, target)
                 : CompanionResolution.Fail(ContractBindingFailure.AmbiguousCompanion);
         }
 
-        return CompanionResolution.Fail(matches.Length > 1
+        return CompanionResolution.Fail(matchCount > 1
             ? ContractBindingFailure.AmbiguousCompanion
-            : named.IsDefaultOrEmpty
+            : namedCount == 0
                 ? ContractBindingFailure.MissingCompanion
                 : ContractBindingFailure.CompanionSignatureMismatch);
     }
