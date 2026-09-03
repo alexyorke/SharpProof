@@ -1,4 +1,5 @@
 {
+  "schemaVersion": 1,
   "enums": [
     {"name":"EffectAllocationKind","access":"public","flags":true,"members":[
       {"name":"None","value":0},
