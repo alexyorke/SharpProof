@@ -1498,7 +1498,8 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal static bool HasSameIdentity(IOperation operation, IOperation? candidate)
     {
-        return candidate is not null && Key(operation).Equals(Key(candidate));
+        return candidate is not null &&
+            (ReferenceEquals(operation, candidate) || Key(operation) == Key(candidate));
     }
 
     private static (SyntaxTree, int, int, OperationKind) Key(IOperation operation)
