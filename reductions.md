@@ -15855,6 +15855,12 @@ Measure-RepositoryCSharpSyntax first resolves the requested paths, then for ever
 |---|---|---|
 | R1320 | **eng/acceptance/Verify.ps1.Measure-RepositoryCSharpSyntax rescans every production project and compile list for each source path. Pre-index compile ownership by ordinal relative path before the metrics loop, retaining the exact-one ownership failure.** | eng/acceptance/Verify.ps1:394-430 |
 
+### Status (continued)
+
+R1320 is applied: acceptance syntax metrics build one ordinal compile-owner
+index, deduplicated within each project, then preserve exact-one ownership
+validation for each requested path. Acceptance script test passes.
+
 ## Second survey, continued: R1321 - package-consumer analyzer validation filters one list per role
 
 Assert-SharpProofAnalyzerItems first filters the evaluated analyzer items to SharpProof DLLs, then independently filters that stable subset for entry points, generators, and legacy portable entry points. It also walks the entry-point and generator subsets separately to derive their file names. The role property and legacy filename predicate can be classified in one pass, preserving the exact-one entry/generator and zero-legacy assertions without maintaining four pipeline projections of the same analyzer list.
