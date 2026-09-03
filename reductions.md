@@ -20899,3 +20899,11 @@ AnalyzerFeaturePipeline.ValidateMethodAttributes, AnalyzeOperationBlock, and Ana
 | ID | Finding | Evidence |
 |---|---|---|
 | R1986 | AnalyzerFeaturePipeline repeats the same rejectedContractApi -> record Abstrained -> return branch in three entry points; share the outcome bookkeeping while retaining their distinct rejection detection and ordering. | SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:133-144,245-251,382-388 |
+
+## Second survey, continued: R1987 - RunVerifier repeats the structured diagnostic projection for error and warning severities
+
+RunVerifier.LogStandardError parses one VerifierDiagnostic and then repeats the same nine positional fields - empty subcategory, diagnostic code, empty help keyword, file, line, column, zero end-line, zero end-column, and message - in both Log.LogError and Log.LogWarning calls. The severity distinction is intentional, and the error branch additionally sets HasStructuredError; the location/message projection is not. A small severity-aware logging helper or delegate can own that projection while leaving parsing, blank-line handling, and error-state bookkeeping at the caller. Keeping the field list in two branches creates a quiet drift point: a future change to the verifier diagnostic location contract can update one severity path and leave the other with different source coordinates or text.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1987 | RunVerifier.LogStandardError duplicates the complete VerifierDiagnostic-to-MSBuild field projection in its error and warning branches; centralize the shared projection while retaining severity and HasStructuredError behavior. | SharpProof.BuildTasks/RunVerifier.cs:1153-1178 |
