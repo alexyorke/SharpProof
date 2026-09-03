@@ -4,8 +4,4 @@ namespace SharpProof.Attributes;
 [AttributeUsage(SharpProofAttributeTargets.Contract, Inherited = false)]
 public sealed class EnforcePureAttribute : Attribute
 {
-    /// <summary>Creates an observable-purity contract.</summary>
-    public EnforcePureAttribute()
-    {
-    }
 }

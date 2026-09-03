@@ -4,8 +4,4 @@ namespace SharpProof.Attributes;
 [AttributeUsage(SharpProofAttributeTargets.Contract, Inherited = false)]
 public sealed class ZeroAllocationsAttribute : Attribute
 {
-    /// <summary>Creates a zero-allocation contract.</summary>
-    public ZeroAllocationsAttribute()
-    {
-    }
 }

@@ -6,10 +6,6 @@ namespace SharpProof.Attributes;
     Inherited = false)]
 public sealed class NotNullAttribute : Attribute
 {
-    /// <summary>Creates a non-null contract.</summary>
-    public NotNullAttribute()
-    {
-    }
 }
 
 /// <summary>Declares that a parameter or return value is greater than zero.</summary>
@@ -18,10 +14,6 @@ public sealed class NotNullAttribute : Attribute
     Inherited = false)]
 public sealed class PositiveAttribute : Attribute
 {
-    /// <summary>Creates a positive-value contract.</summary>
-    public PositiveAttribute()
-    {
-    }
 }
 
 /// <summary>Declares an inclusive integral range for a parameter or return value.</summary>

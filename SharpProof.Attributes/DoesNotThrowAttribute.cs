@@ -4,8 +4,4 @@ namespace SharpProof.Attributes;
 [AttributeUsage(SharpProofAttributeTargets.Contract, Inherited = false)]
 public sealed class DoesNotThrowAttribute : Attribute
 {
-    /// <summary>Creates a no-escaping-modeled-exceptions contract.</summary>
-    public DoesNotThrowAttribute()
-    {
-    }
 }
