@@ -201,10 +201,12 @@ internal sealed partial class OperationEffectScanner
 
         var handlerRegions = _conversionOwnership.ClassifyRegion(
             eventAssignment.HandlerValue);
+        var receiverRegions = _conversionOwnership.ClassifyRegion(
+            reference.Instance);
         var call = _callResolver.Resolve(
             accessor,
-            _conversionOwnership.ClassifyRegion(reference.Instance),
-            _conversionOwnership.ClassifyRegion(reference.Instance),
+            receiverRegions,
+            receiverRegions,
             [handlerRegions],
             [eventAssignment.HandlerValue],
             accessor.IsVirtual || accessor.IsAbstract,
