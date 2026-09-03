@@ -604,9 +604,9 @@ internal static class Program
         try
         {
             StagePublication(members);
+            commitStarted = true;
             foreach (var member in members)
             {
-                commitStarted = true;
                 PublishMember(member);
             }
         }
