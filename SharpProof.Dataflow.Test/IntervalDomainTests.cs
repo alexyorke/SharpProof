@@ -7,7 +7,7 @@ public sealed class IntervalDomainTests
 {
     private readonly IntervalDomain _domain = IntervalDomain.Instance;
 
-    private static IReadOnlyList<IntervalValue> Samples => [
+    private static readonly IReadOnlyList<IntervalValue> Samples = [
         IntervalValue.Bottom,
         IntervalValue.Top,
         IntervalValue.Constant(-2),
