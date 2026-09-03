@@ -3,6 +3,8 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class FalseSwitchGuardPatternRegressionTests
 {
+    private static readonly Compilation SharedCompilation = CreateCompilation();
+
     [TestCase("PropertyGetter")]
     [TestCase("Deconstruct")]
     [TestCase("ListLength")]
@@ -10,7 +12,29 @@ public sealed class FalseSwitchGuardPatternRegressionTests
     public void FalseGuardRetainsMandatoryPatternEffectsInCompleteSummary(
         string methodName)
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = SharedCompilation;
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
+
+        var summary = new EffectAnalysisSession(compilation)
+            .Analyze(method)
+            .Summary;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                methodName);
+            Assert.That(
+                summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                methodName);
+        }
+    }
+
+    private static Compilation CreateCompilation()
+    {
+        return EffectTestHost.CreateCompilation(
             """
             public static class EffectState {
                 public static int Value;
@@ -80,22 +104,5 @@ public sealed class FalseSwitchGuardPatternRegressionTests
                     };
             }
             """);
-        var method = EffectTestHost.SampleMethod(compilation, methodName);
-
-        var summary = new EffectAnalysisSession(compilation)
-            .Analyze(method)
-            .Summary;
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                summary.Completeness,
-                Is.EqualTo(EffectCompleteness.Complete),
-                methodName);
-            Assert.That(
-                summary.Writes.Contains(EffectRegionId.Static()),
-                Is.True,
-                methodName);
-        }
     }
 }

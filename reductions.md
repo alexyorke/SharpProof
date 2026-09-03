@@ -18540,3 +18540,7 @@ facts and session. `ConstantTrueLoopCompletionTests` pass (8/8).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1643 | The analyzer and collector branches repeat configuration fallback, dependency-directory projection, and `@(Analyzer)` remove/reinclude logic; share the remapping mechanics while retaining separate role roots and conditions. | `SharpProof.AnalyzerConsumer.props:60-95` |
+
+R1523 is applied: the four false-switch guard cases now share one immutable
+fixture compilation while each test keeps its selected method and independent
+analysis session. `FalseSwitchGuardPatternRegressionTests` pass (4/4).
