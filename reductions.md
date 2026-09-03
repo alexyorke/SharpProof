@@ -14017,6 +14017,12 @@ accumulator.
 |---|---|---|
 | R1183 | **`ExceptionHandlerReachability.GetReturnNullability` can scan returned values twice.** After building `returnedValues`, it runs `returnedValues.All(DefiniteOperationFacts.IsDefinitelyNonNull)` and, if that is false, runs `returnedValues.All(DefiniteOperationFacts.IsDefinitelyNull)`. An all-null result therefore traverses the complete array twice, while mixed results can revisit values; one tri-state accumulation can preserve the current short-circuit classification without repeating the nullness predicates. | `SharpProof.Effects/ExceptionHandlerReachability.cs:2629-2676` |
 
+### Status (part five hundred five)
+
+R1183 is applied: return nullability now folds non-null, null, and unknown
+evidence in one pass with the original non-null-first classification. The
+Effects test suite passes (323/323).
+
 ## Second survey, part five hundred six: R1184 - exception and abrupt-exit walks are separate
 
 The exception-reachability object answers two reachability questions over the
