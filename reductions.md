@@ -21276,3 +21276,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2007 | CompilerEffectReplayLowerer and OperationEffectScanner repeat the same resolved-spec `DoesNotThrow` plus `Terminates` predicate; centralize only that facet classification while retaining their distinct constructor and exception policies. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:297-307`; `SharpProof.Effects/OperationEffectScanner.cs:1481-1494`; `SharpProof.Effects/ApiSpecResolution.cs:27-65` |
+
+## Second survey, continued: R2008 - RequiresCallSiteDiscovery, EffectMethodNodeBuilder, and CacheSoundnessRules duplicate Roslyn CFG construction
+
+`RequiresCallSiteDiscovery.TryCreateGraph`, `EffectMethodNodeBuilder.TryCreateControlFlowGraph`, and `CacheSoundnessRules.CreateControlFlowGraph` each switch an `IOperation` and independently call `ControlFlowGraph.Create` for `IMethodBodyOperation` and `IConstructorBodyOperation` with the same cancellation token; all three also have a block arm. Their failure boundaries intentionally differ: Requires has field/property/declaration fallbacks and returns `out` state, Effects admits only root blocks and catches `ArgumentException`, and Meta polls cancellation around the call and catches both `ArgumentException` and `InvalidOperationException`. A narrow shared operation-root factory (at least the method/constructor arms, with block admission and exception policy left at each caller) would remove duplicated Roslyn CFG construction without collapsing those caller-specific policies.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2008 | Three production CFG helpers repeat method/constructor `ControlFlowGraph.Create` arms; share only that operation-root factory while retaining each caller's block, fallback, cancellation, and exception policies. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:431-447`; `SharpProof.Effects/EffectMethodNodeBuilder.cs:1121-1137`; `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1062-1088` |
