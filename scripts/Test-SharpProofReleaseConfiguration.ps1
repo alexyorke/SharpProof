@@ -191,17 +191,10 @@ Require-ExactSet `
     -Expected @($contract.tagRuleset.includes) `
     -Owner 'The release-tag ruleset include policy'
 $expectedRulesetExcludes = @($contract.tagRuleset.excludes)
-if ($expectedRulesetExcludes.Count -eq 0) {
-    if ($rulesetExcludes.Count -ne 0) {
-        throw 'The release-tag ruleset exclude policy must equal the exact contract set.'
-    }
-}
-else {
-    Require-ExactSet `
-        -Actual $rulesetExcludes `
-        -Expected $expectedRulesetExcludes `
-        -Owner 'The release-tag ruleset exclude policy'
-}
+Require-ExactSet `
+    -Actual $rulesetExcludes `
+    -Expected $expectedRulesetExcludes `
+    -Owner 'The release-tag ruleset exclude policy'
 if (@($rulesetIncludes | Where-Object {
             $rulesetExcludes -ccontains $_
         }).Count -ne 0) {
@@ -233,17 +226,10 @@ $expectedBypassActors = @($contract.tagRuleset.bypassActors |
     ForEach-Object {
         Get-BypassActorIdentity -Actor $_ -ContractShape $true
     })
-if ($expectedBypassActors.Count -eq 0) {
-    if ($actualBypassActors.Count -ne 0) {
-        throw 'The release-tag bypass policy must equal the exact contract set.'
-    }
-}
-else {
-    Require-ExactSet `
-        -Actual $actualBypassActors `
-        -Expected $expectedBypassActors `
-        -Owner 'The release-tag bypass policy'
-}
+Require-ExactSet `
+    -Actual $actualBypassActors `
+    -Expected $expectedBypassActors `
+    -Owner 'The release-tag bypass policy'
 
 $environmentEvidence = @()
 foreach ($required in $contract.environments) {
