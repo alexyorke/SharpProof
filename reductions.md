@@ -15869,6 +15869,12 @@ Assert-SharpProofAnalyzerItems first filters the evaluated analyzer items to Sha
 |---|---|---|
 | R1321 | **Test-SharpProofPackageConsumers.Assert-SharpProofAnalyzerItems repeatedly scans sharpProofItems for entry points, generators, and legacy entry points. Classify each item once and derive the three validation collections from that pass while keeping the current role and filename rules.** | scripts/Test-SharpProofPackageConsumers.ps1:258-307 |
 
+### Status (continued)
+
+R1321 is applied: package analyzer items are classified once into entry-point,
+generator, and legacy collections with names derived during the same pass.
+Package-consumer architecture test passes.
+
 ## Second survey, continued: R1322 - readme validation reparses the protocol source for every enum
 
 Test-SharpProofReadme calls Get-EnumMembers for ten protocol enum names while validating unknown-reason documentation. Each call runs a new singleline regular expression over the complete generated ProtocolModel source, extracts the matching body, splits it, and normalizes member names. The source is immutable for the gate and the enum names are fixed, so one parsed enum-member map can serve all documentation checks while retaining the missing-enum failure and per-enum member order.
