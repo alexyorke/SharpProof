@@ -20856,3 +20856,12 @@ CompilerEffectReplayLowerer.TryResolveSource assigns the same seven out-paramete
 | ID | Finding | Evidence |
 |---|---|---|
 | R1983 | CompilerEffectReplayLowerer repeats the unresolved out-parameter initialization in two early failure branches and a third source-lookup boundary; initialize the defaults once and retain the existing success/failure overwrites. | SharpProof.CompilerCollector/CompilerArtifact/CompilerEffectReplayLowerer.cs:374-429 |
+R1700 is applied: the documentation gate now resolves backticked repository
+file paths relative to the document or repository root, while excluding dated
+evidence and package-archive entries. The two stale `LanguageSubsetGate.cs`
+references now point to `SharpProof.Analyzer.Core`; a fixture mutation proves
+the new check rejects the old path. The documentation gate and all 24 focused
+`DocumentationSupportContractTests` pass. The same validation repaired the
+release-qualification ordering assertion to recognize its current
+`@releaseArguments` splat and fixed the required README diagnostic-code list
+to flatten both launcher IDs.

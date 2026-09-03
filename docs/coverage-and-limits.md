@@ -43,7 +43,7 @@ Not active as 1.0 preview product features:
 
 ## Analyzer language gate
 
-The exact decision table is `SharpProof.Analyzer/LanguageSubsetGate.cs`. The
+The exact decision table is `SharpProof.Analyzer.Core/LanguageSubsetGate.cs`. The
 following matrix summarizes that checked table.
 
 | Category | Admitted | Rejected |

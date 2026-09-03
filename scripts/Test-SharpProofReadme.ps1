@@ -238,6 +238,63 @@ function Assert-MarkdownLinks {
     }
 }
 
+function Assert-BacktickedRepositoryPaths {
+    param(
+        [Parameter(Mandatory)][string]$RelativePath,
+        [Parameter(Mandatory)][string]$Content
+    )
+
+    if ($datedEvidenceDocuments -contains $RelativePath) {
+        return
+    }
+
+    $sourcePath = Get-RepositoryPath $RelativePath
+    $sourceDirectory = Split-Path $sourcePath -Parent
+    $archivePathPrefixes = @('runtimes/', 'tools/shared/', 'tools/net')
+    $pathPattern = '`(?<path>[^`\r\n]*[/\\][^`\r\n]*\.[A-Za-z0-9]{1,8})`'
+    foreach ($match in [regex]::Matches($Content, $pathPattern)) {
+        $text = $match.Groups['path'].Value
+        $normalized = $text.Replace('\', '/')
+        if ($normalized.Contains('://', [StringComparison]::Ordinal) -or
+            $normalized.Contains('<', [StringComparison]::Ordinal) -or
+            $normalized.Contains('>', [StringComparison]::Ordinal) -or
+            ($archivePathPrefixes | Where-Object {
+                $normalized.StartsWith($_, [StringComparison]::OrdinalIgnoreCase)
+            })) {
+            continue
+        }
+
+        $relative = $normalized.Replace('/', '\')
+        if ($relative.StartsWith('.\', [StringComparison]::Ordinal)) {
+            $relative = $relative.Substring(2)
+        }
+        $candidates = @(
+            [IO.Path]::GetFullPath((Join-Path $sourceDirectory $relative)),
+            [IO.Path]::GetFullPath((Join-Path $repositoryRoot $relative))
+        )
+        $resolved = $false
+        foreach ($candidate in $candidates) {
+            try {
+                $contained = Resolve-SharpProofContainedPath `
+                    -Root $repositoryRoot `
+                    -Path $candidate `
+                    -ParameterName 'Backticked repository path'
+                if (Test-Path -LiteralPath $contained -PathType Leaf) {
+                    $resolved = $true
+                    break
+                }
+            }
+            catch {
+                continue
+            }
+        }
+        if (-not $resolved) {
+            throw (
+                "Broken backticked repository path in ${RelativePath}: $text")
+        }
+    }
+}
+
 function Assert-RepositoryLinksInSource {
     param([Parameter(Mandatory)][string]$RelativePath)
 
@@ -350,6 +407,7 @@ foreach ($relativePath in $maintainedDocuments) {
     Assert-LfUtf8Document $relativePath
     Assert-MarkdownLinks $relativePath
     $maintainedText = Get-RequiredText $relativePath
+    Assert-BacktickedRepositoryPaths $relativePath $maintainedText
     Assert-ParseableMarkdownFences $relativePath $maintainedText
     foreach ($obsoleteWorkerTerm in @(
             'WorkerVerificationStatus',
@@ -429,8 +487,8 @@ $requiredReadmeText = @(
     'SharpProofVerifyPolicy',
     'SharpProofAssumptionPolicy',
     'SharpProofVerify=true',
-    'SharpProof.Worker',
-    $launcherDiagnosticCodes,
+    'SharpProof.Worker'
+) + $launcherDiagnosticCodes + @(
     'SP0027',
     'Proven',
     'Refuted',

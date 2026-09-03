@@ -30,7 +30,7 @@ jobs; they are not interchangeable sources of truth.
 
 The implementation remains the authority for enumerated surfaces:
 
-- `SharpProof.Analyzer/LanguageSubsetGate.cs` classifies analyzer callables,
+- `SharpProof.Analyzer.Core/LanguageSubsetGate.cs` classifies analyzer callables,
   types, operation kinds, and operation shapes.
 - `SharpProof.Specs/ApiSpecTable.cs` declares typed API specifications. Not
   every witnessed facet is consumed by the worker.

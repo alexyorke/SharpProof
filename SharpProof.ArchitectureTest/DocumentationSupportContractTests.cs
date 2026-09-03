@@ -12,6 +12,7 @@ public sealed class DocumentationSupportContractTests
     [TestCase("package-version-drift", false)]
     [TestCase("support-drift", false)]
     [TestCase("stale-contract-api-silence", false)]
+    [TestCase("stale-language-subset-path", false)]
     [TestCase("old-eight-mutation-lanes", false)]
     [TestCase("wrong-container-cpu", false)]
     [TestCase("wrong-container-memory", false)]
@@ -85,7 +86,7 @@ public sealed class DocumentationSupportContractTests
             dispatcher,
             "'release-qualification' {",
             "scripts/Test-SharpProofReadme.ps1')",
-            "-Mode WriteQualificationEvidence");
+            "@releaseArguments");
         Assert.That(workflow, Does.Contain("tooling acceptance"));
         Assert.That(workflow, Does.Contain("tooling release-qualification"));
     }

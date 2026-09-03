@@ -7,6 +7,7 @@ param(
         'package-version-drift',
         'support-drift',
         'stale-contract-api-silence',
+        'stale-language-subset-path',
         'old-eight-mutation-lanes',
         'wrong-container-cpu',
         'wrong-container-memory',
@@ -32,6 +33,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $relativePath = switch ($Mutation) {
     'stale-contract-api-silence' { 'docs\diagnostic-examples.md' }
+    'stale-language-subset-path' { 'docs\README.md' }
     'catalog-resource-drift' { 'eng\acceptance\contract.json' }
     'duplicate-acceptance-property' { 'eng\acceptance\contract.json' }
     'protocol-certainty-schema-drift' {
@@ -117,6 +119,12 @@ try {
             $text += (
                 "`nA readable wrong-payload SharpProof.Attributes assembly " +
                 "disables contract analysis without a diagnostic.`n")
+        }
+        'stale-language-subset-path' {
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue 'SharpProof.Analyzer.Core/LanguageSubsetGate.cs' `
+                -NewValue 'SharpProof.Analyzer/LanguageSubsetGate.cs'
         }
         'old-eight-mutation-lanes' {
             $text = Replace-Required `
