@@ -19005,3 +19005,6 @@ test passes (1/1).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1669 | Two module-initializer tests duplicate static-write, synchronization, and completeness assertions; extract only that common summary envelope. | `SharpProof.Effects.Test/ModuleInitializerEffectTests.cs:34-91,172-207` |
+R1668 is applied: frontend abstention tests now share one invalid-enum exception
+assertion helper, while constructor/factory coverage and the two parameter-name
+checks remain explicit. `FrontendAbstentionValueTests` passes (3/3).
