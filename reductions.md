@@ -20998,3 +20998,11 @@ project root once per execution and reuses a local resolver for every
 request/result/manifest/SARIF/invocation path, retaining per-path locality
 checks and rooted-path handling. The focused published-result build-task
 tests pass 9/9 with zero warnings or errors.
+
+## Second survey, continued: R1992 - ForwardDataflowAnalysis repeats bottom-state initialization
+
+ForwardDataflowAnalysis.AnalyzeCore initializes inputs and outputs with two independent Enumerable.Repeat(domain.Bottom, graph.Blocks.Length).ToArray() expressions. The arrays must remain distinct because the solver mutates them independently, but the documented abstract-domain values are immutable and the bottom value is the same for both states. Cache the block count and one bottom value, then fill the two independent arrays through a shared initialization seam; this removes the duplicate domain.Bottom property evaluation and iterator construction without aliasing the state arrays or changing entry-state, widening, or result behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1992 | AnalyzeCore repeats identical bottom-filled array construction for inputs and outputs; cache the immutable bottom value and retain two distinct mutable state arrays. | SharpProof.Dataflow/ForwardDataflowAnalysis.cs:104-118; SharpProof.Dataflow/IAbstractDomain.cs:3-21 |
