@@ -10668,3 +10668,15 @@ R1015 is deferred: share only the common IR havoc fixture and invariant assertio
 ### Status (part two hundred forty-seven)
 
 R1016 is deferred: table-drive only the common substitution invocation, and retain separate expected reasons for foreign variables, foreign IR terms, and type mismatches.
+
+## Second survey, part two hundred forty-eight: R1017 - repeated partial-expression fixture
+
+`StaticallyUnreachablePartialBranchesAreTotal` and `StaticallyReachablePartialBranchesRemainNonTotal` each build the same `Equal(new SpecBinaryDeclaration(Divide, 1, 0), 0)` term. The tests intentionally place that partial expression in different short-circuit and conditional positions, so their branch-shape assertions should remain separate, but the expression itself is a stable shared fixture. A private `PartialDivision()` helper can remove the duplicated nested declaration construction and make the two tests' actual reachability difference easier to see.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1017 | **The API-spec validation tests duplicate the complete partial-division term.** Both totality tests independently construct the same integer division-by-zero comparison, including identical operators, literals, and Boolean type; only the surrounding branch placement differs. Reusing a helper for that shared partial expression reduces fixture noise while preserving the separate unreachable and reachable branch matrices. | `SharpProof.Specs.Test/ApiSpecValidationTests.cs:189-224,232-258` |
+
+### Status (part two hundred forty-eight)
+
+R1017 is deferred: share only the `1 / 0 == 0` expression fixture, and retain each test's distinct branch placement and expected totality.
