@@ -281,20 +281,10 @@ public sealed class RoslynOperationLowerer
             return GetVariable(symbol, operation.Type);
         }
 
-        var type = operation.Type;
-        if (type == null)
-        {
-            _missingInstance ??= _factory.CreateVariable(
-                "instance:<unknown>",
-                _factory.ObjectType);
-            return _factory.Variable(_missingInstance.Value);
-        }
-        if (!_instances.TryGetValue(type, out var variable))
-        {
-            variable = _factory.CreateVariable("instance:<unknown>", GetTypeId(type));
-            _instances.Add(type, variable);
-        }
-        return _factory.Variable(variable);
+        _missingInstance ??= _factory.CreateVariable(
+            "instance:<unknown>",
+            _factory.ObjectType);
+        return _factory.Variable(_missingInstance.Value);
     }
 
     private LoweredExpression Opaque(
