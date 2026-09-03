@@ -404,6 +404,29 @@ function Measure-RepositoryCSharpSyntax {
     )
 
     $resolvedPaths = @(Assert-RepositoryPaths -Paths $Paths -Scope $Scope)
+    $compileOwnersByPath = [Collections.Generic.Dictionary[string,
+        Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
+    if ($null -ne $ProductionInventory) {
+        foreach ($project in @($ProductionInventory.projects)) {
+            $projectCompilePaths = [Collections.Generic.HashSet[string]]::new(
+                [StringComparer]::Ordinal)
+            foreach ($compile in @($project.compile)) {
+                $compilePath = [string]$compile.path
+                if ([string]::IsNullOrWhiteSpace($compilePath) -or
+                    -not $projectCompilePaths.Add($compilePath)) {
+                    continue
+                }
+                $owners = $null
+                if (-not $compileOwnersByPath.TryGetValue(
+                        $compilePath,
+                        [ref]$owners)) {
+                    $owners = [Collections.Generic.List[object]]::new()
+                    $compileOwnersByPath.Add($compilePath, $owners)
+                }
+                $owners.Add($project)
+            }
+        }
+    }
     $expressionNodes = 0
     $decisionPoints = 0
     for ($index = 0; $index -lt $Paths.Count; $index++) {
@@ -416,10 +439,16 @@ function Measure-RepositoryCSharpSyntax {
         $fullPath = $resolvedPaths[$index]
         $parseOptions = $null
         if ($null -ne $ProductionInventory) {
-            $optionMatches = @($ProductionInventory.projects | Where-Object {
-                @($_.compile | Where-Object { [string]$_.path -ceq $relativePath }).Count -ne 0
-            })
-            if ($optionMatches.Count -ne 1) {
+            $optionMatches = $null
+            $optionMatchCount = if ($compileOwnersByPath.TryGetValue(
+                    $relativePath,
+                    [ref]$optionMatches)) {
+                $optionMatches.Count
+            }
+            else {
+                0
+            }
+            if ($optionMatchCount -ne 1) {
                 throw ("$Scope source '$relativePath' is not uniquely owned by the production inventory.")
             }
             $parseOptions = New-SharpProofCSharpParseOptions -LanguageVersion ([string]$optionMatches[0].parseOptions.languageVersion) -PreprocessorSymbols @($optionMatches[0].parseOptions.preprocessorSymbols | ForEach-Object { [string]$_ })
