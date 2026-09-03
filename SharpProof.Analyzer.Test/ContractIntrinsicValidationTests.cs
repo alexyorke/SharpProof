@@ -1,5 +1,6 @@
 using System.Globalization;
 using NUnit.Framework;
+using SharpProof.Testing;
 
 namespace SharpProof.Analyzer.Test;
 
@@ -10,17 +11,7 @@ public sealed class ContractIntrinsicValidationTests
     public async Task ResultInsideOldReportsNestingForDirectContract()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public static class Target {
-                public static int Read(int value) {
-                    Contract.Ensures(
-                        Contract.Old(Contract.Result<int>()) == value);
-                    return value;
-                }
-            }
-            """,
+            ContractIntrinsicValidationFixtures.DirectContract,
             "contracts",
             ["SP0024"]);
 
@@ -31,24 +22,7 @@ public sealed class ContractIntrinsicValidationTests
     public async Task ResultInsideOldReportsNestingForCompanionContract()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-
-            public interface Target {
-                int Read(int value);
-            }
-
-            [ContractFor(typeof(Target))]
-            public static class TargetContracts {
-                public static int Read(
-                    Target receiver,
-                    int value) {
-                    Contract.Ensures(
-                        Contract.Old(Contract.Result<int>()) == value);
-                    return value;
-                }
-            }
-            """,
+            ContractIntrinsicValidationFixtures.CompanionContract,
             "contracts",
             ["SP0024"]);
 
@@ -88,18 +62,7 @@ public sealed class ContractIntrinsicValidationTests
     public async Task IndirectIntrinsicCallsReportPlacementDiagnostics()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using System;
-            using SharpProof.Attributes;
-
-            public static class Target {
-                public static int Read(int value) {
-                    Func<int> result = Contract.Result<int>;
-                    Func<int, int> old = Contract.Old<int>;
-                    return result() + old(value);
-                }
-            }
-            """,
+            ContractIntrinsicValidationFixtures.IndirectIntrinsicCalls,
             "contracts",
             ["SP0024"]);
 

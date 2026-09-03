@@ -18108,3 +18108,78 @@ returned snapshot and validator diagnostics. `ProtocolJsonTests` pass
 R1404 is applied: `IntervalDomainTests` now caches its immutable sample corpus
 in a static read-only fixture, avoiding reconstruction across law tests while
 preserving all twelve interval values. `IntervalDomainTests` pass (11/11).
+
+## Second survey, part six hundred two: R1560 and R1561 - the command vocabulary is written in four places under four different subsets, and the corpus half of the gate-evidence pipeline is fixture-tested and never invoked
+
+The container command surface has not been examined in this ledger - a search for
+"command surface" and "sp command" returns nothing. It turns out to be one
+vocabulary spelled in four places, and following it into the gate project finds a
+second, smaller vocabulary with the same problem.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1560 | **The container command vocabulary is declared in four places with four different subsets, and no assertion anywhere relates any two of them.** `scripts/Invoke-SharpProofContainer.ps1:4` is the authority: a `ValidateSet` of **36** commands, dispatched by 32 bare `switch` arms plus one script-block arm at `:426` covering four more - the two agree exactly, which is worth stating because it is the only pair here that does. `build.ps1:4-9`, the host-side entry point, declares **21**; it is a strict subset, so nothing is phantom, but the fifteen it omits - `contract`, `restore`, `self-apply`, `semantic-tests`, `portable-tests`, `worker-tests`, `package-tests`, `pr-gates`, `corpus-update`, `performance-smoke`, `pilot-review` and the four `release-*` operations - are container-only by hand rather than by rule. The **24** commands named in any maintained document and the **9** pinned by `scripts/Test-SharpProofReadme.ps1` - `acceptance`, `build`, `check`, `contract`, `coverage`, `mutation`, `pack`, `samples`, `test` - are the third and fourth lists. Every pinned command is documented, which is the safe direction; the unsafe one is that **15 commands are documented and unpinned**, so a document naming `sp quick`, `sp pr`, `sp nightly`, `sp security`, `sp pilots`, `sp performance` or `sp test-changed` can drift from the dispatcher with nothing failing. Counting every `SharpProof.ArchitectureTest` assertion that mentions a command as a quoted literal raises coverage to 29 of 36, but that coverage is incidental - each test pins whatever command it happened to need - and **seven commands are pinned by nothing at all**: `check`, `corpus`, `corpus-update`, `gates`, `pilot-review`, `portable-tests`, `self-apply`. **Three of those seven are worse than unpinned, because the dispatcher passes them through as data.** `:427` computes `$gateMode = if ($Command -ceq 'gates') { 'all' } else { $Command }` and hands the result to `SharpProof.Gates` as its argv[0], so `corpus`, `corpus-update` and `performance-smoke` are simultaneously CLI command names and gate-mode names; renaming either side silently changes what runs. `SharpProof.Gates/Program.cs:83-84` declares its own usage as `[all|corpus|corpus-print|corpus-update|performance|performance-smoke]` - **six** modes, of which **`corpus-print` is reachable from nothing in the repository**: no container command, no script, no workflow, no test names it outside `Program.cs:59` and that usage string. The repository already knows how to check a vocabulary against its authority - `DevCheckCommandPlanTests` executes `Get-SharpProofDevCheckPlan.ps1` and asserts its JSON, and `SemanticArchitectureShardsCoverEveryFixture` asserts a roster against reflection - so asserting that `build.ps1`'s set is a subset of the container's, that the documented set is a subset of the dispatched set, and that the pass-through names match `Program.cs`'s modes is three assertions of a shape already in use. | `scripts/Invoke-SharpProofContainer.ps1:4,426-434`; `build.ps1:4-9`; `scripts/Test-SharpProofReadme.ps1`; `SharpProof.Gates/Program.cs:30-33,47,59,66,73,83-84,98`; `SharpProof.ArchitectureTest/ArchitectureTests.cs`, `BuildSchedulingTests.cs` for the incidental pins; related R321, R577 |
+| R1561 | **The corpus half of the standalone gate-evidence pipeline - a `ValidateSet` value, a validator branch, and twenty-two fixture assertions - is exercised only by its own fixtures, because no caller ever asks for it and the real corpus run bypasses the pipeline entirely.** `scripts/Invoke-SharpProofGateEvidence.ps1:4` declares `[ValidateSet('corpus', 'performance')]`. The script has exactly **two** invocations in the repository, `Invoke-SharpProofContainer.ps1:267` (inside `pr-gates`) and `:438` (the `performance` command), and **both pass `Gate = 'performance'`**. Nothing anywhere passes `corpus`. Meanwhile the actual corpus gate runs through the other arm at `:426-434` - `dotnet run --project SharpProof.Gates --configuration $Configuration -- corpus` - which produces **no evidence envelope at all**, so there is nothing for the validator to read. The unreached machinery is not small: `scripts/Assert-SharpProofStandaloneGateResult.ps1:50` accepts `-ExpectedGate corpus`, `:111` declares a dedicated `$corpusProperties` set, `:136-140` selects it, and `:167-197` adds corpus-only checks on `UnknownReasons` rows and `AllowedDegradations`; `scripts/Test-SharpProofStandaloneGateEvidence.ps1` references `'corpus'` **22** times against **6** for `'performance'`. **The inversion is the finding**: the gate with the larger fixture suite is the one whose production path was never wired to the pipeline, and the gate with the smaller suite is the only one that actually flows through it. Either the corpus command should route through `Invoke-SharpProofGateEvidence.ps1` like `performance` does - which would also give it the Release-built `SharpProof.Gates.dll` at `:52` and the MVID and source-commit binding the envelope carries - or the corpus branch and its fixtures are validating a document shape nothing produces. Both are defensible; what is not defensible is that nothing states which. | `scripts/Invoke-SharpProofGateEvidence.ps1:4,43,52,61,101,124`; `scripts/Invoke-SharpProofContainer.ps1:267-269,426-434,438-441`; `scripts/Assert-SharpProofStandaloneGateResult.ps1:50,111,136-140,167-197`; `scripts/Test-SharpProofStandaloneGateEvidence.ps1:69,109-150`; related R561, R787, R977 |
+
+### Checked and not proposed (part six hundred two)
+
+- **The `ValidateSet` and the `switch` in `Invoke-SharpProofContainer.ps1` agree
+  exactly, and a naive census says they do not.** A regex for bare `'name' {` arms
+  finds 32 against the `ValidateSet`'s 36 and reports `corpus`, `corpus-update`,
+  `gates` and `performance-smoke` as accepted-but-undispatched. They are dispatched
+  together by the script-block arm `{ $_ -in @(...) }` at `:426`, which no
+  arm-shaped pattern matches. Recorded because the false positive is easy to reach
+  and would have been a wrong finding about a TCB script.
+- **`Get-SharpProofDevCheckPlan.ps1` is the model the command surface needs, and
+  it is already here.** It reads `scripts/package-projects.json`, derives one
+  `package-pack:<id>` command per entry, and `DevCheckCommandPlanTests` runs the
+  script and asserts its JSON output rather than restating its logic. That is
+  derivation plus execution-based verification in twelve lines.
+- **R577 has a third and fourth copy of the package topology that it does not
+  name.** It records `PackagedProductFeed.ReadPackageProjects` and
+  `eng/acceptance/Verify.ps1` as embedding the three product project paths.
+  Two more exist: `Get-SharpProofDevCheckPlan.ps1:19-21` throws unless
+  `$packageProjects.Count` is exactly **3**, pinning the manifest's *size* outside
+  the manifest; and `DevCheckCommandPlanTests.CommonCommandIds:11-18` hard-codes
+  `package-pack:SharpProof.Attributes`, `package-pack:SharpProof.Package` and
+  `package-pack:SharpProof.Verifier` plus the literal totals `8` and `7` in its
+  `[TestCase]` rows. The manifest can be reordered or renamed but not resized
+  without editing three other files, two of which fail loudly and one silently.
+  R577 stays `pending` with four copies rather than two.
+- **R724's tail has not stalled, and reporting it as stalled would have been
+  wrong.** The current count is **47** `new ProcessStartInfo` sites across **37**
+  files against the 48/38 recorded when R724 was last measured, which reads like no
+  progress - but `eng/testing/ProcessRunner.cs` was added on **2026-09-02**, one
+  day before this reading, by commit `89ec4c4cd`. **No file containing a hand-rolled
+  `ProcessStartInfo` was added after the helper existed**, so the tail is simply
+  not yet migrated rather than being actively grown. The measurement worth carrying
+  forward is the concentration: `SharpProof.ArchitectureTest` holds **25** of the
+  47 sites across 22 files while using `ProcessRunner` in 4, which makes it the
+  single largest adoption opportunity and the concrete form of R730's claim.
+  `DevCheckCommandPlanTests.ReadPlan:83-104` is one of those 22 - it builds a
+  `ProcessStartInfo` for `pwsh`, starts it, reads both streams and waits, without
+  `CreateNoWindow` or the helper's process-tree termination.
+- **`.gitignore` and `.gitattributes` remain the rejected R155 case.** 203 active
+  patterns in 301 lines, the great majority stock GitHub Visual Studio boilerplate
+  for toolchains this repository does not use. R155 declined to trim it, R503
+  applied the negation-rule cleanup, R288 covers `.gitattributes`, and R1144 covers
+  the `.dockerignore` relationship. Nothing has changed and nothing new is filed.
+- **The command surface has no phantom entries.** Every one of `build.ps1`'s 21
+  commands exists in the container's 36; every one of the container's 36 is
+  dispatched; every command pinned by the documentation gate is documented. All
+  three inclusions run the safe way, which is why R1560 is about missing
+  assertions rather than about an observed break.
+
+### Status (part six hundred two)
+
+R1560 is `pending` and is three subset assertions plus a decision about
+`corpus-print`. R1561 is `pending` and is a routing decision that belongs to
+whoever owns the gate-evidence contract - it is filed as a question with both
+answers stated rather than a preferred remedy, because either resolution is
+defensible and the current state is the only one that is not.
+
+R1405 is applied: direct, companion, and indirect intrinsic-validation source
+fixtures now live in one linked test fixture compiled by both analyzer and
+binder test projects, while host-specific assertions remain separate.
+`SharpProof.Analyzer.Test` passes 4/4 and `SharpProof.Contracts.Test` passes
+3/3 for `ContractIntrinsicValidationTests`.

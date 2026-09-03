@@ -9,6 +9,10 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\eng\testing\ContractIntrinsicValidationFixtures.cs"
+             Link="ContractIntrinsicValidationFixtures.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\SharpProof.Analyzer.Core\SharpProof.Analyzer.Core.csproj" />
     <ProjectReference Include="..\SharpProof.Analyzer\SharpProof.Analyzer.csproj" />
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
