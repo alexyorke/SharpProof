@@ -16629,3 +16629,11 @@ The `container-verifier` job runs `docker compose run --rm tooling package-consu
 | ID | Finding | Evidence |
 |---|---|---|
 | R1377 | `Require-ExactSet` uses three materializing PowerShell pipelines around hash-set insertion and a fourth to test the final subset, although the helper already owns both sets. Replace the side-effecting pipelines with direct loops and `SetEquals`, retaining duplicate rejection and ordinal semantics. | `scripts/Test-SharpProofReleaseConfiguration.ps1:59-80` |
+
+## Second survey, continued: R1378 - Container execution reparses the acceptance contract for adjacent policies
+
+`Resolve-SharpProofSolutionTestTimeoutSeconds` parses `eng/acceptance/contract.json` when the timeout is omitted, while `Get-SharpProofCpuBudget` parses the same file for every non-override CPU policy. The package-test driver invokes the timeout resolver, package parallelism, and build parallelism in one process, so the same immutable contract is read and converted up to three times before work starts; the developer-check path also combines timeout and build policy. Pass one validated contract object through the policy calls or cache it by repository root for the run, retaining the separate timeout, divisor, percentage, override, and fallback semantics.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1378 | `SharpProof.ContainerExecution.psm1` independently loads `contract.json` for solution timeout and CPU-budget decisions. Reuse one per-run contract projection across adjacent calls, especially package tests, without merging the distinct policy validations. | `scripts/SharpProof.ContainerExecution.psm1:264-309,393-435`; callers `scripts/Invoke-SharpProofPackageTests.ps1:35-43`, `scripts/Invoke-SharpProofDevCheck.ps1:20-29` |
