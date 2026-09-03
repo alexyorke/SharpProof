@@ -16084,6 +16084,12 @@ OrdinalIdentityIndex adds non-null IDs with ContainsKey followed by Add. Every p
 |---|---|---|
 | R1337 | **`OrdinalIdentityIndex<T>` performs `ContainsKey` followed by `Add` for every non-null identity. Use `TryAdd` to retain first-row-wins duplicate handling with one dictionary probe.** | `SharpProof.Worker.Protocol/ProtocolJson.cs:1053-1079` |
 
+### Status (continued)
+
+R1337 remains deferred: the protocol assembly targets netstandard2.0, whose
+`Dictionary<TKey, TValue>` API has no `TryAdd`; preserving first-row-wins
+duplicate handling therefore requires the existing compatible probe sequence.
+
 ## Second survey, continued: R1338 - recursive JSON shape validation reparses stable type descriptors
 
 EnsureValueShape repeatedly calls EndsWith, StartsWith, and Substring on the same generated descriptor vocabulary as it descends through every object and array element. Nullability, array element type, immutable-array element type, primitive kind, object shape, and enum identity can be compiled into a cached shape descriptor once per metadata entry; per-value validation would then retain the same recursive checks without allocating and reparsing descriptor substrings at every node. This is distinct from the existing enum-Type cache opportunity, which removes only reflection lookup inside the enum branch.
