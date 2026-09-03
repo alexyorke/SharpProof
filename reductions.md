@@ -16166,6 +16166,11 @@ UnconditionalObjectAndArrayAllocationsAreIndependentlyConfirmed manually checks 
 |---|---|---|
 | R1343 | **`UnconditionalObjectAndArrayAllocationsAreIndependentlyConfirmed` duplicates `AssertRefuted`'s result assertions. Reuse an optional distinct-witness check, preserving the first test's extra identity guarantee and the later tests' common contract.** | `SharpProof.Worker.Test/EffectCounterexampleReplayTests.cs:21-46,332-357,774-788` |
 
+### Status (continued)
+
+R1343 is applied: the allocation replay test reuses `AssertRefuted` with its
+distinct-witness guarantee preserved. The replay test class passes (31 passed).
+
 ## Second survey, continued: R1344 - member-initializer tests repeat the same failing guard fixture
 
 MemberInitializersStopAfterNonCompletingOperands, MemberInitializerSequencesStopAfterNonCompletion, and the first tree in PartialMemberInitializersStopAfterEarlierPartDoesNotComplete each embed the same using directives and identical Guard.Fail/Guard.Positive definitions. The tests intentionally vary the member-initializer layout and, in the third case, add a second partial syntax tree, but a shared source fragment or local fixture builder can own the 10-line guard setup and reduce drift.
