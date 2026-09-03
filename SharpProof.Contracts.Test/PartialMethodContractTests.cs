@@ -319,6 +319,18 @@ public sealed class PartialMethodContractTests
 
         var fromDefinition = builder.Create(definitionAccessor);
         var fromImplementation = builder.Create(implementationAccessor);
+        static void AssertValidInventory(
+            ContractClauseInventory inventory,
+            int expectedClauseCount)
+        {
+            Assert.That(inventory.ImplementationBody, Is.Not.Null);
+            Assert.That(
+                inventory.Clauses,
+                Has.Length.EqualTo(expectedClauseCount));
+            Assert.That(
+                inventory.Clauses.All(static clause => clause.IsValid),
+                Is.True);
+        }
 
         using (Assert.EnterMultipleScope())
         {
@@ -332,20 +344,8 @@ public sealed class PartialMethodContractTests
                     definitionAccessor,
                     implementationAccessor),
                 Is.False);
-            Assert.That(fromDefinition.ImplementationBody, Is.Not.Null);
-            Assert.That(
-                fromDefinition.Clauses,
-                Has.Length.EqualTo(expectedClauseCount));
-            Assert.That(
-                fromDefinition.Clauses.All(static clause => clause.IsValid),
-                Is.True);
-            Assert.That(fromImplementation.ImplementationBody, Is.Not.Null);
-            Assert.That(
-                fromImplementation.Clauses,
-                Has.Length.EqualTo(expectedClauseCount));
-            Assert.That(
-                fromImplementation.Clauses.All(static clause => clause.IsValid),
-                Is.True);
+            AssertValidInventory(fromDefinition, expectedClauseCount);
+            AssertValidInventory(fromImplementation, expectedClauseCount);
             Assert.That(
                 SymbolEqualityComparer.Default.Equals(
                     fromDefinition.Callable,
