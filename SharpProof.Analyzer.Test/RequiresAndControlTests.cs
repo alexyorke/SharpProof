@@ -2862,7 +2862,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }

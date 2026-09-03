@@ -21031,3 +21031,9 @@ arrays, and reuses that bottom for incoming states. The focused
 | ID | Finding | Evidence |
 |---|---|---|
 | R1993 | `CompilerResponseEvidenceAuthority.DependencyEvidenceLabel` and `CallableEvidenceBuilder.BuildDependencyEvidenceLabel` duplicate the `origin[:evidence-id]:call-id:sha256` dependency-entry projection and `:deps=` join; share the formatter while retaining their distinct unsupported-origin policies. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:596-620`; `SharpProof.Worker/CallableEvidenceBuilder.cs:228-254`; related applied R314 |
+
+R1780 is complete: the remaining exact-sequence analyzer fixtures now rely on
+the default diagnostic catalog, including the final reversed-precondition
+regression. Intentional suppression cases remain narrowed where their fixtures
+emit unrelated placement or companion diagnostics; the analyzer project has
+passed 476/476 tests after these oracle changes.
