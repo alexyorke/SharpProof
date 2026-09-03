@@ -932,6 +932,20 @@ public sealed class RequiresAndControlTests
     [Test]
     public async Task UnflowedCallDiscoverySkipsNonexecutedOperations()
     {
+        static string SwitchArmSource(string expression) =>
+            $$"""
+            using SharpProof.Attributes;
+            public static class Guard {
+                public static int Positive(int value) {
+                    Contract.Requires(value > 0);
+                    return value;
+                }
+            }
+            public class Base { public Base(int value) { } }
+            public sealed class Derived(int marker) : Base(
+                {{expression}}) { }
+            """;
+
         var lambda = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System;
@@ -949,87 +963,23 @@ public sealed class RequiresAndControlTests
             "contracts",
             ["SP0027"]);
         var switchArm = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) : Base(
-                0 switch { 0 => 0, _ => Guard.Positive(-1) }) { }
-            """,
+            SwitchArmSource("0 switch { 0 => 0, _ => Guard.Positive(-1) }"),
             "contracts",
             ["SP0027"]);
         var relationalSwitchArm = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) : Base(
-                0 switch { > 0 => Guard.Positive(-1), _ => 0 }) { }
-            """,
+            SwitchArmSource("0 switch { > 0 => Guard.Positive(-1), _ => 0 }"),
             "contracts",
             ["SP0027"]);
         var typeSwitchArm = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) : Base(
-                "value" switch {
-                    string => 0,
-                    _ => Guard.Positive(-1)
-                }) { }
-            """,
+            SwitchArmSource("\"value\" switch { string => 0, _ => Guard.Positive(-1) }"),
             "contracts",
             ["SP0027"]);
         var nanRelationalArm = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) : Base(
-                double.NaN switch {
-                    < 0.0 => Guard.Positive(-1),
-                    _ => 0
-                }) { }
-            """,
+            SwitchArmSource("double.NaN switch { < 0.0 => Guard.Positive(-1), _ => 0 }"),
             "contracts",
             ["SP0027"]);
         var nanDefaultArm = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) : Base(
-                double.NaN switch {
-                    < 0.0 => 0,
-                    _ => Guard.Positive(-1)
-                }) { }
-            """,
+            SwitchArmSource("double.NaN switch { < 0.0 => 0, _ => Guard.Positive(-1) }"),
             "contracts",
             ["SP0027"]);
         var initializer = await AnalyzerTestHost.AnalyzeAsync(
