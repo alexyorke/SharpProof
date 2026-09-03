@@ -14934,3 +14934,11 @@ analyzer tests pass (162 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1240 | **`TryArithmetic` materializes candidate bounds solely to enumerate them twice.** Its `BigInteger[]? bounds` is consumed only by `bounds.Min()` and `bounds.Max()`, so a direct min/max accumulator can produce the identical interval without a temporary array or LINQ passes. | `SharpProof.Effects/ManagedAbstractFlow.cs:1836-1872` |
+
+## Second survey, part five hundred sixty-three: R1241 - simple-assignment recovery is unreachable after the mutation gate
+
+`ManagedFlowResult.TryEvaluate` has a fallback that unwraps `value` and, if it becomes a simple assignment, evaluates the assignment value from a recorded state. Every entry into the private overload first supplies `hasMutation` from `ManagedMutationFacts.HasMutation` (the public overload and the cached-mutation proof callers); that predicate returns true for any assignment anywhere under `value`, including through the harmless wrappers that the fallback removes. Consequently the earlier `!hasMutation` gate cannot pass for the assignment shape tested by the fallback, and its extra mutation scan/state lookup path is dead under the current predicate contract. Either remove the branch or make its intended exception explicit with a different fact, keeping the public mutation rejection semantics intact.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1241 | **`ManagedFlowResult.TryEvaluate` contains an assignment fallback excluded by its own mutation predicate.** The fallback tests an unwrapped `ISimpleAssignmentOperation` only after `!hasMutation`, while `ManagedMutationFacts.HasMutation` classifies every `IAssignmentOperation` in the value subtree as a mutation and all private-overload callers provide that fact. The branch is therefore unreachable unless the mutation contract changes. | `SharpProof.Effects/ManagedAbstractFlow.cs:1396-1433,1471-1494`; `SharpProof.Effects/ManagedMutationFacts.cs:5-18` |
