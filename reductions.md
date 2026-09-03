@@ -16346,3 +16346,7 @@ focused test passes (2 passed).
 R1353 is applied: compiler-artifact parameter-source emission uses a pre-sized
 generic list instead of repeated PowerShell array appends. Generator validation
 passes, including canonical and malformed-schema cases.
+
+R1354 is applied: cancellation graph tests share one immutable method-symbol
+fixture while retaining independent cancellation sources and graph state. The
+focused test passes (2 passed).

@@ -6,7 +6,7 @@ public sealed class EffectCallGraphCancellationTests
     [Test]
     public void CanceledGraphStopsBeforeEnumeratingNodesForSorting()
     {
-        var methods = Methods();
+        var methods = Methods;
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var nodes = new CancellationTrapGraph(
@@ -23,7 +23,7 @@ public sealed class EffectCallGraphCancellationTests
     [Test]
     public void CancellationBeforeEdgeSortStopsBeforeEnumeratingEdges()
     {
-        var methods = Methods();
+        var methods = Methods;
         using var cancellation = new CancellationTokenSource();
         var calls = methods.Skip(1)
             .Select(static target => new EffectCallSite(
@@ -50,7 +50,7 @@ public sealed class EffectCallGraphCancellationTests
                 cancellation.Token)));
     }
 
-    private static IMethodSymbol[] Methods()
+    private static IMethodSymbol[] CreateMethods()
     {
         var compilation = EffectTestHost.CreateCompilation(
             """
@@ -66,6 +66,8 @@ public sealed class EffectCallGraphCancellationTests
             .Where(static method => method.MethodKind == MethodKind.Ordinary)
             .OrderBy(static method => method.Name, StringComparer.Ordinal)];
     }
+
+    private static IMethodSymbol[] Methods { get; } = CreateMethods();
 
     private static Dictionary<IMethodSymbol, EffectMethodNode> EmptyNodes(
         IEnumerable<IMethodSymbol> methods)
