@@ -18688,3 +18688,11 @@ tests retain separate pipelines and assertions. The four affected tests pass
 R1647 is applied: the default-value generator matrices now share one immutable
 source builder while retaining their distinct mismatch and exact-match
 assertions. `ContractForValidatorGeneratorTests` pass (120/120).
+
+## Second survey, continued: R1651 - CSharpScalarSemanticsTests repeats the generated integer catalog as a second expected table
+
+`CSharpScalarSemanticsTests.Expected` hard-codes the same eight integer rows that the generated `CSharpScalarSemantics.Integers` catalog already owns: each `SpecialType`, signedness, bit width, minimum, maximum, and the special `Int64` exact-arithmetic flag. The test then compares both `SupportedIntegers` and `TryGetInteger` against that table, so a catalog edit requires changing the declarative JSON/generated output and this separate row list; the test's `type == System_Int64` assertion adds another copy of the exact-arithmetic policy. An independent oracle is still valuable here, so the reduction is not to call the production catalog from the expected side; instead, keep a smaller independent behavior check or derive the expected rows from one explicitly owned test contract so the full scalar metadata is not maintained in two C# tables.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1651 | The scalar-semantics test duplicates all eight generated integer metadata rows and the Int64 policy in an independent expected dictionary; reduce the second row-by-row authority while retaining an independent catalog/oracle check. | `SharpProof.Frontend.Test/CSharpScalarSemanticsTests.cs:11-32,34-85`; generated catalog at `SharpProof.Frontend/CSharpScalarSemantics.generated.cs:71-82,118-129` |
