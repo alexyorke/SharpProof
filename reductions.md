@@ -20609,3 +20609,11 @@ R1920 is applied: `Invoke-SharpProofContainer.ps1` now routes both `security` an
 `dependency-audit` through one `Invoke-DependencyAudit` helper, while `security`
 retains its Release build with `--no-restore`. The canonical container contract
 validation passes.
+
+## Second survey, continued: R1941 - generated scalar semantics repeat typed linear lookup scaffold
+
+`Generate-CSharpScalarSemantics.ps1` emits three lookup methods with the same loop, successful out assignment, and default/false fallback: `TryGetInteger` scans `Integers` by `SpecialType`, `TryGetUnary` scans `UnaryOperators` by `Kind`, and `TryGetBinary` scans `BinaryOperators` by `Kind`. The arrays are generated immutable catalogs, so the repeated lookup protocol is a maintenance surface as well as repeated linear work. A generated switch or one typed lookup helper can retain the three public method names and their distinct result types while owning the common admission/fallback shape; whether a dictionary is worthwhile depends on the catalog sizes, so this is primarily an accidental-complexity reduction rather than a claimed hot-path defect. The existing `MapBinaryToRoslyn` and two-key conversion lookup remain separate because their key and fallback semantics differ.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1941 | **`Generate-CSharpScalarSemantics.ps1` emits three near-identical single-key catalog scans; share the typed lookup strategy or generate direct maps while retaining the distinct APIs and fail-closed defaults.** | `scripts/Generate-CSharpScalarSemantics.ps1:817-827,901-911,920-930`; generated arrays `SharpProof.Frontend/CSharpScalarSemantics.generated.cs`; consumers in `SharpProof.Frontend/RoslynOperationLowerer.cs:687-704,823-844` |
