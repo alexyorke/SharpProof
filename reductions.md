@@ -16887,3 +16887,35 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 | ID | Finding | Evidence |
 |---|---|---|
 | R1394 | `Test-SharpProofPublicationPlanIdentity` filters `matchingFixtureArchives` separately for main and symbol roles; accumulate both role counts in one pass and retain the exact-one fixture-state contract. | `scripts/SharpProof.PublicationPlanIdentity.psm1:320-357` |
+
+## Second survey, continued: R1395 - Retained fuzz-seed validation rescans a parsed seed list
+
+`Read-SharpProofRetainedFuzzSeedManifest` appends every validated seed to a `List[int]`, then pipes the same list through `Select-Object -Unique` solely to detect duplicates. A `HashSet[int]` used during the parse can reject duplicates as they arrive while the list preserves input order for the returned manifest, removing the second traversal and its pipeline allocation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1395 | `Read-SharpProofRetainedFuzzSeedManifest` validates seeds into a list and then rescans that list with `Select-Object -Unique`; reject duplicates during the existing parse with an ordinal/value set while retaining ordered output. | `scripts/SharpProof.FuzzEvidenceLifecycle.ps1:137-156` |
+
+## Second survey, continued: R1396 - NUnit multi-assertion classification makes several passes over each failure block
+
+`Test-NUnitMultipleAssertionLines` runs separate `Where-Object` pipelines over each failure block for the expected marker, the combined expected/actual form, and `But was`, followed by another scan for exception text. One bounded loop can classify those line kinds and exception presence while preserving the current exact-count and allowed-shape checks, reducing repeated enumeration and temporary arrays.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1396 | `Test-NUnitMultipleAssertionLines` scans each failure block with separate pipelines for expected, actual, but-was, and exception predicates; classify line kinds in one pass before applying the same exact-count rules. | `scripts/SharpProof.MutationEvidence.psm1:31-49` |
+
+## Second survey, continued: R1397 - TRX mutation evidence grows result arrays with repeated copies
+
+`Read-SharpProofMutationTestEvidence` appends every stable identity with `$ledger +=` and every failed XML result with `$failedResults +=` inside the result loop. Each append can allocate and copy the accumulated array; list-backed collections can preserve the later sorting/count checks and convert once after the loop.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1397 | `Read-SharpProofMutationTestEvidence` uses `+=` for the ledger and failed-result collections inside the result loop; use growable lists and materialize only after all results are processed. | `scripts/SharpProof.MutationEvidence.psm1:521-532` |
+
+## Second survey, continued: R1398 - Mutation baseline grouping repeatedly probes the same dictionary entry
+
+`Get-SharpProofMutationBaselinePlan` calls `ContainsKey` and then indexes `$groups[$invocation.Identity]` repeatedly for collision validation and mutation insertion. A single `TryGetValue` can distinguish first insertion from an existing group and retain the group in a local, removing repeated hash lookups without changing the collision checks or sorted output.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1398 | `Get-SharpProofMutationBaselinePlan` performs a presence probe followed by multiple indexer lookups for each invocation identity; use one `TryGetValue` result and a local group. | `scripts/SharpProof.MutationBaselines.psm1:38-55` |
