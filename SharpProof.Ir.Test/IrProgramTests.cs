@@ -496,71 +496,45 @@ public sealed class IrProgramTests
     [Test]
     public void InterpreterEvaluatesCallArgumentsBeforeNullReceiverFailure()
     {
-        var factory = new IrFactory();
-        var receiverType = factory.GetOrCreateReferenceType(
-            factory.CreateIdentity(),
-            "Box");
-        var resultVariable =
-            factory.CreateVariable("result", factory.IntegerType);
-        var member = factory.GetOrCreateMember(
-            factory.CreateIdentity(),
-            receiverType,
-            "Read",
-            factory.IntegerType,
-            isStatic: false,
-            factory.IntegerType);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock("entry");
-        var call = builder.Call(
-            entry,
-            factory.CreateOperation("call"),
-            resultVariable,
-            member,
-            factory.Null(receiverType),
-            DivisionByZero(factory));
-        builder.Return(entry, factory.CreateOperation("return"));
-
-        var result =
-            new IrProgramInterpreter(factory).Execute(builder.Build());
-
-        Assert.That(
-            result.Status,
-            Is.EqualTo(IrProgramExecutionStatus.Exception));
-        Assert.That(result.Instruction, Is.SameAs(call));
-        Assert.That(
-            result.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+        AssertOperandEvaluatedBeforeNullReceiver(
+            (factory, builder, entry, resultVariable) =>
+            {
+                var receiverType = factory.GetOrCreateReferenceType(
+                    factory.CreateIdentity(),
+                    "Box");
+                var member = factory.GetOrCreateMember(
+                    factory.CreateIdentity(),
+                    receiverType,
+                    "Read",
+                    factory.IntegerType,
+                    isStatic: false,
+                    factory.IntegerType);
+                return builder.Call(
+                    entry,
+                    factory.CreateOperation("call"),
+                    resultVariable,
+                    member,
+                    factory.Null(receiverType),
+                    DivisionByZero(factory));
+            });
     }
 
     [Test]
     public void InterpreterEvaluatesLoadIndexBeforeNullReceiverFailure()
     {
-        var factory = new IrFactory();
-        var sequenceType =
-            factory.GetOrCreateSequenceType(factory.IntegerType);
-        var resultVariable =
-            factory.CreateVariable("result", factory.IntegerType);
-        var builder = new IrProgramBuilder(factory);
-        var entry = builder.CreateBlock("entry");
-        var load = builder.Load(
-            entry,
-            factory.CreateOperation("load"),
-            resultVariable,
-            builder.SequenceLocation(
-                factory.Null(sequenceType),
-                DivisionByZero(factory)));
-        builder.Return(entry, factory.CreateOperation("return"));
-
-        var result =
-            new IrProgramInterpreter(factory).Execute(builder.Build());
-
-        Assert.That(
-            result.Status,
-            Is.EqualTo(IrProgramExecutionStatus.Exception));
-        Assert.That(result.Instruction, Is.SameAs(load));
-        Assert.That(
-            result.Exception!.Kind,
-            Is.EqualTo(IrExceptionKind.DivideByZero));
+        AssertOperandEvaluatedBeforeNullReceiver(
+            (factory, builder, entry, resultVariable) =>
+            {
+                var sequenceType =
+                    factory.GetOrCreateSequenceType(factory.IntegerType);
+                return builder.Load(
+                    entry,
+                    factory.CreateOperation("load"),
+                    resultVariable,
+                    builder.SequenceLocation(
+                        factory.Null(sequenceType),
+                        DivisionByZero(factory)));
+            });
     }
 
     [Test]
@@ -635,6 +609,28 @@ public sealed class IrProgramTests
             _ = new IrProgramInterpreter(factory).Execute(
                 builder.Build(),
                 cancellationToken: cancellationToken)));
+    }
+
+    private static void AssertOperandEvaluatedBeforeNullReceiver(
+        Func<IrFactory, IrProgramBuilder, IrBlockId, IrVarId, IrInstruction> append)
+    {
+        var factory = new IrFactory();
+        var resultVariable =
+            factory.CreateVariable("result", factory.IntegerType);
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var instruction = append(factory, builder, entry, resultVariable);
+        builder.Return(entry, factory.CreateOperation("return"));
+
+        var result = new IrProgramInterpreter(factory).Execute(builder.Build());
+
+        Assert.That(
+            result.Status,
+            Is.EqualTo(IrProgramExecutionStatus.Exception));
+        Assert.That(result.Instruction, Is.SameAs(instruction));
+        Assert.That(
+            result.Exception!.Kind,
+            Is.EqualTo(IrExceptionKind.DivideByZero));
     }
 
     private static IrProgram CreateShape()
