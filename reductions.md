@@ -16057,6 +16057,11 @@ WorkerProtocolJson.CompleteUnique first walks every object to check null/complet
 |---|---|---|
 | R1335 | **`CompleteUnique<T>` scans each protocol array twice for completeness and key uniqueness. Replace the two LINQ passes with one loop and a key set, preserving null/completeness checks and ordinal duplicate handling.** | `SharpProof.Worker.Protocol/ProtocolJson.cs:901-933,981-985` |
 
+### Status (continued)
+
+R1335 is applied: protocol completeness and key uniqueness now use one
+fail-closed loop with an ordinal key set. Protocol JSON tests pass (108 passed).
+
 ## Second survey, continued: R1336 - protocol enum-array validation repeats the same input scan
 
 WorkerProtocolJson.AreDefinedUnique first uses All to validate every enum value and then calls Distinct().Count() over the same array to detect duplicates. The generated protocol rules use this for selected features and selection reasons, so one loop can reject an undefined or unspecified value and add each validated value to a HashSet in the same pass while retaining the non-empty requirement.
