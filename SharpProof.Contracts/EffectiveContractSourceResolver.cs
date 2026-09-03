@@ -85,17 +85,18 @@ internal sealed class EffectiveContractSourceResolver
             target,
             implementationBody,
             cancellationToken);
+        var directResolution = new EffectiveContractSourceResolution(
+            target,
+            direct,
+            direct,
+            usesCompanion: false,
+            direct.HasPlacementErrors
+                ? ContractBindingFailure.InvalidClausePlacement
+                : ContractBindingFailure.None);
         if (direct.HasPlacementErrors ||
             direct.Clauses.Any(static clause => clause.IsValid))
         {
-            return new(
-                target,
-                direct,
-                direct,
-                usesCompanion: false,
-                direct.HasPlacementErrors
-                    ? ContractBindingFailure.InvalidClausePlacement
-                    : ContractBindingFailure.None);
+            return directResolution;
         }
 
         if (target.MethodKind == MethodKind.Ordinary)
@@ -133,14 +134,7 @@ internal sealed class EffectiveContractSourceResolver
             }
         }
 
-        return new(
-            target,
-            direct,
-            direct,
-            usesCompanion: false,
-            direct.HasPlacementErrors
-                ? ContractBindingFailure.InvalidClausePlacement
-                : ContractBindingFailure.None);
+        return directResolution;
     }
 
 }
