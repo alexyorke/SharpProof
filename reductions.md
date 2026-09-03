@@ -14740,6 +14740,12 @@ RequiresAndControl analyzer tests pass (92 passed).
 |---|---|---|
 | R1221 | **`AnalyzeAbstractCallSite` and `AnalyzeConcreteCall` duplicate the receiver/nullness/argument prerequisite gate.** Each constructs `DefiniteOperationFacts`, checks an optional receiver, applies the non-static definitely-null rule, and scans `Arguments` for incomplete values; only the abstract/concrete completion predicate and failure sentinel differ. A policy-parameterized helper can centralize the shape without changing either analysis mode's soundness boundary. | `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:360-381,453-478` |
 
+### Status (part five hundred forty-three)
+
+R1221 is applied: abstract and concrete call analysis share one prerequisite
+gate parameterized by completion policy and instance-reference handling. The
+focused RequiresAndControl analyzer suite passes (92 passed).
+
 ## Second survey, part five hundred forty-four: R1222 - operator call extraction allocates a params array
 
 `RequiresCallSiteDiscovery.GetCalls` routes compound assignment, increment/decrement, binary, unary, and user-defined conversion operations through `CreateImplicitOperatorCalls`. That helper declares `params IOperation[] operands`, so each dispatch arm allocates a temporary operand array even though the arity is statically one or two and the caller already has the individual operation properties. The helper then forwards the array to the final factory. Fixed-arity overloads or a non-allocating operand view can remove this per-operation allocation while preserving lifted-null filtering, flow-result checks, and argument order.
