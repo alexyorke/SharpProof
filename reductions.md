@@ -18098,3 +18098,11 @@ returned snapshot and validator diagnostics. `ProtocolJsonTests` pass
 | ID | Finding | Evidence |
 |---|---|---|
 | R1541 | **Both indirect-mutation matrices rebuild an unchanged two-method compilation for every row.** `WriteThroughAlias`/`ReadThroughAlias` share one literal, and `ThroughRefAlias`/`ThroughLocalFunction` share another; every `[TestCase]` call invokes `EffectTestHost.CreateCompilation` before selecting its method. The parameterized expected values from R1027 do not require a new compilation, so the two source groups can be cached independently. | `SharpProof.Effects.Test/IndirectLocalMutationNullnessRegressionTests.cs:6-44,46-110` |
+
+## Second survey, continued: R1542 - the analyzer-mode matrices recompile one immutable `ModeFixture` for every option case
+
+`AnalyzerModeAndEffectTests` contains several parameterized methods whose cases change only analyzer options or a selected assertion path, but each invocation repeats compilation of the same `ModeFixture` (or passes it through the helper that compiles it). The configuration-provider failure matrix has two cases, the retired-mode matrix has four, the profile/features matrix has four, and the contract-companion feature matrix has three. A fixture-scoped compilation with per-case analyzer options can preserve isolation of analyzer runs while removing repeated Roslyn parse/bind setup.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1542 | **Four analyzer-mode matrices repeat immutable fixture compilation.** `ConfigurationProviderFailureReportsAndSuppressesAnalysis` compiles `ModeFixture` for both provider-failure modes; `RetiredModeOptionFailsClosed` compiles it for four retired values; `ProfileAndFeaturesSelectOnlyTheirPipeline` sends the same source through the compilation-producing overload for four profile/feature pairs; and `ContractCompanionBodyIsNotAnalyzedAsAnImplementation` sends an unchanged source through three feature values. The varying options are the behavior under test, not the source, so caching only the compilation (and constructing fresh analyzer options/sessions per case) removes redundant setup without changing the matrix. | `SharpProof.Analyzer.Test/AnalyzerModeAndEffectTests.cs:184-255,308-327,2102-2138` |
