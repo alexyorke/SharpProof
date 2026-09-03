@@ -4,23 +4,6 @@ namespace SharpProof.Analyzer;
 
 internal static partial class RequiresCallSiteAnalyzer
 {
-    internal static AnalyzerSemanticOutcome Analyze(
-        IMethodSymbol caller,
-        SyntaxNode declaration,
-        SemanticModel semanticModel,
-        AnalyzerSession session,
-        Action<Diagnostic> reportDiagnostic,
-        CancellationToken cancellationToken)
-    {
-        return RequiresCallSiteTreeAnalyzer.Analyze(
-            caller,
-            declaration,
-            semanticModel,
-            session,
-            reportDiagnostic,
-            cancellationToken);
-    }
-
     internal static AnalyzerSemanticOutcome AnalyzeCallable(
         IMethodSymbol caller,
         SyntaxNode declaration,

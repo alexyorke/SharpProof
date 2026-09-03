@@ -18856,3 +18856,8 @@ R1506 is applied: the unused `SHARPPROOF_DEV_CONTAINER` environment assignment
 is removed from the development Compose service; all remaining Compose
 environment names retain active consumers. `ContainerAuthorityScriptTests` pass
 (15/15).
+
+R1659 is applied: the analyzer feature pipeline now calls
+`RequiresCallSiteTreeAnalyzer.Analyze` directly, while the tree analyzer's
+intentional fallback retains `RequiresCallSiteAnalyzer.AnalyzeCallable`; the
+pure forwarding facade is removed. `AnalyzerModeAndEffectTests` pass (104/104).

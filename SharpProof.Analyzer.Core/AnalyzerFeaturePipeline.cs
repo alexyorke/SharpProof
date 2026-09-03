@@ -59,7 +59,7 @@ internal static partial class AnalyzerFeaturePipeline
 
         var semanticModel = SharpProof.Frontend.Host.CompilationModelProvider
             .GetSemanticModel(context.Compilation, declaration.SyntaxTree);
-        var outcome = RequiresCallSiteAnalyzer.Analyze(
+        var outcome = RequiresCallSiteTreeAnalyzer.Analyze(
             method,
             declaration,
             semanticModel,
@@ -301,7 +301,7 @@ internal static partial class AnalyzerFeaturePipeline
             !IsNestedCallable(method))
         {
             var requiresOutcome =
-                RequiresCallSiteAnalyzer.Analyze(
+                RequiresCallSiteTreeAnalyzer.Analyze(
                     method,
                     declaration,
                     semanticModel,
