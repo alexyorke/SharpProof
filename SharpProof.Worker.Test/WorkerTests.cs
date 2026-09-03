@@ -287,14 +287,16 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
         var claim = response.Manifest.Claims.Single();
-        var result = response.ClaimResults.Single();
+        var result = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Proven,
+            assertNoErrors: false);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(claim.Kind, Is.EqualTo(WorkerClaimKind.Effect));
             Assert.That(claim.EffectContractKind,
                 Is.EqualTo(WorkerEffectContractKind.DoesNotThrow));
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(result.EffectCertainty,
                 Is.EqualTo(
                     WorkerEffectEvidenceCertainty.CompleteMayEffectSummary));
@@ -330,7 +332,11 @@ public sealed class WorkerTests
 
         var first = await worker.VerifyAsync(request);
         var response = await worker.VerifyAsync(request);
-        var result = response.ClaimResults.Single();
+        var result = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Proven,
+            expectedVacuity: WorkerVacuityKind.ContradictoryPreconditions,
+            assertNoErrors: false);
         var usedPreconditions = result.Assumptions.Where(
             static assumption =>
                 assumption.Kind ==
@@ -339,17 +345,9 @@ public sealed class WorkerTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
-                result.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
                 result.EffectCertainty,
                 Is.EqualTo(
                     WorkerEffectEvidenceCertainty.VacuousEntry));
-            Assert.That(
-                result.Vacuity,
-                Is.EqualTo(
-                    WorkerVacuityKind
-                        .ContradictoryPreconditions));
             Assert.That(result.ProofCore, Is.Not.Empty);
             Assert.That(usedPreconditions, Is.Not.Empty);
             Assert.That(
@@ -432,24 +430,20 @@ public sealed class WorkerTests
         using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
-        var result = response.ClaimResults.Single();
+        var result = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.ResourceLimit,
+            WorkerVacuityKind.None,
+            assertNoErrors: false);
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(backend.CallCount, Is.EqualTo(1));
             Assert.That(
-                result.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                result.Reason,
-                Is.EqualTo(WorkerClaimReason.ResourceLimit));
-            Assert.That(
                 result.EffectCertainty,
                 Is.EqualTo(
                     WorkerEffectEvidenceCertainty.Unavailable));
-            Assert.That(
-                result.Vacuity,
-                Is.EqualTo(WorkerVacuityKind.None));
             Assert.That(
                 response.CallableResults.Single().Coverage,
                 Is.EqualTo(WorkerCallableCoverage.Incomplete));
@@ -728,14 +722,14 @@ public sealed class WorkerTests
         using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
-        var result = response.ClaimResults.Single();
+        var result = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Refuted,
+            WorkerClaimReason.None,
+            assertNoErrors: false);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(
-                result.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
             Assert.That(result.EffectCertainty,
                 Is.EqualTo(
                     WorkerEffectEvidenceCertainty.DefiniteViolation));
@@ -780,15 +774,14 @@ public sealed class WorkerTests
             }
             """,
             cacheEnabled: false);
-        var result = response.ClaimResults.Single();
+        var result = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.EffectContractNotEstablished,
+            assertNoErrors: false);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                result.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.EffectContractNotEstablished));
             Assert.That(
                 result.EffectCertainty,
                 Is.EqualTo(
@@ -944,12 +937,14 @@ public sealed class WorkerTests
         using var worker = new SharpProofWorker(backend);
 
         var response = await worker.VerifyAsync(request);
-        var result = response.ClaimResults.Single();
+        var result = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Proven,
+            expectedRunStatus: WorkerRunStatus.Complete,
+            assertNoErrors: false);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(result.EffectCertainty,
                 Is.EqualTo(
                     WorkerEffectEvidenceCertainty.TrustedCompleteBoundary));
@@ -2289,7 +2284,6 @@ public sealed class WorkerTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(result.Vacuity,
                 Is.EqualTo(WorkerVacuityKind.ContradictoryPreconditions));
             Assert.That(first.Summary.CacheStatus,
@@ -6113,6 +6107,53 @@ public sealed class WorkerTests
                 claim.ClaimId,
                 result.ClaimId,
                 StringComparison.Ordinal));
+    }
+
+    private static WorkerClaimResult AssertClaimVerdict(
+        WorkerVerifyResponse response,
+        WorkerClaimOutcome expectedOutcome,
+        WorkerClaimReason? expectedReason = null,
+        WorkerVacuityKind? expectedVacuity = null,
+        WorkerRunStatus? expectedRunStatus = null,
+        WorkerRunFailureReason? expectedFailureReason = null,
+        string? expectedProofCoreEntry = null,
+        string? errorsMessage = null,
+        bool assertNoErrors = true)
+    {
+        if (assertNoErrors && errorsMessage is null)
+        {
+            Assert.That(response.Errors, Is.Empty);
+        }
+        else if (assertNoErrors)
+        {
+            Assert.That(response.Errors, Is.Empty, errorsMessage!);
+        }
+        var result = response.ClaimResults.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Outcome, Is.EqualTo(expectedOutcome));
+            if (expectedReason is { } reason)
+            {
+                Assert.That(result.Reason, Is.EqualTo(reason));
+            }
+            if (expectedVacuity is { } vacuity)
+            {
+                Assert.That(result.Vacuity, Is.EqualTo(vacuity));
+            }
+            if (expectedRunStatus is { } runStatus)
+            {
+                Assert.That(response.RunStatus, Is.EqualTo(runStatus));
+            }
+            if (expectedFailureReason is { } failureReason)
+            {
+                Assert.That(response.FailureReason, Is.EqualTo(failureReason));
+            }
+            if (expectedProofCoreEntry is { } proofCoreEntry)
+            {
+                Assert.That(result.ProofCore, Does.Contain(proofCoreEntry));
+            }
+        }
+        return result;
     }
 
     private static string GetCallableId(
