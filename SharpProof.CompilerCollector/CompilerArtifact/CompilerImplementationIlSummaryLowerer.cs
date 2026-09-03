@@ -1174,7 +1174,7 @@ internal static class CompilerImplementationIlSummaryLowerer
             if (overflowChecked || instruction.OpCode is
                     ILOpCode.Div or ILOpCode.Rem)
             {
-                if (!TryIntegerRange(
+                if (!CSharpScalarSemantics.TryGetIrIntegerRange(
                         left.SpecialType,
                         out var minimum,
                         out var maximum))
@@ -1564,28 +1564,6 @@ internal static class CompilerImplementationIlSummaryLowerer
                     IrBinaryOperator.LessThanOrEqual,
                     value,
                     _factory.Integer(maximum)));
-        }
-
-        private static bool TryIntegerRange(
-            SpecialType type,
-            out long minimum,
-            out long maximum)
-        {
-            switch (type)
-            {
-                case SpecialType.System_Int32:
-                    minimum = int.MinValue;
-                    maximum = int.MaxValue;
-                    return true;
-                case SpecialType.System_Int64:
-                    minimum = long.MinValue;
-                    maximum = long.MaxValue;
-                    return true;
-                default:
-                    minimum = 0;
-                    maximum = 0;
-                    return false;
-            }
         }
 
         private IrTerm DefaultValue(ScalarType type)

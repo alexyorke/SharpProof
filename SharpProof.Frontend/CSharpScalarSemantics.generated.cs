@@ -155,6 +155,23 @@ internal static class CSharpScalarSemantics
         return false;
     }
 
+    internal static bool TryGetIrIntegerRange(
+        SpecialType type,
+        out long minimum,
+        out long maximum)
+    {
+        if (type is (SpecialType.System_Int32 or SpecialType.System_Int64) &&
+            TryGetInteger(type, out var semantics))
+        {
+            minimum = semantics.Minimum;
+            maximum = semantics.Maximum;
+            return true;
+        }
+        minimum = 0;
+        maximum = 0;
+        return false;
+    }
+
     internal static IrBinaryOperator? MapBinary(
         BinaryOperatorKind kind,
         SpecialType resultType)

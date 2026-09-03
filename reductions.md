@@ -324,6 +324,7 @@ the smallest relevant containerized test target passes.
 | R960 | Normalize private synchronization lock names | Architecture and worker builds/tests passed |
 | R970 | Use static-field naming for shared mutable state | Architecture and worker builds/tests passed |
 | R961 | Replace CompilerArtifact global usings with explicit per-file imports | CompilerArtifact build and generator verification passed |
+| R972 | Reuse scalar-catalog integer bounds in the IL lowerer | CompilerCollector build and Worker.Test: 695 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -9523,7 +9524,9 @@ finding and is covered by the shared cache implementation and tests above.
 
 ### Status (part one hundred ninety-nine)
 
-R972 is `deferred`: sharing is safe only if the lowerer continues to reject the six scalar types that the general frontend catalog supports but this IL translator does not.
+R972 is applied: the IL lowerer now consumes scalar-catalog bounds through a
+helper that admits only its existing `int32`/`int64` subset, preserving the
+translator's supported-type boundary while removing duplicate numeric literals.
 
 ## Second survey, part two hundred: R973 - the complexity ratchet does not cover the complexity
 
