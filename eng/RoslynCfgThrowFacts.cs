@@ -9,6 +9,20 @@ namespace SharpProof.Roslyn;
 
 internal static class RoslynCfgThrowFacts
 {
+    internal static IEnumerable<BasicBlock> ReachableBlocks(
+        ControlFlowGraph graph,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var block in graph.Blocks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (block.IsReachable)
+            {
+                yield return block;
+            }
+        }
+    }
+
     internal static bool OperationMayThrow(IOperation operation)
     {
         if (operation is IConversionOperation conversion)

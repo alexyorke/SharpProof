@@ -990,13 +990,10 @@ internal static class CacheSoundnessRules
             var nextExceptionalInputs = CreateBlockStates(
                 graph,
                 cancellationToken);
-            foreach (var block in graph.Blocks)
+            foreach (var block in RoslynCfgThrowFacts.ReachableBlocks(
+                         graph,
+                         cancellationToken))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!block.IsReachable)
-                {
-                    continue;
-                }
                 var input = new HashSet<IOperation>(
                     exceptionalInputs[block.Ordinal]);
                 foreach (var predecessor in block.Predecessors)

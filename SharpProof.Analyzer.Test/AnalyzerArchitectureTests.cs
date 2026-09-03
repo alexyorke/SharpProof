@@ -175,7 +175,10 @@ public sealed class AnalyzerArchitectureTests
         Assert.That(project, Does.Not.Contain("Microsoft.Z3"));
         Assert.That(project, Does.Not.Contain("SharpProof.Smt"));
         Assert.That(project, Does.Not.Contain("SharpProof.Verify"));
-        Assert.That(project, Does.Contain("SharpProof.Meta.Analyzers"));
+        Assert.That(
+            project,
+            Does.Contain(
+                "<SharpProofUsesMetaAnalyzer>true</SharpProofUsesMetaAnalyzer>"));
     }
 
     [Test]

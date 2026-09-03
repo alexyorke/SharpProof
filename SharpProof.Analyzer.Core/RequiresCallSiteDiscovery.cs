@@ -1,3 +1,5 @@
+using SharpProof.Roslyn;
+
 namespace SharpProof.Analyzer;
 
 internal sealed partial class RequiresCallSiteDiscovery(
@@ -138,14 +140,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
             operationFacts);
         var delegateTargets = GetDirectDelegateTargets(operationRoot!);
         OperationEffectScanner? semanticReachability = null;
-        foreach (var block in graph.Blocks)
+        foreach (var block in RoslynCfgThrowFacts.ReachableBlocks(
+                     graph,
+                     cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!block.IsReachable)
-            {
-                continue;
-            }
-
             var roots = block.Operations
                 .Concat(block.BranchValue == null ? [] : [block.BranchValue])
                 .Concat(

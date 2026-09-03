@@ -21123,3 +21123,9 @@ warnings or errors.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1999 | Get-ValidatedRelease duplicates the six-artifact/package-symbol cardinality checks already enforced by Test-SharpProofReleaseBundleTopology. | scripts/Publish-SharpProofRelease.ps1:241-294; scripts/SharpProof.ReleaseBundle.ps1:52-73 |
+
+R1998 is applied: the shared linked `RoslynCfgThrowFacts.ReachableBlocks`
+iterator now owns cancellation polling and reachable-block filtering for both
+CFG consumers, while their block processing remains separate. The full
+`SharpProof.Analyzer.Test` suite passes 476/476 and
+`SharpProof.Meta.Analyzers.Test` passes 163/163, with zero warnings or errors.
