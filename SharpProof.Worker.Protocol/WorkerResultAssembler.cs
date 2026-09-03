@@ -319,20 +319,37 @@ internal static class WorkerResultAssembler
         out WorkerRunFailureReason failure)
     {
         var evidence = Classify(callables, claims);
-        var errorStates = (errors ?? [])
-            .Select(static error => ProjectError(error.Code))
-            .ToArray();
-        if (errorStates.Any(static state => state == null) ||
-            errorStates.Select(static state => state!.Value).Distinct().Count() > 1)
+        var errorCount = 0;
+        var errorStatus = WorkerRunStatus.Unspecified;
+        var errorFailure = WorkerRunFailureReason.Unspecified;
+        foreach (var error in errors ?? [])
         {
-            status = WorkerRunStatus.Unspecified;
-            failure = WorkerRunFailureReason.Unspecified;
-            return false;
+            var projected = ProjectError(error.Code);
+            if (projected is null)
+            {
+                status = WorkerRunStatus.Unspecified;
+                failure = WorkerRunFailureReason.Unspecified;
+                return false;
+            }
+            if (errorCount == 0)
+            {
+                errorStatus = projected.Value.Status;
+                errorFailure = projected.Value.Failure;
+            }
+            else if (projected.Value.Status != errorStatus ||
+                projected.Value.Failure != errorFailure)
+            {
+                status = WorkerRunStatus.Unspecified;
+                failure = WorkerRunFailureReason.Unspecified;
+                return false;
+            }
+            errorCount++;
         }
 
-        if (errorStates.Length != 0)
+        if (errorCount != 0)
         {
-            (status, failure) = errorStates[0]!.Value;
+            status = errorStatus;
+            failure = errorFailure;
             return true;
         }
 
