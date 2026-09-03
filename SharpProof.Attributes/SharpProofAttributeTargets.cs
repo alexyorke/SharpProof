@@ -12,7 +12,5 @@ internal static class SharpProofAttributeTargets
         AttributeTargets.Class |
         AttributeTargets.Struct |
         AttributeTargets.Interface |
-        AttributeTargets.Method |
-        AttributeTargets.Constructor |
-        AttributeTargets.Property;
+        Contract;
 }
