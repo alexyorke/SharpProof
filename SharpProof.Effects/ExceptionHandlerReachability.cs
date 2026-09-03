@@ -253,7 +253,8 @@ internal sealed class ExceptionHandlerReachability(
                         GetPotentialNullReceiver(
                             invocation,
                             instance,
-                            out dereferenceCompletes),
+                            out dereferenceCompletes,
+                            instanceAlreadyComplete: true),
                         invocation);
                 }
                 if (dereferenceCompletes)
@@ -301,7 +302,8 @@ internal sealed class ExceptionHandlerReachability(
                             GetPotentialNullReceiver(
                                 withOperation,
                                 withOperation.Operand,
-                                out dereferenceCompletes),
+                                out dereferenceCompletes,
+                                instanceAlreadyComplete: true),
                             withOperation);
                     }
                     if (dereferenceCompletes)
@@ -343,7 +345,8 @@ internal sealed class ExceptionHandlerReachability(
                         GetPotentialNullReceiver(
                             eventAssignment,
                             instance,
-                            out dereferenceCompletes),
+                            out dereferenceCompletes,
+                            instanceAlreadyComplete: true),
                         eventAssignment);
                 }
                 if (dereferenceCompletes)
@@ -377,7 +380,8 @@ internal sealed class ExceptionHandlerReachability(
                             GetPotentialNullReceiver(
                                 property,
                                 instance,
-                                out dereferenceCompletes),
+                                out dereferenceCompletes,
+                                instanceAlreadyComplete: true),
                             simple);
                     }
                     if (dereferenceCompletes)
@@ -414,7 +418,8 @@ internal sealed class ExceptionHandlerReachability(
                         GetPotentialNullReceiver(
                             instanceTarget,
                             instanceField,
-                            out _),
+                            out _,
+                            instanceAlreadyComplete: true),
                         simple);
                 }
                 if (simple.Target is IArrayElementReferenceOperation array &&
@@ -426,7 +431,8 @@ internal sealed class ExceptionHandlerReachability(
                         GetPotentialNullReceiver(
                             array,
                             array.ArrayReference,
-                            out var dereferenceCompletes),
+                            out var dereferenceCompletes,
+                            instanceAlreadyComplete: true),
                         simple);
                     if (dereferenceCompletes)
                     {
@@ -870,7 +876,8 @@ internal sealed class ExceptionHandlerReachability(
                         GetPotentialNullReceiver(
                             propertyReference,
                             instance,
-                            out dereferenceCompletes),
+                            out dereferenceCompletes,
+                            instanceAlreadyComplete: true),
                         propertyReference);
                 }
                 if (dereferenceCompletes)
@@ -989,7 +996,8 @@ internal sealed class ExceptionHandlerReachability(
                         GetPotentialNullReceiver(
                             element,
                             element.ArrayReference,
-                            out var receiverCompletes),
+                            out var receiverCompletes,
+                            instanceAlreadyComplete: true),
                         element);
                     if (receiverCompletes)
                     {
@@ -1055,7 +1063,8 @@ internal sealed class ExceptionHandlerReachability(
                                 GetPotentialNullReceiver(
                                     awaitOperation,
                                     awaitOperation.Operation,
-                                    out dereferenceCompletes),
+                                    out dereferenceCompletes,
+                                    instanceAlreadyComplete: true),
                                 awaitOperation);
                         }
                         phaseCompletes = dereferenceCompletes &&
@@ -1864,22 +1873,25 @@ internal sealed class ExceptionHandlerReachability(
     private PotentialExceptions GetPotentialNullReceiver(
         IOperation origin,
         IOperation instance,
-        out bool dereferenceCompletes)
+        out bool dereferenceCompletes,
+        bool instanceAlreadyComplete = false)
     {
         return GetPotentialNullReceiver(
             origin,
             instance,
             _nullReferenceExceptionType,
-            out dereferenceCompletes);
+            out dereferenceCompletes,
+            instanceAlreadyComplete);
     }
 
     private PotentialExceptions GetPotentialNullReceiver(
         IOperation origin,
         IOperation instance,
         INamedTypeSymbol? exceptionType,
-        out bool dereferenceCompletes)
+        out bool dereferenceCompletes,
+        bool instanceAlreadyComplete = false)
     {
-        if (!canCompleteNormally(instance))
+        if (!instanceAlreadyComplete && !canCompleteNormally(instance))
         {
             dereferenceCompletes = false;
             return EmptyPotential;
@@ -2425,7 +2437,8 @@ internal sealed class ExceptionHandlerReachability(
                     GetPotentialNullReceiver(
                         forEach,
                         forEach.Collection,
-                        out var receiverCompletes));
+                        out var receiverCompletes,
+                        instanceAlreadyComplete: true));
                 if (!receiverCompletes)
                 {
                     return result;
@@ -2467,7 +2480,8 @@ internal sealed class ExceptionHandlerReachability(
                 GetPotentialNullReceiver(
                     forEach,
                     collection,
-                    out var receiverCompletes));
+                    out var receiverCompletes,
+                    instanceAlreadyComplete: true));
             if (!receiverCompletes)
             {
                 return result;
