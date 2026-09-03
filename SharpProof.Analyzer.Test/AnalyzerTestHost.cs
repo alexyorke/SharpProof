@@ -270,7 +270,6 @@ internal static class AnalyzerTestHost
         return [.. trustedPlatformAssemblies
             .Split(Path.PathSeparator)
             .Select(static path => MetadataReference.CreateFromFile(path))
-            .Cast<MetadataReference>()
             .Append(
                 MetadataReference.CreateFromFile(
                     typeof(Contract).Assembly.Location))];
