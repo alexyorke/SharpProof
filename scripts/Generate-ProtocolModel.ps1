@@ -421,8 +421,6 @@ foreach ($plan in $validationPlans) {
     $validationPlanTypes.Add($planName, $planType)
     $validationPlanModes.Add($planName, $mode)
 }
-$declarationNames = [Collections.Generic.HashSet[string]]::new(
-    [StringComparer]::Ordinal)
 $declarationByName = [Collections.Generic.Dictionary[string, object]]::new(
     [StringComparer]::Ordinal)
 $constantNames = [Collections.Generic.HashSet[string]]::new(
@@ -446,10 +444,9 @@ foreach ($declaration in $declarations) {
     $kind = [string](Get-RequiredMember $declaration 'kind' 'declaration')
     $name = [string](Get-RequiredMember $declaration 'name' 'declaration')
     Assert-Identifier $name 'Declaration name'
-    if (-not $declarationNames.Add($name)) {
+    if (-not $declarationByName.TryAdd($name, $declaration)) {
         throw "Duplicate protocol declaration '$name'."
     }
-    $declarationByName.Add($name, $declaration)
     $lines.Add('')
     $constants = @(Get-MemberArray $declaration 'constants')
     $constantMemberNames = [Collections.Generic.HashSet[string]]::new(
