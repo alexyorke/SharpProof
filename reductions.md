@@ -15765,3 +15765,26 @@ The campaign starts its result accumulator as a regular array containing complet
 | ID | Finding | Evidence |
 |---|---|---|
 | R1319 | **Test-SharpProofTrustedMutations rebuilds its accumulated result array on every mutation through $results += $result. Use a growable list for the in-memory accumulator and preserve the per-mutation atomic checkpoint writes and result ordering.** | scripts/Test-SharpProofTrustedMutations.ps1:2688-2689,2778-2781; checkpoint serialization at :2433-2466 |
+## Second survey, continued: R1320 - acceptance source metrics rescan the full inventory per path
+
+Measure-RepositoryCSharpSyntax first resolves the requested paths, then for every C# path searches all production inventory projects and, inside each project, all compile items to locate its unique parse-options owner. The production inventory is immutable for the acceptance run, so this nested Where-Object search repeats the same ownership work for every path in a metrics group. A path-to-project or path-to-parse-options index built once from the inventory can preserve the unique-owner assertion and language-version selection while removing the repeated nested scans.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1320 | **eng/acceptance/Verify.ps1.Measure-RepositoryCSharpSyntax rescans every production project and compile list for each source path. Pre-index compile ownership by ordinal relative path before the metrics loop, retaining the exact-one ownership failure.** | eng/acceptance/Verify.ps1:394-430 |
+
+## Second survey, continued: R1321 - package-consumer analyzer validation filters one list per role
+
+Assert-SharpProofAnalyzerItems first filters the evaluated analyzer items to SharpProof DLLs, then independently filters that stable subset for entry points, generators, and legacy portable entry points. It also walks the entry-point and generator subsets separately to derive their file names. The role property and legacy filename predicate can be classified in one pass, preserving the exact-one entry/generator and zero-legacy assertions without maintaining four pipeline projections of the same analyzer list.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1321 | **Test-SharpProofPackageConsumers.Assert-SharpProofAnalyzerItems repeatedly scans sharpProofItems for entry points, generators, and legacy entry points. Classify each item once and derive the three validation collections from that pass while keeping the current role and filename rules.** | scripts/Test-SharpProofPackageConsumers.ps1:258-307 |
+
+## Second survey, continued: R1322 - readme validation reparses the protocol source for every enum
+
+Test-SharpProofReadme calls Get-EnumMembers for ten protocol enum names while validating unknown-reason documentation. Each call runs a new singleline regular expression over the complete generated ProtocolModel source, extracts the matching body, splits it, and normalizes member names. The source is immutable for the gate and the enum names are fixed, so one parsed enum-member map can serve all documentation checks while retaining the missing-enum failure and per-enum member order.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1322 | **Test-SharpProofReadme.Get-EnumMembers rescans and reparses the full generated protocol source once per enum. Build the enum-member map in one source pass or cache each content/name result, preserving exact member-order comparison and unknown-reason coverage.** | scripts/Test-SharpProofReadme.ps1:300-321,693-716 |
