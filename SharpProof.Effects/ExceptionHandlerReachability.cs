@@ -1734,14 +1734,17 @@ internal sealed class ExceptionHandlerReachability(
         IOperation[] IncludeLabeledStatement(IEnumerable<IOperation> operations)
         {
             var result = operations.ToList();
+            var seen = new HashSet<IOperation>(
+                result,
+                ManagedKeyComparer.Instance);
             if (labeledStatement != null &&
-                !result.Any(operation => ReferenceEquals(operation, labeledStatement)))
+                seen.Add(labeledStatement))
             {
                 result.Insert(1, labeledStatement);
             }
             foreach (var invocation in labeledInvocations.Reverse())
             {
-                if (!result.Any(operation => ReferenceEquals(operation, invocation)))
+                if (seen.Add(invocation))
                 {
                     result.Insert(1, invocation);
                 }
