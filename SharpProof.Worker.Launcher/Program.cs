@@ -599,13 +599,11 @@ internal static class Program
         try
         {
             StagePublication(members);
-            foreach (var member in members.Take(members.Count - 1))
+            foreach (var member in members)
             {
                 commitStarted = true;
                 PublishMember(member);
             }
-            commitStarted = true;
-            PublishMember(members[^1]);
         }
         catch (Exception exception) when (
             exception is not OperationCanceledException)
@@ -618,13 +616,7 @@ internal static class Program
         }
         finally
         {
-            foreach (var member in members)
-            {
-                if (member.Temporary != null)
-                {
-                    AtomicFile.TryDeleteStaged(member.Temporary);
-                }
-            }
+            CleanupPublicationStaging(members);
         }
     }
 
@@ -646,12 +638,7 @@ internal static class Program
                     File.Copy(member.Path, backup);
                     backups.Add(member.Path, backup);
                 }
-                catch (IOException)
-                {
-                    AtomicFile.TryDeleteStaged(backup);
-                    throw;
-                }
-                catch (UnauthorizedAccessException)
+                catch (IOException or UnauthorizedAccessException)
                 {
                     AtomicFile.TryDeleteStaged(backup);
                     throw;
@@ -737,12 +724,18 @@ internal static class Program
         }
         finally
         {
-            foreach (var member in restoreMembers)
+            CleanupPublicationStaging(restoreMembers);
+        }
+    }
+
+    private static void CleanupPublicationStaging(
+        IReadOnlyList<PublicationMember> members)
+    {
+        foreach (var member in members)
+        {
+            if (member.Temporary != null)
             {
-                if (member.Temporary != null)
-                {
-                    AtomicFile.TryDeleteStaged(member.Temporary);
-                }
+                AtomicFile.TryDeleteStaged(member.Temporary);
             }
         }
     }
