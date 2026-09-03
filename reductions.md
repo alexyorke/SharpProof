@@ -13876,3 +13876,18 @@ leaving each public method's precedence and source-null fallback unchanged.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1177 | **`OperationNullnessEvaluator` duplicates the null-state decision mechanics in `GetNullState` and `GetNullStatePreferNull`.** Both APIs map the same abstract-flow result to `NonNull`/`Null` and repeat the `null`/instance-reference/non-nullable-value/definitely-non-null fallback predicate; only the ordering of constant-null, flow, and source-null checks differs. Shared internal helpers can remove the duplicated branches without changing the two APIs' intentional precedence. | `SharpProof.Effects/OperationNullnessEvaluator.cs:37-104` |
+
+## Second survey, part five hundred: R1178 - binary-pattern inevitability recomputes left selection
+
+In the binary-pattern branch of `IsPatternEvaluationUnavoidable`, the helper
+first recursively evaluates whether `binary.LeftPattern` is unavoidable. It
+then calls `GetPatternSelectionForUnknownValue` on that same left subtree to
+decide whether the right side can be unavoidable, causing nested binary and
+negated patterns to be traversed a second time. A single structural walk can
+return both the left inevitability and its unknown-value selection, while
+preserving the short-circuit rules for `and` and `or` and the distinct right
+subtree evaluation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1178 | **`SwitchExpressionFacts.IsPatternEvaluationUnavoidable` traverses a binary pattern's left subtree twice.** It separately calls itself and `GetPatternSelectionForUnknownValue` for `binary.LeftPattern`, so nested pattern structure and type checks are repeated before the right-side short-circuit decision. A combined fact projection can remove that duplicate traversal without changing pattern-selection or inevitability semantics. | `SharpProof.Effects/SwitchExpressionFacts.cs:371-418` |
