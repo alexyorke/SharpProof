@@ -14586,6 +14586,12 @@ decision points.
 |---|---|---|
 | R1210 | **`RunVerifier.Execute` repeats timeout termination state updates in two branches.** The `timedOut` process-wait path and the `!outputCompleted` path each compute `processWasAlive`, invoke `TryTerminate` with the remaining deadline, update `retainCleanupAnchor`, and mark `containmentFailed`; only the first path additionally handles cancellation and a final wait. Sharing the common update preserves the distinct timeout/output semantics while removing duplicated process-boundary bookkeeping. | `SharpProof.BuildTasks/RunVerifier.cs:233-278` |
 
+### Status (part five hundred thirty-two)
+
+R1210 is applied: verifier timeout and output-drain termination now share one
+bookkeeping helper while preserving their branch-specific cancellation and wait
+behavior. Build-task tests pass (63 passed).
+
 ## Second survey, part five hundred thirty-three: R1211 - launcher claim reporting repeats result scans
 
 `ValidateAndReport` builds a manifest-claim index, then scans the validated claim-result array once to detect any refutation, walks it again to print each outcome, and scans it a third time to count unknown claims for the incomplete diagnostic. One ordered loop can emit the per-claim lines while accumulating both booleans/counts; the later incomplete diagnostic and final refuted/exit policy can consume those accumulators without changing output order or validation behavior.
