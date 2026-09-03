@@ -16923,3 +16923,11 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 | ID | Finding | Evidence |
 |---|---|---|
 | R1398 | `Get-SharpProofMutationBaselinePlan` performs a presence probe followed by multiple indexer lookups for each invocation identity; use one `TryGetValue` result and a local group. | `scripts/SharpProof.MutationBaselines.psm1:38-55` |
+
+## Second survey, continued: R1399 - Compiler manifest collection rescans the compilation for runtime-evaluation mode
+
+`FinalCompilationCollectorAnalyzer` calls `ContractRuntimePolicy.IsRuntimeEvaluationEnabled` before dispatching to `FinalCompilationCollector.Collect`. When the answer is false, `Collect.Create` immediately calls `ThrowIfRuntimeEvaluationEnabled`, which performs the same syntax-tree scan again before producing the manifest. Carry the already-checked result or make the inner guard conditional on the outer result, retaining the fail-closed check if `Create` has other callers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1399 | `FinalCompilationCollectorAnalyzer` scans all syntax trees for the reserved runtime-evaluation symbol, then `FinalCompilationCollector.Create` rescans the same compilation on the false path; carry the checked result or centralize the guard. | `SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs:21-32`; `SharpProof.CompilerCollector/FinalCompilationCollector.cs:54-63`; `SharpProof.Analyzer.Core/ContractRuntimePolicy.cs:7-26,37-47` |
