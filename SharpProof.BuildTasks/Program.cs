@@ -2,8 +2,8 @@ namespace SharpProof.BuildTasks;
 
 internal static class Program
 {
-    private const string SupervisorArgument = "--supervise-verifier";
-    private const string WorkerArgument = "--run-verifier-child";
+    internal const string SupervisorArgument = "--supervise-verifier";
+    internal const string WorkerArgument = "--run-verifier-child";
 
     private static int Main(string[] arguments)
     {

@@ -173,7 +173,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             process.StartInfo.ArgumentList.Add(resolvedExecutable);
             process.StartInfo.ArgumentList.Add(
                 supervisorAssembly);
-            process.StartInfo.ArgumentList.Add("--supervise-verifier");
+            process.StartInfo.ArgumentList.Add(Program.SupervisorArgument);
             process.StartInfo.ArgumentList.Add(resolvedExecutable);
             foreach (var argument in Arguments)
             {

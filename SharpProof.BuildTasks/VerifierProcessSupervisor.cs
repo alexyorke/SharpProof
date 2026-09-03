@@ -96,7 +96,7 @@ internal static partial class VerifierProcessSupervisor
             };
             process.StartInfo.ArgumentList.Add(
                 typeof(VerifierProcessSupervisor).Assembly.Location);
-            process.StartInfo.ArgumentList.Add("--run-verifier-child");
+            process.StartInfo.ArgumentList.Add(Program.WorkerArgument);
             foreach (var argument in command)
             {
                 process.StartInfo.ArgumentList.Add(argument);

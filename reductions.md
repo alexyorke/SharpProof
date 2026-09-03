@@ -11045,6 +11045,8 @@ In `SharpProof.BuildTasks/Program.cs`, the CLI subcommand switches `--supervise-
 
 R1045 is deferred: expose BuildTasks CLI switch constants internally and replace raw string literals in callers.
 
+R1045 is applied: BuildTasks now exposes the two internal entry-point switch constants and both process-launch callers reference them, eliminating duplicate CLI literals. `BuildTaskTests` (63/63) pass.
+
 ## Second survey, part two hundred seventy-seven: R1046 - repeated imperative platform guards in launcher argument tests
 
 In `SharpProof.Package.Test/LauncherArgumentTests.cs`, seven consecutive test methods begin with an identical 5-line imperative guard checking `!OperatingSystem.IsLinux() || RuntimeInformation.ProcessArchitecture != Architecture.X64` and calling `Assert.Ignore(...)`. Other test fixtures in the repository use declarative `[Platform("Linux")]` attributes or shared helpers. Using declarative platform attributes or a fixture-level setup method removes 35 lines of repetitive platform gating.
