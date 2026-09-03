@@ -12218,7 +12218,7 @@ R1139-R1141 are applied. `ExternalEffectResolver` keeps validation in the receiv
 
 ### Status (part three hundred seventy-one)
 
-R1142 is deferred: classify unknown claim reasons in one pass, preserving the current unsupported-callable, unsupported-contract, infrastructure, and semantic-unknown precedence.
+R1142 is applied: `ProjectCallableReason` now classifies unknown claim reasons in one pass while preserving the unsupported-callable, unsupported-contract, infrastructure, and semantic-unknown precedence. The focused `CompilerCallableLowererTests` run passes (20/20).
 
 ## Second survey, part four hundred fifty-nine: R1143 - three contract vocabularies declared twice
 
@@ -13192,3 +13192,55 @@ remain separate.
 ### Status (part four hundred eighty)
 
 R1157 is pending: expose a validated/batched substitution path for the two summary roots, retaining separate output terms and fail-closed replacement checks.
+
+## Second survey, part four hundred seventy-eight: R974 is applied, and two open items re-verified
+
+Status checks on the build-configuration findings from this survey, against the
+current tree.
+
+### Status update: R974 applied, and the polarity hazard is gone
+
+R974 recorded that `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets`
+repeated a 220-character five-clause condition **verbatim four times**, with a
+fifth copy differing only by `==` versus `!=` on one clause at roughly character
+110 - the guard and its complement visually indistinguishable. It proposed one
+derived property, `_SharpProofVerifyActive`.
+
+**That is exactly what now exists.** `:18-19` defines
+`<_SharpProofVerifyActive>` as `false`, then `true` under the four common clauses
+(`SharpProofVerify`, `_SharpProofProfileNormalized`, `DesignTimeBuild`,
+`BuildingProject`), and `:1` adds it to the file's `TreatAsLocalProperty` list so a
+consumer cannot override it. The compound condition now appears **once** instead of
+five times. The host clause is composed at each use rather than folded in:
+`'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' == 'true'`
+at `:40,97,103,258`, and at `:285` the reject target reads
+`'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' != 'true'`.
+**The polarity difference that R974 called invisible is now the last clause of a
+short readable condition.** Move R974 to applied.
+
+### Checked and not proposed (part four hundred seventy-eight)
+
+- **R977 is unchanged and stands.** All six exact-property validators are still
+  present - `Assert-ExactJsonObjectProperties`, `Assert-ExactJsonProperties`,
+  `Assert-ExactProperties`, `Assert-ExactMembers`, `Require-ExactProperties` and
+  `Test-SharpProofExactProperties` - one per file across
+  `Assert-SharpProofFuzzRunnerResult.ps1`, `Assert-SharpProofStandaloneGateResult.ps1`,
+  `Generate-ApiSpecCatalog.ps1`, `Generate-DiagnosticDescriptors.ps1`,
+  `Complete-SharpProofPilotReview.ps1` and `SharpProof.PublicationPlanIdentity.psm1`.
+  The ordering and case divergences it records are still live.
+- **R951 is unchanged and stands.** Recomputing the transitive compile closure over
+  all 60 projects, excluding analyzer-only references, still yields **42**
+  transitively redundant direct `ProjectReference`s - the same figure as when
+  filed. The 19-to-20 split between minimal and explicit projects is unchanged.
+- This makes fourteen findings from this survey applied or partly applied: R732,
+  R733, R734, R735, R949, R953, R955, R958, R962, R970, R974, R975, R980 and R984.
+  The build-configuration group is now the most-acted-on: of the items filed about
+  `.csproj`, `.props`, `.targets` and packaging, only R951, R961, R965, R978, R986
+  and R1152 remain open.
+
+### Status (part four hundred seventy-eight)
+
+No new ID. R974 was filed as worth acting on ahead of most of this ledger for a
+reason unrelated to line count - a guard whose negation was visually identical to
+itself, in a file that ships to consumers - and that specific hazard is now
+resolved rather than merely deduplicated.
