@@ -410,13 +410,13 @@ internal sealed class ContractApiIdentityResolver
         string name)
     {
         return GetSingleMethod(contract, name) is
-            {
-                MethodKind: MethodKind.Ordinary,
-                DeclaredAccessibility: Accessibility.Public,
-                IsStatic: true,
-                Arity: 0,
-                ReturnsVoid: true
-            } method &&
+        {
+            MethodKind: MethodKind.Ordinary,
+            DeclaredAccessibility: Accessibility.Public,
+            IsStatic: true,
+            Arity: 0,
+            ReturnsVoid: true
+        } method &&
             method.Parameters.Length == 1 &&
             method.Parameters[0] is
             {
@@ -483,14 +483,14 @@ internal sealed class ContractApiIdentityResolver
         int parameterCount)
     {
         return GetSingleMethod(contract, name) is
-            {
-                MethodKind: MethodKind.Ordinary,
-                DeclaredAccessibility: Accessibility.Public,
-                IsStatic: true,
-                Arity: 1,
-                ReturnsByRef: false,
-                ReturnsByRefReadonly: false
-            } method &&
+        {
+            MethodKind: MethodKind.Ordinary,
+            DeclaredAccessibility: Accessibility.Public,
+            IsStatic: true,
+            Arity: 1,
+            ReturnsByRef: false,
+            ReturnsByRefReadonly: false
+        } method &&
             method.Parameters.Length == parameterCount &&
             HasUnconstrainedTypeParameter(method.TypeParameters[0]) &&
             SymbolEqualityComparer.Default.Equals(
@@ -513,6 +513,7 @@ internal sealed class ContractApiIdentityResolver
         string name)
     {
         IMethodSymbol? member = null;
+        var count = 0;
         foreach (var candidate in contract.GetMembers(name))
         {
             if (candidate is not IMethodSymbol candidateMethod)
@@ -520,7 +521,8 @@ internal sealed class ContractApiIdentityResolver
                 continue;
             }
 
-            if (member != null)
+            count++;
+            if (count > 1)
             {
                 return null;
             }

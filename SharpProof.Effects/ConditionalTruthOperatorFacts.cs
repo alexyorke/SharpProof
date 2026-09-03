@@ -38,12 +38,15 @@ internal static class ConditionalTruthOperatorFacts
 
     internal static bool SkipsRightOperand(
         BinaryOperatorKind operatorKind,
-        bool leftValue) => operatorKind switch
+        bool leftValue)
+    {
+        return operatorKind switch
         {
             BinaryOperatorKind.ConditionalAnd => !leftValue,
             BinaryOperatorKind.ConditionalOr => leftValue,
             _ => false
         };
+    }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
