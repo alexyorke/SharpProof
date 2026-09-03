@@ -65,11 +65,7 @@ Test-SharpProofReleaseBundleTopology `
     -Directory $resolvedSource `
     -Artifacts $artifacts `
     -Owner 'Release artifact bundle'
-$expectedPackageIds = @(
-    'SharpProof',
-    'SharpProof.Attributes',
-    'SharpProof.Verifier'
-) | Sort-Object
+$expectedPackageIds = @($SharpProofPackageIds)
 foreach ($kind in @('package', 'symbols')) {
     $actualPackageIds = @(
         $artifacts |
