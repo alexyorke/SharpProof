@@ -18548,3 +18548,8 @@ analysis session. `FalseSwitchGuardPatternRegressionTests` pass (4/4).
 R1524 is applied: the fixed-truth and truth-operator case matrices now reuse
 their immutable fixture compilations while each case still creates its own
 analysis session. `ConditionalTruthOperatorEffectTests` pass (6/6).
+
+R1525 is applied: the terminal-initializer and infeasible-branch case matrices
+now reuse immutable fixture compilations while each case retains its selected
+type and independent analysis session. `BranchingExpressionEffectRegressionTests`
+pass (5/5).

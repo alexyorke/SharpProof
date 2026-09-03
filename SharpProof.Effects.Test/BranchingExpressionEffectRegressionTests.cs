@@ -3,12 +3,33 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class BranchingExpressionEffectRegressionTests
 {
+    private static readonly Compilation TerminalInitializerCompilation =
+        CreateTerminalInitializerCompilation();
+
+    private static readonly Compilation InfeasibleInitializerCompilation =
+        CreateInfeasibleInitializerCompilation();
+
     [TestCase("TerminalTrueInitializer")]
     [TestCase("TerminalFalseInitializer")]
     public void TerminalConditionalInitializerArmDoesNotSuppressReachableSiblingEffects(
         string typeName)
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = TerminalInitializerCompilation;
+        var summary = new EffectAnalysisSession(compilation)
+            .Analyze(EffectTestHost.RequireType(compilation, typeName)
+                .InstanceConstructors
+                .Single(static constructor =>
+                    !constructor.IsImplicitlyDeclared))
+            .Summary;
+
+        Assert.That(
+            summary.Writes.Contains(EffectRegionId.Static()),
+            Is.True);
+    }
+
+    private static Compilation CreateTerminalInitializerCompilation()
+    {
+        return EffectTestHost.CreateCompilation(
             """
             using System;
 
@@ -38,7 +59,15 @@ public sealed class BranchingExpressionEffectRegressionTests
                 }
             }
             """);
+    }
 
+    [TestCase("ShortCircuitAndInitializer")]
+    [TestCase("ShortCircuitOrInitializer")]
+    [TestCase("NonNullCoalesceInitializer")]
+    public void InfeasibleInitializerBranchEffectsAreNotScanned(
+        string typeName)
+    {
+        var compilation = InfeasibleInitializerCompilation;
         var summary = new EffectAnalysisSession(compilation)
             .Analyze(EffectTestHost.RequireType(compilation, typeName)
                 .InstanceConstructors
@@ -48,16 +77,13 @@ public sealed class BranchingExpressionEffectRegressionTests
 
         Assert.That(
             summary.Writes.Contains(EffectRegionId.Static()),
-            Is.True);
+            Is.False,
+            typeName);
     }
 
-    [TestCase("ShortCircuitAndInitializer")]
-    [TestCase("ShortCircuitOrInitializer")]
-    [TestCase("NonNullCoalesceInitializer")]
-    public void InfeasibleInitializerBranchEffectsAreNotScanned(
-        string typeName)
+    private static Compilation CreateInfeasibleInitializerCompilation()
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        return EffectTestHost.CreateCompilation(
             """
             public sealed class ShortCircuitAndInitializer {
                 private static int s_state;
@@ -84,17 +110,5 @@ public sealed class BranchingExpressionEffectRegressionTests
                 }
             }
             """);
-
-        var summary = new EffectAnalysisSession(compilation)
-            .Analyze(EffectTestHost.RequireType(compilation, typeName)
-                .InstanceConstructors
-                .Single(static constructor =>
-                    !constructor.IsImplicitlyDeclared))
-            .Summary;
-
-        Assert.That(
-            summary.Writes.Contains(EffectRegionId.Static()),
-            Is.False,
-            typeName);
     }
 }
