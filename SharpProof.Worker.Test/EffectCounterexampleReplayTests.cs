@@ -22,29 +22,10 @@ public sealed class EffectCounterexampleReplayTests
                 fixture.Target,
                 fixture.Evidence);
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    result.Outcome,
-                    Is.EqualTo(WorkerClaimOutcome.Refuted),
-                    kind.ToString());
-                Assert.That(
-                    result.Reason,
-                    Is.EqualTo(WorkerClaimReason.None),
-                    kind.ToString());
-                Assert.That(
-                    result.EffectCertainty,
-                    Is.EqualTo(
-                        WorkerEffectEvidenceCertainty.DefiniteViolation),
-                    kind.ToString());
-                Assert.That(result.EffectWitness, Is.Not.Null);
-                Assert.That(
-                    result.EffectWitness,
-                    Is.Not.SameAs(fixture.Evidence.Witness));
-                AssertWitnessesEqual(
-                    fixture.Evidence.Witness!,
-                    result.EffectWitness!);
-            }
+            AssertRefuted(
+                fixture.Evidence.Witness!,
+                result,
+                requireDistinctWitness: true);
         }
     }
 
@@ -773,7 +754,8 @@ public sealed class EffectCounterexampleReplayTests
 
     private static void AssertRefuted(
         WorkerEffectViolationWitness expected,
-        WorkerClaimResult actual)
+        WorkerClaimResult actual,
+        bool requireDistinctWitness = false)
     {
         using (Assert.EnterMultipleScope())
         {
@@ -784,6 +766,10 @@ public sealed class EffectCounterexampleReplayTests
             Assert.That(actual.EffectCertainty, Is.EqualTo(
                 WorkerEffectEvidenceCertainty.DefiniteViolation));
             Assert.That(actual.EffectWitness, Is.Not.Null);
+            if (requireDistinctWitness)
+            {
+                Assert.That(actual.EffectWitness, Is.Not.SameAs(expected));
+            }
             AssertWitnessesEqual(expected, actual.EffectWitness!);
         }
     }
