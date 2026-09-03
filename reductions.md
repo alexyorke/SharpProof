@@ -11041,6 +11041,10 @@ In `SharpProof.Package.Test/BuildTaskTests.cs`, `PublishedResultValidatorRejects
 
 R1044 is deferred: consolidate the duplicate manifest setup and task execution harness across negative result validation tests.
 
+R1044 is applied: invalid published-result cases now share one fixture and task harness, with the complete-without-payload variant added to the existing case table. `BuildTaskTests` pass (63/63).
+
+R1044 is applied: the invalid published-result cases now share one fixture and task harness, with the complete-without-payload variant added to the existing case table. `BuildTaskTests` pass.
+
 ## Second survey, part two hundred seventy-six: R1045 - duplicated internal CLI switch constants in BuildTasks
 
 In `SharpProof.BuildTasks/Program.cs`, the CLI subcommand switches `--supervise-verifier` and `--run-verifier-child` are defined as private constants. Meanwhile, their callers in sibling files within the same project and namespace (`RunVerifier.cs` and `VerifierProcessSupervisor.cs`) hardcode the exact same switch strings as string literals. Changing the private constants to `internal const` (or placing them in a shared constants class) allows callers to reference the authoritative definitions rather than repeating magic strings.

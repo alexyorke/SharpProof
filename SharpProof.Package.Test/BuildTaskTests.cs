@@ -515,8 +515,9 @@ public sealed class BuildTaskTests
     [TestCase("missing")]
     [TestCase("malformed")]
     [TestCase("stale-request")]
+    [TestCase("complete-without-payload")]
     [Platform("Linux")]
-    public void PublishedResultValidatorRejectsAbsentOrStaleEvidence(string kind)
+    public void PublishedResultValidatorRejectsInvalidEvidence(string kind)
     {
         var directory = Directory.CreateTempSubdirectory("sharpproof-result-binding-");
         try
@@ -550,6 +551,20 @@ public sealed class BuildTaskTests
                     inputHash = new string('1', 64),
                     runStatus = "Complete"
                 }));
+            }
+            else if (kind == "complete-without-payload")
+            {
+                var requestHash = Convert.ToHexString(
+                    SHA256.HashData(File.ReadAllBytes(request)));
+                File.WriteAllText(
+                    result,
+                    JsonSerializer.Serialize(new
+                    {
+                        protocolVersion = "11",
+                        requestHash,
+                        inputHash = new string('z', 64),
+                        runStatus = "Complete"
+                    }));
             }
 
             var engine = new RecordingBuildEngine();
@@ -672,60 +687,6 @@ public sealed class BuildTaskTests
                 engine.Errors.Single().Message,
                 Does.Contain(
                     $"exceeds the {WorkerProtocolJson.MaximumJsonBytes} byte limit"));
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
-    }
-
-    [Test]
-    [Platform("Linux")]
-    public void PublishedResultValidatorRejectsACompleteResponseWithoutPayload()
-    {
-        var directory = Directory.CreateTempSubdirectory(
-            "sharpproof-result-structure-");
-        try
-        {
-            var manifest = Path.Combine(directory.FullName, "compiler-manifest.json");
-            var request = Path.Combine(directory.FullName, "request.json");
-            var result = Path.Combine(directory.FullName, "result.json");
-            File.WriteAllText(manifest, "{}");
-            var manifestHash = Convert.ToHexString(
-                SHA256.HashData(File.ReadAllBytes(manifest)));
-            var requestJson = JsonSerializer.Serialize(new
-            {
-                protocolVersion = "11",
-                compilerManifest = new { path = manifest, sha256 = manifestHash },
-                budgets = new { },
-                cache = new { },
-                verifyPolicy = "Advisory",
-                assumptionPolicy = "Allow"
-            });
-            File.WriteAllText(request, requestJson);
-            var requestHash = Convert.ToHexString(
-                SHA256.HashData(File.ReadAllBytes(request)));
-            File.WriteAllText(
-                result,
-                JsonSerializer.Serialize(new
-                {
-                    protocolVersion = "11",
-                    requestHash,
-                    inputHash = new string('z', 64),
-                    runStatus = "Complete"
-                }));
-
-            var engine = new RecordingBuildEngine();
-            var task = new ValidatePublishedVerificationResult
-            {
-                BuildEngine = engine,
-                RequestPath = request,
-                ResultPath = result,
-                ManifestPath = manifest
-            };
-
-            Assert.That(task.Execute(), Is.False);
-            Assert.That(engine.Errors, Is.Not.Empty);
         }
         finally
         {
