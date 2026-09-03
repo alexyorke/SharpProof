@@ -10753,3 +10753,15 @@ R1022 is deferred: share only the common definite type-initialization-failure as
 ### Status (part two hundred fifty-four)
 
 R1023 is deferred: share only the assertions for methods after a conditionally throwing initializer, and retain the first-initializer expectations separately.
+
+## Second survey, part two hundred fifty-five: R1024 - repeated internal assumption construction
+
+`SourceDomainPredicateIsRetainedAlongsideIdenticalUserAssumption` and `NormalCompletionAuthorityReplacesAliasedResultDomain` both construct an `Assumption` by reflecting over its non-public constructor, selecting the single instance constructor, and invoking it with the factory, predicate, and justification. The justification types and later assertions intentionally differ, but the reflection and argument plumbing are identical. A test-only `CreateAssumption` helper can encapsulate that access workaround and make the two scenarios' actual policy differences visible.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1024 | **Postcondition-obligation tests duplicate the non-public `Assumption` constructor workaround.** Two tests repeat `typeof(Assumption).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Single().Invoke(...)` with the same factory/predicate/justification argument shape. A focused test helper can remove the reflection boilerplate while preserving the distinct `UserAssumedJustification` and `LoweredJustification` paths. | `SharpProof.Worker.Test/PostconditionObligationBuilderTests.cs:117-143,147-190` |
+
+### Status (part two hundred fifty-five)
+
+R1024 is deferred: centralize only the test-side constructor access, and keep the two justification policies and their assertions independent.
