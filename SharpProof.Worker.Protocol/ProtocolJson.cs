@@ -819,12 +819,33 @@ public static partial class WorkerProtocolJson
         var expected = values.GroupBy(static value => value)
             .ToDictionary(static group => group.Key, static group => group.Count());
         var seen = new HashSet<TKind>();
-        return actual != null &&
-            actual.Length == expected.Count &&
-            actual.All(value => value != null && count(value) > 0 &&
-                IsDefined(kind(value), unspecified) && seen.Add(kind(value)) &&
-                expected.TryGetValue(kind(value), out var expectedCount) &&
-                count(value) == expectedCount);
+        if (actual == null || actual.Length != expected.Count)
+        {
+            return false;
+        }
+
+        foreach (var value in actual)
+        {
+            if (value == null)
+            {
+                return false;
+            }
+            var itemCount = count(value);
+            if (itemCount <= 0)
+            {
+                return false;
+            }
+            var itemKind = kind(value);
+            if (!IsDefined(itemKind, unspecified) ||
+                !seen.Add(itemKind) ||
+                !expected.TryGetValue(itemKind, out var expectedCount) ||
+                itemCount != expectedCount)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
     private static WorkerProtocolError[] ValidateProtocolErrors(WorkerProtocolError[]? values, Validator errors)
     {
