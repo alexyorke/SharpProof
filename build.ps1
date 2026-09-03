@@ -119,6 +119,10 @@ switch ($Profile) {
         $arguments = if ($Profile -ceq 'build') {
             @('-Target', $Target)
         }
+        elseif ($Profile -ceq 'samples' -and
+                -not [string]::IsNullOrWhiteSpace($PackageSource)) {
+            @('-PackageSource', $PackageSource)
+        }
         else { @() }
         Invoke-Container $Profile $Configuration $arguments
     }
