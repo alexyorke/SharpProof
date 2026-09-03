@@ -10541,3 +10541,15 @@ R1005 is deferred: physical containment is security-sensitive; only cache proven
 ### Status (part two hundred thirty-seven)
 
 R1006 is deferred: keep the two public fixture names for readability and consolidate only their identical assertion plumbing if this test script is next maintained.
+
+## Second survey, part two hundred thirty-eight: R1007 - validation builds discarded summary counts
+
+`WorkerProtocolJson.ValidateSummary` independently calls `CountsMatch` for the outcome and reason arrays, then calls `WorkerResultAssembler.SummarizeAssumptions` only to compare assumption totals and conflicting kinds. `SummarizeAssumptions` currently delegates to `Summarize`, whose `SummaryAccumulator` allocates and fills both `_outcomes` and `_reasons` while walking the claim results, but the wrapper returns only `summary.Assumptions` and `summary.ConflictingAssumptionKinds`; those two count maps are discarded. A dedicated assumption-only accumulator, or an explicit summary mode that omits unused count maps, can remove this validation-side work while retaining `CountsMatch` as the independent trust-boundary check for untrusted response counts. This is distinct from R745: it does not reuse producer state or weaken validation, it removes fields that the validation call already knows it will not consume.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1007 | **Validation recomputes and discards outcome/reason counts while checking assumptions.** `ValidateSummary` first validates the supplied outcome and reason counts with two independent `CountsMatch` calls, then invokes `SummarizeAssumptions`; that method runs the full `SummaryAccumulator`, including its outcome and reason dictionaries, even though it returns only the assumption summary and conflict flag. Split the assumption aggregation from the full producer summary, or make the discarded count fields optional, while keeping the independent untrusted-count checks intact. | `SharpProof.Worker.Protocol/ProtocolJson.cs:763-786`; `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:107-113,115-195`; related producer/validation boundary R745 | |
+
+### Status (part two hundred thirty-eight)
+
+R1007 is deferred: preserve the independent `CountsMatch` validation and remove only the count aggregation that `SummarizeAssumptions` does not return to its caller.
