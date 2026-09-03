@@ -154,93 +154,49 @@ public sealed class FrontendSemanticEdgeCaseTests
     [Test]
     public void CompileInvalidSemanticEdgeDoesNotPoisonValidPeer()
     {
-        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
-        [
-            Exact("long", "", "0L"),
-            Exact("long", "", "long.MaxValue + 1L")
-        ]);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
-            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
-        }
+        AssertValidPeerIsolation("long.MaxValue + 1L");
     }
 
     [Test]
     public void CompileSuccessfulSemanticEdgeInjectionDoesNotPoisonValidPeer()
     {
-        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
-        [
-            Exact("long", "", "0L"),
-            Exact(
-                "long",
-                "",
-                "0L; public static long EdgeTarget999() => 0L")
-        ]);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
-            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
-        }
+        AssertValidPeerIsolation(
+            "0L; public static long EdgeTarget999() => 0L");
     }
 
     [Test]
     public void NonnumericSemanticEdgeInjectionDoesNotEscapeBatchIsolation()
     {
-        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
-        [
-            Exact("long", "", "0L"),
-            Exact(
-                "long",
-                "",
-                "0L; public static long EdgeTargetOops() => 0L")
-        ]);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
-            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
-        }
+        AssertValidPeerIsolation(
+            "0L; public static long EdgeTargetOops() => 0L");
     }
 
     [Test]
     public void StaticInitializerInjectionDoesNotPoisonValidPeer()
     {
-        var results = new FrontendDifferentialOracle().CompareSemanticEdges(
-        [
-            Exact("long", "", "0L"),
-            Exact(
-                "long",
-                "",
-                "0L; static readonly long Poison = Throw(); " +
-                "static long Throw() => throw new System.Exception()")
-        ]);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));
-            Assert.That(results[1].Status, Is.EqualTo(FuzzOracleStatus.Mismatch));
-        }
+        AssertValidPeerIsolation(
+            "0L; static readonly long Poison = Throw(); " +
+            "static long Throw() => throw new System.Exception()");
     }
 
     [Test]
     public void TopLevelInitializerInjectionDoesNotPoisonValidPeer()
     {
+        AssertValidPeerIsolation(
+            "0L; } public static class Injected { " +
+            "[System.Runtime.CompilerServices.ModuleInitializer] " +
+            "public static void Initialize() => " +
+            "throw new System.Exception(); } public static class Tail { " +
+            "public static long Value => 0L");
+    }
+
+    private static void AssertValidPeerIsolation(string injectedExpression)
+    {
         var results = new FrontendDifferentialOracle().CompareSemanticEdges(
         [
             Exact("long", "", "0L"),
-            Exact(
-                "long",
-                "",
-                "0L; } public static class Injected { " +
-                "[System.Runtime.CompilerServices.ModuleInitializer] " +
-                "public static void Initialize() => " +
-                "throw new System.Exception(); } public static class Tail { " +
-                "public static long Value => 0L")
+            Exact("long", "", injectedExpression)
         ]);
-
         using (Assert.EnterMultipleScope())
         {
             Assert.That(results[0].Status, Is.EqualTo(FuzzOracleStatus.Agreement));

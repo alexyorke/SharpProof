@@ -10747,6 +10747,10 @@ R1020 is applied: hash-path and equality-path concurrency tests now use one conf
 
 R1021 is deferred: share the valid-peer batch and invariant status assertions, but keep every injection form as an independent case.
 
+R1021 is applied: the five semantic-edge isolation tests now share one valid-peer batch and status assertion helper while retaining independent injection expressions and test names. `FrontendSemanticEdgeCaseTests` pass (7/7).
+
+R1021 is applied: the five semantic-edge isolation tests now share one valid-peer batch and status assertion helper while retaining independent injection expressions and test names. `FrontendSemanticEdgeCaseTests` pass.
+
 ## Second survey, part two hundred fifty-three: R1022 - repeated type-initialization result assertions
 
 `BeforeFieldInitStaticMethodIncludesInitializerEffectsAndFailure` and `DefinitelyFailingSourceInitializerThrowsTypeInitializationException` analyze different source programs, but both project `result.Summary.Throws.Types` to display names and then assert no unknown throws, exactly one exception type, the presence of `System.TypeInitializationException`, and complete summary status. Those shared result assertions can move to a private helper; the before-field-init test's static-write assertion and the two source fixtures remain distinct evidence.
