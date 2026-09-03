@@ -16152,6 +16152,12 @@ New-SharpProofPublicationInputSnapshot materializes the sorted publication entri
 |---|---|---|
 | R1342 | **`New-SharpProofPublicationInputSnapshot` sorts the complete entry list twice more solely to detect duplicate paths and file identities. Populate ordinal path and identity sets during projection, retaining the fail-closed checks and sorted output.** | `scripts/SharpProof.PublicationPlanTopology.ps1:44-85` |
 
+### Status (continued)
+
+R1342 is applied: publication paths and file identities are checked with
+ordinal sets during the existing projection, avoiding the two extra sorts.
+Publication topology tests pass (14 passed).
+
 ## Second survey, continued: R1343 - replay tests duplicate the shared refutation assertion envelope
 
 UnconditionalObjectAndArrayAllocationsAreIndependentlyConfirmed manually checks Refuted, None, DefiniteViolation, non-null witness, and deep witness equality. The same outcome/certainty/witness contract is already centralized in AssertRefuted, used by the capability and exception replay tests; the first test adds only the distinct-witness assertion. Extend or parameterize AssertRefuted and reuse it here so the shared result contract cannot drift between tests.
