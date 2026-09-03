@@ -20833,3 +20833,10 @@ exception. `Tools/SharpProof.Fuzz` has no test project. Its normal container
 build is currently blocked by four pre-existing diagnostics in unrelated
 `SharpProof.Testing` and `SharpProof.Host` sources, so no Fuzz-specific test
 failure is attributable to this change.
+
+R1720 is applied: the eleven semantic-cache tests now use one exact diagnostic
+oracle that requires the expected `SPMETA010` multiset and source locations,
+instead of repeating count-only assertions. Specialized fixture sources remain
+local where their enum/cache shapes differ. The full
+`SharpProof.Meta.Analyzers.Test` project passes 163/163 tests with zero warnings
+or errors.

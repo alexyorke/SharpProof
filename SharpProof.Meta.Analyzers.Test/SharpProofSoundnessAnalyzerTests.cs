@@ -521,10 +521,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(4));
+        AssertSemanticCacheDiagnostics(diagnostics, 4);
     }
 
     [Test]
@@ -588,10 +585,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(4));
+        AssertSemanticCacheDiagnostics(diagnostics, 4);
     }
 
     [Test]
@@ -665,10 +659,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(4));
+        AssertSemanticCacheDiagnostics(diagnostics, 4);
     }
 
     [Test]
@@ -689,10 +680,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """));
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(1));
+        AssertSemanticCacheDiagnostics(diagnostics, 1);
     }
 
     [Test]
@@ -798,10 +786,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(1));
+        AssertSemanticCacheDiagnostics(diagnostics, 1);
     }
 
     [Test]
@@ -833,10 +818,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(4));
+        AssertSemanticCacheDiagnostics(diagnostics, 4);
     }
 
     [Test]
@@ -884,10 +866,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """));
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(1));
+        AssertSemanticCacheDiagnostics(diagnostics, 1);
     }
 
     [Test]
@@ -1091,10 +1070,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """));
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(4));
+        AssertSemanticCacheDiagnostics(diagnostics, 4);
     }
 
     [Test]
@@ -1124,10 +1100,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(1));
+        AssertSemanticCacheDiagnostics(diagnostics, 1);
     }
 
     [TestCase("SetAsync")]
@@ -1193,10 +1166,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(4));
+        AssertSemanticCacheDiagnostics(diagnostics, 4);
     }
 
     [Test]
@@ -1228,10 +1198,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             }
             """);
 
-        Assert.That(
-            diagnostics.Count(static diagnostic =>
-                diagnostic.Id == "SPMETA010"),
-            Is.EqualTo(1));
+        AssertSemanticCacheDiagnostics(diagnostics, 1);
     }
 
     [TestCaseSource(nameof(CSharpExpressionConstructionCases))]
@@ -3383,6 +3350,27 @@ public sealed class SharpProofSoundnessAnalyzerTests
             diagnostics.Count(static diagnostic =>
                 diagnostic.Id == "SPMETA003"),
             Is.EqualTo(2));
+    }
+
+    private static void AssertSemanticCacheDiagnostics(
+        ImmutableArray<Diagnostic> diagnostics,
+        int expectedCount)
+    {
+        var actualIds = diagnostics
+            .Select(static diagnostic => diagnostic.Id)
+            .ToArray();
+        var expectedIds = Enumerable
+            .Repeat("SPMETA010", expectedCount)
+            .ToArray();
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(actualIds, Is.EqualTo(expectedIds));
+            Assert.That(
+                diagnostics.All(static diagnostic =>
+                    diagnostic.Location.IsInSource),
+                Is.True);
+        }
     }
 
     private static async Task<ImmutableArray<Diagnostic>> Analyze(string source)
