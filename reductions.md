@@ -18711,3 +18711,8 @@ R1649 is applied: `AcyclicBlockPredicateExecutor.Run` now receives one
 `RunInputs` context for its immutable execution state instead of redeclaring
 and forwarding eight individual state parameters; resource limits remain
 explicit. `AcyclicBlockPredicateExecutorTests` pass (14/14).
+
+R1650 is applied: the independent projection oracle now expresses precedence
+with compact ordered guards instead of a second switch-shaped implementation,
+while still checking every five-flag combination against the generated tuple.
+`EffectEvaluationProjectionsTests` pass (2/2).
