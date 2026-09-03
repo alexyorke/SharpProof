@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -24,6 +25,9 @@ internal sealed class WorkerProtocolJsonObjectShape(
 
 public static partial class WorkerProtocolJson
 {
+    private static readonly ConcurrentDictionary<string, Type> s_enumTypes =
+        new(StringComparer.Ordinal);
+
     private static void EnsureJsonShape(
         string json,
         string rootType)
@@ -157,12 +161,18 @@ public static partial class WorkerProtocolJson
         string declaredType)
     {
         RequireValueKind(value, JsonValueKind.String);
-        var enumType = typeof(WorkerProtocolJson).Assembly.GetType(
-            typeof(WorkerProtocolJson).Namespace + "." + declaredType,
-            throwOnError: false,
-            ignoreCase: false);
+        var enumType = s_enumTypes.GetOrAdd(
+            declaredType,
+            static typeName =>
+            {
+                var type = typeof(WorkerProtocolJson).Assembly.GetType(
+                    typeof(WorkerProtocolJson).Namespace + "." + typeName,
+                    throwOnError: false,
+                    ignoreCase: false);
+                return type is { IsEnum: true } ? type : typeof(void);
+            });
         var text = value.GetString();
-        if (enumType == null || !enumType.IsEnum || text == null)
+        if (!enumType.IsEnum || text == null)
         {
             throw new JsonException("The declared JSON enum type is invalid.");
         }

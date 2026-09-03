@@ -320,6 +320,7 @@ the smallest relevant containerized test target passes.
 | R955 | Guard effect-contract catalog generation with an explicit schema version | Generator verification passed |
 | R964 | Use an exhaustive analyzer outcome rank instead of generic enum reflection | `SharpProof.Analyzer.Test`: 476 passed |
 | R966 | Share Frontend abstention enum validation while retaining sentinel policies | `SharpProof.Frontend.Test`: 121 passed |
+| R969 | Cache protocol enum type resolution with a fail-closed sentinel | `SharpProof.Worker.Test`: 695 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -9458,7 +9459,9 @@ quantities that currently share one number.
 
 ### Status (part one hundred ninety-six)
 
-R969 is `deferred`: the cache is local to the protocol validator, but its invalid-type representation and initialization strategy should be tested against the generated shape table before applying it.
+R969 is applied: protocol enum type resolution is cached by declared type with
+a non-enum sentinel for unknown names, preserving fail-closed validation while
+avoiding repeated assembly lookups.
 
 ## Second survey, part one hundred ninety-seven: R970 - three names for one kind of field
 
@@ -9510,7 +9513,8 @@ capable of holding once it is.
 
 ### Status (part one hundred ninety-eight)
 
-R971 is `deferred`: the cache is local to the protocol validator, but its invalid-type representation and initialization strategy should be tested against the generated shape table before applying it.
+R971 is `merged` into R969: it repeated the same protocol enum type-resolution
+finding and is covered by the shared cache implementation and tests above.
 
 ## Second survey, part one hundred ninety-nine: R972 - IL integer bounds shadow the scalar catalog
 
