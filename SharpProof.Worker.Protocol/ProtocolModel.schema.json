@@ -53,6 +53,24 @@
       {"name":"VacuousEntry","meaning":"Contradictory entry preconditions prove the effect claim vacuously"}
     ]
   },
+  "analyzerProducerVocabulary": {
+    "outcomes": ["Proven", "Refuted", "Unknown"],
+    "reasons": [
+      "None",
+      "UnsupportedContract",
+      "EffectContractNotEstablished",
+      "EffectSummaryIncomplete",
+      "ResourceLimit",
+      "UnsupportedBody"
+    ],
+    "certainties": [
+      "IncompleteMayEffectSummary",
+      "CompleteMayEffectSummary",
+      "TrustedCompleteBoundary",
+      "DefiniteViolation",
+      "Unavailable"
+    ]
+  },
   "validationTables": [
     {
       "name": "ClaimShape",

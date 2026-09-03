@@ -348,32 +348,22 @@ if ($effectCertaintyTables.Count -ne 1) {
 }
 $effectCertaintyRows = @(
     Get-RequiredMember $effectCertaintyTables[0] 'rows' 'EffectCertainty table')
+$analyzerVocabulary = Get-RequiredMember `
+    $schema `
+    'analyzerProducerVocabulary' `
+    'schema'
 $analyzerOutcomes = [Collections.Generic.HashSet[string]]::new(
+    [string[]](Get-RequiredMember $analyzerVocabulary 'outcomes' `
+        'analyzer producer vocabulary'),
     [StringComparer]::Ordinal)
 $analyzerReasons = [Collections.Generic.HashSet[string]]::new(
+    [string[]](Get-RequiredMember $analyzerVocabulary 'reasons' `
+        'analyzer producer vocabulary'),
     [StringComparer]::Ordinal)
 $analyzerCertainties = [Collections.Generic.HashSet[string]]::new(
+    [string[]](Get-RequiredMember $analyzerVocabulary 'certainties' `
+        'analyzer producer vocabulary'),
     [StringComparer]::Ordinal)
-foreach ($name in @('Proven', 'Refuted', 'Unknown')) {
-    [void]$analyzerOutcomes.Add($name)
-}
-foreach ($name in @(
-        'None',
-        'UnsupportedContract',
-        'EffectContractNotEstablished',
-        'EffectSummaryIncomplete',
-        'ResourceLimit',
-        'UnsupportedBody')) {
-    [void]$analyzerReasons.Add($name)
-}
-foreach ($name in @(
-        'IncompleteMayEffectSummary',
-        'CompleteMayEffectSummary',
-        'TrustedCompleteBoundary',
-        'DefiniteViolation',
-        'Unavailable')) {
-    [void]$analyzerCertainties.Add($name)
-}
 $producerTupleRows = [Collections.Generic.List[object]]::new()
 foreach ($row in $effectCertaintyRows) {
     $values = @($row)
