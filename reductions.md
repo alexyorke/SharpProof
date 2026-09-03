@@ -10817,6 +10817,8 @@ R1025 is deferred: remove only the redundant `ToImmutableArray()` call, and pres
 
 R1026 is deferred: share only the divergent base declaration and completion-facts construction, and retain the separate runtime-override and base-qualified-call cases.
 
+R1026 is applied: the virtual-dispatch tests now share the divergent base declaration and completion-facts factory while retaining separate override and base-qualified-call scenarios. `VirtualDispatchCompletionRegressionTests` pass (2/2).
+
 ## Second survey, part two hundred fifty-eight: R1027 - string-dispatched parameterized assertions
 
 `IndirectMutationDoesNotSuppressReceiverEffects` is parameterized with `ThroughRefAlias` and `ThroughLocalFunction`, but its assertion envelope changes inside the test by comparing `methodName` to the literal `ThroughRefAlias`. The two cases therefore do not advertise their different expected write/completeness contracts in the test data; adding or renaming a case can silently select the wrong assertions. Supplying expected values as test-case arguments, or splitting the cases when their contracts are intentionally different, removes the string branch while preserving the shared exception assertion.

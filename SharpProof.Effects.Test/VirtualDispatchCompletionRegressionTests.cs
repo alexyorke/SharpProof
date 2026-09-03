@@ -5,17 +5,19 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class VirtualDispatchCompletionRegressionTests
 {
+    private const string DivergingBaseDeclaration = """
+        public class DivergingBase {
+            public virtual void Invoke() {
+                while (true) { }
+            }
+        }
+        """;
+
     [Test]
     public void ReturningOverrideMakesVirtualCallMayComplete()
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = CreateDivergingBaseCompilation(
             """
-            public class DivergingBase {
-                public virtual void Invoke() {
-                    while (true) { }
-                }
-            }
-
             public sealed class ReturningDerived : DivergingBase {
                 public override void Invoke() {
                 }
@@ -40,9 +42,7 @@ public sealed class VirtualDispatchCompletionRegressionTests
             "Invoke");
         var caller = EffectTestHost.SampleMethod(compilation, "Run");
         var invocation = GetInvocation(compilation, caller);
-        var completion = new DefiniteOperationFacts(
-            compilation,
-            CancellationToken.None);
+        var completion = CreateCompletionFacts(compilation);
 
         using (Assert.EnterMultipleScope())
         {
@@ -68,14 +68,8 @@ public sealed class VirtualDispatchCompletionRegressionTests
     [Test]
     public void BaseQualifiedCallStillUsesTheBaseBody()
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = CreateDivergingBaseCompilation(
             """
-            public class DivergingBase {
-                public virtual void Invoke() {
-                    while (true) { }
-                }
-            }
-
             public sealed class Derived : DivergingBase {
                 private static int state;
 
@@ -90,9 +84,7 @@ public sealed class VirtualDispatchCompletionRegressionTests
             "Derived",
             "Run");
         var invocation = GetInvocation(compilation, caller);
-        var completion = new DefiniteOperationFacts(
-            compilation,
-            CancellationToken.None);
+        var completion = CreateCompletionFacts(compilation);
 
         using (Assert.EnterMultipleScope())
         {
@@ -105,6 +97,19 @@ public sealed class VirtualDispatchCompletionRegressionTests
                     .CanCompleteNormally(invocation),
                 Is.False);
         }
+    }
+
+    private static CSharpCompilation CreateDivergingBaseCompilation(
+        string source)
+    {
+        return EffectTestHost.CreateCompilation(
+            DivergingBaseDeclaration + Environment.NewLine + source);
+    }
+
+    private static DefiniteOperationFacts CreateCompletionFacts(
+        Compilation compilation)
+    {
+        return new DefiniteOperationFacts(compilation, CancellationToken.None);
     }
 
     private static IInvocationOperation GetInvocation(
