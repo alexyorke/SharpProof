@@ -13889,6 +13889,12 @@ leaving each public method's precedence and source-null fallback unchanged.
 |---|---|---|
 | R1177 | **`OperationNullnessEvaluator` duplicates the null-state decision mechanics in `GetNullState` and `GetNullStatePreferNull`.** Both APIs map the same abstract-flow result to `NonNull`/`Null` and repeat the `null`/instance-reference/non-nullable-value/definitely-non-null fallback predicate; only the ordering of constant-null, flow, and source-null checks differs. Shared internal helpers can remove the duplicated branches without changing the two APIs' intentional precedence. | `SharpProof.Effects/OperationNullnessEvaluator.cs:37-104` |
 
+### Status (part four hundred ninety-nine)
+
+R1177 is applied: both null-state APIs share abstract-flow mapping and the
+static non-null shape predicate while retaining their distinct precedence.
+The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred: R1178 - binary-pattern inevitability recomputes left selection
 
 In the binary-pattern branch of `IsPatternEvaluationUnavoidable`, the helper
