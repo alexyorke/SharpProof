@@ -12918,14 +12918,14 @@ No new ID. R980 stays open in narrowed form; the byte-exact half is real and the
 pipeline evidence for it was independently verified. What changes is its size: the
 gap is five catalog-shaped generators and a formatting-drift class, not fourteen
 generators and everything about them.
-## Second survey, part four hundred seventy-five: R1154 - one hex convention, three encodings, and a no-op
+## Second survey, part four hundred seventy-five: R1156 - one hex convention, three encodings, and a no-op
 
 A census of every SHA-256 computation and hex encoding in production, against the
 lowercase-hex invariant the repository validates for.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R1154 | **The "SHA-256 hex is lowercase" invariant is validated in two places, produced three different ways, and not applied at four production sites - and one of the encodings ends in a call that does nothing.** The invariant is asserted by `SharpProof.Ir/HashEncoding.cs:26-29` `IsSha256`, which accepts only `0-9a-f`, by its `ProtocolHashEncoding` twin in `SharpProof.Worker.Protocol`, and in prose by the CA1308 justification at `OpenSourceCorpusCatalog.cs:63,72` - *"Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal."* It is produced three ways. **First**, the shared helper `HashEncoding.ToLowerHex` (`:14-17`), which formats each byte with `"x2"` and `InvariantCulture`; it has real adoption - `CompilerCompilationCapture`, `CompilerRelationalSummaryProvider`, `CompilerSpecificationPackProvider`, `ApiSpecResolution`, `WorkerPerformanceProbe`, `ProbeHash`. **Second**, `Convert.ToHexString(...)` followed by `.ToLowerInvariant()`, at `OpenSourceCorpusCatalog.cs:75,390` and `OpenSourceCorpusImporter.cs:161-164` - a two-step spelling of what the shared helper does in one, in the very files whose comments state the convention. **Third, not at all**: `Convert.ToHexString` returns **uppercase**, and four production sites keep it - `RunVerifier.cs:1376` `GetFileIdentity`, and `LinuxPathIdentity.cs:488,624`, one of which feeds a filesystem path component. **And `RunVerifier.cs:392` ends with `.ToUpperInvariant()` on a `Convert.ToHexString` result, which is already uppercase - a no-op.** Whether the four uppercase sites are defects depends on whether their values ever meet an `IsSha256` check; what is certain is that one repository-wide identity convention has three encodings and a shared helper that four sites bypass. | `SharpProof.Ir/HashEncoding.cs:12-30`; `SharpProof.BuildTasks/RunVerifier.cs:392,1376`; `SharpProof.Host/LinuxPathIdentity.cs:488,624`; `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:63,72,75,390`; `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:161-164` |
+| R1156 | **The "SHA-256 hex is lowercase" invariant is validated in two places, produced three different ways, and not applied at four production sites - and one of the encodings ends in a call that does nothing.** The invariant is asserted by `SharpProof.Ir/HashEncoding.cs:26-29` `IsSha256`, which accepts only `0-9a-f`, by its `ProtocolHashEncoding` twin in `SharpProof.Worker.Protocol`, and in prose by the CA1308 justification at `OpenSourceCorpusCatalog.cs:63,72` - *"Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal."* It is produced three ways. **First**, the shared helper `HashEncoding.ToLowerHex` (`:14-17`), which formats each byte with `"x2"` and `InvariantCulture`; it has real adoption - `CompilerCompilationCapture`, `CompilerRelationalSummaryProvider`, `CompilerSpecificationPackProvider`, `ApiSpecResolution`, `WorkerPerformanceProbe`, `ProbeHash`. **Second**, `Convert.ToHexString(...)` followed by `.ToLowerInvariant()`, at `OpenSourceCorpusCatalog.cs:75,390` and `OpenSourceCorpusImporter.cs:161-164` - a two-step spelling of what the shared helper does in one, in the very files whose comments state the convention. **Third, not at all**: `Convert.ToHexString` returns **uppercase**, and four production sites keep it - `RunVerifier.cs:1376` `GetFileIdentity`, and `LinuxPathIdentity.cs:488,624`, one of which feeds a filesystem path component. **And `RunVerifier.cs:392` ends with `.ToUpperInvariant()` on a `Convert.ToHexString` result, which is already uppercase - a no-op.** Whether the four uppercase sites are defects depends on whether their values ever meet an `IsSha256` check; what is certain is that one repository-wide identity convention has three encodings and a shared helper that four sites bypass. | `SharpProof.Ir/HashEncoding.cs:12-30`; `SharpProof.BuildTasks/RunVerifier.cs:392,1376`; `SharpProof.Host/LinuxPathIdentity.cs:488,624`; `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:63,72,75,390`; `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:161-164` |
 
 ### Checked and not proposed (part four hundred seventy-five)
 
@@ -12950,7 +12950,7 @@ lowercase-hex invariant the repository validates for.
 
 ### Status (part four hundred seventy-five)
 
-R1154 is `pending`. The safe, mechanical part is replacing the two
+R1156 is `pending`. The safe, mechanical part is replacing the two
 `Convert.ToHexString(...).ToLowerInvariant()` pairs with the shared helper and
 deleting the no-op `.ToUpperInvariant()`. The part that needs an owner's answer is
 the four uppercase sites: either they are outside the lowercase domain and should
@@ -13134,7 +13134,9 @@ fail-closed while avoiding the second pair of generic enum validations.
 
 ### Status (part four hundred seventy-seven)
 
-R1154 is pending: preserve `Widen`'s entry validation while reusing the validated comparison path instead of invoking `LessThanOrEqual`'s validation twice.
+R1154 is applied: `Widen` retains its entry validation and reuses the validated
+comparison path instead of invoking `LessThanOrEqual`'s validation twice. The
+Dataflow test suite passes (50/50).
 
 ## Second survey, part four hundred seventy-eight: R1155 - duplicate callable normalization in GetClauseInventory
 

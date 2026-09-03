@@ -79,6 +79,12 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
     {
         Validate(left.Kind);
         Validate(right.Kind);
+        return LessThanOrEqualValidated(left, right);
+    }
+
+    private bool LessThanOrEqualValidated(
+        SequenceCardinalityValue left, SequenceCardinalityValue right)
+    {
         if (left.IsBottom)
         {
             return true;
@@ -123,7 +129,7 @@ public sealed class SequenceCardinalityDomain : ClosedAbstractDomain<SequenceCar
             return candidate;
         }
 
-        if (candidate.IsBottom || LessThanOrEqual(candidate, previous))
+        if (candidate.IsBottom || LessThanOrEqualValidated(candidate, previous))
         {
             return previous;
         }
