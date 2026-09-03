@@ -10091,3 +10091,43 @@ separate production gate pair.
 R987 is `deferred`: share the analyzer-session callback lifecycle and outcome
 combination only; keep the Roslyn identity/sorting policy and the OSS catalog-ID
 projection separate.
+
+## Second survey, part two hundred nineteen: R988 - four SDK-policy readers
+
+The repository's SDK policy is small, but its parsing and enforcement are spread
+across build-time and release-time authorities. `PackageBuildSdkPin.PinAndValidateAsync`
+reads the repository `global.json` as bytes, requires `sdk.version` and a
+non-empty `sdk.rollForward`, copies the exact bytes into the performance probe
+directory, and runs `dotnet --version` in both directories before comparing the
+selected versions. `Publish-SharpProofRelease.Get-RepositorySdkVersion` reads
+the same file independently, extracts only `sdk.version`, and applies its own
+`^9.0\.[0-9]+$` rule before `Resolve-ReleaseDotNet` probes the executable. The
+container contract script separately deserializes `global.json` and compares
+both version and roll-forward against `toolchain.json`, while the package
+consumer fixture either copies the repository file or synthesizes a new one with
+an override version and a hard-coded `rollForward = 'disable'` before probing
+the consumer SDK.
+
+These callers have real policy differences and should not be collapsed into one
+validator: the performance gate must prove that a copied policy selects the same
+SDK in two working directories; release publication restricts the supported
+version shape and validates a chosen executable; the container gate reconciles
+two catalogs; and package-consumer testing intentionally supports the minimum-SDK
+override. The accidental complexity is the repeated untyped schema access and
+the repeated assumption that `rollForward` is present, non-empty, or exactly
+`disable`. A shared build-support `global.json` policy reader/writer could own
+property shape, canonical version text, and roll-forward representation, with
+each caller retaining its distinct comparison and override rules. Without it,
+changes to the SDK policy shape or roll-forward semantics must be synchronized
+manually across production C#, release PowerShell, container validation, and
+consumer-fixture generation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R988 | **The SDK policy in `global.json` is parsed or synthesized independently by four build/release authorities.** `PackageBuildSdkPin` validates and copies the policy before comparing SDK selection in the repository and probe directories; `Publish-SharpProofRelease` reads the version again and applies a different format rule; `Test-SharpProofContainerContract` compares version and roll-forward against the toolchain catalog; and `Test-SharpProofPackageConsumers` copies or recreates the same object for current/minimum-SDK consumer runs. Their enforcement and override semantics are intentionally different, so only a shared typed policy projection should be considered. Centralizing the schema read/write and canonical roll-forward representation would remove repeated JSON-property plumbing and prevent one authority from silently accepting a changed policy shape that another rejects. | `SharpProof.Gates/Performance/PackageBuildSdkPin.cs:13-78`; `scripts/Publish-SharpProofRelease.ps1:84-142,704`; `scripts/Test-SharpProofContainerContract.ps1:23-25,338-339`; `scripts/Test-SharpProofPackageConsumers.ps1:323-347,386-393`; `global.json` |
+
+### Status (part two hundred nineteen)
+
+R988 is `deferred`: share only the typed SDK-policy projection and serialization
+shape; keep performance selection equality, release version restrictions,
+toolchain reconciliation, and minimum-SDK consumer overrides separate.
