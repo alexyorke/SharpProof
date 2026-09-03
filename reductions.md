@@ -14060,3 +14060,19 @@ semantics.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1187 | **`ExceptionHandlerReachability.PushChildrenCore` checks simple-assignment target inputs twice.** Its `ISimpleAssignmentOperation` case calls `inputs.All(canCompleteNormally)` and then calls `PushSequentialCore(inputs, remaining)`, whose loop invokes `canCompleteNormally` over the same receiver/index/argument sequence again. A prefix helper that returns both the reachable inputs and the all-complete flag can keep value scheduling and target traversal aligned without repeating completion analysis. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1213-1221,1413-1427` |
+
+## Second survey, part five hundred ten: R1188 - object-creation arguments are revalidated
+
+The object-creation branch uses the argument-completion result to decide
+whether constructor exception analysis is meaningful. After that decision,
+`PushChildrenCore` independently asks whether every argument value completes
+before scheduling an initializer, then passes the same arguments into
+`PushSequentialCore`, which checks their completion prefix once more. The
+initializer gate and child ordering are separate responsibilities, but a
+materialized argument-completion projection can serve both while retaining
+the current rule that an initializer is reachable only after the constructor
+and all arguments complete.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1188 | **`ExceptionHandlerReachability` revalidates object-creation arguments across exception analysis and child scheduling.** The `IObjectCreationOperation` case computes `creation.Arguments.All(argument => canCompleteNormally(argument.Value))` before resolving constructor effects; `PushChildrenCore` repeats the same `All` check for initializer reachability and then `PushSequentialCore(creation.Arguments, remaining)` invokes the completion predicate over the arguments again. One cached argument-prefix projection can remove these repeated scans without changing constructor, initializer, or argument order semantics. | `SharpProof.Effects/ExceptionHandlerReachability.cs:580-626,1339-1348,1413-1427` |
