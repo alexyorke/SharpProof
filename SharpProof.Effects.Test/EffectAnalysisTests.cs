@@ -4004,57 +4004,23 @@ public sealed class EffectAnalysisTests
     public void ExplicitAndImplicitExceptionsRemainResolved()
     {
         var compilation = EffectTestHost.CreateCompilation(
-            """
+            $$"""
             using System;
 
             public static class Sample {
                 public static void Explicit(Exception exception) => throw exception;
-                public static int Divide(int left, int right) => left / right;
-                public static int Remainder(int left, int right) => left % right;
-                public static int? NullableDivide(int? left, int? right) =>
-                    left / right;
-                public static int? NullableRemainder(int? left, int? right) =>
-                    left % right;
+                {{ExceptionTestSources.CommonMethods}}
                 public static uint? NullableUnsignedDivide(
                     uint? left,
                     uint? right) => left / right;
                 public static uint? NullableUnsignedRemainder(
                     uint? left,
                     uint? right) => left % right;
-                public static nint NativeDivide(nint left, nint right) =>
-                    left / right;
-                public static nint NativeRemainder(nint left, nint right) =>
-                    left % right;
-                public static nuint NativeUnsignedDivide(
-                    nuint left,
-                    nuint right) => left / right;
-                public static nuint NativeUnsignedRemainder(
-                    nuint left,
-                    nuint right) => left % right;
-                public static int CompoundDivide(int left, int right) {
-                    left /= right;
-                    return left;
-                }
-                public static int CompoundRemainder(int left, int right) {
-                    left %= right;
-                    return left;
-                }
                 public static int Length(string text) => text.Length;
                 public static int Index(int[] values, int index) => values[index];
                 public static int CheckedAdd(int left, int right) =>
                     checked(left + right);
-                public static int CheckedIncrement(int value) {
-                    checked {
-                        value++;
-                    }
-                    return value;
-                }
-                public static int[] Array(int length) => new int[length];
                 public static int[] FixedArray() => new int[1];
-                public static void Lock(object gate) {
-                    lock (gate) {
-                    }
-                }
             }
             """);
         var session = new EffectAnalysisSession(compilation);

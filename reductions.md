@@ -18765,3 +18765,8 @@ R1652 is applied: soundness string-shape traversal now reuses the shared
 cancellation-aware `OperationUnwrapping` helper for parenthesized and built-in
 conversion wrappers, while string-specific cases remain local.
 `ReportsCSharpExpressionTextConstruction` passes (9/9).
+
+R1653 is applied: runtime-oracle and static-analysis exception tests now share
+the common arithmetic, checked-increment, array, and lock source fragment while
+retaining their distinct fixtures and assertions. Both affected tests pass
+(1/1 each).
