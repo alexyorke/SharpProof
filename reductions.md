@@ -20984,3 +20984,11 @@ CallableCounterexampleReplayer.Replay traverses target.Variables once to materia
 | ID | Finding | Evidence |
 |---|---|---|
 | R1990 | CallableCounterexampleReplayer.Replay rescans the immutable target-variable list for result, pre-state, and interval phases; pre-partition those roles once while retaining exact-one-result, type, order, and fail-closed checks. | SharpProof.Worker/CallableCounterexampleReplayer.cs:65-114 |
+
+## Second survey, continued: R1991 - CallableCounterexampleReplayer duplicates identical exception handlers
+
+CallableCounterexampleReplayer.Replay catches ArgumentException and InvalidOperationException in adjacent clauses, and both clauses return the same CounterexampleReplayFailed reason without inspecting the exception. A single exception-pattern catch can express the same fail-closed policy and remove one handler boundary; cancellation and every other exception remain unaffected because they are not included in the filter.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1991 | CallableCounterexampleReplayer.Replay has adjacent ArgumentException and InvalidOperationException catches with identical returns; combine the exception pattern without broadening the fail-closed boundary. | SharpProof.Worker/CallableCounterexampleReplayer.cs:122-124 |
