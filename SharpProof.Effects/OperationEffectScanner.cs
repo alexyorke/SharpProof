@@ -822,6 +822,7 @@ internal sealed partial class OperationEffectScanner
                 creation,
                 receiver,
                 argumentProjection.Regions,
+                argumentProjection.ActualArguments,
                 argumentProjection.HasParamArray);
         var constructor = new EffectStep(
             EffectSummaryDomain.Instance.Join(allocation, construction),
@@ -907,6 +908,7 @@ internal sealed partial class OperationEffectScanner
                 creation,
                 receiver,
                 argumentProjection.Regions,
+                argumentProjection.ActualArguments,
                 argumentProjection.HasParamArray);
             var result = arguments.Then(new EffectStep(
                 construction,

@@ -96,6 +96,7 @@ internal sealed class EffectCallSiteResolver(
         IObjectCreationOperation creation,
         EffectRegionSet receiver,
         ImmutableArray<EffectRegionSet> arguments,
+        ImmutableArray<IOperation?>? actualArguments = null,
         bool? hasParamArray = null)
     {
         var constructor = creation.Constructor;
@@ -136,6 +137,12 @@ internal sealed class EffectCallSiteResolver(
             arguments = [];
         }
 
+        var alignedActualArguments = actualArguments is { } projected &&
+                projected.Length == constructor.Parameters.Length
+            ? projected
+            : AlignActualArguments(
+                creation.Arguments,
+                constructor.Parameters.Length);
         return EffectSummaryOperations.Join(
             implicitLayers,
             HasExplicitSourceTypeInitialization(constructor)
@@ -146,9 +153,7 @@ internal sealed class EffectCallSiteResolver(
                 receiver,
                 receiver,
                 arguments,
-                AlignActualArguments(
-                    creation.Arguments,
-                    constructor.Parameters.Length),
+                alignedActualArguments,
                 dispatchUncertain: false,
                 creation,
                 instance: null,
