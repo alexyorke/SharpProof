@@ -32,27 +32,18 @@
     <file src="..\SharpProof.ContractForGenerator\bin\$configuration$\netstandard2.0\SharpProof.ContractForGenerator.pdb" target="tools\analyzers\dotnet\cs" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.CompilerCollector.dll" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.CompilerCollector.pdb" target="tools\collector" />
+    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.*.pdb" target="tools\shared\netstandard2.0" exclude="SharpProof.CompilerCollector.pdb" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.Core.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Analyzer.Core.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.CompilerArtifact.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.CompilerArtifact.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Contracts.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Contracts.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Dataflow.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Dataflow.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Effects.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Effects.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Frontend.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Frontend.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Ir.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Ir.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Specs.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Specs.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.Specs\RelationalSpecPackCatalog.json" target="tools\collector" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Summaries.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Summaries.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Worker.Protocol.dll" target="tools\shared\netstandard2.0" />
-    <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\SharpProof.Worker.Protocol.pdb" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\Microsoft.Bcl.AsyncInterfaces.dll" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\System.Buffers.dll" target="tools\shared\netstandard2.0" />
     <file src="..\SharpProof.CompilerCollector\bin\$configuration$\netstandard2.0\System.Collections.Immutable.dll" target="tools\shared\netstandard2.0" />
