@@ -17,7 +17,7 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 
 $expected = Get-SharpProofReleaseVersion -RepositoryRoot $repositoryRoot
-$versions = @($expected, $expected, $expected, $expected, $expected, $expected)
+$versions = @($expected) * 6
 $manifestVersion = $expected
 $planVersion = $expected
 $identity = Get-SharpProofReleaseVersionAuthority -RepositoryRoot $repositoryRoot
