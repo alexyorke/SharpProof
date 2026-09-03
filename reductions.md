@@ -15505,12 +15505,11 @@ all 21. The corruption is always `String.Replace`.
 
 ### Status (part five hundred eighty-eight)
 
-R1302 is `pending`. The guard half is mechanical and can be applied on its own -
-capture the text before each replace and throw when it is unchanged - and it would
-convert a class of misdirected failures into a one-line diagnosis. The derivation
-half touches the contract-reading code and should be sequenced with whoever owns
-`Test-SharpProofReadme.ps1`'s resource-claim block, since the sentence must be
-composed identically on both sides or the fixture stops corrupting anything.
+R1302 is applied: every documentation mutation now fails at the fixture when its
+expected needle is absent, and the container resource claim is derived from the
+acceptance contract just like the documentation gate. All 21 drift mutations
+pass; the clean fixture remains blocked by the existing README SP0047/SP0048
+documentation drift.
 
 ## Second survey, part five hundred eighty-nine: R1303 - fourteen recursion budgets, thirteen names, and the two that are four times tighter than the rest
 
