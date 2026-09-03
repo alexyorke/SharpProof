@@ -16420,3 +16420,11 @@ The focused AdvisoryActivationTests suite passes (26 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1360 | **`RoslynOperationLowerer.VisitUnaryOperator` lowers a literal operand before a fast path that ignores it.** Check the constant-only integer-negation case before child lowering, while preserving operator, lifted, unsupported, and checked-arithmetic guards for other unary operations. | `SharpProof.Frontend/RoslynOperationLowerer.cs:681-714,449-495`; `SharpProof.Frontend/CompilerConstantAdmission.cs:28-35` |
+R1355 is kept deferred: the two operation stages intentionally use different
+relative orders, so a shared catalog would require opaque references or a larger
+order/schema model and would not provide a clear net reduction without harming
+catalog readability.
+
+R1356 is kept deferred: reusable API-spec profiles require a schema and generator
+expansion change; the current explicit declarations preserve fail-closed validation
+and distinct witness metadata, so the proposed indirection is not a safe reduction.
