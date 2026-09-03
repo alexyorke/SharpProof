@@ -18684,3 +18684,7 @@ R1646 is applied: the unsupported effect and contract source fixtures are now
 centralized in `WorkerTestSources`, while manifest-builder and end-to-end worker
 tests retain separate pipelines and assertions. The four affected tests pass
 (2 manifest-builder and 2 worker cases).
+
+R1647 is applied: the default-value generator matrices now share one immutable
+source builder while retaining their distinct mismatch and exact-match
+assertions. `ContractForValidatorGeneratorTests` pass (120/120).

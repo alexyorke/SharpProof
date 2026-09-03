@@ -55,20 +55,7 @@ public sealed class ContractForValidatorGeneratorTests
         string targetDefault,
         string companionDefault)
     {
-        var run = Run(
-            $$"""
-            using SharpProof.Attributes;
-            public interface ITarget {
-                void Read({{type}} value = {{targetDefault}});
-            }
-            [ContractFor(typeof(ITarget))]
-            public static class TargetContracts {
-                public static void Read(
-                    ITarget receiver,
-                    {{type}} value = {{companionDefault}}) {
-                }
-            }
-            """);
+        var run = Run(CreateDefaultValueSource(type, targetDefault, companionDefault));
 
         AssertSingle(run, "SPCF0005");
     }
@@ -88,8 +75,17 @@ public sealed class ContractForValidatorGeneratorTests
         string targetDefault,
         string companionDefault)
     {
-        var run = Run(
-            $$"""
+        var run = Run(CreateDefaultValueSource(type, targetDefault, companionDefault));
+
+        Assert.That(run.Diagnostics, Is.Empty);
+    }
+
+    private static string CreateDefaultValueSource(
+        string type,
+        string targetDefault,
+        string companionDefault)
+    {
+        return $$"""
             using SharpProof.Attributes;
             public interface ITarget {
                 void Read({{type}} value = {{targetDefault}});
@@ -101,9 +97,7 @@ public sealed class ContractForValidatorGeneratorTests
                     {{type}} value = {{companionDefault}}) {
                 }
             }
-            """);
-
-        Assert.That(run.Diagnostics, Is.Empty);
+            """;
     }
 
     [Test]
