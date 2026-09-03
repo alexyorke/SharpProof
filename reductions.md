@@ -326,6 +326,7 @@ the smallest relevant containerized test target passes.
 | R961 | Replace CompilerArtifact global usings with explicit per-file imports | CompilerArtifact build and generator verification passed |
 | R972 | Reuse scalar-catalog integer bounds in the IL lowerer | CompilerCollector build and Worker.Test: 695 passed |
 | R996 | Share the left-associated addition-chain fixture in IR depth tests | `SharpProof.Ir.Test`: 114 passed |
+| R999 | Read analyzer option aliases once during validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -10447,7 +10448,9 @@ R998 is deferred: the vocabulary is tiny and stable today; add a shared descript
 
 ### Status (part two hundred thirty)
 
-R999 is deferred: configuration is a low-frequency path, so combine the read only if the option registry grows or the provider lookup becomes measurable; preserve the current explicit alias policy.
+R999 is applied: each registered option now reads its three aliases once while
+retaining first-alias precedence, conflict reporting, whitespace handling, and
+the separate global/tree validation policy.
 
 ## Second survey, part two hundred thirty-one: R1000 - repeated protocol effect-manifest fixture
 
@@ -10460,3 +10463,15 @@ R999 is deferred: configuration is a low-frequency path, so combine the read onl
 ### Status (part two hundred thirty-one)
 
 R1000 is deferred: the helper exists already, so route the two direct users through it first; decide separately whether the hash-sensitive test needs an optional pre-seal snapshot rather than adding a second factory.
+
+## Second survey, part two hundred thirty-two: R1001 - repeated requires-discovery test setup
+
+`RequiresCallSiteDiscoveryTests` repeatedly reconstructs the same Roslyn-to-discovery adapter. Fourteen tests find a single declaration, obtain its semantic model, retrieve the corresponding `IMethodSymbol`, construct `RequiresCallSiteDiscovery` with `CancellationToken.None`, and call `.Get(callerContracts: null)`. Several neighboring tests repeat the same constructor setup before calling `HasPotentialCallSite` or `GetPotentialCallOwners`, and the late async tests repeat it after resolving a method through `DeclaringSyntaxReferences`. The test behaviors intentionally cover different operation shapes and discovery APIs, so their assertions and source fixtures should remain separate. A test-only helper accepting the compilation plus a declaration/method selector, or returning the normalized `(caller, declaration, semanticModel, discovery)` tuple, can own the adapter plumbing. The existing `GetMethod` helper only resolves a metadata-named symbol and therefore does not remove the declaration/model/discovery repetition. This is distinct from R087-R096/R276's raw-source fixture duplication and R545's analyzer-execution overload setup.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1001 | **Requires-call-site tests repeat the complete declaration-to-discovery adapter.** Fourteen `.Get(callerContracts: null)` cases and at least three alternate discovery cases independently resolve a syntax declaration, semantic model, and method symbol before constructing the same `RequiresCallSiteDiscovery` object with `CancellationToken.None`. A tuple-returning or selector-based test helper can preserve each test's distinct discovery operation and assertions while removing the shared Roslyn plumbing. | `SharpProof.Analyzer.Test/RequiresCallSiteDiscoveryTests.cs:28-40,73-85,171-182,229-240,298-306,349-360,395-406,429-440,465-476,500-511,536-547,571-582,644-652,699-711,990-1002,1586-1596,1755-1759`; existing symbol-only helper `:1766-1775`; related fixture/execution seams R087-R096, R276, R545 |
+
+### Status (part two hundred thirty-two)
+
+R1001 is deferred: the adapter is test-only and the source cases are intentionally independent; add the helper if discovery APIs or the number of direct cases grows enough to make constructor/setup drift costly.
