@@ -19170,3 +19170,11 @@ fixture-specific package-name, release-version, role, and duplicate checks
 remain local. The parameterized publication-destination fixture suite passes
 (37/37); the broader filter still has one pre-existing static publisher-text
 failure unrelated to this reduction.
+
+## Second survey, continued: R1680 - deferred-call completion fixtures repeat the same source shell
+
+The first two tests in `DeferredCallCompletionTests` pass separate multiline sources to `AssertCallReturnsBeforeSuffix`. Both sources define `using System`, `public static class Sample`, the same `private static int state`, a `Deferred` method that throws `InvalidOperationException`, and the same `Run` body (`_ = Deferred(); state++;`); only the async `Task` form versus iterator `IEnumerable<int>` form and its `yield break` differ. The helper already centralizes compilation, operation lookup, completion evaluation, and summary assertions, but the raw source shell remains duplicated. A small source builder or shared fixture prefix with a form-specific deferred-method body can preserve the distinct async-versus-iterator behavior while keeping the common caller setup in one place.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1680 | The async and iterator deferred-call cases duplicate the `Sample`/state/Run fixture shell; factor the common source while retaining their distinct deferred method forms. | `SharpProof.Effects.Test/DeferredCallCompletionTests.cs:8-47` |
