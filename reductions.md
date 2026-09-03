@@ -17678,3 +17678,7 @@ the project set either describes.
 R1397 is applied: mutation evidence now uses growable lists for the stable
 ledger and failed TRX results, materializing the sorted ledger only after the
 result loop. Mutation evidence behavioral fixtures pass.
+
+R1398 is applied: mutation baseline grouping now uses one `TryGetValue` probe
+and a retained local group per invocation identity, preserving collision
+validation and sorted output. Mutation evidence behavioral fixtures pass.

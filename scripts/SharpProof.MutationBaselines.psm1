@@ -38,21 +38,23 @@ function Get-SharpProofMutationBaselinePlan {
             -Project ([string]$mutation.Project) `
             -Filter ([string]$mutation.Filter) `
             -Configuration $Configuration
-        if (-not $groups.ContainsKey($invocation.Identity)) {
-            $groups.Add($invocation.Identity, [pscustomobject]@{
+        $group = $null
+        if (-not $groups.TryGetValue($invocation.Identity, [ref]$group)) {
+            $group = [pscustomobject]@{
                     Invocation = $invocation
                     Mutations = [Collections.Generic.List[object]]::new()
-                })
+                }
+            $groups.Add($invocation.Identity, $group)
         }
-        elseif ($groups[$invocation.Identity].Invocation.Project -cne
+        elseif ($group.Invocation.Project -cne
                 $invocation.Project -or
-            $groups[$invocation.Identity].Invocation.Filter -cne
+            $group.Invocation.Filter -cne
                 $invocation.Filter -or
-            $groups[$invocation.Identity].Invocation.Configuration -cne
+            $group.Invocation.Configuration -cne
                 $invocation.Configuration) {
             throw 'Mutation baseline invocation identities collided.'
         }
-        $groups[$invocation.Identity].Mutations.Add($mutation)
+        $null = $group.Mutations.Add($mutation)
     }
     return @($groups.Values | Sort-Object {
             $_.Invocation.Project
