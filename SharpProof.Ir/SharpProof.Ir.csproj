@@ -31,5 +31,6 @@
     <InternalsVisibleTo Include="SharpProof.Testing" />
     <InternalsVisibleTo Include="SharpProof.Verify" />
     <InternalsVisibleTo Include="SharpProof.Worker.Launcher" />
+    <InternalsVisibleTo Include="SharpProof.Fuzz" />
   </ItemGroup>
 </Project>

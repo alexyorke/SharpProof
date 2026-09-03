@@ -19503,3 +19503,71 @@ precedence pass, including infrastructure, timeout, and cancellation flags, used
 by both `CallableVerificationPolicy` and `WorkerResultAssembler`. Response-only
 compatibility fallbacks remain local. The focused worker projection and lowering
 tests pass (24/24).
+
+## Second survey, part six hundred eleven: R1720 - eleven semantic-cache tests share one count-only oracle, and the assertionless-test lens closes at zero
+
+An assertion-envelope census over the test tree: every `[Test]`, `[TestCase]` and
+`[TestCaseSource]` body was parsed, its contiguous runs of four or more assertion
+lines extracted and normalized, and the runs compared across methods. This is a
+different signal from the whole-body near-duplicate scan of part six hundred four,
+which found six pairs: these methods differ enormously in their embedded fixture
+source and are identical only in their tail.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1720 | **Eleven tests in `SharpProofSoundnessAnalyzerTests` end in the same four-line assertion - a count of one diagnostic id and nothing else - and the oracle cannot tell where the diagnostic was reported.** Six methods close with `Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"), Is.EqualTo(4));` - `SemanticCacheGetOrAddInspectsValueFactories`, `SemanticCacheWritesClassifyCanonicalEnumValues`, `SemanticCacheWritesClassifyNumericEnumConversions`, `SemanticCacheWritesInspectVirtualAndInterfaceProducerImplementations`, `SemanticCacheWritesRejectCoalesceAndCompoundAssignments`, `SemanticCacheWritesUnwrapNestedOrdinaryConversions` - and five close with the identical expression against `Is.EqualTo(1)`: `SemanticCacheWritesFollowGenericForwardedArguments`, `SemanticCacheWritesFollowNestedAssignmentEvaluationOrder`, `SemanticCacheWritesRetainAllConditionalDefinitions`, `SemanticCacheWritesRetainPreAssignmentValuesOnExceptionalPaths`, `WorkerVerifyResponseIsAConservativeSemanticCacheValue`. Nothing else is asserted in any of the eleven - no span, no message, no symbol. **That makes the oracle weaker than the names claim.** `SemanticCacheWritesFollowGenericForwardedArguments` builds a fixture with three `CacheForwarder.Forward` calls - two on `ProofCache<Answer>` and one on `ProofCache<string>` - and asserts that exactly one `SPMETA010` exists. Whether the analyzer reported it on an `Answer` call or on the `string` call, which is the distinction the test is named for, is unchecked; any single report anywhere in the fixture passes. The same holds for each of the other ten. **This is the output half of R1664 and the two should be applied together.** R1664 records that the same matrix repeats the `namespace SharpProof.Verify; enum Answer { Unknown, Proven }` and `ProofCache.Write` prelude across its fixtures and proposes a shared source prefix. With the input prelude shared and the assertion tail identical, what is left per method is the specialized declaration and an expected count - which is a `[TestCase]` row. Eleven method envelopes collapse to one method and eleven rows, and the natural place to strengthen the oracle to a located assertion is that one method rather than eleven. **Scale for context**: the file is 3,564 lines and asserts eleven distinct `SPMETA` ids, of which `SPMETA010` accounts for 28 of the 95 occurrences - the largest single group, and the one with the weakest check. | `SharpProof.Meta.Analyzers.Test/SharpProofSoundnessAnalyzerTests.cs` (3,564 lines; the eleven methods named above); related R1664, R618, R619, R620, R1352, R1111, R1071 |
+
+### Checked and not proposed (part six hundred eleven)
+
+- **There are no assertionless tests, and a naive detector says there are 214.**
+  Parsing all **1,950** test method bodies and looking for `Assert`, `Is.`,
+  `Does.`, `Has.` or `Throws` flags 214 methods - 11 percent. Every one is a false
+  positive: the assertion lives in a helper, either a local one such as
+  `AssertNestingDiagnostic(diagnostics)`, a shared one such as
+  `DiagnosticDescriptorCatalogAssertions.AssertOutput(...)`, or an expectation
+  passed as an argument, as in `AnalyzerTestHost.AnalyzeAsync(source, "contracts",
+  ["SP0024"])`. Widening the detector to assertion-named helpers leaves **nine**,
+  of which three are `[TestCaseSource]` data providers, three delegate to
+  fixture runners that assert internally, and one - `IrSmtBackendTests:614` -
+  calls `AssertOwnedExpressionDisposed<T>(...)`, missed only because the generic
+  parameter sits between the name and the parenthesis. **Two remain, and both are
+  correct.** `PerformanceGateTests.AdvisoryPackagePolicyRunsAnalyzerAndOmitsVerifierWork`
+  calls `PerformanceGate.ValidateAdvisoryPackagePolicy`, which throws on
+  violation; and
+  `ContainerNativeLibrarySetupTests.VerifiedZ3ResolverInstallationIsIdempotent`
+  calls `ContainerNativeLibrary.InstallZ3ResolverRequired` twice, where the
+  property under test is exactly that the second call returns instead of throwing -
+  `ContainerNativeLibrary.cs:16-26` takes a lock, returns early when the handle is
+  already set, and throws only when rebinding to a different assembly. A
+  does-not-throw test against a method that throws on failure is the right shape.
+  **This lens is closed at zero.**
+- **The other repeated assertion envelopes are smaller and mostly justified.**
+  Eighty-one runs of four or more assertion lines repeat across methods. After
+  R1720 the largest is a ten-line envelope shared by four methods in
+  `AnalyzerModeAndEffectTests` - `EffectProofRequiresEstablishedCalleePreconditions`,
+  `IncompatibleCastCannotEstablishCalleePrecondition`,
+  `LaterArgumentMutationCannotProveEarlierCalleeArgument` and
+  `ExternalClosedPreconditionMustAlsoBeEstablished` - which asserts the exact
+  diagnostic id set **and** a message substring, so it is a strong oracle repeated
+  rather than a weak one; the remainder are runs of four to eight lines shared by
+  two or three methods, which is the ordinary cost of NUnit's assertion syntax. Two
+  entries in the census are the same method counted twice, an artifact of a nested
+  `EnterMultipleScope` block, not a duplication.
+- **The `SPMETA` id space is internally consistent.** The file asserts eleven
+  distinct ids, `SPMETA001` through `SPMETA011`, with occurrence counts 15, 8, 24,
+  7, 3, 3, 1, 1, 4, 28 and 1. There is no gap and no id asserted that the meta
+  analyzer does not define.
+
+### Status (part six hundred eleven)
+
+R1720 is `pending` and is best applied with R1664 rather than after it: sharing the
+prelude without collapsing the envelope leaves eleven methods that still differ
+only in a number, and collapsing the envelope without the prelude leaves eleven
+long inline fixtures in `[TestCase]` rows. Done together the file loses eleven
+method headers and gains one place to strengthen a count into a location.
+
+R537 is applied: `IrStructuralShrinker` now consumes the canonical
+`IrTraversal.GetChildren` implementation through an explicit fuzz-tool friend
+assembly declaration, removing its duplicate IR child-kind switch while leaving
+shrinker rebuilding and minimization policy unchanged. The focused fuzz runner
+tests pass (32/32).

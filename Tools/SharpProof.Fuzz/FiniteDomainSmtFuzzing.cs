@@ -455,7 +455,7 @@ public static class IrStructuralShrinker
             }
         }
 
-        var children = Children(term);
+        var children = IrTraversal.GetChildren(term);
         foreach (var child in children)
         {
             if (child.Type == term.Type)
@@ -513,30 +513,11 @@ public static class IrStructuralShrinker
                 return;
             }
 
-            foreach (var child in Children(current))
+            foreach (var child in IrTraversal.GetChildren(current))
             {
                 Visit(child);
             }
         }
-    }
-
-    private static ImmutableArray<IrTerm> Children(IrTerm term)
-    {
-        return term switch
-        {
-            IrOpaqueTerm opaque => [
-                .. opaque.Receiver == null ? [] : new[] { opaque.Receiver },
-            .. opaque.Arguments
-            ],
-            IrUnaryTerm unary => [unary.Operand],
-            IrBinaryTerm binary => [binary.Left, binary.Right],
-            IrConditionalTerm conditional =>
-                [conditional.Condition, conditional.WhenTrue, conditional.WhenFalse],
-            IrCastTerm cast => [cast.Operand],
-            IrLengthTerm length => [length.Value],
-            IrSequenceAccessTerm access => [access.Sequence, access.Index],
-            _ => []
-        };
     }
 
     private static IrTerm? TryReplaceChild(
