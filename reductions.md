@@ -13825,6 +13825,12 @@ through a prevalidated target state; retain the nullness and value branch rules.
 |---|---|---|
 | R1174 | **`OperationCompletionEvaluator.CanCompleteCoalesceAssignment` can complete the assignment target twice.** It first validates `assignment.Target`, then the definitely-null branch calls `CanCompleteWriteTarget(assignment.Target)`, which repeats target completion for field, array, ref-return invocation, or property targets. A write-target seam that consumes the already-computed target completion can remove the duplicate while preserving nullness, RHS, and write-specific checks. | `SharpProof.Effects/OperationCompletionEvaluator.cs:801-818,862-901` |
 
+### Status (part four hundred ninety-six)
+
+R1174 is applied: coalesce assignments carry the completed target into the
+write-specific check, reusing field, array, and ref-return completion while
+retaining setter method-tail validation. The Effects test suite passes (323/323).
+
 ## Second survey, part four hundred ninety-seven: R1175 - switch-value completion is prechecked twice
 
 `CanCompleteSwitchExpression` first calls `CanCompleteNormally` for the switch
