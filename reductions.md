@@ -20802,3 +20802,9 @@ R1941 is applied: `Generate-CSharpScalarSemantics.ps1` now emits one generic
 typed lookup helper for the integer, unary, and binary catalogs instead of
 repeating the same scan and fallback protocol three times. Generator
 verification and the full `SharpProof.Frontend.Test` project pass (121/121).
+
+R1740 is applied: the equality/ordered, compound-assumption, and conditional
+refinement pairs in `ManagedAbstractFlowTests` are parameterized, and the
+repeated invocation/state integer-interval assertion envelope is shared by all
+eight cited tests. The full `SharpProof.Effects.Test` project passes 323/323
+tests with zero warnings or errors.

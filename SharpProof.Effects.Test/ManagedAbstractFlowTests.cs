@@ -423,19 +423,29 @@ public sealed class ManagedAbstractFlowTests
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
         Assert.That(flow, Is.Not.Null);
         Assert.That(calls, Has.Length.EqualTo(2));
-        Assert.That(flow!.TryEvaluate(calls[0], calls[0].Arguments[0].Value, out var safe), Is.True);
-        Assert.That(flow.TryEvaluate(calls[1], calls[1].Arguments[0].Value, out var violated), Is.True);
-        Assert.That(safe.TryGetInteger(out var safeInterval), Is.True);
-        Assert.That(violated.TryGetInteger(out var violatedInterval), Is.True);
-        Assert.That(safeInterval, Is.EqualTo(IntervalValue.Range(1, 2)));
-        Assert.That(violatedInterval, Is.EqualTo(IntervalValue.Constant(-1)));
+        AssertIntegerInterval(
+            analysis,
+            calls[0],
+            0,
+            IntervalValue.Range(1, 2));
+        AssertIntegerInterval(
+            analysis,
+            calls[1],
+            0,
+            IntervalValue.Constant(-1));
     }
 
-    [Test]
-    public void EqualityBranchesIntersectBothVariableIntervals()
+    [TestCase("==", 3, 7,
+        TestName = "EqualityBranchesIntersectBothVariableIntervals")]
+    [TestCase("<", 0, 6,
+        TestName = "OrderedBranchesRefineBothVariableIntervals")]
+    public void BranchesRefineBothVariableIntervals(
+        string comparison,
+        int expectedLeftMinimum,
+        int expectedLeftMaximum)
     {
         var (analysis, call) = AnalyzeSingleCall(
-            """
+            $$"""
             public static class Sample {
                 private static void Sink(int left, int right) {
                 }
@@ -443,66 +453,23 @@ public sealed class ManagedAbstractFlowTests
                 public static void Calls(
                     [SharpProof.Attributes.InRange(0, 10)] int left,
                     [SharpProof.Attributes.InRange(3, 7)] int right) {
-                    if (left == right)
+                    if (left {{comparison}} right)
                         Sink(left, right);
                 }
             }
             """);
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
-        Assert.That(
-            analysis.Result!.TryEvaluate(
-                call,
-                call.Arguments[0].Value,
-                out var left),
-            Is.True);
-        Assert.That(
-            analysis.Result.TryEvaluate(
-                call,
-                call.Arguments[1].Value,
-                out var right),
-            Is.True);
-        Assert.That(left.TryGetInteger(out var leftInterval), Is.True);
-        Assert.That(right.TryGetInteger(out var rightInterval), Is.True);
-        Assert.That(leftInterval, Is.EqualTo(IntervalValue.Range(3, 7)));
-        Assert.That(rightInterval, Is.EqualTo(IntervalValue.Range(3, 7)));
-    }
-
-    [Test]
-    public void OrderedBranchesRefineBothVariableIntervals()
-    {
-        var (analysis, call) = AnalyzeSingleCall(
-            """
-            public static class Sample {
-                private static void Sink(int left, int right) {
-                }
-
-                public static void Calls(
-                    [SharpProof.Attributes.InRange(0, 10)] int left,
-                    [SharpProof.Attributes.InRange(3, 7)] int right) {
-                    if (left < right)
-                        Sink(left, right);
-                }
-            }
-            """);
-
-        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
-        Assert.That(
-            analysis.Result!.TryEvaluate(
-                call,
-                call.Arguments[0].Value,
-                out var left),
-            Is.True);
-        Assert.That(
-            analysis.Result.TryEvaluate(
-                call,
-                call.Arguments[1].Value,
-                out var right),
-            Is.True);
-        Assert.That(left.TryGetInteger(out var leftInterval), Is.True);
-        Assert.That(right.TryGetInteger(out var rightInterval), Is.True);
-        Assert.That(leftInterval, Is.EqualTo(IntervalValue.Range(0, 6)));
-        Assert.That(rightInterval, Is.EqualTo(IntervalValue.Range(3, 7)));
+        AssertIntegerInterval(
+            analysis,
+            call,
+            0,
+            IntervalValue.Range(expectedLeftMinimum, expectedLeftMaximum));
+        AssertIntegerInterval(
+            analysis,
+            call,
+            1,
+            IntervalValue.Range(3, 7));
     }
 
     [Test]
@@ -611,27 +578,28 @@ public sealed class ManagedAbstractFlowTests
             .Single(static invocation => invocation.TargetMethod.Name == "Sink");
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
-        Assert.That(
-            analysis.Result!.TryEvaluate(
-                sink,
-                sink.Arguments[0].Value,
-                out var value),
-            Is.True);
-        Assert.That(value.TryGetInteger(out var interval), Is.True);
-        Assert.That(
-            interval,
-            Is.EqualTo(IntervalValue.Range(1, int.MaxValue)));
+        AssertIntegerInterval(
+            analysis,
+            sink,
+            0,
+            IntervalValue.Range(1, int.MaxValue));
     }
 
-    [Test]
-    public void AssumeRefinesCompoundAndFacts()
+    [TestCase("left > 0 && right > 0", 1, int.MaxValue,
+        TestName = "AssumeRefinesCompoundAndFacts")]
+    [TestCase("!(left > 0 || right > 0)", int.MinValue, 0,
+        TestName = "AssumeRefinesNegatedCompoundOrFacts")]
+    public void AssumeRefinesCompoundFacts(
+        string condition,
+        int expectedMinimum,
+        int expectedMaximum)
     {
         var compilation = EffectTestHost.CreateCompilation(
-            """
+            $$"""
             public static class Sample {
                 public static void Calls(int left, int right) {
                     SharpProof.Attributes.Contract.Requires(
-                        left > 0 && right > 0);
+                        {{condition}});
                 }
             }
             """);
@@ -640,56 +608,29 @@ public sealed class ManagedAbstractFlowTests
             .Single(static invocation => invocation.TargetMethod.Name == "Requires");
         var state = ManagedAbstractFlow.ForCompilation(compilation)
             .Assume(ManagedFlowState.Empty, requires.Arguments[0].Value, true);
+        var expected = IntervalValue.Range(expectedMinimum, expectedMaximum);
 
-        Assert.That(
-            state.Get(method.Parameters[0]).TryGetInteger(out var left),
-            Is.True);
-        Assert.That(left, Is.EqualTo(IntervalValue.Range(1, int.MaxValue)));
-        Assert.That(
-            state.Get(method.Parameters[1]).TryGetInteger(out var right),
-            Is.True);
-        Assert.That(right, Is.EqualTo(IntervalValue.Range(1, int.MaxValue)));
+        AssertIntegerInterval(state, method.Parameters[0], expected);
+        AssertIntegerInterval(state, method.Parameters[1], expected);
     }
 
-    [Test]
-    public void AssumeRefinesNegatedCompoundOrFacts()
+    [TestCase("left > 0 && right > 0", 1, int.MaxValue,
+        TestName = "ContractRequiresRefinesConditionalAndFacts")]
+    [TestCase("!(left > 0 || right > 0)", int.MinValue, 0,
+        TestName = "ContractRequiresRefinesNegatedConditionalOrFacts")]
+    public void ContractRequiresRefinesConditionalFacts(
+        string condition,
+        int expectedMinimum,
+        int expectedMaximum)
     {
         var compilation = EffectTestHost.CreateCompilation(
-            """
-            public static class Sample {
-                public static void Calls(int left, int right) {
-                    SharpProof.Attributes.Contract.Requires(
-                        !(left > 0 || right > 0));
-                }
-            }
-            """);
-        var (method, root, _) = GetCallsContext(compilation);
-        var requires = root.Descendants().OfType<IInvocationOperation>()
-            .Single(static invocation => invocation.TargetMethod.Name == "Requires");
-        var state = ManagedAbstractFlow.ForCompilation(compilation)
-            .Assume(ManagedFlowState.Empty, requires.Arguments[0].Value, true);
-
-        Assert.That(
-            state.Get(method.Parameters[0]).TryGetInteger(out var left),
-            Is.True);
-        Assert.That(left, Is.EqualTo(IntervalValue.Range(int.MinValue, 0)));
-        Assert.That(
-            state.Get(method.Parameters[1]).TryGetInteger(out var right),
-            Is.True);
-        Assert.That(right, Is.EqualTo(IntervalValue.Range(int.MinValue, 0)));
-    }
-
-    [Test]
-    public void ContractRequiresRefinesConditionalAndFacts()
-    {
-        var compilation = EffectTestHost.CreateCompilation(
-            """
+            $$"""
             public static class Sample {
                 private static void Sink(int value) {
                 }
 
                 public static void Calls(int left, int right) {
-                    if (left > 0 && right > 0) {
+                    if ({{condition}}) {
                         Sink(left);
                         Sink(right);
                     }
@@ -700,57 +641,12 @@ public sealed class ManagedAbstractFlowTests
         var sinks = root.Descendants().OfType<IInvocationOperation>()
             .Where(static invocation => invocation.TargetMethod.Name == "Sink")
             .ToArray();
+        var expected = IntervalValue.Range(expectedMinimum, expectedMaximum);
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
         Assert.That(sinks, Has.Length.EqualTo(2));
         foreach (var sink in sinks)
-        {
-            Assert.That(
-                analysis.Result!.TryEvaluate(
-                    sink, sink.Arguments[0].Value, out var value),
-                Is.True);
-            Assert.That(value.TryGetInteger(out var interval), Is.True);
-            Assert.That(
-                interval,
-                Is.EqualTo(IntervalValue.Range(1, int.MaxValue)));
-        }
-    }
-
-    [Test]
-    public void ContractRequiresRefinesNegatedConditionalOrFacts()
-    {
-        var compilation = EffectTestHost.CreateCompilation(
-            """
-            public static class Sample {
-                private static void Sink(int value) {
-                }
-
-                public static void Calls(int left, int right) {
-                    if (!(left > 0 || right > 0)) {
-                        Sink(left);
-                        Sink(right);
-                    }
-                }
-            }
-            """);
-        var (method, root, _, analysis) = AnalyzeCalls(compilation);
-        var sinks = root.Descendants().OfType<IInvocationOperation>()
-            .Where(static invocation => invocation.TargetMethod.Name == "Sink")
-            .ToArray();
-
-        Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
-        Assert.That(sinks, Has.Length.EqualTo(2));
-        foreach (var sink in sinks)
-        {
-            Assert.That(
-                analysis.Result!.TryEvaluate(
-                    sink, sink.Arguments[0].Value, out var value),
-                Is.True);
-            Assert.That(value.TryGetInteger(out var interval), Is.True);
-            Assert.That(
-                interval,
-                Is.EqualTo(IntervalValue.Range(int.MinValue, 0)));
-        }
+            AssertIntegerInterval(analysis, sink, 0, expected);
     }
 
     [Test]
@@ -781,16 +677,11 @@ public sealed class ManagedAbstractFlowTests
                 invocation.TargetMethod.Name == "Sink");
 
         Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete));
-        Assert.That(
-            analysis.Result!.TryEvaluate(
-                sink,
-                sink.Arguments[0].Value,
-                out var value),
-            Is.True);
-        Assert.That(value.TryGetInteger(out var interval), Is.True);
-        Assert.That(
-            interval,
-            Is.EqualTo(IntervalValue.Range(int.MinValue, int.MaxValue)));
+        AssertIntegerInterval(
+            analysis,
+            sink,
+            0,
+            IntervalValue.Range(int.MinValue, int.MaxValue));
     }
 
     [Test]
@@ -872,28 +763,18 @@ public sealed class ManagedAbstractFlowTests
                 sink.Arguments[0].Value,
                 out var text),
             Is.True);
-        Assert.That(
-            analysis.Result.TryEvaluate(
-                sink,
-                sink.Arguments[1].Value,
-                out var positive),
-            Is.True);
-        Assert.That(
-            analysis.Result.TryEvaluate(
-                sink,
-                sink.Arguments[2].Value,
-                out var range),
-            Is.True);
         Assert.That(text.TryGetNullness(out var nullness), Is.True);
         Assert.That(nullness, Is.EqualTo(NullnessValue.MaybeNull));
-        Assert.That(positive.TryGetInteger(out var positiveInterval), Is.True);
-        Assert.That(range.TryGetInteger(out var rangeInterval), Is.True);
-        Assert.That(
-            positiveInterval,
-            Is.EqualTo(IntervalValue.Range(int.MinValue, int.MaxValue)));
-        Assert.That(
-            rangeInterval,
-            Is.EqualTo(IntervalValue.Range(int.MinValue, int.MaxValue)));
+        AssertIntegerInterval(
+            analysis,
+            sink,
+            1,
+            IntervalValue.Range(int.MinValue, int.MaxValue));
+        AssertIntegerInterval(
+            analysis,
+            sink,
+            2,
+            IntervalValue.Range(int.MinValue, int.MaxValue));
     }
 
     [TestCase(false)]
@@ -953,6 +834,31 @@ public sealed class ManagedAbstractFlowTests
         var analysis = ManagedAbstractFlow.ForCompilation(compilation)
             .Analyze(method, graph, null, default);
         return (method, root, graph, analysis);
+    }
+
+    private static void AssertIntegerInterval(
+        ManagedFlowAnalysis analysis,
+        IInvocationOperation invocation,
+        int argumentIndex,
+        IntervalValue expected)
+    {
+        Assert.That(
+            analysis.Result!.TryEvaluate(
+                invocation,
+                invocation.Arguments[argumentIndex].Value,
+                out var value),
+            Is.True);
+        Assert.That(value.TryGetInteger(out var interval), Is.True);
+        Assert.That(interval, Is.EqualTo(expected));
+    }
+
+    private static void AssertIntegerInterval(
+        ManagedFlowState state,
+        IParameterSymbol parameter,
+        IntervalValue expected)
+    {
+        Assert.That(state.Get(parameter).TryGetInteger(out var interval), Is.True);
+        Assert.That(interval, Is.EqualTo(expected));
     }
 
     private static (ManagedFlowAnalysis Analysis, IInvocationOperation Call)
