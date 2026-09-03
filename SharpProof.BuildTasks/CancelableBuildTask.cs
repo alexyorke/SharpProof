@@ -56,6 +56,35 @@ public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
         }
     }
 
+    protected static IEnumerable<string> Present(
+        string? first,
+        string? second,
+        string? third = null,
+        string? fourth = null,
+        string? fifth = null)
+    {
+        if (!string.IsNullOrWhiteSpace(first))
+        {
+            yield return first!;
+        }
+        if (!string.IsNullOrWhiteSpace(second))
+        {
+            yield return second!;
+        }
+        if (!string.IsNullOrWhiteSpace(third))
+        {
+            yield return third!;
+        }
+        if (!string.IsNullOrWhiteSpace(fourth))
+        {
+            yield return fourth!;
+        }
+        if (!string.IsNullOrWhiteSpace(fifth))
+        {
+            yield return fifth!;
+        }
+    }
+
     protected static IEnumerable<string> Present(params string?[] paths)
     {
         return paths.Where(static path => !string.IsNullOrWhiteSpace(path))!;
