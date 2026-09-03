@@ -18529,3 +18529,6 @@ finding was renumbered to R1540 by the ledger reconciliation.)
 | ID | Finding | Evidence |
 |---|---|---|
 | R1642 | The `ReadBounds` and `ReadModified` cases reconstruct the same emitted metadata target and consumer compilation; share the immutable fixture or table-drive the two method selections. | `SharpProof.Contracts.Test/ContractForMetadataSignatureTests.cs:16-55,67-206` |
+R1522 is applied: the eight constant-loop completion cases now share one
+fixture-scoped Roslyn compilation while each test creates its own analysis
+facts and session. `ConstantTrueLoopCompletionTests` pass (8/8).

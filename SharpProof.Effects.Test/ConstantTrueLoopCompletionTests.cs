@@ -3,6 +3,8 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class ConstantTrueLoopCompletionTests
 {
+    private static readonly Compilation SharedCompilation = CreateCompilation();
+
     [TestCase("DoForever", "RunAfterDoForever", false)]
     [TestCase("ForForever", "RunAfterForForever", false)]
     [TestCase("DoBreak", "RunAfterDoBreak", true)]
@@ -44,7 +46,16 @@ public sealed class ConstantTrueLoopCompletionTests
             string helperName,
             string callerName)
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = SharedCompilation;
+        return (
+            compilation,
+            EffectTestHost.SampleMethod(compilation, helperName),
+            EffectTestHost.SampleMethod(compilation, callerName));
+    }
+
+    private static Compilation CreateCompilation()
+    {
+        return EffectTestHost.CreateCompilation(
             """
             public static class Sample {
                 private static int s_state;
@@ -148,9 +159,5 @@ public sealed class ConstantTrueLoopCompletionTests
                 }
             }
             """);
-        return (
-            compilation,
-            EffectTestHost.SampleMethod(compilation, helperName),
-            EffectTestHost.SampleMethod(compilation, callerName));
     }
 }
