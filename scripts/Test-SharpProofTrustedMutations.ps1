@@ -2710,7 +2710,10 @@ try {
         }
     }
 
-    $results = @($completedResults)
+    $results = [Collections.Generic.List[object]]::new()
+    foreach ($completedResult in $completedResults) {
+        $results.Add($completedResult)
+    }
     foreach ($mutation in $mutations) {
         if ($completedMutationNames.Contains([string]$mutation.Name)) {
             continue
@@ -2800,9 +2803,9 @@ try {
                 $result | Add-Member -NotePropertyName catalogOrdinal `
                     -NotePropertyValue ([int]$mutation.CatalogOrdinal)
             }
-            $results += $result
+            $results.Add($result)
             Write-MutationEvidence `
-                -Results @($results) `
+                -Results $results.ToArray() `
                 -EvidenceSelection inProgress
         }
         finally {
@@ -2822,7 +2825,7 @@ try {
         $trackedTreeChanged -or $trackedIndexChanged) {
         throw 'Repository identity changed while mutation evidence was produced.'
     }
-    Write-MutationEvidence -Results @($results) -EvidenceSelection $selection
+    Write-MutationEvidence -Results $results.ToArray() -EvidenceSelection $selection
     Write-Host "Killed $($results.Count) trusted-boundary mutations."
     Write-Host "Evidence: $output"
 }
