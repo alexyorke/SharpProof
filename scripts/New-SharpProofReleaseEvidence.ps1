@@ -161,13 +161,20 @@ function Test-PackageThirdPartyInventory {
 
         [Parameter(Mandatory = $true)]
         [AllowEmptyCollection()]
-        [object[]]$NoticeComponents
+        [object[]]$NoticeComponents,
+
+        [Parameter()]
+        [AllowNull()]
+        [IO.Compression.ZipArchive]$Archive
     )
 
-    $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
+    $ownsArchive = $null -eq $Archive
+    if ($ownsArchive) {
+        $Archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
+    }
     try {
         $actualThirdPartyEntries = @(
-            $archive.Entries |
+            $Archive.Entries |
                 Where-Object {
                     ($_.FullName.EndsWith(
                             '.dll',
@@ -199,7 +206,7 @@ function Test-PackageThirdPartyInventory {
             return
         }
         $notice = Get-ArchiveText `
-            -Archive $archive `
+            -Archive $Archive `
             -EntryName 'THIRD-PARTY-NOTICES.txt'
         $actualNoticePackages = @(
             [regex]::Matches(
@@ -245,7 +252,9 @@ function Test-PackageThirdPartyInventory {
         }
     }
     finally {
-        $archive.Dispose()
+        if ($ownsArchive) {
+            $Archive.Dispose()
+        }
     }
 }
 
@@ -370,26 +379,6 @@ if ($commits[0] -ne $checkoutCommit) {
         "NuGet artifact repository commit '$($commits[0])' does not match " +
         "checkout '$checkoutCommit'.")
 }
-$packagePayloadEvidence = [Collections.Generic.List[object]]::new()
-$payloadValidationCache = @{}
-foreach ($item in $identities |
-        Where-Object { $_.File.Extension -eq '.nupkg' }) {
-    $packageId = $item.Identity.Id
-    $components = @(
-        $thirdPartyManifest.packages.PSObject.Properties[$packageId].Value
-    )
-    $payloads = @(Test-SharpProofPackagePayload `
-        -PackagePath $item.File.FullName `
-        -PackageId $packageId `
-        -RepositoryRoot $repositoryRoot `
-        -Components $components `
-        -ValidationCache $payloadValidationCache)
-    $packagePayloadEvidence.Add([pscustomobject][ordered]@{
-        packageId = $packageId
-        entries = $payloads
-    })
-}
-
 foreach ($packageId in $expectedIds) {
     $main = @(
         $identities |
@@ -421,34 +410,54 @@ $thirdPartyPackages = @(
 if (($thirdPartyPackages -join '|') -ne ($expectedIds -join '|')) {
     throw 'Third-party component manifest must cover the exact package graph.'
 }
+$packagePayloadEvidence = [Collections.Generic.List[object]]::new()
 $thirdPartyComponents = [Collections.Generic.List[object]]::new()
 $thirdPartyNoticeComponents = @(
     $thirdPartyManifest.packages.PSObject.Properties |
         ForEach-Object { @($_.Value) }
 )
+$payloadValidationCache = @{}
 foreach ($item in $identities |
         Where-Object { $_.File.Extension -eq '.nupkg' }) {
     $packageId = $item.Identity.Id
     $components = @(
         $thirdPartyManifest.packages.PSObject.Properties[$packageId].Value
     )
-    Test-PackageThirdPartyInventory `
-        -PackagePath $item.File.FullName `
-        -PackageId $packageId `
-        -Components $components `
-        -NoticeComponents $thirdPartyNoticeComponents
-    foreach ($component in $components) {
-        $thirdPartyComponents.Add([pscustomobject][ordered]@{
+    $archive = [IO.Compression.ZipFile]::OpenRead($item.File.FullName)
+    try {
+        $payloads = @(Test-SharpProofPackagePayload `
+            -PackagePath $item.File.FullName `
+            -PackageId $packageId `
+            -RepositoryRoot $repositoryRoot `
+            -Components $components `
+            -ValidationCache $payloadValidationCache `
+            -Archive $archive)
+        $packagePayloadEvidence.Add([pscustomobject][ordered]@{
             packageId = $packageId
-            id = [string]$component.id
-            version = [string]$component.version
-            license = [string]$component.license
-            entries = @(
-                @($component.entries) |
-                    ForEach-Object { [string]$_ } |
-                    Sort-Object
-            )
+            entries = $payloads
         })
+        Test-PackageThirdPartyInventory `
+            -PackagePath $item.File.FullName `
+            -PackageId $packageId `
+            -Components $components `
+            -NoticeComponents $thirdPartyNoticeComponents `
+            -Archive $archive
+        foreach ($component in $components) {
+            $thirdPartyComponents.Add([pscustomobject][ordered]@{
+                packageId = $packageId
+                id = [string]$component.id
+                version = [string]$component.version
+                license = [string]$component.license
+                entries = @(
+                    @($component.entries) |
+                        ForEach-Object { [string]$_ } |
+                        Sort-Object
+                )
+            })
+        }
+    }
+    finally {
+        $archive.Dispose()
     }
 }
 $catalogComponents = @(Get-SharpProofThirdPartyComponentGraph `

@@ -133,7 +133,11 @@ function Test-SharpProofPackagePayload {
         [object[]]$ExpectedPayloads,
 
         [Parameter()]
-        [hashtable]$ValidationCache
+        [hashtable]$ValidationCache,
+
+        [Parameter()]
+        [AllowNull()]
+        [IO.Compression.ZipArchive]$Archive
     )
 
     $useEvidence = $null -ne $ExpectedPayloads
@@ -174,10 +178,13 @@ function Test-SharpProofPackagePayload {
             ForEach-Object { [string]$_ } |
             Sort-Object
     )
-    $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
+    $ownsArchive = $null -eq $Archive
+    if ($ownsArchive) {
+        $Archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
+    }
     try {
         $payloadEntries = @(
-            $archive.Entries |
+            $Archive.Entries |
                 Where-Object {
                     $_.FullName -ne ($PackageId.ToLowerInvariant() + '.nuspec') -and
                     $_.FullName -ne '_rels/.rels' -and
@@ -205,7 +212,7 @@ function Test-SharpProofPackagePayload {
         $payloadEvidence = [Collections.Generic.List[object]]::new()
         $toolchain = $null
         foreach ($specification in $specifications) {
-            $entry = $archive.GetEntry([string]$specification.Entry)
+            $entry = $Archive.GetEntry([string]$specification.Entry)
             if ($null -eq $entry) {
                 throw "Package '$PackageId' is missing payload '$($specification.Entry)'."
             }
@@ -290,6 +297,8 @@ function Test-SharpProofPackagePayload {
         }
     }
     finally {
-        $archive.Dispose()
+        if ($ownsArchive) {
+            $Archive.Dispose()
+        }
     }
 }
