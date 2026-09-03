@@ -14966,3 +14966,27 @@ while avoiding repeated source-type walks. Meta analyzer tests pass (162 passed)
 | ID | Finding | Evidence |
 |---|---|---|
 | R1241 | **`ManagedFlowResult.TryEvaluate` contains an assignment fallback excluded by its own mutation predicate.** The fallback tests an unwrapped `ISimpleAssignmentOperation` only after `!hasMutation`, while `ManagedMutationFacts.HasMutation` classifies every `IAssignmentOperation` in the value subtree as a mutation and all private-overload callers provide that fact. The branch is therefore unreachable unless the mutation contract changes. | `SharpProof.Effects/ManagedAbstractFlow.cs:1396-1433,1471-1494`; `SharpProof.Effects/ManagedMutationFacts.cs:5-18` |
+
+## Second survey, part five hundred sixty-four: R1242 - uncertainty sentinel repeats a numeric bit
+
+`EffectSummary` validates `EffectUncertainty` by allowing bits through `EffectUncertainty.Unknown`, then separately defines `var uncertaintyMarker = (EffectUncertainty)(1 << 6)` to reject a mixed unknown state. The generated enum already expresses the same relationship as `EffectUncertainty.Unknown & ~EffectUncertainty.All` (`Unknown = 127`, `All = 63`), so the literal is a second authority for the sentinel bit. A named enum-derived marker or shared validation helper can preserve the intentional unknown-only rule while removing numeric coupling, following the same reduction pattern as the capability and allocation sentinels without conflating their domains.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1242 | **`EffectSummary` repeats the unknown uncertainty marker numerically.** The constructor checks `(EffectUncertainty)(1 << 6)` after the generated enum already defines `Unknown` as `All` plus that marker. Deriving the marker from `Unknown & ~All` keeps validation tied to the catalog if the uncertainty layout changes. | `SharpProof.Effects/EffectSummary.cs:36-46`; `SharpProof.Effects/EffectContractMappings.generated.cs:93-105` |
+
+## Second survey, part five hundred sixty-five: R1243 - symbol sort keys are rebuilt per comparison
+
+`EffectSymbolComparer<TSymbol>.Compare` constructs a canonical compiler display for both non-null symbols on every comparison, then may ask Roslyn for source locations as a tie-breaker. The comparer is used by `List.Sort`/`OrderBy` at several Effects call-graph, analysis-session, and throw-set ordering sites, so a symbol participating in many comparisons is repeatedly converted to the same stable identity. Projecting each input to `(symbol, canonicalIdentity, locationKey)` before sorting, or using a compilation-scoped cache with the same symbol identity semantics, can retain the equality and source-order tie-breakers while avoiding repeated display construction.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1243 | **`EffectSymbolComparer<TSymbol>` recomputes stable symbol sort keys for each comparison.** `Compare` calls `CanonicalIdentity` for both operands and searches their source locations after every identity tie; the same immutable Roslyn symbols can therefore be formatted repeatedly by one sort. A key projection or appropriately scoped cache can own the canonical display/location data while preserving null, equality, and deterministic tie-break behavior. | `SharpProof.Effects/EffectValues.cs:222-276`; call sites `SharpProof.Effects/EffectCallGraph.cs:39-45,70-75,105` and `SharpProof.Effects/EffectAnalysisSession.cs:413,537,575,667` |
+
+## Second survey, part five hundred sixty-six: R1244 - read/write region projection walks one catalog twice
+
+`ExternalEffectResolver` needs both analysis read and write regions for one validated contract. It calls `EffectContractMappings.ToAnalysisRegions` twice with the same effect flags and parameter count; each call independently walks the complete `RegionContracts` catalog and may construct the parameter-region set. A combined projection returning both region sets can perform one catalog walk and share the parameter expansion while keeping the read/write mapping and out-of-range parameter behavior unchanged.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1244 | **`ExternalEffectResolver` projects the same contract-region catalog separately for reads and writes.** The two adjacent `ToAnalysisRegions` calls repeat the catalog traversal and parameter expansion for one contract. A paired read/write projection can accumulate both outputs in one pass without changing the individual mapping API or region semantics. | `SharpProof.Effects/ExternalEffectResolver.cs:245-246`; `SharpProof.Effects/EffectContractMappings.cs:81-107` |
