@@ -18900,3 +18900,11 @@ class still has its pre-existing complexity-ratchet failure
 | ID | Finding | Evidence |
 |---|---|---|
 | R1662 | Two worker test classes hard-code the same ordered `UserAssume`/`TrustedBoundary` expectation; share or derive the protocol-order fixture. | `SharpProof.Worker.Test/ClaimManifestBuilderTests.cs:23-26,1154-1174`; `SharpProof.Worker.Test/ProtocolJsonTests.cs:23-26,356-373` |
+
+## Second survey, continued: R1663 - Two MSBuild tests duplicate the same runtime-closure override matrix
+
+`RuntimeClosureOverridesAreRejected` and `ProjectBodyRuntimeClosureOverridesAreRejectedBeforePublication` each repeat the same three NUnit cases: `SharpProofToolsDirectory`, `SharpProofWorkerPath`, and `SharpProofLauncherPath`. The tests intentionally exercise different override injection paths, so their bodies and assertions should remain distinct, but the identical matrix is maintenance-sensitive: adding or removing a closure property can leave one path untested. Move the three names to a shared `TestCaseSource` or test-data constant.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1663 | Two runtime-closure rejection tests repeat the same three property-name cases; share the matrix while retaining separate build-path assertions. | `SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs:147-151,171-175` |
