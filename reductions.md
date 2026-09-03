@@ -11876,3 +11876,15 @@ R1115 is deferred: factor the repeated one-call summary fixture into a test-only
 ### Status (part three hundred forty-seven)
 
 R1116 is deferred: share the ordinal target probe, but keep the live-tree aggregate diagnostics and the archived-source fail-fast validation as separate callers.
+
+## Second survey, part three hundred forty-eight: R1117 - duplicated parallel-process lifecycle plumbing
+
+`SharpProof.ContainerExecution.psm1` centralizes the parallel `ProcessStartInfo` construction, but `Invoke-SharpProofParallelDotnetBuilds` and `Invoke-SharpProofParallelDotnetTests` still independently allocate a `Process`, assign the start info, start it with the same failure cleanup, begin asynchronous stdout/stderr reads, record `StartTime`, and dispose or kill active processes in `finally`. Their schedulers intentionally differ: builds launch a validated set up front and stop compiler servers, while tests admit slot-weighted work and collect per-test results as processes finish. A private process-lifecycle helper or shared active-process record can own the start/capture/termination mechanics while leaving scheduling, output labels, failure aggregation, elapsed-time projection, and compiler-server shutdown at the callers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1117 | **Parallel build and test schedulers duplicate process lifecycle code after sharing the start-info factory.** Both create/start/capture/dispose `Process` instances and kill unfinished processes on failure; only the surrounding scheduling and completion policy differs. Sharing that lifecycle seam reduces drift in cleanup and stream handling without merging the build and slot-aware test schedulers. | `scripts/SharpProof.ContainerExecution.psm1:621-635,681-689,779-792,844-851` |
+
+### Status (part three hundred forty-eight)
+
+R1117 is deferred: extract only the common parallel-process start/capture/cleanup seam, preserving each scheduler's admission, deadline, output, failure, timing, and compiler-server behavior.
