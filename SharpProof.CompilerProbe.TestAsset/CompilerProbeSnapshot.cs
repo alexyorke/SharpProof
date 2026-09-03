@@ -62,6 +62,18 @@ internal static class CompilerProbeSnapshot
             .Select(static tree => tree.Options)
             .OfType<CSharpParseOptions>()
             .ToArray();
+        var languageVersions = new HashSet<string>(StringComparer.Ordinal);
+        var preprocessorSymbols = new HashSet<string>(StringComparer.Ordinal);
+        var specifiedLanguageVersions = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var option in parseOptions)
+        {
+            languageVersions.Add(option.LanguageVersion.ToString());
+            specifiedLanguageVersions.Add(option.SpecifiedLanguageVersion.ToString());
+            foreach (var symbol in option.PreprocessorSymbolNames)
+            {
+                preprocessorSymbols.Add(symbol);
+            }
+        }
         var json = new ProbeJsonObject(builder);
         json.Boolean(
 "allowUnsafe",
@@ -74,10 +86,7 @@ internal static class CompilerProbeSnapshot
             options.Deterministic);
         json.StringArray(
 "languageVersions",
-            parseOptions
-                .Select(static option => option.LanguageVersion.ToString())
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(static value => value, StringComparer.Ordinal));
+            languageVersions.OrderBy(static value => value, StringComparer.Ordinal));
         json.String(
 "mainTypeName",
             options.MainTypeName ?? string.Empty);
@@ -95,17 +104,12 @@ internal static class CompilerProbeSnapshot
             options.Platform.ToString());
         json.StringArray(
 "preprocessorSymbols",
-            parseOptions
-                .SelectMany(static option => option.PreprocessorSymbolNames)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(static value => value, StringComparer.Ordinal));
+            preprocessorSymbols.OrderBy(static value => value, StringComparer.Ordinal));
         json.StringArray(
 "specifiedLanguageVersions",
-            parseOptions
-                .Select(static option =>
-                    option.SpecifiedLanguageVersion.ToString())
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(static value => value, StringComparer.Ordinal));
+            specifiedLanguageVersions.OrderBy(
+                static value => value,
+                StringComparer.Ordinal));
         json.StringArray(
 "usings",
             options.Usings.OrderBy(
