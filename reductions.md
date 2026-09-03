@@ -15944,3 +15944,11 @@ LauncherMarker.cs contains only an internal static class declaration and a repos
 | ID | Finding | Evidence |
 |---|---|---|
 | R1331 | **`SharpProof.Worker.Launcher/LauncherMarker.cs` declares an unreferenced internal marker type. Remove the dead sentinel if no external build convention depends on its presence; the project has independent executable and generated compile units.** | SharpProof.Worker.Launcher/LauncherMarker.cs:1-3; SharpProof.Worker.Launcher/SharpProof.Worker.Launcher.csproj:1-24; repository-wide search finds only the declaration |
+
+## Second survey, continued: R1332 - probe contract exposes an unused assembly path
+
+CompilerProbeContract.AssemblyPath exposes typeof(CompilerProbeContract).Assembly.Location, but a repository-wide search finds no call to CompilerProbeContract.AssemblyPath and no reflection lookup for that property. The rest of the contract constants are consumed by the probe generator, snapshot, analyzer, or package tests; this property is the only unreferenced member in the contract surface. If the test asset has no external consumer that calls it dynamically, removing the property and its XML comment trims dead API surface without changing the probe protocol.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1332 | **`CompilerProbeContract.AssemblyPath` is an unreferenced public property. Remove it if no external fixture consumer calls it dynamically; the generated probe and package tests use the other contract members and do not need this assembly-location accessor.** | SharpProof.CompilerProbe.TestAsset/CompilerProbeContract.cs:55-56; repository-wide search finds no `CompilerProbeContract.AssemblyPath` reference |
