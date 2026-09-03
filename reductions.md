@@ -20348,3 +20348,11 @@ records that all 248 entries were checked rather than 170, and the two
 security-shaped cases are named in its row. The correction is recorded rather than
 silently applied because the first figure was published in this ledger and cited
 in a status report.
+
+## Second survey, continued: R1881 - ContractBinderTests wrap a non-disposable fixture in IDisposable
+
+`ContractSubject` is created with `using var` throughout the binder suite, but its only fields are a `CSharpCompilation` and a `ContractBinder` over a fresh `IrFactory`; it owns no disposable resource. Its `Dispose()` method is literally empty, so every `using` adds a generated try/finally and falsely signals that compilation or binding state needs teardown. Removing `IDisposable`/`Dispose` and changing these locals to ordinary variables would remove test-only lifecycle ceremony without changing fixture setup or assertions. This is separate from the repository's real temporary-directory disposal findings.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1881 | A private binder-test fixture implements `IDisposable` solely to provide an empty `Dispose`; dozens of `using var` declarations therefore add no-op lifecycle scaffolding. | `SharpProof.Contracts.Test/ContractBinderTests.cs:21-34,66-1609,1637-1645,1781-1783` |
