@@ -2170,16 +2170,6 @@ internal sealed class ExceptionHandlerReachability(
         {
             yield break;
         }
-        if ((property.Parent is ICoalesceAssignmentOperation coalesce &&
-             ReferenceEquals(coalesce.Target, property)) ||
-            (property.Parent is ICompoundAssignmentOperation compound &&
-             ReferenceEquals(compound.Target, property)) ||
-            (property.Parent is IIncrementOrDecrementOperation increment &&
-             ReferenceEquals(increment.Target, property)))
-        {
-            yield return property.Property.GetMethod;
-            yield break;
-        }
         yield return property.Property.GetMethod;
     }
 
