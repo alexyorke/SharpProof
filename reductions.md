@@ -15910,6 +15910,12 @@ DevCheckCommandPlanTests keeps DebugCommandIds and ReleaseCommandIds as separate
 |---|---|---|
 | R1324 | **DevCheckCommandPlanTests duplicates the seven command IDs shared by DebugCommandIds and ReleaseCommandIds. Define one shared ordered command sequence and model the Debug-only package-product-build row explicitly, preserving the configuration-specific count and order assertions.** | SharpProof.ArchitectureTest/DevCheckCommandPlanTests.cs:11-46 |
 
+### Status (continued)
+
+R1324 is applied: Debug and Release command plans share one ordered base array,
+with Debug adding its package-product-build entry. Dev-check plan tests pass (3
+passed).
+
 ## Second survey, continued: R1325 - marker attributes repeat empty constructors
 
 DoesNotThrowAttribute, EnforcePureAttribute, and ZeroAllocationsAttribute each declare the same public parameterless constructor whose body is empty. NotNullAttribute and PositiveAttribute do the same in ClosedContractAttributes. With no instance fields or initialization, C# supplies an equivalent public parameterless constructor when no other constructor exists. If constructor-specific XML documentation is not required, removing the five bodies reduces repeated API boilerplate while preserving the public attribute activation syntax; InRange and argument-taking attributes remain explicit.
