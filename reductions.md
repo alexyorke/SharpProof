@@ -14364,3 +14364,17 @@ projection.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1203 | **`RoslynProgramLowerer.LowerInvocation` computes each invocation result type twice.** It calls `_expressions.GetTypeId(invocation.Type)` for the call temporary, then `_expressions.GetMember(..., invocation.Type, ...)`, whose implementation calls `GetTypeId(resultType)` again with the same `invocation.Type`. Reusing the first `IrTypeId` in member construction removes the repeated specialization/classification and preserves the existing member identity and result-type behavior. | `SharpProof.Frontend/RoslynProgramLowerer.cs:384-398`; `SharpProof.Frontend/RoslynOperationLowerer.cs:194-210` |
+
+## Second survey, part five hundred twenty-six: R1204 - ordered CFG selection is used as a membership set
+
+`SelectBlocks` returns an array so the selected CFG blocks can be emitted in a
+stable order. `Lower` then uses `selected.Contains(block)` inside a scan of all
+graph blocks to identify a reachable catch handler omitted by the selected
+subgraph. Array `Contains` is linear, so this turns that membership check into
+a second block-scale walk on top of the already-built reachability set. Keep
+the ordered array for lowering and carry a comparer-equivalent `HashSet` (or
+return the existing reachable set alongside it) for the omission test.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1204 | **`RoslynProgramLowerer.LoweringSession` performs linear selected-block membership scans.** `SelectBlocks` materializes an ordered `BasicBlock[]`, but `Lower` calls `selected.Contains(block)` while enumerating every graph block to find an omitted catch handler. Reusing the `HashSet<BasicBlock>` already built during reachability, or returning a membership set alongside the ordered array, preserves emission order and equality semantics while removing the repeated linear search. | `SharpProof.Frontend/RoslynProgramLowerer.cs:80-88,741-762` |
