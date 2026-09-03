@@ -113,7 +113,7 @@ internal static class CompilerFeatureScopeFingerprint
         {
             hash.Add(JsonSerializer.SerializeToUtf8Bytes(
                 value,
-                WorkerProtocolJson.Options));
+                WorkerProtocolJson.SharedOptions));
         }
     }
 }

@@ -1037,10 +1037,10 @@ internal static class CompilerLoweredArtifact
             .Add(existentials.Count)
             .Add(JsonSerializer.SerializeToUtf8Bytes(
                 graph,
-                WorkerProtocolJson.Options))
+                WorkerProtocolJson.SharedOptions))
             .Add(JsonSerializer.SerializeToUtf8Bytes(
                 dependencyEvidence,
-                WorkerProtocolJson.Options))
+                WorkerProtocolJson.SharedOptions))
             .Finish();
     }
 
@@ -1263,7 +1263,7 @@ internal static class CompilerLoweredArtifact
         var graph = PortableIrGraphCodec.Encode(factory, null, [clause.Condition]).Graph;
         using var hash = new CanonicalHashWriter();
         return hash.Add("SharpProofClausePredicate/v1", clause.Kind, clause.Evidence, clause.ClaimId ?? clause.AssumptionId)
-            .Add(JsonSerializer.SerializeToUtf8Bytes(graph, WorkerProtocolJson.Options)).Finish();
+            .Add(JsonSerializer.SerializeToUtf8Bytes(graph, WorkerProtocolJson.SharedOptions)).Finish();
     }
     private static T At<T>(IReadOnlyList<T> items, int index, string kind)
     {

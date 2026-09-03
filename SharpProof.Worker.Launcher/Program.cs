@@ -483,7 +483,7 @@ internal static class Program
                 response.FailureReason,
                 response.Summary
             },
-            WorkerProtocolJson.Options));
+            WorkerProtocolJson.SharedOptions));
         if (response.RunStatus != WorkerRunStatus.Complete)
         {
             Console.Error.WriteLine("SharpProof worker run " + response.RunStatus +

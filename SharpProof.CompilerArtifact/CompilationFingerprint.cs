@@ -27,7 +27,7 @@ internal static class CompilationFingerprint
             SourceLineMapVersion,
             JsonSerializer.SerializeToUtf8Bytes(
                 entries,
-                WorkerProtocolJson.Options));
+                WorkerProtocolJson.SharedOptions));
         return hash.Finish();
     }
 
@@ -42,7 +42,7 @@ internal static class CompilationFingerprint
             SyntaxTreeSnapshotVersion,
             JsonSerializer.SerializeToUtf8Bytes(
                 snapshot,
-                WorkerProtocolJson.Options));
+                WorkerProtocolJson.SharedOptions));
         return hash.Finish();
     }
 
@@ -58,11 +58,11 @@ internal static class CompilationFingerprint
             "SharpProof.CompilerCompilationSnapshot",
             10,
             "budget.expression_depth", maximumExpressionDepth,
-            JsonSerializer.Serialize(snapshot, WorkerProtocolJson.Options),
+            JsonSerializer.Serialize(snapshot, WorkerProtocolJson.SharedOptions),
             JsonSerializer.Serialize(
                 CompilerDiagnosticArtifactOrdering.Canonicalize(
                     ArgumentNullGuard.NotNull(diagnostics, nameof(diagnostics))),
-                WorkerProtocolJson.Options));
+                WorkerProtocolJson.SharedOptions));
         return hash.Finish();
     }
 

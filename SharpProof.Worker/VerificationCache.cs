@@ -70,7 +70,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             }
             var json = await WorkerProtocolJson.ReadUtf8FileAsync(path, cancellationToken)
                 .ConfigureAwait(false);
-            var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.Options);
+            var envelope = JsonSerializer.Deserialize<CacheEnvelope>(json, WorkerProtocolJson.SharedOptions);
             if (envelope is not
                 {
                     SchemaVersion: WorkerCacheVersions.Current,
@@ -84,7 +84,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 return null;
             }
             cancellationToken.ThrowIfCancellationRequested();
-            var payload = JsonSerializer.Deserialize<CachePayload>(envelope.Payload, WorkerProtocolJson.Options);
+            var payload = JsonSerializer.Deserialize<CachePayload>(envelope.Payload, WorkerProtocolJson.SharedOptions);
             if (payload is not
                 {
                     ManifestHash: var payloadManifestHash,
@@ -186,10 +186,10 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             cacheLock = AcquireLock(_directory);
             RecoverInterruptedTransactions(cancellationToken);
             var payload = JsonSerializer.Serialize(new CachePayload(
-                manifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.Options);
+                manifest.Hash, response.CallableResults, response.ClaimResults), WorkerProtocolJson.SharedOptions);
             var envelope = new CacheEnvelope(WorkerCacheVersions.Current,
                 inputHash, HashText(payload), payload);
-            var json = JsonSerializer.Serialize(envelope, WorkerProtocolJson.Options);
+            var json = JsonSerializer.Serialize(envelope, WorkerProtocolJson.SharedOptions);
             if (Encoding.UTF8.GetByteCount(json) >
                 Math.Min(_maximumBytes, WorkerProtocolJson.MaximumJsonBytes))
             {

@@ -15,6 +15,10 @@ public static partial class WorkerProtocolJson
 
     public static JsonSerializerOptions Options => new(s_options);
 
+    // Trusted in-process callers share the immutable configuration instead of
+    // allocating a defensive copy for every serialization operation.
+    internal static JsonSerializerOptions SharedOptions => s_options;
+
     internal static bool IsCompilerDiagnosticCode(string? value)
     {
         return value != null &&

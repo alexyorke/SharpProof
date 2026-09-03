@@ -86,7 +86,7 @@ internal static class SarifProjection
             ["version"] = "2.1.0",
             ["runs"] = new[] { run }
         };
-        return JsonSerializer.Serialize(document, WorkerProtocolJson.Options);
+        return JsonSerializer.Serialize(document, WorkerProtocolJson.SharedOptions);
     }
 
     private static object ClaimResult(

@@ -137,11 +137,11 @@ internal static partial class PortableIrGraphCodec
         }
         var actual = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
             graph,
-            WorkerProtocolJson.Options);
+            WorkerProtocolJson.SharedOptions);
         cancellationToken.ThrowIfCancellationRequested();
         var expected = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
             canonical,
-            WorkerProtocolJson.Options);
+            WorkerProtocolJson.SharedOptions);
         cancellationToken.ThrowIfCancellationRequested();
         Require(
             actual.SequenceEqual(expected),

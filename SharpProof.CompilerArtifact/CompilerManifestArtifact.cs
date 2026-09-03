@@ -391,7 +391,7 @@ internal static class CompilerManifestArtifactJson
         cancellationToken.ThrowIfCancellationRequested();
         var json = JsonSerializer.Serialize(
                 artifact,
-                WorkerProtocolJson.Options) +
+                WorkerProtocolJson.SharedOptions) +
             "\n";
         cancellationToken.ThrowIfCancellationRequested();
         if (Encoding.UTF8.GetByteCount(json) >
@@ -414,7 +414,7 @@ internal static class CompilerManifestArtifactJson
         cancellationToken.ThrowIfCancellationRequested();
 
         var artifact = JsonSerializer.Deserialize<CompilerManifestArtifact>(
-            json, WorkerProtocolJson.Options) ??
+            json, WorkerProtocolJson.SharedOptions) ??
             throw new JsonException("A compiler manifest artifact is required.");
         cancellationToken.ThrowIfCancellationRequested();
         Validate(artifact, cancellationToken);
