@@ -21037,3 +21037,11 @@ the default diagnostic catalog, including the final reversed-precondition
 regression. Intentional suppression cases remain narrowed where their fixtures
 emit unrelated placement or companion diagnostics; the analyzer project has
 passed 476/476 tests after these oracle changes.
+
+## Second survey, continued: R1994 - SemanticClaimIdentity and ContractClauseInventoryBuilder duplicate HasSameSite
+
+`SemanticClaimIdentity` and `ContractClauseInventoryBuilder` each define a private `HasSameSite(SyntaxNode left, SyntaxNode right)` that returns exactly `left.SyntaxTree == right.SyntaxTree && left.Span == right.Span`. Both use it repeatedly for Roslyn parent/ancestor termination and statement/body identity checks, so this is a shared syntax-site invariant rather than coincidental text. The projects already share `SharpProof.Frontend` as a Roslyn-aware dependency, making a small internal helper there a possible owner. The helper must preserve tree-object identity plus exact `TextSpan` equality; broader location or equivalence comparisons would change semantics.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1994 | `SemanticClaimIdentity.HasSameSite` and `ContractClauseInventoryBuilder.HasSameSite` duplicate the exact Roslyn syntax-tree/object and span equality predicate; centralize this two-part site comparison in a shared frontend helper while retaining each caller's traversal policy. | `SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs:542-545`; `SharpProof.Contracts/ContractClauseInventoryBuilder.cs:443-446`; shared dependency `SharpProof.Frontend/SharpProof.Frontend.csproj`; related R286 |
