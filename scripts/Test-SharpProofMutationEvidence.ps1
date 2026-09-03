@@ -77,6 +77,35 @@ function New-TestParts {
     }
 }
 
+function New-TrxFixture {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name,
+        [Parameter(Mandatory)]
+        [object[]]$Parts,
+        [int]$Failed = 0,
+        [string]$Summary
+    )
+
+    $parts = @($Parts)
+    $total = $parts.Count
+    if ($total -eq 0 -or $Failed -lt 0 -or $Failed -gt $total) {
+        throw 'TRX fixtures require a valid part and failure count.'
+    }
+    if ([string]::IsNullOrEmpty($Summary)) {
+        $Summary = if ($Failed -gt 0) { 'Failed' } else { 'Completed' }
+    }
+    $counters = 'total="{0}" executed="{0}" passed="{1}" failed="{2}" {3}' -f `
+        $total, ($total - $Failed), $Failed, $zeroInfrastructure
+    return Write-Fixture `
+        -Name $Name `
+        -Summary $Summary `
+        -Counters $counters `
+        -Definitions (($parts | ForEach-Object Definition) -join '') `
+        -Entries (($parts | ForEach-Object Entry) -join '') `
+        -Results (($parts | ForEach-Object Result) -join '')
+}
+
 function Assert-Throws {
     param(
         [scriptblock]$Action,
@@ -475,14 +504,7 @@ $zeroInfrastructure = 'error="0" timeout="0" aborted="0" inconclusive="0" notRun
 
 try {
     $passing = New-TestParts -Outcome Passed -Message ''
-    $passingPath = Write-Fixture `
-        -Name passing `
-        -Summary Completed `
-        -Counters ('total="1" executed="1" passed="1" failed="0" ' +
-            $zeroInfrastructure) `
-        -Definitions $passing.Definition `
-        -Entries $passing.Entry `
-        -Results $passing.Result
+    $passingPath = New-TrxFixture -Name passing -Parts $passing
     $baseline = Read-SharpProofMutationTestEvidence `
         -TrxPath $passingPath `
         -EvidenceName baseline `
@@ -505,14 +527,9 @@ try {
         -Method 'SecondExpected(CaseOne)' `
         -TestId test-batch-2 `
         -ExecutionId execution-batch-2
-    $batchPath = Write-Fixture `
+    $batchPath = New-TrxFixture `
         -Name passing-batch `
-        -Summary Completed `
-        -Counters ('total="2" executed="2" passed="2" failed="0" ' +
-            $zeroInfrastructure) `
-        -Definitions ($batchFirst.Definition + $batchSecond.Definition) `
-        -Entries ($batchFirst.Entry + $batchSecond.Entry) `
-        -Results ($batchFirst.Result + $batchSecond.Result)
+        -Parts @($batchFirst, $batchSecond)
     $batch = Read-SharpProofMutationTestEvidence `
         -TrxPath $batchPath `
         -EvidenceName passing-batch `
@@ -544,14 +561,7 @@ try {
         -Outcome Passed `
         -Message '' `
         -Method 'ExpectedTest(CaseOne)'
-    $parameterizedPath = Write-Fixture `
-        -Name parameterized `
-        -Summary Completed `
-        -Counters ('total="1" executed="1" passed="1" failed="0" ' +
-            $zeroInfrastructure) `
-        -Definitions $parameterized.Definition `
-        -Entries $parameterized.Entry `
-        -Results $parameterized.Result
+    $parameterizedPath = New-TrxFixture -Name parameterized -Parts $parameterized
     $parameterizedBaseline = Read-SharpProofMutationTestEvidence `
         -TrxPath $parameterizedPath `
         -EvidenceName parameterized `
@@ -569,14 +579,9 @@ try {
         -Message '' `
         -Method ExpectedTest `
         -DisplayName 'ExpectedTest(Case("A"))'
-    $caseBaselinePath = Write-Fixture `
+    $caseBaselinePath = New-TrxFixture `
         -Name case-ledger-baseline `
-        -Summary Completed `
-        -Counters ('total="1" executed="1" passed="1" failed="0" ' +
-            $zeroInfrastructure) `
-        -Definitions $caseBaselineParts.Definition `
-        -Entries $caseBaselineParts.Entry `
-        -Results $caseBaselineParts.Result
+        -Parts $caseBaselineParts
     $caseBaseline = Read-SharpProofMutationTestEvidence `
         -TrxPath $caseBaselinePath `
         -EvidenceName case-ledger-baseline `
@@ -589,14 +594,10 @@ try {
         -Message $caseAssertionMessage `
         -Method ExpectedTest `
         -DisplayName 'ExpectedTest(Case("A"))'
-    $exactCasePath = Write-Fixture `
+    $exactCasePath = New-TrxFixture `
         -Name exact-case-ledger `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $exactCaseParts.Definition `
-        -Entries $exactCaseParts.Entry `
-        -Results $exactCaseParts.Result
+        -Parts $exactCaseParts `
+        -Failed 1
     $exactCase = Read-SharpProofMutationTestEvidence `
         -TrxPath $exactCasePath `
         -EvidenceName exact-case-ledger `
@@ -651,14 +652,10 @@ try {
                 -DisplayName 'ExpectedTest(Case("A"))'
         })
     foreach ($drift in $caseOnlyDrifts) {
-        $driftPath = Write-Fixture `
+        $driftPath = New-TrxFixture `
             -Name $drift.Name `
-            -Summary Failed `
-            -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-                $zeroInfrastructure) `
-            -Definitions $drift.Parts.Definition `
-            -Entries $drift.Parts.Entry `
-            -Results $drift.Parts.Result
+            -Parts $drift.Parts `
+            -Failed 1
         Assert-Throws `
             -Because $drift.Because `
             -ExpectedMessage 'test ledger changed' `
@@ -687,14 +684,9 @@ try {
         -DisplayName 'ExpectedTest(Case("a"))' `
         -TestId test-case-row-2 `
         -ExecutionId execution-case-row-2
-    $caseRowsPath = Write-Fixture `
+    $caseRowsPath = New-TrxFixture `
         -Name case-distinct-rows `
-        -Summary Completed `
-        -Counters ('total="2" executed="2" passed="2" failed="0" ' +
-            $zeroInfrastructure) `
-        -Definitions ($upperParameter.Definition + $lowerParameter.Definition) `
-        -Entries ($upperParameter.Entry + $lowerParameter.Entry) `
-        -Results ($upperParameter.Result + $lowerParameter.Result)
+        -Parts @($upperParameter, $lowerParameter)
     $caseRows = Read-SharpProofMutationTestEvidence `
         -TrxPath $caseRowsPath `
         -EvidenceName case-distinct-rows `
@@ -721,14 +713,9 @@ try {
         -Method expectedTest `
         -TestId test-case-method-2 `
         -ExecutionId execution-case-method-2
-    $caseMethodsPath = Write-Fixture `
+    $caseMethodsPath = New-TrxFixture `
         -Name case-distinct-methods `
-        -Summary Completed `
-        -Counters ('total="2" executed="2" passed="2" failed="0" ' +
-            $zeroInfrastructure) `
-        -Definitions ($upperMethod.Definition + $lowerMethod.Definition) `
-        -Entries ($upperMethod.Entry + $lowerMethod.Entry) `
-        -Results ($upperMethod.Result + $lowerMethod.Result)
+        -Parts @($upperMethod, $lowerMethod)
     $caseMethods = Read-SharpProofMutationTestEvidence `
         -TrxPath $caseMethodsPath `
         -EvidenceName case-distinct-methods `
@@ -745,14 +732,7 @@ try {
         -Outcome Passed `
         -Message '' `
         -Method ExpectedTestAfterRename
-    $renamedPath = Write-Fixture `
-        -Name renamed `
-        -Summary Completed `
-        -Counters ('total="1" executed="1" passed="1" failed="0" ' +
-            $zeroInfrastructure) `
-        -Definitions $renamed.Definition `
-        -Entries $renamed.Entry `
-        -Results $renamed.Result
+    $renamedPath = New-TrxFixture -Name renamed -Parts $renamed
     Assert-Throws `
         -Because 'a renamed method sharing the expected prefix' `
         -ExpectedMessage 'identity does not match' `
@@ -768,14 +748,10 @@ try {
     $assertion = New-TestParts `
         -Outcome Failed `
         -Message "Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2"
-    $assertionPath = Write-Fixture `
+    $assertionPath = New-TrxFixture `
         -Name assertion `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $assertion.Definition `
-        -Entries $assertion.Entry `
-        -Results $assertion.Result
+        -Parts $assertion `
+        -Failed 1
     $mutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $assertionPath `
         -EvidenceName assertion `
@@ -796,14 +772,10 @@ try {
             -Outcome Failed `
             -Message $forgery.Message `
             -StackTrace $forgery.Stack
-        $path = Write-Fixture `
+        $path = New-TrxFixture `
             -Name $forgery.Name `
-            -Summary Failed `
-            -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-                $zeroInfrastructure) `
-            -Definitions $parts.Definition `
-            -Entries $parts.Entry `
-            -Results $parts.Result
+            -Parts $parts `
+            -Failed 1
         Assert-Throws `
             -Because $forgery.Name `
             -ExpectedMessage 'not killed solely by assertions' `
@@ -821,14 +793,10 @@ try {
     $contextAssertion = New-TestParts `
         -Outcome Failed `
         -Message "The scalar-bound mutation changed the result.`nAssert.That(actual, Is.EqualTo(expected))`nExpected: 1`nBut was: 2"
-    $contextPath = Write-Fixture `
+    $contextPath = New-TrxFixture `
         -Name user-context `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $contextAssertion.Definition `
-        -Entries $contextAssertion.Entry `
-        -Results $contextAssertion.Result
+        -Parts $contextAssertion `
+        -Failed 1
     $contextEvidence = Read-SharpProofMutationTestEvidence `
         -TrxPath $contextPath `
         -EvidenceName user-context `
@@ -869,14 +837,10 @@ try {
             "        : kind)`n" +
             " Expected: GreaterThan`n" +
             " But was: GreaterThanOrEqual")
-    $multilinePath = Write-Fixture `
+    $multilinePath = New-TrxFixture `
         -Name multiline-assertion `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $multilineAssertion.Definition `
-        -Entries $multilineAssertion.Entry `
-        -Results $multilineAssertion.Result
+        -Parts $multilineAssertion `
+        -Failed 1
     $multilineMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $multilinePath `
         -EvidenceName multiline-assertion `
@@ -894,14 +858,10 @@ try {
             "                .Select(static error => error.Code), Does.Contain(""response.claim_set""))`n" +
             " Expected: some item equal to ""response.claim_set""`n" +
             " But was:  < ""summary.totals"" >")
-    $identifierContinuationPath = Write-Fixture `
+    $identifierContinuationPath = New-TrxFixture `
         -Name identifier-continuation `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $identifierContinuation.Definition `
-        -Entries $identifierContinuation.Entry `
-        -Results $identifierContinuation.Result
+        -Parts $identifierContinuation `
+        -Failed 1
     $identifierContinuationMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $identifierContinuationPath `
         -EvidenceName identifier-continuation `
@@ -916,14 +876,10 @@ try {
     $prefixedAssertion = New-TestParts `
         -Outcome Failed `
         -Message "Incomplete-reason flags 4 changed projection precedence.`n Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2"
-    $prefixedPath = Write-Fixture `
+    $prefixedPath = New-TrxFixture `
         -Name prefixed-assertion `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $prefixedAssertion.Definition `
-        -Entries $prefixedAssertion.Entry `
-        -Results $prefixedAssertion.Result
+        -Parts $prefixedAssertion `
+        -Failed 1
     $prefixedMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $prefixedPath `
         -EvidenceName prefixed-assertion `
@@ -938,14 +894,10 @@ try {
     $collectionAssertion = New-TestParts `
         -Outcome Failed `
         -Message "Assert.That(actual, Is.EqualTo(expected))`n Expected is <System.Int32[1]>, actual is <System.Int32[0]>`n Values differ at index [0]"
-    $collectionPath = Write-Fixture `
+    $collectionPath = New-TrxFixture `
         -Name collection-assertion `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $collectionAssertion.Definition `
-        -Entries $collectionAssertion.Entry `
-        -Results $collectionAssertion.Result
+        -Parts $collectionAssertion `
+        -Failed 1
     $collectionMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $collectionPath `
         -EvidenceName collection `
@@ -969,14 +921,10 @@ try {
              " Missing (1): expected-item`n" +
              " Extra (2): actual-item`n" +
              " -----------^")
-    $nunitCollectionPath = Write-Fixture `
+    $nunitCollectionPath = New-TrxFixture `
         -Name nunit-collection-assertion `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $nunitCollectionAssertion.Definition `
-        -Entries $nunitCollectionAssertion.Entry `
-        -Results $nunitCollectionAssertion.Result
+        -Parts $nunitCollectionAssertion `
+        -Failed 1
     $nunitCollectionMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $nunitCollectionPath `
         -EvidenceName nunit-collection `
@@ -999,14 +947,10 @@ try {
             " Expected: True`n" +
             " But was: False`n" +
             " at test.cs:11")
-    $multiplePath = Write-Fixture `
+    $multiplePath = New-TrxFixture `
         -Name multiple-assertion `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $multipleAssertion.Definition `
-        -Entries $multipleAssertion.Entry `
-        -Results $multipleAssertion.Result
+        -Parts $multipleAssertion `
+        -Failed 1
     $multipleMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $multiplePath `
         -EvidenceName multiple-assertion `
@@ -1027,14 +971,10 @@ try {
             " 2) Assert.That(second, Is.EqualTo(expected))`n" +
             " Expected: 1`n" +
             " But was: 2")
-    $multipleCollectionPath = Write-Fixture `
+    $multipleCollectionPath = New-TrxFixture `
         -Name multiple-collection-assertion `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $multipleCollectionAssertion.Definition `
-        -Entries $multipleCollectionAssertion.Entry `
-        -Results $multipleCollectionAssertion.Result
+        -Parts $multipleCollectionAssertion `
+        -Failed 1
     $multipleCollectionMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $multipleCollectionPath `
         -EvidenceName multiple-collection-assertion `
@@ -1053,14 +993,10 @@ try {
             " Expected: 1`n" +
             " But was: 2`n" +
             " 2) System.InvalidOperationException : crash")
-    $multipleMixedPath = Write-Fixture `
+    $multipleMixedPath = New-TrxFixture `
         -Name multiple-mixed `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $multipleMixed.Definition `
-        -Entries $multipleMixed.Entry `
-        -Results $multipleMixed.Result
+        -Parts $multipleMixed `
+        -Failed 1
     Assert-Throws `
         -Because 'a mixed Assert.Multiple failure and exception' `
         -ExpectedMessage 'not killed solely by assertions' `
@@ -1077,14 +1013,10 @@ try {
     $crash = New-TestParts `
         -Outcome Failed `
         -Message 'System.NullReferenceException: crash'
-    $crashPath = Write-Fixture `
+    $crashPath = New-TrxFixture `
         -Name crash `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $crash.Definition `
-        -Entries $crash.Entry `
-        -Results $crash.Result
+        -Parts $crash `
+        -Failed 1
     Assert-Throws `
         -Because 'a crash stack mentions Assert.That' `
         -ExpectedMessage 'not killed solely by assertions' `
@@ -1099,14 +1031,7 @@ try {
     }
 
     $other = New-TestParts -Outcome Passed -Message '' -Method OtherTest
-    $wrongIdentityPath = Write-Fixture `
-        -Name wrong-identity `
-        -Summary Completed `
-        -Counters ('total="1" executed="1" passed="1" failed="0" ' +
-            $zeroInfrastructure) `
-        -Definitions $other.Definition `
-        -Entries $other.Entry `
-        -Results $other.Result
+    $wrongIdentityPath = New-TrxFixture -Name wrong-identity -Parts $other
     Assert-Throws `
         -Because 'an unexpected selected test' `
         -ExpectedMessage 'identity does not match' `
@@ -1187,14 +1112,10 @@ try {
     $mixed = New-TestParts `
         -Outcome Failed `
         -Message "Assert.That(actual, Is.EqualTo(expected))`n Expected: 1`n But was: 2`n System.NullReferenceException: teardown crash"
-    $mixedPath = Write-Fixture `
+    $mixedPath = New-TrxFixture `
         -Name mixed `
-        -Summary Failed `
-        -Counters ('total="1" executed="1" passed="0" failed="1" ' +
-            $zeroInfrastructure) `
-        -Definitions $mixed.Definition `
-        -Entries $mixed.Entry `
-        -Results $mixed.Result
+        -Parts $mixed `
+        -Failed 1
     Assert-Throws `
         -Because 'assertion evidence with a trailing crash' `
         -ExpectedMessage 'not killed solely by assertions' `

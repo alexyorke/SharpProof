@@ -371,6 +371,7 @@ the smallest relevant containerized test target passes.
 | R875 | Reuse bottom-up traversal child arrays after suspension | `SharpProof.Ir.Test`: 114 passed |
 | R953 | Remove the redundant SMT copy of `ArgumentNullGuard` | `SharpProof.Smt.Test`: 30 passed |
 | R878 | Avoid duplicate atomic-file destination normalization | `SharpProof.Ir.Test`: AtomicFileTests, 7 passed |
+| R073 | Consolidate repeated TRX-fixture construction while keeping partial and timeout counters explicit | `Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -422,7 +423,7 @@ status document.
 | R038-R039, R041 | These alter soundness-sensitive traversal, pattern, or replay-candidate ordering; defer to a dedicated semantic refactor. |
 | R007-R009 | Compiler-probe JSON bytes, artifact authority, and IL opcode admission are compatibility/soundness boundaries; defer to focused format work. |
 | R027-R031 | Generalizing process, temporary-directory, and package-test setup changes cleanup/lifetime semantics across many fixtures; defer after the shared root/default work already removed the exact duplication. |
-| R057-R058, R060, R073, R087-R096, R104-R105 | These parameterize or abstract large test fixtures; keep named failure isolation and local arrange/assert evidence in this reduction pass. |
+| R057-R058, R060, R087-R096, R104-R105 | These parameterize or abstract large test fixtures; keep named failure isolation and local arrange/assert evidence in this reduction pass. |
 | R066-R070 | These change sample/pilot inheritance, scheduled validation, packaged imports, workflow setup, or automatic production-project classification. |
 | R072, R074, R076 | Shared shard/coverage/timing orchestration would centralize timeout, process, and atomic-publication semantics; treat as dedicated infrastructure work. |
 | R078-R080, R082-R085 | Soundness-critical recursive traversal, dispatch, alias, and abstract-value changes are deferred as requested. |
@@ -466,7 +467,7 @@ Merged IDs are not separate work items and must not be counted twice.
 
 ## Pending queue
 
-The active follow-up queue is R058, R060, R073, R087-R094, R096, R104-R105,
+The active follow-up queue is R058, R060, R087-R094, R096, R104-R105,
 R107, R149, R165, R169, R171-R185, R194, R211, R217-R218, and R221.
 Each still requires current-tree validation before implementation. The other
 items in the Deferred table are intentional behavior, public API, release
