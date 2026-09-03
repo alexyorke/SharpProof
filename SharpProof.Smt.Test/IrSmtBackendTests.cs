@@ -614,25 +614,18 @@ public sealed class IrSmtBackendTests
     public void QueryExpressionOwnerDisposesOnExceptionalAndCanceledExit()
     {
         using var context = new Z3Context();
-        Z3Expr? exceptional = null;
-        Action exceptionalAction = () => ThrowAfterOwning(
+        AssertOwnedExpressionDisposed<InvalidOperationException>(
             context,
-            expression => exceptional = expression);
-        Assert.Throws<InvalidOperationException>(exceptionalAction);
-        Assert.That(NativeObject(exceptional!), Is.EqualTo(IntPtr.Zero));
+            static _ => { });
 
         using var cancellation = new CancellationTokenSource();
-        Z3Expr? canceled = null;
-        Action canceledAction = () => ThrowAfterOwning(
+        AssertOwnedExpressionDisposed<OperationCanceledException>(
             context,
             expression =>
             {
-                canceled = expression;
                 cancellation.Cancel();
                 cancellation.Token.ThrowIfCancellationRequested();
             });
-        Assert.Throws<OperationCanceledException>(canceledAction);
-        Assert.That(NativeObject(canceled!), Is.EqualTo(IntPtr.Zero));
     }
 
     [Test]
@@ -968,6 +961,22 @@ public sealed class IrSmtBackendTests
         var expression = owner.Own(context.MkInt(7));
         afterOwn(expression);
         throw new InvalidOperationException("pinned query failure");
+    }
+
+    private static void AssertOwnedExpressionDisposed<TException>(
+        Z3Context context,
+        Action<Z3Expr> afterOwn)
+        where TException : Exception
+    {
+        Z3Expr? expression = null;
+        Assert.Throws<TException>(() => ThrowAfterOwning(
+            context,
+            owned =>
+            {
+                expression = owned;
+                afterOwn(owned);
+            }));
+        Assert.That(NativeObject(expression!), Is.EqualTo(IntPtr.Zero));
     }
 
     private sealed class DisposableLabel(string label) : IDisposable
