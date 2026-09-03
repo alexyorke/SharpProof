@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -20,6 +22,10 @@ internal static class CacheSoundnessRules
             "TryWriteAsync", "Update", "Write", "WriteAsync"
         }
             .ToImmutableHashSet(StringComparer.Ordinal);
+    private static readonly ConditionalWeakTable<
+        Compilation,
+        ConcurrentDictionary<ISymbol, ImmutableArray<ISymbol>>>
+        DispatchTargetCaches = new();
 
     internal static void AnalyzeWrite(OperationAnalysisContext context, IInvocationOperation invocation)
     {
@@ -1439,6 +1445,16 @@ internal static class CacheSoundnessRules
             return targets.ToImmutable();
         }
 
+        var dispatchTargetCache = DispatchTargetCaches.GetValue(
+            compilation,
+            static _ => new ConcurrentDictionary<ISymbol, ImmutableArray<ISymbol>>(
+                SymbolEqualityComparer.Default));
+        if (dispatchTargetCache.TryGetValue(symbol, out var cached))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return cached;
+        }
+
         foreach (var type in GetSourceTypes(compilation.Assembly.GlobalNamespace))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1460,7 +1476,9 @@ internal static class CacheSoundnessRules
                 }
             }
         }
-        return targets.ToImmutable();
+        var result = targets.ToImmutable();
+        dispatchTargetCache.TryAdd(symbol, result);
+        return result;
     }
 
     private static void AddTarget(
