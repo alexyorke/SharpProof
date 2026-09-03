@@ -20821,3 +20821,8 @@ FuzzUsageException lives in Tools/SharpProof.Fuzz, whose project file sets Outpu
 | ID | Finding | Evidence |
 |---|---|---|
 | R1981 | FuzzUsageException has an unused empty public constructor. The type is part of an executable explicitly declared to have no public API contract; all in-repository construction sites pass a message or inner exception, and the parameterless overload has no initialization. Remove the overload unless external callers are intentionally supported. | Tools/SharpProof.Fuzz/FuzzOptions.cs:93-107; Tools/SharpProof.Fuzz/Program.cs:7-20; Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj:6-11 |
+R1760's four-case coalesce-assignment cluster is applied: the getter, receiver,
+index, and value variants now share one scenario-driven test harness while
+retaining their distinct source fixtures and expected method-kind sequences.
+The full `SharpProof.Analyzer.Test` project passes 476/476 tests with zero
+warnings or errors.

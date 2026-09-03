@@ -333,22 +333,71 @@ public sealed class RequiresCallSiteDiscoveryTests
         }
     }
 
-    [Test]
-    public void CoalesceAssignmentSkipsSetterAfterNonreturningGetter()
+    [TestCase("getter", TestName =
+        "CoalesceAssignmentSkipsSetterAfterNonreturningGetter")]
+    [TestCase("receiver", TestName =
+        "CoalesceAssignmentSkipsSetterAfterNonreturningReceiver")]
+    [TestCase("index", TestName =
+        "CoalesceAssignmentSkipsSetterAfterNonreturningIndex")]
+    [TestCase("value", TestName =
+        "CoalesceAssignmentSkipsSetterAfterNonreturningValue")]
+    public void CoalesceAssignmentSkipsSetterAfterNonreturningExpression(
+        string scenario)
     {
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            #nullable enable
-            using System;
-            public sealed class Subject {
-                public string? Value {
-                    get => throw new InvalidOperationException();
-                    set { }
+        var (source, expected) = scenario switch
+        {
+            "getter" => (
+                """
+                #nullable enable
+                using System;
+                public sealed class Subject {
+                    public string? Value {
+                        get => throw new InvalidOperationException();
+                        set { }
+                    }
+                    public void Call() { Value ??= null; }
                 }
-                public void Call() { Value ??= null; }
-            }
-            """,
-            []);
+                """,
+                new[] { MethodKind.PropertyGet }),
+            "receiver" => (
+                """
+                #nullable enable
+                using System;
+                public sealed class Box { public string? Value { get; set; } }
+                public static class Subject {
+                    private static Box Fail() => throw new InvalidOperationException();
+                    public static void Call() { Fail().Value ??= null; }
+                }
+                """,
+                new[] { MethodKind.PropertyGet, MethodKind.Ordinary }),
+            "index" => (
+                """
+                #nullable enable
+                using System;
+                public sealed class Box {
+                    public string? this[int index] { get => null; set { } }
+                }
+                public static class Subject {
+                    private static int Fail() => throw new InvalidOperationException();
+                    public static void Call(Box box) { box[Fail()] ??= null; }
+                }
+                """,
+                new[] { MethodKind.PropertyGet, MethodKind.Ordinary }),
+            "value" => (
+                """
+                #nullable enable
+                using System;
+                public sealed class Subject {
+                    public string? Value { get; set; }
+                    private static string Fail() =>
+                        throw new InvalidOperationException();
+                    public void Call() { Value ??= Fail(); }
+                }
+                """,
+                new[] { MethodKind.PropertyGet, MethodKind.Ordinary }),
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null)
+        };
+        var compilation = AnalyzerTestHost.CreateCompilation(source, []);
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
@@ -361,97 +410,7 @@ public sealed class RequiresCallSiteDiscoveryTests
         Assert.That(
             candidates!.Value.Select(static candidate =>
                 candidate.TargetMethod.MethodKind),
-            Is.EqualTo([MethodKind.PropertyGet]));
-    }
-
-    [Test]
-    public void CoalesceAssignmentSkipsSetterAfterNonreturningReceiver()
-    {
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            #nullable enable
-            using System;
-            public sealed class Box { public string? Value { get; set; } }
-            public static class Subject {
-                private static Box Fail() => throw new InvalidOperationException();
-                public static void Call() { Fail().Value ??= null; }
-            }
-            """,
-            []);
-        var tree = compilation.SyntaxTrees.Single();
-        var declaration = tree.GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Call");
-        var discovery = CreateDiscovery(compilation, declaration);
-        var candidates = discovery
-            .Get(callerContracts: null);
-
-        Assert.That(candidates, Is.Not.Null);
-        Assert.That(
-            candidates!.Value.Select(static candidate =>
-                candidate.TargetMethod.MethodKind),
-            Is.EqualTo([MethodKind.PropertyGet, MethodKind.Ordinary]));
-    }
-
-    [Test]
-    public void CoalesceAssignmentSkipsSetterAfterNonreturningIndex()
-    {
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            #nullable enable
-            using System;
-            public sealed class Box {
-                public string? this[int index] { get => null; set { } }
-            }
-            public static class Subject {
-                private static int Fail() => throw new InvalidOperationException();
-                public static void Call(Box box) { box[Fail()] ??= null; }
-            }
-            """,
-            []);
-        var tree = compilation.SyntaxTrees.Single();
-        var declaration = tree.GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Call");
-        var discovery = CreateDiscovery(compilation, declaration);
-        var candidates = discovery
-            .Get(callerContracts: null);
-
-        Assert.That(candidates, Is.Not.Null);
-        Assert.That(
-            candidates!.Value.Select(static candidate =>
-                candidate.TargetMethod.MethodKind),
-            Is.EqualTo([MethodKind.PropertyGet, MethodKind.Ordinary]));
-    }
-
-    [Test]
-    public void CoalesceAssignmentSkipsSetterAfterNonreturningValue()
-    {
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            #nullable enable
-            using System;
-            public sealed class Subject {
-                public string? Value { get; set; }
-                private static string Fail() =>
-                    throw new InvalidOperationException();
-                public void Call() { Value ??= Fail(); }
-            }
-            """,
-            []);
-        var tree = compilation.SyntaxTrees.Single();
-        var declaration = tree.GetRoot().DescendantNodes()
-            .OfType<MethodDeclarationSyntax>()
-            .Single(static method => method.Identifier.ValueText == "Call");
-        var discovery = CreateDiscovery(compilation, declaration);
-        var candidates = discovery
-            .Get(callerContracts: null);
-
-        Assert.That(candidates, Is.Not.Null);
-        Assert.That(
-            candidates!.Value.Select(static candidate =>
-                candidate.TargetMethod.MethodKind),
-            Is.EqualTo([MethodKind.PropertyGet, MethodKind.Ordinary]));
+            Is.EqualTo(expected));
     }
 
     [Test]
