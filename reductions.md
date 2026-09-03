@@ -20808,3 +20808,8 @@ refinement pairs in `ManagedAbstractFlowTests` are parameterized, and the
 repeated invocation/state integer-interval assertion envelope is shared by all
 eight cited tests. The full `SharpProof.Effects.Test` project passes 323/323
 tests with zero warnings or errors.
+
+R1761 is applied: the nested primary-constructor base-argument and unreachable
+argument cases in `RequiresAndControlTests` are one parameterized test with
+preserved named cases. The full `SharpProof.Analyzer.Test` project passes
+476/476 tests with zero warnings or errors.

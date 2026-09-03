@@ -588,11 +588,16 @@ public sealed class RequiresAndControlTests
         Assert.That(diagnostics, Is.Empty);
     }
 
-    [Test]
-    public async Task PrimaryConstructorBaseArgumentsCheckNestedCalls()
+    [TestCase("Guard.Positive(-1)", true,
+        TestName = "PrimaryConstructorBaseArgumentsCheckNestedCalls")]
+    [TestCase("false ? Guard.Positive(-1) : 0", false,
+        TestName = "PrimaryConstructorSkipsUnreachableNestedCalls")]
+    public async Task PrimaryConstructorBaseArgumentsHandleNestedCalls(
+        string baseArgument,
+        bool expectedDiagnostic)
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
+            $$"""
             using SharpProof.Attributes;
             public static class Guard {
                 public static int Positive(int value) {
@@ -604,34 +609,15 @@ public sealed class RequiresAndControlTests
                 public Base(int value) { }
             }
             public sealed class Derived(int marker) :
-                Base(Guard.Positive(-1)) { }
+                Base({{baseArgument}}) { }
             """,
             "contracts",
             ["SP0027"]);
 
-        AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
-    }
-
-    [Test]
-    public async Task PrimaryConstructorSkipsUnreachableNestedCalls()
-    {
-        var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
-            public class Base { public Base(int value) { } }
-            public sealed class Derived(int marker) :
-                Base(false ? Guard.Positive(-1) : 0) { }
-            """,
-            "contracts",
-            ["SP0027"]);
-
-        Assert.That(diagnostics, Is.Empty);
+        if (expectedDiagnostic)
+            AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
+        else
+            Assert.That(diagnostics, Is.Empty);
     }
 
     [Test]
