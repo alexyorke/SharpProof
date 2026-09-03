@@ -123,9 +123,6 @@ Invoke-SharpProofTimedPhase -Name 'package-tests' -Timings $timings -Action {
         TimeoutSeconds = $TimeoutSeconds
     }
     $packageArguments.NoBuild = $true
-    if (-not [bool]$packagePackCommands[0].noBuild) {
-        $packageArguments.Remove('NoBuild')
-    }
     & (Join-Path $PSScriptRoot 'Invoke-SharpProofPackageTests.ps1') `
         @packageArguments
 }
