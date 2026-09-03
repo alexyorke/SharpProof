@@ -14695,3 +14695,11 @@ behavior. Build-task tests pass (63 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1223 | **`GetListPatternCalls` allocates a `params long?[]` for every implicit list-pattern member.** Its index and slice paths pass one or two known values into the variadic helper, which allocates an array before the dictionary builder performs the actual mapping. One- and two-value overloads retain the same argument semantics without the temporary array. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1484-1521,1550-1566` |
+
+## Second survey, part five hundred forty-six: R1224 - acceptance evidence requirements are restated outside their catalog
+
+`eng/acceptance/preview-evidence.v1.json` declares the ordered `requiredEvidence` vocabulary, but `eng/acceptance/Verify.ps1` converts the parsed property back to a comma-separated string and compares it with a second hard-coded six-item list. The assertion confirms today's values but does not make the JSON the sole authority: adding, removing, or reordering a requirement requires a synchronized edit in the verifier, and changing only the verifier's literal can make the check validate a policy different from the catalog. Keep the ordered comparison if it is intentional, but derive the expected value from the same contract or validate the list's shape without duplicating its contents.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1224 | **`Verify.ps1` duplicates the `preview-evidence` required-evidence list as a literal.** The verifier reads `previewEvidence.requiredEvidence` and then compares it to a separately typed comma string containing the same six IDs, creating two build-policy authorities. A catalog-driven assertion removes the drift surface while preserving order and exact membership checks. | `eng/acceptance/preview-evidence.v1.json:4-10`; `eng/acceptance/Verify.ps1:457-460` |
