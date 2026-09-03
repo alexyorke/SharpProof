@@ -254,18 +254,9 @@ public sealed class ContainerSourceCleanlinessTests
             "chmod",
             "+x",
             "scripts/executable.sh");
-        await RequireSuccessAsync(repository, "git", "init", "--quiet");
-        await RequireSuccessAsync(
+        await ArchitectureGitRepository.InitializeAsync(
             repository,
-            "git",
-            "config",
-            "user.email",
-            "fixture@sharpproof.test");
-        await RequireSuccessAsync(
-            repository,
-            "git",
-            "config",
-            "user.name",
+            "fixture@sharpproof.test",
             "SharpProof Fixture");
         await RequireSuccessAsync(repository, "git", "add", "--", ".");
         await RequireSuccessAsync(

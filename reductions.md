@@ -18653,3 +18653,11 @@ R1603 is applied: the conditional-null IR cases now share immutable declarations
 API-spec target/facets, and one factory-backed term fixture while retaining the
 true/false branch construction and assertions. `ApiSpecConditionalNullInstantiationTests`
 pass (2/2).
+
+R1620 is applied: the remaining architecture Git fixtures now delegate
+repository initialization and identity/configuration setup to
+`ArchitectureGitRepository.InitializeAsync`, preserving each caller's author and
+settings. The four affected suites pass: ContainerSourceCleanliness 39/39,
+ChangedTestSelection 6/6, ReleaseQualificationMatrix 3/3, and CoverageScript
+33/33. The broader Architecture project retains unrelated pre-existing gate
+failures (14 failures).

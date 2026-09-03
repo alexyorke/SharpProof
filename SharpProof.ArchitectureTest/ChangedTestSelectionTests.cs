@@ -24,9 +24,10 @@ public sealed class ChangedTestSelectionTests
         try
         {
             await CreateFixtureAsync(root, changedInput);
-            await RunAsync(root, "git", "init", "--quiet");
-            await RunAsync(root, "git", "config", "user.email", "test@example.invalid");
-            await RunAsync(root, "git", "config", "user.name", "SharpProof Test");
+            await ArchitectureGitRepository.InitializeAsync(
+                root,
+                "test@example.invalid",
+                "SharpProof Test");
             await RunAsync(root, "git", "add", ".");
             await RunAsync(root, "git", "commit", "--quiet", "-m", "baseline");
             await File.AppendAllTextAsync(

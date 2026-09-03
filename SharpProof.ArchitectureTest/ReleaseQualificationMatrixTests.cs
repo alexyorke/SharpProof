@@ -88,9 +88,10 @@ public sealed partial class ReleaseQualificationMatrixTests
                 Path.Combine(sourceRoot, "scripts", name),
                 Path.Combine(fixture.FullName, "scripts", name));
         }
-        await RunAsync(fixture.FullName, "git", "init", "-q");
-        await RunAsync(fixture.FullName, "git", "config", "user.email", "fixture@example.invalid");
-        await RunAsync(fixture.FullName, "git", "config", "user.name", "Fixture");
+        await ArchitectureGitRepository.InitializeAsync(
+            fixture.FullName,
+            "fixture@example.invalid",
+            "Fixture");
         await File.WriteAllTextAsync(
             Path.Combine(fixture.FullName, "tracked.txt"),
             "fixture\n");
@@ -155,18 +156,9 @@ public sealed partial class ReleaseQualificationMatrixTests
         await File.WriteAllTextAsync(
             Path.Combine(scripts.FullName, "Test-SharpProofPilotReport.ps1"),
             "function Test-SharpProofPilotReport { return $true }\n");
-        await RunAsync(fixture.FullName, "git", "init", "-q");
-        await RunAsync(
+        await ArchitectureGitRepository.InitializeAsync(
             fixture.FullName,
-            "git",
-            "config",
-            "user.email",
-            "fixture@example.invalid");
-        await RunAsync(
-            fixture.FullName,
-            "git",
-            "config",
-            "user.name",
+            "fixture@example.invalid",
             "Fixture");
         await File.WriteAllTextAsync(
             Path.Combine(fixture.FullName, "tracked.txt"),

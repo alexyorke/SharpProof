@@ -724,29 +724,11 @@ public sealed class CoverageScriptTests
         Directory.CreateDirectory(repository);
         try
         {
-            await AssertSuccessAsync(RunAsync(
+            await ArchitectureGitRepository.InitializeAsync(
                 repository,
-                "git",
-                "init",
-                "--object-format=sha1"));
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "config",
-                "user.email",
-                "coverage-script@example.invalid"));
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "config",
-                "user.name",
-                "Coverage Script Test"));
-            await AssertSuccessAsync(RunAsync(
-                repository,
-                "git",
-                "config",
-                "core.autocrlf",
-                "false"));
+                "coverage-script@example.invalid",
+                "Coverage Script Test",
+                ("core.autocrlf", "false"));
 
             await WriteFixtureAsync(root, repository);
             await AssertSuccessAsync(RunAsync(
