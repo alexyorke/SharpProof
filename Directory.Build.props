@@ -44,7 +44,6 @@
       '$(MSBuildProjectName)' == 'SharpProof.Frontend' Or
       '$(MSBuildProjectName)' == 'SharpProof.Frontend.Test' Or
       '$(MSBuildProjectName)' == 'SharpProof.Fuzz' Or
-      '$(MSBuildProjectName)' == 'SharpProof.Fuzz.Test' Or
       '$(MSBuildProjectName)' == 'SharpProof.Ir.Test' Or
       '$(MSBuildProjectName)' == 'SharpProof.Smt' Or
       '$(MSBuildProjectName)' == 'SharpProof.Specs' Or
@@ -71,8 +70,25 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit3TestAdapter" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Analyzer.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.ArchitectureTest' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.ContractForGenerator.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Contracts.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Effects.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Frontend.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Ir.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Specs.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Worker.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestRepository.cs"
              Link="TestRepository.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.ArchitectureTest' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Specs.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\ProcessRunner.cs"
              Link="ProcessRunner.cs" />
   </ItemGroup>

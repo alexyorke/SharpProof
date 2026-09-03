@@ -18828,3 +18828,10 @@ the stale claim that the rules remain warnings during builds.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1658 | The private probe-artifact model exposes `SyntaxTreeCount`, but it is referenced only at its declaration; remove the unused convenience property. | `SharpProof.Package.Test/FinalCompilationProbeTests.cs:352-394` |
+
+R1500 is applied: shared test-source links now use explicit, measured consumer
+lists (`TestRepository` in ten projects and `ProcessRunner` in three), and the
+unused Fuzz test IR-alias link is removed. `SharpProof.Fuzz.Test` passes
+(39/39) and the architecture scheduling gate passes (1/1); the unrelated
+`SharpProof.Attributes.Test` suite remains blocked by pre-existing NUnit
+`Assert.Throws` overload ambiguities.
