@@ -16370,3 +16370,27 @@ focused test passes (2 passed).
 R308 is applied: the Worker schema suites share schema-type rendering and JSON
 wire-property-order assertions; declaration-specific checks remain local. The
 combined schema tests pass (9 passed).
+
+## Second survey, continued: R1357 - repeated intrinsic-member scans
+
+`ContractApiSymbols.TryCreate` calls `FindGenericIntrinsic` once for `Result` and once for `Old`; each helper invokes `contract.GetMembers(name).OfType<IMethodSymbol>()` and filters the returned sequence. The two names and parameter-count rules are distinct, but the contract type is traversed twice during one symbol-initialization pass. A single member enumeration that records the two expected generic intrinsics and detects duplicate/missing matches can preserve the current fail-closed shape checks while removing the repeated Roslyn member lookup and LINQ pipeline.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1357 | **`ContractApiSymbols.TryCreate` scans the contract type separately for `Result` and `Old`.** One categorized member pass can retain the distinct name/arity/parameter-count checks and duplicate detection while removing the second `GetMembers`/filter pipeline. | `SharpProof.Contracts/ContractApiSymbols.cs:25-32,60-70` |
+
+## Second survey, continued: R1358 - repeated compilation-reference activation harness
+
+`AdvisoryActivationTests` repeats the same positive compilation-reference test envelope three times: create an external compilation, create a caller with its metadata reference and `SP0027`, allocate `RecordingSessionFactory`, run `AnalyzeAsync`, assert one session, and assert the diagnostic ID. The external source and caller source intentionally differ for nested-parameter, method-clause, and accessor contracts; a helper accepting those source strings and the expected assertion policy can own only the invariant setup and result plumbing, preserving each semantic fixture and the first test's additional `AD0001` check.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1358 | **Three positive compilation-reference activation tests duplicate the external/caller compilation and analyzer assertion envelope.** A source-parameterized helper can centralize the invariant harness while retaining the distinct contract shapes and diagnostic checks. | `SharpProof.Analyzer.Test/AdvisoryActivationTests.cs:181-225,228-266,268-307` |
+
+## Second survey, continued: R1359 - single-consumer event accessor materialization
+
+`AnalyzerSyntaxHelpersTests` materializes `eventAccessors` with `Where(...).ToArray()` and then consumes that array exactly once in the immediately following `foreach`; the broader `accessors` array is correctly retained because later property and indexer projections enumerate it again. Keeping the event subset deferred removes a temporary array and one copy without changing the source-tree traversal or assertions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1359 | **`AnalyzerSyntaxHelpersTests` eagerly copies the event-accessor subset for one enumeration.** Remove that one-shot `ToArray()` while retaining the shared `accessors` snapshot needed by the later projections. | `SharpProof.Analyzer.Test/AnalyzerSyntaxHelpersTests.cs:34-37,65-70` |
