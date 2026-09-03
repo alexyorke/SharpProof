@@ -14522,6 +14522,12 @@ enumerating the sorted claim rows.
 |---|---|---|
 | R1207 | **`WorkerProtocolJson.ValidateClaimMembership` traverses one sorted claim array three times.** The `expected` rows are separately mapped for dense ordinals and callable claim IDs, then passed through `HasVerifierCompatibleClaimOrder`, which walks the same rows again. A single projection can retain the ordinal, membership, and claim-kind checks while preserving their separate `Validator.Check` results and sort order. | `SharpProof.Worker.Protocol/ProtocolJson.cs:563-580` |
 
+### Status (part five hundred twenty-nine)
+
+R1207 is applied: sorted claim rows now validate dense ordinals, membership,
+and verifier ordering in one pass while retaining independent diagnostics.
+Focused ProtocolJson tests pass (108/108).
+
 ## Second survey, part five hundred thirty: R1208 - count-row selectors are repeatedly invoked
 
 `CountsMatch` validates each untrusted summary count row through a compact
