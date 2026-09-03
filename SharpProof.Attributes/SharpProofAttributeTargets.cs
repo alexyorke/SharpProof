@@ -7,6 +7,10 @@ internal static class SharpProofAttributeTargets
         AttributeTargets.Method |
         AttributeTargets.Property;
 
+    internal const AttributeTargets ParameterOrReturn =
+        AttributeTargets.Parameter |
+        AttributeTargets.ReturnValue;
+
     internal const AttributeTargets Declaration =
         AttributeTargets.Assembly |
         AttributeTargets.Class |

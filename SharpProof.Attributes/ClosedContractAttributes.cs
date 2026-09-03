@@ -2,7 +2,7 @@ namespace SharpProof.Attributes;
 
 /// <summary>Declares that a parameter or return value is non-null.</summary>
 [AttributeUsage(
-    AttributeTargets.Parameter | AttributeTargets.ReturnValue,
+    SharpProofAttributeTargets.ParameterOrReturn,
     Inherited = false)]
 public sealed class NotNullAttribute : Attribute
 {
@@ -14,7 +14,7 @@ public sealed class NotNullAttribute : Attribute
 
 /// <summary>Declares that a parameter or return value is greater than zero.</summary>
 [AttributeUsage(
-    AttributeTargets.Parameter | AttributeTargets.ReturnValue,
+    SharpProofAttributeTargets.ParameterOrReturn,
     Inherited = false)]
 public sealed class PositiveAttribute : Attribute
 {
@@ -26,7 +26,7 @@ public sealed class PositiveAttribute : Attribute
 
 /// <summary>Declares an inclusive integral range for a parameter or return value.</summary>
 [AttributeUsage(
-    AttributeTargets.Parameter | AttributeTargets.ReturnValue,
+    SharpProofAttributeTargets.ParameterOrReturn,
     Inherited = false)]
 public sealed class InRangeAttribute : Attribute
 {
