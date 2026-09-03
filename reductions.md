@@ -14769,6 +14769,12 @@ tests pass (44 passed).
 |---|---|---|
 | R1223 | **`GetListPatternCalls` allocates a `params long?[]` for every implicit list-pattern member.** Its index and slice paths pass one or two known values into the variadic helper, which allocates an array before the dictionary builder performs the actual mapping. One- and two-value overloads retain the same argument semantics without the temporary array. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1484-1521,1550-1566` |
 
+### Status (part five hundred forty-five)
+
+R1223 is applied: list-pattern implicit argument projection now accepts fixed
+one- or two-value inputs, removing the per-member params array. Requires-call-site
+discovery tests pass (44 passed).
+
 ## Second survey, part five hundred forty-six: R1224 - acceptance evidence requirements are restated outside their catalog
 
 `eng/acceptance/preview-evidence.v1.json` declares the ordered `requiredEvidence` vocabulary, but `eng/acceptance/Verify.ps1` converts the parsed property back to a comma-separated string and compares it with a second hard-coded six-item list. The assertion confirms today's values but does not make the JSON the sole authority: adding, removing, or reordering a requirement requires a synchronized edit in the verifier, and changing only the verifier's literal can make the check validate a policy different from the catalog. Keep the ordered comparison if it is intentional, but derive the expected value from the same contract or validate the list's shape without duplicating its contents.
