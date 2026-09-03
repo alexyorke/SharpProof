@@ -62,6 +62,11 @@ public sealed class WorkerMsBuildIntegrationTests
         "SharpProof.targets",
         "SharpProof.Verifier.targets"
     ];
+    private static readonly string[] s_runtimeClosureProperties = [
+        "SharpProofToolsDirectory",
+        "SharpProofWorkerPath",
+        "SharpProofLauncherPath"
+    ];
 
     [Test]
     public void CanonicalContainerIsMandatoryForTheVerifier()
@@ -146,9 +151,7 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(File.Exists(project.ResultPath), Is.False);
     }
 
-    [TestCase("SharpProofToolsDirectory")]
-    [TestCase("SharpProofWorkerPath")]
-    [TestCase("SharpProofLauncherPath")]
+    [TestCaseSource(nameof(s_runtimeClosureProperties))]
     public async Task RuntimeClosureOverridesAreRejected(string property)
     {
         RequireContainerWorker();
@@ -170,9 +173,7 @@ public sealed class WorkerMsBuildIntegrationTests
         Assert.That(File.Exists(project.ResultPath), Is.False);
     }
 
-    [TestCase("SharpProofToolsDirectory")]
-    [TestCase("SharpProofWorkerPath")]
-    [TestCase("SharpProofLauncherPath")]
+    [TestCaseSource(nameof(s_runtimeClosureProperties))]
     public async Task ProjectBodyRuntimeClosureOverridesAreRejectedBeforePublication(
         string property)
     {

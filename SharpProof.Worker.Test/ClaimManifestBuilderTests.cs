@@ -20,10 +20,6 @@ public sealed class ClaimManifestBuilderTests
         WorkerClaimEvidence.CompanionClause,
         WorkerClaimEvidence.ReturnAttribute
     ];
-    private static readonly WorkerAssumptionKind[] UserAndTrusted = [
-        WorkerAssumptionKind.UserAssume,
-        WorkerAssumptionKind.TrustedBoundary
-    ];
 
     [Test]
     public void EffectWireMappingsAreNamedAndExhaustive()
@@ -1171,7 +1167,7 @@ public sealed class ClaimManifestBuilderTests
 
         Assert.That(
             first.Entry.Assumptions.Select(static value => value.Kind),
-            Is.EqualTo(UserAndTrusted));
+            Is.EqualTo(WorkerTestData.UserAndTrustedAssumptions));
         Assert.That(
             first.Entry.Assumptions.Select(static value => value.Id),
             Is.EqualTo(second.Entry.Assumptions.Select(static value => value.Id)));

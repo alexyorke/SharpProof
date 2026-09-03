@@ -20,10 +20,6 @@ public sealed class ProtocolJsonTests
     private static readonly string[] s_requestProperties = [
         "protocolVersion", "compilerManifest", "budgets", "cache", "verifyPolicy", "assumptionPolicy"
     ];
-    private static readonly WorkerAssumptionKind[] s_assumptionKinds = [
-        WorkerAssumptionKind.UserAssume,
-        WorkerAssumptionKind.TrustedBoundary
-    ];
 
     private static IEnumerable<TestCaseData> ProtocolScalingCases()
     {
@@ -368,7 +364,7 @@ public sealed class ProtocolJsonTests
             Assert.That(
                 roundTrip.Manifest.Callables[0].Assumptions
                     .Select(static assumption => assumption.Kind),
-                Is.EqualTo(s_assumptionKinds));
+                Is.EqualTo(WorkerTestData.UserAndTrustedAssumptions));
             Assert.That(roundTrip.Compilation.SyntaxTrees, Has.Length.EqualTo(1));
             Assert.That(
                 roundTrip.Compilation.SyntaxTrees[0].Sha256,

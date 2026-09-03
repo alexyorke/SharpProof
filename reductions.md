@@ -18914,3 +18914,17 @@ protocol schema tests now use one reflection-based constants/enums validator,
 with visibility, optional-constants, and protocol wire-name checks supplied by
 the callers. Their schema-specific property/default validators remain separate
 where the generated models differ. The combined schema-model tests pass (9/9).
+
+R1661 is applied: package-layout and worker allocation replay tests now share
+the immutable `AllocationWitnessKinds.Managed` wire vocabulary through the
+explicit two-project test-source link. The worker replay test and packaged
+replay test pass (1/1 each).
+
+R1662 is applied: claim-manifest and protocol JSON tests now share the immutable
+`WorkerTestData.UserAndTrustedAssumptions` ordering fixture instead of carrying
+parallel arrays. The affected manifest and protocol tests pass (1/1 each).
+
+R1663 is applied: the two runtime-closure rejection tests now consume one
+`s_runtimeClosureProperties` test-case source for the three override names,
+while retaining their distinct build-path assertions. The affected cases pass
+(6/6 and 3/3).

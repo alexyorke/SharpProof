@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Reflection;
 using System.Reflection.Metadata;
@@ -54,10 +55,8 @@ public sealed class PackageLayoutSmokeTests
         "ManagedObjectAllocation"
     ];
 
-    private static readonly string[] ExpectedAllocationReplayWitnessKinds = [
-        "managed-allocation",
-        "managed-array-allocation"
-    ];
+    private static readonly ImmutableArray<string>
+        ExpectedAllocationReplayWitnessKinds = AllocationWitnessKinds.Managed;
 
     private static readonly string[] ExpectedCollectorEntryFileNames = [
         "SharpProof.CompilerCollector.dll"

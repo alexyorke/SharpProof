@@ -109,6 +109,12 @@
              Link="TestCompilation.cs" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Worker.Test'">
+    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\AllocationWitnessKinds.cs"
+             Link="AllocationWitnessKinds.cs" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(IsRoslynAnalyzer)' == 'true'">
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers">
       <PrivateAssets>all</PrivateAssets>

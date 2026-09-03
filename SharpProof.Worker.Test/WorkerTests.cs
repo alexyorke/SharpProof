@@ -88,10 +88,8 @@ public sealed class WorkerTests
         "netstandard.dll"
     ];
 
-    private static readonly string[] ReplayedAllocationWitnessKinds = [
-        "managed-allocation",
-        "managed-array-allocation"
-    ];
+    private static readonly ImmutableArray<string>
+        ReplayedAllocationWitnessKinds = AllocationWitnessKinds.Managed;
 
     private static bool TryCreateFileSymbolicLink(string link, string target)
     {
