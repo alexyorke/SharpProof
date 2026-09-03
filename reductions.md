@@ -9345,3 +9345,11 @@ folded into R749 because the cost stopped being hypothetical this week: the
 repository made a change that reduced duplication by 23 lines and increased it by
 2 in the one place the mechanism does not reach, and it will do so again for the
 next default.
+
+## Second survey, part one hundred ninety: R966 - duplicated frontend abstention validation
+
+| R966 | **`FrontendSubsetClassification` and `FrontendProgramAbstention` independently validate the same public `FrontendAbstention` enum.** Both constructors call `Enum.IsDefined(typeof(FrontendAbstention), value)` and throw the same `ArgumentOutOfRangeException` shape. Both then separately enforce the sentinel rule around `FrontendAbstention.None`: a classification permits `None` only for `Exact`, while a program abstention rejects `None` unconditionally. A private validator can own the shared enum admission and expose the two explicit `None` policies at the call sites, removing duplicated boundary code without collapsing the semantically different classification and per-operation-abstention contracts. The `FrontendSubsetClassification` and `FrontendProgramAbstention` constructors remain public validation boundaries, so the reduction must retain their current exception ordering and messages. | `SharpProof.Frontend/FrontendSubset.cs:31-58,106-128`; public call paths `SharpProof.Frontend/OperationSubsetClassifier.cs:20-41` and `SharpProof.Frontend/RoslynProgramLowerer.cs:683-687` |
+
+### Status (part one hundred ninety)
+
+R966 is `deferred`: the common enum guard is straightforward, but the helper should be introduced with constructor tests that pin the current invalid-value and `None`-sentinel exception ordering.
