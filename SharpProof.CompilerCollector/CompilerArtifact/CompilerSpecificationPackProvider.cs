@@ -16,6 +16,8 @@ internal sealed class CompilerSpecificationPackProvider
         LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly IrFactory _factory;
     private readonly ImmutableDictionary<string, MethodDefinition> _methods;
+    private readonly Dictionary<IMethodSymbol, MethodDefinition?> _resolved =
+        new(SymbolEqualityComparer.Default);
 
     internal CompilerSpecificationPackProvider(
         IrFactory factory,
@@ -220,12 +222,18 @@ internal sealed class CompilerSpecificationPackProvider
     {
         method = SemanticClaimIdentity.NormalizeCandidate(method)
             .OriginalDefinition;
+        if (_resolved.TryGetValue(method, out var cached))
+        {
+            definition = cached!;
+            return cached != null;
+        }
         var identity = method.GetDocumentationCommentId();
         if (identity == null ||
             !_methods.TryGetValue(identity, out var resolved) ||
             resolved == null)
         {
             definition = null!;
+            _resolved[method] = null;
             return false;
         }
 
@@ -240,6 +248,7 @@ internal sealed class CompilerSpecificationPackProvider
             !MatchesType(method.ReturnType, resolved.ResultType))
         {
             definition = null!;
+            _resolved[method] = null;
             return false;
         }
 
@@ -250,11 +259,13 @@ internal sealed class CompilerSpecificationPackProvider
                     resolved.ParameterTypes[index]))
             {
                 definition = null!;
+                _resolved[method] = null;
                 return false;
             }
         }
 
         definition = resolved;
+        _resolved[method] = definition;
         return true;
     }
 

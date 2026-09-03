@@ -19203,7 +19203,7 @@ its own method-shape validation, callback-specific results, cancellation, and
 image ownership. The focused fuzz comparison tests pass (7/7).
 
 R544 is applied: finite-domain "all assignments" and "some satisfying
-assignment” checks now share one short-circuiting assignment search, with
+assignment" checks now share one short-circuiting assignment search, with
 separate leaf predicates and polarity. Boolean/integer ordering, cancellation,
 unsupported-type fallback, and environment cleanup remain unchanged. The
 focused finite-domain tests pass (2/2).
@@ -19215,3 +19215,8 @@ The fuzz oracle has two private method-name helpers with the same formatting mec
 | ID | Finding | Evidence |
 |---|---|---|
 | R1681 | The fuzz oracle duplicates invariant indexed-name formatting in `MethodName` and `SemanticEdgeMethodName`; parameterize the prefix while retaining the separate ordinary and semantic-edge names. | `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1553,1586,1597-1606`; related R633 and R696 |
+
+R639 is applied: specification-pack method resolution now caches normalized
+method identities, including misses, so admission and later summary building
+reuse one validated definition. Pack overlap, type/shape checks, and fail-closed
+build behavior remain unchanged. The focused provider tests pass (7/7).
