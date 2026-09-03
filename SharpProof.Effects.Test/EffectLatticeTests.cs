@@ -6,7 +6,7 @@ public sealed class EffectLatticeTests
     [Test]
     public void JoinSatisfiesFiniteLatticeLaws()
     {
-        var samples = CreateSamples();
+        var samples = Samples;
         var domain = EffectSummaryDomain.Instance;
 
         foreach (var value in samples)
@@ -33,7 +33,7 @@ public sealed class EffectLatticeTests
     public void ProjectionIsMonotoneUnderPublicUnknownOrder()
     {
         var domain = EffectSummaryDomain.Instance;
-        var samples = CreateSamples();
+        var samples = Samples;
         var closure = samples
             .Concat(
                 from left in samples
@@ -145,6 +145,8 @@ public sealed class EffectLatticeTests
             EffectSummary.Top
         ];
     }
+
+    private static ImmutableArray<EffectSummary> Samples { get; } = CreateSamples();
 
     private static EffectSummary Summary(
         EffectRegionSet reads = default,

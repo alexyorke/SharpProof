@@ -16335,3 +16335,6 @@ The focused test passes (2 passed).
 R1350 is applied: runtime dependency assemblies are marked when enqueued, so
 converging references never add duplicate queue entries. The focused test passes
 (1 passed).
+
+R1351 is applied: the immutable lattice-law sample set is initialized once and
+shared by both tests. The focused test passes (3 passed).
