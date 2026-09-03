@@ -21152,3 +21152,9 @@ CFG consumers, while their block processing remains separate. The full
 | ID | Finding | Evidence |
 |---|---|---|
 | R2001 | pack revalidates every package payload and symbol pair immediately after New-SharpProofReleaseEvidence validated the same packages. | scripts/Invoke-SharpProofContainer.ps1:560-568; scripts/New-SharpProofReleaseEvidence.ps1:420-462; scripts/Test-SharpProofReleaseArtifacts.ps1:133-162 |
+
+R2000 is applied: the publish wrapper now retains its explicit tag-to-release
+version check and delegates the complete bundle validation to the publisher's
+existing `Get-ValidatedRelease` path, removing the duplicate preflight process.
+Both release scripts parse cleanly, and the focused release-version authority
+tests pass 7/7 with zero warnings or errors.

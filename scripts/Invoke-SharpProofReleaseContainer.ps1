@@ -241,10 +241,10 @@ switch ($Mode) {
         $source = Require-Environment 'NUGET_SOURCE'
         $apiKey = Require-Environment 'NUGET_API_KEY'
         $packageRoot = Resolve-RepositoryPath $PackageSource
-        & (Join-Path $repositoryRoot 'scripts/Test-SharpProofReleaseArtifacts.ps1') `
-            -PackageSource $packageRoot -ExpectedTag $tag
-        if ($LASTEXITCODE -ne 0) {
-            throw 'Release artifact validation failed before publication.'
+        $releaseVersion = Get-SharpProofReleaseVersion `
+            -RepositoryRoot $repositoryRoot
+        if ($tag -cne "v$releaseVersion") {
+            throw "Release tag '$tag' does not match package version '$releaseVersion'."
         }
         $arguments = @{
             PackageSource = $packageRoot
