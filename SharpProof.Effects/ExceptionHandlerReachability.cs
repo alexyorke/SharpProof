@@ -1532,6 +1532,8 @@ internal sealed class ExceptionHandlerReachability(
             var reachableClauses = new List<ICaseClauseOperation>();
             var bodyReachable = false;
             var stopsSelection = false;
+            var completionFacts =
+                new Dictionary<ICaseClauseOperation, ClauseCompletionFacts>();
             foreach (var clause in @case.Clauses)
             {
                 if (clause is IDefaultCaseClauseOperation)
@@ -1566,9 +1568,10 @@ internal sealed class ExceptionHandlerReachability(
                 if (clauseSelection != SwitchSelection.Never)
                 {
                     reachableClauses.Add(clause);
-                    bodyReachable |= CanCaseClauseReachBody(
-                        clause,
-                        clauseSelection);
+                    bodyReachable |= GetCaseClauseCompletionFacts(
+                            clause,
+                            completionFacts)
+                        .CanReachBody;
                 }
                 stopsSelection |= clauseSelection == SwitchSelection.Always ||
                     clause is IPatternCaseClauseOperation barrierClause &&
@@ -1576,11 +1579,15 @@ internal sealed class ExceptionHandlerReachability(
                         barrierClause.Pattern,
                         @switch.Value.Type,
                         inputDefinitelyNonNull) &&
-                    !canCompleteNormally(barrierClause.Pattern) ||
+                    !GetCaseClauseCompletionFacts(
+                        barrierClause,
+                        completionFacts).PatternCompletes ||
                     patternSelection == SwitchSelection.Always &&
                     clause is IPatternCaseClauseOperation
                     { Guard: not null } guarded &&
-                    !canCompleteNormally(guarded.Guard);
+                    !GetCaseClauseCompletionFacts(
+                        guarded,
+                        completionFacts).GuardCompletes;
                 if (stopsSelection)
                 {
                     break;
@@ -1741,31 +1748,58 @@ internal sealed class ExceptionHandlerReachability(
         return [sequenceEntry];
     }
 
-    private bool CanCaseClauseReachBody(
+    private ClauseCompletionFacts GetCaseClauseCompletionFacts(
         ICaseClauseOperation clause,
-        SwitchSelection selection)
+        Dictionary<ICaseClauseOperation, ClauseCompletionFacts> cache)
     {
-        if (selection == SwitchSelection.Never)
+        if (cache.TryGetValue(clause, out var cached))
         {
-            return false;
+            return cached;
         }
+
+        ClauseCompletionFacts result;
         if (clause is not IPatternCaseClauseOperation pattern)
         {
-            return true;
+            result = new(
+                PatternCompletes: true,
+                GuardCompletes: true,
+                CanReachBody: true);
         }
-        if (!canCompleteNormally(pattern.Pattern))
+        else if (pattern.Guard == null)
         {
-            return false;
+            var patternCompletes = canCompleteNormally(pattern.Pattern);
+            result = new(
+                patternCompletes,
+                GuardCompletes: true,
+                CanReachBody: patternCompletes);
         }
-        if (pattern.Guard == null)
+        else if (pattern.Guard.ConstantValue is
+                 { HasValue: true, Value: bool guard })
         {
-            return true;
+            var patternCompletes = canCompleteNormally(pattern.Pattern);
+            result = new(
+                patternCompletes,
+                GuardCompletes: true,
+                CanReachBody: patternCompletes && guard);
         }
-        return pattern.Guard.ConstantValue is
-        { HasValue: true, Value: bool guard }
-                ? guard
-                : canCompleteNormally(pattern.Guard);
+        else
+        {
+            var patternCompletes = canCompleteNormally(pattern.Pattern);
+            var guardCompletes = canCompleteNormally(pattern.Guard);
+            result = new(
+                patternCompletes,
+                guardCompletes,
+                CanReachBody: patternCompletes && guardCompletes);
+        }
+
+        cache.Add(clause, result);
+        return result;
     }
+
+    private readonly record struct ClauseCompletionFacts(
+        bool PatternCompletes,
+        bool GuardCompletes,
+        bool CanReachBody);
 
     private static SwitchSelection GetPatternSelection(
         IPatternOperation pattern,
