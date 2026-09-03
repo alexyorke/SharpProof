@@ -8357,8 +8357,9 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred sixteen)
 
-R906 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R906 is `applied`: callable-ID resolution now lets its existing normalization
+loop handle cached IDs, removing the redundant pre-loop dictionary probe.
+ClaimManifestBuilderTests passed (50 tests).
 
 ## Second survey, part four hundred seventeen: R907 - per-method compiler-reference rescans
 
@@ -9292,3 +9293,55 @@ ledger is duplication and shadowed authority, not hygiene.
 ### Status (part one hundred eighty-eight)
 
 R964 is `deferred`: the reduction is small but sits on analyzer aggregation paths and can be implemented without weakening the existing invalid-value boundary, provided the specialized rank code retains an explicit default failure.
+
+## Second survey, part one hundred eighty-nine: R731 is applied, and R965 - a cost it just demonstrated
+
+A diff of all 15 tracked `.props`/`.targets` files against each other, which found
+that one earlier finding has been fixed and another has quietly grown as a result.
+
+### Status update: R731 is applied, exactly as proposed
+
+R731 recorded that `IsPackable` was declared 24 times, decided nothing, and
+defaulted the wrong way - 23 non-test projects hand-writing an opt-out while 15
+non-test, non-shipping projects were silently packable. **That is now fixed.**
+`Directory.Build.props:17` sets
+`<IsPackable Condition="'$(IsPackable)' == ''">false</IsPackable>`, flipping the
+default; the 23 individual `<IsPackable>false</IsPackable>` lines are **gone from
+every csproj**; and exactly **three** projects now declare `IsPackable=true` -
+`SharpProof.Attributes`, `SharpProof.Package`, and `SharpProof.Verifier` -
+**precisely the three listed in `scripts/package-projects.json`**. The property now
+agrees with the manifest instead of shadowing it. Move R731 to applied.
+
+**A correction to my own measurement while verifying this:** a walk-up script
+written for this part reported 25 projects still silently packable. That is wrong.
+It stopped ascending at the first path component and never examined the repository
+root, so it missed the new conditional default. The correct figure is **zero**.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R965 | **The two fixture trees do not inherit the repository defaults, so every future root-level default must be written three times - and applying R731 just demonstrated it.** `samples/Directory.Build.props` and `eng/pilots/Directory.Build.props` each shadow the root `Directory.Build.props` rather than importing it, which MSBuild's first-file-wins discovery makes unavoidable unless they explicitly import the parent. R749 measured **17 identical lines** between the two fixture files. After R731 was applied that count is **18**: the fix added `<IsPackable>false</IsPackable>` to the root *and* to both fixture files, because neither would otherwise receive it. So a change made to remove 23 duplicated lines added 2 more in the one place the mechanism cannot reach. This is a standing multiplier, not a one-off: `TargetFramework`, `LangVersion`, `Nullable`, `ImplicitUsings`, `Deterministic`, `TreatWarningsAsErrors`, `EnableNETAnalyzers`, `NuGetAudit`, `OutputType` and now `IsPackable` are each written three times, and the next root default will be written three times too - or, worse, twice, and silently not apply to the fixtures. The fix is one line in each fixture file: `<Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />`, after which each keeps only what it genuinely overrides. That also resolves the half of R749 about the two files' 18 shared lines, and makes the R961 global-using divergence the only remaining per-project build-mechanism split. | `Directory.Build.props:17`; `samples/Directory.Build.props:1-12`; `eng/pilots/Directory.Build.props:1-13`; `scripts/package-projects.json`; R731, R749 |
+
+### Checked and not proposed (part one hundred eighty-nine)
+
+- **MSBuild duplication is confined to that one pair.** Across all 15 tracked
+  `.props` and `.targets` files - 903 lines in total - only **eight** four-line
+  blocks appear in two or more files, and **seven of the eight are the
+  samples/pilots pair**. The eighth is a shared `<Analyzer>` item shape between
+  `SharpProof.Package/buildTransitive/SharpProof.targets` and
+  `eng/self-application/SharpProof.SelfApplication.props`, which is R752's subject.
+  There is no other duplication between build files; the two large ones,
+  `SharpProof.Verifier.targets` (282 lines) and `Directory.Build.props` (149),
+  share nothing with anything.
+- **R750 is unchanged and all four of its premises re-verified**: `eng/pilots`
+  still sets `NuGetAudit=false` and `ManagePackageVersionsCentrally=false`, still
+  has **zero** `packages.lock.json` files, and none of its five third-party
+  packages appears in `eng/release/third-party-components.json`. The R731 fix
+  touched packability only; the supply-chain exemptions are untouched.
+
+### Status (part one hundred eighty-nine)
+
+R965 is `pending` and is two lines of MSBuild. It is filed now rather than
+folded into R749 because the cost stopped being hypothetical this week: the
+repository made a change that reduced duplication by 23 lines and increased it by
+2 in the one place the mechanism does not reach, and it will do so again for the
+next default.

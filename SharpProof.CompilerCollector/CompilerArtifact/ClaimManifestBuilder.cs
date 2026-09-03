@@ -607,11 +607,6 @@ internal sealed partial class ClaimManifestBuilder(
         void Resolve(IMethodSymbol method)
         {
             method = ContractClauseInventoryBuilder.NormalizeCallable(method);
-            if (ids.ContainsKey(method))
-            {
-                return;
-            }
-
             var unresolved = new Stack<IMethodSymbol>();
             string parentId;
             while (true)
