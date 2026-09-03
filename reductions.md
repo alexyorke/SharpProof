@@ -20955,3 +20955,8 @@ iterator for nullable conditional branches, while preserving the distinct
 fact-aware and ordinary traversal policies. The focused
 `RequiresCallSiteDiscoveryTests` suite passes 44/44 with zero warnings or
 errors.
+
+R1780's nineteen `AnalyzerModeAndEffectTests` candidates are now using the
+default diagnostic catalog instead of suppressing every unasserted ID. The
+focused class passes 104/104 with zero warnings or errors; intentionally
+multi-ID suppression fixtures remain unchanged.

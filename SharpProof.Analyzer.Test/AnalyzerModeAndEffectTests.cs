@@ -1187,7 +1187,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0046"],
+            [],
             new SharpProofAnalyzer(factory));
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0046");
@@ -1235,7 +1235,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0002"],
+            [],
             new SharpProofAnalyzer(factory),
             allowCompilationErrors: true);
 
@@ -1356,7 +1356,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0002"],
+            [],
             new SharpProofAnalyzer(factory));
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
@@ -1377,7 +1377,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0024"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
     }
@@ -1460,7 +1460,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0002"],
+            [],
             new SharpProofAnalyzer(factory));
 
         using (Assert.EnterMultipleScope())
@@ -1497,7 +1497,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0002"],
+            [],
             new SharpProofAnalyzer(factory));
 
         using (Assert.EnterMultipleScope())
@@ -1531,7 +1531,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0002"],
+            [],
             new SharpProofAnalyzer(factory));
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0002");
@@ -1592,7 +1592,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "contracts",
-            ["SP0027"],
+            [],
             new SharpProofAnalyzer(factory));
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
@@ -1657,7 +1657,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "contracts",
-            ["SP0027"],
+            [],
             new SharpProofAnalyzer(factory));
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
@@ -1719,7 +1719,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "contracts",
-            ["SP0027"],
+            [],
             new SharpProofAnalyzer(factory));
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
@@ -1788,7 +1788,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "contracts",
-            ["SP0027"],
+            [],
             new SharpProofAnalyzer(factory));
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
@@ -1899,7 +1899,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0045"],
+            [],
             new SharpProofAnalyzer(factory));
 
         using (Assert.EnterMultipleScope())
@@ -1965,7 +1965,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0016"],
+            [],
             new SharpProofAnalyzer(factory));
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0016", 3);
@@ -2187,7 +2187,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0047"],
+            [],
             new SharpProofAnalyzer(factory));
 
         using (Assert.EnterMultipleScope())
@@ -2272,7 +2272,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0047"],
+            [],
             new SharpProofAnalyzer(factory),
             allowCompilationErrors: true);
 
@@ -2298,7 +2298,7 @@ public sealed class AnalyzerModeAndEffectTests
                 }
                 """,
                 "effects",
-                ["SP0047"],
+                [],
                 new SharpProofAnalyzer(factory));
             return (diagnostics, factory);
         }));
@@ -2431,7 +2431,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0046"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0046", 8);
     }
@@ -2529,7 +2529,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0045"],
+            [],
             new SharpProofAnalyzer(factory));
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0045", 4);
@@ -2691,7 +2691,7 @@ public sealed class AnalyzerModeAndEffectTests
             }
             """,
             "effects",
-            ["SP0046"],
+            [],
             new SharpProofAnalyzer(factory));
 
         var unsafeMethods = new[]
