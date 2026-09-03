@@ -15801,6 +15801,12 @@ Emit-Class first walks every property to validate its identifier and type and po
 |---|---|---|
 | R1316 | **Generate-DeclarativeModels.Emit-Class traverses each property twice and repeats name/type extraction. Cache the normalized property descriptors or emit from the prepared values instead of re-reading the raw schema objects.** | scripts/Generate-DeclarativeModels.ps1:107-112,142-158 |
 
+### Status (continued)
+
+R1316 is applied: declarative class properties are normalized once and emitted
+from cached descriptors, eliminating the second raw-schema traversal. The
+declarative generator verifies deterministic output.
+
 ## Second survey, continued: R1317 - declarative class assignments linearly re-find parameters
 
 Emit-Class already traverses all constructor parameters to validate their names and types and build parameterSources. Every assignment then runs Where-Object over the complete raw parameter array to check that its parameter exists. A parameter-name HashSet or dictionary built during the first pass can preserve the unknown-parameter diagnostic without repeating a pipeline scan for each assignment.
