@@ -10505,3 +10505,15 @@ R1002 is deferred: resolve the intended native-payload coverage before consolida
 ### Status (part two hundred thirty-four)
 
 R1003 is deferred: first define the approved repository-rooted temporary-directory API; do not replace the fixture with the current system-temp-only helper until the receipt script's containment contract is preserved.
+
+## Second survey, part two hundred thirty-five: R1004 - duplicate compiler-artifact generator run in acceptance
+
+The acceptance verifier first runs `Generate-CompilerArtifactModel.ps1 -Verify` against the checked-in compiler-artifact outputs and then immediately invokes `Test-CompilerArtifactModelGenerator.ps1`. The latter's first `canonical` case reads the same authoritative schema and invokes the generator again, this time writing four temporary generated files, but only checks the child exit code; it does not inspect those temporary outputs. The remaining malformed-schema cases provide the script's distinct value by exercising rejection messages, so the whole test script should not be removed. A mode or parameter that skips the canonical regeneration when the acceptance verifier has already authenticated the checked-in outputs, while retaining it for standalone execution, would remove one full schema parse/emission pass from the acceptance path without dropping malformed-input coverage.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1004 | **Acceptance regenerates the compiler-artifact model twice before testing malformed schemas.** `Verify.ps1` runs the generator in `-Verify` mode and then calls the generator-test script; that script's canonical case invokes the same generator on the unchanged canonical schema and writes four temporary outputs whose existence or bytes are never asserted. Keep the malformed `unknown-property`, `unknown-role`, `unknown-slot-role`, `duplicate-method`, and `missing-argument` cases, but make the canonical pass optional or consume the preceding verification result so acceptance does not pay for a duplicate full generation. | `eng/acceptance/Verify.ps1:249-263`; `scripts/Test-CompilerArtifactModelGenerator.ps1:43-58,82-87`; generator output verification `scripts/Generate-CompilerArtifactModel.ps1:1510-1527` | |
+
+### Status (part two hundred thirty-five)
+
+R1004 is deferred: preserve the script's standalone canonical smoke test, and only bypass it when an explicit acceptance caller has already verified the checked-in compiler-artifact outputs.
