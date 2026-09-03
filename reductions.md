@@ -20918,3 +20918,8 @@ R1985 is applied: `SharpProofAnalyzerEngine` now shares a lazy
 used by both advisory scans. Their distinct tree analyses remain unchanged;
 the full `SharpProof.Analyzer.Test` project passes 476/476 tests with zero
 warnings or errors.
+
+R1987 is applied: `RunVerifier` now routes structured warning/error records
+through one logging helper that owns the shared MSBuild location/message
+projection, while preserving severity and `HasStructuredError`. The focused
+verifier logging tests pass 14/14 with zero build warnings or errors.

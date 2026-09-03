@@ -1150,34 +1150,38 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                 continue;
             }
 
-            if (diagnostic.Severity == "error")
-            {
-                HasStructuredError = true;
-                Log.LogError(
-                    string.Empty,
-                    diagnostic.Code,
-                    string.Empty,
-                    diagnostic.File,
-                    diagnostic.Line,
-                    diagnostic.Column,
-                    0,
-                    0,
-                    diagnostic.Message);
-            }
-            else
-            {
-                Log.LogWarning(
-                    string.Empty,
-                    diagnostic.Code,
-                    string.Empty,
-                    diagnostic.File,
-                    diagnostic.Line,
-                    diagnostic.Column,
-                    0,
-                    0,
-                    diagnostic.Message);
-            }
+            LogStructuredDiagnostic(diagnostic);
         }
+    }
+
+    private void LogStructuredDiagnostic(VerifierDiagnostic diagnostic)
+    {
+        if (diagnostic.Severity == "error")
+        {
+            HasStructuredError = true;
+            Log.LogError(
+                string.Empty,
+                diagnostic.Code,
+                string.Empty,
+                diagnostic.File,
+                diagnostic.Line,
+                diagnostic.Column,
+                0,
+                0,
+                diagnostic.Message);
+            return;
+        }
+
+        Log.LogWarning(
+            string.Empty,
+            diagnostic.Code,
+            string.Empty,
+            diagnostic.File,
+            diagnostic.Line,
+            diagnostic.Column,
+            0,
+            0,
+            diagnostic.Message);
     }
 
     private static bool TryParseLegacyDiagnostic(
