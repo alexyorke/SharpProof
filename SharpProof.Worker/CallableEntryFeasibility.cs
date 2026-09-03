@@ -28,8 +28,6 @@ internal sealed partial record CallableEntryFeasibility
     {
         var evidence = proofCore
             .Where(static label => !string.IsNullOrWhiteSpace(label))
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static label => label, StringComparer.Ordinal)
             .ToImmutableArray();
         return evidence.IsDefaultOrEmpty
             ? Unknown(WorkerClaimReason.MalformedBackendResult)
