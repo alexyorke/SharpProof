@@ -14825,6 +14825,12 @@ argument queries. Meta analyzer tests pass (162 passed).
 |---|---|---|
 | R1227 | **`AnalyzeProperty` invokes `IsAutoProperty` twice for the same property.** The string-field and mutable-static checks perform identical declaration/accessor syntax analysis when both conditions reach their final conjunct. A per-property cached boolean removes the repeated Roslyn traversal without merging the distinct diagnostics. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:676-704,922-934` |
 
+### Status (part five hundred forty-nine)
+
+R1227 is applied: property analysis computes the auto-property shape once and
+reuses it for the independent string-field and mutable-storage diagnostics. Meta
+analyzer tests pass (162 passed).
+
 ## Second survey, part five hundred fifty: R1228 - companion method resolution materializes three method collections
 
 `ContractForSymbolMatcher.ResolveCompanion` first materializes all ordinary methods on the companion type, then materializes a same-name subset, and then materializes a signature-matching subset of that same array. The final decision only needs to know whether any same-name method exists, how many candidates match, and which method is the unique match. One ordered pass over ordinary methods can retain those three pieces of state, preserving the existing `HasUniqueTarget` check and failure distinctions while removing the intermediate `named` and `matches` arrays and the second candidate scan.
