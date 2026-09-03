@@ -600,6 +600,7 @@ internal static partial class AnalyzerFeaturePipeline
         if (!CanReachMemberInitializer(
                 initializer,
                 isStatic,
+                type,
                 context.SemanticModel,
                 operationFacts,
                 context.CancellationToken))
@@ -653,21 +654,11 @@ internal static partial class AnalyzerFeaturePipeline
     private static bool CanReachMemberInitializer(
         EqualsValueClauseSyntax target,
         bool isStatic,
+        INamedTypeSymbol type,
         SemanticModel semanticModel,
         DefiniteOperationFacts operationFacts,
         CancellationToken cancellationToken)
     {
-        var containingType = target.FirstAncestorOrSelf<TypeDeclarationSyntax>();
-        var type = containingType == null
-            ? null
-            : semanticModel.GetDeclaredSymbol(
-                containingType,
-                cancellationToken);
-        if (type == null)
-        {
-            return true;
-        }
-
         foreach (var reference in EffectMethodNodeBuilder
                      .GetMemberInitializerReferences(
                          semanticModel.Compilation,

@@ -18,7 +18,7 @@ internal sealed partial class SharpProofAnalyzerEngine
             sessionFactory, nameof(sessionFactory));
     }
 
-    internal static ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+    internal static ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
         [
             .. GeneratedDiagnosticDescriptors.SupportedDiagnostics,
             .. ContractForDiagnosticDescriptors.SupportedDiagnostics
