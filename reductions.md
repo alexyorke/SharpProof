@@ -18679,3 +18679,8 @@ tests pass: `CompilerArtifactModelSchemaTests` 4/4 and
 R1645 is applied: the property/event accessor discovery cases now share one
 immutable compilation while each test creates its own syntax declaration and
 discovery instance. `RequiresCallSiteDiscoveryTests` pass (44/44).
+
+R1646 is applied: the unsupported effect and contract source fixtures are now
+centralized in `WorkerTestSources`, while manifest-builder and end-to-end worker
+tests retain separate pipelines and assertions. The four affected tests pass
+(2 manifest-builder and 2 worker cases).
