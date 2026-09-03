@@ -2624,10 +2624,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         out long length)
     {
         var value = SwitchExpressionFacts.GetGoverningValue(pattern);
-        if (value is IArrayCreationOperation
-            { DimensionSizes.Length: 1 } array &&
-            array.DimensionSizes[0].ConstantValue is
-            { HasValue: true, Value: int arrayLength })
+        if (ArrayLengthFacts.TryGetConstantLength(value, out var arrayLength))
         {
             length = arrayLength;
             return true;

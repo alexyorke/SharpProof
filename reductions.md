@@ -21101,3 +21101,9 @@ with zero warnings or errors.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1997 | **`ManagedAbstractFlow.TryGetListPatternLength` and `OperationCompletionEvaluator.TryGetGoverningListLength` duplicate the one-dimensional constant-array length projection; share only that fact and retain their distinct property-length policies.** | `SharpProof.Effects/ManagedAbstractFlow.cs:2622-2634`; `SharpProof.Effects/OperationCompletionEvaluator.cs:554-570` |
+
+R1997 is applied: the shared `ArrayLengthFacts.TryGetConstantLength` helper now
+owns the one-dimensional constant-array length projection used by both list
+pattern analyses, while their distinct unwrapping and property-length policies
+remain local. The full `SharpProof.Effects.Test` suite passes 323/323 with zero
+warnings or errors.

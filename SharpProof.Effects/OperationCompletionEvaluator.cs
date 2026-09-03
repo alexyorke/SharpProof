@@ -560,10 +560,7 @@ internal sealed class OperationCompletionEvaluator
         {
             value = DefiniteOperationFacts.UnwrapHarmlessValue(value);
         }
-        if (value is IArrayCreationOperation
-            { DimensionSizes.Length: 1 } arrayCreation &&
-            arrayCreation.DimensionSizes[0].ConstantValue is
-            { HasValue: true, Value: int arrayLength })
+        if (ArrayLengthFacts.TryGetConstantLength(value, out var arrayLength))
         {
             length = arrayLength;
             return true;
