@@ -16,18 +16,10 @@ $OutputPath = Resolve-SharpProofPath $OutputPath (
     Join-Path $repositoryRoot 'SharpProof.Contracts\BoundContractModel.generated.cs')
 $schema = Get-Content -LiteralPath $SchemaPath -Raw | ConvertFrom-Json
 
-function Get-RequiredProperty([object]$Object, [string]$Name, [string]$Context) {
-    $property = $Object.PSObject.Properties[$Name]
-    if ($null -eq $property -or $null -eq $property.Value) {
-        throw "$Context must define '$Name'."
-    }
-    return $property.Value
-}
-
-if ([int](Get-RequiredProperty $schema 'schemaVersion' 'Bound contract model') -ne 1) {
+if ([int](Required $schema 'schemaVersion' 'Bound contract model') -ne 1) {
     throw 'Bound contract model schema version must be 1.'
 }
-if ([string](Get-RequiredProperty $schema 'namespace' 'Bound contract model') -ne
+if ([string](Required $schema 'namespace' 'Bound contract model') -ne
     'SharpProof.Contracts') {
     throw 'Bound contract model namespace must be SharpProof.Contracts.'
 }
@@ -44,9 +36,9 @@ $lines.Add('')
 $lines.Add('namespace SharpProof.Contracts;')
 
 foreach ($enum in @($schema.enums)) {
-    $name = [string](Get-RequiredProperty $enum 'name' 'Bound contract enum')
+    $name = [string](Required $enum 'name' 'Bound contract enum')
     Assert-Identifier $name 'Bound contract enum name'
-    $members = @(Get-RequiredProperty $enum 'members' "enum '$name'")
+    $members = @(Required $enum 'members' "enum '$name'")
     if ($members.Count -eq 0) {
         throw "enum '$name' must define members."
     }
@@ -63,15 +55,15 @@ foreach ($enum in @($schema.enums)) {
 }
 
 foreach ($class in @($schema.classes)) {
-    $name = [string](Get-RequiredProperty $class 'name' 'Bound contract class')
+    $name = [string](Required $class 'name' 'Bound contract class')
     Assert-Identifier $name 'Bound contract class name'
-    $constructor = Get-RequiredProperty $class 'constructor' "class '$name'"
-    $access = [string](Get-RequiredProperty $constructor 'access' "class '$name' constructor")
+    $constructor = Required $class 'constructor' "class '$name'"
+    $access = [string](Required $constructor 'access' "class '$name' constructor")
     if ($access -notin @('internal', 'public')) {
         throw "class '$name' has unsupported constructor access '$access'."
     }
-    $parameters = @(Get-RequiredProperty $constructor 'parameters' "class '$name' constructor")
-    $assignments = @(Get-RequiredProperty $constructor 'assignments' "class '$name' constructor")
+    $parameters = @(Required $constructor 'parameters' "class '$name' constructor")
+    $assignments = @(Required $constructor 'assignments' "class '$name' constructor")
     if ($parameters.Count -ne $assignments.Count) {
         throw "class '$name' constructor assignments must match parameters."
     }
@@ -84,8 +76,8 @@ foreach ($class in @($schema.classes)) {
             [StringComparer]::OrdinalIgnoreCase)
     for ($index = 0; $index -lt $parameters.Count; $index++) {
         $parameter = $parameters[$index]
-        $type = [string](Get-RequiredProperty $parameter 'type' "class '$name' parameter")
-        $parameterName = [string](Get-RequiredProperty $parameter 'name' "class '$name' parameter")
+        $type = [string](Required $parameter 'type' "class '$name' parameter")
+        $parameterName = [string](Required $parameter 'name' "class '$name' parameter")
         Assert-TypeName $type "class '$name' parameter type"
         Assert-Identifier $parameterName "class '$name' parameter name"
         if (-not $parametersByName.TryAdd($parameterName, $parameter)) {
@@ -108,9 +100,9 @@ foreach ($class in @($schema.classes)) {
         $lines.Add("        $propertyName = $parameterName;")
     }
     $lines.Add('    }')
-    foreach ($property in @(Get-RequiredProperty $class 'properties' "class '$name'")) {
-        $propertyName = [string](Get-RequiredProperty $property 'name' "class '$name' property")
-        $type = [string](Get-RequiredProperty $property 'type' "class '$name' property")
+    foreach ($property in @(Required $class 'properties' "class '$name'")) {
+        $propertyName = [string](Required $property 'name' "class '$name' property")
+        $type = [string](Required $property 'type' "class '$name' property")
         Assert-Identifier $propertyName "class '$name' property name"
         Assert-TypeName $type "class '$name' property type"
         $lines.Add("    public $type $propertyName { get; }")
@@ -123,9 +115,9 @@ foreach ($class in @($schema.classes)) {
         @($projectionProperty.Value)
     }
     foreach ($projection in $projections) {
-        $propertyName = [string](Get-RequiredProperty $projection 'name' "class '$name' projection")
-        $type = [string](Get-RequiredProperty $projection 'type' "class '$name' projection")
-        $expression = [string](Get-RequiredProperty $projection 'expression' "class '$name' projection")
+        $propertyName = [string](Required $projection 'name' "class '$name' projection")
+        $type = [string](Required $projection 'type' "class '$name' projection")
+        $expression = [string](Required $projection 'expression' "class '$name' projection")
         Assert-Identifier $propertyName "class '$name' projection name"
         Assert-TypeName $type "class '$name' projection type"
         if ($expression -notmatch '^[A-Za-z_][A-Za-z0-9_ .?=<>|&!()]+$') {

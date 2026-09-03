@@ -19407,3 +19407,93 @@ layout mutations failing).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1701 | `ManagedAbstractFlow.Transfer`'s `IsBottom` early return survived a behavior-preserving mutation probe; prove/document the bottom-preservation invariant or remove the redundant guard. | `SharpProof.Effects/ManagedAbstractFlow.cs:197-215,338-349,1582-1648`; historical mutation probe recorded in `eng/agent-notes/archive/unverified.md:67-99,129-141` |
+
+## Second survey, part six hundred ten: the documentation-content axis measured to exhaustion, and the diagnostic vocabularies confirmed clean
+
+No new ID. R1700 in the previous part is the only defect this axis produced; this
+part records the measurements that bound it, so no later pass repeats them.
+
+### Checked and not proposed (part six hundred ten)
+
+- **Four hundred backticked code symbols across twenty-one maintained documents,
+  and every one resolves.** R321 established the technique on `SEMANTICS.md` (45
+  symbols, all resolving). Extending it: `docs/architecture.md` 39,
+  `docs/coverage-and-limits.md` 38, `docs/public-api.md` 25,
+  `docs/smt-lifecycle.md` 14, `docs/unknown-reasons.md` 103,
+  `docs/analysis-limits.md` 45, `docs/diagnostic-examples.md` 18,
+  `samples/README.md` 18, `docs/README.md` 12, `eng/acceptance/README.md` 10,
+  `SharpProof.Gates/README.md` 10, `docs/native-smt-packaging.md` 8, plus small
+  counts in `README.md`, `docs/container-development.md`,
+  `docs/preview-support.md`, `docs/release-constants.md`,
+  `SharpProof.Gates/Corpus/README.md` and `eng/agent-notes/status.md`. **Zero
+  unresolved.** The prose about code is accurate everywhere; only a path had
+  drifted, which is R1700.
+- **The ungated documents contain almost no repository paths, so R1700's scope is
+  the gated set.** The 18 markdown files outside `$maintainedDocuments` hold **8**
+  backticked repository-path spans between them and **all 8 resolve**. Whatever is
+  wrong with the ungated set - and part five hundred ninety-three found one file
+  with two dead references - it is not path drift.
+- **`docs/unknown-reasons.md` is correct in both directions, which is unusual
+  enough to record.** Its tables name **59** distinct values across 90 rows, and
+  every one is a member of a real enum among the repository's 147 enums and 476
+  distinct member names. In the reverse direction, all **72** members of the ten
+  protocol enums the gate names - `WorkerFeatureSet` (4), `WorkerVerifyPolicy` (4),
+  `WorkerAssumptionPolicy` (4), `WorkerRunStatus` (5), `WorkerRunFailureReason`
+  (11), `WorkerCallableCoverage` (3), `WorkerCallableCoverageReason` (10),
+  `WorkerClaimOutcome` (4), `WorkerClaimReason` (20), `WorkerCacheStatus` (7) -
+  appear in the document. The gate at `Test-SharpProofReadme.ps1:712-735` only
+  requires containment of each member, and `:855-872` matches one delimited block
+  exactly; the reverse direction is unenforced and nevertheless holds. A 362-line
+  reference document with no drift is worth noting precisely because nothing makes
+  it stay that way.
+- **The diagnostic-code vocabularies are clean and the two suspicious ids are
+  not defects.** Across the whole repository the `SP` id space is: 13 analyzer
+  descriptors in `eng/diagnostics/diagnostic-descriptors.v1.json`, 2 launcher codes
+  in `SharpProof.Host/VerifierDiagnosticCodes.cs`, and 10 `SPCF` generator codes.
+  `SP0048` appears in eight documents while being absent from the descriptor
+  catalog, which reads like a documented-but-unimplemented diagnostic; it is a
+  verifier-launcher code, `docs/diagnostic-examples.md:222` says so explicitly, and
+  `Test-SharpProofReadme.ps1:424` gates the pair. `SP0047` appears in **both** the
+  catalog and `VerifierDiagnosticCodes`, which reads like a collision; the earlier
+  part that filed R743 already established that it legitimately exists in both
+  worlds. The only other ids mentioned anywhere are `SP0001` and `SP9999`, each
+  appearing exactly once as a synthetic unknown-code test input -
+  `CompilerManifestArtifactTests.cs:791` and `BuildTaskTests.cs:846`.
+- **R743 is confirmed complete at HEAD.** It recorded the two launcher ids written
+  by hand at five sites with no shared constant.
+  `SharpProof.Host/VerifierDiagnosticCodes.cs` now declares
+  `IncompleteSelectedCallable` and `AssumptionsDeclared`, and every production
+  consumer goes through them - `RunVerifier.cs:1189-1196` for the four marker rows,
+  `VerifierDiagnosticTransport.cs:94-95` for validation,
+  `Worker.Launcher/Program.cs:485,527` and `SarifProjection.cs:42,130` for the two
+  output channels. The one remaining literal pair, `$launcherDiagnosticCodes` at
+  `Test-SharpProofReadme.ps1:424`, is a single named array in a PowerShell script
+  that cannot reference a C# constant, which is the shape R743's completion note
+  describes. No residual.
+- **`DocumentationSnippetTests` checks that documentation C# compiles, not what it
+  diagnoses, and that is a bounded gap rather than a finding.**
+  `MaintainedCSharpFenceCompiles` enumerates every ` ```csharp ` fence in
+  `README.md` and all of `docs/`, compiles each through `AnalyzerTestHost`, and
+  requires zero errors. `docs/diagnostic-examples.md` labels its ten fences with
+  the diagnostic each is meant to produce, and nothing asserts that it does. The
+  reason this is not filed: the document's claims are about analyzer *behaviour*
+  under specific option settings, and asserting them would mean re-running the
+  analyzer with each fence's profile - a materially larger piece of work than the
+  correspondence checks this ledger has been filing, and one whose absence has
+  produced no observed error, since all 18 of the document's symbols and all its
+  ids resolve.
+
+### Status (part six hundred ten)
+
+No new ID. The documentation axis is now measured on three independent
+dimensions - symbol resolution (400, all resolving), repository-path resolution
+(845 spans across gated and ungated documents, two defects, both R1700), and
+enumerated-vocabulary correspondence (`unknown-reasons.md`, 59 values and 72
+members, both directions holding). Together with R321 on gate scope and R1501 on
+the archived set, the documentation surface has no further open questions that a
+reduction pass can answer.
+
+R1682 is applied: `Generate-BoundContractModel.ps1` now reuses the sourced
+`GeneratedFileHelpers.ps1::Required` accessor instead of maintaining a duplicate
+`Get-RequiredProperty` implementation. The generated bound-contract output is
+deterministic and the focused contract model test passes (1/1).
