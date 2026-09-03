@@ -16428,3 +16428,19 @@ catalog readability.
 R1356 is kept deferred: reusable API-spec profiles require a schema and generator
 expansion change; the current explicit declarations preserve fail-closed validation
 and distinct witness metadata, so the proposed indirection is not a safe reduction.
+
+## Second survey, continued: R1361 - pre-sized trusted-mutation shard collections
+
+`Invoke-SharpProofTrustedMutationsParallel.ps1` validates `$parallelism` and then knows the final shard count, but initializes `$shards` as a PowerShell array and appends one descriptor per shard with `+=`; each append copies the fixed-size array. The adjacent `$shardTimings` list is also bounded by the same parallelism value. A pre-sized generic list or object array for both collections can remove the repeated growth/copy overhead while preserving shard order, path fields, and timing aggregation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1361 | **`Invoke-SharpProofTrustedMutationsParallel.ps1` grows a known-bounded shard descriptor array with `+=`.** Pre-size the shard and timing collections from validated parallelism while preserving the existing order and output shape. | `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1:29-40,64-80` |
+
+## Second survey, continued: R1362 - PDB sequence-point postprocessing scans
+
+`Get-PortablePdbModule` already visits every PDB sequence point while building `documentStates`, but then scans all document states once to decide whether any non-compiler-generated sequence point exists and projects the sorted document arrays. After all modules are built, the outer routine scans every projected document sequence-point array again solely to compute `sequencePointCount`. Maintain a production-point count during the existing point walk and return it with the module, or accumulate it during document projection, so the presence check and aggregate count do not require extra full passes while retaining compiler-generated filtering and the serialized inventory shape.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1362 | **Production PDB inventory re-scans completed document state for presence and then re-scans projected sequence-point arrays for the total count.** Carry the count from the existing point walk or projection to remove the postprocessing traversals without changing filtering or output. | `scripts/Get-SharpProofProductionInventory.ps1:247-300,443-446` |
