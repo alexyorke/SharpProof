@@ -4,6 +4,7 @@ internal sealed partial record WorkerInputSnapshot
 {
     internal const string ManifestUnavailable = "The compiler manifest is unavailable.";
     internal const string ManifestInvalid = "The compiler manifest is invalid.";
+    private static ReadOnlySpan<byte> Utf8Preamble => [0xEF, 0xBB, 0xBF];
     internal static Task<WorkerInputSnapshot> LoadAsync(WorkerVerifyRequest request,
         WorkerCacheIdentity cacheIdentity, CancellationToken cancellationToken)
     {
@@ -55,7 +56,7 @@ internal sealed partial record WorkerInputSnapshot
     }
     private static string DecodeUtf8(byte[] bytes)
     {
-        var offset = bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }) ? 3 : 0;
+        var offset = bytes.AsSpan().StartsWith(Utf8Preamble) ? 3 : 0;
         return new UTF8Encoding(false, true).GetString(bytes, offset, bytes.Length - offset);
     }
 }
