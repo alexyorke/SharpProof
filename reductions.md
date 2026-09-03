@@ -12108,7 +12108,11 @@ passes (33/33).
 
 ### Status (part three hundred sixty-four)
 
-R1133 is deferred: construct a per-file declaration index for OSS instrumentation while retaining exact-one-match validation and the existing instrumentation map.
+R1133 is applied: the OSS catalog and runner now build one line-range
+declaration index per parsed source file and resolve each manifest method from
+that index. Exact-one-match validation, declaration hashes, and instrumentation
+maps are unchanged. The focused `SharpProof.Gates.Test` corpus suite passes
+(23/23).
 
 ## Second survey, part three hundred sixty-five: R1134 - duplicate corpus-case uniqueness enforcement
 

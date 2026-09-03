@@ -187,6 +187,11 @@ internal static class OpenSourceCorpusCatalog
             files.Add(key, (file, root));
         }
 
+        var declarationIndexes = files.ToDictionary(
+            static pair => pair.Key,
+            static pair => BuildDeclarationIndex(pair.Value.Root),
+            StringComparer.Ordinal);
+
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var locations = new HashSet<string>(StringComparer.Ordinal);
         var declarations = new HashSet<string>(StringComparer.Ordinal);
@@ -229,7 +234,9 @@ internal static class OpenSourceCorpusCatalog
                     $"Duplicate OSS corpus source location: {location}.");
             }
 
-            var declaration = FindDeclaration(sourceFile.Root, method);
+            var declaration = FindDeclaration(
+                declarationIndexes[fileKey],
+                method);
             var declarationHash = ComputeNormalizedSha256(
                 GetDeclaration(declaration));
             if (!string.Equals(
@@ -301,19 +308,34 @@ internal static class OpenSourceCorpusCatalog
         }
     }
 
-    internal static MethodDeclarationSyntax FindDeclaration(
-        CompilationUnitSyntax root,
-        OpenSourceCorpusMethod method)
+    internal static ImmutableDictionary<
+        (int StartLine, int EndLine),
+        ImmutableArray<MethodDeclarationSyntax>> BuildDeclarationIndex(
+        CompilationUnitSyntax root)
     {
-        var matches = root.DescendantNodes()
+        return root.DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
-            .Where(candidate =>
+            .GroupBy(static candidate =>
             {
                 var lineSpan = candidate.SyntaxTree.GetLineSpan(candidate.Span);
-                return lineSpan.StartLinePosition.Line + 1 == method.StartLine &&
-                       lineSpan.EndLinePosition.Line + 1 == method.EndLine;
+                return (
+                    StartLine: lineSpan.StartLinePosition.Line + 1,
+                    EndLine: lineSpan.EndLinePosition.Line + 1);
             })
-            .ToImmutableArray();
+            .ToImmutableDictionary(
+                static group => group.Key,
+                static group => group.ToImmutableArray());
+    }
+
+    internal static MethodDeclarationSyntax FindDeclaration(
+        ImmutableDictionary<(int StartLine, int EndLine),
+            ImmutableArray<MethodDeclarationSyntax>> declarationIndex,
+        OpenSourceCorpusMethod method)
+    {
+        var key = (StartLine: method.StartLine, EndLine: method.EndLine);
+        var matches = declarationIndex.TryGetValue(key, out var declarations)
+            ? declarations
+            : ImmutableArray<MethodDeclarationSyntax>.Empty;
         if (matches.Length != 1)
         {
             throw new InvalidDataException(

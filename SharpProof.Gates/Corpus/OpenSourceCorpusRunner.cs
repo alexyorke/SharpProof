@@ -59,8 +59,12 @@ internal static class OpenSourceCorpusRunner
             var key = $"{file.SourceId}|{file.Path}";
             if (methodsByFile.TryGetValue(key, out var methods))
             {
+                var declarationIndex =
+                    OpenSourceCorpusCatalog.BuildDeclarationIndex(root);
                 var selected = methods.ToImmutableDictionary(
-                    method => OpenSourceCorpusCatalog.FindDeclaration(root, method),
+                    method => OpenSourceCorpusCatalog.FindDeclaration(
+                        declarationIndex,
+                        method),
                     static method => method);
                 root = root.ReplaceNodes(
                     selected.Keys,
