@@ -344,6 +344,7 @@ the smallest relevant containerized test target passes.
 | R948 | Share supervisor protocol-line normalization between record checks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
 | R818 | Remove the unreachable unsupported-host sample branch | `samples` command passed (expected diagnostics included) |
 | R875 | Reuse bottom-up traversal child arrays after suspension | `SharpProof.Ir.Test`: 114 passed |
+| R878 | Avoid duplicate atomic-file destination normalization | `SharpProof.Ir.Test`: AtomicFileTests, 7 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -8032,8 +8033,9 @@ build-file changes were made during this audit.
 
 ### Status (part three hundred eighty-eight)
 
-R878 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R878 is `applied`: the sync and async convenience writers now let
+`PrepareStaged` normalize the destination once and publish using the original
+path, preserving relative-path behavior and atomic replacement.
 
 ## Second survey, part three hundred eighty-nine: R879 - duplicated atomic publication skeleton
 
@@ -8985,3 +8987,49 @@ IVT grant that already exist. R954 is `pending` and is the one with observable
 consequence - a nullability contract that differs by assembly for one method body
 is the kind of divergence that produces a redundant null check in one place and a
 missing one in another, with nothing at the call site to show why.
+
+## Second survey, part one hundred seventy-seven: R955 - the one generator that validates nothing
+
+An audit of all 37 tracked JSON files for a version field, an acceptance-contract
+pin, and a reader; then a comparison of every generator's input validation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R955 | **`Generate-EffectContractMappings.ps1` is the only one of the fifteen generators that performs no input validation at all, and its catalog is the only product catalog with no `schemaVersion` to validate.** Comparing all fifteen on three axes - a `schemaVersion` check, an allowed-member whitelist, and `Get-RequiredMember` calls - every generator has at least one. `Generate-OperationSupportCatalog.ps1:18-20` is the minimum shape: `if ([int]$catalog.schemaVersion -ne 1) { throw ... }`. `Generate-ContractApiCatalog.ps1:40-51` pairs a version check with a seven-member whitelist that rejects an unrecognized top-level key. `Generate-ProtocolModel.ps1` makes 112 `Get-RequiredMember` calls. **`Generate-EffectContractMappings.ps1` has zero of all three**: `:17` reads `ConvertFrom-Json` and `:19` begins emitting. Its input, `SharpProof.Effects/EffectContractMappings.catalog.json`, is 212 lines with seven top-level keys - `enums`, `records`, `capabilities`, `regions`, `directEvents`, `referenceFamilyMarkers`, `evidenceRules` - and **no version field**, alone among the twenty product catalogs and schemas, all of which carry one. The consequence is specific: a catalog edited into a shape the generator does not expect produces silently wrong `EffectContractMappings.generated.cs` rather than a thrown error, and a renamed or mistyped top-level key is simply skipped by the `foreach` loops. This is the same shape as R755 - the convention holds perfectly wherever something checks it, and the one place nothing checks is the one place it broke - applied to generator input rather than file headers. | `scripts/Generate-EffectContractMappings.ps1:1-30`; `SharpProof.Effects/EffectContractMappings.catalog.json`; `scripts/Generate-OperationSupportCatalog.ps1:18-20`; `scripts/Generate-ContractApiCatalog.ps1:40-51`; `scripts/Generate-ProtocolModel.ps1`; the other 12 `Generate-*.ps1` |
+
+### Checked and not proposed (part one hundred seventy-seven)
+
+- **The repository has no comment debt.** A sweep for `TODO`, `FIXME`, `HACK`,
+  `XXX`, `WORKAROUND`, `TEMPORARY`, `REVISIT`, `BUG:`, and "for now" across every
+  tracked `.cs`, `.ps1`, `.psm1`, `.sh`, `.props`, `.targets` and `.json` file
+  returns **zero markers in the repository's own source**. Every hit is either
+  third-party program text embedded in `SharpProof.Gates/Corpus/oss-methods.json`
+  or a sponsor URL in `.opencode/package-lock.json` that contains the substring
+  "hacks". For a 286k-line codebase this is unusual and worth recording as a
+  measured fact rather than an assumption.
+- **The JSON catalog estate is otherwise uniform.** Of 37 tracked JSON files, 32
+  carry a version field, 28 are pinned in `eng/acceptance/contract.json`, and 35
+  are read by a script or test. The five without a version are four editor and SDK
+  configuration files - `.vscode/settings.json`, `.devcontainer/devcontainer.json`,
+  `global.json`, `opencode.json` - which have externally defined schemas, plus the
+  one in R955. The nine unpinned are the corpus data files, the ratchets, and
+  the same editor configuration; none is a product schema.
+- **`.config/dotnet-tools.json` is read by no script, and that is already
+  settled.** `docs/code-usefulness-audit.md:197` records it as
+  *"Rejected deletion: intentional manually invoked Roslynator tool manifest."*
+  Do not re-file it.
+- **The absent XML documentation comments in `SharpProof.Attributes` are already
+  R295.** A doc-density measurement across the 23 production assemblies found the
+  shipped public-API assembly at zero `///` comments against a 268-line
+  hand-maintained `SharpProof.Attributes.xml`; R295 states exactly this, including
+  that `GenerateDocumentationFile` is unset so nothing can compare the two. The
+  measurement is recorded here only as independent confirmation. Every other
+  assembly is internal-by-packaging, so their near-zero doc density is not a
+  finding.
+
+### Status (part one hundred seventy-seven)
+
+R955 is `pending` and is small - a `schemaVersion` in the catalog and a
+three-line guard in the generator, matching what the other fourteen already do.
+It is worth doing because the catalog it protects drives effect-contract mappings,
+where a silently skipped key means a missing mapping rather than a build failure.

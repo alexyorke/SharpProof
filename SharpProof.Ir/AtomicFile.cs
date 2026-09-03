@@ -69,12 +69,11 @@ internal static class AtomicFile
 
     internal static void WriteUtf8(string path, string content)
     {
-        var destination = Path.GetFullPath(path);
-        var temporary = PrepareStaged(destination);
+        var temporary = PrepareStaged(path);
         try
         {
             File.WriteAllText(temporary, content, Utf8);
-            PublishStaged(temporary, destination);
+            PublishStaged(temporary, path);
         }
         finally
         {
@@ -91,8 +90,7 @@ internal static class AtomicFile
     internal static async Task WriteBytesAsync(
         string path, byte[] content, CancellationToken cancellationToken = default)
     {
-        var destination = Path.GetFullPath(path);
-        var temporary = PrepareStaged(destination);
+        var temporary = PrepareStaged(path);
         try
         {
             using (var stream = new FileStream(temporary, FileMode.CreateNew,
@@ -102,7 +100,7 @@ internal static class AtomicFile
                     .ConfigureAwait(false);
             }
 
-            PublishStaged(temporary, destination);
+            PublishStaged(temporary, path);
         }
         finally
         {
