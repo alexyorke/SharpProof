@@ -25,7 +25,42 @@ internal sealed class WorkerProtocolJsonObjectShape(
 
 public static partial class WorkerProtocolJson
 {
+    private enum JsonValueShapeKind
+    {
+        Array,
+        Object,
+        String,
+        Boolean,
+        Number,
+        Enum
+    }
+
+    private sealed class JsonValueShape
+    {
+        internal JsonValueShape(
+            bool allowsNull,
+            string declaredType,
+            JsonValueShapeKind kind,
+            string? elementType = null,
+            WorkerProtocolJsonObjectShape? objectShape = null)
+        {
+            AllowsNull = allowsNull;
+            DeclaredType = declaredType;
+            Kind = kind;
+            ElementType = elementType;
+            ObjectShape = objectShape;
+        }
+
+        internal bool AllowsNull { get; }
+        internal string DeclaredType { get; }
+        internal JsonValueShapeKind Kind { get; }
+        internal string? ElementType { get; }
+        internal WorkerProtocolJsonObjectShape? ObjectShape { get; }
+    }
+
     private static readonly ConcurrentDictionary<string, Type> s_enumTypes =
+        new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, JsonValueShape> s_valueShapes =
         new(StringComparer.Ordinal);
 
     private static void EnsureJsonShape(
@@ -86,63 +121,93 @@ public static partial class WorkerProtocolJson
 
     private static void EnsureValueShape(JsonElement value, string declaredType)
     {
-        var allowsNull = declaredType.EndsWith("?", StringComparison.Ordinal);
-        if (allowsNull)
+        var shape = s_valueShapes.GetOrAdd(
+            declaredType,
+            static type => CreateValueShape(type));
+        if (shape.AllowsNull && value.ValueKind == JsonValueKind.Null)
         {
-            declaredType = declaredType.Substring(0, declaredType.Length - 1);
-            if (value.ValueKind == JsonValueKind.Null)
-            {
-                return;
-            }
-        }
-        if (declaredType.EndsWith("[]", StringComparison.Ordinal))
-        {
-            EnsureArrayShape(
-                value,
-                declaredType.Substring(0, declaredType.Length - 2));
             return;
         }
+
+        switch (shape.Kind)
+        {
+            case JsonValueShapeKind.Array:
+                EnsureArrayShape(value, shape.ElementType!);
+                return;
+            case JsonValueShapeKind.Object:
+                EnsureObjectShape(value, shape.ObjectShape!);
+                return;
+            case JsonValueShapeKind.String:
+                RequireValueKind(value, JsonValueKind.String);
+                EnsureNoLoneSurrogates(value.GetString());
+                return;
+            case JsonValueShapeKind.Boolean:
+                if (value.ValueKind is not (
+                        JsonValueKind.True or JsonValueKind.False))
+                {
+                    throw new JsonException("A JSON boolean is required.");
+                }
+                return;
+            case JsonValueShapeKind.Number:
+                RequireValueKind(value, JsonValueKind.Number);
+                return;
+            case JsonValueShapeKind.Enum:
+                EnsureCanonicalEnum(value, shape.DeclaredType);
+                return;
+            default:
+                throw new JsonException("The declared JSON value type is invalid.");
+        }
+    }
+
+    private static JsonValueShape CreateValueShape(string declaredType)
+    {
+        var allowsNull = declaredType.EndsWith("?", StringComparison.Ordinal);
+        var normalizedType = allowsNull
+            ? declaredType.Substring(0, declaredType.Length - 1)
+            : declaredType;
+        if (normalizedType.EndsWith("[]", StringComparison.Ordinal))
+        {
+            return new JsonValueShape(
+                allowsNull,
+                normalizedType,
+                JsonValueShapeKind.Array,
+                normalizedType.Substring(0, normalizedType.Length - 2));
+        }
+
         const string immutableArrayPrefix = "ImmutableArray<";
-        if (declaredType.StartsWith(
+        if (normalizedType.StartsWith(
                 immutableArrayPrefix,
                 StringComparison.Ordinal) &&
-            declaredType.EndsWith(">", StringComparison.Ordinal))
+            normalizedType.EndsWith(">", StringComparison.Ordinal))
         {
-            EnsureArrayShape(
-                value,
-                declaredType.Substring(
+            return new JsonValueShape(
+                allowsNull,
+                normalizedType,
+                JsonValueShapeKind.Array,
+                normalizedType.Substring(
                     immutableArrayPrefix.Length,
-                    declaredType.Length - immutableArrayPrefix.Length - 1));
-            return;
+                    normalizedType.Length - immutableArrayPrefix.Length - 1));
         }
+
         if (WorkerProtocolMetadata.JsonObjectShapes.TryGetValue(
-                declaredType,
+                normalizedType,
                 out var objectShape))
         {
-            EnsureObjectShape(value, objectShape);
-            return;
+            return new JsonValueShape(
+                allowsNull,
+                normalizedType,
+                JsonValueShapeKind.Object,
+                objectShape: objectShape);
         }
-        if (declaredType == "string")
+
+        var kind = normalizedType switch
         {
-            RequireValueKind(value, JsonValueKind.String);
-            EnsureNoLoneSurrogates(value.GetString());
-            return;
-        }
-        if (declaredType == "bool")
-        {
-            if (value.ValueKind is not (
-                    JsonValueKind.True or JsonValueKind.False))
-            {
-                throw new JsonException("A JSON boolean is required.");
-            }
-            return;
-        }
-        if (declaredType is "int" or "uint" or "long")
-        {
-            RequireValueKind(value, JsonValueKind.Number);
-            return;
-        }
-        EnsureCanonicalEnum(value, declaredType);
+            "string" => JsonValueShapeKind.String,
+            "bool" => JsonValueShapeKind.Boolean,
+            "int" or "uint" or "long" => JsonValueShapeKind.Number,
+            _ => JsonValueShapeKind.Enum
+        };
+        return new JsonValueShape(allowsNull, normalizedType, kind);
     }
 
     private static void EnsureArrayShape(
