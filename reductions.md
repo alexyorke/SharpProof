@@ -9443,3 +9443,55 @@ quantities that currently share one number.
 ### Status (part one hundred ninety-six)
 
 R969 is `deferred`: the cache is local to the protocol validator, but its invalid-type representation and initialization strategy should be tested against the generated shape table before applying it.
+
+## Second survey, part one hundred ninety-seven: R970 - three names for one kind of field
+
+A naming census across production C#: every private instance field, every private
+or internal static field, and the prefix vocabulary of every boolean-returning
+method.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R970 | **Private static fields use three naming conventions with no rule separating them, while private instance fields use exactly one.** Instance fields are **349 of 349 `_camelCase`** - total uniformity. Static fields split **122 `PascalCase`, 12 `s_camelCase`, 4 `_camelCase`**. The obvious candidate rule - `Pascal` for immutable, `s_` for mutable - **does not hold in either direction**: of the 122 Pascal statics, **103 are `readonly` and 19 are not**; and `s_` covers both `static readonly` arrays (`OperationSubsetClassifier.cs:5` `s_knownOperationKinds`, `LauncherArguments.generated.cs:16` `s_required`) and mutable counters (`s_nextScope` in `IrFactory.cs:5`, `IrProgramBuilder.cs:5`, and `ApiSpecTable.cs:18`). So all three styles are used for both kinds of state. **The four `_camelCase` statics are the ones that actively mislead**, because they are indistinguishable from the 349 instance fields that share the convention, and all four are mutable: `SharpProof.Host/ContainerNativeLibrary.cs:10-11` `_z3Assembly` and `_z3Handle` are **process-wide mutable native state**, written under a lock and through `Volatile.Write`, yet named exactly as if they were per-instance; `SharpProof.BuildTasks/RunVerifier.cs:37` `_nextCleanupAnchor` is a shared counter. A reader who assumes instance scope from the name would be wrong about the one property - sharing - that determines whether the surrounding lock is necessary. | `SharpProof.Host/ContainerNativeLibrary.cs:9-11`; `SharpProof.BuildTasks/RunVerifier.cs:37`; `SharpProof.Ir/IrFactory.cs:5`; `SharpProof.Ir/IrProgramBuilder.cs:5`; `SharpProof.Specs/ApiSpecTable.cs:18`; `SharpProof.Frontend/OperationSubsetClassifier.cs:5`; 122 Pascal statics across production |
+
+### Checked and not proposed (part one hundred ninety-seven)
+
+- **`ManagedAbstractFlow.cs:29` `_walkDepth` is the fourth `_camelCase` static and
+  must NOT be renamed without reading the comment above it.** It is the
+  repository's only `[ThreadStatic]` field, and `:26-28` explains why: *"Instances
+  are shared per compilation across Roslyn's concurrent analysis threads, so the
+  recursion guard cannot live in an instance field."* Its `static` is load-bearing
+  and its per-thread scope is the point. If R970 is actioned, this is the one
+  field whose rename must preserve that reasoning; a mechanical sweep that treated
+  it as an instance field would break the recursion guard. It is excluded from
+  R970's four for that reason - the finding names the other three plus it, but
+  only the other three are unambiguous.
+- **Private instance field naming is already perfect** - 349 of 349 `_camelCase`,
+  no exceptions. An earlier count reported 8 `PascalCase` instance fields; those
+  were regex false positives (`ContractsEnabled` is a property expression,
+  `LoweringContext` is a type name inside a generic parameter list). Recorded so
+  the 8 is not repeated.
+- **Boolean method prefixes are healthy and need no convention work.** 313 `Is`,
+  145 `Try`, 105 `Has`, 74 `Can`, 23 `Matches`, 14 `Contains`, plus small counts of
+  `Supports`, `Are`, `Requires`, `Should`. The 221 in the "other" bucket are
+  predicates whose verb is the domain operation rather than a question prefix
+  (`Validate`, `Accepts`, `Resolve`-shaped names); that is normal and not a
+  deviation from a stated rule, since no rule is stated.
+
+### Status (part one hundred ninety-seven)
+
+R970 is `pending` and is cosmetic in three of its four instances. The
+substantive part is the `ContainerNativeLibrary` pair: two mutable process-wide
+native handles wearing the instance-field convention, in the one file where
+mistaking scope changes whether the surrounding synchronization looks necessary.
+The rest of the split is a rule that has never been written down - which the
+100-percent uniformity of instance-field naming shows this codebase is perfectly
+capable of holding once it is.
+
+## Second survey, part one hundred ninety-eight: R971 - repeated protocol enum type discovery
+
+| R971 | **`WorkerProtocolJson.EnsureCanonicalEnum` rediscovers the same enum `Type` for every enum-valued JSON node.** The shape metadata supplies a stable declared type name such as `WorkerClaimReason` or `WorkerRunStatus`; nevertheless each field and each element of an enum array calls `Assembly.GetType`, checks `IsEnum`, and only then parses the text. The generated protocol model has a closed set of enum types, and the object-shape dictionary is immutable after initialization, so the assembly lookup and enum-kind check are invariant by `declaredType`, while the spelling parse and canonical-value comparison must remain per value. A small cached declared-type-to-enum-type map, including a fail-closed entry for an unknown type, can remove repeated reflection metadata discovery from request/response deserialization without weakening unknown-type, invalid-value, or canonical-spelling errors. | `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:83-141,155-183`; generated shape vocabulary `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:463-650`; deserialization entrypoints `SharpProof.Worker.Protocol/ProtocolJson.cs:64-71,1066-1069` |
+
+### Status (part one hundred ninety-eight)
+
+R971 is `deferred`: the cache is local to the protocol validator, but its invalid-type representation and initialization strategy should be tested against the generated shape table before applying it.
