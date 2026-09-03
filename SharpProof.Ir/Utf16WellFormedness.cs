@@ -1,12 +1,6 @@
-#if SHARPPROOF_WORKER_PROTOCOL
-namespace SharpProof.Worker.Protocol;
-
-internal static class ProtocolUtf16WellFormedness
-#else
-namespace SharpProof.Ir;
+namespace SharpProof;
 
 internal static class Utf16WellFormedness
-#endif
 {
     internal static bool IsWellFormed(string value)
     {
