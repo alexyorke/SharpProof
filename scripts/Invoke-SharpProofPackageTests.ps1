@@ -179,6 +179,11 @@ function Get-DiscoveredTestMethods {
             '(?m)^\s{4}(?<method>[A-Za-z_][A-Za-z0-9_]*)(?:\(|\s*$)') |
             ForEach-Object { $_.Groups['method'].Value } |
             Sort-Object -Unique)
+    $listedMethodSet = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($listedMethod in $listedMethods) {
+        [void]$listedMethodSet.Add([string]$listedMethod)
+    }
     $testAssembly = [Reflection.Assembly]::LoadFrom($Assembly)
     $bindingFlags = [Reflection.BindingFlags]::Instance -bor
         [Reflection.BindingFlags]::Static -bor
@@ -192,7 +197,7 @@ function Get-DiscoveredTestMethods {
         }
         else {
             @($type.GetMethods($bindingFlags) |
-                Where-Object { $listedMethods -contains $_.Name } |
+                Where-Object { $listedMethodSet.Contains([string]$_.Name) } |
                 ForEach-Object { $_.Name } |
                 Sort-Object -Unique)
         }
