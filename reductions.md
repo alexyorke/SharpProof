@@ -14898,3 +14898,11 @@ analyzer tests pass (162 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1237 | **`IsAcyclic` checks `included.Contains` twice for each included root block.** The outer `Where` filters on `included`, then `Visit` immediately repeats the same set membership before inspecting marks; the recursive check remains necessary for branch destinations. Restructuring the root/recursive entry points can keep the reachability filter and remove the guaranteed root-level duplicate. | `SharpProof.Effects/ManagedAbstractFlow.cs:1037-1069` |
+
+## Second survey, part five hundred sixty: R1238 - unsupported storage probes allocate discarded keys
+
+`ManagedAbstractFlow.TryStorage` returns a Boolean indicating whether an operation is a parameter, local, or flow-capture reference, but its default switch arm still creates `new object()` for every other operation. The storage output is consumed only on the true path by all callers, so the false path's object is immediately discarded and never serves as a key. Making the output nullable or assigning a non-allocating default on failure can preserve the out-parameter contract while removing needless heap allocations from condition and target analysis.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1238 | **`TryStorage` allocates a throwaway object for every unsupported operation.** Its `_ => new object()` arm only satisfies `out object storage`; callers branch on the returned Boolean and do not read `storage` when false. A null/default failure value or a success-only storage result removes the per-probe allocation without changing tracked-storage identity. | `SharpProof.Effects/ManagedAbstractFlow.cs:980-991`; callers at `SharpProof.Effects/ManagedAbstractFlow.cs:406-419,448,947,955` |
