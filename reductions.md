@@ -14862,3 +14862,11 @@ discovery tests pass (44 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1234 | **`GetMemberInitializerReferences` reconstructs the same syntax-tree order map on every invocation.** Its `compilation.SyntaxTrees.Select(...).ToDictionary(...)` projection is immutable for a compilation but is rebuilt before each member-initializer query. Reusing one compilation-scoped ordering snapshot removes the repeated map allocation without changing member filtering or source-span ordering. | `SharpProof.Effects/EffectMethodNodeBuilder.cs:356-376` |
+
+## Second survey, part five hundred fifty-seven: R1235 - unknown conditional evaluation repeats its condition walk
+
+`ManagedAbstractFlow.EvaluateConditional` evaluates the condition once to discover whether it is a known Boolean. When the result is unknown, it calls `Assume` for the true state and again for the false state. `Assume` begins by evaluating its condition before applying its recursive refinement rules, so both branch refinements reevaluate the same conditional expression that the caller just classified. Passing the already-known abstract condition value into a refinement overload, or separating condition classification from state refinement, can retain the two branch states and short-circuit behavior while removing these repeated walks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1235 | **`EvaluateConditional` reevaluates an unknown condition during both branch assumptions.** After `EvaluateCore(operation.Condition, state)` fails to produce a Boolean, each `Assume(state, operation.Condition, ...)` invokes `EvaluateCore` on that same condition again before refining. A cached condition value/refinement entry point can preserve branch-sensitive state while avoiding up to two duplicate condition traversals. | `SharpProof.Effects/ManagedAbstractFlow.cs:377-410,757-768` |
