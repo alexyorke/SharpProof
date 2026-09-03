@@ -1,15 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <DefineConstants>$(DefineConstants);SHARPPROOF_SMT_ARGUMENT_GUARD</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Z3" />
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\SharpProof.Ir\ArgumentNullGuard.cs"
-             Link="ArgumentNullGuard.cs" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Smt.Test" />

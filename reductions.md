@@ -344,6 +344,7 @@ the smallest relevant containerized test target passes.
 | R948 | Share supervisor protocol-line normalization between record checks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
 | R818 | Remove the unreachable unsupported-host sample branch | `samples` command passed (expected diagnostics included) |
 | R875 | Reuse bottom-up traversal child arrays after suspension | `SharpProof.Ir.Test`: 114 passed |
+| R953 | Remove the redundant SMT copy of `ArgumentNullGuard` | `SharpProof.Smt.Test`: 30 passed |
 | R878 | Avoid duplicate atomic-file destination normalization | `SharpProof.Ir.Test`: AtomicFileTests, 7 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
@@ -8896,20 +8897,20 @@ direct-reference assertion beyond the single project it currently covers. The
 measurement is recorded here mainly so that a future pass does not repeat the
 naive version of it and report 68.
 
-## Second survey, part one hundred seventy-three: R952 - duplicated precondition policy shells
+## Second survey, part one hundred seventy-eight: R952 - duplicated precondition policy shells
 
 | ID | Finding | Evidence |
 |---|---|---|
 | R952 | **`AnalyzerSession` constructs two compilation-scoped conservative precondition policies with the same symbol-resolution core.** Its screening path creates a `ConservativeEffectCallPreconditionPolicy` with source companions enabled, while the `EffectAnalysisSession` path receives a second instance with source companions disabled as its fallback. The mode difference is intentional, but both instances resolve the same cached `ContractApiIdentityResolver`, retain the same contract/attribute symbol fields, and reference the same compilation-level companion-type cache; only their mode-specific method caches and source-companion decision differ. A shared immutable policy core (identity symbols and companion inventory) with thin mode-specific query state, or one policy with an explicit mode at the query boundary, can remove duplicate wiring and make the reason for the two semantics visible without merging their results or weakening the source-companion distinction. | `SharpProof.Analyzer.Core/AnalyzerSession.cs:93-109`; `SharpProof.Effects/EffectCallPreconditionPolicy.cs:14-77,101-132`; shared resolver cache `SharpProof.Frontend/ContractApiIdentityResolver.cs:26-82` | 
 
-### Status (part one hundred seventy-three)
+### Status (part one hundred seventy-eight)
 
 R952 is `deferred`: the two source-companion modes must remain behaviorally
 distinct; this is a design-level reduction of duplicated policy state and
 construction, not a request to reuse one mode's per-method answers for the
 other.
 
-## Second survey, part one hundred seventy-five: R952 - the undeclared exit-code vocabulary
+## Second survey, part one hundred seventy-five: R956 - the undeclared exit-code vocabulary
 
 A cross-language numeric-literal census: distinctive numbers appearing in both
 production C# and a configuration or script file. Most of the 27 hits are
@@ -8917,7 +8918,7 @@ coincidental powers of two and round bounds. Two are a shared contract.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R952 | **The verifier's process exit-code contract - 124 for timeout, 125 for environment failure - is written as bare integer literals at roughly forty sites across C#, bash, and PowerShell, is named nowhere, and is documented nowhere.** `124` appears in production at `SharpProof.BuildTasks/RunVerifier.cs:325`, `VerifierProcessSupervisor.cs:149`, `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:164,268`, and `SharpProof.Host/LinuxWorkerProcess.cs:165`, and is asserted at eight further sites in `SharpProof.Package.Test/BuildTaskTests.cs` and `LauncherArgumentTests.cs`. `125` appears at `RunVerifier.cs:306,1025,1046` and at **ten sites in `VerifierProcessSupervisor.cs`** (`:27,36,54,83,107,138,142,187,204`), plus **two `exit 125` in `eng/container/entrypoint.sh` and twelve in `eng/container/loop-command.sh`**. The meanings are used consistently - 124 wherever a wait times out, 125 wherever a precondition on the environment fails: not Linux, not x86_64, missing container contract, missing loop source, lock already held, snapshot outside the artifacts root. **They are the GNU `timeout` conventions**, which is presumably why they were chosen, but nothing in the repository says so; a search of all 47 markdown files finds no exit-code documentation, and the acceptance contract does not pin them. **The contrast inside one file makes the point.** `LinuxWorkerProcess.cs` *declares* `LinuxProcessControlConstants` at `:358-367` with eight named signal and syscall numbers, uses `LinuxProcessControlConstants.SignalKill` at `:118-123` - and returns a bare `124` at `:165`. The same file both owns the naming convention and does not apply it to the value that crosses the process boundary into MSBuild, the shell entrypoint, and the tests. This composes directly with R949: that item moves two prctl option constants into the shared class and deduplicates the `prctl` P/Invoke; the exit codes belong in the same place, and `SharpProof.BuildTasks` already consumes that class at twenty sites. The shell half cannot share a C# constant, so the two `.sh` files would keep their literals - but a named C# constant plus one line of comment in each script is the difference between a convention and a coincidence. | `SharpProof.Host/LinuxWorkerProcess.cs:118-123,165,358-367`; `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:27,36,54,83,107,138,142,149,187,204`; `SharpProof.BuildTasks/RunVerifier.cs:306,325,1025,1046`; `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:164,268`; `eng/container/entrypoint.sh` (2 sites); `eng/container/loop-command.sh` (12 sites); `SharpProof.Package.Test/BuildTaskTests.cs:451,914,1178,1291,1341,1516`; `SharpProof.Package.Test/LauncherArgumentTests.cs:67,97,271` |
+| R956 | **The verifier's process exit-code contract - 124 for timeout, 125 for environment failure - is written as bare integer literals at roughly forty sites across C#, bash, and PowerShell, is named nowhere, and is documented nowhere.** `124` appears in production at `SharpProof.BuildTasks/RunVerifier.cs:325`, `VerifierProcessSupervisor.cs:149`, `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:164,268`, and `SharpProof.Host/LinuxWorkerProcess.cs:165`, and is asserted at eight further sites in `SharpProof.Package.Test/BuildTaskTests.cs` and `LauncherArgumentTests.cs`. `125` appears at `RunVerifier.cs:306,1025,1046` and at **ten sites in `VerifierProcessSupervisor.cs`** (`:27,36,54,83,107,138,142,187,204`), plus **two `exit 125` in `eng/container/entrypoint.sh` and twelve in `eng/container/loop-command.sh`**. The meanings are used consistently - 124 wherever a wait times out, 125 wherever a precondition on the environment fails: not Linux, not x86_64, missing container contract, missing loop source, lock already held, snapshot outside the artifacts root. **They are the GNU `timeout` conventions**, which is presumably why they were chosen, but nothing in the repository says so; a search of all 47 markdown files finds no exit-code documentation, and the acceptance contract does not pin them. **The contrast inside one file makes the point.** `LinuxWorkerProcess.cs` *declares* `LinuxProcessControlConstants` at `:358-367` with eight named signal and syscall numbers, uses `LinuxProcessControlConstants.SignalKill` at `:118-123` - and returns a bare `124` at `:165`. The same file both owns the naming convention and does not apply it to the value that crosses the process boundary into MSBuild, the shell entrypoint, and the tests. This composes directly with R949: that item moves two prctl option constants into the shared class and deduplicates the `prctl` P/Invoke; the exit codes belong in the same place, and `SharpProof.BuildTasks` already consumes that class at twenty sites. The shell half cannot share a C# constant, so the two `.sh` files would keep their literals - but a named C# constant plus one line of comment in each script is the difference between a convention and a coincidence. | `SharpProof.Host/LinuxWorkerProcess.cs:118-123,165,358-367`; `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:27,36,54,83,107,138,142,149,187,204`; `SharpProof.BuildTasks/RunVerifier.cs:306,325,1025,1046`; `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:164,268`; `eng/container/entrypoint.sh` (2 sites); `eng/container/loop-command.sh` (12 sites); `SharpProof.Package.Test/BuildTaskTests.cs:451,914,1178,1291,1341,1516`; `SharpProof.Package.Test/LauncherArgumentTests.cs:67,97,271` |
 
 ### Checked and not proposed (part one hundred seventy-five)
 
@@ -8933,15 +8934,15 @@ coincidental powers of two and round bounds. Two are a shared contract.
   `MaximumModuleCount`) is declared once in
   `CompilerArtifactModel.schema.json`, generated into C#, and cross-checked
   against `eng/acceptance/contract.json` by `ArchitectureTests:2138-2150`. That is
-  the shape R952 asks for, already applied to the neighbouring vocabulary.
+  the shape R956 asks for, already applied to the neighbouring vocabulary.
 - The `exit 2` used by both container scripts for "clean exact-commit source
   required" and "loop snapshot does not match host HEAD" is **not** included in
-  R952. It is shell-only, never crosses into C#, and 2 carries no
+  R956. It is shell-only, never crosses into C#, and 2 carries no
   cross-tool convention worth naming.
 
 ### Status (part one hundred seventy-five)
 
-R952 is `pending` and should be actioned with R949 - the same two
+R956 is `pending` and should be actioned with R949 - the same two
 assemblies, the same shared constants class, the same already-open seam. Of the
 two it is the more consequential: a duplicated P/Invoke declaration fails loudly
 if the copies drift, whereas an exit code that means "timed out" in one process
@@ -8981,12 +8982,10 @@ mechanism rather than a name collision.
 
 ### Status (part one hundred seventy-six)
 
-R953 is `pending` and its `SharpProof.Smt` half is the cheap, safe part: delete
-the link and the `DefineConstants`, and call the class through the reference and
-IVT grant that already exist. R954 is `pending` and is the one with observable
-consequence - a nullability contract that differs by assembly for one method body
-is the kind of divergence that produces a redundant null check in one place and a
-missing one in another, with nothing at the call site to show why.
+R953 is `applied` for its cheap SMT half: the project now consumes the
+IR-owned guard through its existing project reference/IVT seam, with one global
+namespace import. R954 remains `pending` because changing the shared guard's
+nullability contract in the IR assembly has observable compiler-flow effects.
 
 ## Second survey, part one hundred seventy-seven: R955 - the one generator that validates nothing
 
@@ -9033,3 +9032,16 @@ R955 is `pending` and is small - a `schemaVersion` in the catalog and a
 three-line guard in the generator, matching what the other fourteen already do.
 It is worth doing because the catalog it protects drives effect-contract mappings,
 where a silently skipped key means a missing mapping rather than a build failure.
+
+## Second survey, part one hundred seventy-eight: R957 - duplicated compiler model decoders
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R957 | **The compiler artifact authority and the worker cache maintain two nearly identical `WorkerModelValue[]` decoders.** Both build an ordinal-string dictionary from `target.Variables`, allocate an immutable IR-value builder, walk every row, reject null/unknown/non-input variables, call the shared scalar `CompilerModelValues.TryCreateValue`, reject duplicate variable IDs, then require every Boolean/integer receiver and parameter to be present before freezing the model. The implementations differ at the edges - the authority precomputes a required array and uses `ContainsKey` plus `Add`, while the worker scans eligible variables afterward and uses `TryAdd` - but those are equivalent rejection policies, not different model semantics. A shared decoder can own label lookup, role filtering, scalar-required admission, and duplicate handling with an explicit policy for nullable rows and error surface; the authority and worker can retain their distinct replay/reason paths without carrying two copies of the model contract. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:806-861`; `SharpProof.Worker/VerificationCache.cs:655-701`; shared scalar conversion `SharpProof.CompilerArtifact/CompilerModelValues.cs:5-35` |
+
+### Status (part one hundred seventy-eight)
+
+R957 is `deferred`: the model decoder is a cross-assembly validation seam,
+so the shared core must preserve fail-closed null handling, ordinal duplicate
+rejection, scalar-input requirements, and each caller's surrounding replay
+failure behavior.
