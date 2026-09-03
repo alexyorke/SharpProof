@@ -447,17 +447,22 @@ internal static class Program
         WriteErrors(response.Errors, "SharpProof ");
 
         var manifestClaims = response.Manifest.Claims.ToDictionary(static claim => claim.ClaimId, StringComparer.Ordinal);
-        var refuted = response.ClaimResults.Any(static result => result.Outcome == WorkerClaimOutcome.Refuted);
+        var refuted = false;
+        var unknownClaims = 0;
         foreach (var result in response.ClaimResults)
         {
             var claim = manifestClaims[result.ClaimId];
             var reason = result.Reason == WorkerClaimReason.None ? string.Empty : " (" + result.Reason + ")";
             Console.WriteLine("SharpProof " + result.Outcome + " " + claim.CallableId + " " +
                 LauncherPresentation.ClaimKind(claim) + " claim " + result.ClaimId + reason);
+            refuted |= result.Outcome == WorkerClaimOutcome.Refuted;
+            if (result.Outcome == WorkerClaimOutcome.Unknown)
+            {
+                unknownClaims++;
+            }
         }
         var incomplete = response.CallableResults
             .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete).ToArray();
-        var unknownClaims = response.ClaimResults.Count(static result => result.Outcome == WorkerClaimOutcome.Unknown);
         if (incomplete.Length != 0)
         {
             ReportDiagnostic(
