@@ -23,10 +23,10 @@ function Get-SharpProofWeightedMutationShards {
         throw 'Mutation shard count cannot exceed the mutation count.'
     }
 
-    $buckets = @()
+    $buckets = [object[]]::new($ShardCount)
     $loads = [long[]]::new($ShardCount)
     for ($index = 0; $index -lt $ShardCount; $index++) {
-        $buckets += ,([Collections.Generic.List[object]]::new())
+        $buckets[$index] = [Collections.Generic.List[object]]::new()
     }
 
     $weighted = for ($index = 0; $index -lt $Mutations.Count; $index++) {
