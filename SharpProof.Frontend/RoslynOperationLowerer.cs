@@ -201,6 +201,18 @@ public sealed class RoslynOperationLowerer
         ISymbol symbol, ref IrTerm? receiver, string purpose, ITypeSymbol? resultType,
         params IrTerm[] arguments)
     {
+        return GetMember(
+            symbol,
+            ref receiver,
+            purpose,
+            GetTypeId(resultType),
+            arguments);
+    }
+
+    internal IrMemberId GetMember(
+        ISymbol symbol, ref IrTerm? receiver, string purpose, IrTypeId resultType,
+        params IrTerm[] arguments)
+    {
         var declaringType = GetTypeId(symbol.ContainingType);
         if (receiver != null && receiver.Type != declaringType)
         {
@@ -211,7 +223,7 @@ public sealed class RoslynOperationLowerer
             CompilerIdentityBridge.InternSymbol(_factory, symbol),
             declaringType,
             purpose + CompilerIdentityBridge.CreateSymbolDisplay(symbol),
-            GetTypeId(resultType),
+            resultType,
             receiver == null,
             [.. arguments.Select(static argument => argument.Type)]);
     }

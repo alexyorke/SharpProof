@@ -390,7 +390,7 @@ public sealed class RoslynProgramLowerer(
             var resultType = _expressions.GetTypeId(invocation.Type);
             var hasSupportedResult = invocation.TargetMethod.ReturnsVoid ||
                 CompilerIdentityBridge.IsSupportedValueDomain(invocation.Type);
-            var member = _expressions.GetMember(invocation.TargetMethod, ref receiver, "call:", invocation.Type, arguments);
+            var member = _expressions.GetMember(invocation.TargetMethod, ref receiver, "call:", resultType, arguments);
             var isDirect = IsDirectInvocation(invocation);
             if (!isDirect)
             {
