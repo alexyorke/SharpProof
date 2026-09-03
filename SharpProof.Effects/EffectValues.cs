@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace SharpProof.Effects;
 
 public readonly record struct EffectCapabilitySet
@@ -223,6 +225,9 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
     where TSymbol : class, ISymbol
 {
     internal static EffectSymbolComparer<TSymbol> Instance { get; } = new();
+    private static readonly ConditionalWeakTable<TSymbol, SymbolSortKey>
+        SortKeys = new();
+
     private EffectSymbolComparer()
     {
     }
@@ -244,9 +249,11 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
             return 1;
         }
 
+        var leftKey = GetSortKey(left);
+        var rightKey = GetSortKey(right);
         var result = string.Compare(
-            CanonicalIdentity(left),
-            CanonicalIdentity(right),
+            leftKey.Identity,
+            rightKey.Identity,
             StringComparison.Ordinal);
         if (result != 0)
         {
@@ -258,17 +265,46 @@ internal sealed class EffectSymbolComparer<TSymbol> : IComparer<TSymbol>
             return 0;
         }
 
-        var leftLocation = left.Locations.FirstOrDefault(static location => location.IsInSource);
-        var rightLocation = right.Locations.FirstOrDefault(static location => location.IsInSource);
-        result = string.Compare(leftLocation?.SourceTree?.FilePath,
-            rightLocation?.SourceTree?.FilePath, StringComparison.Ordinal);
+        result = string.Compare(leftKey.SourcePath,
+            rightKey.SourcePath, StringComparison.Ordinal);
         return result != 0
             ? result
-            : (leftLocation?.SourceSpan.Start ?? -1)
-                .CompareTo(rightLocation?.SourceSpan.Start ?? -1);
+            : leftKey.SourceStart.CompareTo(rightKey.SourceStart);
     }
 
-    private static string CanonicalIdentity(TSymbol symbol)
+    private static SymbolSortKey GetSortKey(TSymbol symbol)
+    {
+        return SortKeys.GetValue(symbol, static value => new(value));
+    }
+
+    private sealed class SymbolSortKey
+    {
+        internal SymbolSortKey(TSymbol symbol)
+        {
+            Identity = CanonicalIdentity(symbol);
+            var location = symbol.Locations.FirstOrDefault(
+                static candidate => candidate.IsInSource);
+            SourcePath = location?.SourceTree?.FilePath;
+            SourceStart = location?.SourceSpan.Start ?? -1;
+        }
+
+        internal string Identity
+        {
+            get;
+        }
+
+        internal string? SourcePath
+        {
+            get;
+        }
+
+        internal int SourceStart
+        {
+            get;
+        }
+    }
+
+    private static string CanonicalIdentity(ISymbol symbol)
     {
         return symbol is ITypeSymbol type
             ? CompilerIdentityBridge.CreateTypeDisplay(type)
