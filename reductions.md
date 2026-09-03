@@ -15261,6 +15261,12 @@ passed).
 |---|---|---|
 | R1257 | **`ContractApiIdentityResolver.HasMetadataName` reparses stable metadata names for every comparison.** Each call repeats separator lookup, substring creation, and namespace splitting for catalog strings used across several symbol-validation paths. Cache parsed metadata-name parts while retaining the current exact namespace and type matching rules. | `SharpProof.Frontend/ContractApiIdentityResolver.cs:94-125,128-139,532-588` |
 
+### Status (part five hundred seventy-nine)
+
+R1257 is applied: metadata-name separator, type, and namespace segments are
+cached per name, preserving exact namespace-boundary and ordinal comparisons
+without repeated parsing. Contract API identity tests pass (6 passed).
+
 ## Second survey, part five hundred eighty: R1258 - contract-shape cardinality checks copy immutable Roslyn collections
 
 `HasSingleClause` and `HasSingleGenericIdentityMethod` each call `GetMembers(name).OfType<IMethodSymbol>().ToImmutableArray()` only to test `Length == 1` and inspect the one method. `HasOnlyElidingConditionalAttribute` applies the same filtered-`ToImmutableArray` pattern to `method.GetAttributes()` before testing that exactly one matching attribute exists. Roslyn already supplies immutable member and attribute collections, and the validation needs only a bounded cardinality scan; a shared single-match helper or direct loop can retain the exact shape predicates and exception-free fail-closed behavior without allocating filtered copies.
