@@ -1521,10 +1521,11 @@ internal static class CompilerImplementationIlSummaryLowerer
         private IrTerm WrapInt32(IrTerm value)
         {
             const long modulus = 4294967296;
+            var modulusTerm = _factory.Integer(modulus);
             var remainder = _factory.Binary(
                 IrBinaryOperator.Remainder,
                 value,
-                _factory.Integer(modulus));
+                modulusTerm);
             var unsigned = _factory.Conditional(
                 _factory.Binary(
                     IrBinaryOperator.LessThan,
@@ -1533,7 +1534,7 @@ internal static class CompilerImplementationIlSummaryLowerer
                 _factory.Binary(
                     IrBinaryOperator.Add,
                     remainder,
-                    _factory.Integer(modulus)),
+                    modulusTerm),
                 remainder);
             return _factory.Conditional(
                 _factory.Binary(
@@ -1543,7 +1544,7 @@ internal static class CompilerImplementationIlSummaryLowerer
                 _factory.Binary(
                     IrBinaryOperator.Subtract,
                     unsigned,
-                    _factory.Integer(modulus)),
+                    modulusTerm),
                 unsigned);
         }
 
