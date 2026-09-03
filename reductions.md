@@ -18734,3 +18734,8 @@ R1642 is applied: the two metadata-signature cases now reuse one immutable
 emitted-target reference and consumer compilation while retaining per-case
 method selection and binding assertions. `ContractForMetadataSignatureTests`
 pass (2/2).
+
+R1644 is applied: the two terminal-object-initializer cases now share one
+immutable metadata reference and compilation while retaining per-test effect
+sessions and constructor selection. `TerminalObjectInitializerEffectTests`
+pass (2/2).

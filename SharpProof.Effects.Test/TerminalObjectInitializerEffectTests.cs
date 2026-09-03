@@ -3,6 +3,8 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class TerminalObjectInitializerEffectTests
 {
+    private static readonly CSharpCompilation Compilation = CreateCompilation();
+
     [Test]
     public void NonCompletingArgumentRetainsInitializerWrite()
     {
@@ -32,6 +34,17 @@ public sealed class TerminalObjectInitializerEffectTests
 
     private static EffectSummary AnalyzeConstructor(string typeName)
     {
+        var compilation = Compilation;
+        return new EffectAnalysisSession(compilation)
+            .Analyze(EffectTestHost.RequireType(compilation, typeName)
+                .InstanceConstructors
+                .Single(static constructor =>
+                    !constructor.IsImplicitlyDeclared))
+            .Summary;
+    }
+
+    private static CSharpCompilation CreateCompilation()
+    {
         var metadataException = EffectTestHost.EmitReference(
             """
             public sealed class MetadataException : System.Exception {
@@ -40,7 +53,7 @@ public sealed class TerminalObjectInitializerEffectTests
             }
             """,
             "TerminalObjectInitializerMetadata");
-        var compilation = EffectTestHost.CreateCompilation(
+        return EffectTestHost.CreateCompilation(
             """
             using System;
 
@@ -80,11 +93,5 @@ public sealed class TerminalObjectInitializerEffectTests
             }
             """,
             metadataException);
-        return new EffectAnalysisSession(compilation)
-            .Analyze(EffectTestHost.RequireType(compilation, typeName)
-                .InstanceConstructors
-                .Single(static constructor =>
-                    !constructor.IsImplicitlyDeclared))
-            .Summary;
     }
 }
