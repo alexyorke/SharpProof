@@ -18590,3 +18590,11 @@ R1542 is applied: the analyzer-mode matrices now cache the exact immutable
 compilations for each diagnostic-ID set, while analyzer options, factories, and
 feature/profile cases remain per-test. `AnalyzerModeAndEffectTests` pass
 (104/104).
+
+## Second survey, continued: R1645 - Requires-call-site accessor tests recompile identical property/event fixtures
+
+The two accessor-discovery tests compile the same Subject source twice. Both create the identical property/event fixture, retrieve the sole method declaration, and construct the same discovery object; only the discovery API under assertion differs. A fixture-scoped compilation/tree/declaration, with a fresh discovery instance per test if its state is mutable, can remove repeated parsing and binding while keeping both API assertions independent. This complements the existing declaration-to-discovery adapter note: the adapter can remain reusable while this exact source fixture is constructed once.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1645 | Two accessor-discovery tests rebuild identical property/event source and declaration setup before exercising different discovery APIs; cache the immutable fixture and keep discovery state case-local. | `SharpProof.Analyzer.Test/RequiresCallSiteDiscoveryTests.cs:200-232,266-310` |
