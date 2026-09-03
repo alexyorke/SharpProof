@@ -59,18 +59,12 @@ internal static class EffectClaimResultAssembler
 
         if (entryFeasibility.IsContradictory)
         {
-            var vacuous = CreateResult(
-                WorkerClaimOutcome.Proven,
-                WorkerClaimReason.None,
-                WorkerEffectEvidenceCertainty.VacuousEntry);
-            vacuous.Vacuity =
-                WorkerVacuityKind.ContradictoryPreconditions;
-            vacuous.ProofCore = [.. entryFeasibility.ProofCore];
-            vacuous.Assumptions =
-                CallableClaimResultAssembler.MarkAssumptionsUsed(
-                    target,
-                    entryFeasibility.UsedAssumptionIds);
-            return vacuous;
+            return CallableClaimResultAssembler.Contradictory(
+                target,
+                evidence.ClaimId,
+                WorkerEffectEvidenceCertainty.VacuousEntry,
+                entryFeasibility.ProofCore,
+                entryFeasibility.UsedAssumptionIds);
         }
 
         if (evidence.Outcome == WorkerClaimOutcome.Refuted)

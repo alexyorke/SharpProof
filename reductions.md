@@ -16394,3 +16394,7 @@ combined schema tests pass (9 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1359 | **`AnalyzerSyntaxHelpersTests` eagerly copies the event-accessor subset for one enumeration.** Remove that one-shot `ToArray()` while retaining the shared `accessors` snapshot needed by the later projections. | `SharpProof.Analyzer.Test/AnalyzerSyntaxHelpersTests.cs:34-37,65-70` |
+
+R408 is applied: contradictory claim construction now has one shared assembler
+helper while retaining each caller's evidence-certainty and replay semantics.
+Worker tests pass (148 passed).

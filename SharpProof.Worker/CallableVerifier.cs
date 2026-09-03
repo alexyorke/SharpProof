@@ -322,25 +322,15 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         ContradictoryPostconditions(
             CompilerCallablePreparation target,
             int postconditionCount,
-            CallableEntryFeasibility entryFeasibility)
+        CallableEntryFeasibility entryFeasibility)
     {
         return [.. Enumerable.Range(0, postconditionCount).Select(index =>
-        {
-            var record = CallableClaimResultAssembler.Create(
+            CallableClaimResultAssembler.Contradictory(
                 target,
                 target.Entry.ClaimIds[index],
-                WorkerClaimOutcome.Proven,
-                WorkerClaimReason.None,
-                WorkerEffectEvidenceCertainty.Unspecified);
-            record.Vacuity =
-                WorkerVacuityKind.ContradictoryPreconditions;
-            record.ProofCore = [.. entryFeasibility.ProofCore];
-            record.Assumptions =
-                CallableClaimResultAssembler.MarkAssumptionsUsed(
-                    target,
-                    entryFeasibility.UsedAssumptionIds);
-            return record;
-        })];
+                WorkerEffectEvidenceCertainty.Unspecified,
+                entryFeasibility.ProofCore,
+                entryFeasibility.UsedAssumptionIds))];
     }
 
     private async Task<ProofOutcome?> ProbeSatisfiabilityAsync(

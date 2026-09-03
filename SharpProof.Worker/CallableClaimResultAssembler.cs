@@ -176,6 +176,25 @@ internal static class CallableClaimResultAssembler
         return record;
     }
 
+    internal static WorkerClaimResult Contradictory(
+        CompilerCallablePreparation target,
+        string claimId,
+        WorkerEffectEvidenceCertainty certainty,
+        IReadOnlyList<string> proofCore,
+        IReadOnlySet<string> usedAssumptionIds)
+    {
+        var record = Create(
+            target,
+            claimId,
+            WorkerClaimOutcome.Proven,
+            WorkerClaimReason.None,
+            certainty);
+        record.Vacuity = WorkerVacuityKind.ContradictoryPreconditions;
+        record.ProofCore = [.. proofCore];
+        record.Assumptions = MarkAssumptionsUsed(target, usedAssumptionIds);
+        return record;
+    }
+
     internal static WorkerAssumptionEvidence[] MarkAssumptionsUsed(
         CompilerCallablePreparation target,
         IReadOnlySet<string> usedAssumptionIds)
