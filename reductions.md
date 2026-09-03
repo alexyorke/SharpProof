@@ -15025,6 +15025,13 @@ pass (34 passed).
 |---|---|---|
 | R1241 | **`ManagedFlowResult.TryEvaluate` contains an assignment fallback excluded by its own mutation predicate.** The fallback tests an unwrapped `ISimpleAssignmentOperation` only after `!hasMutation`, while `ManagedMutationFacts.HasMutation` classifies every `IAssignmentOperation` in the value subtree as a mutation and all private-overload callers provide that fact. The branch is therefore unreachable unless the mutation contract changes. | `SharpProof.Effects/ManagedAbstractFlow.cs:1396-1433,1471-1494`; `SharpProof.Effects/ManagedMutationFacts.cs:5-18` |
 
+### Status (part five hundred sixty-three)
+
+R1241 is deferred: an outer wrapper can be mutation-bearing while its
+assignment value is pure, allowing the fallback to recover a recorded child
+state. Removing it would change proof availability for that case, so it needs a
+soundness-owner decision rather than a mechanical reduction.
+
 ## Second survey, part five hundred sixty-four: R1242 - uncertainty sentinel repeats a numeric bit
 
 `EffectSummary` validates `EffectUncertainty` by allowing bits through `EffectUncertainty.Unknown`, then separately defines `var uncertaintyMarker = (EffectUncertainty)(1 << 6)` to reject a mixed unknown state. The generated enum already expresses the same relationship as `EffectUncertainty.Unknown & ~EffectUncertainty.All` (`Unknown = 127`, `All = 63`), so the literal is a second authority for the sentinel bit. A named enum-derived marker or shared validation helper can preserve the intentional unknown-only rule while removing numeric coupling, following the same reduction pattern as the capability and allocation sentinels without conflating their domains.
