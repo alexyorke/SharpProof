@@ -1204,15 +1204,7 @@ public sealed class FrontendLoweringTests
             bool returnExpressionOnly = true,
             bool allowUnsafe = false)
         {
-            var source =
-                """
-                #nullable enable
-                public static class Subject {
-                """ +
-                Environment.NewLine +
-                members +
-                Environment.NewLine +
-                "}";
+            var source = FrontendTestHelpers.WrapSubjectMembers(members);
             var syntaxTree = CSharpSyntaxTree.ParseText(
                 source,
                 new CSharpParseOptions(LanguageVersion.CSharp12));

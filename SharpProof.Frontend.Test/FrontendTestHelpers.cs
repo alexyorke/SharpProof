@@ -5,6 +5,18 @@ namespace SharpProof.Frontend.Test;
 
 internal static class FrontendTestHelpers
 {
+    internal static string WrapSubjectMembers(string members)
+    {
+        return """
+            #nullable enable
+            public static class Subject {
+            """ +
+            Environment.NewLine +
+            members +
+            Environment.NewLine +
+            "}";
+    }
+
     internal static IOperation? TryGetExpressionOperation(
         SemanticModel model,
         ExpressionSyntax expression)

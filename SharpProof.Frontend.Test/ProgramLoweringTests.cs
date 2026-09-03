@@ -828,15 +828,7 @@ public sealed class ProgramLoweringTests
         string members,
         Func<IMethodSymbol, bool>? isKnownPure = null)
     {
-        var source =
-            """
-            #nullable enable
-            public static class Subject {
-            """ +
-            Environment.NewLine +
-            members +
-            Environment.NewLine +
-            "}";
+        var source = FrontendTestHelpers.WrapSubjectMembers(members);
         var tree = CSharpSyntaxTree.ParseText(
             source,
             new CSharpParseOptions(LanguageVersion.CSharp12));

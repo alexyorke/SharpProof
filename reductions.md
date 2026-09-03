@@ -18786,3 +18786,8 @@ retaining their distinct fixtures and assertions. Both affected tests pass
 | ID | Finding | Evidence |
 |---|---|---|
 | R1656 | After R764, `ToContractEffects` has no repository caller; remove the dead single-field wrapper and keep the paired `ProjectCapabilities` projection as the sole production seam. | `SharpProof.Effects/EffectContractMappings.cs:40-43`; paired production use at `SharpProof.Effects/EffectProjection.cs:30-31`; parity callers at `SharpProof.Effects.Test/EffectContractWireParityTests.cs:99-117` |
+
+R1654 is applied: operation and program lowering tests now share
+`FrontendTestHelpers.WrapSubjectMembers` for the nullable `Subject` source
+envelope while retaining separate compilation options and result wrappers.
+`FrontendLoweringTests` pass (37/37) and `ProgramLoweringTests` pass (27/27).
