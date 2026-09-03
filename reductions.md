@@ -19178,3 +19178,9 @@ The first two tests in `DeferredCallCompletionTests` pass separate multiline sou
 | ID | Finding | Evidence |
 |---|---|---|
 | R1680 | The async and iterator deferred-call cases duplicate the `Sample`/state/Run fixture shell; factor the common source while retaining their distinct deferred method forms. | `SharpProof.Effects.Test/DeferredCallCompletionTests.cs:8-47` |
+
+R552 is applied: package-source validation now returns its already validated
+path and canonical version, so the consumer script no longer rescans package
+archives solely to recover `SharpProof`'s version. Exact package/symbol sets,
+version agreement, repository identity, and pair validation remain unchanged;
+the affected architecture command-plan checks pass (2/2).

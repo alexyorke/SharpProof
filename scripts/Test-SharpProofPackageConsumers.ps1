@@ -88,24 +88,10 @@ function Resolve-SharpProofPackageSource {
             -PackageVersion $versions[0] `
             -RepositoryCommit $repositoryCommit
     }
-    return [string]$resolved
-}
-
-function Get-SharpProofPortablePackageVersion {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Source
-    )
-
-    $package = Get-ChildItem -LiteralPath $Source -File -Filter '*.nupkg' |
-        ForEach-Object {
-            Get-SharpProofPackageIdentity -Path $_.FullName
-        } |
-        Where-Object { $_.Id -eq 'SharpProof' }
-    if (@($package).Count -ne 1) {
-        throw "The package source must contain exactly one SharpProof package."
+    return [pscustomobject][ordered]@{
+        Path = [string]$resolved
+        Version = [string]$versions[0]
     }
-    return [string]$package.Version
 }
 
 function New-FrameworkPackageSource {
@@ -502,14 +488,15 @@ if ($ValidatePackageSourceOnly) {
     if ($null -eq $resolvedPackageSource) {
         throw 'ValidatePackageSourceOnly requires PackageSource or SHARPPROOF_PACKAGE_SOURCE.'
     }
-    Write-Host "Validated exact SharpProof package source: $resolvedPackageSource"
+    Write-Host (
+        "Validated exact SharpProof package source: " +
+        $resolvedPackageSource.Path)
     return
 }
 if ($null -ne $resolvedPackageSource) {
-    $packageVersion = Get-SharpProofPortablePackageVersion `
-        -Source $resolvedPackageSource
+    $packageVersion = [string]$resolvedPackageSource.Version
     Test-SharpProofFrameworkConsumers `
-        -Source $resolvedPackageSource `
+        -Source $resolvedPackageSource.Path `
         -Version $packageVersion `
         -RepositoryRoot $repositoryRoot `
         -SdkVersion $ConsumerSdkVersion
@@ -534,7 +521,7 @@ $previousPackageSource = [Environment]::GetEnvironmentVariable(
 if ($null -ne $resolvedPackageSource) {
     [Environment]::SetEnvironmentVariable(
         'SHARPPROOF_PACKAGE_SOURCE',
-        $resolvedPackageSource,
+        $resolvedPackageSource.Path,
         [EnvironmentVariableTarget]::Process)
 }
 
