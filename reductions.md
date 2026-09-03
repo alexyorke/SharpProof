@@ -18997,3 +18997,11 @@ R520 is applied: the native resolver now uses one cleanup catch for all loader
 failures, including cancellation exceptions, so partially published handles
 and assembly state are always reset before rethrowing. The native-library setup
 test passes (1/1).
+
+## Second survey, continued: R1669 - Module-initializer tests repeat the common effect-summary envelope
+
+`SourceModuleInitializerEffectsPrecedeOrdinaryEntryPoints` and `ModuleInitializerAnalysisDoesNotReenterThroughItsCallees` independently assert that a module-initializer-influenced result contains a static write, contains synchronization, and is complete. The latter also needs its no-recursion and analyzed-method-count checks, while the former needs the exception assertion for each entry point, so the tests should remain separate; a small `AssertModuleInitializerEffects` helper can own only the three shared summary predicates and leave those scenario-specific checks local.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1669 | Two module-initializer tests duplicate static-write, synchronization, and completeness assertions; extract only that common summary envelope. | `SharpProof.Effects.Test/ModuleInitializerEffectTests.cs:34-91,172-207` |
