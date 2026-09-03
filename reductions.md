@@ -13913,3 +13913,18 @@ preserve those policies without revisiting nested pattern structure.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1179 | **`OperationCompletionEvaluator.CanCompletePatternEvaluation` walks each recursive subpattern twice for separate facts.** It calls `CanCompletePatternEvaluation` and then `SwitchExpressionFacts.IsTotalPattern` on the same deconstruction and property subpatterns, repeating nested pattern traversal before deciding whether to stop. A combined fact seam can remove the structural duplicate while retaining distinct completion and total-pattern semantics; this is separate from R613's repeated totality call within each loop. | `SharpProof.Effects/OperationCompletionEvaluator.cs:243-276`; `SharpProof.Effects/SwitchExpressionFacts.cs:338-368` |
+
+## Second survey, part five hundred two: R1180 - thrown-expression type projection is repeated
+
+After confirming that a thrown expression can complete, the exception
+reachability walk unwraps that expression to inspect its type. The named-type
+branch calls `UnwrapHarmlessValue`, and if it does not match, the immediately
+following type-parameter branch unwraps the same immutable operation again.
+The nullness result and operation tree have not changed between branches. Keep
+the named-type and type-parameter admission policies separate, but cache the
+unwrapped operation or its type once for this decision chain to avoid repeating
+the wrapper traversal.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1180 | **`ExceptionHandlerReachability` unwraps a thrown exception expression twice in one type decision.** The `INamedTypeSymbol` check and the fallback `ITypeParameterSymbol` check each call `DefiniteOperationFacts.UnwrapHarmlessValue(exception)` with identical input. A local unwrapped operation/type projection can remove the duplicate traversal while preserving nullness, implicit-conversion, and unknown-potential behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:201-225` |
