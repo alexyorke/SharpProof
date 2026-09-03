@@ -318,6 +318,7 @@ the smallest relevant containerized test target passes.
 | R527 | Aggregate worker callable and claim reasons in one pass | `SharpProof.Worker.Test`: 695 passed |
 | R991 | Share the contract-owned solution-test timeout fallback across direct runners | PowerShell parsing and module helper validation |
 | R955 | Guard effect-contract catalog generation with an explicit schema version | Generator verification passed |
+| R964 | Use an exhaustive analyzer outcome rank instead of generic enum reflection | `SharpProof.Analyzer.Test`: 476 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -9303,7 +9304,9 @@ ledger is duplication and shadowed authority, not hygiene.
 
 ### Status (part one hundred eighty-eight)
 
-R964 is `deferred`: the reduction is small but sits on analyzer aggregation paths and can be implemented without weakening the existing invalid-value boundary, provided the specialized rank code retains an explicit default failure.
+R964 is applied: analyzer outcome ranking now uses an exhaustive switch with an
+explicit invalid-value failure, removing generic enum reflection from each
+aggregation merge. The full analyzer test suite passed (476 tests).
 
 ## Second survey, part one hundred eighty-nine: R731 is applied, and R965 - a cost it just demonstrated
 
