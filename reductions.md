@@ -10566,3 +10566,15 @@ R1007 is deferred: preserve the independent `CountsMatch` validation and remove 
 ### Status (part two hundred thirty-nine)
 
 R1008 is deferred: preserve first-match and malformed-target rejection semantics when replacing the per-claim linear search with an index.
+
+## Second survey, part two hundred forty: R1009 - duplicate OSS corpus manifest load
+
+`CorpusGate.RunAsync` first calls `OpenSourceCorpusCatalog.Load(repositoryRoot)` and retains the validated `OpenSourceCorpusDocument` for observation. It then calls `CorpusCatalog.CreateCases(repositoryRoot)`, whose open-source branch calls `OpenSourceCorpusCatalog.CreateCases(repositoryRoot)`, which calls `Load(repositoryRoot)` again before projecting `Methods` into baseline cases. The second call repeats path recovery, file I/O, JSON deserialization, and the full manifest validation for the same immutable document in one gate run. An overload that accepts the already-loaded document can preserve the zero-argument repository-root convenience API and the case-generation boundary while removing this duplicate load; the separate manifest load in snapshot rendering/update paths should remain where no document is already available.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1009 | **The corpus gate parses and validates its OSS manifest twice per run.** `RunAsync` retains `openSourceDocument`, but `CorpusCatalog.CreateCases(repositoryRoot)` discards that value and re-enters `OpenSourceCorpusCatalog.Load` through its open-source case factory. Pass the validated document into case projection (while keeping the default-root overload for standalone callers) to remove duplicate recovery, I/O, deserialization, and validation without changing corpus cases or observation semantics. | `SharpProof.Gates/Corpus/CorpusGate.cs:42-66`; `SharpProof.Gates/Corpus/CorpusCatalog.cs:19-25`; `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:25-57` | |
+
+### Status (part two hundred forty)
+
+R1009 is deferred: use the single loaded manifest only within a gate invocation; retain an explicit load for independent snapshot/render/update entrypoints.
