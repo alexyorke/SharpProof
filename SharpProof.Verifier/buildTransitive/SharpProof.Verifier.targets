@@ -137,7 +137,6 @@
         WorkerProtocolPath="$(_SharpProofWorkerProtocolPath)"
         CompilerOutputPaths="@(_SharpProofCompilerOwnedOutput)"
         CachePath="$(_SharpProofActiveCacheDirectory)" />
-    <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
   </Target>
 
   <Target Name="_SharpProofCleanupInvocation"
@@ -256,7 +255,6 @@
           AfterTargets="CoreCompile"
           DependsOnTargets="_SharpProofVerifyCore"
           Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' == 'true'">
-    <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
   </Target>
 
   <Target Name="SharpProofResetPublishedVerification"
