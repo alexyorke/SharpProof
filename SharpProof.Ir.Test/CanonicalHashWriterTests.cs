@@ -85,19 +85,19 @@ public sealed class CanonicalHashWriterTests
     [Test]
     public void StreamGrowthBeyondTheDeclaredLengthFailsClosed()
     {
-        using var writer = new CanonicalHashWriter();
-        using var stream = new GrowingStream([0, 1, 2, 3]);
-
-        Assert.That(
-            (Action)(() => writer.Add(stream)),
-            Throws.TypeOf<InvalidDataException>());
+        AssertStreamGrowthFails([0, 1, 2, 3]);
     }
 
     [Test]
     public void ZeroLengthStreamGrowthFailsClosed()
     {
+        AssertStreamGrowthFails([]);
+    }
+
+    private static void AssertStreamGrowthFails(byte[] initial)
+    {
         using var writer = new CanonicalHashWriter();
-        using var stream = new GrowingStream([]);
+        using var stream = new GrowingStream(initial);
 
         Assert.That(
             (Action)(() => writer.Add(stream)),

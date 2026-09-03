@@ -18394,3 +18394,60 @@ classification values. `CorpusGateTests` pass (23/23).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1603 | The `true` and `false` cases rebuild the same declarations, API-spec table, IR factory, and instantiation; share the invariant fixture while retaining both null-branch assertions. | `SharpProof.Specs.Test/ApiSpecConditionalNullInstantiationTests.cs:13-16,18-53,55-71,75-93` |
+R1511 is applied: the two canonical-hash stream-growth tests now share one
+failure assertion helper while retaining their non-empty and zero-length
+boundary inputs. `CanonicalHashWriterTests` pass (7/7).
+
+## Second survey, part six hundred six: R1620 and R1621 - applied R781 left four call sites behind under three flag spellings, and two schema suites duplicate a forty-eight-line helper beside the file that exists to hold it
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1620 | **`SharpProof.ArchitectureTest` initializes a throwaway Git repository in six places under three spellings of the quiet flag and two different object-format policies, and one file both uses the shared initializer and hand-rolls it thirty lines away.** Applied R781 created `ArchitectureGitRepository.InitializeAsync` and migrated the three fixtures it named - `AcceptanceScriptTests`, `CoverageScriptTests` and `ProductionInventoryAuthorityTests` - each of which now delegates from a thin `InitializeRepositoryAsync(string)`. **Four sites were not migrated and are not named by R781.** `ContainerSourceCleanlinessTests.cs:257-269` runs `git init --quiet` then `git config user.email` and `user.name` by hand; `ChangedTestSelectionTests.cs:27-29` runs `git init --quiet` and the same two configs; `ReleaseQualificationMatrixTests.cs:91-93` and `:158-166` each run `git init -q` and the same two configs. **The flag divergence is the part that matters.** `ArchitectureGitRepository.cs:9-14` passes `--object-format=sha1`, pinning the repository's hash algorithm explicitly; of the four unmigrated sites, **none** passes it, so they inherit whatever the host git defaults to - and this repository's own product reasons about SHA-1 blob identity in `docs/code-usefulness-audit.md` and its release evidence. The quiet flag meanwhile appears as `--quiet` twice, `-q` twice, and not at all in the shared helper: three spellings of one intent across six sites. **The clearest single signal is inside one file.** `CoverageScriptTests.cs:1066` declares `InitializeRepositoryAsync` delegating to the shared helper, and `AssertChangedFilesAsync` at `:716-740` in the same file runs `git init --object-format=sha1` plus both configs inline instead of calling it - so the file demonstrates the correct pattern and bypasses it. **Five success-assertion wrappers under three names** compound it: `AssertSuccessAsync` at `AcceptanceScriptTests.cs:244` and `CoverageScriptTests.cs:1586` returning `Task<ProcessRunnerResult>`, `AssertSuccessAsync` at `ProductionInventoryAuthorityTests.cs:288` returning `Task`, `RunCheckedAsync` at `ArchitectureGitRepository.cs:22`, and `RequireSuccessAsync` at `ContainerSourceCleanlinessTests.cs:359` - one behaviour, three verbs, two return shapes, one assembly. | `SharpProof.ArchitectureTest/ArchitectureGitRepository.cs:9-19,22-36`; `ContainerSourceCleanlinessTests.cs:257-269,359`; `ChangedTestSelectionTests.cs:27-29`; `ReleaseQualificationMatrixTests.cs:91-93,158-166`; `CoverageScriptTests.cs:716-740,1066-1074,1586`; `AcceptanceScriptTests.cs:244`; `ProductionInventoryAuthorityTests.cs:288`; applied R781; related R724, R728 |
+| R1621 | **`ReplacementValue(Type, object?)` is written twice, forty-eight lines against forty-seven, in two files of one assembly that already share a helper file linked for exactly them.** `SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs:756-803` and `ProtocolModelSchemaTests.cs:533-579` both map a CLR type to a distinct replacement value for mutation-style schema assertions, in the same order and with the same constants - `"changed"` for `string`, `!(bool)current` for `bool`, `17` for `int`, `17L` for `long`, then the `Nullable.GetUnderlyingType` recursion. The protocol copy inserts one extra arm, `17U` for `uint`, which is correct and necessary: `ProtocolModel.schema.json` uses `uint` and `CompilerArtifactModel.schema.json` does not. A single implementation carrying the union changes nothing for either caller. **The destination already exists and is already used by both files.** `SharpProof.Worker.Test/SchemaModelTestHelpers.cs` holds exactly two members, `AssertJsonPropertyOrder` and `SchemaType`, and both schema suites call it - so the pattern, the file and the call sites are all in place, and this one helper was left outside. **The other three same-signature pairs in these two files should stay separate, and checking that is what makes this finding narrow rather than a sweep.** `AssertEnum(Type, JsonElement)` differs because `ProtocolModel.schema.json` declares `underlyingType` and a boolean `flags` per enum and the artifact schema declares neither - twenty occurrences against zero. `AssertConstants(Type, JsonElement)` differs because `Generate-CompilerArtifactModel.ps1:381` emits `internal const` (22 of them) while `Generate-ProtocolModel.ps1:522` emits `public const` (13), so the two copies must pass different `BindingFlags`. `ReadSchema()` differs by path. Only `ReplacementValue` is the same function twice. | `SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs:756-803`; `SharpProof.Worker.Test/ProtocolModelSchemaTests.cs:533-579`; `SharpProof.Worker.Test/SchemaModelTestHelpers.cs`; `Directory.Build.props:88-92`; `scripts/Generate-CompilerArtifactModel.ps1:381`; `scripts/Generate-ProtocolModel.ps1:522`; related R730, R1580 |
+
+### Checked and not proposed (part six hundred six)
+
+- **Embedded fixture-source duplication across the test tree is negligible, and
+  the largest case is already filed.** Extracting every raw-string block of four or
+  more non-blank lines from every test file gives **1,182** blocks. Exactly **21**
+  are exact duplicates of another block, **11** of those span more than one file,
+  and the total redundant fixture text is **186 lines** - about 1.6 percent. The
+  largest cross-file case, 18 lines shared between
+  `SharpProof.Analyzer.Test/ContractApiIdentityAnalyzerTests.cs:276` and
+  `SharpProof.Worker.Test/ClaimManifestBuilderTests.cs:1272`, is a synthetic
+  `namespace SharpProof.Attributes { ... }` surface, which is **R309**. Nothing
+  else in the set is worth a finding.
+- **The three unmigrated `AssertEnum`/`AssertConstants` divergences were tested
+  against the schemas before being excluded, and each check reversed an initial
+  suspicion.** The artifact schema does contain the string `"flags"` twice, which
+  looked like an unchecked field next to the protocol suite's `flags` assertion; it
+  is `"kind": "flags"` on two mapping declarations and
+  `CompilerArtifactModelSchemaTests.cs:408` reads it. The protocol model does carry
+  one `internal const string Domain`, which looked like a constant invisible to a
+  `BindingFlags.Public` scan; it is hand-emitted scaffolding at
+  `Generate-ProtocolModel.ps1:1008`, not one of the schema's 13 declared constants.
+  Both helpers are correct for their own model.
+- **The four `InitializeRepositoryAsync(string)` declarations are not four copies.**
+  Three are thin wrappers over `ArchitectureGitRepository.InitializeAsync`
+  differing only in the author identity and git settings they pass, which is
+  applied R781 working as designed. The fourth,
+  `ContainerSourceCleanlinessTests.cs`, shares only the name: it writes a fixture
+  tree of scripts and sources, and its git bootstrap is a hundred lines further
+  down. The duplication R1620 files is the git bootstrap, not the wrapper.
+- **Private test helpers are 371 declarations with only 14 repeated signatures.**
+  Across every test file, `private` helper declarations parsed by return type,
+  name and parameter list give 371 declarations, of which **14** signatures appear
+  in more than one file. Nine of the fourteen are explained - `CreateCompilation`
+  and `CreateReferences` are R602, R608 and R729; `DeleteTemporaryRepository` is
+  R1507; `RequireNoErrors` and `CreatePlatformReferences` sit in two different
+  projects' hosts that part six hundred three already showed are not duplicates;
+  `AssertInvalid`, `Escape`, `Location` and `ReadSchema` are two-line or
+  path-specific. The remaining five are R1620 and R1621 above. This axis is now
+  fully accounted for.
+
+### Status (part six hundred six)
+
+R1620 is `pending` and is four call-site migrations plus a decision on
+`--object-format`; the decision is the substantive half, because the shared helper
+pins the hash algorithm and four fixtures do not. R1621 is `pending` and is one
+method moved into a file that both callers already reference.
