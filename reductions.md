@@ -19013,3 +19013,7 @@ R1669 is applied: the two module-initializer tests now share the static-write,
 synchronization, and completeness assertion envelope, while exception,
 recursion, and analyzed-method-count checks remain scenario-specific.
 `ModuleInitializerEffectTests` passes (5/5).
+
+R1667 is applied: IR identifier tests now use one ordered prefix table for
+default and factory-created formatting checks, while allocation, default-state,
+and string-hash assertions remain covered. `IrIdentifierTests` passes (2/2).
