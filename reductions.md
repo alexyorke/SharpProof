@@ -15828,6 +15828,12 @@ Test-SharpProofTrustedMutations registers 248 mutations across 108 distinct targ
 |---|---|---|
 | R1318 | **Test-SharpProofTrustedMutations rereads the same mutation target file for every registration in both preflight passes. Cache live and archived content independently by target path, then apply each mutation's unique-needle check to the cached text rather than duplicating file reads.** | scripts/Test-SharpProofTrustedMutations.ps1:2218-2235,2479-2486; 248 registrations across 108 distinct File values |
 
+### Status (continued)
+
+R1318 is applied: live and archived mutation preflight reads are cached by
+normalized target path, while each registration still receives its own needle
+diagnostic. Mutation preflight architecture test passes.
+
 ## Second survey, continued: R1319 - trusted-mutation evidence grows a PowerShell array with plus-equals
 
 The campaign starts its result accumulator as a regular array containing completed results, then appends each newly killed mutation with $results += $result. PowerShell arrays are fixed-size, so each append constructs and copies a larger array; the checkpoint writer serializes the accumulated prefix after every mutation, making the repeated accumulator copy an avoidable second cost on top of the intentionally durable write. A generic List[object] can be seeded with completed results and use Add while still being enumerated by Write-MutationEvidence and emitted as the same mutations array.
