@@ -14398,3 +14398,18 @@ error boundary.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1205 | **`CompilerLoweredArtifact.Decode` scans callable artifacts twice for one identity gate.** Its pre-loop condition materializes `artifacts.Select(item => item?.CallableId).Distinct(...).Count()` and then runs `artifacts.Any(item => item == null || !callables.ContainsKey(item.CallableId))` over the same rows. A single loop can combine null, duplicate-ID, and manifest-membership validation without changing the accepted artifact set or exception behavior. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:337-340` |
+
+## Second survey, part five hundred twenty-eight: R1206 - summary free-variable checks repeat the same list scans
+
+For each lowered summary call, `DecodeBody` builds `free` from the result and
+existential variables. The validation condition then performs one distinctness
+scan and three more `Any` scans over that unchanged list to reject duplicate,
+canonical, program, or previously claimed summary variables. A single
+`HashSet<IrVarId>` accumulation can retain the list for later relation
+construction while collecting the duplicate and membership flags in one pass;
+the independent relation-type and free-variable-role checks should remain
+separate.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1206 | **`CompilerLoweredArtifact.DecodeBody` rescans each summary call's free-variable list four times.** The `free` result-plus-existentials array is passed through `Distinct().Count()` and then through separate `Any` predicates for `canonical`, `programVariables`, and `summaryVariables`. One set-building pass can preserve all four rejection rules and the later `summaryVariables.UnionWith(free)` behavior without repeating the same bounded sequence traversal. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:888-907` |
