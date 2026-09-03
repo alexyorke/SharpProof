@@ -654,16 +654,21 @@ internal sealed class OperationCompletionEvaluator
             SymbolEqualityComparer.Default.Equals(
                 invocation.TargetMethod.OriginalDefinition,
                 method.OriginalDefinition);
-        return StaticInitializationMayComplete(method) &&
-            (hasUncertainVirtualDispatch ||
-             !DefiniteOperationFacts.HasSourceCompletionFlow(method) ||
-             _completionFacts.MethodCanCompleteNormally(method));
+        return CanCompleteMethodTail(method, hasUncertainVirtualDispatch);
     }
 
     internal bool CanMethodCompleteNormally(IMethodSymbol method)
     {
+        return CanCompleteMethodTail(method, hasUncertainVirtualDispatch: false);
+    }
+
+    private bool CanCompleteMethodTail(
+        IMethodSymbol method,
+        bool hasUncertainVirtualDispatch)
+    {
         return StaticInitializationMayComplete(method) &&
-            (!DefiniteOperationFacts.HasSourceCompletionFlow(method) ||
+            (hasUncertainVirtualDispatch ||
+             !DefiniteOperationFacts.HasSourceCompletionFlow(method) ||
              _completionFacts.MethodCanCompleteNormally(method));
     }
 

@@ -13555,8 +13555,9 @@ tail also preserves the order of the existing checks.
 
 ### Status (part four hundred eighty-four)
 
-R1162 is `pending`: share the static-initialization/source-completion tail and
-retain the invocation-only uncertain-dispatch escape.
+R1162 is applied: invocation and direct-method completion now share the
+static-initialization/source-completion tail, with the invocation-only uncertain
+dispatch escape passed explicitly. The Effects test suite passes (323/323).
 
 ## Second survey, part four hundred eighty-five: R1163 - repeated record-clone completion check
 
