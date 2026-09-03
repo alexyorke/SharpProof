@@ -14712,6 +14712,12 @@ Requires-call-site analyzer tests pass (82 passed).
 |---|---|---|
 | R1219 | **`HasReplayableCallEvaluation` repeats the same accessor-evaluation return across five branches.** Accessor/list-pattern, foreach, recursive-pattern, indirect-delegate, and implicit-operation cases all return `HasReplayableAccessorEvaluation(call, operationFacts)` independently. Combining those shape tests into one branch reduces accidental control-flow duplication without merging the separate `using` or ordinary-prefix rules. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:608-649` |
 
+### Status (part five hundred forty-one)
+
+R1219 is applied: replayability discovery combines accessor-style operation
+shapes into one result branch while retaining distinct using and ordinary-prefix
+policies. Requires-call-site analyzer tests pass (82 passed).
+
 ## Second survey, part five hundred forty-two: R1220 - primary-initializer arguments are copied twice
 
 `RequiresCallSiteAnalyzer.AnalyzePrimaryConstructorInitializer` stores initializer arguments in an `ImmutableArray<IArgumentOperation?>`, whether they came from an invocation operation or syntax-based semantic-model lookups. After checking that the array contains no nulls, it immediately calls `OfType<IArgumentOperation>().ToImmutableArray()` to build the `RequiresCallSiteCandidate`, re-enumerating and allocating the same argument sequence. A typed validated projection can serve both paths, retaining the null rejection for syntax-derived operations while removing the post-validation filtering copy.
