@@ -221,6 +221,8 @@ internal static class EffectTestHost
             caller,
             static (_, _) => false,
             static (_, _) => false,
+            static (_, _) => OperationNullnessEvaluator.NullState.Unknown,
+            static (_, _) => OperationNullnessEvaluator.NullState.Unknown,
             static _ => false);
     }
 
