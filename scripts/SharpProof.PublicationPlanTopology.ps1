@@ -70,12 +70,19 @@ function New-SharpProofPublicationInputSnapshot {
             $files.Add($file)
         }
     }
+    $seenPaths = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    $seenIdentities = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
     $entries = @($files | Sort-Object FullName | ForEach-Object {
-        Get-SharpProofPublicationPlanFileIdentity -Path $_.FullName
+        $entry = Get-SharpProofPublicationPlanFileIdentity -Path $_.FullName
+        if (-not $seenPaths.Add([string]$entry.path) -or
+            -not $seenIdentities.Add([string]$entry.fileIdentity)) {
+            throw 'Publication inputs are empty, duplicated, or aliased.'
+        }
+        $entry
     })
-    if ($entries.Count -eq 0 -or
-        @($entries.path | Sort-Object -Unique).Count -ne $entries.Count -or
-        @($entries.fileIdentity | Sort-Object -Unique).Count -ne $entries.Count) {
+    if ($entries.Count -eq 0) {
         throw 'Publication inputs are empty, duplicated, or aliased.'
     }
     return [pscustomobject][ordered]@{
