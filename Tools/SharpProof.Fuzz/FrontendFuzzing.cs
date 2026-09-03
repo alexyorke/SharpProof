@@ -979,15 +979,12 @@ public sealed class FrontendDifferentialOracle
             return [.. Enumerable.Repeat(failure, generatedCases.Count)];
         }
 
-        image.Position = 0;
-        var loadContext = new AssemblyLoadContext(
+        return WithLoadedGeneratedAssembly(
+            image,
             "SharpProofFrontendFuzz",
-            isCollectible: true);
-        try
-        {
-            var assembly = loadContext.LoadFromStream(image);
-            var runtimeType = assembly.GetType(
-                "SharpProofGeneratedFrontend")!;
+            "SharpProofGeneratedFrontend",
+            runtimeType =>
+            {
             var results = ImmutableArray.CreateBuilder<FrontendDifferentialResult>(
                 generatedCases.Count);
             for (var index = 0; index < generatedCases.Count; index++)
@@ -1044,11 +1041,7 @@ public sealed class FrontendDifferentialOracle
                     environment.SequenceOrigins));
             }
             return results.ToImmutable();
-        }
-        finally
-        {
-            loadContext.Unload();
-        }
+            });
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -1158,15 +1151,12 @@ public sealed class FrontendDifferentialOracle
                 method.Identifier.ValueText == SemanticEdgeMethodName(index)))
             .ToArray();
 
-        image.Position = 0;
-        var loadContext = new AssemblyLoadContext(
+        return WithLoadedGeneratedAssembly(
+            image,
             "SharpProofFrontendSemanticEdges",
-            isCollectible: true);
-        try
-        {
-            var assembly = loadContext.LoadFromStream(image);
-            var runtimeType = assembly.GetType(
-                "SharpProofGeneratedFrontendEdges")!;
+            "SharpProofGeneratedFrontendEdges",
+            runtimeType =>
+            {
             var results =
                 ImmutableArray.CreateBuilder<FrontendSemanticEdgeResult>(
                     cases.Count);
@@ -1182,6 +1172,24 @@ public sealed class FrontendDifferentialOracle
                     cancellationToken));
             }
             return results.ToImmutable();
+            });
+    }
+
+    private static TResult WithLoadedGeneratedAssembly<TResult>(
+        MemoryStream image,
+        string contextName,
+        string typeName,
+        Func<Type, TResult> callback)
+    {
+        image.Position = 0;
+        var loadContext = new AssemblyLoadContext(
+            contextName,
+            isCollectible: true);
+        try
+        {
+            var assembly = loadContext.LoadFromStream(image);
+            var runtimeType = assembly.GetType(typeName)!;
+            return callback(runtimeType);
         }
         finally
         {

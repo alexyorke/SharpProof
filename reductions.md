@@ -19196,3 +19196,8 @@ manifest canonicality/uniqueness, repository containment, and each caller's
 context-specific diagnostics remain explicit. The three focused inventory
 authority tests pass (3/3); the fourth test in the broader class still hits
 the pre-existing production-complexity member limit.
+
+R633 is applied: frontend differential and semantic-edge comparisons now share
+one collectible generated-assembly load/unload wrapper, while each path keeps
+its own method-shape validation, callback-specific results, cancellation, and
+image ownership. The focused fuzz comparison tests pass (7/7).
