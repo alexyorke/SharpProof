@@ -372,7 +372,12 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
 
     private static bool IsHexMarker(string value, int start)
     {
-        for (var index = start; index < start + 32; index++)
+        return IsHexRange(value, start, 32);
+    }
+
+    private static bool IsHexRange(string value, int start, int length)
+    {
+        for (var index = start; index < start + length; index++)
         {
             if (!IsHexDigit(value[index]))
             {
@@ -527,7 +532,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
     {
         return fileName.Length == 64 + CacheFileSuffix.Length &&
             fileName.EndsWith(CacheFileSuffix, StringComparison.Ordinal) &&
-            fileName.Take(64).All(IsHexDigit);
+            IsHexRange(fileName, 0, 64);
     }
 
     private void ValidatePath(string path)
