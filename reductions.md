@@ -14027,3 +14027,20 @@ for the distinct ordered-catch and filter policies.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1185 | **`ExceptionHandlerReachability.GetReachability` memoizes per catch but recomputes the shared protected-block exception set.** For every uncached `CatchClauseSyntax`, it resolves the enclosing try's block and calls `GetPotentialExceptions(protectedBlock)` even though that value does not depend on the target catch; sibling catches therefore repeat the same full operation walk. A per-try or per-protected-block potential cache can remove that repeated analysis while leaving each target's `CanKnownReach`, `CanUnknownReach`, and filter selection independent. | `SharpProof.Effects/ExceptionHandlerReachability.cs:22,45-79,82-90` |
+
+## Second survey, part five hundred eight: R1186 - invocation prerequisites are checked twice
+
+In the main exception walk, invocation processing first validates the receiver
+and every argument with `canCompleteNormally` to decide whether dereference,
+static initialization, and dispatch analysis may proceed. The same invocation
+is then pushed through `PushChildren`, whose invocation branch checks that
+receiver and argument prefix again before scheduling child operations. These
+checks have the same short-circuit completion policy; the second pass is not a
+different exception fact. Carry the validated prefix into the child scheduling
+helper, or have one helper return the schedulable child prefix together with
+the prerequisite result, while preserving the existing argument order and
+fail-closed behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1186 | **`ExceptionHandlerReachability` recomputes invocation prerequisites in its exception branch and child scheduler.** The `IInvocationOperation` case checks the instance and all argument values with `canCompleteNormally` before resolving nullness, initialization, and dispatch; after that, `PushChildren(invocation)` reaches the same receiver/argument completion checks before pushing the operation children. A shared prerequisite/scheduling projection can remove the duplicate completion walk without changing which invocation children are visited or which potential exceptions are added. | `SharpProof.Effects/ExceptionHandlerReachability.cs:238-278,1184-1210` |
