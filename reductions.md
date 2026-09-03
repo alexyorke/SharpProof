@@ -14170,3 +14170,17 @@ post-label policies while avoiding the fallback rewalk.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1193 | **`ExceptionHandlerReachability.GetGotoTargetContinuation` can traverse the same syntax subtree twice in its no-invocation fallback.** It scans `target.DescendantNodes()` for invocations, then, when none are found, scans `methodSyntax.DescendantNodes()` and filters by `SpanStart > target.Span.End`; the second method walk includes the already-tested label subtree. Reusing one method-level invocation sequence with a post-label slice can remove that redundant syntax traversal without changing the fallback's first-invocation behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1590-1627` |
+
+## Second survey, part five hundred sixteen: R1194 - lock completion is rechecked by the scheduler
+
+The lock branch first asks whether the locked value can complete before
+classifying its nullness and adding lock-related potential exceptions. It then
+passes the same operation to `PushChildrenCore`, whose lock case calls
+`canCompleteNormally(@lock.LockedValue)` again before deciding whether the
+body is reachable. The scheduler still needs the child-order and nullness
+policy, but it can consume the already-established completion fact from the
+exception branch or a shared lock-prefix projection.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1194 | **`ExceptionHandlerReachability` rechecks the locked value's completion.** The `ILockOperation` exception branch calls `canCompleteNormally(@lock.LockedValue)`, and `PushChildrenCore` calls the same predicate again while deciding whether to push `@lock.Body`; the operation and callback inputs are unchanged. Carrying the lock-value completion result into child scheduling removes the duplicate completion traversal without changing nullness or body-order semantics. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1000-1024,1350-1358` |
