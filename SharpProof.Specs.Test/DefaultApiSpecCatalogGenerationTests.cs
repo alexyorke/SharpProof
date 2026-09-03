@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -687,33 +686,16 @@ public sealed class DefaultApiSpecCatalogGenerationTests
     private static async Task<GeneratorResult> RunGeneratorAsync(
         params string[] arguments)
     {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "pwsh",
-            WorkingDirectory = TestRepository.FindRoot(),
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        startInfo.ArgumentList.Add("-NoLogo");
-        startInfo.ArgumentList.Add("-NoProfile");
-        startInfo.ArgumentList.Add("-File");
-        startInfo.ArgumentList.Add(GeneratorPath());
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(startInfo) ??
-            throw new InvalidOperationException(
-                "Failed to start the API-spec catalog generator.");
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        var startInfo = ProcessRunner.CreateStartInfo(
+            TestRepository.FindRoot(),
+            "pwsh",
+            ["-NoLogo", "-NoProfile", "-File", GeneratorPath(), .. arguments]);
+        var result = await ProcessRunner.RunCapturedAsync(
+            startInfo,
+            CancellationToken.None);
         return new GeneratorResult(
-            process.ExitCode,
-            (await output) + Environment.NewLine + (await error));
+            result.ExitCode,
+            result.Output + Environment.NewLine + result.Error);
     }
 
     private static string CatalogPath()
