@@ -32,6 +32,9 @@ internal sealed class ContractApiIdentityResolver
     private readonly Compilation _compilation;
     private readonly INamedTypeSymbol? _attribute;
     private readonly INamedTypeSymbol? _conditionalAttribute;
+    private readonly ConcurrentDictionary<IAssemblySymbol, bool>
+        _compilationReferenceCache =
+            new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<string, AttributeResolution> _attributes =
         new(StringComparer.Ordinal);
 
@@ -164,13 +167,15 @@ internal sealed class ContractApiIdentityResolver
     private bool IsCompilationReference(
         IAssemblySymbol assembly)
     {
-        return _compilation.References.Any(reference =>
-            reference is CompilationReference &&
-            _compilation.GetAssemblyOrModuleSymbol(reference) is
-                IAssemblySymbol referenced &&
-            SymbolEqualityComparer.Default.Equals(
-                assembly,
-                referenced));
+        return _compilationReferenceCache.GetOrAdd(
+            assembly,
+            candidate => _compilation.References.Any(reference =>
+                reference is CompilationReference &&
+                _compilation.GetAssemblyOrModuleSymbol(reference) is
+                    IAssemblySymbol referenced &&
+                SymbolEqualityComparer.Default.Equals(
+                    candidate,
+                    referenced)));
     }
 
     /// <summary>
