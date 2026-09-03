@@ -19029,3 +19029,11 @@ R510 is applied: simple, compound, read-modify-write, and coalesce assignment
 paths now share one completion-and-write commit helper, while ref-assignment,
 operator, conversion, and nullness-specific behavior remains in each caller.
 `SharpProof.Effects.Test` passes (323/323).
+
+## Second survey, continued: R1671 - Effect replay tests repeat the allocation-only unknown-result setup
+
+`AllocationCannotRefuteAnUnrelatedEffectContract` and the opening half of `ResponseAuthorityRejectsAllocationOnlyEnforcePureRefutation` both create a managed-object-allocation fixture, change its contract kind to `EnforcePure`, seal the evidence, assemble the claim result, and assert `Unknown`, `CounterexampleReplayFailed`, and a null effect witness. The second test then has a separate forged-response authority scenario, so the end-to-end tests should remain distinct; a helper returning or asserting this common allocation-only replay result can remove the duplicated setup and three-assertion envelope.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1671 | Two effect-replay tests duplicate the allocation-only `EnforcePure` setup and unknown-result assertions; centralize that prelude while retaining the distinct response-authority checks. | `SharpProof.Worker.Test/EffectCounterexampleReplayTests.cs:166-190,241-263` |
