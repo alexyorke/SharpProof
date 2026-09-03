@@ -16220,3 +16220,9 @@ In `ReleaseQualificationMatrixTests`, both receipt tests build the same six-elem
 | ID | Finding | Evidence |
 |---|---|---|
 | R1347 | **`ReleaseQualificationMatrixTests` constructs the same six package-artifact fixture twice.** Both receipt scenarios independently generate `package-{index}.nupkg` rows with `bytes = 1`; a shared fixture helper can preserve the distinct portable and pilot evidence shapes while removing the repeated setup. | `SharpProof.ArchitectureTest/ReleaseQualificationMatrixTests.cs:100-104,178-183` |
+
+### Status (continued)
+
+R1347 is applied: both qualification receipt scenarios use one shared package
+artifact factory, and the full matrix passes (3 passed). Isolated fixtures now
+also include the writer's required release-json and package-identity scripts.
