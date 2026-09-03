@@ -10554,3 +10554,15 @@ R1006 is deferred: keep the two public fixture names for readability and consoli
 ### Status (part two hundred thirty-eight)
 
 R1007 is deferred: preserve the independent `CountsMatch` validation and remove only the count aggregation that `SummarizeAssumptions` does not return to its caller.
+
+## Second survey, part two hundred thirty-nine: R1008 - linear cached-claim postcondition lookup
+
+`VerificationCache.ReplayCachedClaims` builds a target-by-callable dictionary whose value already contains each target's filtered postcondition array. It then resolves every cached claim's ordinal with `Array.FindIndex` over that same array before replaying it. The manifest claim ID is already indexed in `claimById`, and the target postcondition collection is immutable for the duration of the replay, so a per-target claim-ID-to-ordinal map can make the replay lookup direct. The map must preserve the current first-match/fail-closed behavior if malformed target data can contain duplicate or null claim IDs; this is a lookup optimization, not a proposal to skip the existing manifest, response, or replay validation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1008 | **Cached-claim replay linearly searches postconditions for every claim.** After materializing each callable's postcondition array, `ReplayCachedClaims` calls `Array.FindIndex` over that array once per cached claim. A target-scoped ordinal map (with explicit duplicate handling matching the current first-match behavior) can remove the repeated claim-ID scans while retaining manifest-ID lookup, model validation, entry-assumption checks, and concrete replay. | `SharpProof.Worker/VerificationCache.cs:598-646`; adjacent manifest claim index `:617-628`; analogous compiler-authority search `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:788-796` | |
+
+### Status (part two hundred thirty-nine)
+
+R1008 is deferred: preserve first-match and malformed-target rejection semantics when replacing the per-claim linear search with an index.
