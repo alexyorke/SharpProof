@@ -15172,6 +15172,12 @@ Frontend catalog-parity tests pass (6 passed).
 |---|---|---|
 | R1251 | **`LauncherArguments.LauncherRuntimePaths` rebuilds the same runtime-closure array repeatedly.** The generated getter allocates and recomputes all companion paths on each query; `ValidateDistinctPaths` queries it multiple times and once per component in a filter. Cache the stable projection or capture it once per validation while preserving the existing companion inventory and conflict checks. | `SharpProof.Worker.Launcher/LauncherArguments.generated.cs:52-70`; `SharpProof.Worker.Launcher/Program.cs:1037-1067` |
 
+### Status (part five hundred seventy-three)
+
+R1251 is applied: path validation captures the launcher runtime-closure array
+once per pass and reuses it for directory and conflict checks, retaining the
+generated companion inventory. Launcher argument tests pass (75 passed).
+
 ## Second survey, part five hundred seventy-four: R1252 - invocation arguments are lowered and validated in separate scans
 
 `RoslynProgramLowerer.LowerInvocation` first calls `LowerInvocationArguments`, which enumerates every argument, reads its parameter ordinal, lowers its value, sorts the resulting pairs, and materializes the IR terms. It then calls `IsDirectInvocation`, which enumerates the same Roslyn arguments again, rereads the parameter ordinals and parameter count, allocates a `HashSet<int>`, and checks explicit argument shape and ordinal uniqueness. The directness fact is needed for later havoc policy, but it can be accumulated alongside argument lowering or returned with the ordered argument projection, preserving the separate public helper for callers that only need a predicate.
