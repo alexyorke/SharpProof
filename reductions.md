@@ -14420,6 +14420,12 @@ repeated tree work; any cache must remain scoped to this lowerer's
 |---|---|---|
 | R1202 | **`RoslynOperationLowerer.Opaque` walks the same operation tree once for lowering and again for purity.** Receiver/argument children are enumerated and lowered through `LowerCore`, then `IsDemonstrablyPure` recursively traverses the operation and its children again to decide whether to create a pure opaque term. The existing lowering cache prevents duplicate lowering results but does not avoid the second purity walk. Combining the projections or memoizing purity per operation within a lowering run can preserve the distinct abstention, depth, and `_isKnownPure` semantics while removing redundant traversal.** | `SharpProof.Frontend/RoslynOperationLowerer.cs:290-338,345-391` |
 
+### Status (part five hundred twenty-four)
+
+R1202 is applied: purity results are memoized per operation and depth within
+each lowering run, preserving the depth limit and purity callback semantics.
+The Frontend test suite passes (121/121).
+
 ## Second survey, part five hundred twenty-five: R1203 - invocation result type is projected twice
 
 `LowerInvocation` needs the IR result type to create a temporary for a
