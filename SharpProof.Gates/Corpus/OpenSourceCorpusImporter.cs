@@ -158,10 +158,8 @@ SOFTWARE.
         var licenseContent = licenseText.EndsWith('\n')
             ? licenseText
             : licenseText + "\n";
-        var licenseHash = Convert.ToHexString(
-                System.Security.Cryptography.SHA256.HashData(
-                    Encoding.UTF8.GetBytes(licenseContent)))
-            .ToLowerInvariant();
+        var licenseHash = HashEncoding.ComputeSha256Hex(
+            Encoding.UTF8.GetBytes(licenseContent));
         var source = new OpenSourceCorpusSource(
             SourceId,
             RepositoryUrl,

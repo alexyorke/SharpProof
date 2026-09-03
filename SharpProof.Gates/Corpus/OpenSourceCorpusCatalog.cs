@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -57,24 +56,14 @@ internal static class OpenSourceCorpusCatalog
                 $"{method.SourceId}:{method.Path}:{method.StartLine}"))];
     }
 
-    [SuppressMessage(
-        "Globalization",
-        "CA1308:Normalize strings to uppercase",
-        Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
     internal static string ComputeSha256(string value)
     {
         return ComputeNormalizedSha256(NormalizeLineEndings(value));
     }
 
-    [SuppressMessage(
-        "Globalization",
-        "CA1308:Normalize strings to uppercase",
-        Justification = "Checked-in corpus manifests publish SHA-256 values in lowercase hexadecimal.")]
     internal static string ComputeNormalizedSha256(string normalizedValue)
     {
-        return Convert.ToHexString(
-                SHA256.HashData(Encoding.UTF8.GetBytes(normalizedValue)))
-            .ToLowerInvariant();
+        return HashEncoding.ComputeSha256Hex(Encoding.UTF8.GetBytes(normalizedValue));
     }
 
     internal static string NormalizeLineEndings(string value)
@@ -387,9 +376,7 @@ internal static class OpenSourceCorpusCatalog
                 $"OSS corpus source {source.Id} license file is missing.");
         }
 
-        var actualHash = Convert.ToHexString(
-                SHA256.HashData(File.ReadAllBytes(licensePath)))
-            .ToLowerInvariant();
+        var actualHash = HashEncoding.ComputeSha256Hex(File.ReadAllBytes(licensePath));
         if (!string.Equals(
                 actualHash,
                 source.LicenseSha256,

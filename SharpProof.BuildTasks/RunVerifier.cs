@@ -390,7 +390,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     internal static string CreateSupervisorNonce()
     {
         return Convert.ToHexString(
-            RandomNumberGenerator.GetBytes(32)).ToUpperInvariant();
+            RandomNumberGenerator.GetBytes(32));
     }
 
     internal static bool WaitForOutputCompletion(
