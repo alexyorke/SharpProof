@@ -556,7 +556,8 @@ internal static class CompilerImplementationIlSummaryLowerer
             }
 
             var builder = new IrProgramBuilder(_factory);
-            var blocks = leaders.ToDictionary(
+            var leaderArray = leaders.ToArray();
+            var blocks = leaderArray.ToDictionary(
                 static offset => offset,
                 offset => builder.CreateBlock(
                     "il:" + offset.ToString(
@@ -572,7 +573,6 @@ internal static class CompilerImplementationIlSummaryLowerer
                 return null;
             }
 
-            var leaderArray = leaders.ToArray();
             // Instructions are already decoded in offset order.  Keep an
             // offset-to-index map so each basic block can walk its contiguous
             // slice once instead of filtering the complete instruction list.
