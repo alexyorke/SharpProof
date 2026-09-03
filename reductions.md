@@ -19571,3 +19571,11 @@ R537 is applied: `IrStructuralShrinker` now consumes the canonical
 assembly declaration, removing its duplicate IR child-kind switch while leaving
 shrinker rebuilding and minimization policy unchanged. The focused fuzz runner
 tests pass (32/32).
+
+## Second survey, continued: R1721 - list-pattern consumers duplicate slice-versus-indexer member selection
+
+`RequiresCallSiteDiscovery.GetListPatternCalls` and `OperationCompletionEvaluator.GetReachableImplicitListPatternMembers` independently select the callable member for each list-pattern item with the same three-way policy: a slice item with no nested pattern yields null, a slice with a nested pattern resolves `slice.SliceSymbol`, and a non-slice resolves `pattern.IndexerSymbol`, all through `SwitchExpressionFacts.GetCallableListPatternMember`. Their later work is intentionally different (implicit-call argument construction versus completion/member collection), but this shared selection rule is a second authority for the same list-pattern shape. A small Effects-internal helper that accepts the pattern and item can centralize the projection while retaining each consumer's ordering and short-circuit behavior; this is narrower than R1161's duplicated list-shape preparation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1721 | `RequiresCallSiteDiscovery` and `OperationCompletionEvaluator` repeat the exact slice/nested-pattern versus indexer member selector; centralize only that projection. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1487-1498`; `SharpProof.Effects/OperationCompletionEvaluator.cs:463-471`; related R1161 |
