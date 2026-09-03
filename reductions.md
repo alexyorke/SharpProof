@@ -18950,3 +18950,11 @@ needs a focused failure-path test before changing behavior.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1665 | Three release-authority contract tests repeat script-name arrays, path construction, and file reads; share a snapshot/table-driven harness while preserving their distinct required markers and the first test's fourth script. | `SharpProof.Package.Test/ReleasePublicationScriptTests.cs:296-320,568-619` |
+
+## Second survey, continued: R1666 - Release tests repeat the full package-feed copy loop
+
+Four release scenarios rebuild the same package-source fixture by iterating `feed.Packages.Concat(feed.SymbolPackages)`, deriving each archive filename, and copying it into `workspace.PackageSource`: the offline collision plan, stale-commit plan, invalid-symbol payload, and payload-closure tests. The only variation is local formatting and a temporary destination variable; the selective single-package role test is a different shape and can remain local. A `PublicationWorkspace`/test helper that populates all six feed archives would centralize this immutable setup and keep future package-count changes synchronized across the scenarios.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1666 | Four release scenarios duplicate the all-packages-to-fixture copy loop; centralize population of `PublicationWorkspace.PackageSource` while retaining selective single-package mutations separately. | `SharpProof.Package.Test/ReleasePublicationScriptTests.cs:120-129,238-246,331-340,629-638` |
