@@ -14,56 +14,48 @@ public sealed class CompilerProbeInputConsistencyTests
     [Test]
     public async Task StatefulAdditionalTextCannotAuthenticateDifferentGeneratorInput()
     {
-        var root = Path.Combine(
-            Path.GetTempPath(),
-            "sharpproof-probe-input-consistency-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            var outputPath = Path.Combine(root, "probe.json");
-            var input = new StatefulAdditionalText(
-                Path.Combine(root, CompilerProbeContract.AdditionalFileName),
-                "generator-value",
-                "later-value");
-            var options = new ProbeOptionsProvider(
-                outputPath,
-                input,
-                metadataValue: "metadata");
-            var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(
-                LanguageVersion.CSharp12);
-            var compilation = CreateCompilation(parseOptions);
-            GeneratorDriver driver = CSharpGeneratorDriver.Create(
-                generators: [new CompilerProbeGenerator().AsSourceGenerator()],
-                additionalTexts: [input],
-                parseOptions: parseOptions,
-                optionsProvider: options);
+        using var temporary = new TempDirectory(
+            "sharpproof-probe-input-consistency-");
+        var root = temporary.FullName;
+        var outputPath = Path.Combine(root, "probe.json");
+        var input = new StatefulAdditionalText(
+            Path.Combine(root, CompilerProbeContract.AdditionalFileName),
+            "generator-value",
+            "later-value");
+        var options = new ProbeOptionsProvider(
+            outputPath,
+            input,
+            metadataValue: "metadata");
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(
+            LanguageVersion.CSharp12);
+        var compilation = CreateCompilation(parseOptions);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [new CompilerProbeGenerator().AsSourceGenerator()],
+            additionalTexts: [input],
+            parseOptions: parseOptions,
+            optionsProvider: options);
 
-            driver.RunGeneratorsAndUpdateCompilation(
-                compilation,
-                out var generatedCompilation,
-                out var generatorDiagnostics);
+        driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var generatedCompilation,
+            out var generatorDiagnostics);
 
-            Assert.That(generatorDiagnostics, Is.Empty);
-            var analyzerOptions = new AnalyzerOptions([input], options);
-            var diagnostics = await generatedCompilation.WithAnalyzers(
-                    [new CompilerProbeAnalyzer()],
-                    new CompilationWithAnalyzersOptions(
-                        analyzerOptions,
-                        onAnalyzerException: null,
-                        concurrentAnalysis: false,
-                        logAnalyzerExecutionTime: false,
-                        reportSuppressedDiagnostics: false))
-                .GetAnalyzerDiagnosticsAsync();
+        Assert.That(generatorDiagnostics, Is.Empty);
+        var analyzerOptions = new AnalyzerOptions([input], options);
+        var diagnostics = await generatedCompilation.WithAnalyzers(
+                [new CompilerProbeAnalyzer()],
+                new CompilationWithAnalyzersOptions(
+                    analyzerOptions,
+                    onAnalyzerException: null,
+                    concurrentAnalysis: false,
+                    logAnalyzerExecutionTime: false,
+                    reportSuppressedDiagnostics: false))
+            .GetAnalyzerDiagnosticsAsync();
 
-            Assert.That(
-                diagnostics.Select(static diagnostic => diagnostic.Id),
-                Is.EquivalentTo([CompilerProbeContract.FailureDiagnosticId]));
-            Assert.That(File.Exists(outputPath), Is.False);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        Assert.That(
+            diagnostics.Select(static diagnostic => diagnostic.Id),
+            Is.EquivalentTo([CompilerProbeContract.FailureDiagnosticId]));
+        Assert.That(File.Exists(outputPath), Is.False);
     }
 
     private static CSharpCompilation CreateCompilation(

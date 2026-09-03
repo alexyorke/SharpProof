@@ -19128,3 +19128,8 @@ The complete `SharpProof.Meta.Analyzers.Test` project passes (163/163).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1678 | The opaque-identity test class repeats a four-assertion helper body for two abstention values; parameterize the expected enum. | `SharpProof.Frontend.Test/OpaqueSemanticIdentityTests.cs:42-43,73-74,139-166` |
+
+R1677 is applied: the compiler-probe test now owns its temporary root with the
+shared `TempDirectory` helper, removing manual GUID path construction and
+recursive cleanup. The focused `CompilerProbeInputConsistencyTests` test passes
+(1/1).
