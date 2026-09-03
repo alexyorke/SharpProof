@@ -18366,3 +18366,7 @@ schema-model axis is closed.
 R1509 is applied: the redundant `immutableObservations` alias was removed from
 `CorpusGate.RunAsync`; all downstream checks use the existing immutable array
 directly. `CorpusGateTests` pass (23/23).
+
+R1510 is applied: corpus support counts are accumulated alongside case-index
+construction in one pass, preserving duplicate-ID detection and all support
+classification values. `CorpusGateTests` pass (23/23).

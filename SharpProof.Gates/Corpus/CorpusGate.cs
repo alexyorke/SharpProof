@@ -81,11 +81,26 @@ internal static class CorpusGate
         var casesByIdBuilder = ImmutableDictionary.CreateBuilder<
             string, CorpusCase>(StringComparer.Ordinal);
         var duplicateCaseIds = false;
+        var supportedCaseCount = 0;
+        var supportedOpenSourceMethodCount = 0;
+        var intentionallyUnsupportedCaseCount = 0;
         foreach (var item in cases)
         {
             if (!casesByIdBuilder.TryAdd(item.Id, item))
             {
                 duplicateCaseIds = true;
+            }
+            if (item.Support == CorpusSupport.Supported)
+            {
+                supportedCaseCount++;
+                if (item.Origin == CorpusOrigin.OpenSource)
+                {
+                    supportedOpenSourceMethodCount++;
+                }
+            }
+            else if (item.Support == CorpusSupport.IntentionallyUnsupported)
+            {
+                intentionallyUnsupportedCaseCount++;
             }
         }
         if (duplicateCaseIds)
@@ -189,13 +204,6 @@ internal static class CorpusGate
             observation.Verdict == CorpusVerdict.SilentUnknown);
         var totalUnknownCount = unknownCount + silentUnknownCount;
         var casesById = casesByIdBuilder.ToImmutable();
-        var supportedCaseCount = cases.Count(static item =>
-            item.Support == CorpusSupport.Supported);
-        var supportedOpenSourceMethodCount = cases.Count(static item =>
-            item.Origin == CorpusOrigin.OpenSource &&
-            item.Support == CorpusSupport.Supported);
-        var intentionallyUnsupportedCaseCount = cases.Count(static item =>
-            item.Support == CorpusSupport.IntentionallyUnsupported);
         var supportedUnknownCount = observations.Count(observation =>
             casesById[observation.CaseId].Support == CorpusSupport.Supported &&
             observation.Verdict is
