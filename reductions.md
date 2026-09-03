@@ -17682,3 +17682,35 @@ result loop. Mutation evidence behavioral fixtures pass.
 R1398 is applied: mutation baseline grouping now uses one `TryGetValue` probe
 and a retained local group per invocation identity, preserving collision
 validation and sorted output. Mutation evidence behavioral fixtures pass.
+
+## Second survey, continued: R1509 - the corpus gate introduces a no-op observation alias before every downstream consumer
+
+`CorpusGate.RunAsync` assigns `var immutableObservations = observations` and then routes the metamorphic, cache-replay, concurrency, count, reason, and result logic through that local. `observations` is already an `ImmutableArray<CorpusObservation>` and the assignment performs no materialization or conversion; the method later uses the original name again for the diagnostic total. Removing the alias (or using one consistently named local) removes a misleading indication that an immutable copy or normalization occurred without changing any value or lifetime.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1509 | **`CorpusGate.RunAsync` names the same immutable observation array twice.** `observations` is returned by `ObserveAllAsync` as an `ImmutableArray<CorpusObservation>`, and line 171 immediately assigns it to `immutableObservations` with no transformation. Every consumer between lines 173 and 235 could use the original value; the later `observations.Sum(...)` at line 229 confirms the alias is not an ownership boundary. This is accidental naming complexity rather than a defensive copy. | `SharpProof.Gates/Corpus/CorpusGate.cs:62-66,171-219,229-230` |
+
+## Second survey, continued: R1510 - the corpus gate rescans every case three times for support summary counters
+
+After the `casesByIdBuilder` loop has already visited every `CorpusCase`, `RunAsync` calls `cases.Count` independently for supported cases, supported open-source cases, and intentionally unsupported cases. These are disjoint predicates over the same immutable input and produce only scalar metadata. The existing index-building loop can accumulate the three counters alongside `TryAdd`, or a single summary pass can do so, preserving duplicate-ID detection and all values while removing two full traversals.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1510 | **`CorpusGate.RunAsync` performs three avoidable full scans for related counts.** The case index loop at lines 81-94 already touches every case, then lines 193-199 enumerate `cases` once for each of three support aggregates. Because `cases` is immutable for the run and the predicates are independent scalar classifications, one accumulator in the existing loop (or one shared summary pass) can produce all three counts. The current shape needlessly repeats iteration and hides that these values are one partition summary. | `SharpProof.Gates/Corpus/CorpusGate.cs:81-94,192-199,220-235` |
+
+## Second survey, continued: R1511 - the canonical-hash stream-growth tests duplicate their entire failure harness
+
+`CanonicalHashWriterTests.StreamGrowthBeyondTheDeclaredLength` and `ZeroLengthStreamGrowthFailsClosed` each construct a writer, construct a `GrowingStream`, invoke `writer.Add(stream)`, and assert the same `InvalidDataException`; only the initial byte array differs. A parameterized test case or a small assertion helper can retain the two boundary inputs while keeping one setup and failure assertion.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1511 | **Two `CanonicalHashWriter` stream-growth tests differ only in fixture length.** The non-empty and zero-length tests have byte-for-byte identical setup and assertion structure, with `[0, 1, 2, 3]` versus `[]` as the sole behavioral input difference. Keeping the two cases as data in one test makes the boundary coverage explicit and removes duplicated test scaffolding. | `SharpProof.Ir.Test/CanonicalHashWriterTests.cs:85-105` |
+
+## Second survey, continued: R1512 - the ContractFor cycle tests repeat one unsupported implementation body three times
+
+`ContractForCycleAnalyzerTests` embeds the same `Map` implementation - `Contract.Ensures(true); Func<int> unsupported = () => value; return unsupported();` - in the self-cycle fixture and in both classes of the mutual-cycle fixture. The cycle topology and diagnostic assertions are the actual variables; a shared fixture fragment or source-builder helper can supply the implementation body while those topology-specific assertions remain local.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1512 | **The self-cycle and mutual-cycle fixtures duplicate the same implementation source.** The self-target test has the body once, while the mutual-cycle test copies it into both `LeftContracts.Map` and `RightContracts.Map`; all three copies exist only to force implementation analysis alongside cycle diagnostics. Sharing that raw body through a narrowly scoped fixture helper would keep the semantic trigger in one place and reduce drift between regression cases without merging their distinct cycle assertions. | `SharpProof.Analyzer.Test/ContractForCycleAnalyzerTests.cs:49-104` |
