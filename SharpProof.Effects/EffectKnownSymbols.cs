@@ -2,6 +2,10 @@ namespace SharpProof.Effects;
 
 internal sealed class EffectKnownSymbols
 {
+    private readonly object _awaiterCacheGate = new();
+    private readonly Dictionary<INamedTypeSymbol, IMethodSymbol?> _awaiterContinuations =
+        new(SymbolEqualityComparer.Default);
+
     internal EffectKnownSymbols(Compilation compilation)
     {
         compilation = ArgumentNullGuard.NotNull(
@@ -29,12 +33,22 @@ internal sealed class EffectKnownSymbols
             return null;
         }
 
-        return FindInterfaceImplementation(
-                namedAwaiter,
-                CriticalNotifyCompletionUnsafeOnCompleted) ??
-            FindInterfaceImplementation(
-                namedAwaiter,
-                NotifyCompletionOnCompleted);
+        lock (_awaiterCacheGate)
+        {
+            if (_awaiterContinuations.TryGetValue(namedAwaiter, out var cached))
+            {
+                return cached;
+            }
+
+            var resolved = FindInterfaceImplementation(
+                    namedAwaiter,
+                    CriticalNotifyCompletionUnsafeOnCompleted) ??
+                FindInterfaceImplementation(
+                    namedAwaiter,
+                    NotifyCompletionOnCompleted);
+            _awaiterContinuations.Add(namedAwaiter, resolved);
+            return resolved;
+        }
     }
 
     private static IMethodSymbol? FindMethod(

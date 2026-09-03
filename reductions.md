@@ -12496,9 +12496,10 @@ but its awaiter lookup retains no result for an already-seen awaiter type.
 
 ### Status (part four hundred sixty-six)
 
-R1150 is `pending`: memoize awaiter-type continuation resolution within the
-compilation-scoped analysis session, including negative results, without changing
-the unsafe-before-ordinary continuation selection.
+R1150 is applied: `EffectKnownSymbols` now caches awaiter-type continuation
+resolution, including negative results, behind a compilation-scoped lock while
+retaining unsafe-before-ordinary fallback selection. The full `SharpProof.Effects.Test`
+suite passes (323/323).
 
 ## Second survey, part four hundred sixty-seven: R1151 - two forms of one assertion scope, 96 to 4
 
