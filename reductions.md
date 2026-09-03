@@ -19774,3 +19774,216 @@ both `pending`, and both now confirmed accurate at HEAD.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1761 | Two adjacent primary-constructor argument tests repeat the Guard/Base/analyzer harness; parameterize only the base argument and expected diagnostic IDs. | `SharpProof.Analyzer.Test/RequiresAndControlTests.cs:581-623,605-624`; related R1760 |
+## Second survey, part six hundred fifteen: R1780 - seventy-seven analyzer tests suppress every diagnostic they do not already expect, so their exact-sequence oracle cannot fail by surprise
+
+`RequiresAndControlTests.cs` - 2,972 lines and 86 tests, the largest analyzer test
+file and one this ledger had never read for content - turns out to have a single
+dominant shape, and reading it leads to a property of the shared test host that
+applies far beyond that file.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1780 | **Seventy-seven analyzer tests pass, as the set of diagnostics to enable, exactly the set of diagnostics they then assert - and the host suppresses everything else - so none of the seventy-seven can fail because the analyzer started reporting something new.** `AnalyzerTestHost.CreateCompilation:62-92` takes an `enabledIds` collection and, when it is non-empty, calls `WithSpecificDiagnosticOptions` mapping **every** id in `new SharpProofAnalyzer().SupportedDiagnostics` to `ReportDiagnostic.Warn` if it is in the set and **`ReportDiagnostic.Suppress` if it is not**. `AnalyzerTestHost.AssertIds:19-26` then asserts `diagnostics.Select(d => d.Id)` `Is.EqualTo(expected)` - an exact, ordered sequence comparison, which reads as a strict oracle. It is strict only inside a set the test itself narrowed to its own expectation. A representative case, `PrimaryConstructorSameNamedOverloadIsAnalyzed`: `AnalyzeAsync(source, "contracts", ["SP0027"])` followed by `AssertIds(diagnostics, "SP0027")`. The other twelve analyzer diagnostics are suppressed in that compilation, so if a change made the analyzer additionally report `SP0002`, `SP0016` or `SP0046` on this fixture, the test would pass unchanged. **The count is 77 of 78.** Scanning every test that pairs an `enabledIds` list with an `AssertIds` call gives **81** candidates, of which three are parser artefacts (a variable name inside the asserted arguments). Of the real 78, **77 have the two sets equal**; the concentration is **50 in `RequiresAndControlTests.cs`** - more than half its 86 tests - **19 in `AnalyzerModeAndEffectTests.cs`**, and 8 across six other files. **Exactly one test uses the mechanism the strong way**, and it proves the strong way works: `RequiresAndControlTests.SuppressionOnlyChangesReportingAndTrustDoesNotSharpen` enables `["SP0002", "SP0024"]` and asserts only `["SP0002"]`, so it can and does establish that SP0024 is absent. **The remedy costs nothing and the host already implements it.** `CreateCompilation:74` only applies the suppression map `if (!enabled.IsEmpty)`; passing an empty collection leaves every diagnostic at its catalog default, and all thirteen are `isEnabledByDefault: true`. So `AnalyzeAsync(source, "contracts", [])` with an unchanged `AssertIds(diagnostics, "SP0027")` converts an oracle that cannot see surprises into one that fails on any unexpected id, for the price of deleting two characters per test. Where a fixture genuinely needs unrelated noise suppressed, the narrowing should stay and say so - which is what the one correct test demonstrates. | `SharpProof.Analyzer.Test/AnalyzerTestHost.cs:19-26,36-60,62-92` (especially `:74-83`, the `Warn`-or-`Suppress` map); `RequiresAndControlTests.cs` (50 of 86 tests; `PrimaryConstructorSameNamedOverloadIsAnalyzed`, `PartialMethodRequiresBelongsToImplementationExactlyOnce` as representatives; `SuppressionOnlyChangesReportingAndTrustDoesNotSharpen` as the one counter-example); `AnalyzerModeAndEffectTests.cs` (19); `ContractIntrinsicValidationTests.cs`, `RequiresCallSiteDiscoveryTests.cs`, `AdvisoryActivationTests.cs`, `MemberInitializerConstructorPathRegressionTests.cs`, `UnrelatedClausePlacementPreconditionRegressionTests.cs`, `VirtualHierarchyPreconditionRegressionTests.cs` (8); `eng/diagnostics/diagnostic-descriptors.v1.json` for the thirteen ids and their defaults; related R1720, R1760 |
+
+### Checked and not proposed (part six hundred fifteen)
+
+- **The file's shape census is what led here, and it is worth recording.**
+  `RequiresAndControlTests.cs` has 86 `[Test]` methods but only **71**
+  `Assert.That` calls - fewer assertions than tests - because most delegate.
+  Classifying every test block by which host entry points it calls and whether it
+  asserts directly gives: **41** that call `AnalyzeAsync` then `AssertIds` and
+  nothing else, **27** that call `AnalyzeAsync` and assert directly, **9** that do
+  both, and 9 singletons using `CreateCompilation`, `EmitReference` or a local
+  helper. The 41 are pure `(source, mode, expected ids)` triples and are the
+  clearest `[TestCase]` candidates in the repository - about six lines of envelope
+  each, roughly 250 lines of ceremony for 41 rows of data. That consolidation is
+  **R1760**'s remedy applied to the whole file rather than to its ten-method
+  cluster, and it should be sequenced after R1780: collapsing 41 tests into rows
+  while every row still suppresses its own competition would bake the weak oracle
+  into a table.
+- **`AssertIds` is a good helper and is not the problem.** Its two overloads assert
+  an exact ordered id sequence, and the second, `AssertIds(diagnostics, expected,
+  count)`, expands to a repeated sequence so that "exactly three SP0027" is
+  expressible. It is the correct shape; what weakens it is the enable-set passed
+  three lines earlier.
+- **This is not the count-only weakness of R1720 and should not be merged with
+  it.** R1720 concerns eleven tests whose assertion is a *count* of one id, losing
+  location; R1780 concerns tests whose assertion is an exact *sequence* but over a
+  pre-filtered universe, losing everything outside the filter. A test can suffer
+  both; none of the eleven in R1720 is among the 77 here, because
+  `SharpProofSoundnessAnalyzerTests` uses a different host.
+- **Four candidates were rejected as parser artefacts before filing.** Three of the
+  four "enabled set differs from asserted set" hits -
+  `DefinitelyAbsentLiftedArithmeticSatisfiesDoesNotThrow`,
+  `SourceConditionalInvocationAndArgumentsFollowEmission`,
+  `PartialInvocationFollowsCompilerEmission` - differ only because the asserted
+  argument list contains an identifier (`unsafeMethods.Length`,
+  `expectedDiagnostics`) rather than a literal. Only
+  `SuppressionOnlyChangesReportingAndTrustDoesNotSharpen` genuinely enables more
+  than it expects, and the finding leans on that one case rather than on the count
+  of four.
+
+### Status (part six hundred fifteen)
+
+R1780 is `pending`. It is the largest-scope test finding in this survey - 77 tests
+across eight files - and the cheapest to apply: the enable-set argument becomes
+`[]` wherever a test has no reason to suppress. It should be applied **before**
+R1760's table consolidation of the same file, because the two touch the same lines
+and the order determines whether the resulting table carries the strong oracle or
+the weak one.
+
+## Second survey, part six hundred sixteen: R1800 - the suppression map is re-implemented three times inline beside the helper that offers it, and the shipped gate does the opposite
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1800 | **`ContractApiIdentityAnalyzerTests.cs` builds `AnalyzerTestHost.CreateCompilation`'s diagnostic-suppression map by hand three times, in a file that calls the host on the next line each time - and the production gate host, given the same choice, enables every descriptor instead.** At `:396-402`, `:462-469` and `:551-558` the file writes `new SharpProofAnalyzer().SupportedDiagnostics.ToImmutableDictionary(descriptor => descriptor.Id, descriptor => descriptor.Id == "SP0050" ? ReportDiagnostic.Warn : ReportDiagnostic.Suppress, StringComparer.Ordinal)` - the second and third naming `"SP0047"` - which is character-for-character the body of `AnalyzerTestHost.CreateCompilation:76-82` with the set membership test replaced by an equality against one literal. Each of the three then immediately calls `AnalyzerTestHost.AnalyzeAsync(compilation, ...)`, so the host is in scope and already used; `AnalyzerTestHost.CreateCompilation(source, ["SP0050"], references)` expresses the same thing in one line. **They are also three more instances of R1780 that its census could not see.** That scan matched tests passing an `enabledIds` argument; these three construct the map inline, so they suppress the other twelve diagnostics without appearing in the count of 77. The real total is 80. **The shipped gate is the counter-example and it is explicit about why.** `SharpProof.Gates/AnalyzerGateHost.cs:34-38` derives `DiagnosticIds` from `GeneratedDiagnosticDescriptors.SupportedDiagnostics` rather than listing them, under a doc comment ending *"descriptor cannot be silently omitted from the gate"*, and `:50-54` maps **every** id to `ReportDiagnostic.Warn` with no suppression branch at all. So the code that runs the analyzer over the real corpus enables all thirteen diagnostics by construction, while eighty tests run it with twelve of the thirteen switched off - and the eighty are the ones asserting an exact diagnostic sequence. | `SharpProof.Analyzer.Test/ContractApiIdentityAnalyzerTests.cs:390-404,458-472,545-562`; `SharpProof.Analyzer.Test/AnalyzerTestHost.cs:62-92`; `SharpProof.Gates/AnalyzerGateHost.cs:32-38,44-58`; related R1780, R730, R1580 |
+
+### Checked and not proposed (part six hundred sixteen)
+
+- **R1780's scope stops at the analyzer host and does not reach the other test
+  projects.** `EffectTestHost.CreateCompilation` takes only a source and additional
+  references - it has no `enabledIds` parameter and calls
+  `WithSpecificDiagnosticOptions` nowhere - so `SharpProof.Effects.Test`'s 64 files
+  run every diagnostic at its default severity. Searching the whole repository for
+  `WithSpecificDiagnosticOptions` finds six sites: the analyzer host, the three
+  inline copies in R1800, the production gate host, and
+  `FinalCompilationCollectorTests.cs:538-547`, which raises `CS0168` to `Error` to
+  force a compiler error on purpose - the opposite direction and correct.
+- **`AnalyzerGateHost.DiagnosticIds` is a derived list, not a hand-written one, and
+  is worth naming as a positive.** It is `GeneratedDiagnosticDescriptors.SupportedDiagnostics
+  .Select(d => d.Id).Distinct().OrderBy(...)` - the tier-A shape of part six hundred
+  eight applied to a vocabulary rather than a file set. Adding a fourteenth
+  descriptor to the catalog puts it in the gate automatically. This is the same
+  repository that hand-writes the six-fixture parallelism list of R1640 and the
+  22-name production-project array of R362; the technique is present and unevenly
+  applied.
+- **The three inline copies differ from the host in one respect that is not an
+  improvement.** The host tests set membership (`enabled.Contains(descriptor.Id)`),
+  the copies test equality against a single literal, so each copy can enable
+  exactly one diagnostic. Two of the three want exactly one; whether the third
+  does is not stated anywhere. Replacing them with the host call makes the
+  single-element case explicit as `["SP0047"]` and leaves room to widen it, which
+  is what R1780 asks for.
+
+### Status (part six hundred sixteen)
+
+R1800 is `pending` and is three call-site replacements of about seven lines each.
+It should travel with R1780: the same edit that removes the hand-built map decides
+which ids the test enables, and the production gate two directories away shows
+what that answer is when nobody is economising.
+
+## Second survey, part six hundred seventeen: R1820 - the largest MSBuild duplication is an analyzer reference copied eighteen times, gated by a hand-written sixteen-name list that omits two of the copies
+
+A duplication measurement across the MSBuild family that had not been run: all
+**78** tracked `.props`, `.targets`, `.csproj` and `.nuspec` files, comment-stripped
+and normalized to **1,566** significant lines, then scanned for repeated lines and
+for contiguous three-line blocks shared between files.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1820 | **The single largest block of duplicated build configuration is a three-line `ProjectReference` to `SharpProof.Meta.Analyzers`, copied into eighteen `.csproj` files, and the architecture gate that protects it iterates a hand-written sixteen-name array - so two of the eighteen are ungated and one of those two is production code in the trusted computing base.** The block is `<ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />`, and it is the most-shared three-line sequence in the repository's build files by a wide margin - the runner-up, a pair of `ProjectReference` lines to `SharpProof.Ir` and a sibling, appears in eight. `BoundaryEnforcementTests.EverySoundnessCriticalProjectRunsTheMetaAnalyzer:364-387` loads each project named in `SoundnessCriticalProjects` and asserts the reference exists with `OutputItemType="Analyzer"` and `ReferenceOutputAssembly="false"`. **All sixteen pass, and the check runs in one direction only.** Measured: eighteen projects carry the reference; `SoundnessCriticalProjects` names sixteen; the set difference is `SharpProof.Meta.Analyzers.Test`, which is deliberate self-dogfooding covered by `MetaAnalyzerSelfDogfoodsBannedApisWithoutReferencingItself`, and **`SharpProof.Worker.Launcher`**, which is production code, is declared in the acceptance contract's trusted computing base, and appears in `eng/release/first-party-assemblies.json` - and whose meta-analyzer coverage nothing asserts. Deleting its reference breaks no test. In the other direction, **six production projects run no meta-analyzer at all** - `SharpProof.Attributes`, `SharpProof.BuildTasks`, `SharpProof.Fuzz`, `SharpProof.Gates`, `SharpProof.Meta.Analyzers` and `SharpProof.Worker.Protocol` - of which `BuildTasks`, `Gates` and `Worker.Protocol` are also TCB-declared. Whether that is intended is stated nowhere. **`SoundnessCriticalProjects` is the third hand-written project-classification array in one assembly.** `ArchitectureRepository` already declares `ProductionProjects` (22) and derives `BannedApiProjects` (23), which R362 and R1508 are about; `BoundaryEnforcementTests:13-33` adds a third, sixteen names, overlapping both and equal to neither. **The remedy is demonstrated twice in the file that should own it.** `Directory.Build.props:94-99` already attaches `Microsoft.CodeAnalysis.Analyzers` to every project where `IsRoslynAnalyzer` is true, and `:127-131` attaches `BannedApiAnalyzers` plus `BannedSymbols.txt` to every `SharpProofProductionProject`. One more `ItemGroup` on a `SharpProofSoundnessCritical` property collapses eighteen copies to one declaration and eighteen one-line opt-ins - and makes the gate's list derivable rather than restated. | `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:13-33,364-387`; the eighteen `.csproj` files carrying the reference; `SharpProof.Worker.Launcher/SharpProof.Worker.Launcher.csproj` (the ungated production copy); `Directory.Build.props:94-99,127-131` for the mechanism already in use; `eng/acceptance/contract.json` and `eng/release/first-party-assemblies.json` for `Worker.Launcher`'s standing; related R362, R1508, R1640, R973 |
+
+### Checked and not proposed (part six hundred seventeen)
+
+- **The rest of the MSBuild duplication is either central already or inherent.**
+  Of the 1,566 significant lines across 78 files, the most repeated are
+  `<Project Sdk="Microsoft.NET.Sdk">` (60), `ReferenceOutputAssembly="false"` (20),
+  `<TargetFramework>netstandard2.0</TargetFramework>` (20), the
+  `SharpProof.Ir` project reference (20) and
+  `<PackageReference Include="System.Collections.Immutable" />` (20). None is a
+  reduction: the SDK line is required per project, the target frameworks are the
+  three-way split the product needs, and the package references are already
+  version-free thanks to central package management. **47** three-line blocks are
+  shared across files and after R1820 the largest remaining is an eight-file
+  `ProjectReference` pair that simply reflects the dependency graph.
+- **The `SharpProof.Package` and `SharpProof.Verifier` packaging projects repeat a
+  four-attribute reference shape internally**, `ReferenceOutputAssembly="false"` /
+  `SkipGetTargetFrameworkProperties="true"` / `PrivateAssets="all"` /
+  `TreatAsPackageReference="false"`, three times in one file and twice in the
+  other. That is the standard incantation for "build this project but package
+  nothing from it" and MSBuild offers no shorter spelling; the two projects are
+  also the subject of R1152 and R1301 already.
+- **The gate's attribute assertions are the right shape and should be kept.**
+  `EverySoundnessCriticalProjectRunsTheMetaAnalyzer` does not merely check that a
+  reference exists - it requires `OutputItemType="Analyzer"` and
+  `ReferenceOutputAssembly="false"`, which are exactly the two attributes that
+  distinguish "runs as an analyzer" from "linked as a library". Centralizing the
+  reference into `Directory.Build.props` would let the gate assert the property
+  instead, but the attribute pair must remain asserted somewhere.
+- **`EffectTestHost` has no diagnostic-suppression mechanism, so R1780 does not
+  reach `SharpProof.Effects.Test`.** Its `CreateCompilation` overloads take a
+  source and additional references only and never call
+  `WithSpecificDiagnosticOptions`. Repository-wide that method appears at six
+  sites: the analyzer test host, R1800's three inline copies, the production gate
+  host which enables everything, and
+  `FinalCompilationCollectorTests.cs:538-547`, which raises `CS0168` to `Error` to
+  force a compiler error deliberately.
+
+### Status (part six hundred seventeen)
+
+R1820 is `pending`. The centralization is mechanical and the file to put it in
+already contains two working examples; the part that needs a decision is the
+membership question the measurement exposes - whether `SharpProof.Worker.Launcher`
+belongs in the soundness-critical set, and whether the six production projects that
+run no meta-analyzer are meant to.
+
+## Second survey, part six hundred eighteen: four open questions left by R1780 and R1800, all measured and all closed
+
+No new ID. R1780 and R1800 each raised a "does this happen elsewhere" question.
+All four are answerable by measurement and all four answer no.
+
+### Checked and not proposed (part six hundred eighteen)
+
+- **The hand-built conditional option map exists in exactly four places in the
+  repository, and R1800 already names three of them.** Searching every tracked
+  `.cs` file for a `ToDictionary` or `ToImmutableDictionary` call whose *value*
+  selector is a ternary - the shape that turns a set membership into a per-key
+  option - returns **four** hits: `AnalyzerTestHost.cs:77`, the helper, and
+  `ContractApiIdentityAnalyzerTests.cs:397`, `:464` and `:553`, the three copies.
+  **Zero** in production code, zero in any other test project. There is no wider
+  family of hand-written option maps; the pattern is one helper and its three
+  bypasses.
+- **No other test host can weaken an oracle the way R1780 describes, because no
+  other test host has the mechanism.**
+  `SharpProof.Effects.Test/EffectTestHost.cs` exposes two `CreateCompilation`
+  overloads taking a source or syntax trees plus references, and calls
+  `WithSpecificDiagnosticOptions` nowhere;
+  `SharpProof.ContractForGenerator.Test/GeneratorTestHost.cs` contains no
+  occurrence of `WithSpecificDiagnosticOptions`, `enabledIds` or
+  `ReportDiagnostic` at all. Repository-wide the method appears at **six** sites,
+  every one accounted for: the analyzer host, R1800's three copies, the production
+  `AnalyzerGateHost` which maps every id to `Warn`, and
+  `FinalCompilationCollectorTests.cs:538-547` which raises `CS0168` to `Error` on
+  purpose. **R1780's blast radius is the analyzer test host and stops there.**
+- **`RequiresCallSiteDiscoveryTests.cs` is not a second `RequiresAndControlTests`
+  and needs no new finding.** Measured the same way: **41** tests, whose dominant
+  shapes are 17 using `CreateCompilation` plus `AnalyzeAsync` plus a direct
+  `Assert.That`, and 12 using `CreateCompilation` plus `CreateDiscovery` plus a
+  direct `Assert.That`. Only **4** use `AssertIds`, so only 2 of its tests fall
+  into R1780's 77. Its duplication is the discovery-adapter setup, which is applied
+  R1001 plus R1339, R1344 and R1645 - four existing findings on one file. Nothing
+  in its shape census is unfiled.
+- **`AnalyzerModeAndEffectTests.cs` is the second large uniform file and is already
+  inside both findings.** It has **86** tests, the same count as
+  `RequiresAndControlTests.cs`: 40 call `AnalyzeAsync` and assert directly, 34 call
+  `AnalyzeAsync` then `AssertIds`, and the rest are singletons. Nineteen of its
+  tests are among R1780's 77, and its four-method ten-line assertion cluster is
+  recorded in part six hundred eleven. No third finding is warranted; when R1780 and
+  R1760 are applied this file is the second-largest beneficiary.
+- **Production has no analogue of the narrowed oracle, because production does not
+  assert - it validates, and that surface is already mapped.** The equivalent
+  question for production code is whether a validator checks a set it narrowed
+  itself, and part six hundred eight's taxonomy answers it exhaustively: tier A is
+  four checks comparing a declaration to reality, tier B is two comparing two
+  hand-written declarations (R362, R973), and tier C is the containment-only family
+  - R1305, R1502, R1505, R1561, R1640, R577, R1500, and now R1820. Every
+  one-directional check this survey has found in production or build code is in
+  that list.
+
+### Status (part six hundred eighteen)
+
+No new ID. Four questions that R1780 and R1800 left open are now measured rather
+than assumed: the conditional option map exists four times and nowhere else, the
+suppression mechanism exists in one test host and nowhere else, the sibling file
+that looked like a second instance is not one, and production's version of the
+same weakness is the tier-C list part six hundred eight already enumerates.

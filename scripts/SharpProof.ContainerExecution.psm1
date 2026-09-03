@@ -74,7 +74,47 @@ function Write-SharpProofFailureOutput {
         return
     }
 
-    $maximumLength = 8000
+    # Quiet callers only need actionable diagnostics.  Dotnet's captured
+    # output also contains static-graph, assembly-copy, and successful-test
+    # progress; replaying that material makes a changed-test failure hard to
+    # scan without adding information.  Keep failure lines and remove the
+    # terminal colour escapes that otherwise make the summary noisy.
+    $ansiPattern = [char]27 + '\[[0-?]*[ -/]*[@-~]'
+    $normalized = [regex]::Replace($Output, $ansiPattern, '')
+    $progressPatterns = @(
+        '^\s*Static graph loaded ',
+        '^\s*[^:]+ -> .+\.(dll|exe|pdb)\s*$',
+        '^\s*Test run for ',
+        '^\s*VSTest version ',
+        '^\s*Starting test execution',
+        '^\s*A total of \d+ test files matched',
+        '^\s*Passed!\s+- Failed:\s+0,',
+        '^\s*Test Run Successful',
+        '^\s*Results File:',
+        '^\s*Attachments:',
+        '^\s*(Determining projects to restore|All projects are up-to-date)',
+        '^\s*(Build started|Build succeeded|Time Elapsed)'
+    )
+    $summaryLines = @(
+        $normalized -split '\r?\n' |
+            Where-Object {
+                if ([string]::IsNullOrWhiteSpace($_)) {
+                    return $false
+                }
+                foreach ($pattern in $progressPatterns) {
+                    if ($_ -match $pattern) {
+                        return $false
+                    }
+                }
+                return $true
+            } |
+            ForEach-Object { $_.TrimEnd() }
+    )
+    if ($summaryLines.Count -gt 0) {
+        $Output = $summaryLines -join [Environment]::NewLine
+    }
+
+    $maximumLength = 6000
     if ($Output.Length -gt $maximumLength) {
         $headLength = [int]($maximumLength / 2)
         $tailLength = $maximumLength - $headLength
