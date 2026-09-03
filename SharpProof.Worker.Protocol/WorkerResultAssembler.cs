@@ -231,12 +231,8 @@ internal static class WorkerResultAssembler
         bool FatalCallable, bool FatalClaim, bool TimedOut, bool Canceled) Classify(
         IEnumerable<WorkerCallableResult>? callables, IEnumerable<WorkerClaimResult>? claims)
     {
-        var callableReasons = callables?.OfType<WorkerCallableResult>()
-            .Select(static result => result.Reason).ToArray() ?? [];
-        var claimReasons = claims?.OfType<WorkerClaimResult>()
-            .Select(static result => result.Reason).ToArray() ?? [];
-        var callableSummary = SummarizeCallableReasons(callableReasons);
-        var claimSummary = SummarizeClaimReasons(claimReasons);
+        var callableSummary = SummarizeCallableReasons(callables);
+        var claimSummary = SummarizeClaimReasons(claims);
         var callableFailure = callableSummary.Failure;
         var claimFailure = claimSummary.Failure;
         var failure = claimFailure is WorkerRunFailureReason.BackendUnavailable or
@@ -257,14 +253,19 @@ internal static class WorkerResultAssembler
     }
 
     private static (WorkerRunFailureReason Failure, bool Canceled, bool TimedOut) SummarizeCallableReasons(
-        WorkerCallableCoverageReason[] reasons)
+        IEnumerable<WorkerCallableResult>? callables)
     {
         var infrastructureFailure = false;
         var missingClaimResult = false;
         var canceled = false;
         var timedOut = false;
-        foreach (var reason in reasons)
+        foreach (var callable in callables ?? [])
         {
+            if (callable == null)
+            {
+                continue;
+            }
+            var reason = callable.Reason;
             infrastructureFailure |= reason == WorkerCallableCoverageReason.InfrastructureFailure;
             missingClaimResult |= reason == WorkerCallableCoverageReason.MissingClaimResult;
             canceled |= reason == WorkerCallableCoverageReason.Canceled;
@@ -281,7 +282,7 @@ internal static class WorkerResultAssembler
     }
 
     private static (WorkerRunFailureReason Failure, bool Canceled, bool TimedOut) SummarizeClaimReasons(
-        WorkerClaimReason[] reasons)
+        IEnumerable<WorkerClaimResult>? claims)
     {
         var backendUnavailable = false;
         var infrastructureFailure = false;
@@ -289,8 +290,13 @@ internal static class WorkerResultAssembler
         var counterexampleReplayFailed = false;
         var canceled = false;
         var timedOut = false;
-        foreach (var reason in reasons)
+        foreach (var claim in claims ?? [])
         {
+            if (claim == null)
+            {
+                continue;
+            }
+            var reason = claim.Reason;
             backendUnavailable |= reason == WorkerClaimReason.BackendUnavailable;
             infrastructureFailure |= reason == WorkerClaimReason.InfrastructureFailure;
             malformedBackendResult |= reason == WorkerClaimReason.MalformedBackendResult;
