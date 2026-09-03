@@ -11759,7 +11759,7 @@ In `SharpProof.Smt.Test/IrSmtBackendTests.cs`, `QueryExpressionOwnerDisposesOnEx
 
 ### Status (part three hundred thirty-seven)
 
-R1106 is deferred: extract an assertion helper for native expression disposal on abnormal exit in `IrSmtBackendTests`.
+R1106 is applied: extract an assertion helper for native expression disposal on abnormal exit in `IrSmtBackendTests`; the focused test passes.
 
 ## Second survey, part three hundred thirty-eight: R1107 - duplicated operand evaluation order test scaffolding in IrProgramTests
 
@@ -12096,3 +12096,15 @@ R1133 is deferred: construct a per-file declaration index for OSS instrumentatio
 ### Status (part three hundred sixty-five)
 
 R1134 is deferred: use one case-ID index/uniqueness boundary so duplicates remain a controlled corpus-gate failure instead of a later dictionary exception.
+
+## Second survey, part three hundred sixty-six: R1135 - duplicate termination scan in OSS candidate selection
+
+`SelectDiverseCandidates` advances through each per-file candidate group by offset. Its loop condition calls `byFile.Any(group => group.Length > offset)` to discover whether the next round has work, then the loop body immediately walks every group and performs the same `group.Length <= offset` test before adding candidates. The body can record whether it added anything and stop after an empty round, preserving round-robin ordering, the count limit, and the short-circuit at the requested count without scanning all groups twice per offset.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1135 | **OSS candidate selection scans every file group twice per round to detect termination.** The `byFile.Any` loop condition and the following `foreach` repeat the same "has an item at this offset" question. Track whether the body added a candidate and terminate on an empty round while preserving deterministic round-robin selection. | `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:359-378` |
+
+### Status (part three hundred sixty-six)
+
+R1135 is deferred: fold candidate-round termination into the existing group walk and retain ordering, diversity, and exact-count validation.
