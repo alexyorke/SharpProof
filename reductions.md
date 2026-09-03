@@ -19120,3 +19120,11 @@ R1664 is applied: the semantic-cache soundness fixtures now share the exact
 `Answer { Unknown, Proven }` and `ProofCache.Write` source prefix, while
 specialized enum, cache, interface, generic, and mutation shapes remain local.
 The complete `SharpProof.Meta.Analyzers.Test` project passes (163/163).
+
+## Second survey, continued: R1678 - Opaque-identity tests duplicate pure-abstention assertions
+
+`OpaqueSemanticIdentityTests` defines `AssertPureConversionAbstention` and `AssertPureUnsupportedOperationAbstention`. Both helpers assert the same `IrOpaqueTerm` type, `Pure` purity, and `ClosedAbstention` decision; only the final expected `FrontendAbstention` enum differs. Replacing them with one `AssertPureAbstention(FrontendLoweringResult result, FrontendAbstention expected)` helper would remove the duplicated assertion block while keeping the two operation-specific expectations at their call sites. This is independent of the platform-reference construction already covered by R729.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1678 | The opaque-identity test class repeats a four-assertion helper body for two abstention values; parameterize the expected enum. | `SharpProof.Frontend.Test/OpaqueSemanticIdentityTests.cs:42-43,73-74,139-166` |
