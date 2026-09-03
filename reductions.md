@@ -10729,3 +10729,15 @@ R1020 is deferred: share the comparer shell only, and keep separate tests that f
 ### Status (part two hundred fifty-two)
 
 R1021 is deferred: share the valid-peer batch and invariant status assertions, but keep every injection form as an independent case.
+
+## Second survey, part two hundred fifty-three: R1022 - repeated type-initialization result assertions
+
+`BeforeFieldInitStaticMethodIncludesInitializerEffectsAndFailure` and `DefinitelyFailingSourceInitializerThrowsTypeInitializationException` analyze different source programs, but both project `result.Summary.Throws.Types` to display names and then assert no unknown throws, exactly one exception type, the presence of `System.TypeInitializationException`, and complete summary status. Those shared result assertions can move to a private helper; the before-field-init test's static-write assertion and the two source fixtures remain distinct evidence.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1022 | **Static-initialization regression tests duplicate the same exception-summary assertion envelope.** Two independent tests repeat the throw-type projection and four assertions for a definite single `TypeInitializationException` with complete analysis; only their source path and additional write expectation differ. A focused assertion helper can remove the repeated envelope without merging the distinct initialization scenarios. | `SharpProof.Effects.Test/StaticFieldTypeInitializationTests.cs:95-140,143-176` |
+
+### Status (part two hundred fifty-three)
+
+R1022 is deferred: share only the common definite type-initialization-failure assertions, and preserve each source fixture and its scenario-specific effects.
