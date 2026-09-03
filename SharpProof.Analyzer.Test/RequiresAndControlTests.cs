@@ -8,6 +8,20 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class RequiresAndControlTests
 {
+    private const string NonCompletingGuardSource =
+        """
+        using System;
+        using SharpProof.Attributes;
+        public static class Guard {
+            public static int Fail() =>
+                throw new InvalidOperationException();
+            public static int Positive(int value) {
+                Contract.Requires(value > 0);
+                return value;
+            }
+        }
+        """;
+
     [Test]
     public async Task PrimaryConstructorSameNamedOverloadIsAnalyzed()
     {
@@ -348,17 +362,8 @@ public sealed class RequiresAndControlTests
     public async Task MemberInitializersStopAfterNonCompletingOperands()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            NonCompletingGuardSource +
             """
-            using System;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Fail() =>
-                    throw new InvalidOperationException();
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
             public sealed class Subject {
                 private int field = Guard.Fail() + Guard.Positive(-1);
                 private int Property { get; } =
@@ -375,17 +380,8 @@ public sealed class RequiresAndControlTests
     public async Task MemberInitializerSequencesStopAfterNonCompletion()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
+            NonCompletingGuardSource +
             """
-            using System;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Fail() =>
-                    throw new InvalidOperationException();
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
             public sealed class Subject {
                 private int first = Guard.Fail(), second = Guard.Positive(-1);
                 private int third = Guard.Positive(-2);
@@ -406,17 +402,8 @@ public sealed class RequiresAndControlTests
     public async Task PartialMemberInitializersStopAfterEarlierPartDoesNotComplete()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
+            NonCompletingGuardSource +
             """
-            using System;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Fail() =>
-                    throw new InvalidOperationException();
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
             public sealed partial class Subject {
                 private int first = Guard.Fail();
             }
