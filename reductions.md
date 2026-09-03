@@ -16775,3 +16775,19 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 | ID | Finding | Evidence |
 |---|---|---|
 | R1385 | `SharpProof.Worker.Launcher.Program.ValidateAndReport` creates an `incomplete` array solely for count/first-item access; accumulate the count and first callable during one pass, retaining the same diagnostic and exit-code semantics. | `SharpProof.Worker.Launcher/Program.cs:449-477` |
+
+## Second survey, continued: R1386 - Dockerfile authority validation rescans all lines for each image ARG
+
+`Assert-DockerfileAuthority` builds five image authorities, then runs a full `$lines` scan and grows a temporary `$declarations` array separately for each image ARG. The validation only needs one declaration per known argument and all five names are available before the scan; one pass can collect declarations by argument and retain the same before-first-`FROM`, exact-text, and duplicate checks, avoiding five repeated regex walks and intermediate arrays.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1386 | `Assert-DockerfileAuthority` scans the complete Dockerfile once per image authority to find its ARG declaration; collect the five known declarations in one pass while preserving exact image, uniqueness, and pre-`FROM` validation. | `scripts/Test-SharpProofContainerContract.ps1:94-158` |
+
+## Second survey, continued: R1387 - Compose authority validation repeatedly searches the file for service ranges
+
+`Assert-ComposeAuthority` first scans the services block to collect names, then for every service rescans from `$servicesStart` to find that service header, rescans again to find its end, and materializes the slice. A single pass over the services block can emit each service’s start/end range and validate the shared-anchor and forbidden-override rules as blocks close, retaining service ordering and the canonical `tooling` requirement while removing repeated whole-file scans.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1387 | `Assert-ComposeAuthority` re-walks the Compose lines once to locate each service and again to locate its end; parse service ranges in one ordered pass instead of rescanning the same block per service. | `scripts/Test-SharpProofContainerContract.ps1:235-333` |
