@@ -1715,6 +1715,18 @@ public sealed class ArchitectureTests
             performanceTests.Split("[Category(\"Performance\")]", StringSplitOptions.None),
             Has.Length.EqualTo(3));
         Assert.That(
+            performanceTests.Split("[Category(\"Coverage\")]", StringSplitOptions.None),
+            Has.Length.EqualTo(2));
+        var coverageCategoryIndex = performanceTests.IndexOf(
+            "[Category(\"Coverage\")]",
+            StringComparison.Ordinal);
+        Assert.That(coverageCategoryIndex, Is.GreaterThanOrEqualTo(0));
+        var coverageMethodIndex = performanceTests.IndexOf(
+            "ReleasePerformanceProtocolProducesStructuralEvidence",
+            coverageCategoryIndex,
+            StringComparison.Ordinal);
+        Assert.That(coverageMethodIndex, Is.GreaterThan(coverageCategoryIndex));
+        Assert.That(
             corpusTests,
             Does.Contain(
                 "[Category(\"Corpus\")]" + Environment.NewLine +

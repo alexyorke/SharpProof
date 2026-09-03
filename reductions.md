@@ -9392,12 +9392,10 @@ fixture duplication, and the category vocabulary that the build system filters o
 
 ### Status (part one hundred ninety-one)
 
-R967 is `pending` and the fix is one assertion in a test that already loads the
-file it needs: `PerformanceGateTests.cs` is already read at
-`ArchitectureTests.cs:1705-1708` for the `Performance` check, so asserting
-`[Category("Coverage")]` beside it is a two-line addition. It is worth doing
-because the failure mode is a coverage gate that passes while measuring nothing,
-which is the one class of failure a coverage gate cannot self-detect.
+R967 is `applied`: the architecture check now requires exactly one coverage
+category and verifies that it is attached to
+`ReleasePerformanceProtocolProducesStructuralEvidence`. The focused
+PerformanceContract architecture test passed.
 
 ## Second survey, part one hundred ninety-four: R968 - one constant, three limits, three exception types
 
