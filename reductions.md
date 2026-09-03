@@ -13715,6 +13715,12 @@ retaining conservative recomputation when a cycle or depth boundary is active.
 |---|---|---|
 | R1169 | **`ConversionOwnershipClassifier.BuildLocalRegions` re-runs method-level ref-alias analysis on every fixed-point pass.** The invocation, setter, and getter branches call `MethodMayIntroduceUnknownRefAlias` inside `while (changed)`, and that helper reparses and recursively walks each target method from scratch. Memoizing only completed, context-independent method results can preserve the active-method cycle and maximum-depth fallbacks while avoiding repeated compilation/tree work across call sites and region iterations. | `SharpProof.Effects/ConversionOwnershipClassifier.cs:238-421,666-729` |
 
+### Status (part four hundred ninety-one)
+
+R1169 is applied: completed context-independent ref-alias analyses are cached
+per classifier, while cycle and depth-limit fallbacks remain uncached. The
+Effects test suite passes (323/323).
+
 ## Second survey, part four hundred ninety-two: R1170 - call arguments projected by several independent passes
 
 The call-scanning boundary derives several facts from the same immutable
