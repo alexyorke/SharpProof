@@ -33,14 +33,15 @@ function Resolve-SharpProofPackageSource {
     if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
         throw "SharpProof package source is not a directory: $resolved"
     }
+    $packageSourceFiles = @(Get-ChildItem -LiteralPath $resolved -File)
     $packageFiles = @(
-        Get-ChildItem -LiteralPath $resolved -File -Filter '*.nupkg'
+        $packageSourceFiles | Where-Object Extension -eq '.nupkg'
     )
     if ($packageFiles.Count -ne 3) {
         throw "SharpProof package source must contain exactly three nupkg files; found $($packageFiles.Count)."
     }
     $symbolPackageFiles = @(
-        Get-ChildItem -LiteralPath $resolved -File -Filter '*.snupkg'
+        $packageSourceFiles | Where-Object Extension -eq '.snupkg'
     )
     if ($symbolPackageFiles.Count -ne 3) {
         throw "SharpProof package source must contain exactly three snupkg files; found $($symbolPackageFiles.Count)."

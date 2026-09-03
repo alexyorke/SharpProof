@@ -16606,6 +16606,11 @@ The `container-verifier` job runs `docker compose run --rm tooling package-consu
 |---|---|---|
 | R1374 | `Resolve-SharpProofPackageSource` performs two directory enumerations and two identical `Get-SharpProofPackageIdentity` projections solely to separate package and symbol files. Build one six-file inventory and derive the two typed collections from it, retaining their distinct cardinality, ID, version, and pairing checks. | `scripts/Test-SharpProofPackageConsumers.ps1:36-55` |
 
+R1374 is applied: package-source validation now enumerates the directory once
+and partitions that inventory into package and symbol files by extension. The
+existing exact counts, identity checks, and package/symbol pairing validation
+remain unchanged. Focused ReleasePublicationScriptTests pass (24 passed).
+
 ## Second survey, continued: R1375 - Package payload validation reparses shared repository metadata per package
 
 `Test-SharpProofPackagePayload` reads and converts `first-party-assemblies.json` on every invocation, and reads and converts `toolchain.json` before scanning every payload. `New-SharpProofReleaseEvidence` invokes it once for each of the three `.nupkg` files with the same repository root, so the immutable first-party inventory is parsed three times; the toolchain document is also parsed for packages that never visit the Z3 size branches. Load these documents once in the release-evidence pass or memoize them by repository root, and make the toolchain read lazy for the no-evidence Z3 cases while preserving the current schema checks and payload-specific policies.
