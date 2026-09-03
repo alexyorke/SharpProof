@@ -15215,6 +15215,14 @@ For non-invocation, non-array-element values, `RoslynProgramLowerer.LowerValue` 
 |---|---|---|
 | R1254 | **`RoslynProgramLowerer.LowerValue` prewalks and then lowers the same operation tree.** `LowerNestedOperations` recursively enumerates children before `RoslynOperationLowerer.Lower` performs its own visitor traversal. Combine or cache the two projections while retaining nested-call/element evaluation order and the existing depth guard. | `SharpProof.Frontend/RoslynProgramLowerer.cs:290-351,353-383`; `SharpProof.Frontend/RoslynOperationLowerer.cs:56-109` |
 
+### Status (part five hundred seventy-six)
+
+R1254 is deferred: the prewalk deliberately schedules nested calls and array
+element effects before the enclosing lowering, while the expression lowerer has
+its own operation-result cache and depth/abstention behavior. Combining the walks
+would require a behavior-sensitive scheduler redesign rather than a safe
+mechanical reduction.
+
 ## Second survey, part five hundred seventy-seven: R1255 - null-comparison probing discards a conversion walk
 
 The binary lowerer probes every equality or inequality through `GetNullComparison` before entering the ordinary equality path. `TryGetNullComparisonValue` unwraps both operands with the general implicit-conversion loop, but when neither operand is a null constant it discards those results. The ordinary equality path then unwraps both operands again with the reference-only loop before testing generic string-specialization behavior. A single comparison projection can retain the null-constant recognition and reference-only semantics while avoiding the first walk for non-null comparisons, or reuse the already-unwrapped operands where the conversion kinds coincide.
