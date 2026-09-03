@@ -14433,3 +14433,18 @@ enumerating the sorted claim rows.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1207 | **`WorkerProtocolJson.ValidateClaimMembership` traverses one sorted claim array three times.** The `expected` rows are separately mapped for dense ordinals and callable claim IDs, then passed through `HasVerifierCompatibleClaimOrder`, which walks the same rows again. A single projection can retain the ordinal, membership, and claim-kind checks while preserving their separate `Validator.Check` results and sort order. | `SharpProof.Worker.Protocol/ProtocolJson.cs:563-580` |
+
+## Second survey, part five hundred thirty: R1208 - count-row selectors are repeatedly invoked
+
+`CountsMatch` validates each untrusted summary count row through a compact
+`All` predicate. That predicate calls the supplied `count` selector once for
+positivity and again for equality, and calls the supplied `kind` selector for
+enum validation, set admission, dictionary lookup, and the lookup key. The
+selectors are currently simple property projections, but this generic helper
+can be passed arbitrary delegates. Capturing each row's kind and count once
+before the checks preserves short-circuit order and duplicate detection while
+removing repeated projection work.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1208 | **`WorkerProtocolJson.CountsMatch` recomputes each count row's kind and count.** Its `actual.All` predicate evaluates `count(value)` twice and `kind(value)` three times for a valid row: before positivity/enum checks, for `seen.Add`, and again for dictionary lookup. Local `itemKind` and `itemCount` values inside an equivalent loop can preserve the existing validation order and fail-fast behavior without repeated generic delegate calls. | `SharpProof.Worker.Protocol/ProtocolJson.cs:809-821` |
