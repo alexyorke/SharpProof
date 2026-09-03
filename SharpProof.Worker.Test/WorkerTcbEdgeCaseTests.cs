@@ -893,45 +893,24 @@ public sealed class WorkerTcbEdgeCaseTests
         }
     }
 
-    [Test]
-    public async Task CacheRejectsAHashedPayloadWithNullCallableResults()
+    [TestCase(
+        false,
+        TestName = "CacheRejectsAHashedPayloadWithNullCallableResults")]
+    [TestCase(
+        true,
+        TestName = "CacheRejectsPayloadSealedForADifferentManifest")]
+    public async Task CacheRejectsMalformedPayload(bool differentManifest)
     {
         using var temporaryDirectory = new TempDirectory("worker-cache-edge-");
         var directory = temporaryDirectory.FullName;
         var manifest = new WorkerClaimManifest();
         WorkerProtocolJson.SealManifest(manifest);
-        var inputHash = new string('a', 64);
+        var inputHash = new string(differentManifest ? 'b' : 'a', 64);
         await WriteCacheEnvelopeAsync(
             directory,
             inputHash,
-            manifest.Hash,
-            callableResults: null,
-            []);
-        var cache = new VerificationCache(directory, 1024 * 1024);
-
-        var response = await cache.TryReadAsync(
-            inputHash,
-            manifest,
-            [],
-            new WorkerBudgets(),
-            CancellationToken.None);
-
-        Assert.That(response, Is.Null);
-    }
-
-    [Test]
-    public async Task CacheRejectsPayloadSealedForADifferentManifest()
-    {
-        using var temporaryDirectory = new TempDirectory("worker-cache-manifest-");
-        var directory = temporaryDirectory.FullName;
-        var manifest = new WorkerClaimManifest();
-        WorkerProtocolJson.SealManifest(manifest);
-        var inputHash = new string('b', 64);
-        await WriteCacheEnvelopeAsync(
-            directory,
-            inputHash,
-            new string('c', 64),
-            [],
+            differentManifest ? new string('c', 64) : manifest.Hash,
+            differentManifest ? [] : null,
             []);
         var cache = new VerificationCache(directory, 1024 * 1024);
 

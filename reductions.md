@@ -11451,6 +11451,10 @@ In `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs`, `CacheRejectsAHashedPaylo
 
 R1074 is deferred: parameterize the cache envelope rejection tests in `WorkerTcbEdgeCaseTests`.
 
+R1074 is applied: both malformed cache-envelope cases share one temporary-directory, cache, and read/assertion harness while retaining distinct test names and payload mutations. `WorkerTcbEdgeCaseTests` pass (44/44).
+
+R1074 is applied: both malformed cache-envelope cases share one temporary-directory, cache, and read/assertion harness while retaining distinct test names and payload mutations. `WorkerTcbEdgeCaseTests` pass.
+
 ## Second survey, part three hundred six: R1075 - unshared temporary directory lifecycle in container contract tests
 
 `eng/testing/TempDirectory.cs` is already compiled into `SharpProof.Worker.Test`. However, `ContainerContractTests.cs` defines a custom `CreateTemporaryDirectory()` helper and wraps test methods in manual `try ... finally { Directory.Delete(root, recursive: true); }` blocks, while `WorkerBinaryIdentityTests.cs` retains manual `Path.GetTempPath()` and `File.Delete` calls. Adopting `TempDirectory` and standard `using var` declarations across these suites removes manual directory management and ensures reliable cleanup.
