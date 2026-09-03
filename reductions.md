@@ -14173,6 +14173,12 @@ decision, preserving the separate selection and barrier predicates.
 |---|---|---|
 | R1190 | **`ExceptionHandlerReachability.GetReachableSwitchCases` can recheck a clause's pattern and guard completion.** `CanCaseClauseReachBody` calls `canCompleteNormally` for the pattern and non-constant guard, while the following `stopsSelection` expression can call the same predicate again for the barrier pattern and for an `Always` pattern's guard. A clause-completion projection can share those results without changing the ordered switch stop rules. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1492-1520,1668-1697` |
 
+### Status (part five hundred twelve)
+
+R1190 is applied: switch clause pattern/guard completion facts are cached per
+clause and reused for body reachability and stop barriers, preserving guard and
+stop-selection behavior. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred thirteen: R1191 - selected switch cases are copied through extra passes
 
 `GetReachableSwitchCases` first walks the switch cases to compute the selected
