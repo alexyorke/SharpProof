@@ -51,7 +51,7 @@ public sealed class ContractForMetadataSignatureTests
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
-        ContractTestCompilation.AssertNoErrors(compilation);
+        TestCompilation.AssertNoErrors(compilation);
         var target = compilation.GetTypeByMetadataName("MetadataTarget")!
             .GetMembers(methodName)
             .OfType<IMethodSymbol>()

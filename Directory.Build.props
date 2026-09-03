@@ -89,6 +89,8 @@
                         '$(MSBuildProjectName)' == 'SharpProof.Worker.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestMetadataReferences.cs"
              Link="TestMetadataReferences.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestCompilation.cs"
+             Link="TestCompilation.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(IsRoslynAnalyzer)' == 'true'">

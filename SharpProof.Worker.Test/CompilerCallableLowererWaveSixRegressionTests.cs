@@ -130,7 +130,7 @@ public sealed class CompilerCallableLowererWaveSixRegressionTests
         ClaimManifestBuildResult Discovery) CreateCompilation(
         string source)
     {
-        var compilation = WorkerTestCompilation.Create(
+        var compilation = TestCompilation.Create(
             "CompilerCallableLowererWaveSixRegressionTests",
             (Path.Combine(
                     TestContext.CurrentContext.WorkDirectory,

@@ -669,7 +669,7 @@ public sealed class CompilerCallableLowererTests
 
     private static CSharpCompilation CreateCompilation(string source)
     {
-        return WorkerTestCompilation.Create(
+        return TestCompilation.Create(
             "CompilerCallableLowererTests",
             ("Subject.cs", source));
     }

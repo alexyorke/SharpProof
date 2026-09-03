@@ -18622,3 +18622,9 @@ The two accessor-discovery tests compile the same Subject source twice. Both cre
 | ID | Finding | Evidence |
 |---|---|---|
 | R1648 | Two unmanaged-function-pointer matrices rebuild identical interpolated target/companion source; centralize the source builder and retain the separate cardinality assertions. | `SharpProof.ContractForGenerator.Test/ContractForValidatorGeneratorTests.cs:710-770` |
+
+R1580 is applied: the duplicated contract and worker compilation factories are
+now one shared `eng/testing/TestCompilation.cs`, with the existing project
+specific overload behavior preserved and both projects linked through the common
+test item group. `SharpProof.Contracts.Test` passes (142/142) and
+`SharpProof.Worker.Test` passes (695/695).

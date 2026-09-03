@@ -440,7 +440,7 @@ public sealed class ContractClauseInventoryTests
         bool includeSharpProofReference,
         OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary)
     {
-        return ContractTestCompilation.Create(
+        return TestCompilation.Create(
             "ClauseInventory",
             source,
             outputKind: outputKind,

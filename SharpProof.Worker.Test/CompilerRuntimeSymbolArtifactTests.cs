@@ -100,7 +100,7 @@ public sealed class CompilerRuntimeSymbolArtifactTests
             #undef SHARPPROOF_CONTRACTS
             internal static class Subject { }
             """;
-        var compilation = WorkerTestCompilation.Create(
+        var compilation = TestCompilation.Create(
             "CompilerRuntimeSymbolArtifactTests",
             ("Subject.cs", source));
         var discovery = new ClaimManifestBuilder(compilation).Build();

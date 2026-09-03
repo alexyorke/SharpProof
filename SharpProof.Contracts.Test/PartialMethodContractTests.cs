@@ -462,7 +462,7 @@ public sealed class PartialMethodContractTests
     private static CSharpCompilation CreateCompilation(
         params (string FileName, string Source)[] sources)
     {
-        return ContractTestCompilation.Create(
+        return TestCompilation.Create(
             "PartialContracts",
             sources,
             LanguageVersion.Preview);

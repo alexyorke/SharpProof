@@ -41,7 +41,7 @@ public sealed class ContractIntrinsicValidationTests
         string typeName,
         string methodName)
     {
-        var compilation = ContractTestCompilation.Create(
+        var compilation = TestCompilation.Create(
             "ContractIntrinsicValidation",
             source);
 

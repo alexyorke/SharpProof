@@ -581,7 +581,7 @@ public sealed class ConstructedGenericContractTests
 
     private static CSharpCompilation CreateCompilation(string source)
     {
-        return ContractTestCompilation.Create(
+        return TestCompilation.Create(
             "ConstructedContracts",
             source,
             allowUnsafe: true);

@@ -186,7 +186,7 @@ public sealed class CompilerRelationalSummaryProviderTests
 
     private static CSharpCompilation CreateCompilation(string source)
     {
-        return WorkerTestCompilation.Create(
+        return TestCompilation.Create(
             "CompilerRelationalSummaryProviderTests",
             ("Subject.cs", source));
     }

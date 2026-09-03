@@ -1653,7 +1653,7 @@ public sealed class ContractBinderTests
             string source,
             bool allowUnsafe = false)
         {
-            var compilation = ContractTestCompilation.Create(
+            var compilation = TestCompilation.Create(
                 "Contracts",
                 source,
                 allowUnsafe);

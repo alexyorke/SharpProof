@@ -101,7 +101,7 @@ public sealed class ContractApiIdentityTests
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
-        ContractTestCompilation.AssertNoErrors(compilation);
+        TestCompilation.AssertNoErrors(compilation);
         return compilation;
     }
 
@@ -146,7 +146,7 @@ public sealed class ContractApiIdentityTests
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
-        ContractTestCompilation.AssertNoErrors(compilation);
+        TestCompilation.AssertNoErrors(compilation);
         using var stream = new MemoryStream();
         var result = compilation.Emit(stream);
         Assert.That(

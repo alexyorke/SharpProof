@@ -2607,7 +2607,7 @@ public sealed class ClaimManifestBuilderTests
         OutputKind outputKind,
         params (string FileName, string Source)[] sources)
     {
-        return WorkerTestCompilation.Create(
+        return TestCompilation.Create(
             "ManifestTests",
             outputKind,
             sources);
