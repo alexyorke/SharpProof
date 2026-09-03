@@ -21023,3 +21023,11 @@ R1992 is applied: `ForwardDataflowAnalysis.AnalyzeCore` now caches the block
 count and immutable bottom value before constructing its two independent state
 arrays, and reuses that bottom for incoming states. The focused
 `ForwardDataflowAnalysisTests` suite passes 10/10 with zero warnings or errors.
+
+## Second survey, continued: R1993 - CompilerResponseEvidenceAuthority and CallableEvidenceBuilder duplicate dependency-evidence serialization
+
+`CompilerResponseEvidenceAuthority.DependencyEvidenceLabel` and `CallableEvidenceBuilder.BuildDependencyEvidenceLabel` independently serialize each `CompilerPreparedSummaryEvidence` as an origin prefix, optional specification-pack evidence identity, call identity, and SHA-256 digest, then join the entries under `:deps=`. The loops implement the same wire protocol and differ only at the unsupported-origin boundary: the compiler authority returns an empty component, while the worker throws `InvalidDataException`. The existing R314 centralization covers the enum-to-prefix mapping, not this enclosing formatter. A shared formatter with an explicit invalid-origin policy, or a prevalidated typed prefix, would remove this drift-prone projection while preserving the caller-specific failure behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1993 | `CompilerResponseEvidenceAuthority.DependencyEvidenceLabel` and `CallableEvidenceBuilder.BuildDependencyEvidenceLabel` duplicate the `origin[:evidence-id]:call-id:sha256` dependency-entry projection and `:deps=` join; share the formatter while retaining their distinct unsupported-origin policies. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:596-620`; `SharpProof.Worker/CallableEvidenceBuilder.cs:228-254`; related applied R314 |
