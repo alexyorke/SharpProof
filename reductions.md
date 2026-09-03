@@ -11735,7 +11735,7 @@ In `SharpProof.Fuzz.Test/FuzzRunnerTests.cs`, both `CancellationPropagates` and 
 
 ### Status (part three hundred thirty-five)
 
-R1104 is deferred: replace `try/catch/Assert.Pass` with standard `Assert.Throws` in `FuzzRunnerTests`.
+R1104 is applied: replace `try/catch/Assert.Pass` with standard `Assert.Throws` in `FuzzRunnerTests`; the focused exception tests pass.
 
 ## Second survey, part three hundred thirty-six: R1105 - duplicated assumption and assertion program execution fixtures in IrProgramTests
 
@@ -11747,7 +11747,7 @@ In `SharpProof.Ir.Test/IrProgramTests.cs`, `InterpreterDistinguishesAssumptionAn
 
 ### Status (part three hundred thirty-six)
 
-R1105 is deferred: parameterize assumption and assertion execution tests in `IrProgramTests`.
+R1105 is applied: parameterize assumption and assertion execution tests in `IrProgramTests`; the focused fixture passes both cases.
 
 ## Second survey, part three hundred thirty-seven: R1106 - duplicated exception and cancellation disposal assertions in SMT backend tests
 
@@ -12072,3 +12072,15 @@ R1131 is deferred: validate standalone gate JSON from a duplicate-aware parse bo
 ### Status (part three hundred sixty-three)
 
 R1132 is deferred: remove the now-unconditional change flag and preserve the required authority append plus XML save.
+
+## Second survey, part three hundred sixty-four: R1133 - repeated per-file declaration walks in OSS corpus instrumentation
+
+`OpenSourceCorpusRunner.ObserveAsync` groups manifest methods by source file, but its per-file instrumentation branch resolves each method by calling `OpenSourceCorpusCatalog.FindDeclaration(root, method)`. `FindDeclaration` scans `root.DescendantNodes().OfType<MethodDeclarationSyntax>()` and recomputes line spans for every candidate on every call. A source file containing several selected methods therefore traverses and filters the same syntax tree once per method before `ReplaceNodes` can run. Build one line-range-to-declaration index per parsed file and retain the existing exact-one-match validation; this is separate from R1011's discarded parse-tree duplication and R860's manifest-ID lookups.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1133 | **OSS corpus instrumentation rescans each source file once per selected method.** `methods.ToImmutableDictionary` invokes `FindDeclaration` independently for every method, and each invocation walks all method declarations and recomputes line spans. Index declarations once per file, preserving exact-match and line-range semantics before instrumentation. | `SharpProof.Gates/Corpus/OpenSourceCorpusRunner.cs:60-67`; `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:304-322` |
+
+### Status (part three hundred sixty-four)
+
+R1133 is deferred: construct a per-file declaration index for OSS instrumentation while retaining exact-one-match validation and the existing instrumentation map.
