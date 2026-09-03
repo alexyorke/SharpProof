@@ -15937,6 +15937,12 @@ Test-SharpProofContainedPathFixtures.Require-Rejection catches every exception f
 | ID | Finding | Evidence |
 |---|---|---|
 | R1326 | **Test-SharpProofContainedPathFixtures.Require-Rejection masks unexpected failures by accepting any exception as a valid rejection. Assert the expected exception type and message/parameter contract so broken fixtures cannot pass as containment coverage.** | scripts/Test-SharpProofContainedPathFixtures.ps1:12-20,34-50,52-67 |
+
+### Status (continued)
+
+R1326 is applied: contained-path fixtures require a runtime rejection with the
+expected parameter-prefixed message; unrelated exception types or messages now
+fail. Canonical contained-path fixtures pass.
 ## Second survey, continued: R1327 - mutation-baseline fixture helper accepts any exception
 
 Test-SharpProofMutationBaselines.Assert-Throws catches any exception and returns without checking its type or message. The surrounding cases intend to distinguish a rejected exit code, timeout, missing TRX evidence, and order-contamination result, but an unrelated parser, path, or null-reference failure would satisfy the same helper. Return the caught exception or use a typed assertion and retain the caller-specific expected-failure messages.
