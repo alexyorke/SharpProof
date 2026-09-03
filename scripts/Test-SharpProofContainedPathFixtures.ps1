@@ -14,8 +14,15 @@ function Require-Rejection([string]$Path, [string]$Name) {
         Resolve-SharpProofContainedPath -Root $root -Path $Path -ParameterName $Name | Out-Null
         throw "Contained-path fixture '$Name' was accepted."
     }
-    catch {
+    catch [Management.Automation.RuntimeException] {
         if ($_.Exception.Message -eq "Contained-path fixture '$Name' was accepted.") { throw }
+        if (-not $_.Exception.Message.StartsWith(
+                "$Name must ",
+                [StringComparison]::Ordinal)) {
+            throw (
+                "Contained-path fixture '$Name' failed with an unexpected " +
+                "rejection: $($_.Exception.Message)")
+        }
     }
 }
 
