@@ -13599,6 +13599,12 @@ removing a repeated ownership/classification traversal.
 |---|---|---|
 | R1164 | **`OperationEffectScanner.ScanEventAssignment` classifies the same event receiver twice.** The call-site resolver receives `_conversionOwnership.ClassifyRegion(reference.Instance)` once as its receiver region and immediately again as its write-receiver region, with no intervening state change. Reusing the computed region set keeps the resolver's read/write distinction explicit while eliminating the duplicate classification. | `SharpProof.Effects/OperationEffectScanner.Expressions.cs:159-216`; resolver parameters `SharpProof.Effects/EffectCallSiteResolver.cs:39-58` |
 
+### Status (part four hundred eighty-six)
+
+R1164 is applied: event assignment now classifies the receiver region once and
+passes the cached set to both resolver slots. The Effects test suite passes
+(323/323).
+
 ## Second survey, part four hundred eighty-seven: R1165 - array dimensions enumerated twice
 
 `OperationEffectScanner.ScanArrayCreation` enumerates
