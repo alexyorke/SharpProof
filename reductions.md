@@ -16585,3 +16585,7 @@ In `Write-SharpProofQualificationReceipt.ps1`, the package-backed gate set is id
 R1370 is covered by R1367: the multiplication extrema fold is already shared
 through the local candidate helper, with the same four products and overflow
 checks preserved.
+
+R1372 is applied: package-backed qualification gates now rely on the single
+shared six-unique-artifact validation and keep only their gate-specific checks.
+The focused ReleaseQualification architecture tests pass (5 passed).

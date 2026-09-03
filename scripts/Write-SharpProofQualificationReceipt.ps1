@@ -63,8 +63,7 @@ $valid = switch -Regex ($Gate) {
         [int]$evidence.schemaVersion -eq 1 -and
         [string]$evidence.status -ceq 'passed' -and
         [string]$evidence.commit -ceq $commit -and
-        [string]$evidence.osFamily -ceq $Gate.Substring(9) -and
-        $packageArtifacts.Count -eq 6
+        [string]$evidence.osFamily -ceq $Gate.Substring(9)
     }
     '^release-configuration$' {
         [int]$evidence.schemaVersion -eq 1 -and
@@ -85,14 +84,12 @@ $valid = switch -Regex ($Gate) {
     'package-consumers' {
         [int]$evidence.schemaVersion -eq 1 -and
         [string]$evidence.status -ceq 'passed' -and
-        [string]$evidence.commit -ceq $commit -and
-        $packageArtifacts.Count -eq 6
+        [string]$evidence.commit -ceq $commit
     }
     'pilots' {
         [string]$evidence.reviewStatus -ceq 'Reviewed' -and
         (Test-SharpProofPilotReport -Report $evidence -ExpectedCommit $commit `
-            -RepositoryRoot $repositoryRoot) -and
-        $packageArtifacts.Count -eq 6
+            -RepositoryRoot $repositoryRoot)
     }
 }
 if (-not $valid) {
