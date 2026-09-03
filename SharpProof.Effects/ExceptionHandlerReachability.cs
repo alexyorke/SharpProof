@@ -28,6 +28,9 @@ internal sealed class ExceptionHandlerReachability(
         _objectCreationArgumentsCache = new();
     private readonly Dictionary<ILockOperation, bool>
         _lockValueCompletionCache = new();
+    private readonly Dictionary<
+        ICoalesceAssignmentOperation,
+        (bool Completes, bool IsNonNull)> _coalesceAssignmentTargetFactsCache = new();
     private readonly INamedTypeSymbol? _exceptionType =
         compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
     private readonly INamedTypeSymbol? _nullReferenceExceptionType =
@@ -461,16 +464,10 @@ internal sealed class ExceptionHandlerReachability(
             }
             if (operation is ICoalesceAssignmentOperation coalesce)
             {
-                var targetCompletes = canCompleteNormally(coalesce.Target);
-                var targetIsNonNull =
-                    DefiniteOperationFacts.IsDefinitelyNonNull(
-                        coalesce.Target) ||
-                    abstractFlow?.ProvesNonNull(
-                        coalesce,
-                        coalesce.Target) == true;
+                var targetFacts = GetCoalesceAssignmentTargetFacts(coalesce);
                 if (coalesce.Target is IPropertyReferenceOperation property &&
-                    targetCompletes &&
-                    !targetIsNonNull &&
+                    targetFacts.Completes &&
+                    !targetFacts.IsNonNull &&
                     canCompleteNormally(coalesce.Value))
                 {
                     AddPropertySetterExceptions(
@@ -1328,14 +1325,8 @@ internal sealed class ExceptionHandlerReachability(
                 remaining.Push(coalesce.Value);
                 return;
             case ICoalesceAssignmentOperation coalesce:
-                var targetCompletes = canCompleteNormally(coalesce.Target);
-                var targetIsNonNull =
-                    DefiniteOperationFacts.IsDefinitelyNonNull(
-                        coalesce.Target) ||
-                    abstractFlow?.ProvesNonNull(
-                        coalesce,
-                        coalesce.Target) == true;
-                if (targetCompletes && !targetIsNonNull)
+                var targetFacts = GetCoalesceAssignmentTargetFacts(coalesce);
+                if (targetFacts.Completes && !targetFacts.IsNonNull)
                 {
                     remaining.Push(coalesce.Value);
                 }
@@ -1513,6 +1504,27 @@ internal sealed class ExceptionHandlerReachability(
         var complete = canCompleteNormally(@lock.LockedValue);
         _lockValueCompletionCache.Add(@lock, complete);
         return complete;
+    }
+
+    private (bool Completes, bool IsNonNull)
+        GetCoalesceAssignmentTargetFacts(ICoalesceAssignmentOperation coalesce)
+    {
+        if (_coalesceAssignmentTargetFactsCache.TryGetValue(
+                coalesce,
+                out var cached))
+        {
+            return cached;
+        }
+
+        var facts = (
+            Completes: canCompleteNormally(coalesce.Target),
+            IsNonNull: DefiniteOperationFacts.IsDefinitelyNonNull(
+                coalesce.Target) ||
+                abstractFlow?.ProvesNonNull(
+                    coalesce,
+                    coalesce.Target) == true);
+        _coalesceAssignmentTargetFactsCache.Add(coalesce, facts);
+        return facts;
     }
 
     private static void PushAllCore(
