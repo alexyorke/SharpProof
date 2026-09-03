@@ -17796,3 +17796,43 @@ once and reuses each initializer's before-entry state for source methods,
 preserving terminal-initializer short-circuiting and direct-witness behavior.
 `ModuleInitializerOrderingRegressionTests` pass (3/3); `EffectAnalysisTests`
 pass (147/147).
+
+## Second survey, continued: R1521 - the sequence-cardinality law fixture reconstructs the same sample array on every property access
+
+`SequenceCardinalityDomainTests.Samples` is an expression-bodied property that allocates a new eight-element array and recreates its values whenever read. Both `OrderAndJoinSatisfySampledProductLaws` and `HavocIsConservative` read it, so the identical sample set is rebuilt for each law invocation. A static readonly immutable sample fixture can preserve the values and avoid repeated construction; the shared collection is read-only by the tests.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1521 | **`SequenceCardinalityDomainTests.Samples` repeats immutable fixture construction across law tests.** The property creates eight cardinality values, including two domain-generated intervals, on every access, and it is passed to two independent `DomainLawAssertions` calls. Caching that fixed corpus at fixture scope removes the repeated allocation and domain normalization while retaining the same sampled laws. | `SharpProof.Dataflow.Test/SequenceCardinalityDomainTests.cs:8-21,23-27,97-101` |
+
+## Second survey, continued: R1522 - the constant-loop completion test compiles one eight-case source fixture eight times
+
+`ConstantTrueLoopCompletionTests.ConstantLoopCompletionControlsCallerSuffix` is parameterized with eight helper/caller pairs, but `CreateCase` compiles the same complete source containing all eight pairs on every invocation. Each run then selects only the requested pair. A fixture-scoped lazy compilation and symbol lookup, or a source factory that emits only the selected pair, can keep the eight expectations while removing seven redundant full compilations.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1522 | **The constant-loop regression matrix repeats a 149-line compilation for every case.** All eight `[TestCase]` rows call `CreateCase`, whose source literal contains `DoForever`, `ForForever`, `DoBreak`, `ForBreak`, `BreakThroughFinally`, `ReturnFromLoop`, `GotoOutOfLoop`, `RootBreak`, and all eight suffix callers. NUnit therefore parses and binds the identical fixture eight times to analyze one pair per invocation. Reusing one immutable compilation (with per-test analysis objects) would preserve the matrix and eliminate the repeated setup. | `SharpProof.Effects.Test/ConstantTrueLoopCompletionTests.cs:6-21,40-155` |
+
+## Second survey, continued: R1523 - the false-switch-guard matrix recompiles one four-pattern source for each test case
+
+`FalseSwitchGuardPatternRegressionTests.FalseGuardRetainsMandatoryPatternEffectsInCompleteSummary` has four `[TestCase]` values, while its source literal declares all four pattern forms and their helper types. Every case invokes `EffectTestHost.CreateCompilation` on that unchanged source and analyzes only one selected method. A cached fixture or a narrowly parameterized source/compilation helper can retain all four pattern cases while avoiding repeated parsing and binding.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1523 | **Four NUnit cases repeat the same pattern-effect compilation.** The `PropertyGetter`, `Deconstruct`, `ListLength`, and `ListIndexer` cases select different methods, but lines 13-82 compile all four methods and all supporting types every time. The source is immutable and the test only varies the method name, so one fixture-scoped compilation or shared compiled symbol map removes three redundant compilations without collapsing the behavioral cases. | `SharpProof.Effects.Test/FalseSwitchGuardPatternRegressionTests.cs:6-13,15-82` |
+
+## Second survey, continued: R1524 - the conditional-truth operator matrix recompiles a four-method source for every case
+
+`ConditionalTruthOperatorEffectTests.FixedTruthResultControlsConditionalCompletion` supplies four method names through `[TestCase]`, but its source literal contains all four methods plus both operator helper types. Each NUnit invocation rebuilds the same compilation and analyzes just the selected method. A cached fixture or a helper that compiles the shared source once can keep the four operator cases and remove the repeated setup.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1524 | **The four fixed-truth cases duplicate their entire compilation fixture.** `AndRightNeverCompletes`, `OrRightNeverCompletes`, `AndOperatorNeverCompletes`, and `OrOperatorNeverCompletes` differ only in the selected method and expected suffix flag, while `CreateCompilation` receives the same lines 15-85 on every invocation. Sharing that immutable compilation leaves the short-circuit distinctions explicit and avoids four parse/bind cycles. | `SharpProof.Effects.Test/ConditionalTruthOperatorEffectTests.cs:6-14,15-93` |
+
+## Second survey, continued: R1525 - the branching-initializer cases repeat two identical multi-type compilations
+
+`BranchingExpressionEffectRegressionTests` uses `[TestCase]` over type names in two tests, but each test method embeds a source literal containing every type in its group and recompiles that literal for each selected type. The first group compiles both terminal-arm types twice; the second compiles all three infeasible-branch types three times. A fixture-level compilation per source group, or one source with a shared symbol lookup, can preserve the separate expectations while removing the duplicate parse/bind work.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1525 | **Both initializer matrices compile more source than their selected case needs.** The two terminal-arm cases share one unchanged two-type source literal, and the three short-circuit/coalesce cases share one unchanged three-type literal; NUnit reruns each literal once per `[TestCase]` value. The analysis intentionally varies only the selected type name, so caching each group compilation would remove three redundant compilations across the two tests without changing coverage. | `SharpProof.Effects.Test/BranchingExpressionEffectRegressionTests.cs:6-12,15-52,54-99` |
