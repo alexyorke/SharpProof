@@ -489,14 +489,14 @@ internal static class SwitchExpressionFacts
                 binary.RightPattern,
                 inputType,
                 inputDefinitelyNonNull);
-            var selection = binary.OperatorKind == BinaryOperatorKind.And
+            var combinedSelection = binary.OperatorKind == BinaryOperatorKind.And
                 ? And(left.Selection, right.Selection)
                 : Or(left.Selection, right.Selection);
             var rightRequired = binary.OperatorKind == BinaryOperatorKind.And
                 ? left.Selection == SwitchExpressionSelection.Always
                 : left.Selection == SwitchExpressionSelection.Never;
             return new(
-                selection,
+                combinedSelection,
                 left.IsUnavoidable ||
                 rightRequired && right.IsUnavoidable);
         }
