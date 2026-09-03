@@ -6,6 +6,8 @@
     <EnableNETAnalyzers>false</EnableNETAnalyzers>
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <NuGetAudit>false</NuGetAudit>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+    <RestoreLockedMode>false</RestoreLockedMode>
     <SharpProofSamplePackageVersion>$(SharpProofPackageVersion)</SharpProofSamplePackageVersion>
     <SharpProofProfile>advisory</SharpProofProfile>
     <SharpProofFeatures>all</SharpProofFeatures>
