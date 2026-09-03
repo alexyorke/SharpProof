@@ -73,10 +73,15 @@ internal static class CorpusSnapshotFormat
 
     private static void ValidateCanonicalData(string[] lines)
     {
-        if (lines.Any(static line => !IsCanonicalData(line)) ||
-            !IsCanonicalOrder(lines))
+        for (var index = 0; index < lines.Length; index++)
         {
-            throw Invalid();
+            if (!IsCanonicalData(lines[index]) ||
+                (index > 0 && StringComparer.Ordinal.Compare(
+                    lines[index - 1],
+                    lines[index]) > 0))
+            {
+                throw Invalid();
+            }
         }
     }
 
@@ -133,12 +138,6 @@ internal static class CorpusSnapshotFormat
     private static bool IsData(string? line)
     {
         return !string.IsNullOrEmpty(line) && line[0] != '#';
-    }
-
-    private static bool IsCanonicalOrder(string[] lines)
-    {
-        return lines.SequenceEqual(
-            lines.OrderBy(static line => line, StringComparer.Ordinal));
     }
 
     private static InvalidDataException Invalid()
