@@ -13932,6 +13932,12 @@ preserve those policies without revisiting nested pattern structure.
 |---|---|---|
 | R1179 | **`OperationCompletionEvaluator.CanCompletePatternEvaluation` walks each recursive subpattern twice for separate facts.** It calls `CanCompletePatternEvaluation` and then `SwitchExpressionFacts.IsTotalPattern` on the same deconstruction and property subpatterns, repeating nested pattern traversal before deciding whether to stop. A combined fact seam can remove the structural duplicate while retaining distinct completion and total-pattern semantics; this is separate from R613's repeated totality call within each loop. | `SharpProof.Effects/OperationCompletionEvaluator.cs:243-276`; `SharpProof.Effects/SwitchExpressionFacts.cs:338-368` |
 
+### Status (part five hundred one)
+
+R1179 is applied: recursive pattern completion now carries child totality
+alongside completion, preserving the existing short-circuit and conservative
+failure behavior. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred two: R1180 - thrown-expression type projection is repeated
 
 After confirming that a thrown expression can complete, the exception
