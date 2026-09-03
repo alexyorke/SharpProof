@@ -14381,6 +14381,11 @@ sorted order and the entry-block lookup while removing one collection pass.
 |---|---|---|
 | R1200 | **`CompilerImplementationIlSummaryLowerer.Translator.Translate` enumerates the leader set twice.** It calls `leaders.ToDictionary(...)` to create IR blocks and then calls `leaders.ToArray()` for the ordered block-emission loop, with no intervening mutation. Building both projections from one materialized leader array preserves block order and entry selection without repeating the `SortedSet<int>` walk. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:557-577` |
 
+### Status (part five hundred twenty-two)
+
+R1200 is applied: the ordered IL leader array is materialized once and reused
+for block creation and emission. Focused implementation-IL tests pass (7/7).
+
 ## Second survey, part five hundred twenty-three: R1201 - IL wrapping re-interns one constant
 
 `WrapInt32` uses the same `4294967296` modulus in its remainder, unsigned
