@@ -547,16 +547,7 @@ public sealed class ProtocolJsonTests
     [Test]
     public void EffectCertaintyMustAgreeWithOutcomeAndUnknownReason()
     {
-        var manifest = CreateManifest();
-        manifest.Callables[0].SelectedFeatures = [WorkerSelectedFeature.Effects];
-        manifest.Callables[0].SelectionReasons = [
-            WorkerSelectionReason.ExplicitAnnotation
-        ];
-        manifest.Claims[0].Kind = WorkerClaimKind.Effect;
-        manifest.Claims[0].Evidence = WorkerClaimEvidence.Attribute;
-        manifest.Claims[0].EffectContractKind =
-            WorkerEffectContractKind.DoesNotThrow;
-        WorkerProtocolJson.SealManifest(manifest);
+        var manifest = CreateEffectManifest();
         var response = CreateResponse(manifest);
 
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -715,20 +706,7 @@ public sealed class ProtocolJsonTests
                 .Select(static error => error.Code),
             Does.Contain("response.vacuity"));
 
-        var effectManifest = CreateManifest();
-        effectManifest.Callables[0].SelectedFeatures = [
-            WorkerSelectedFeature.Effects
-        ];
-        effectManifest.Callables[0].SelectionReasons = [
-            WorkerSelectionReason.ExplicitAnnotation
-        ];
-        effectManifest.Claims[0].Kind =
-            WorkerClaimKind.Effect;
-        effectManifest.Claims[0].Evidence =
-            WorkerClaimEvidence.Attribute;
-        effectManifest.Claims[0].EffectContractKind =
-            WorkerEffectContractKind.DoesNotThrow;
-        WorkerProtocolJson.SealManifest(effectManifest);
+        var effectManifest = CreateEffectManifest();
         response = CreateResponse(effectManifest);
         response.ClaimResults[0].EffectCertainty =
             WorkerEffectEvidenceCertainty.VacuousEntry;

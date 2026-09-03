@@ -327,6 +327,7 @@ the smallest relevant containerized test target passes.
 | R972 | Reuse scalar-catalog integer bounds in the IL lowerer | CompilerCollector build and Worker.Test: 695 passed |
 | R996 | Share the left-associated addition-chain fixture in IR depth tests | `SharpProof.Ir.Test`: 114 passed |
 | R999 | Read analyzer option aliases once during validation | `SharpProof.Analyzer.Test`: 476 passed |
+| R1000 | Reuse the existing effect-manifest test factory | `SharpProof.Worker.Test`: ProtocolJsonTests, 108 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -10462,7 +10463,9 @@ the separate global/tree validation policy.
 
 ### Status (part two hundred thirty-one)
 
-R1000 is deferred: the helper exists already, so route the two direct users through it first; decide separately whether the hash-sensitive test needs an optional pre-seal snapshot rather than adding a second factory.
+R1000 is applied for the two direct users of the existing effect-manifest
+factory. The hash-sensitive test retains its pre-seal construction so it can
+capture the manifest identity before the effect mutation.
 
 ## Second survey, part two hundred thirty-two: R1001 - repeated requires-discovery test setup
 
