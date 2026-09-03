@@ -14,6 +14,15 @@ public sealed class SharpProofSoundnessAnalyzerTests
     private static readonly ImmutableArray<MetadataReference> PlatformReferences =
         CreatePlatformReferences();
 
+    private static string SemanticCacheWriteFixture(string body) =>
+        """
+        namespace SharpProof.Verify;
+        enum Answer { Unknown, Proven }
+        sealed class ProofCache {
+            internal void Write(Answer answer) { }
+        }
+        """ + body;
+
     [TestCase(
         """
         using Microsoft.CodeAnalysis;
@@ -462,12 +471,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
     public async Task SemanticCacheWritesDistinguishAliasVersions()
     {
         var diagnostics = await Analyze(
+            SemanticCacheWriteFixture(
             """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache {
-                internal void Write(Answer answer) { }
-            }
             sealed class C {
                 void M(ProofCache cache) {
                     var answer = Answer.Proven;
@@ -476,7 +481,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     cache.Write(answer);
                 }
             }
-            """);
+            """));
 
         Assert.That(
             diagnostics.Count(static diagnostic =>
@@ -593,12 +598,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
     public async Task SemanticCacheWritesTrackRefOutAndDeconstructionDefinitions()
     {
         var diagnostics = await Analyze(
+            SemanticCacheWriteFixture(
             """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache {
-                internal void Write(Answer answer) { }
-            }
             sealed class C {
                 private static void SetRef(ref Answer answer) =>
                     answer = Answer.Unknown;
@@ -629,7 +630,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     cache.Write(answer);
                 }
             }
-            """);
+            """));
 
         Assert.That(
             diagnostics.Count(static diagnostic =>
@@ -674,12 +675,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
     public async Task SemanticCacheWritesFollowNestedAssignmentEvaluationOrder()
     {
         var diagnostics = await Analyze(
+            SemanticCacheWriteFixture(
             """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache {
-                internal void Write(Answer answer) { }
-            }
             sealed class C {
                 private static Answer ReturnUnknown(Answer answer) =>
                     Answer.Unknown;
@@ -690,7 +687,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     cache.Write(answer);
                 }
             }
-            """);
+            """));
 
         Assert.That(
             diagnostics.Count(static diagnostic =>
@@ -702,12 +699,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
     public async Task SemanticCacheWritesUseNestedCallableReachingValues()
     {
         var unsafeDiagnostics = await Analyze(
+            SemanticCacheWriteFixture(
             """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache {
-                internal void Write(Answer answer) { }
-            }
             sealed class C {
                 void Lambda(ProofCache cache) {
                     var answer = Answer.Proven;
@@ -727,14 +720,10 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     Write();
                 }
             }
-            """);
+            """));
         var safeDiagnostics = await Analyze(
+            SemanticCacheWriteFixture(
             """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache {
-                internal void Write(Answer answer) { }
-            }
             sealed class C {
                 void Lambda(ProofCache cache) {
                     var answer = Answer.Unknown;
@@ -754,7 +743,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     Write();
                 }
             }
-            """);
+            """));
 
         using (Assert.EnterMultipleScope())
         {
@@ -883,12 +872,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
     public async Task SemanticCacheWritesRetainAllConditionalDefinitions()
     {
         var diagnostics = await Analyze(
+            SemanticCacheWriteFixture(
             """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache {
-                internal void Write(Answer answer) { }
-            }
             sealed class C {
                 void M(ProofCache cache, bool first, bool second) {
                     var answer = Answer.Unknown;
@@ -897,7 +882,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     cache.Write(answer);
                 }
             }
-            """);
+            """));
 
         Assert.That(
             diagnostics.Count(static diagnostic =>
@@ -909,12 +894,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
     public async Task SemanticCacheWritesJoinBranchesLoopsAndOverwrites()
     {
         var diagnostics = await Analyze(
+            SemanticCacheWriteFixture(
             """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache {
-                internal void Write(Answer answer) { }
-            }
             sealed class C {
                 void ExhaustiveSafe(ProofCache cache, bool condition) {
                     var answer = Answer.Unknown;
@@ -948,7 +929,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     cache.Write(answer);
                 }
             }
-            """);
+            """));
 
         Assert.That(
             diagnostics.Count(static diagnostic =>
@@ -1007,12 +988,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
     public async Task SemanticCacheWritesAnalyzeHelperReturnExpressions()
     {
         var diagnostics = await Analyze(
+            SemanticCacheWriteFixture(
             """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache {
-                internal void Write(Answer answer) { }
-            }
             static class AnswerSource {
                 internal static Answer Alias() {
                     var answer = Answer.Unknown;
@@ -1048,7 +1025,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     cache.Write(AnswerSource.ConditionalProperty);
                 }
             }
-            """);
+            """));
 
         Assert.That(
             diagnostics.Count(static diagnostic =>
@@ -1060,10 +1037,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
     public async Task SemanticCacheWritesIgnoreReturnsInConstantDisabledHelperBranches()
     {
         var diagnostics = await Analyze(
+            SemanticCacheWriteFixture(
             """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache { internal void Write(Answer answer) { } }
             static class AnswerSource {
                 internal static Answer Create() {
                     if (false) return Answer.Unknown;
@@ -1073,7 +1048,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
             sealed class C {
                 void M(ProofCache cache) => cache.Write(AnswerSource.Create());
             }
-            """);
+            """));
 
         Assert.That(diagnostics.Count(static diagnostic => diagnostic.Id == "SPMETA010"), Is.EqualTo(0));
     }
@@ -1082,12 +1057,8 @@ public sealed class SharpProofSoundnessAnalyzerTests
     public async Task SemanticCacheWritesInspectVirtualAndInterfaceProducerImplementations()
     {
         var diagnostics = await Analyze(
+            SemanticCacheWriteFixture(
             """
-            namespace SharpProof.Verify;
-            enum Answer { Unknown, Proven }
-            sealed class ProofCache {
-                internal void Write(Answer answer) { }
-            }
             interface IAnswerSource {
                 Answer Create();
                 Answer Value { get; }
@@ -1118,7 +1089,7 @@ public sealed class SharpProofSoundnessAnalyzerTests
                     cache.Write(source.Value);
                 }
             }
-            """);
+            """));
 
         Assert.That(
             diagnostics.Count(static diagnostic =>

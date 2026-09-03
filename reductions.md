@@ -19115,3 +19115,8 @@ its local trusted-assembly parsing and error-message variant. The focused
 | ID | Finding | Evidence |
 |---|---|---|
 | R1677 | The compiler-probe test hand-rolls a flat temp root and recursive delete despite linked disposable/guarded cleanup helpers; adopt the shared ownership abstraction. | `SharpProof.Package.Test/CompilerProbeInputConsistencyTests.cs:18-21,63-67`; `eng/testing/TempDirectory.cs:1-18`; `eng/testing/TestRepository.cs:59-82`; `Directory.Build.props:75-102` |
+
+R1664 is applied: the semantic-cache soundness fixtures now share the exact
+`Answer { Unknown, Proven }` and `ProofCache.Write` source prefix, while
+specialized enum, cache, interface, generic, and mutation shapes remain local.
+The complete `SharpProof.Meta.Analyzers.Test` project passes (163/163).
