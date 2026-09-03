@@ -11786,3 +11786,15 @@ R1108 is deferred: extract an assertion helper for finite-domain differential or
 ### Status (part three hundred forty)
 
 R1109 is pending: forward `GITHUB_ACTIONS` through the container environment to ensure CI builds enforce locked package restore as designed.
+
+## Second survey, part three hundred forty-one: R1110 - repeated release-version fixture values
+
+`Test-SharpProofReleaseVersionAuthorityFixtures.ps1` initializes the six package-version slots with the same `$expected` expression six times, then mutates selected slots for the `foreign-matching`, `mixed-package`, and `case-only-prerelease` scenarios. The six-element shape is meaningful because it models the fixed release package set, but the repeated expression is unnecessary and makes the count easy to drift. Initializing with `@($expected) * 6` preserves the mutable six-slot array and all per-mutation behavior while removing the repetition.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1110 | **Release-version authority fixtures repeat one expected value six times to build a fixed-size array.** The baseline assignment spells `$expected` six times before mutation cases alter individual entries; PowerShell array multiplication can express the same six-slot fixture directly, reducing visual noise without collapsing distinct manifest, plan, or package-version mutations. | `scripts/Test-SharpProofReleaseVersionAuthorityFixtures.ps1:19-33` |
+
+### Status (part three hundred forty-one)
+
+R1110 is deferred: initialize the six package-version entries with array multiplication, and retain the separate manifest, plan, and package mutation fields.
