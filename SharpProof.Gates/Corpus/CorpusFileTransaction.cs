@@ -189,16 +189,26 @@ internal static class CorpusFileTransaction
         byte[] content,
         CancellationToken cancellationToken)
     {
-        using var stream = new FileStream(
+        using var stream = OpenDurableFile(path, asynchronous: true);
+        await stream.WriteAsync(content, cancellationToken)
+            .ConfigureAwait(false);
+        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static FileStream OpenDurableFile(string path, bool asynchronous)
+    {
+        var options = FileOptions.WriteThrough;
+        if (asynchronous)
+        {
+            options |= FileOptions.Asynchronous;
+        }
+        return new FileStream(
             path,
             FileMode.CreateNew,
             FileAccess.Write,
             FileShare.None,
             4096,
-            FileOptions.Asynchronous | FileOptions.WriteThrough);
-        await stream.WriteAsync(content, cancellationToken)
-            .ConfigureAwait(false);
-        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            options);
     }
 
     private static void Restore(IEnumerable<TransactionEntry> entries)
@@ -217,13 +227,9 @@ internal static class CorpusFileTransaction
                 try
                 {
                     var content = File.ReadAllBytes(entry.BackupPath);
-                    using (var stream = new FileStream(
+                    using (var stream = OpenDurableFile(
                         restore,
-                        FileMode.CreateNew,
-                        FileAccess.Write,
-                        FileShare.None,
-                        4096,
-                        FileOptions.WriteThrough))
+                        asynchronous: false))
                     {
                         stream.Write(content, 0, content.Length);
                         stream.Flush(flushToDisk: true);

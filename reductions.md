@@ -19153,3 +19153,8 @@ only the `TestMetadataReferences` helper it uses. The focused
 `CompilerProbeInputConsistencyTests` test passes (1/1); the package suite also
 builds, while unrelated release-packaging integration cases remain blocked by
 the existing `SPMETA003` `ContainerNativeLibrary` gate.
+
+R622 is applied in its safe shared portion: corpus transaction staging and
+synchronous recovery now use one durable-file stream factory, while their
+asynchronous cancellation and synchronous flush-to-disk operations remain
+distinct. `CorpusGateTests` passes (23/23).
