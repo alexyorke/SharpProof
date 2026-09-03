@@ -16937,3 +16937,19 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 | ID | Finding | Evidence |
 |---|---|---|
 | R1399 | `FinalCompilationCollectorAnalyzer` scans all syntax trees for the reserved runtime-evaluation symbol, then `FinalCompilationCollector.Create` rescans the same compilation on the false path; carry the checked result or centralize the guard. | `SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs:21-32`; `SharpProof.CompilerCollector/FinalCompilationCollector.cs:54-63`; `SharpProof.Analyzer.Core/ContractRuntimePolicy.cs:7-26,37-47` |
+
+## Second survey, continued: R1400 - AnalyzeAll recomputes module-initializer prefixes for every source method
+
+`EffectAnalysisSession.AnalyzeAll` invokes `EffectModuleInitialization.SummarizeBeforeEntry` inside the projection for every source method. That helper starts at `EffectSummary.Bottom` and folds the same initializer prefix from the beginning for each method, so ordinary methods repeat the full initializer sequence and initializer methods repeat their respective prefixes. Precomputing prefix steps or a method-to-prefix map once per summary snapshot can preserve the first non-completing initializer boundary while avoiding the repeated prefix work.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1400 | `EffectAnalysisSession.AnalyzeAll` folds the module-initializer prefix independently for every source method; cache prefix states or summarize the ordered initializer sequence once per method position. | `SharpProof.Effects/EffectAnalysisSession.cs:132-157`; `SharpProof.Effects/EffectModuleInitialization.cs:102-126` |
+
+## Second survey, continued: R1401 - Effect-claim evaluation resolves an unused declared contract on facet-only methods
+
+`EffectContractDiagnostics.Evaluate` resolves and projects the declared effect contract, computes declared-completeness state, and tracks declared witnesses even when `summaryContracts` is empty. In that case the method has only facet claims such as purity, allocation, capability, or no-throw, and none of the declared-contract values are consumed by the `Add` calls. Make declared-contract resolution/projection lazy or conditional on a selected summary contract, while retaining the separate argument validation path for malformed attributes.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1401 | `EffectContractDiagnostics.Evaluate` performs declared effect-contract resolution and projection for methods with no `EffectContract` claim; defer that work until `summaryContracts` is nonempty. | `SharpProof.Analyzer.Core/EffectContractDiagnostics.cs:73-154,171-236` |
