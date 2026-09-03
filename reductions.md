@@ -18183,3 +18183,122 @@ fixtures now live in one linked test fixture compiled by both analyzer and
 binder test projects, while host-specific assertions remain separate.
 `SharpProof.Analyzer.Test` passes 4/4 and `SharpProof.Contracts.Test` passes
 3/3 for `ContractIntrinsicValidationTests`.
+
+## Second survey, part six hundred three: R1580 - two test projects declare the same compilation factory, and only one of them uses the constant the other project already uses
+
+Five test projects own a private compilation factory - `AnalyzerTestHost.cs` (212
+normalized lines), `GeneratorTestHost.cs` (205), `EffectTestHost.cs` (242),
+`ContractTestCompilation.cs` (55) and `WorkerTestCompilation.cs` (41), 755
+normalized lines in total. Four pairwise overlaps are small and explained by the
+shared Roslyn idiom. One is not.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1580 | **`SharpProof.Contracts.Test/ContractTestCompilation.cs` and `SharpProof.Worker.Test/WorkerTestCompilation.cs` are the same function written twice - 23 of `WorkerTestCompilation`'s 41 normalized lines appear verbatim in the other - and they live in exactly the two projects that already share a file through the `ItemGroup` that would host the merged version.** Both build `new CSharpParseOptions(LanguageVersion.CSharp12, preprocessorSymbols: [<the contract symbol>])`; both call `CSharpCompilation.Create(<name>, sources.Select(source => CSharpSyntaxTree.ParseText(source.Source, parseOptions, source.FileName)), TestMetadataReferences.WithSharpProof, new CSharpCompilationOptions(outputKind, nullableContextOptions: NullableContextOptions.Enable))`; both then filter `compilation.GetDiagnostics()` to `Severity == DiagnosticSeverity.Error` and assert emptiness with `string.Join(Environment.NewLine, errors.Select(e => e.ToString()))`. The differences are parameters, not behaviour: `ContractTestCompilation` adds `allowUnsafe`, `includeSharpProofReference` and `languageVersion`, suffixes a GUID onto the assembly name, returns `ToImmutableArray()` and exposes `AssertNoErrors` as a separate member; `WorkerTestCompilation` takes the assembly name as given, returns `ToArray()` and inlines the assertion. Every one of those is expressible as a default argument on one implementation. **The distribution mechanism is not just available, it is already pointed at these two projects and no others.** `Directory.Build.props:88-92` links `eng/testing/TestMetadataReferences.cs` into `SharpProof.Contracts.Test` and `SharpProof.Worker.Test` - the exact pair - and both factories call `TestMetadataReferences.WithSharpProof`. Adding the merged factory beside it is a two-line `Compile Include` in a group that exists. **The sharpest detail is one token.** `WorkerTestCompilation.cs:26` writes `preprocessorSymbols: [Contract.ConditionalSymbol]`, using the public constant; `ContractTestCompilation.cs:36` writes `preprocessorSymbols: ["SHARPPROOF_CONTRACTS"]`, the literal. `SharpProof.Contracts.Test` project-references `SharpProof.Attributes` (`:13`) and **already uses the constant in the identical idiom** at `ContractApiIdentityTests.cs:14`. So the project that owns the hard-coded copy demonstrably can and does use the constant elsewhere; the literal survives only in the shared helper, which is the place it is copied from most. That is R374's "independently authored at four boundaries" reproduced inside a single test project. | `SharpProof.Contracts.Test/ContractTestCompilation.cs:25-67`; `SharpProof.Worker.Test/WorkerTestCompilation.cs:20-49`; `SharpProof.Contracts.Test/ContractApiIdentityTests.cs:14`; `SharpProof.Contracts.Test/SharpProof.Contracts.Test.csproj:13`; `Directory.Build.props:88-92`; `eng/testing/TestMetadataReferences.cs`; related R374, R730, R602, R608, R1500 |
+
+### Checked and not proposed (part six hundred three)
+
+- **The three large test hosts are not duplicates of each other and merging them
+  would be wrong.** `AnalyzerTestHost` and `GeneratorTestHost` share 21 normalized
+  lines out of 212 and 205; `GeneratorTestHost` and `EffectTestHost` share 20;
+  `AnalyzerTestHost` and `EffectTestHost` share 16. Inspecting the shared lines
+  shows they are the unavoidable Roslyn idiom - `using` directives, `var
+  compilation = CSharpCompilation.Create(`, `new CSharpCompilationOptions(`,
+  `OutputKind.DynamicallyLinkedLibrary,`, `nullableContextOptions:
+  NullableContextOptions.Enable,` and the error-diagnostic filter - not shared
+  logic. Each host then does something genuinely different: run analyzers with
+  options providers, drive a source generator, or emit and reload an assembly. Only
+  the two small factories are the same function.
+- **`SharpProof.Effects.Test` has excellent host adoption and the naive census says
+  otherwise.** A grep for `CSharpCompilation.Create` reports three regression-test
+  files building their own compilations. They do not: the `.` in the pattern
+  matched the space in `CSharpCompilation CreateCompilation`, and all three call
+  `EffectTestHost.CreateCompilation`. Measured properly, **58 of the project's 64
+  files** use `EffectTestHost` and **zero** call `CSharpCompilation.Create(`
+  directly. Recorded because the same regex trap will mislead the next census.
+- **The direct-construction surface is 65 sites in 34 files, and the concentration
+  is already filed.** `SharpProof.Specs.Test/ApiSpecTests.cs` holds 11,
+  `CompilerProbeSnapshotTests.cs` 6, `FrontendLoweringTests.cs` 5. The Worker-side
+  concentration is R602 and R608; the metadata-reference half is R729 and R730.
+  R1580 is the one pair those findings do not name.
+- **No production or script file of fifty non-blank lines or more remains uncited
+  by name in this ledger.** Ranking every tracked `.cs`, `.ps1` and `.psm1` under a
+  production project, `scripts/` or `eng/`, excluding generated files, against the
+  ledger's text gives **zero** uncited files at that size. The file-coverage axis
+  that produced R1159 and R1303 earlier in this survey is exhausted for production
+  code. **52 test files** of that size remain uncited, which is where the remaining
+  unexamined surface is.
+- **The `artifacts/` path vocabulary is not a duplication finding.** Twenty-four
+  distinct `artifacts/` subpaths appear as literals across scripts, tests and
+  workflows, the most repeated being `artifacts/release-qualification` (7),
+  `artifacts/mutation/trusted-mutations.json` (6) and `artifacts/timings` (5).
+  Every repeat is a producer and its consumers or a test asserting where a script
+  writes, which is correspondence rather than duplication - the two sides must name
+  the same path for the assertion to mean anything. The one odd-looking entry,
+  `artifacts/../artifacts/report.json`, is a deliberate canonicalization fixture at
+  `scripts/Test-SharpProofContainedPathFixtures.ps1:36`.
+
+### Status (part six hundred three)
+
+R1580 is `pending` and is the cheapest consolidation left in the test tree: one
+merged factory in `eng/testing/`, two `Compile Include` lines in the `ItemGroup`
+that already serves both projects, and two files deleted. The constant fix is
+independent and is one token.
+
+R1406 is applied: the two recycled-supervisor-PID tests now share a
+parameterized cleanup assertion helper while retaining their distinct timeout,
+signal, and child-process scenarios. `VerifierProcessSupervisorBug202Tests`
+pass (3/3).
+
+## Second survey, part six hundred four: R1600 - two of forty-four regression files are named after a development batch, and the method-level duplication lens closes at six pairs
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1600 | **Forty-two of the repository's forty-four `*RegressionTests.cs` files name the behaviour they pin; two name a development wave that is documented nowhere, and both sit beside a correctly named sibling in the same project that already owns their subject.** The convention is otherwise exact - `ArrayAccessCompletion`, `LiftedNullableOperator`, `RefLocalEffect`, `VirtualHierarchyPrecondition`, forty-two in all, each a behaviour. The two exceptions are `SharpProof.Effects.Test/OperationCompletionWaveFiveRegressionTests.cs` and `SharpProof.Worker.Test/CompilerCallableLowererWaveSixRegressionTests.cs`. **Both are grab-bags.** Wave five holds five regressions with no shared subject - a non-exhaustive switch expression with a returning arm, a recursive source call with a base case, a constant null conversion to nullable, a user-defined constant null conversion to a struct, and lifted null division by zero reaching following writes. Wave six holds three: two about signed `Int64` source intervals and one about an expression-bodied `Requires`-only void method. What the members of each file share is the batch they were fixed in, and nothing else. **"Wave" is a concept the repository does not define.** A search across every `.cs`, `.ps1`, `.md` and `.json` finds the word only in these two file names and in `docs/container-development.md:182`, where "parallel wave" means test scheduling - an unrelated use. There is no numbering scheme, no wave one through four, and no document explaining what a wave was. **Each file's subject already has a home next to it.** `SharpProof.Worker.Test/CompilerCallableLowererTests.cs` sits beside the wave-six file, and `SharpProof.Effects.Test/CompositeOperationCompletionRegressionTests.cs` beside the wave-five one. The cost is not the two names: it is that a future regression in either area has no rule telling it whether to join the wave file, join the subject file, or start its own, and a reader looking for the lifted-null-division regression cannot find it by name in a project where forty-two other files can be found exactly that way. Note that the wave-six file's *contents* are already in this ledger three times - R602, R608 and applied R1071 - and none of the three remarks on the name. | `SharpProof.Effects.Test/OperationCompletionWaveFiveRegressionTests.cs:10,40,83,123,163`; `SharpProof.Worker.Test/CompilerCallableLowererWaveSixRegressionTests.cs:15,37,89`; `SharpProof.Worker.Test/CompilerCallableLowererTests.cs`; `SharpProof.Effects.Test/CompositeOperationCompletionRegressionTests.cs`; the other 42 `*RegressionTests.cs` file names; related R602, R608, R1071 |
+
+### Checked and not proposed (part six hundred four)
+
+- **Method-level duplication in the test tree is exhausted, and the number is
+  six.** Across **1,874** test method bodies of ten or more normalized lines,
+  bucketed by length and compared pairwise, exactly **six** pairs reach a Jaccard
+  similarity of 0.85 or higher on their normalized line sets. Inspecting them
+  shows every one is a deliberate positive/negative or variant pair where the
+  near-identity **is** the test design:
+  `SourceDefinedContractForAttributeIsRejected` against
+  `ProjectShadowedContractForAttributeIsRejected`,
+  `AllowsComposedFiltersThatExcludeCancellation` against
+  `RejectsComposedFiltersThatMayIncludeCancellation`, and
+  `LinuxEvidencePathsUseOrdinalCanonicalContainment` against
+  `PilotPackagesAndOutputsUseExactCandidateAuthority`. Together with R296's finding
+  of **zero** exact duplicate bodies in PowerShell and two in C#, both already
+  filed, the whole method-body duplication axis is closed in both languages and at
+  both exact and near thresholds. No future pass should re-derive it.
+- **The one-file-per-regression convention is deliberate and consolidating it
+  would fight an existing policy.** `SharpProof.Effects.Test` is 64 files, of which
+  **37** are regression files holding **61** test attributes across **2,767**
+  non-blank lines, and **24 of the 37 contain exactly one test**. The obvious
+  reduction - merge them by topic - is wrong here: the repository operates a
+  per-file complexity ratchet (`eng/acceptance/algorithm-size-ratchets.json`) whose
+  stated purpose is keeping files reviewable, and merging thirty-seven fixtures
+  would produce exactly the shape that ratchet exists to prevent. The bodies are
+  also genuinely distinct, as the near-duplicate scan above confirms. R1600 asks
+  only that the two files which break the *naming* half of the convention be
+  brought into it, and explicitly does not ask for consolidation.
+- **The remaining unexamined surface is test files, and it is now bounded.** Every
+  tracked `.cs`, `.ps1` and `.psm1` of fifty non-blank lines or more under a
+  production project, `scripts/`, or `eng/` is cited by name somewhere in this
+  ledger - **zero** uncited. **52** test files of that size are not, and this part
+  worked through the largest cluster of them, the `SharpProof.Effects.Test`
+  regression family, which yielded one naming finding and no duplication.
+- **`SharpProof.Effects.Test` has the best host adoption in the repository.** 58 of
+  its 64 files use `EffectTestHost`, and **zero** call `CSharpCompilation.Create(`
+  directly. The six that use neither need no compilation at all. Whatever
+  duplication remains in that project is not compilation setup.
+
+### Status (part six hundred four)
+
+R1600 is `pending` and is two file renames plus a decision about where three of the
+eight tests belong - the two signed-`Int64` interval tests already share a helper
+after applied R1071, so they move together. It is filed at this size because the
+convention it breaks is otherwise 42 for 42, which makes the two exceptions
+decidable rather than a matter of taste.

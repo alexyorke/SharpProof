@@ -11,23 +11,9 @@ public sealed class VerifierProcessSupervisorBug202Tests
     [Platform("Linux")]
     public void RecycledSupervisorPidIsNotScannedAfterCleanupDeadline()
     {
-        var opened = false;
-        var cleanup = VerifierProcessSupervisor.StopDescendants(
-            Environment.ProcessId,
+        AssertRecycledSupervisorPidIsNotScanned(
             0,
-            _ =>
-            {
-                opened = true;
-                return -1;
-            },
-            (descriptor, signal) => -1,
-            supervisorPidFd: 777);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(opened, Is.False);
-            Assert.That(cleanup.Complete, Is.True);
-        }
+            (descriptor, signal) => -1);
     }
 
     [Test]
@@ -64,24 +50,10 @@ public sealed class VerifierProcessSupervisorBug202Tests
         Assert.That(descendant, Is.Not.Null);
         try
         {
-            var opened = false;
-            var cleanup = VerifierProcessSupervisor.StopDescendants(
-                Environment.ProcessId,
+            AssertRecycledSupervisorPidIsNotScanned(
                 100,
-                _ =>
-                {
-                    opened = true;
-                    return -1;
-                },
                 (descriptor, signal) =>
-                    descriptor == 777 && signal == 0 ? -1 : 0,
-                supervisorPidFd: 777);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(opened, Is.False);
-                Assert.That(cleanup.Complete, Is.True);
-            }
+                    descriptor == 777 && signal == 0 ? -1 : 0);
         }
         finally
         {
@@ -90,6 +62,29 @@ public sealed class VerifierProcessSupervisorBug202Tests
                 descendant.Kill(entireProcessTree: true);
                 descendant.WaitForExit();
             }
+        }
+    }
+
+    private static void AssertRecycledSupervisorPidIsNotScanned(
+        int maximumMilliseconds,
+        Func<int, int, int> sendSignal)
+    {
+        var opened = false;
+        var cleanup = VerifierProcessSupervisor.StopDescendants(
+            Environment.ProcessId,
+            maximumMilliseconds,
+            _ =>
+            {
+                opened = true;
+                return -1;
+            },
+            sendSignal,
+            supervisorPidFd: 777);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(opened, Is.False);
+            Assert.That(cleanup.Complete, Is.True);
         }
     }
 }
