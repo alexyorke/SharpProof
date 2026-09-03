@@ -20,6 +20,7 @@ x-sharpproof-common: &sharpproof-common
   init: true
   network_mode: bridge
   environment: &sharpproof-environment
+    GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
     NUGET_PACKAGES: /home/sharpproof/.nuget/packages
     DOTNET_CLI_HOME: /home/sharpproof/.dotnet
     SHARPPROOF_REPO_ROOT: /workspace/SharpProof
