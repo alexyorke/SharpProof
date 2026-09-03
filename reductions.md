@@ -10731,6 +10731,10 @@ R1019 is applied: the convergence test keeps its specific exception and message 
 
 R1020 is deferred: share the comparer shell only, and keep separate tests that force hashing and equality while the factory is interning an external identity.
 
+R1020 is applied: hash-path and equality-path concurrency tests now use one configurable comparer shell, preserving their distinct callback behavior and constant-hash semantics. `IrFactoryInvariantRegressionTests` pass (9/9).
+
+R1020 is applied: hash-path and equality-path concurrency tests now use one configurable comparer shell, preserving their distinct callback behavior and constant-hash semantics. `IrFactoryInvariantRegressionTests` pass.
+
 ## Second survey, part two hundred fifty-two: R1021 - repeated frontend batch-isolation harness
 
 `CompileInvalidSemanticEdgeDoesNotPoisonValidPeer`, `CompileSuccessfulSemanticEdgeInjectionDoesNotPoisonValidPeer`, `NonnumericSemanticEdgeInjectionDoesNotEscapeBatchIsolation`, `StaticInitializerInjectionDoesNotPoisonValidPeer`, and `TopLevelInitializerInjectionDoesNotPoisonValidPeer` all submit the same valid `Exact("long", "", "0L")` case beside one injected second case, call `CompareSemanticEdges`, and assert that result zero agrees while result one mismatches. Their second expressions deliberately target different isolation boundaries, so those inputs and test names should remain separate, but a helper accepting the injected expression can own the common two-case batch and status assertions.
