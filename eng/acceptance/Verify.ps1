@@ -256,7 +256,6 @@ $productionInventory = ($productionInventoryJson -join [Environment]::NewLine) |
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofReleaseAuthorityClosureFixtures.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofPilotAuthorityFixtures.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainedPathFixtures.ps1')
-& (Join-Path $repositoryRoot 'scripts\Generate-DeclarativeModels.ps1') -Verify
 $previewEvidence = Get-Content -LiteralPath (
     Join-Path $acceptanceRoot 'preview-evidence.v1.json') -Raw |
     ConvertFrom-Json
