@@ -15923,6 +15923,13 @@ DoesNotThrowAttribute, EnforcePureAttribute, and ZeroAllocationsAttribute each d
 | ID | Finding | Evidence |
 |---|---|---|
 | R1325 | **Five marker attributes repeat explicit empty public parameterless constructors. If constructor-specific documentation is not an API requirement, rely on the compiler-supplied public constructor and remove the empty bodies while preserving the public attribute signature.** | SharpProof.Attributes/DoesNotThrowAttribute.cs:5-10; EnforcePureAttribute.cs:5-10; ZeroAllocationsAttribute.cs:5-10; ClosedContractAttributes.cs:7-24 |
+
+### Status (continued)
+
+R1325 is applied: five marker attributes now rely on the compiler-supplied
+public parameterless constructor. The attributes library builds cleanly; its
+test project remains blocked by the pre-existing NUnit Assert.Throws overload
+ambiguity.
 ## Second survey, continued: R1326 - contained-path fixture helper masks unexpected exceptions
 
 Test-SharpProofContainedPathFixtures.Require-Rejection catches every exception from Resolve-SharpProofContainedPath and treats it as the intended rejection; only the helper's own 'fixture was accepted' exception is rethrown. A fixture typo, missing directory, platform API failure, or unrelated argument error can therefore make a rejection case pass. Assert the expected exception type and containment-failure shape so these tests distinguish a real boundary rejection from an unexpected test failure.
