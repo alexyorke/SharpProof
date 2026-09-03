@@ -15246,6 +15246,13 @@ lowering tests pass (37 passed).
 |---|---|---|
 | R1256 | **`ContractApiIdentityResolver` rescans all compilation references for each trusted API candidate.** `IsTrustedReferenceType` calls `IsCompilationReference` during contract and attribute validation, and the latter reprojects every reference on each call. Cache the reference-assembly membership for the immutable compilation without changing the trusted-reference predicate. | `SharpProof.Frontend/ContractApiIdentityResolver.cs:47-54,128-161,164-174` |
 
+### Status (part five hundred seventy-eight)
+
+R1256 is applied: trusted-reference membership is memoized per resolver and
+assembly, eliminating repeated compilation-reference projections while retaining
+symbol-equality and fail-closed behavior. Contract API identity tests pass (6
+passed).
+
 ## Second survey, part five hundred seventy-nine: R1257 - metadata names are reparsed on every symbol comparison
 
 `ContractApiIdentityResolver.HasMetadataName` parses its immutable metadata-name argument with `LastIndexOf('.')`, creates two `Substring` values, and passes the namespace portion to `NamespaceMatches`, which calls `Split('.')` again. The same routine is reached while resolving each catalog attribute, rejecting shadowed attributes, checking clause ownership, and scanning the known-attribute list. These names come from the generated closed catalog and do not change during analysis, so pre-parsing namespace/type components or caching them by metadata name can remove repeated string work while preserving ordinal comparisons and namespace-boundary checks.
