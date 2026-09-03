@@ -16589,3 +16589,19 @@ checks preserved.
 R1372 is applied: package-backed qualification gates now rely on the single
 shared six-unique-artifact validation and keep only their gate-specific checks.
 The focused ReleaseQualification architecture tests pass (5 passed).
+
+## Second survey, continued: R1373 - Release qualification reruns the same exact package-consumer command
+
+The `container-verifier` job runs `docker compose run --rm tooling package-consumers -Configuration Release -PackageSource nupkgs`, and `release-qualification` waits for that job and then invokes the same command with the same arguments after downloading the same exact package artifact. No input, filter, or package projection differs between the two calls; the second run is only useful if it is an intentional defense-in-depth boundary. If that boundary is required, bind and consume a receipt from the first run; otherwise remove the duplicate container run and retain the qualification-specific gates.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1373 | `package-consumers.yml` runs the identical exact-package consumer command in `container-verifier` and again in `release-qualification`, despite the latter depending on the former and downloading the same artifact identity. Share a receipt or remove one invocation while keeping the surrounding release-specific acceptance, mutation, coverage, and publication checks. | `.github/workflows/package-consumers.yml:62-77,113-123,130-132,188-192` |
+
+## Second survey, continued: R1374 - Package-source validation enumerates the same directory twice by extension
+
+`Resolve-SharpProofPackageSource` calls `Get-ChildItem` once for `*.nupkg` and again for `*.snupkg`, then runs two otherwise identical identity-projection pipelines over those results. A single file inventory filtered by the two allowed extensions and partitioned by extension can preserve the separate exact-three checks and identity comparisons while removing the repeated directory traversal and pipeline setup. This is local to the resolver; the later portable-version reparse is the separate cross-stage issue already tracked elsewhere.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1374 | `Resolve-SharpProofPackageSource` performs two directory enumerations and two identical `Get-SharpProofPackageIdentity` projections solely to separate package and symbol files. Build one six-file inventory and derive the two typed collections from it, retaining their distinct cardinality, ID, version, and pairing checks. | `scripts/Test-SharpProofPackageConsumers.ps1:36-55` |
