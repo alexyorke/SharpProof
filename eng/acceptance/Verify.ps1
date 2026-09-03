@@ -246,19 +246,7 @@ $productionInventory = ($productionInventoryJson -join [Environment]::NewLine) |
 
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofContainerContract.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofReadme.ps1')
-& (Join-Path $repositoryRoot 'scripts\Generate-DiagnosticDescriptors.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-CSharpScalarSemantics.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-ContractApiCatalog.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-AnalyzerDiagnosticCatalog.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-ProjectionCatalog.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-LauncherArguments.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-BoundContractModel.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-EffectContractMappings.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-OperationSupportCatalog.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-IrModel.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-ApiSpecCatalog.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-ProtocolModel.ps1') -Verify
-& (Join-Path $repositoryRoot 'scripts\Generate-CompilerArtifactModel.ps1') -Verify
+& (Join-Path $repositoryRoot 'scripts\Test-SharpProofGeneratedOutputs.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-CompilerArtifactModelGenerator.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationEvidence.ps1')
 & (Join-Path $repositoryRoot 'scripts\Test-SharpProofMutationScheduling.ps1')

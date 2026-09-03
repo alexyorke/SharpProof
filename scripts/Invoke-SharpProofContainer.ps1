@@ -257,6 +257,9 @@ switch ($Command) {
         }
         & (Join-Path $repositoryRoot `
             'scripts/Test-SharpProofContainerContract.ps1')
+        Invoke-RequiredScript `
+            'scripts/Test-SharpProofGeneratedOutputs.ps1' `
+            'Generated-output verification failed.'
         Invoke-SharpProofSolutionBuild -BuildConfiguration $Configuration
 
         $performanceOutput = Join-Path $repositoryRoot (

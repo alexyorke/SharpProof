@@ -326,6 +326,7 @@ the smallest relevant containerized test target passes.
 | R961 | Replace CompilerArtifact global usings with explicit per-file imports | CompilerArtifact build and generator verification passed |
 | R972 | Reuse scalar-catalog integer bounds in the IL lowerer | CompilerCollector build and Worker.Test: 695 passed |
 | R975 | Share PowerShell canonical-container admission checks | PowerShell smoke check; ContainerAuthorityScriptTests: 15; BuildSchedulingTests: 25 passed |
+| R980 | Share generated-output verification and run it in PR gates | Generated-output verifier; AcceptanceScriptTests and BuildSchedulingTests passed |
 | R996 | Share the left-associated addition-chain fixture in IR depth tests | `SharpProof.Ir.Test`: 114 passed |
 | R999 | Read analyzer option aliases once during validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R1000 | Reuse the existing effect-manifest test factory | `SharpProof.Worker.Test`: ProtocolJsonTests, 108 passed |
@@ -9879,13 +9880,12 @@ and which pipeline commands reach it.
 
 ### Status (part two hundred ten)
 
-R980 is `pending` and is the most consequential gate-coverage gap found in this
-survey, alongside R967. The fix needs no new mechanism: fourteen tests shaped like
-`CheckedInGeneratedOutputsAreCurrent`, or one data-driven test over the generator
-list, would move staleness detection from the nightly lane into the pull-request
-lane where the edit is made. R981 is `applied`: the fifteen top-level generator
-verification calls now have consistent indentation. AcceptanceScriptTests passed
-all 15 tests.
+R980 is applied: the fourteen top-level generated-output verifications now live in
+one data-driven script, which acceptance and `pr-gates` both invoke. The API-spec
+generator continues to verify its delegated witness outputs, so the complete
+fifteen-generator coverage is now reachable from pull requests as well as
+acceptance. R981 is applied: the verification call has consistent indentation.
+AcceptanceScriptTests and BuildSchedulingTests passed.
 
 ## Second survey, part two hundred eleven: R982 - a parallel recursive IR rewriter
 
