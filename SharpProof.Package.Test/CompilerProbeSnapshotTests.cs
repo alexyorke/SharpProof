@@ -18,8 +18,7 @@ public sealed class CompilerProbeSnapshotTests
             "ProbeConsumer",
             [CSharpSyntaxTree.ParseText("class C {}", path: "café.cs")],
             [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]);
-        var output = await CaptureSnapshotAsync(
-            Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json"), compilation);
+        var output = await CaptureSnapshotAsync(compilation);
 
         Assert.That(output, Does.Contain("\\u00e9.cs"));
     }
@@ -38,8 +37,7 @@ public sealed class CompilerProbeSnapshotTests
                     path: "AlsoHandwritten.cs")
             ],
             [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)]);
-        var output = await CaptureSnapshotAsync(
-            Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json"), compilation);
+        var output = await CaptureSnapshotAsync(compilation);
 
         using var document = JsonDocument.Parse(output);
         var kinds = document.RootElement.GetProperty("syntaxTrees")
@@ -75,9 +73,7 @@ public sealed class CompilerProbeSnapshotTests
             "ProbeConsumer",
             [CSharpSyntaxTree.ParseText("class Consumer {}")],
             [MetadataReference.CreateFromImage(image)]);
-        var output = await CaptureSnapshotAsync(
-            Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json"),
-            compilation);
+        var output = await CaptureSnapshotAsync(compilation);
 
         using var document = JsonDocument.Parse(output);
         var reference = document.RootElement.GetProperty("portableReferences")
@@ -144,6 +140,15 @@ public sealed class CompilerProbeSnapshotTests
             "ProbeConsumer",
             references: [referencedCompilation.ToMetadataReference()]);
         return await CaptureSnapshotAsync(outputPath, compilation);
+    }
+
+    private static async Task<string> CaptureSnapshotAsync(
+        CSharpCompilation compilation)
+    {
+        using var directory = new TempDirectory("sharpproof-probe-snapshot-");
+        return await CaptureSnapshotAsync(
+            Path.Combine(directory.FullName, "probe.json"),
+            compilation);
     }
 
     private static async Task<string> CaptureSnapshotAsync(
