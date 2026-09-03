@@ -1670,7 +1670,10 @@ internal sealed class ManagedFlowState
         }
 
         return left._values.Keys.Union(right._values.Keys, Comparer).All(key =>
-            ManagedAbstractValue.Join(left.Get(key), right.Get(key)) == right.Get(key));
+        {
+            var rightValue = right.Get(key);
+            return ManagedAbstractValue.Join(left.Get(key), rightValue) == rightValue;
+        });
     }
 }
 
