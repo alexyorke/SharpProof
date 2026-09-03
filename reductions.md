@@ -18508,3 +18508,8 @@ R1512 is applied: the repeated unsupported `Map` implementation body in the
 ContractFor self-cycle and mutual-cycle fixtures now comes from one shared
 constant, while cycle topology and diagnostic assertions remain distinct.
 `ContractForCycleAnalyzerTests` pass (5/5).
+
+The earlier sequence-cardinality R1521 entry is applied: its fixed sample
+corpus is now a static read-only fixture, avoiding reconstruction across law
+tests. `SequenceCardinalityDomainTests` pass (6/6). (The later dependency
+finding was renumbered to R1540 by the ledger reconciliation.)
