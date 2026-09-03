@@ -16637,3 +16637,8 @@ The `container-verifier` job runs `docker compose run --rm tooling package-consu
 | ID | Finding | Evidence |
 |---|---|---|
 | R1378 | `SharpProof.ContainerExecution.psm1` independently loads `contract.json` for solution timeout and CPU-budget decisions. Reuse one per-run contract projection across adjacent calls, especially package tests, without merging the distinct policy validations. | `scripts/SharpProof.ContainerExecution.psm1:264-309,393-435`; callers `scripts/Invoke-SharpProofPackageTests.ps1:35-43`, `scripts/Invoke-SharpProofDevCheck.ps1:20-29` |
+
+R1146 is applied: spec and summary assumptions rely on the final depth sweep,
+which still runs after source-domain and normal-completion assumptions are added;
+the duplicate per-assumption checks are gone. The focused worker claim/lowering
+coverage run passes (182 passed).

@@ -84,11 +84,6 @@ internal static class CallableEvidenceBuilder
                 specAssumption.Predicate,
                 body.SpecResultProjections);
             var predicate = Guard(factory, guard, specPredicate);
-            if (GetDepth(predicate) > maximumExpressionDepth)
-            {
-                return CallableEvidenceBuildResult.Fail(
-                    WorkerClaimReason.UnsupportedExpression);
-            }
 
             ProofJustification justification =
                 new SpecJustification(specAssumption.Spec);
@@ -127,11 +122,6 @@ internal static class CallableEvidenceBuilder
                 factory,
                 projectedGuard,
                 projectedPredicate);
-            if (GetDepth(predicate) > maximumExpressionDepth)
-            {
-                return CallableEvidenceBuildResult.Fail(
-                    WorkerClaimReason.UnsupportedExpression);
-            }
 
             var summaryEvidence = summaryAssumption.Origin ==
                     CompilerSummaryOrigin.SpecificationPack
