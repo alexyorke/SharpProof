@@ -14399,6 +14399,11 @@ IR factory's interning behavior.
 |---|---|---|
 | R1201 | **`CompilerImplementationIlSummaryLowerer.Translator.WrapInt32` re-interns the same modulus three times.** The remainder, negative-remainder adjustment, and final signed adjustment each call `_factory.Integer(modulus)` with unchanged input; `IrFactory.Integer` synchronizes and interns by the same structural key on every call. Caching one `IrIntegerTerm` per wrap removes the duplicate factory work without changing the generated term graph. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:1523-1549`; `SharpProof.Ir/IrFactory.cs:372-380` |
 
+### Status (part five hundred twenty-three)
+
+R1201 is applied: `WrapInt32` interns the modulus term once and reuses it for
+all three arithmetic adjustments. Focused implementation-IL tests pass (7/7).
+
 ## Second survey, part five hundred twenty-four: R1202 - opaque lowering repeats child traversal
 
 `Opaque` first lowers its receiver and child arguments through `LowerCore`, then
