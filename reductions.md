@@ -19085,3 +19085,7 @@ remains explicit. `EffectCounterexampleReplayTests` passes (31/31).
 R1674 is applied: the compiler-manifest authority test now reuses one evidence
 mutation action for both independent source artifacts. The focused
 `CompilerManifestArtifactTests` class passes (91/91).
+
+R1675 is applied: portable-IR round-trip tests now use one canonical graph JSON
+equality helper, while the golden-wire test retains its explicit byte check.
+`PortableIrGraphCodecTests` passes (54/54).

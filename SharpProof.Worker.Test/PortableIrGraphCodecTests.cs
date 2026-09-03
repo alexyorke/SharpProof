@@ -51,9 +51,7 @@ public sealed class PortableIrGraphCodecTests
                 decoded.Instructions,
                 Has.Count.EqualTo(
                     encoded.Graph.Blocks.Sum(static block => block.Instructions.Length)));
-            Assert.That(
-                JsonSerializer.Serialize(encodedAgain.Graph),
-                Is.EqualTo(JsonSerializer.Serialize(encoded.Graph)));
+            AssertGraphJsonEqual(encoded.Graph, encodedAgain.Graph);
         }
 
         var decodedConditional = (IrConditionalTerm)decoded.Roots[fixture.ConditionalRoot];
@@ -124,9 +122,7 @@ public sealed class PortableIrGraphCodecTests
             Assert.That(
                 decoded.Variables,
                 Has.Count.EqualTo(encoded.Graph.Variables.Length));
-            Assert.That(
-                JsonSerializer.Serialize(reencoded.Graph),
-                Is.EqualTo(JsonSerializer.Serialize(encoded.Graph)));
+            AssertGraphJsonEqual(encoded.Graph, reencoded.Graph);
         }
     }
 
@@ -263,9 +259,7 @@ public sealed class PortableIrGraphCodecTests
             decoded.Factory,
             decoded.Program,
             decoded.Roots);
-        Assert.That(
-            JsonSerializer.Serialize(reencoded.Graph),
-            Is.EqualTo(JsonSerializer.Serialize(encoded.Graph)));
+        AssertGraphJsonEqual(encoded.Graph, reencoded.Graph);
     }
 
     [Test]
@@ -401,6 +395,15 @@ public sealed class PortableIrGraphCodecTests
         Assert.That(
             serialized.Members.Single().DocumentationCommentId,
             Is.EqualTo("M:Subject.Transform(System.Int32)"));
+    }
+
+    private static void AssertGraphJsonEqual(
+        PortableIrGraph expected,
+        PortableIrGraph actual)
+    {
+        Assert.That(
+            JsonSerializer.Serialize(actual),
+            Is.EqualTo(JsonSerializer.Serialize(expected)));
     }
 
     private static PortableIrGraph CreateCallIdentityGraph()
