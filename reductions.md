@@ -16573,3 +16573,11 @@ stop behavior. The focused RequiresCallSiteDiscoveryTests suite passes (44 passe
 R1369 is applied: the four package-rejection tests now share one package cleanup
 and rejection-assertion helper while retaining their distinct malformed identity
 setups. The focused ApiSpecTests suite passes (33 passed).
+
+## Second survey, continued: R1372 - Qualification receipt gate branches repeat a package-artifact cardinality invariant
+
+In `Write-SharpProofQualificationReceipt.ps1`, the package-backed gate set is identified first and every row is normalized; the common pre-switch validation then throws unless there are exactly six unique package artifacts. The `portable-*`, `package-consumers`, and `pilots` switch arms each test `$packageArtifacts.Count -eq 6` again, so those predicates are tautologies after the shared guard succeeds. Remove the repeated branch checks or expose the common validated result directly, while retaining the single six-unique invariant and the pilot-specific report validation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1372 | `Write-SharpProofQualificationReceipt.ps1` repeats a post-validation `$packageArtifacts.Count -eq 6` check in the portable, package-consumer, and pilot switch arms. The shared package-artifact precondition already rejects any non-six or duplicate set; carry that validated state into the branches and keep only gate-specific predicates. | `scripts/Write-SharpProofQualificationReceipt.ps1:32-52,62-67,85-95` |
