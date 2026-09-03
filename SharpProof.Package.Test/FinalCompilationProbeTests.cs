@@ -385,7 +385,6 @@ public sealed class FinalCompilationProbeTests
         {
             get;
         }
-        internal int SyntaxTreeCount => SyntaxTrees.Length;
         internal string[] SyntaxTreePaths =>
             [.. SyntaxTrees.Select(static tree => {
                 using var document = JsonDocument.Parse(tree);

@@ -18839,3 +18839,7 @@ unused Fuzz test IR-alias link is removed. `SharpProof.Fuzz.Test` passes
 R1657 is applied: the unreferenced `ContractSelectionInventory.ContractForMetadataName`
 alias is removed; `ContractApiMetadata.ContractFor` remains the single metadata
 authority. `SharpProof.Contracts.Test` passes (142/142).
+
+R1658 is applied: the unused `ProbeArtifact.SyntaxTreeCount` convenience property
+is removed; probe path assertions continue using `SyntaxTrees` and
+`SyntaxTreePaths`. `FinalCompilationProbeTests` pass (7/7).
