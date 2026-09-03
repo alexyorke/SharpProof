@@ -30,22 +30,29 @@ function Test-NUnitMultipleAssertionLines {
         else {
             $Lines.Count
         }
-        $block = @($Lines[$start..($end - 1)])
-        $hasExpected = @($block | Where-Object {
-                $_ -match '^Expected(:| is\b| and actual are both\b)'
-            }).Count -ne 0
-        $hasActual = @($block | Where-Object {
-                $_ -match '^Expected is\b.*\bactual is\b'
-            }).Count -eq 1
-        $hasButWas = @($block | Where-Object {
-                $_ -match '^But was:'
-            }).Count -eq 1
-        if ($block[0] -notmatch '^\d+\)\s+Assert\.That\(' -or
-            @($block | Where-Object {
-                $_ -match '(?i)\bSystem\.[A-Za-z]+Exception\b'
-            }).Count -ne 0 -or
+        $hasExpected = $false
+        $actualCount = 0
+        $butWasCount = 0
+        $exceptionCount = 0
+        for ($lineIndex = $start; $lineIndex -lt $end; $lineIndex++) {
+            $line = $Lines[$lineIndex]
+            if ($line -match '^Expected(:| is\b| and actual are both\b)') {
+                $hasExpected = $true
+            }
+            if ($line -match '^Expected is\b.*\bactual is\b') {
+                $actualCount++
+            }
+            if ($line -match '^But was:') {
+                $butWasCount++
+            }
+            if ($line -match '(?i)\bSystem\.[A-Za-z]+Exception\b') {
+                $exceptionCount++
+            }
+        }
+        if ($Lines[$start] -notmatch '^\d+\)\s+Assert\.That\(' -or
+            $exceptionCount -ne 0 -or
             -not $hasExpected -or
-            (-not $hasActual -and -not $hasButWas)) {
+            ($actualCount -ne 1 -and $butWasCount -ne 1)) {
             return $false
         }
     }

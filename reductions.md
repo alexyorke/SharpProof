@@ -17074,3 +17074,498 @@ R1395 is applied: retained fuzz-seed parsing now tracks duplicates in an
 ordinal integer set during the existing JSON loop, preserving ordered seeds
 and the original validation-error precedence without a second scan.
 `FuzzRunnerEvidenceTests` pass (2/2).
+
+R1396 is applied: NUnit multi-assertion failure blocks are now classified by
+one bounded line loop, retaining exact expected/actual/But-was counts,
+exception rejection, and message precedence. Mutation evidence behavioral
+fixtures pass.
+
+## Second survey, part five hundred ninety-two: R1500 - the shared-source gating measured for precision, and R233's proposal points the wrong way
+
+`Directory.Build.props` distributes nine shared source files into their consumers
+by three different mechanisms: one derived property matching a name pattern, one
+19-term `Or` chain of project names, and six explicit project-name allow-lists.
+Nobody has measured which of the three is accurate. Precision here is decidable -
+for each linked file, does the consuming project reference any type the file
+declares? Both shared test helpers live in the **global namespace**, so a
+plain-name search over each project's own `.cs` files is exact, not an
+approximation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1500 | **Accuracy of the shared-source gating falls monotonically as the condition becomes more automatic - the six hand-written allow-lists are 16 for 16 correct, the 19-term name chain is 18 for 19, and the one pattern-derived condition is right for 3 of 19 and 10 of 19 - which is the opposite of the direction R233 proposes.** `Directory.Build.props:70` links `TestRepository.cs` and `ProcessRunner.cs` into every project whose name matches `Test$` (`:24`), which is **19** projects. `ProcessRunner` is referenced from **3** of them - `SharpProof.ArchitectureTest`, `SharpProof.Package.Test`, `SharpProof.Specs.Test` - and `TestRepository` from **10**. That is 16 + 9 = **25 file-into-assembly compilations with no reference**, about **2,100 lines** of C# compiled to be discarded. The extreme case is `SharpProof.Attributes.Test`: **345** lines of its own across two files, plus **167** lines of shared helpers it never names - nearly half its size in infrastructure it does not use. Contrast the six explicit lists at `:80,88,101,108,115,121`, which name 16 projects between them for `TempDirectory.cs`, `TestMetadataReferences.cs`, `DictionaryAnalyzerConfigOptions.cs`, `DiagnosticDescriptorCatalogAssertions.cs`, `ApiSpecTestFacets.cs` and `RuntimeAssemblyTestHost.cs`: **every one of the sixteen references the file it is given** - zero stale entries. The 19-term `SharpProofUsesIrIdentifiers` chain at `:39-58` sits between the two: eighteen of its nineteen projects use at least one of the nine `global using` aliases in `IrIdentifierAliases.cs`, and one, **`SharpProof.Fuzz.Test`**, uses none - it has `using SharpProof.Ir;` in two files and never names `IrId`, `IrVarId`, `IrTypeId` or any of the other six. **The bearing on R233 is the point.** R233 proposes replacing the explicit lists with "an opt-in property set in each consuming `.csproj`" to remove about 40 lines of central condition. The measurement says the explicit per-project decisions are the ones that are correct, and the single place where a per-project decision was already replaced by a computed condition is the single place that is wrong - by a factor of six for `ProcessRunner`. R233's *cost* claim stands (the central file does know every consumer); its implied *quality* claim does not. Any replacement must keep a per-project statement of intent, because that is the mechanism with a perfect record here; an opt-in property in each `.csproj` would preserve it, an automatic one would repeat the defect. **This is enforceable rather than a matter of taste**: the repository already asserts set equality between approved and discovered generated outputs in `BoundaryEnforcementTests`, and R730 asked for exactly this technique on the adjacent axis. A test that fails when a project links a shared source it never references is the same shape, and it would have caught all 26 of these. | `Directory.Build.props:24,39-58,61-68,70-78,80-86,88-92,101-106,108-113,115-119,121-125`; `eng/testing/ProcessRunner.cs` (84 lines, global namespace); `eng/testing/TestRepository.cs` (83 lines, global namespace); `SharpProof.Ir/IrIdentifierAliases.cs`; `SharpProof.Fuzz.Test/{FrontendSemanticEdgeCaseTests,FuzzRunnerTests}.cs`; `SharpProof.Attributes.Test/`; related R233, R730, R301, R070 |
+
+### Checked and not proposed (part five hundred ninety-two)
+
+- **Two candidate findings in this part were false and were killed by checking,
+  not by judgment.** The first: `DictionaryAnalyzerConfigOptions.cs` appeared
+  stale for two of its three named projects. It is not - the file declares
+  **two** types, `DictionaryAnalyzerConfigOptions` at `:6` and
+  `DictionaryAnalyzerConfigOptionsProvider` at `:34`, and
+  `SharpProof.ContractForGenerator.Test/GeneratorTestHost.cs:139,187` and
+  `SharpProof.Gates/AnalyzerGateHost.cs:120` both construct the **Provider**. A
+  word-boundary search for the shorter name excludes the longer one, which is
+  what produced the false positive. The second: `SharpProof.Fuzz` looked like an
+  allow-list entry naming a project that does not exist, because it is the only
+  project in the repository outside the root - `Tools/SharpProof.Fuzz/` - and a
+  root-relative listing finds nothing. It uses 24 aliases. Both are recorded
+  because the same two traps will catch the next pass.
+- **The unused links cost nothing in coverage, and the obvious argument that they
+  do is wrong.** `eng/coverage/SharpProof.Managed.runsettings:8` sets
+  `<IncludeTestAssembly>False</IncludeTestAssembly>`, so no test assembly is
+  instrumented and the 25 unreferenced compilations never reach
+  `eng/coverage/baseline.json`. R1500 claims build-time and comprehension cost
+  only. The one shared helper that *does* land in an instrumented assembly is
+  `DictionaryAnalyzerConfigOptions.cs` inside `SharpProof.Gates`, whose floor is
+  74.85 - and its 66 lines are genuinely used there.
+- **`eng/testing/` is not a test-only directory, and that was already recorded
+  rather than re-filed.** The `DictionaryAnalyzerConfigOptions.cs` group names
+  `SharpProof.Gates`, a production `Exe` under `SharpProofProductionProject`,
+  which was noted in the part that refreshed R233's counts. Worth repeating only
+  for the reading hazard: at `:101-103` the three names are
+  `SharpProof.Analyzer.Test`, `SharpProof.ContractForGenerator.Test` and
+  `SharpProof.Gates`, and `SharpProof.Gates.Test` is also a real project, so the
+  one non-test entry is one suffix away from being invisible to a skim.
+- **R730 is the complementary direction and is not duplicated.** R730 says the
+  helper loses to a hand-written copy *inside projects that link it*; R1500 says
+  the link reaches projects that reference nothing at all. Same mechanism, opposite
+  failure. Together they bound it on both sides: `TestMetadataReferences.cs` is
+  linked into 2 projects where 9 files use it and 5 re-implement it, while
+  `ProcessRunner.cs` is linked into 19 where 3 use it. Neither is fixed by moving
+  the helper; both are fixed by the check R730 asked for.
+- **R425 remains applied and R301 remains accurate.** No `.csproj` outside
+  `artifacts/` references `eng/testing` - all nine shared sources are distributed
+  from `Directory.Build.props:61-125` only. R301's observation that
+  `Invoke-SharpProofChangedTests.ps1` parses `<Compile Include>` from the `.csproj`
+  alone, and so cannot see props-injected sources, is unchanged and is made
+  slightly worse by R1500: impact analysis is blind to these links in both
+  directions, so neither the 25 useless edges nor the 30 real ones are visible to
+  it.
+- **`SharpProof.Smoke.Net472`, `SharpProof.CompilerProbe.TestAsset` and the eight
+  `samples/` projects take none of the nine shared sources**, correctly - none
+  matches `Test$`, none is named in any allow-list, and none references a shared
+  type. The gating has no false negatives anywhere; every error found is
+  over-inclusion.
+
+### Status (part five hundred ninety-two)
+
+R1500 is `pending` and splits cleanly. Narrowing `:70-78` to an explicit list is a
+two-line edit with an exactly known answer - `ProcessRunner.cs` needs three
+projects, `TestRepository.cs` needs ten - and removing `SharpProof.Fuzz.Test`
+from `:39-58` is one line. The check that keeps it true afterwards is the larger
+piece and is shared with R730; until it exists, this measurement has a shelf life
+of one new test project.
+
+## Second survey, part five hundred ninety-three: R1501 - one archived document is missing the banner that marks the other three as history, and it is the one that reads as an instruction and the one that has gone stale
+
+The four files in `eng/agent-notes/archive/` were adjudicated by the prior audit
+and kept: `docs/code-usefulness-audit.md:116` records *"`eng/agent-notes/archive/`
+is fixed historical audit evidence. It is not..."*, and rows `:870-873` give all
+four the verdict `retained` with the rationale *"Rejected deletion: fixed
+historical audit evidence, not current product machinery."* **That decision is not
+in dispute and is not reopened here.** The finding is that one of the four does
+not say so.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1501 | **Three of the four archived agent notes open with a blockquote historical banner; `queue.md` opens with none - and it is the only one of the four written in the imperative, the only one containing a section headed "refill from here", and the only one of the eighteen ungated markdown files that fails the documentation gate's own checks.** The banners are the repository's established convention and are nearly identical: `comprehensive-audit-register.md:3-5` and `unverified.md:3-5` both read *"> Historical archive: this file records ... It is not an active queue; use the [current documentation map](../../../docs/README.md) for current guidance"*, and `preview-debt.md:3-8` carries a four-line *"> Historical note: ... are not the active release contract"*. `queue.md` has **zero** `>` lines in its first six. What it has instead is live-voice procedure: a Method section in the imperative (*"One item per iteration. Both gates must pass before every commit inside the canonical container"*), and a heading `## Backlog - refill from here when Ready empties` at `:56` carrying three numbered next actions - in a file whose own second line says *"do not refill its backlog while the preview register is active."* The document instructs and forbids the same act eight lines apart. **The staleness follows the missing banner exactly.** Running the gate's own checks over all eighteen ungated markdown files, seventeen are clean and `queue.md` fails twice, both inside its imperative sections: `:13` tells the reader the complexity ratchet runs in *"`ci.yml`, `package-consumers.yml` and `weekly.yml`"*, and `.github/workflows/weekly.yml` was deleted on **2026-09-01** by commit `652c0895f`, *"Remove redundant weekly acceptance workflow"* - two days before this reading; and `:59` says *"Record each verdict in `mutation-audit.md`, one commit per iteration"*, a file that **has never existed in any commit on any branch**, so that instruction was unfollowable when it was written. The reachability is short and deliberate: `eng/agent-notes/status.md` is gated, is in `$currentMaintainedDocuments`, and its line 5 sends the reader to *"historical agent queues ... archived under `eng/agent-notes/archive/`"*. **The fix is one blockquote**, copied from either of its two siblings, and it converts a document that reads as a live queue into one that reads as what the audit already decided it is. Deleting the two dead references is optional and arguably wrong - a historical record may legitimately name a workflow that has since gone - but only once the document is marked as a record. | `eng/agent-notes/archive/queue.md:1-13,56-62`; `comprehensive-audit-register.md:3-5`; `unverified.md:3-5`; `preview-debt.md:3-8`; `eng/agent-notes/status.md:5`; `docs/code-usefulness-audit.md:116,870-873`; `.github/workflows/` (no `weekly.yml`); commit `652c0895f`; related R321, R1302 |
+
+### Status update: R321 is partly applied, its counts have drifted, and its file citation is dead
+
+R321 records that the documentation gate covers 55 percent of tracked markdown and
+that *"both stale documents found anywhere in this survey are in the ungated
+set"* - `BUGS.md` (R317) and `eng/agent-notes/status.md` (R300). Three things have
+changed and all three should be recorded before anyone acts on it.
+
+- **Its decisive evidence has been discharged.** `BUGS.md` and
+  `eng\agent-notes\status.md` are now entries 3 and 4 of
+  `$currentMaintainedDocuments`. R317 and R300 are both marked applied elsewhere in
+  this ledger; what was not previously noted is that the fix included **pulling
+  both files into the gate**, which is the structural half of R321 applied to
+  exactly the two files that had failed.
+- **Its counts have drifted in the right direction.** R321 says 47 tracked
+  markdown files, 26 gated (19 + 7), 21 ungated. Today: **46** tracked (excluding
+  this ledger), **28** gated - `$currentMaintainedDocuments` has grown from 19 to
+  **21** and `$datedEvidenceDocuments` still holds 7 - and **18** ungated.
+  Coverage is 61 percent, not 55.
+- **Its file citation no longer exists.** R321 cites
+  `scripts/Generate-Readme.ps1:36-65,329-371`. That file was renamed to
+  `scripts/Test-SharpProofReadme.ps1` by commit `844c89623`, *"Rename
+  documentation validator"*. The lists are now at `:35-68` and the three checking
+  loops at `:349-374`, `:376-388` and `:1063-1080`. Anyone opening R321's citation
+  today finds nothing.
+
+The unapplied half stands, and R1501 is new evidence for it: with the two files
+R321 named now inside the gate, the survey's only remaining stale document is
+again an ungated one, found by running the gate's own checks against the files it
+does not run on.
+
+### Checked and not proposed (part five hundred ninety-three)
+
+- **The ungated set is otherwise clean, which is worth stating because it bounds
+  R321's urgency.** All 18 files outside `$maintainedDocuments` were put through
+  the four checks the gate applies - UTF-8 without BOM, LF line endings, resolvable
+  relative markdown links, and the three banned obsolete worker terms - plus the
+  three banned host-bootstrap strings from the `$currentMaintainedDocuments` loop
+  and a scan for backticked paths that no longer resolve. **Seventeen pass
+  everything.** R321's gap is real and its mechanism is right, but the observable
+  cost today is one file.
+- **`queue.md`'s two dead references are not proposed for deletion.** A frozen
+  record naming a workflow that was later removed is not itself wrong; what is
+  wrong is that nothing tells the reader the file is a record. This is why R1501
+  asks for the banner and explicitly declines to ask for the edits.
+- **The three sibling banners are already the convention this repository
+  enforces elsewhere, which is what makes the omission decidable rather than
+  stylistic.** Six of the ten `docs/soundness-notes/` files open with the same
+  blockquote shape, and R321 covers the split among the other four. R1501 is the
+  same convention in a different directory, with the difference that here the
+  banner's absence correlates perfectly with live-voice content and with observed
+  staleness - three for three on banners, one for one on failures.
+- **No markdown file in the repository is orphaned.** All 46 have at least one
+  inbound reference from another tracked file. The four archive files are reachable
+  from `docs/code-usefulness-audit.md` (as manifest rows, which is enumeration
+  rather than citation) and, for `preview-debt.md` and `unverified.md`, from
+  `queue.md` itself - so the archive's only *intentional* inbound edge from outside
+  the archive is the sentence in the gated `status.md`. That single edge is what
+  makes R1501 worth the one line it costs.
+- **The PowerShell function surface has no dead code at all.** Across **356**
+  `function` declarations in **101** `.ps1` and `.psm1` files, **zero** are
+  referenced nowhere outside their own declaration. 57 are called exactly once, and
+  every one of the 57 is called from within its own file - ordinary decomposition,
+  not indirection. This lens is exhausted; there is no PowerShell equivalent of the
+  dead-C#-member findings.
+- **Every tracked data file has at least two inbound references.** All `.json`,
+  `.txt`, `.snapshot`, `.yml` and `.yaml` files outside `artifacts/` and excluding
+  lock files were checked for inbound textual references by full path and by
+  basename: none is referenced zero times and none exactly once. There is no
+  orphaned fixture, schema, corpus or contract file.
+
+### Status (part five hundred ninety-three)
+
+R1501 is `pending` and is one blockquote, copyable verbatim from
+`unverified.md:3-5` with the wording adjusted. It is filed at this size because
+the cost of leaving it is not cosmetic: `status.md` is gated, current, and points
+at the archive, and the one file there that does not announce itself as history
+tells a reader to run a workflow that was deleted and to write into a file that
+has never existed.
+
+## Second survey, part five hundred ninety-four: R1502 and R1503 - the trusted computing base is not closed under "what decides this file's behaviour", and three nested solution filters carry 50 hand-written paths under one assertion that checks the wrong boundary
+
+`eng/acceptance/contract.json` declares **350** TCB paths - `trustedKernel.paths`
+plus every `trustedComputingBase.components[].paths` - of which **141 are not
+C#**. Membership is deliberately a reviewed decision: `ArchitectureTests.cs:601`
+says so in a comment, *"contract.json is the reviewed source of path ownership"*.
+Neither finding below proposes adding or removing a path on my judgement. R1502 is
+about a property the declaration can be checked for without adjudicating
+membership at all.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1502 | **Six MSBuild files are in the trusted computing base; five are closed under `<Import>` and the sixth is not - `Directory.Build.targets` imports a 74-line file outside the TCB and branches on a property defined in exactly one place, a 149-line file also outside the TCB, so the behaviour of a TCB member is decided by two non-members.** The five that are closed are the shipping consumer files: `SharpProof.Package/buildTransitive/SharpProof.props`, `.targets` and `SharpProof.ConsumerContract.props`, and the two `SharpProof.Verifier/buildTransitive/` files. The one `<Import>` among them, `SharpProof.targets:14`, resolves to `SharpProof.ConsumerContract.props`, which **is** declared. `Directory.Build.targets` is the exception on both counts. Its `:2-3` imports `eng/self-application/SharpProof.SelfApplication.props` - 74 lines that inject the source-built analyzer and generator into every compilation, default `SharpProofProfile`, `SharpProofFeatures` and `SharpProofVerify`, and suppress `SP0024` - and that file is **not in the TCB**. Its `:20` reads `'$(IsTestProject)' == 'true'` to suppress `CA1515;CA2007;CA5394`, and `IsTestProject` is assigned at exactly **one** place in the repository, `Directory.Build.props:29`, also **not in the TCB**. Its `:25` reads `IsRoslynAnalyzer`, set by six `.csproj` files of which three are declared and three - `SharpProof.CompilerCollector`, `SharpProof.Meta.Analyzers`, `SharpProof.CompilerProbe.TestAsset` - are not. **What `Directory.Build.props` decides makes this more than a graph property.** Besides `IsTestProject` it computes `SharpProofProductionProject` (`:33-36`), the sole gate on `Microsoft.CodeAnalysis.BannedApiAnalyzers`, the `AdditionalFiles` entry for `BannedSymbols.txt`, and `WarningsAsErrors;RS0030` (`:127-136`) - so the enforcement of the repository's own 39-entry soundness ban (*"Do not mutate a compilation during analysis"*, *"Use SharpProof.Frontend.Host.CompilationModelProvider"*) is switched on by a file outside the TCB, and `BannedSymbols.txt` itself is outside it too. It also sets `WarningsAsErrors;NU1901;NU1902;NU1903;NU1904`, which is what turns NuGet vulnerability advisories into build failures. Counting all 29 tracked build and configuration files - `.props`, `.targets`, `.slnf`, `.sln`, `.slnx`, `.globalconfig`, `.editorconfig`, `compose.yaml`, `global.json`, `NuGet.Config`, `BannedSymbols.txt`, `.gitattributes`, `.dockerignore` - **9 are in the TCB and 20 are out**, and the out-set includes `Directory.Build.props`, `BannedSymbols.txt`, `Directory.Packages.props`, `.globalconfig`, `.editorconfig`, `global.json` (which pins SDK `9.0.316` with `rollForward: disable`) and `NuGet.Config`, while `.dockerignore` is in. **The check that should have caught this is present and does something else.** `ArchitectureTests.TrustedComputingBaseDeclarationNamesEveryRequiredPath` (`:569-640`) asserts the kernel is non-empty, every component is named and non-empty, no path is declared twice within a component or across the union, and that every mutation target is inside the union. That is well-formedness plus one containment in one direction - nothing named "required" is ever defined, so the test's name promises a completeness property it does not check. The closure this finding asks for is mechanical and needs no judgement about membership: for every `.props`/`.targets` in the TCB, its `<Import>` targets must be in the TCB. Today that is one assertion and one violation. | `eng/acceptance/contract.json` (350 paths, 141 non-C#); `Directory.Build.targets:2-3,20,25`; `Directory.Build.props:24,29,33-36,127-136`; `eng/self-application/SharpProof.SelfApplication.props:1-74`; `BannedSymbols.txt`; `global.json`; `SharpProof.Package/buildTransitive/SharpProof.targets:14`; `SharpProof.ArchitectureTest/ArchitectureTests.cs:569-640,601`; `scripts/Get-SharpProofTcbPaths.ps1:56-84`; related R752, R732 |
+| R1503 | **The three solution filters hold 50 hand-written project paths encoding a strict three-level nesting; `SharpProof.Dev.Tests.slnf` is a hand-copy of a set the build already computes; and the only assertion anywhere on their contents checks the outer boundary through the inner file.** `SharpProof.Dev.Tests.slnf` names **19** projects and the repository has **19** projects whose name ends in `Test` - it is exactly the set `Directory.Build.props:24` derives with `Regex::IsMatch('$(MSBuildProjectName)', 'Test$')`, written out by hand. The three are strictly nested: Portable (14) ⊂ Semantic (17) ⊂ Dev (19), with `Dev - Semantic = {SharpProof.Package.Test, SharpProof.Worker.Test}` and `Semantic - Portable = {SharpProof.ArchitectureTest, SharpProof.Fuzz.Test, SharpProof.Gates.Test}`. So 50 path strings express 19 names and 5 exclusions. **The single content assertion checks the wrong pair.** `ArchitectureTests.cs:1339-1344` asserts `SharpProof.Portable.Tests.slnf` does **not** contain `SharpProof.Package.Test` or `SharpProof.Worker.Test` - the `Dev - Semantic` difference, which Portable inherits from Semantic anyway - so it would pass unchanged if Portable were byte-identical to Semantic. The three names that actually distinguish Portable from Semantic are asserted nowhere, `SharpProof.Semantic.Tests.slnf` has no content assertion at all, and neither does `Dev`. **The hand-maintenance is visible in the files.** Portable is fully alphabetical; Dev and Semantic both break sort order at the identical point - `SharpProof.Testing.Test` followed by `SharpProof.Fuzz.Test` - with Fuzz, Gates, Verify and Worker appended after the sorted run, the signature of four separate manual additions. A twentieth test project is added to `SharpProof.sln`, builds, and runs in none of the three. **One further asymmetry worth recording rather than resolving**: `SharpProof.Semantic.Tests.slnf` is declared in the TCB's `policy` component while `Dev` and `Portable` are not, even though `Dev` is a strict superset of `Semantic` and is what `Invoke-SharpProofCoverage.ps1:175` runs to produce the coverage evidence. | `SharpProof.Dev.Tests.slnf`, `SharpProof.Semantic.Tests.slnf`, `SharpProof.Portable.Tests.slnf`; `Directory.Build.props:24`; `SharpProof.ArchitectureTest/ArchitectureTests.cs:1209-1211,1339-1344`; `scripts/Invoke-SharpProofCoverage.ps1:175`; `scripts/Invoke-SharpProofSemanticTests.ps1:44,270`; `scripts/Invoke-SharpProofContainer.ps1:335`; `eng/acceptance/contract.json` `policy` component; related R274, R233 |
+
+### Checked and not proposed (part five hundred ninety-four)
+
+- **Neither finding proposes a TCB membership change, and that restraint is
+  deliberate.** `ArchitectureTests.cs:601` states that `contract.json` is the
+  reviewed source of path ownership, so whether `Directory.Build.props` or
+  `BannedSymbols.txt` *should* be declared is an authority decision. R1502 asks
+  only for the property that needs no such decision - a TCB build file's imports
+  must also be declared - and reports the membership table as evidence that the
+  boundary was drawn by hand rather than derived.
+- **The prior consistency note on the filters checked a different property and
+  still holds.** An earlier part recorded that *"`SharpProof.sln` and the three
+  `.slnf` filters are exactly consistent with the 47 tracked non-sample project
+  files: no orphaned entries, no missing projects"*. That is referential
+  integrity - every named project exists - and it is still true. R1503 is about
+  redundancy and gating: the entries are all valid, there are simply 50 of them
+  encoding 19 names, and almost nothing asserts which ones belong where.
+- **R752 is adjacent and not duplicated.** R752 records that
+  `SharpProof.SelfApplication.props` is the only substantive authority file whose
+  contents no test asserts, that it is a third parallel copy of the consumer
+  analyzer configuration, and that no workflow runs it. R1502 is a different claim
+  about the same file - that a declared TCB member imports it - and the two
+  compound: the file that the trusted build file pulls in is also the file nothing
+  asserts and nothing exercises in CI.
+- **The PowerShell function surface and the data-file surface are both clean, so
+  neither produced a finding.** 356 `function` declarations across 101 `.ps1` and
+  `.psm1` files, **zero** referenced nowhere but their own declaration; and every
+  tracked `.json`, `.txt`, `.snapshot`, `.yml` and `.yaml` outside `artifacts/`
+  and excluding lock files has at least **two** inbound references. Both lenses
+  are recorded as exhausted.
+- **`Directory.Build.targets`'s container guard is properly closed and is the
+  reason the file is in the TCB.** `:5-9` fails restore and build unless
+  `SHARPPROOF_CONTAINER` is `1` and `SHARPPROOF_CONTAINER_CONTRACT` names an
+  existing file; both are set by `compose.yaml` and `eng/container/entrypoint.sh`,
+  and all three of those files are declared. That dependency is closed. R1502 is
+  about the other two edges out of the same file, not this one.
+- **R732 needs no status update; it is already recorded applied.**
+  `SharpProof.Analyzer.Core.csproj:4` sets `IsRoslynAnalyzer`, matching the
+  status note that already exists in this ledger. It is mentioned here only
+  because the same `Directory.Build.targets:25` condition is one of R1502's three
+  edges, and re-reading it confirmed the fix rather than finding a gap.
+
+### Status (part five hundred ninety-four)
+
+Both are `pending`. R1502's remedy is one architecture assertion - parse the
+`<Import>` elements of every declared `.props`/`.targets` and require the resolved
+target to be declared - plus whatever membership decision that assertion then
+forces, which belongs to the contract's owner and not to this ledger. R1503 splits:
+deleting `SharpProof.Dev.Tests.slnf` in favour of the solution plus a `Test$`
+selection is the largest reduction and touches four scripts and two tests;
+extending `ArchitectureTests.cs:1339-1344` to assert the two actual differences
+between the three filters is small, immediate, and independently useful.
+
+## Second survey, part five hundred ninety-five: R1504 - a build file explains why five rules stay warnings, and the next file in the import chain makes all five errors; plus R749's stated mechanism is no longer true
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1504 | **`.globalconfig:8-10` states, as the recorded rationale for the dead-code rule set, that "This remains a warning because reflection, MEF, analyzer registration, and serialization can be invisible to static reachability analysis" - and `Directory.Build.props:23` makes every rule the comment is attached to a build error, in all 47 projects where those rules run.** The comment introduces four severity assignments: `dotnet_diagnostic.CA1811.severity = warning` (`:11`), `IDE0051` (`:13`), `IDE0052` (`:14`) and `IDE0060` (`:15`), with `CS8019` above it at `:7` under the neighbouring comment. `Directory.Build.props:23` reads `<WarningsAsErrors>$(WarningsAsErrors);CA1811;CS8019;IDE0051;IDE0052;IDE0060;NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>` - unconditional, in the same `PropertyGroup` as the language defaults, reaching every project. **There is nowhere in the repository where these five remain warnings.** No `.csproj`, `.props` or `.targets` places any of the five in `NoWarn`; the only projects that escape are the two consumer-fixture trees, and they escape by disabling the analyzers wholesale - `samples/Directory.Build.props:6-7` and `eng/pilots/Directory.Build.props:6-7` set `EnableNETAnalyzers` and `EnforceCodeStyleInBuild` to `false`, so the rules do not run at all rather than running as warnings. The comment therefore describes a state that does not exist for any file in the product. **The rationale is the part that matters, not the word.** It names a genuine hazard - a private member reached only through reflection, an analyzer registered by attribute, a serialization-only setter - and gives it as the reason for stopping short of an error. The adjacent file takes the opposite position without acknowledging the trade, so a maintainer who hits `error CA1811` on a reflection-reached member reads `.globalconfig`, is told the rule is deliberately a warning for exactly their case, and has no file to consult that explains why the build disagrees. **This is the evidence R284 asked for and did not have.** R284 records that the ID list is duplicated across the two files and says the split "may be deliberate ... in which case it should be recorded as such". The split has already produced a false statement about the repository's own policy, which settles the question: whatever the mechanism, the severity file and the escalation file are not independently readable. Two secondary corrections while the files are open: **R284's citation has drifted**, `WarningsAsErrors` is at `Directory.Build.props:23`, not `:21`; and the same list has grown since R284 was written, from five IDs to nine, with `NU1901;NU1902;NU1903;NU1904` added - four NuGet vulnerability advisories that have **no** `.globalconfig` severity line at all, so the two files now overlap on five of nine rather than five of five. | `.globalconfig:1-15`, especially `:8-10` and `:11,13,14,15`; `Directory.Build.props:18,21,23`; `samples/Directory.Build.props:6-7`; `eng/pilots/Directory.Build.props:6-7`; no `NoWarn` of the five anywhere; related R284, R950 |
+
+### Status update: R749's load-bearing premise has been removed, which makes it easier to apply, not resolved
+
+R749 records the duplication between `samples/Directory.Build.props` and
+`eng/pilots/Directory.Build.props` and excuses part of it with a mechanism claim:
+*"Neither fixture tree imports the root `Directory.Build.props` - MSBuild
+discovery stops at the first file found walking up - which is correct and is why
+they restate the ten shared properties."* **That sentence is now false.** Both
+files open with the identical line
+
+`<Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />`
+
+so both explicitly reach past MSBuild's discovery rule and import the root. Three
+consequences, none of them recorded:
+
+- **The restated properties are now overrides, and every one of them is a real
+  override.** Measured against the root: `NuGetAudit` true to false,
+  `RestorePackagesWithLockFile` true to false, `RestoreLockedMode` conditional to
+  false, `EnableNETAnalyzers` true to false, `EnforceCodeStyleInBuild` true to
+  false, `TreatWarningsAsErrors` false to true; `TargetFramework`, `OutputType` and
+  `SharpProofFeatures` are set by neither parent. **None is dead**, so R749's
+  reduction is still a reduction and not a deletion.
+- **R749's proposal is now a smaller edit than when it was written.** With no
+  import chain, factoring the ten shared properties into one file meant creating
+  an import relationship that did not exist. Both files already import a parent
+  today, so a single fixture-policy props file imported by both is an ordinary
+  edit. The finding got cheaper and nobody moved it.
+- **One divergence R749 named is resolved.** It records that both files import
+  `SharpProof.Release.props` *"spelled with forward slashes in one and backslashes
+  in the other"*. Neither imports it now; the sole importer is
+  `Directory.Build.props:2`, and the two fixture files carry the same
+  `GetPathOfFileAbove` line character-for-character. The slash divergence is gone.
+
+The counts have also moved by one line each - 17 shared of 21 and 26 non-blank
+lines, against R749's "17 of their 22 and 27" - and the shared set's membership
+has changed even though its size has not: `LangVersion`, `Nullable`,
+`ImplicitUsings` and `Deterministic` are gone from both, while
+`EnforceCodeStyleInBuild`, `RestorePackagesWithLockFile`, `RestoreLockedMode` and
+the import line are now shared and were not listed.
+
+### Checked and not proposed (part five hundred ninety-five)
+
+- **R749 already covers the central-package-management asymmetry in full and it
+  was not re-filed.** Its closing passage - *"'consumer fixtures do not use
+  central package management' is achieved two entirely different ways"*, with
+  `eng/pilots/` shadowing via a three-line `Directory.Packages.props` and
+  `samples/` relying on the root file conditioning on
+  `'$(SharpProofSamplePackageVersion)' == ''` - is exactly what a fresh reading of
+  those files produces, down to the observation that pilots set
+  `ManagePackageVersionsCentrally` a second time in their own
+  `Directory.Build.props:11`. Confirmed still true at HEAD; nothing to add.
+- **`eng/pilots/Directory.Packages.props` is a live shadow, not a dead file, and
+  the obvious reading is wrong.** Its five lines only set
+  `ManagePackageVersionsCentrally` to false, which
+  `eng/pilots/Directory.Build.props:11` already does - so it looks redundant. It
+  is not: MSBuild finds `Directory.Packages.props` by walking up to the *first*
+  match, so the file's existence is what stops the root's fourteen
+  `PackageVersion` entries from being imported. Deleting it would change restore
+  behaviour. Recorded because the redundant-looking-but-load-bearing shape will
+  catch a future pass.
+- **`RestoreLockedMode` is correctly wired and is not a finding.**
+  `Directory.Build.props:4,13` makes it conditional on `ContinuousIntegrationBuild`,
+  itself conditional on `GITHUB_ACTIONS`, and `compose.yaml:23` explicitly
+  forwards `GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}` into the container. So locked
+  restore is on in CI and off locally by design, and the container boundary does
+  not silently break the chain - which was the thing worth checking, since every
+  repository build runs inside that container.
+- **The four NuGet advisory IDs in `WarningsAsErrors` are backed by real audit
+  settings.** `Directory.Build.props:9-11` sets `NuGetAudit true`,
+  `NuGetAuditMode all` and `NuGetAuditLevel low`, so `NU1901`-`NU1904` can
+  actually fire; the two fixture trees turn `NuGetAudit` off, consistently with
+  disabling the analyzers. The escalation is not vacuous. This is noted because
+  R1504 observes those four have no `.globalconfig` line, and the reason is that
+  they need none.
+
+### Status (part five hundred ninety-five)
+
+R1504 is `pending` and is a three-line comment edit in `.globalconfig` - either
+delete the rationale or restate it as *why the rule is an error despite the
+reflection hazard* - plus the two corrections to R284's own row. The R749 status
+update carries no new ID: R749 stays `pending`, its duplication claim intact, with
+the note that its stated reason for tolerating the duplication no longer applies
+and its remedy is now cheaper than when it was filed.
+
+## Second survey, part five hundred ninety-six: R1505 and R1506 - the container image installs four executables and the contract declares three of them, and one environment variable in the same file is read nowhere
+
+The container definition is three files: `compose.yaml` (84 lines, in the TCB),
+`eng/container/Dockerfile` (73 lines, in the TCB), and the eight files under
+`eng/container/`. Both findings below come from comparing what those files
+actually install and set against what the acceptance contract and the rest of the
+repository know about.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1505 | **`eng/container/Dockerfile:50-53` installs four executables into the image with four consecutive `COPY --chmod=0755` lines, and `eng/acceptance/contract.json:671-673` declares three of them in three consecutive lines - the omitted one is `loop-command.sh`, which at 211 lines is the largest script in the directory, larger than the `entrypoint.sh` that is declared.** The Dockerfile's four: `entrypoint.sh` to `/usr/local/bin/sharpproof-container`, `dev-command.sh` to `/usr/local/bin/sp`, `dev-init.sh` to `/usr/local/bin/sharpproof-dev-init`, and `loop-command.sh` to `/usr/local/bin/sharpproof-loop`. The contract's three: `entrypoint.sh`, `dev-command.sh`, `dev-init.sh`. Seven of the eight `eng/container/` files are declared - the Dockerfile, `toolchain.json`, `New-ContainerContract.ps1`, `Prepare-NativePayload.ps1` and those three scripts; `loop-command.sh` alone is not. **What it does is not peripheral.** R505, R559 and R747 are all about this file: it materializes the source snapshot into the loop workspace, carries a lock protocol, reconciles a persistent workspace volume across runs, and implements the same relative-path safety case twice. R747 records that "the source-snapshot policy is implemented twice in two shell scripts, and only one of the two has a test that executes it" - the untested half is this one. So the file the contract omits is the one the ledger already says is the least verified of the pair. **This is R1502 in the container graph rather than the MSBuild graph, and the same closure rule answers both.** There, a declared `.targets` imports an undeclared `.props`; here, a declared `Dockerfile` installs an undeclared executable. The mechanical check is the same shape: for every declared file that pulls in another file - by `<Import>`, by `COPY`, by `source` - the pulled-in file must also be declared. Membership stays a reviewed decision; what the check supplies is the list of decisions that have not been made. | `eng/container/Dockerfile:40-42,50-53`; `eng/acceptance/contract.json:118,671-673`; `eng/container/loop-command.sh` (211 lines, undeclared); `eng/container/entrypoint.sh` (170 lines, declared); related R1502, R505, R559, R747 |
+| R1506 | **`compose.yaml:52` sets `SHARPPROOF_DEV_CONTAINER: "1"` into the `dev` service and nothing in the repository reads it, in a file that is itself in the trusted computing base - and its name differs by one word from `SHARPPROOF_CONTAINER`, which twenty-five places do read as the gate on whether a build is allowed to run at all.** A `git grep` over every tracked file returns exactly one hit, the assignment. By contrast `SHARPPROOF_CONTAINER` is set at `eng/container/Dockerfile:21` and consumed in **25** places across MSBuild, production C#, tests and scripts - `Directory.Build.targets:7` fails restore and build without it, `SharpProof.Verifier.csproj:42` raises its own `Error`, `SharpProof.Host/ContainerContract.cs:32` and `eng/testing/TestRepository.cs:48` read it, and `ContainerContractTests` sets it to `0` and `1` to test both branches. A reader of `compose.yaml` sees the two names three lines apart in the same `environment` block and has no way to tell that one is load-bearing and the other is inert. **Every other environment name in the file is live, which is what makes this one decidable rather than a guess.** Of the thirteen `SHARPPROOF_*` names in `compose.yaml`, nine are read elsewhere; `SHARPPROOF_USER_UID` and `SHARPPROOF_USER_GID` are host-side `${...:-1000}` interpolations rather than variables set into the container, so having no in-repository reader is correct for them; and `SHARPPROOF_LOOP_SOURCE_ROOT` and `SHARPPROOF_LOOP_ARTIFACTS_ROOT`, which have exactly one reader each, are both read by `eng/container/loop-command.sh:4,6`. That leaves `SHARPPROOF_DEV_CONTAINER` as the only value written into a container and read by nobody. | `compose.yaml:22-29,47-52`; `eng/container/Dockerfile:21`; `Directory.Build.targets:7`; `SharpProof.Verifier/SharpProof.Verifier.csproj:42`; `SharpProof.Host/ContainerContract.cs:32`; `eng/testing/TestRepository.cs:48`; `SharpProof.Worker.Test/ContainerContractTests.cs:64,77,81,131,184,195,209`; `eng/container/loop-command.sh:4,6` |
+
+### Checked and not proposed (part five hundred ninety-six)
+
+- **`SHARPPROOF_USER_UID` and `SHARPPROOF_USER_GID` are not dead and the naive
+  reading says they are.** Both appear only in `compose.yaml`, which makes them
+  look like two more inert names next to `SHARPPROOF_DEV_CONTAINER`. They are not
+  set into the container at all - they appear as `user:
+  "${SHARPPROOF_USER_UID:-1000}:${SHARPPROOF_USER_GID:-1000}"`, a host-side
+  interpolation Compose resolves from the caller's shell before the container
+  exists. The same is true of `SHARPPROOF_TMPFS_SIZE`,
+  `SHARPPROOF_CONTAINER_MEMORY_LIMIT` and `SHARPPROOF_CONTAINER_CPU_LIMIT`, which
+  are consumed by `tmpfs`, `mem_limit` and `cpus`. Only names that appear on the
+  left of a colon under `environment:` are candidates, and only one of those has
+  no reader.
+- **`compose.yaml` is already well factored and offers no structural reduction.**
+  Three services over 84 lines, with `x-sharpproof-common`,
+  `x-sharpproof-nuget-volume`, `x-sharpproof-dotnet-volume` and
+  `&sharpproof-environment` anchors doing the sharing. The residue is four lines
+  repeated between `dev` and `loop` - the `user:` line,
+  `DOTNET_CLI_USE_MSBUILD_SERVER: "1"`, `SHARPPROOF_ORIGIN_URL`, and the
+  `command: ["dev", "-lc", "while sleep 1000; do :; done"]` - which a fifth anchor
+  would absorb. Four lines against an extra indirection in the file that defines
+  the build boundary is not worth proposing; it is recorded so a future pass does
+  not re-derive it and reach a different conclusion.
+- **`RestoreLockedMode`'s chain through the container is intact.**
+  `Directory.Build.props:4,13` gates locked restore on `GITHUB_ACTIONS`, and
+  `compose.yaml:23` forwards `GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}` explicitly.
+  Since every repository build runs inside this container, a missing forward would
+  have made locked mode unreachable everywhere; it is not missing.
+- **`loop-command.sh` itself is heavily covered and R1505 adds only the contract
+  omission.** R505 compares its source-copy set against `entrypoint.sh`'s, R559
+  records its duplicated relative-path safety case, and R747 records that the
+  snapshot policy exists twice with only one half executed by a test. None of the
+  three mentions the acceptance contract, and R1505 does not restate any of them.
+
+### Status (part five hundred ninety-six)
+
+R1505 is `pending` and its remedy is the same single architecture assertion R1502
+asks for, widened by one file type: parse `COPY` sources out of the declared
+Dockerfile alongside `<Import>` targets out of declared MSBuild files, and require
+each to be declared. One check answers both findings and produces exactly two
+membership questions for the contract's owner. R1506 is `pending` and is a
+one-line deletion, or a one-line consumer if the marker was meant to be read.
+
+## Second survey, part five hundred ninety-seven: R1300 is applied except for the site it excluded, R296 is discharged, and R1507 - the delete family that used a different idiom and so was never counted
+
+### Status update: R1300 is applied for every site that could adopt the helper, and the helper itself was strengthened
+
+R1300 named one shared helper and **seven** hand-rolled copies under three
+containment forms, and argued that form (b) - `GetRelativePath` plus rejecting
+rooted, `"."`, `".."` and `".." + separator` - is the stronger test while the
+shared helper used the weaker form (a) `StartsWith`. Both halves have been acted
+on.
+
+- **The helper now uses form (b).** `eng/testing/TestRepository.cs:59-80` computes
+  `Path.GetRelativePath(expectedRoot, resolved)` and throws unless it is
+  unrooted and not `"."`, `".."`, or `".." + separator`. The `StartsWith` form
+  R1300 criticised is gone from the shared implementation.
+- **Six of the seven copies now call it.** `DefaultApiSpecCatalogGenerationTests.cs:783`,
+  `PackagedProductFeed.cs:111`, `FinalCompilationProbeTests.cs:871`,
+  `DependencyAuditScriptTests.cs:532`, `ReleasePublicationScriptTests.cs:1011` and
+  `FinalCompilationCollectorTests.cs:1469` all delegate. The case-insensitive
+  form (c) that R1300 singled out - the only `OrdinalIgnoreCase` comparison and
+  the only unconditional `Directory.Delete` - is gone. Callers of the helper have
+  gone from **5 to 11**, across nine files.
+- **The seventh is exactly the one R1300 said could not adopt it.**
+  `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:795-814` still resolves,
+  compares with `StartsWith(expectedRoot + separator, Ordinal)`, throws *"Refusing
+  to remove an unexpected probe directory."*, and deletes. It is production code in
+  `SharpProof.Gates` and cannot see an `eng/testing` source - the production/test
+  boundary R725 recorded for the process runner and R1300 restated. It is now the
+  **only** site in the repository still using the weaker containment form, which
+  makes the residual precise: one file, one production boundary, and a decision
+  about where the guard should live rather than a cleanup.
+
+**Move R1300 to applied**, with the `WorkerPerformanceProbe` site recorded against
+R725's boundary problem rather than against R1300.
+
+### Status update: R296's duplication census is discharged, and the PowerShell half is now zero
+
+R296 measured **PowerShell: 13 duplicate function-body groups, 18 redundant
+copies, 141 redundant body lines**, and **C#: 4 groups, 4 copies, 36 lines**,
+and concluded *"Any future effort is better spent on the 141 lines in PowerShell
+than on hunting further C# copies."* Re-running the same census at HEAD:
+
+- **PowerShell: 0 groups, 0 copies, 0 redundant lines.** 101 tracked `.ps1` and
+  `.psm1` files, **365** function bodies parsed, median body 18 normalized lines,
+  largest 380. Not one pair of bodies of four normalized lines or more is
+  identical. Tightening the test to near-duplicates - Jaccard similarity of 0.90
+  or higher over the normalized line sets of the **334** bodies of six lines or
+  more - also returns **zero pairs**. The 141 lines R296 pointed future effort at
+  no longer exist.
+- **C#: 2 groups, 2 copies, 27 lines**, over **3,803** parsed method bodies
+  excluding generated files (3,860 including them, and the two extra groups do not
+  change - no generated file duplicates a hand-written body). Both survivors are
+  already filed: `KillTree` at `SharpProof.Gates/GateProcess.cs:33` and
+  `eng/testing/ProcessRunner.cs:64` is **R958**, which already calls the pair
+  byte-identical; and the `DeleteTemporaryRepository` pair is R1507 below.
+
+**Whole-body duplication is exhausted as a lens in both languages.** No future
+pass should re-derive it; what remains is partial and structural duplication,
+which is where the rest of this ledger already is.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1507 | **"Clear the read-only attribute on every file, then delete the tree" is written four times, three of them with no containment check at all - a fourth containment form R1300 never enumerated, because these copies use a different idiom and so did not match the pattern it searched for.** The four sites are `SharpProof.ArchitectureTest/CoverageScriptTests.cs:1605-1620` and `SharpProof.ArchitectureTest/ProductionInventoryAuthorityTests.cs:305-320`, both named `DeleteTemporaryRepository` and **byte-identical** after normalization, in the **same assembly**; `SharpProof.ArchitectureTest/AcceptanceScriptTests.cs:263-278`, named `DeleteDirectory`, the same body under a different name; and `SharpProof.Package.Test/DependencyAuditScriptTests.cs:519-536`, which is the one that gets it right. **The right one proves the other three have no reason to exist.** `DependencyAuditScriptTests.Dispose` enumerates the tree, clears `FileAttributes.Normal`, and then calls `TestRepository.DeleteOwnedTemporaryDirectory(Root, ..., "Refusing to remove an unexpected audit directory.")` - so the attribute step and the shared guarded delete compose without friction, and the pattern is already demonstrated inside the repository. The other three call `Directory.Delete(path, recursive: true)` directly after clearing attributes, with `Directory.Exists` as their only precondition. Two of them are in `SharpProof.ArchitectureTest`, which links `TestRepository` and calls it in 37 files, so adopting the helper is a call-site change with no build impact; and the two are used **18 times** between them - 15 call sites in `CoverageScriptTests`, 3 in `ProductionInventoryAuthorityTests`. Every path they delete is built under `Path.GetTempPath()` in the same file, so the missing guard is latent rather than live, exactly as R1300 characterised its own set. **One more site is inconsistent with itself**: `PackagedProductFeed.cs:111` calls the guarded helper on the success path, and its `catch` at `:171-176` deletes `root` recursively behind a bare `Directory.Exists` - so the failure path, the one that runs when state is already unexpected, is the unguarded one. | `SharpProof.ArchitectureTest/CoverageScriptTests.cs:1605-1620` (15 call sites), `ProductionInventoryAuthorityTests.cs:305-320` (3 call sites), `AcceptanceScriptTests.cs:263-278`; `SharpProof.Package.Test/DependencyAuditScriptTests.cs:519-536` for the correct composition; `SharpProof.Package.Test/PackagedProductFeed.cs:111,171-176`; `eng/testing/TestRepository.cs:59-80`; related R1300, R727, R726 |
+
+### Checked and not proposed (part five hundred ninety-seven)
+
+- **`BannedSymbolInventoryCoversEverySoundnessBoundary` is a strong gate and the
+  obvious suspicion about it is wrong.** Its name promises completeness and its
+  body only asserts that `BannedSymbols.txt` *contains* 15 required substrings -
+  the superset shape R1305 criticises for the third-party notice - so it looked
+  like a second instance. Measuring it says otherwise: the 15 substrings are broad
+  enough that **37 of the file's 39 entries** are pinned by at least one of them.
+  Only two are unpinned, both `SemanticModel` speculative-binding overloads
+  (`GetSpeculativeSymbolInfo`, `GetSpeculativeAliasInfo`) whose siblings are
+  pinned. The gate is doing close to what its name claims and no finding is filed.
+- **`SemanticArchitectureShardsCoverEveryFixture` is exactly what its name says,
+  and is the model the other universally-named gates should follow.**
+  `BuildSchedulingTests.cs` reads the `$architectureFixtures` roster out of
+  `Invoke-SharpProofSemanticTests.ps1` by regex and asserts `Is.EqualTo` against
+  the set of types in the `SharpProof.ArchitectureTest` namespace carrying
+  `[TestFixture]`, discovered by **reflection**. Exact set equality against a
+  reflected truth, not a substring check - a new fixture that is not sharded fails
+  the build. Twenty of the suite's 180 architecture test methods carry a
+  universally quantified name; two were checked in depth here and both hold.
+- **The semantic scheduler derives rather than duplicates.**
+  `Invoke-SharpProofSemanticTests.ps1:47` builds `$semanticProjects` by reading
+  `SharpProof.Semantic.Tests.slnf` and projecting its `solution.projects`, so the
+  project list is derived from the filter rather than restated - the opposite of
+  R1503's finding about the filters themselves, and worth recording because it
+  shows the derivation was available and taken here.
+  `$architectureFixtureSlots` at `:188` names 9 fixtures out of the full roster and
+  `:350` guards every read with `ContainsKey`, so the unlisted fixtures take a
+  documented default rather than silently getting zero.
+- **Workflow step duplication is already recorded and was re-measured, not
+  re-filed.** Nine `checkout` + `prepare-qualified-packages` pairs across five
+  workflows, `actions/checkout` at 11 uses, `upload-artifact` at 9,
+  `download-artifact` at 4 - every external action SHA-pinned with a version
+  comment, and every one of the four pinned to a single SHA everywhere it appears,
+  with no drift. An earlier part already states these counts and concludes the
+  composite-action mechanism carries the real weight. Nothing has changed.
+
+### Status (part five hundred ninety-seven)
+
+R1507 is `pending` and is the cheapest item in this part: two of its three copies
+sit in an assembly that already calls the helper 37 times, and
+`DependencyAuditScriptTests.Dispose` is a working four-line template for the
+change. R1300 should move to applied. R296 should move to applied with its
+PowerShell figure recorded as zero, so that no later pass spends effort on the
+141 lines it pointed at.
