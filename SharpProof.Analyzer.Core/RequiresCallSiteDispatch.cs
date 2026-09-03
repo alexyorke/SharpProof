@@ -8,9 +8,8 @@ internal static class RequiresCallSiteDispatch
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        target = ArgumentNullGuard.NotNull(target, nameof(target));
+        target = ArgumentNullGuard.NotNull(target, nameof(target)).ReducedFrom ?? target;
         if (target.IsStatic ||
-            target.ReducedFrom != null ||
             instance == null ||
             TryGetExactReceiverType(instance) is not { } receiverType)
         {

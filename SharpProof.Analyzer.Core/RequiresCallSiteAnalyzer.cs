@@ -300,11 +300,8 @@ internal static partial class RequiresCallSiteAnalyzer
                 return AnalyzerSemanticOutcome.NotApplicable;
             }
 
-            var contractTarget =
-                candidate.TargetMethod.ReducedFrom ??
-                candidate.TargetMethod;
-            contractTarget = RequiresCallSiteDispatch.ResolveExactTarget(
-                contractTarget,
+            var contractTarget = RequiresCallSiteDispatch.ResolveExactTarget(
+                candidate.TargetMethod,
                 candidate.Instance,
                 cancellationToken);
             if ((contractTarget is

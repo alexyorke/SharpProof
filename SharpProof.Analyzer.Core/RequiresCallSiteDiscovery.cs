@@ -58,11 +58,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
             }
             foreach (var call in calls)
             {
-                var target =
-                    call.TargetMethod.ReducedFrom ??
-                    call.TargetMethod;
-                target = RequiresCallSiteDispatch.ResolveExactTarget(
-                    target,
+                var target = RequiresCallSiteDispatch.ResolveExactTarget(
+                    call.TargetMethod,
                     call.Instance,
                     cancellationToken);
                 if (hasPotentialPreconditions(target))
