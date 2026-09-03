@@ -57,16 +57,20 @@ public static class CompilerIdentityBridge
         }
 
         var definition = property.Property.OriginalDefinition;
-        if (definition is
+        if (definition is not
             {
                 IsStatic: false,
                 IsIndexer: false,
                 GetMethod: not null,
                 SetMethod: null,
                 Parameters.IsEmpty: true
-            } &&
-            property.Instance.Type?.SpecialType ==
-                SpecialType.System_String)
+            })
+        {
+            return false;
+        }
+
+        if (property.Instance.Type?.SpecialType ==
+            SpecialType.System_String)
         {
             return definition.ContainingType.SpecialType ==
                     SpecialType.System_String &&
@@ -79,15 +83,8 @@ public static class CompilerIdentityBridge
             return false;
         }
 
-        return definition is
-        {
-            IsStatic: false,
-            IsIndexer: false,
-            GetMethod: not null,
-            SetMethod: null,
-            Parameters.IsEmpty: true,
-            ContainingType.SpecialType: SpecialType.System_Array
-        } &&
+        return definition.ContainingType.SpecialType ==
+            SpecialType.System_Array &&
             (definition.MetadataName == "Length" &&
              definition.Type.SpecialType == SpecialType.System_Int32 ||
              definition.MetadataName == "LongLength" &&
