@@ -13115,3 +13115,21 @@ constant duplications, **three were already filed** and the fourth is not worth
 filing. Reading the ledger first - which this survey's own instruction requires -
 is what kept three duplicates out of it, and this is the clearest instance of that
 in the session.
+## Second survey, part four hundred seventy-seven: R1154 - repeated sequence-domain validation in Widen
+
+`SequenceCardinalityDomain.Widen` validates `previous.Kind` and
+`candidate.Kind` at entry, then calls `LessThanOrEqual(candidate, previous)`
+when both values are non-bottom. `LessThanOrEqual` immediately validates both
+kinds again before comparing the lattice and interval values. The duplicated
+`ArgumentNullGuard.RequireDefined` calls are on the normal widening path, not a
+separate error boundary. A private validated-order helper (or equivalent
+branching that preserves the entry checks) can keep invalid enum values
+fail-closed while avoiding the second pair of generic enum validations.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1154 | **`SequenceCardinalityDomain.Widen` validates both operands twice on its non-bottom path.** The entry checks are followed by `LessThanOrEqual`, which repeats the same kind validation before doing its comparison. Reusing a validated-order helper removes the duplicate generic enum checks without weakening invalid-value rejection. | `SharpProof.Dataflow/SequenceCardinalityDomain.cs:77-94,116-133,171-174` |
+
+### Status (part four hundred seventy-seven)
+
+R1154 is pending: preserve `Widen`'s entry validation while reusing the validated comparison path instead of invoking `LessThanOrEqual`'s validation twice.
