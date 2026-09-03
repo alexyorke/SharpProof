@@ -12952,12 +12952,12 @@ lowercase-hex invariant the repository validates for.
 
 ### Status (part four hundred seventy-five)
 
-R1156 is `pending`. The safe, mechanical part is replacing the two
-`Convert.ToHexString(...).ToLowerInvariant()` pairs with the shared helper and
-deleting the no-op `.ToUpperInvariant()`. The part that needs an owner's answer is
-the four uppercase sites: either they are outside the lowercase domain and should
-say so, or they are inside it and are currently producing values that
-`HashEncoding.IsSha256` would reject.
+R1156 is partly applied: corpus normalization and license verification now use
+the shared lowercase SHA-256 helper, and the no-op `.ToUpperInvariant()` was
+removed from supervisor nonce generation. The four uppercase identity sites
+remain unchanged because their case semantics are not established; either they
+are outside the lowercase domain and should say so, or they are inside it and
+are currently producing values that `HashEncoding.IsSha256` would reject.
 ## Second survey, part four hundred seventy-five: R734 and R735 are applied - the counts confirm it exactly
 
 Continuing to apply the reflection-gate precondition to this ledger's own open
