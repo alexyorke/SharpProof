@@ -15674,6 +15674,12 @@ Invoke-SharpProofFuzzCampaign derives status by filtering the completed run reco
 |---|---|---|
 | R1307 | **Invoke-SharpProofFuzzCampaign repeats its failed-run predicate for status and passed. Materialize one failed-run snapshot or count and reuse it for both summary fields, preserving the current rule that either process failure or validation failure makes the campaign fail.** | scripts/Invoke-SharpProofFuzzCampaign.ps1:237-253 |
 
+### Status (continued)
+
+R1307 is applied: fuzz campaign summaries now reuse one failed-run snapshot
+for both `status` and `passed`, preserving the existing fail-closed rule.
+Fuzz runner evidence tests pass (2 passed).
+
 ## Second survey, continued: R1308 - coverage authority projects are linearly re-found per baseline project
 
 Test-SharpProofCoverage already compares the sorted names from the baseline and independently recomputed authority before constructing the output. It then loops over every baseline project and runs Where-Object across the full recomputed project list to find the same exact-name record, validating that the result count is one. An ordinal name-to-project index built once after the name comparison can preserve the duplicate/missing-project check while removing the repeated full scans.
