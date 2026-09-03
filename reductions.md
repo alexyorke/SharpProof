@@ -15096,3 +15096,11 @@ pass (34 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1250 | **The three closed-contract attributes duplicate the same parameter/return target expression.** `NotNull`, `Positive`, and `InRange` each spell the identical `AttributeTargets` union. Centralizing the shared mask reduces repeated metadata policy without merging the public attribute types. | `SharpProof.Attributes/ClosedContractAttributes.cs:3-36` |
+
+## Second survey, part five hundred seventy-three: R1251 - launcher runtime paths rebuild on every query
+
+`LauncherArguments.LauncherRuntimePaths` is an immutable-in-practice projection of the launcher's assembly location, companion extensions, and generated runtime-companion inventory, but its getter constructs a new array and repeats `Assembly.Location`, `Path.GetDirectoryName`, `Path.ChangeExtension`, `Path.Combine`, and runtime-type assembly lookups on every access. `ValidateDistinctPaths` reads the property while deriving runtime directories, again while building the conflict candidates, and again inside the `runtimeSnapshot.ComponentPaths` filter, where the complete eleven-element array is rebuilt once per component path. The runtime closure paths do not change during a process, so a cached immutable projection or one local snapshot per validation pass can retain the same path set while removing repeated metadata and allocation work. This is narrower than R799, which covers canonicalization and filesystem identity calls after paths are obtained, and R798, which covers repeated validation phases.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1251 | **`LauncherArguments.LauncherRuntimePaths` rebuilds the same runtime-closure array repeatedly.** The generated getter allocates and recomputes all companion paths on each query; `ValidateDistinctPaths` queries it multiple times and once per component in a filter. Cache the stable projection or capture it once per validation while preserving the existing companion inventory and conflict checks. | `SharpProof.Worker.Launcher/LauncherArguments.generated.cs:52-70`; `SharpProof.Worker.Launcher/Program.cs:1037-1067` |
