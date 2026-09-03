@@ -1054,12 +1054,8 @@ internal sealed class ManagedAbstractFlow
         ISet<int>? included)
     {
         var marks = new byte[graph.Blocks.Length];
-        bool Visit(BasicBlock block)
+        bool VisitIncluded(BasicBlock block)
         {
-            if (included != null && !included.Contains(block.Ordinal))
-            {
-                return true;
-            }
             if (marks[block.Ordinal] != 0)
             {
                 return marks[block.Ordinal] == 2;
@@ -1077,10 +1073,21 @@ internal sealed class ManagedAbstractFlow
             marks[block.Ordinal] = 2;
             return true;
         }
+
+        bool Visit(BasicBlock block)
+        {
+            if (included != null && !included.Contains(block.Ordinal))
+            {
+                return true;
+            }
+
+            return VisitIncluded(block);
+        }
+
         return graph.Blocks
             .Where(block => block.IsReachable &&
                 (included == null || included.Contains(block.Ordinal)))
-            .All(Visit);
+            .All(VisitIncluded);
     }
 
     private static IEnumerable<(ControlFlowBranch Branch, bool? Expected)> Successors(BasicBlock block)
