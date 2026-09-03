@@ -12576,8 +12576,10 @@ NuGet actually packs from.
 R1152 is partly applied: the duplicated title, description, release-notes,
 copyright, and tag properties are gone from both custom-nuspec projects. Their
 `PackageId` properties remain because they control package identity/output naming;
-the live nuspec metadata remains unchanged. The container pack workflow is the
-next validation gate before considering this safe half complete.
+the live nuspec metadata remains unchanged. Direct container packing still
+produces `SharpProof` and `SharpProof.Verifier` nupkg/snupkg outputs. The full
+`pack` workflow remains blocked earlier by its existing README gate requiring
+`SP0047 SP0048` text.
 
 ## Second survey, part four hundred sixty-nine: documentation links and layer separation - no finding
 
