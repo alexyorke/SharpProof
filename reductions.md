@@ -18747,3 +18747,11 @@ pass (2/2).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1653 | Two Effects suites maintain the same divide/remainder, native arithmetic, compound assignment, checked increment, array, and lock source methods; share the common fixture fragment while retaining distinct runtime and summary assertions. | `SharpProof.Effects.Test/RuntimeEffectOracleTests.cs:246-282`; `SharpProof.Effects.Test/EffectAnalysisTests.cs:4010-4041,4046-4057` |
+
+## Second survey, continued: R1654 - two Frontend test hosts rebuild the same `Subject`-members source envelope
+
+`FrontendLoweringTests.CompiledMethod.Create` and `ProgramLoweringTests.Lower` both accept a `members` string and construct the same `#nullable enable` plus `public static class Subject {` envelope, using `Environment.NewLine` before the members and closing brace. The compilation options and returned wrapper types remain intentionally different, so the reduction is only a shared `WrapSubjectMembers` test-source helper. Keeping the envelope in two same-project helpers makes a change to the nullable/class/path convention or line-ending policy drift between the operation and program lowering suites.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1654 | The two Frontend lowering helpers duplicate the `Subject` source envelope around caller-supplied members; share that small source builder while retaining separate compilation options and result wrappers. | `SharpProof.Frontend.Test/FrontendLoweringTests.cs:1202-1216`; `SharpProof.Frontend.Test/ProgramLoweringTests.cs:826-840` |
