@@ -130,20 +130,31 @@ function Test-SharpProofPackagePayload {
 
         [Parameter()]
         [AllowEmptyCollection()]
-        [object[]]$ExpectedPayloads
+        [object[]]$ExpectedPayloads,
+
+        [Parameter()]
+        [hashtable]$ValidationCache
     )
 
-    $ownership = Get-Content `
-        -LiteralPath (Join-Path `
-            $RepositoryRoot `
-            'eng/release/first-party-assemblies.json') `
-        -Raw |
-        ConvertFrom-Json
-    if ($ownership.schemaVersion -ne 1) {
-        throw 'Unsupported first-party assembly inventory schema.'
-    }
-    $firstPartyNames = @($ownership.assemblyNames | ForEach-Object { [string]$_ })
     $useEvidence = $null -ne $ExpectedPayloads
+    if ($null -eq $ValidationCache) {
+        $ValidationCache = @{}
+    }
+    if (-not $ValidationCache.ContainsKey('FirstPartyNames')) {
+        $ownership = Get-Content `
+            -LiteralPath (Join-Path `
+                $RepositoryRoot `
+                'eng/release/first-party-assemblies.json') `
+            -Raw |
+            ConvertFrom-Json
+        if ($ownership.schemaVersion -ne 1) {
+            throw 'Unsupported first-party assembly inventory schema.'
+        }
+        $ValidationCache['FirstPartyNames'] = @(
+            $ownership.assemblyNames |
+                ForEach-Object { [string]$_ })
+    }
+    $firstPartyNames = @($ValidationCache['FirstPartyNames'])
     $specifications = if ($useEvidence) {
         @($ExpectedPayloads | ForEach-Object {
             [pscustomobject][ordered]@{
@@ -192,14 +203,24 @@ function Test-SharpProofPackagePayload {
 
         $actualThirdParty = [Collections.Generic.List[string]]::new()
         $payloadEvidence = [Collections.Generic.List[object]]::new()
-        $toolchain = Get-Content `
-            -LiteralPath (Join-Path $RepositoryRoot 'eng/container/toolchain.json') `
-            -Raw |
-            ConvertFrom-Json
+        $toolchain = $null
         foreach ($specification in $specifications) {
             $entry = $archive.GetEntry([string]$specification.Entry)
             if ($null -eq $entry) {
                 throw "Package '$PackageId' is missing payload '$($specification.Entry)'."
+            }
+            if (-not $useEvidence -and
+                $entry.FullName -in @(
+                    'tools/native/linux-x64/libz3.so',
+                    'tools/net9/Microsoft.Z3.dll')) {
+                if (-not $ValidationCache.ContainsKey('Toolchain')) {
+                    $ValidationCache['Toolchain'] = Get-Content `
+                        -LiteralPath (Join-Path `
+                            $RepositoryRoot 'eng/container/toolchain.json') `
+                        -Raw |
+                        ConvertFrom-Json
+                }
+                $toolchain = $ValidationCache['Toolchain']
             }
             $assemblyName = $null
             if ($useEvidence) {

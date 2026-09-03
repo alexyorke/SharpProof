@@ -306,6 +306,7 @@ function Get-ValidatedRelease {
     Test-SharpProofThirdPartyComponentProjection `
         -ActualComponents @($manifest.thirdPartyComponents) `
         -ExpectedComponents $catalogComponents
+    $payloadValidationCache = @{}
     foreach ($packageId in $packageOrder) {
         $main = @(
             $packageArtifacts |
@@ -368,7 +369,8 @@ function Get-ValidatedRelease {
                 $payloadSets |
                     Where-Object { [string]$_.packageId -eq $packageId } |
                     ForEach-Object { @($_.entries) }
-            )
+            ) `
+            -ValidationCache $payloadValidationCache
         $null = Test-SharpProofSymbolPackagePair `
             -PackagePath $mainPath `
             -SymbolPackagePath $symbolsPath `

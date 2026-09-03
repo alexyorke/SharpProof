@@ -16619,6 +16619,12 @@ remain unchanged. Focused ReleasePublicationScriptTests pass (24 passed).
 |---|---|---|
 | R1375 | `Test-SharpProofPackagePayload` reloads the same first-party assembly inventory and toolchain JSON for each package validation. Pass or cache one validated metadata projection per repository run, with lazy toolchain access for the Z3-only checks, instead of repeating identical file I/O and JSON parsing. | `scripts/Test-SharpProofPackagePayloads.ps1:136-145,193-199`; caller `scripts/New-SharpProofReleaseEvidence.ps1:380-396` |
 
+R1375 is applied: payload validation accepts a caller-owned per-run cache,
+sharing the schema-validated first-party inventory across package checks and
+loading the toolchain document only when a non-evidence Z3 entry is reached.
+All release callers share that cache; the focused ReleasePublicationScriptTests
+pass (24 passed).
+
 ## Second survey, continued: R1376 - Canonical workflow parsing traverses job headings twice
 
 `Get-CanonicalWorkflowJobs` extracts all job headings, runs a separate `Group-Object` pipeline over the complete match collection to detect duplicates, and then loops over that same collection again to slice blocks and populate the dictionary. Building the dictionary during the slicing loop with an ordinal duplicate check (or collecting duplicate IDs in the same pass) can retain the fail-closed duplicate-key policy and alias checks while removing one full traversal and an intermediate grouping allocation.

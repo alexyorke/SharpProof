@@ -371,6 +371,7 @@ if ($commits[0] -ne $checkoutCommit) {
         "checkout '$checkoutCommit'.")
 }
 $packagePayloadEvidence = [Collections.Generic.List[object]]::new()
+$payloadValidationCache = @{}
 foreach ($item in $identities |
         Where-Object { $_.File.Extension -eq '.nupkg' }) {
     $packageId = $item.Identity.Id
@@ -381,7 +382,8 @@ foreach ($item in $identities |
         -PackagePath $item.File.FullName `
         -PackageId $packageId `
         -RepositoryRoot $repositoryRoot `
-        -Components $components)
+        -Components $components `
+        -ValidationCache $payloadValidationCache)
     $packagePayloadEvidence.Add([pscustomobject][ordered]@{
         packageId = $packageId
         entries = $payloads

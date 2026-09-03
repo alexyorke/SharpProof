@@ -130,6 +130,7 @@ foreach ($component in $catalogComponents) {
     }
     [void]$componentsByPackage[$packageId].Add($component)
 }
+$payloadValidationCache = @{}
 foreach ($packageId in $expectedPackageIds) {
     $mainArtifact = $artifactsByKindAndPackage["package|$packageId"]
     $symbolArtifact = $artifactsByKindAndPackage["symbols|$packageId"]
@@ -146,7 +147,8 @@ foreach ($packageId in $expectedPackageIds) {
         -PackageId $packageId `
         -RepositoryRoot $repositoryRoot `
         -Components $components `
-        -ExpectedPayloads $payloadEntries
+        -ExpectedPayloads $payloadEntries `
+        -ValidationCache $payloadValidationCache
     $null = Test-SharpProofSymbolPackagePair `
         -PackagePath (Join-Path `
             $resolvedSource `
