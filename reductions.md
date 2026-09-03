@@ -14441,6 +14441,12 @@ projection.
 |---|---|---|
 | R1203 | **`RoslynProgramLowerer.LowerInvocation` computes each invocation result type twice.** It calls `_expressions.GetTypeId(invocation.Type)` for the call temporary, then `_expressions.GetMember(..., invocation.Type, ...)`, whose implementation calls `GetTypeId(resultType)` again with the same `invocation.Type`. Reusing the first `IrTypeId` in member construction removes the repeated specialization/classification and preserves the existing member identity and result-type behavior. | `SharpProof.Frontend/RoslynProgramLowerer.cs:384-398`; `SharpProof.Frontend/RoslynOperationLowerer.cs:194-210` |
 
+### Status (part five hundred twenty-five)
+
+R1203 is applied: invocation lowering reuses its computed result type when
+constructing the member, avoiding a second type projection. The Frontend test
+suite passes (121/121).
+
 ## Second survey, part five hundred twenty-six: R1204 - ordered CFG selection is used as a membership set
 
 `SelectBlocks` returns an array so the selected CFG blocks can be emitted in a
