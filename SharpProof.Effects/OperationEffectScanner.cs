@@ -823,10 +823,17 @@ internal sealed partial class OperationEffectScanner
             EffectAllocationKind.Managed);
         var methodReference = MethodGroupConversionFacts
             .GetDelegateConstructorCheckedTarget(delegateCreation);
-        if (methodReference?.Instance is not { } instance ||
-            _nullnessEvaluator.IsProvenNonNull(
-                instance,
-                methodReference))
+        if (methodReference?.Instance is not { } instance)
+        {
+            return EffectSummaryOperations.Join(
+                children.Summary,
+                allocation);
+        }
+
+        var instanceNullState = _nullnessEvaluator.GetNullState(
+            instance,
+            methodReference);
+        if (instanceNullState == OperationNullnessEvaluator.NullState.NonNull)
         {
             return EffectSummaryOperations.Join(
                 children.Summary,
@@ -837,9 +844,7 @@ internal sealed partial class OperationEffectScanner
             EffectSummaryOperations.Join(
                 allocation,
                 Throw(FrameworkTypeMetadataNames.ArgumentException)),
-            !_nullnessEvaluator.IsProvenNull(
-                instance,
-                methodReference))).Summary;
+            instanceNullState != OperationNullnessEvaluator.NullState.Null)).Summary;
     }
 
     private EffectSummary ScanThrow(IThrowOperation thrown)

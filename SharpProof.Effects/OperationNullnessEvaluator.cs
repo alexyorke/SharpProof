@@ -2,6 +2,13 @@ namespace SharpProof.Effects;
 
 internal sealed class OperationNullnessEvaluator
 {
+    internal enum NullState
+    {
+        Unknown,
+        Null,
+        NonNull
+    }
+
     private readonly ManagedFlowResult? _abstractFlow;
     private readonly INamedTypeSymbol? _monitorType;
     private readonly IOperation _root;
@@ -25,6 +32,36 @@ internal sealed class OperationNullnessEvaluator
             (value.ConstantValue is { HasValue: true, Value: null } ||
              _abstractFlow?.ProvesNull(origin, value) == true ||
              IsSourceDefinitelyNull(value, origin));
+    }
+
+    internal NullState GetNullState(IOperation? value, IOperation origin)
+    {
+        if (value == null ||
+            value is IInstanceReferenceOperation ||
+            (value.Type is { IsValueType: true } type &&
+             !ManagedAbstractValue.IsNullableType(type)) ||
+            DefiniteOperationFacts.IsDefinitelyNonNull(value))
+        {
+            return NullState.NonNull;
+        }
+
+        if (_abstractFlow?.TryEvaluate(origin, value, out var result) == true)
+        {
+            if (result.IsDefinitelyNonNull)
+            {
+                return NullState.NonNull;
+            }
+
+            if (result.IsDefinitelyNull)
+            {
+                return NullState.Null;
+            }
+        }
+
+        return value.ConstantValue is { HasValue: true, Value: null } ||
+            IsSourceDefinitelyNull(value, origin)
+            ? NullState.Null
+            : NullState.Unknown;
     }
 
     internal bool IsImplicitLockEnterWithNullValue(IInvocationOperation invocation)
