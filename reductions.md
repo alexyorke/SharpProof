@@ -3347,6 +3347,7 @@ validation while keeping their distinct messages and metadata. R514 remains
 pending because validation changes must retain their security and geometry
 semantics.
 
+
 ## Second survey, part seventy: R518-R520 - effect-scanner phases and native-loader cleanup
 
 | R518 | **`OperationEffectScanner` duplicates the null-check-to-throw helper for receivers and locks.** `PotentialNullReceiver` and `PotentialNullLock` both return an empty summary when `_nullnessEvaluator.IsProvenNonNull` succeeds and otherwise call `Throw` with a framework exception identity; only the input parameter name and exception (`NullReferenceException` versus `ArgumentNullException`) differ. A parameterized `PotentialNullAccess` helper can centralize the branch while preserving the distinct C# failure semantics at each call site. | `SharpProof.Effects/OperationEffectScanner.cs:1216-1235` |
@@ -10355,9 +10356,39 @@ four value representations into one domain type.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R994 | **Heterogeneous abstract-domain joins repeat the same bottom-absorption fast path.** Four concrete joins independently return the other operand for `(bottom, value)` and `(value, bottom)` before their domain-specific merge: interval, sequence-cardinality, effect-summary, and managed-flow values. A narrowly scoped helper or callback-based wrapper could centralize those two branches while preserving each domain's validation and non-bottom semantics; because the branches are small, this remains a deferred, low-priority simplification rather than a reason to merge the domains. This is distinct from R377, which covers the enum-level flat-diamond decision trees. | `SharpProof.Dataflow/IntervalDomain.cs:118-128`; `SharpProof.Dataflow/SequenceCardinalityDomain.cs:96-109`; `SharpProof.Effects/EffectSummary.cs:193-206`; `SharpProof.Effects/ManagedAbstractFlow.cs:1889-1900`; R377 |\n+
+| R994 | **Heterogeneous abstract-domain joins repeat the same bottom-absorption fast path.** Four concrete joins independently return the other operand for `(bottom, value)` and `(value, bottom)` before their domain-specific merge: interval, sequence-cardinality, effect-summary, and managed-flow values. A narrowly scoped helper or callback-based wrapper could centralize those two branches while preserving each domain's validation and non-bottom semantics; because the branches are small, this remains a deferred, low-priority simplification rather than a reason to merge the domains. This is distinct from R377, which covers the enum-level flat-diamond decision trees. | `SharpProof.Dataflow/IntervalDomain.cs:118-128`; `SharpProof.Dataflow/SequenceCardinalityDomain.cs:96-109`; `SharpProof.Effects/EffectSummary.cs:193-206`; `SharpProof.Effects/ManagedAbstractFlow.cs:1889-1900`; R377 |
 ### Status (part two hundred twenty-five)
 
 R994 is `deferred`: retain the explicit bottom fast paths unless a shared
 domain-join abstraction can improve rather than hide the concrete lattice
 semantics.
+
+## Second survey, part two hundred twenty-six: R995 - duplicate indented JSON options in executables
+
+The two executable JSON-output surfaces each define their own pretty-print
+options object with no other settings. SharpProof.Gates/Program.cs defines
+JsonDefaults.Indented as a new JsonSerializerOptions with only
+WriteIndented = true, and uses it for the aggregate, standalone, and
+performance-smoke outputs. The top-level Tools/SharpProof.Fuzz/Program.cs
+does the same in a file-local FuzzJson.Indented helper for its summary
+output. The options are not the Worker protocol serializer: that boundary
+needs camel-case naming, unmapped-member rejection, depth limits, and enum
+conversion, so its richer configuration should remain separate. Likewise,
+OpenSourceCorpusImporter adds camel-case naming and an enum converter.
+
+If a shared executable-support source is worthwhile, one tiny factory can own
+the default indented-output option and both programs can retain their
+program-specific result envelopes and exit policies. Because the duplicated
+configuration is only one setting and the executables currently sit in
+separate projects, this is a low-priority cleanup rather than a reason to add
+a new production dependency solely for a three-line helper.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R995 | **The Gates and Fuzz executables duplicate the same indented JSON serializer factory.** JsonDefaults.Indented and FuzzJson.Indented each allocate a default JsonSerializerOptions containing only WriteIndented = true, while their call sites independently serialize gate envelopes, smoke results, or fuzz summaries. A small shared executable-support helper or linked source can centralize this one setting without merging the distinct output models; keep the richer protocol and corpus-import options separate. | SharpProof.Gates/Program.cs:38-44,51-56,75-78,160-169; Tools/SharpProof.Fuzz/Program.cs:32-35,44-53; distinct corpus options SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:53-58; protocol options SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:216-230 |
+
+### Status (part two hundred twenty-six)
+
+R995 is deferred: the setting is redundant, but a shared helper should not
+add dependency or source-link complexity disproportionate to the tiny
+duplication.
