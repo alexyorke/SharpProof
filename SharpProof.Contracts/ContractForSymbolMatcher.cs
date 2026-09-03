@@ -128,12 +128,20 @@ internal static class ContractForSymbolMatcher
         }
 
         var targetLayers = GetGenericTypeLayers(contractTarget.Target);
-        return targetLayers.Length == companionLayers.Length &&
-               targetLayers.Select((layer, index) =>
-                       TypeParameterListsMatch(
-                           layer.TypeParameters,
-                           companionLayers[index].TypeParameters))
-                   .All(static matches => matches);
+        if (targetLayers.Length != companionLayers.Length)
+        {
+            return false;
+        }
+        for (var index = 0; index < targetLayers.Length; index++)
+        {
+            if (!TypeParameterListsMatch(
+                    targetLayers[index].TypeParameters,
+                    companionLayers[index].TypeParameters))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     internal static ImmutableArray<IMethodSymbol> GetOrdinaryMethods(INamedTypeSymbol type)
@@ -364,11 +372,20 @@ internal static class ContractForSymbolMatcher
 
         var receiverMatches =
             target.IsStatic || IsReceiver(target, companion.Parameters[0]);
-        return receiverMatches &&
-               target.Parameters.Select((parameter, index) =>
-                       ParametersMatch(parameter, companion.Parameters[index + offset]))
-                   .All(static matches => matches) &&
-               TypeParameterListsMatch(target.TypeParameters, companion.TypeParameters);
+        if (!receiverMatches)
+        {
+            return false;
+        }
+        for (var index = 0; index < target.Parameters.Length; index++)
+        {
+            if (!ParametersMatch(
+                    target.Parameters[index],
+                    companion.Parameters[index + offset]))
+            {
+                return false;
+            }
+        }
+        return TypeParameterListsMatch(target.TypeParameters, companion.TypeParameters);
     }
 
     private static CompanionResolution SpecializeCompanion(
@@ -595,10 +612,18 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<ITypeParameterSymbol> left,
         ImmutableArray<ITypeParameterSymbol> right)
     {
-        return left.Length == right.Length &&
-        left.Select((parameter, index) =>
-                TypeParameterConstraintsMatch(parameter, right[index]))
-            .All(static matches => matches);
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+        for (var index = 0; index < left.Length; index++)
+        {
+            if (!TypeParameterConstraintsMatch(left[index], right[index]))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool TypeParameterConstraintsMatch(
@@ -703,24 +728,46 @@ internal static class ContractForSymbolMatcher
             !SymbolEqualityComparer.Default.Equals(
                 leftNamed.OriginalDefinition, rightNamed.OriginalDefinition) ||
             !TypesMatch(leftNamed.ContainingType, rightNamed.ContainingType,
-                leftScope, rightScope, normalizeMappedTypeParameters) ||
-            !leftNamed.TypeArguments.Select((argument, index) =>
-                    CustomModifiersMatch(
-                        leftNamed.GetTypeArgumentCustomModifiers(index),
-                        rightNamed.GetTypeArgumentCustomModifiers(index)) &&
-                    TypesMatch(argument, rightNamed.TypeArguments[index],
-                        leftScope, rightScope, normalizeMappedTypeParameters))
-                .All(static matches => matches))
+                leftScope, rightScope, normalizeMappedTypeParameters))
         {
             return false;
         }
 
-        return !leftNamed.IsTupleType ||
-               leftNamed.TupleElements.Length == rightNamed.TupleElements.Length &&
-               leftNamed.TupleElements.Select((element, index) =>
-                       string.Equals(element.Name,
-                           rightNamed.TupleElements[index].Name, StringComparison.Ordinal))
-                   .All(static matches => matches);
+        for (var index = 0; index < leftNamed.TypeArguments.Length; index++)
+        {
+            if (!CustomModifiersMatch(
+                    leftNamed.GetTypeArgumentCustomModifiers(index),
+                    rightNamed.GetTypeArgumentCustomModifiers(index)) ||
+                !TypesMatch(
+                    leftNamed.TypeArguments[index],
+                    rightNamed.TypeArguments[index],
+                    leftScope,
+                    rightScope,
+                    normalizeMappedTypeParameters))
+            {
+                return false;
+            }
+        }
+
+        if (!leftNamed.IsTupleType)
+        {
+            return true;
+        }
+        if (leftNamed.TupleElements.Length != rightNamed.TupleElements.Length)
+        {
+            return false;
+        }
+        for (var index = 0; index < leftNamed.TupleElements.Length; index++)
+        {
+            if (!string.Equals(
+                    leftNamed.TupleElements[index].Name,
+                    rightNamed.TupleElements[index].Name,
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool ArrayShapePartsMatch(
@@ -739,31 +786,39 @@ internal static class ContractForSymbolMatcher
         ISymbol rightScope,
         bool normalizeMappedTypeParameters)
     {
-        return (left.CallingConvention, left.ReturnsByRef,
-                   left.ReturnsByRefReadonly, left.Parameters.Length) ==
-               (right.CallingConvention, right.ReturnsByRef,
-                   right.ReturnsByRefReadonly, right.Parameters.Length) &&
-               TypesMatch(left.ReturnType, right.ReturnType,
-                   leftScope, rightScope, normalizeMappedTypeParameters) &&
-               FunctionPointerReturnCustomModifiersMatch(
-                   left.ReturnTypeCustomModifiers,
-                   right.ReturnTypeCustomModifiers,
-                   left.UnmanagedCallingConventionTypes,
-                   right.UnmanagedCallingConventionTypes) &&
-               CustomModifiersMatch(
-                   left.RefCustomModifiers,
-                   right.RefCustomModifiers) &&
-               UnmanagedCallingConventionTypesMatch(
-                   left.UnmanagedCallingConventionTypes,
-                   right.UnmanagedCallingConventionTypes) &&
-               left.Parameters.Select((parameter, index) =>
-                       FunctionPointerParametersMatch(
-                           parameter,
-                           right.Parameters[index],
-                           leftScope,
-                           rightScope,
-                           normalizeMappedTypeParameters))
-                   .All(static matches => matches);
+        if ((left.CallingConvention, left.ReturnsByRef,
+                left.ReturnsByRefReadonly, left.Parameters.Length) !=
+            (right.CallingConvention, right.ReturnsByRef,
+                right.ReturnsByRefReadonly, right.Parameters.Length) ||
+            !TypesMatch(left.ReturnType, right.ReturnType,
+                leftScope, rightScope, normalizeMappedTypeParameters) ||
+            !FunctionPointerReturnCustomModifiersMatch(
+                left.ReturnTypeCustomModifiers,
+                right.ReturnTypeCustomModifiers,
+                left.UnmanagedCallingConventionTypes,
+                right.UnmanagedCallingConventionTypes) ||
+            !CustomModifiersMatch(
+                left.RefCustomModifiers,
+                right.RefCustomModifiers) ||
+            !UnmanagedCallingConventionTypesMatch(
+                left.UnmanagedCallingConventionTypes,
+                right.UnmanagedCallingConventionTypes))
+        {
+            return false;
+        }
+        for (var index = 0; index < left.Parameters.Length; index++)
+        {
+            if (!FunctionPointerParametersMatch(
+                    left.Parameters[index],
+                    right.Parameters[index],
+                    leftScope,
+                    rightScope,
+                    normalizeMappedTypeParameters))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool UnmanagedCallingConventionTypesMatch(
@@ -848,12 +903,21 @@ internal static class ContractForSymbolMatcher
         ImmutableArray<CustomModifier> left,
         ImmutableArray<CustomModifier> right)
     {
-        return left.Length == right.Length &&
-               left.Select((modifier, index) =>
-                       modifier.IsOptional == right[index].IsOptional &&
-                       SymbolEqualityComparer.Default.Equals(
-                           modifier.Modifier, right[index].Modifier))
-                   .All(static matches => matches);
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+        for (var index = 0; index < left.Length; index++)
+        {
+            if (left[index].IsOptional != right[index].IsOptional ||
+                !SymbolEqualityComparer.Default.Equals(
+                    left[index].Modifier,
+                    right[index].Modifier))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool OwnersMatch(

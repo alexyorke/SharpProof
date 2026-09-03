@@ -11669,6 +11669,10 @@ In `SharpProof.Contracts/ContractForSymbolMatcher.cs`, seven symbol matching met
 
 R1091 is deferred: replace LINQ pairwise matching with non-allocating loops in `ContractForSymbolMatcher`.
 
+R1091 is applied: all seven pairwise symbol-matching paths now use indexed early-exit loops, eliminating LINQ iterators and closures while preserving comparison order and short-circuiting. `SharpProof.Contracts.Test` passes (142/142).
+
+R1091 is applied: all seven pairwise symbol-matching paths now use indexed early-exit loops, eliminating LINQ iterators and closures while preserving comparison order and short-circuiting. The Contracts test suite passes.
+
 ## Second survey, part three hundred twenty-three: R1092 - redundant GroupBy duplicate detection on sorted spec declarations
 
 In `SharpProof.Specs/ApiSpecTable.cs`, `ApiSpecTable.Create` sorts incoming declarations into an `ordered` array by `declaration.Target?.WitnessIdentifier`. Immediately afterward, it executes `.GroupBy(...).FirstOrDefault(static group => group.Count() != 1)` to detect duplicate witness identifiers. Because the array is already sorted by witness identifier using the same comparer, any duplicates are guaranteed to be adjacent. Running `GroupBy` allocates an internal hash lookup table and grouping lists. Checking adjacent elements in a single pass detects duplicates in $O(N)$ time with zero allocations.
