@@ -15841,6 +15841,12 @@ The campaign starts its result accumulator as a regular array containing complet
 | ID | Finding | Evidence |
 |---|---|---|
 | R1319 | **Test-SharpProofTrustedMutations rebuilds its accumulated result array on every mutation through $results += $result. Use a growable list for the in-memory accumulator and preserve the per-mutation atomic checkpoint writes and result ordering.** | scripts/Test-SharpProofTrustedMutations.ps1:2688-2689,2778-2781; checkpoint serialization at :2433-2466 |
+
+### Status (continued)
+
+R1319 is applied: trusted-mutation results use a growable list and pass array
+snapshots to each atomic checkpoint write, preserving order and evidence shape.
+Mutation preflight architecture test passes.
 ## Second survey, continued: R1320 - acceptance source metrics rescan the full inventory per path
 
 Measure-RepositoryCSharpSyntax first resolves the requested paths, then for every C# path searches all production inventory projects and, inside each project, all compile items to locate its unique parse-options owner. The production inventory is immutable for the acceptance run, so this nested Where-Object search repeats the same ownership work for every path in a metrics group. A path-to-project or path-to-parse-options index built once from the inventory can preserve the unique-owner assertion and language-version selection while removing the repeated nested scans.
