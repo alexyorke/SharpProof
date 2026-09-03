@@ -18580,3 +18580,13 @@ R1529 is applied (also tracked by duplicate finding R1541): the two
 indirect-mutation matrices now each reuse one immutable source compilation while
 retaining per-case method selection and expected-effect assertions.
 `IndirectLocalMutationNullnessRegressionTests` pass (4/4).
+
+R1540 is deferred: aligning transitive package versions is dependency-graph
+policy work rather than a code reduction and would require coordinated lock-file
+regeneration; the existing NuGet lock files remain intact pending an explicit
+release-parity decision.
+
+R1542 is applied: the analyzer-mode matrices now cache the exact immutable
+compilations for each diagnostic-ID set, while analyzer options, factories, and
+feature/profile cases remain per-test. `AnalyzerModeAndEffectTests` pass
+(104/104).

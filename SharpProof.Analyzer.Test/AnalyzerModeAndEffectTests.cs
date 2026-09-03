@@ -30,6 +30,24 @@ public sealed class AnalyzerModeAndEffectTests
         }
         """;
 
+    private static readonly CSharpCompilation ConfigurationFailureCompilation =
+        AnalyzerTestHost.CreateCompilation(
+            ModeFixture,
+            ["SP0025", "SP0045"]);
+
+    private static readonly CSharpCompilation RetiredModeCompilation =
+        AnalyzerTestHost.CreateCompilation(
+            ModeFixture,
+            ["SP0025", "SP0045", "SP0027"]);
+
+    private static readonly CSharpCompilation ProfileFeaturesCompilation =
+        AnalyzerTestHost.CreateCompilation(
+            ModeFixture,
+            ["SP0045", "SP0027"]);
+
+    private static readonly CSharpCompilation ContractCompanionCompilation =
+        CreateContractCompanionCompilation();
+
     [Test]
     public async Task ProfileOffCreatesNoAnalysisSession()
     {
@@ -214,9 +232,7 @@ public sealed class AnalyzerModeAndEffectTests
         bool failGlobalOptions)
     {
         var factory = new ThrowingSessionFactory();
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            ModeFixture,
-            ["SP0025", "SP0045"]);
+        var compilation = ConfigurationFailureCompilation;
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
             new FailingOptionsProvider(failGlobalOptions),
@@ -235,9 +251,7 @@ public sealed class AnalyzerModeAndEffectTests
     [TestCase("all-experimental")]
     public async Task RetiredModeOptionFailsClosed(string retiredMode)
     {
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            ModeFixture,
-            ["SP0025", "SP0045", "SP0027"]);
+        var compilation = RetiredModeCompilation;
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -315,9 +329,8 @@ public sealed class AnalyzerModeAndEffectTests
         string[] expected)
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            ModeFixture,
+            ProfileFeaturesCompilation,
             mode: null,
-            ["SP0045", "SP0027"],
             profile: profile,
             features: features);
 
@@ -2106,32 +2119,8 @@ public sealed class AnalyzerModeAndEffectTests
         string features)
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
-            using System;
-            using SharpProof.Attributes;
-
-            public sealed class Service {
-                public int Map(int value) => value;
-            }
-
-            [ContractFor(typeof(Service))]
-            public static class ServiceContracts {
-                private static int state;
-
-                public static int Map(Service receiver, int value) {
-                    Contract.Requires(value > 0);
-                    Action unsupportedDummy = () => state++;
-                    if (value < 0) {
-                        throw new InvalidOperationException();
-                    }
-                    unsupportedDummy();
-                    return value;
-                }
-            }
-
-            """,
+            ContractCompanionCompilation,
             mode: null,
-            ["SP0027", "SP0047"],
             features: features);
 
         Assert.That(diagnostics, Is.Empty);
@@ -3650,6 +3639,36 @@ public sealed class AnalyzerModeAndEffectTests
             descriptors.Single(static descriptor => descriptor.Id == "SP0049")
                 .DefaultSeverity,
             Is.EqualTo(DiagnosticSeverity.Error));
+    }
+
+    private static CSharpCompilation CreateContractCompanionCompilation()
+    {
+        return AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            using SharpProof.Attributes;
+
+            public sealed class Service {
+                public int Map(int value) => value;
+            }
+
+            [ContractFor(typeof(Service))]
+            public static class ServiceContracts {
+                private static int state;
+
+                public static int Map(Service receiver, int value) {
+                    Contract.Requires(value > 0);
+                    Action unsupportedDummy = () => state++;
+                    if (value < 0) {
+                        throw new InvalidOperationException();
+                    }
+                    unsupportedDummy();
+                    return value;
+                }
+            }
+
+            """,
+            ["SP0027", "SP0047"]);
     }
 
     private sealed class ThrowingSessionFactory : IAnalyzerSessionFactory
