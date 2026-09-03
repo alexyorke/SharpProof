@@ -14628,6 +14628,12 @@ allocating an array snapshot. Worker MSBuild integration tests pass (75 passed,
 |---|---|---|
 | R1213 | **`SharpProofWorker.VerifyAsync` scans callable preparations once for lane sizing and again for ordering.** `CountSolverTargets` performs a predicate count over `targets`, after which `OrderBy(...).ToArray()` buffers and re-enumerates the same collection. Sharing one ordered/count projection preserves the lane-capacity calculation and stable callable order while avoiding a redundant pass over the immutable target list. | `SharpProof.Worker/SharpProofWorker.cs:253-280,591-595` |
 
+### Status (part five hundred thirty-five)
+
+R1213 is applied: worker lane sizing now counts the already ordered target
+buffer, avoiding a second traversal of the preparation source. Worker lane
+allocation tests pass (1 passed).
+
 ## Second survey, part five hundred thirty-six: R1214 - cache filename validation allocates a LINQ iterator per entry
 
 `VerificationCache.IsOwnedCacheEntry` has already factored its hexadecimal test through `IsHexDigit`, but it still expresses the fixed first-64-character check as `fileName.Take(64).All(IsHexDigit)`. Cache recovery and capacity maintenance call this predicate for every directory entry, so the LINQ pipeline creates iterator/enumerator work for a range whose length is already known and whose neighboring `IsHexMarker` routine uses an indexed loop. A shared bounded character-range helper can preserve the lowercase-only rule and suffix/length checks while removing the per-entry LINQ machinery.
