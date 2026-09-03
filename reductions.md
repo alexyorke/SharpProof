@@ -321,6 +321,8 @@ the smallest relevant containerized test target passes.
 | R964 | Use an exhaustive analyzer outcome rank instead of generic enum reflection | `SharpProof.Analyzer.Test`: 476 passed |
 | R966 | Share Frontend abstention enum validation while retaining sentinel policies | `SharpProof.Frontend.Test`: 121 passed |
 | R969 | Cache protocol enum type resolution with a fail-closed sentinel | `SharpProof.Worker.Test`: 695 passed |
+| R960 | Normalize private synchronization lock names | Architecture and worker builds/tests passed |
+| R970 | Use static-field naming for shared mutable state | Architecture and worker builds/tests passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -9177,13 +9179,12 @@ Three of the four come back clean; two modest inconsistencies remain.
 
 ### Status (part one hundred eighty-four)
 
-R960 and R961 are both `pending` and both minor - a naming rule and a
-mechanism choice, neither with a present defect behind it. They are filed because
-they are decidable and cheap, and because R961 constrains something the
-repository actively does elsewhere: sharing one source file across several
-projects. The substantive result of this part is the three clean sweeps, and in
-particular the 153-for-153 `ConfigureAwait` match, which is worth knowing before
-anyone proposes an async-hygiene pass.
+R960 is applied: all production synchronization objects now use the `_gate`
+or `Gate` name, independent of assembly boundary. R961 remains `pending`
+because removing the CompilerArtifact global usings would require a broader
+source-portability migration. The substantive result of this part is the three
+clean sweeps, and in particular the 153-for-153 `ConfigureAwait` match, which is
+worth knowing before anyone proposes an async-hygiene pass.
 
 ## Second survey, part one hundred eighty-five: R962 - the only virtual member
 
@@ -10332,3 +10333,33 @@ validation already recorded under R562.
 R993 is `deferred`: centralize only the canonical package-file row
 projection; preserve each gate's source, platform, identity, receipt, and
 exact-six validation policies.
+
+## Second survey, part two hundred twenty-five: R994 - repeated bottom absorption in heterogeneous domain joins
+
+Four join implementations repeat the same two-arm lattice prelude before
+doing their domain-specific merge. `IntervalDomain.Join` returns `right` when
+`left.IsBottom` and `left` when `right.IsBottom`; `SequenceCardinalityDomain.Join`
+does the same after kind validation; `EffectSummaryDomain.Join` repeats it
+after its object guards; and the internal `ManagedAbstractFlow.Join` repeats
+the identical identity-preserving fast path before handling unknown scalar
+states and widening fields. R377 already covers the duplicated enum-level
+flat-diamond operations (`JoinKind` and nullness), not this shared value-level
+absorption at the entry points of interval, sequence, effect, and managed-flow
+joins.
+
+A small domain helper or a protected `Join` wrapper with a domain-specific
+merge callback could own the common bottom cases while leaving each concrete
+join's validation, top/unknown handling, and field merge local. This is a
+low-priority reduction: the repeated code is only two branches per domain,
+and a generic abstraction should not obscure the readable lattice boundary.
+The useful candidate is therefore the common fast-path seam, not forcing all
+four value representations into one domain type.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R994 | **Heterogeneous abstract-domain joins repeat the same bottom-absorption fast path.** Four concrete joins independently return the other operand for `(bottom, value)` and `(value, bottom)` before their domain-specific merge: interval, sequence-cardinality, effect-summary, and managed-flow values. A narrowly scoped helper or callback-based wrapper could centralize those two branches while preserving each domain's validation and non-bottom semantics; because the branches are small, this remains a deferred, low-priority simplification rather than a reason to merge the domains. This is distinct from R377, which covers the enum-level flat-diamond decision trees. | `SharpProof.Dataflow/IntervalDomain.cs:118-128`; `SharpProof.Dataflow/SequenceCardinalityDomain.cs:96-109`; `SharpProof.Effects/EffectSummary.cs:193-206`; `SharpProof.Effects/ManagedAbstractFlow.cs:1889-1900`; R377 |\n+
+### Status (part two hundred twenty-five)
+
+R994 is `deferred`: retain the explicit bottom fast paths unless a shared
+domain-join abstraction can improve rather than hide the concrete lattice
+semantics.
