@@ -13822,3 +13822,18 @@ callers.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1175 | **`OperationCompletionEvaluator.CanCompleteSwitchExpression` validates the switch value twice.** Its explicit `CanCompleteNormally(switchExpression.Value)` guard is immediately followed by `SwitchExpressionFacts.GetReachableArms`, whose `GetArms` implementation invokes the same callback for `operation.Value` before selecting arms. A prevalidated arm-selection entry point can remove the duplicate completion traversal without changing reachability rules. | `SharpProof.Effects/OperationCompletionEvaluator.cs:158-169`; `SharpProof.Effects/SwitchExpressionFacts.cs:92-122` |
+
+## Second survey, part four hundred ninety-eight: R1176 - switch scanning rechecks one value through three queries
+
+`OperationEffectScanner.ScanSwitchExpression` invokes
+`GetEvaluatedPatternOnlyArms`, then `GetReachableArms`, then
+`HasReachableUnmatchedPath`, passing the same completion delegate and the same
+switch operation to each. Each helper begins by calling that delegate for
+`operation.Value`, so a value that completes normally is re-traversed three
+times during one scan before the pattern/arm work. A shared switch-reachability
+projection can carry the validated value state to all three consumers while
+retaining their distinct arm and unmatched-path results.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1176 | **`OperationEffectScanner.ScanSwitchExpression` revalidates the switch value three times through `SwitchExpressionFacts`.** The pattern-only arm query, reachable-arm query, and unmatched-path query each re-invoke `_completionEvaluator.CanCompleteNormally` for the same `switchExpression.Value`; this is separate from R448's duplicated per-arm selection logic and R1175's evaluator-to-helper boundary. A shared reachability result can remove the repeated value traversals without merging the consumers' semantics. | `SharpProof.Effects/OperationEffectScanner.cs:1037-1062`; `SharpProof.Effects/SwitchExpressionFacts.cs:92-122,174-190` |
