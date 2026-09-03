@@ -108,10 +108,9 @@ function Get-BypassActorIdentity {
     return "$actorType|$actorIdIdentity|$bypassMode"
 }
 
-function Get-CanonicalWorkflowJob {
+function Get-CanonicalWorkflowJobs {
     param(
-        [Parameter(Mandatory = $true)][string]$Yaml,
-        [Parameter(Mandatory = $true)][string]$JobId
+        [Parameter(Mandatory = $true)][string]$Yaml
     )
 
     if ($Yaml.Contains("`t", [StringComparison]::Ordinal)) {
@@ -133,26 +132,25 @@ function Get-CanonicalWorkflowJob {
     if ($duplicateJobIds.Count -ne 0) {
         throw 'The release workflow contains duplicate job keys.'
     }
-    $heading = @($jobHeadings | Where-Object {
-            $_.Groups['id'].Value -ceq $JobId
-        })
-    if ($heading.Count -ne 1) {
-        throw "The release workflow must contain exactly one '$JobId' job."
+    $jobs = [Collections.Generic.Dictionary[string, string]]::new(
+        [StringComparer]::Ordinal)
+    for ($index = 0; $index -lt $jobHeadings.Count; $index++) {
+        $heading = $jobHeadings[$index]
+        $start = $heading.Index
+        $length = if ($index + 1 -eq $jobHeadings.Count) {
+            $jobsText.Length - $start
+        }
+        else {
+            $jobHeadings[$index + 1].Index - $start
+        }
+        $jobId = $heading.Groups['id'].Value
+        $block = $jobsText.Substring($start, $length).TrimEnd("`n")
+        if ([regex]::IsMatch($block, '(?m)^\s*(?:<<:|[^#\n]+:\s*[&*][A-Za-z0-9_-]+)')) {
+            throw "Release job '$jobId' cannot use YAML aliases or merge keys."
+        }
+        $jobs[$jobId] = $block
     }
-    $start = $heading[0].Index
-    $nextHeading = @($jobHeadings | Where-Object Index -gt $start |
-        Select-Object -First 1)
-    $length = if ($nextHeading.Count -eq 0) {
-        $jobsText.Length - $start
-    }
-    else {
-        $nextHeading[0].Index - $start
-    }
-    $block = $jobsText.Substring($start, $length).TrimEnd("`n")
-    if ([regex]::IsMatch($block, '(?m)^\s*(?:<<:|[^#\n]+:\s*[&*][A-Za-z0-9_-]+)')) {
-        throw "Release job '$JobId' cannot use YAML aliases or merge keys."
-    }
-    return $block
+    return $jobs
 }
 
 $head = (& git -C $repositoryRoot rev-parse HEAD).Trim()
@@ -166,9 +164,13 @@ Require-ExactSet `
     -Actual @($contract.workflowJobs | ForEach-Object { [string]$_.id }) `
     -Expected $expectedWorkflowJobIds `
     -Owner 'The release workflow job authority'
+$canonicalWorkflowJobs = Get-CanonicalWorkflowJobs -Yaml $workflow
 $workflowEvidence = @($contract.workflowJobs | ForEach-Object {
         $jobId = [string]$_.id
-        $job = Get-CanonicalWorkflowJob -Yaml $workflow -JobId $jobId
+        if (-not $canonicalWorkflowJobs.ContainsKey($jobId)) {
+            throw "The release workflow must contain exactly one '$jobId' job."
+        }
+        $job = $canonicalWorkflowJobs[$jobId]
         if ([string]::IsNullOrWhiteSpace($job)) {
             throw "Release job '$jobId' is empty."
         }
