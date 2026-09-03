@@ -14912,3 +14912,11 @@ argument queries. Meta analyzer tests pass (162 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1238 | **`TryStorage` allocates a throwaway object for every unsupported operation.** Its `_ => new object()` arm only satisfies `out object storage`; callers branch on the returned Boolean and do not read `storage` when false. A null/default failure value or a success-only storage result removes the per-probe allocation without changing tracked-storage identity. | `SharpProof.Effects/ManagedAbstractFlow.cs:980-991`; callers at `SharpProof.Effects/ManagedAbstractFlow.cs:406-419,448,947,955` |
+
+## Second survey, part five hundred sixty-one: R1239 - state-order comparison looks up the right value twice
+
+`ManagedFlowState.LessThanOrEqual` unions the keys from both states and, for each key, compares `ManagedAbstractValue.Join(left.Get(key), right.Get(key))` with `right.Get(key)`. The second `right.Get(key)` is the same immutable state lookup used as the join operand; no state changes between the two calls. Capturing the right-hand value once per key preserves the lattice comparison and missing-key defaults while removing a dictionary probe and repeated fallback value construction.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1239 | **`ManagedFlowState.LessThanOrEqual` calls `right.Get(key)` twice per unioned key.** The first result is passed to `ManagedAbstractValue.Join`, then the identical key is looked up again for equality. A local right-hand value removes the redundant lookup without changing abstract-state ordering. | `SharpProof.Effects/ManagedAbstractFlow.cs:1615-1639` |
