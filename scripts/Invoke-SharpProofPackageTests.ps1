@@ -558,149 +558,91 @@ try {
         }
     }
 
-    $pending = [Collections.Generic.Queue[object]]::new()
-    foreach ($shard in @($shards | Sort-Object `
-            @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
-            @{ Expression = 'Name'; Descending = $false })) {
-        $pending.Enqueue($shard)
-    }
-    $running = [Collections.Generic.List[object]]::new()
-    $shardTimings = [Collections.Generic.List[object]]::new()
-    $failures = [Collections.Generic.List[string]]::new()
-    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $orderedShards = @($shards | Sort-Object `
+        @{ Expression = 'EstimatedMilliseconds'; Descending = $true }, `
+        @{ Expression = 'Name'; Descending = $false })
     $testPhase = [Diagnostics.Stopwatch]::StartNew()
+    $preparePackageTest = {
+        param([object]$shard)
 
-    while ($pending.Count -gt 0 -or $running.Count -gt 0) {
-        while ($pending.Count -gt 0 -and $running.Count -lt $parallelism) {
-            $next = $pending.Peek()
-            $nextIsExclusive =
-                $next.PSObject.Properties.Name -contains 'Exclusive' -and
-                [bool]$next.Exclusive
-            if ($nextIsExclusive -and $running.Count -gt 0) {
-                break
-            }
-            $shard = $pending.Dequeue()
-            $environment = @{
-                SHARPPROOF_PACKAGE_SOURCE = $feed
-            }
-            $isolatedOutput = ''
-            if ($coverageEnabled) {
-                $isolatedOutput = New-SharpProofIsolatedTestOutput `
-                    -SourceDirectory (Join-Path $repositoryRoot (
-                        'SharpProof.Package.Test/bin/' + $Configuration +
-                        '/net9.0')) `
-                    -DestinationDirectory (Join-Path `
-                        $isolatedOutputRoot (
-                            $shard.Name + '/' + $Configuration + '/net9.0'))
-            }
-            $directVstest = -not $coverageEnabled -and
-                -not $nextIsExclusive
-            if ($directVstest) {
-                $environment['DOTNET_HOST_PATH'] = $resolvedDotnetHost
-            }
-            $arguments = if ($directVstest) {
-                @('vstest', $testAssembly)
-            }
-            else {
-                @(
-                    'test', $testProject, '-c', $Configuration,
-                    '--no-build', '--no-restore')
-            }
-            if (-not $directVstest -and
-                -not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
-                $arguments += '-p:OutDir=' + $isolatedOutput + '/'
-            }
-            if ($directVstest) {
-                $arguments += '/TestCaseFilter:' + $shard.Filter
-                $arguments += '/logger:console;verbosity=minimal'
-                $arguments += "/logger:trx;LogFileName=$($shard.Name).trx"
-                $arguments += '/ResultsDirectory:' + (
-                    Join-Path $results $shard.Name)
-            }
-            else {
-                $arguments += @(
-                    '--filter', $shard.Filter,
-                    '--logger', 'console;verbosity=minimal',
-                    '--logger', "trx;LogFileName=$($shard.Name).trx",
-                    '--results-directory', (Join-Path $results $shard.Name))
-            }
-            $arguments = Add-SharpProofCoverageArguments `
-                -Arguments $arguments `
-                -Enabled $coverageEnabled `
-                -Settings $resolvedCoverageSettings
-            $startInfo = New-SharpProofParallelProcessStartInfo `
-                -FileName 'dotnet' `
-                -WorkingDirectory $repositoryRoot `
-                -Arguments $arguments `
-                -Environment $environment
-            $process = [Diagnostics.Process]::new()
-            $process.StartInfo = $startInfo
-            if (-not $process.Start()) {
-                $process.Dispose()
-                throw "Could not start package test $($shard.Name)."
-            }
-            $running.Add([pscustomobject]@{
-                Shard = $shard
-                Process = $process
-                StartedUtc = $process.StartTime.ToUniversalTime()
-                StandardOutput = $process.StandardOutput.ReadToEndAsync()
-                StandardError = $process.StandardError.ReadToEndAsync()
-            })
-            if ($nextIsExclusive) {
-                break
-            }
+        $nextIsExclusive =
+            $shard.PSObject.Properties.Name -contains 'Exclusive' -and
+            [bool]$shard.Exclusive
+        $environment = @{
+            SHARPPROOF_PACKAGE_SOURCE = $feed
         }
-
-        if ([DateTime]::UtcNow -ge $deadline) {
-            foreach ($active in @($running)) {
-                if (-not $active.Process.HasExited) {
-                    $active.Process.Kill($true)
-                }
-            }
-            throw "Parallel package tests exceeded $TimeoutSeconds seconds."
+        $isolatedOutput = ''
+        if ($coverageEnabled) {
+            $isolatedOutput = New-SharpProofIsolatedTestOutput `
+                -SourceDirectory (Join-Path $repositoryRoot (
+                    'SharpProof.Package.Test/bin/' + $Configuration +
+                    '/net9.0')) `
+                -DestinationDirectory (Join-Path `
+                    $isolatedOutputRoot (
+                        $shard.Name + '/' + $Configuration + '/net9.0'))
         }
-
-        $completed = @($running | Where-Object { $_.Process.HasExited })
-        if ($completed.Count -eq 0) {
-            Start-Sleep -Milliseconds 100
-            continue
+        $directVstest = -not $coverageEnabled -and
+            -not $nextIsExclusive
+        if ($directVstest) {
+            $environment['DOTNET_HOST_PATH'] = $resolvedDotnetHost
         }
-        foreach ($active in $completed) {
-            $active.Process.WaitForExit()
-            $stdout = $active.StandardOutput.GetAwaiter().GetResult()
-            $stderr = $active.StandardError.GetAwaiter().GetResult()
-            $exitCode = $active.Process.ExitCode
-            if (-not $Quiet -or $exitCode -ne 0) {
-                Write-Host "--- Package test $($active.Shard.Name) ---"
-                if ($Quiet) {
-                    Write-SharpProofFailureOutput (
-                        [string]$stdout + [string]$stderr)
-                }
-                else {
-                    if (-not [string]::IsNullOrWhiteSpace($stdout)) {
-                        Write-Host $stdout.TrimEnd()
-                    }
-                    if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-                        Write-Host $stderr.TrimEnd()
-                    }
-                }
-            }
-            if ($exitCode -ne 0) {
-                $failures.Add(
-                    "$($active.Shard.Name) exited ${exitCode}: " +
-                    $active.Shard.Filter)
-            }
-            $shardTimings.Add([pscustomobject]@{
-                name = $active.Shard.Name
-                filter = $active.Shard.Filter
-                elapsedMilliseconds = [long](
-                    ($active.Process.ExitTime.ToUniversalTime() -
-                        $active.StartedUtc).TotalMilliseconds)
-                exitCode = $exitCode
-            })
-            [void]$running.Remove($active)
-            $active.Process.Dispose()
+        $arguments = if ($directVstest) {
+            @('vstest', $testAssembly)
         }
+        else {
+            @(
+                'test', $testProject, '-c', $Configuration,
+                '--no-build', '--no-restore')
+        }
+        if (-not $directVstest -and
+            -not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
+            $arguments += '-p:OutDir=' + $isolatedOutput + '/'
+        }
+        if ($directVstest) {
+            $arguments += '/TestCaseFilter:' + $shard.Filter
+            $arguments += '/logger:console;verbosity=minimal'
+            $arguments += "/logger:trx;LogFileName=$($shard.Name).trx"
+            $arguments += '/ResultsDirectory:' + (
+                Join-Path $results $shard.Name)
+        }
+        else {
+            $arguments += @(
+                '--filter', $shard.Filter,
+                '--logger', 'console;verbosity=minimal',
+                '--logger', "trx;LogFileName=$($shard.Name).trx",
+                '--results-directory', (Join-Path $results $shard.Name))
+        }
+        $arguments = Add-SharpProofCoverageArguments `
+            -Arguments $arguments `
+            -Enabled $coverageEnabled `
+            -Settings $resolvedCoverageSettings
+        return [pscustomobject]@{
+            Arguments = $arguments
+            Environment = $environment
+        }
+    }.GetNewClosure()
+    $testRun = Invoke-SharpProofParallelDotnetTests `
+        -Tests $orderedShards `
+        -RepositoryRoot $repositoryRoot `
+        -Parallelism $parallelism `
+        -TimeoutSeconds $TimeoutSeconds `
+        -Prepare $preparePackageTest `
+        -Label 'Package test' `
+        -Quiet:$Quiet
+    $shardTimings = [Collections.Generic.List[object]]::new()
+    foreach ($result in @($testRun.Completed)) {
+        $shardTimings.Add([pscustomobject]@{
+            name = $result.Test.Name
+            filter = $result.Test.Filter
+            elapsedMilliseconds = $result.ElapsedMilliseconds
+            exitCode = $result.ExitCode
+        })
+    }
+    $failures = [Collections.Generic.List[string]]::new()
+    foreach ($failure in @($testRun.Failures)) {
+        $failures.Add(
+            "$($failure.Test.Name) exited $($failure.ExitCode): " +
+            $failure.Test.Filter)
     }
     $testPhase.Stop()
     $phaseTimings.Add([pscustomobject]@{

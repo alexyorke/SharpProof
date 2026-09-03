@@ -689,6 +689,174 @@ function Invoke-SharpProofParallelDotnetBuilds {
     }
 }
 
+function Invoke-SharpProofParallelDotnetTests {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Tests,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 1024)]
+        [int]$Parallelism,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 86400)]
+        [int]$TimeoutSeconds,
+
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Prepare,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Label,
+
+        [switch]$Quiet
+    )
+
+    Assert-SharpProofContainer `
+        'Parallel tests require the canonical Linux container.'
+    $pending = [Collections.Generic.List[object]]::new()
+    foreach ($test in $Tests) {
+        $name = [string]$test.Name
+        $slots = if ($test.PSObject.Properties.Name -contains 'Slots') {
+            [int]$test.Slots
+        }
+        elseif ($test.PSObject.Properties.Name -contains 'Exclusive' -and
+            [bool]$test.Exclusive) {
+            $Parallelism
+        }
+        else {
+            1
+        }
+        if ([string]::IsNullOrWhiteSpace($name) -or
+            $slots -lt 1 -or $slots -gt $Parallelism) {
+            throw (
+                "Parallel $Label entries require a name and valid slot count.")
+        }
+        $pending.Add([pscustomobject]@{
+            Test = $test
+            Slots = $slots
+        })
+    }
+
+    $running = [Collections.Generic.List[object]]::new()
+    $completed = [Collections.Generic.List[object]]::new()
+    $failures = [Collections.Generic.List[string]]::new()
+    $activeSlots = 0
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    try {
+        while ($pending.Count -gt 0 -or $running.Count -gt 0) {
+            while ($pending.Count -gt 0) {
+                $availableSlots = $Parallelism - $activeSlots
+                $next = $pending |
+                    Where-Object { $_.Slots -le $availableSlots } |
+                    Select-Object -First 1
+                if ($null -eq $next) {
+                    break
+                }
+                [void]$pending.Remove($next)
+                $test = $next.Test
+                $invocation = & $Prepare $test
+                if ($null -eq $invocation -or
+                    $invocation.PSObject.Properties.Name -notcontains
+                        'Arguments') {
+                    throw "The $Label preparation did not return arguments."
+                }
+                $startInfo = New-SharpProofParallelProcessStartInfo `
+                    -FileName 'dotnet' `
+                    -WorkingDirectory $RepositoryRoot `
+                    -Arguments @($invocation.Arguments) `
+                    -Environment $(if (
+                        $invocation.PSObject.Properties.Name -contains
+                            'Environment') {
+                        $invocation.Environment
+                    }
+                    else {
+                        $null
+                    })
+                $process = [Diagnostics.Process]::new()
+                $process.StartInfo = $startInfo
+                if (-not $process.Start()) {
+                    $process.Dispose()
+                    throw "Could not start $Label '$($test.Name)'."
+                }
+                $running.Add([pscustomobject]@{
+                    Test = $test
+                    Slots = $next.Slots
+                    Process = $process
+                    StartedUtc = $process.StartTime.ToUniversalTime()
+                    StandardOutput = $process.StandardOutput.ReadToEndAsync()
+                    StandardError = $process.StandardError.ReadToEndAsync()
+                })
+                $activeSlots += $next.Slots
+            }
+
+            if ([DateTime]::UtcNow -ge $deadline) {
+                throw "Parallel $Label tests exceeded $TimeoutSeconds seconds."
+            }
+            $finished = @($running | Where-Object { $_.Process.HasExited })
+            if ($finished.Count -eq 0) {
+                Start-Sleep -Milliseconds 100
+                continue
+            }
+            foreach ($active in $finished) {
+                $active.Process.WaitForExit()
+                $stdout = $active.StandardOutput.GetAwaiter().GetResult()
+                $stderr = $active.StandardError.GetAwaiter().GetResult()
+                $exitCode = $active.Process.ExitCode
+                $elapsed = [long](
+                    ($active.Process.ExitTime.ToUniversalTime() -
+                        $active.StartedUtc).TotalMilliseconds)
+                if (-not $Quiet -or $exitCode -ne 0) {
+                    Write-Host "--- $Label $($active.Test.Name) ---"
+                    if ($Quiet) {
+                        Write-SharpProofFailureOutput (
+                            [string]$stdout + [string]$stderr)
+                    }
+                    else {
+                        if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                            Write-Host $stdout.TrimEnd()
+                        }
+                        if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                            Write-Host $stderr.TrimEnd()
+                        }
+                    }
+                }
+                if ($exitCode -ne 0) {
+                    $failures.Add(
+                        "$($active.Test.Name) exited $exitCode.")
+                }
+                $completed.Add([pscustomobject]@{
+                    Test = $active.Test
+                    ElapsedMilliseconds = $elapsed
+                    ExitCode = $exitCode
+                    StandardOutput = [string]$stdout
+                    StandardError = [string]$stderr
+                })
+                [void]$running.Remove($active)
+                $activeSlots -= $active.Slots
+                $active.Process.Dispose()
+            }
+        }
+    }
+    finally {
+        foreach ($active in @($running)) {
+            if (-not $active.Process.HasExited) {
+                $active.Process.Kill($true)
+                $active.Process.WaitForExit()
+            }
+            $active.Process.Dispose()
+        }
+    }
+
+    return [pscustomobject]@{
+        Completed = @($completed)
+        Failures = @($failures)
+    }
+}
+
 function New-SharpProofParallelProcessStartInfo {
     [CmdletBinding()]
     param(
@@ -881,6 +1049,7 @@ Export-ModuleMember -Function @(
     'Invoke-SharpProofGitText',
     'Invoke-SharpProofTimedPhase',
     'Invoke-SharpProofParallelDotnetBuilds',
+    'Invoke-SharpProofParallelDotnetTests',
     'New-SharpProofParallelProcessStartInfo',
     'New-SharpProofCoverageContext',
     'Remove-SharpProofCoverageOutput',

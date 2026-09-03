@@ -388,160 +388,91 @@ else {
         'sharpproof-semantic-tests-' + [Guid]::NewGuid().ToString('N'))
 }
 [IO.Directory]::CreateDirectory($resultsRoot) | Out-Null
-$pending = [Collections.Generic.List[object]]::new()
-foreach ($task in $tasks) {
-    $pending.Add($task)
-}
-$running = [Collections.Generic.List[object]]::new()
-$activeSlots = 0
 $timings = [Collections.Generic.List[object]]::new()
 $failures = [Collections.Generic.List[string]]::new()
-$deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 $campaign = [Diagnostics.Stopwatch]::StartNew()
 
 try {
-    while ($pending.Count -gt 0 -or $running.Count -gt 0) {
-        while ($pending.Count -gt 0) {
-            $availableSlots = $parallelism - $activeSlots
-            $task = $pending |
-                Where-Object { $_.Slots -le $availableSlots } |
-                Select-Object -First 1
-            if ($null -eq $task) {
-                break
+    $prepareSemanticTest = {
+        param([object]$task)
+
+        $environment = @{
+            SHARPPROOF_TEST_PROJECT_PARALLELISM = $task.Slots.ToString(
+                [Globalization.CultureInfo]::InvariantCulture)
+        }
+        $isolatedOutput = ''
+        if ($coverageEnabled -and $task.IsolateOutput) {
+            $isolatedOutput = New-SharpProofIsolatedTestOutput `
+                -SourceDirectory (Join-Path $repositoryRoot (
+                    'SharpProof.Worker.Test/bin/' + $Configuration +
+                    '/net9.0')) `
+                -DestinationDirectory (Join-Path `
+                    $isolatedOutputRoot (
+                        $task.Name + '/' + $Configuration + '/net9.0'))
+        }
+        $directVstest = -not $coverageEnabled -and
+            $task.Target.EndsWith(
+                '.csproj', [StringComparison]::OrdinalIgnoreCase)
+        if ($directVstest) {
+            $assembly = Get-SharpProofTestAssemblyPath `
+                -ProjectPath $task.Target `
+                -Configuration $Configuration
+            $arguments = @('vstest', $assembly)
+            $arguments += '/TestCaseFilter:' + $task.Filter
+            $arguments += '/logger:console;verbosity=minimal'
+            $arguments += "/logger:trx;LogFileName=$($task.Name).trx"
+            $arguments += '/ResultsDirectory:' + (
+                Join-Path $resultsRoot $task.Name)
+            if ($task.PSObject.Properties.Name -contains 'RunSettings') {
+                $arguments += '/Settings:' + $task.RunSettings
             }
-            [void]$pending.Remove($task)
-            $environment = @{
-                SHARPPROOF_TEST_PROJECT_PARALLELISM = $task.Slots.ToString(
-                    [Globalization.CultureInfo]::InvariantCulture)
+        }
+        else {
+            $arguments = @(
+                'test', $task.Target, '-c', $Configuration,
+                '--no-build', '--no-restore')
+            if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
+                $arguments += '-p:OutDir=' + $isolatedOutput + '/'
             }
-            $isolatedOutput = ''
-            if ($coverageEnabled -and $task.IsolateOutput) {
-                $isolatedOutput = New-SharpProofIsolatedTestOutput `
-                    -SourceDirectory (Join-Path $repositoryRoot (
-                        'SharpProof.Worker.Test/bin/' + $Configuration +
-                        '/net9.0')) `
-                    -DestinationDirectory (Join-Path `
-                        $isolatedOutputRoot (
-                            $task.Name + '/' + $Configuration + '/net9.0'))
+            $arguments += @(
+                '--filter', $task.Filter,
+                '--logger', 'console;verbosity=minimal',
+                '--logger', "trx;LogFileName=$($task.Name).trx",
+                '--results-directory', (Join-Path $resultsRoot $task.Name))
+            if ($task.ProjectParallelism -gt 0) {
+                $arguments += "/m:$($task.ProjectParallelism)"
             }
-            $directVstest = -not $coverageEnabled -and
-                $task.Target.EndsWith(
-                    '.csproj', [StringComparison]::OrdinalIgnoreCase)
-            if ($directVstest) {
-                $assembly = Get-SharpProofTestAssemblyPath `
-                    -ProjectPath $task.Target `
-                    -Configuration $Configuration
-                $arguments = @('vstest', $assembly)
-                $arguments += '/TestCaseFilter:' + $task.Filter
-                $arguments += '/logger:console;verbosity=minimal'
-                $arguments += "/logger:trx;LogFileName=$($task.Name).trx"
-                $arguments += '/ResultsDirectory:' + (
-                    Join-Path $resultsRoot $task.Name)
-                if ($task.PSObject.Properties.Name -contains 'RunSettings') {
-                    $arguments += '/Settings:' + $task.RunSettings
-                }
-            }
-            else {
-                $arguments = @(
-                    'test', $task.Target, '-c', $Configuration,
-                    '--no-build', '--no-restore')
-                if (-not [string]::IsNullOrWhiteSpace($isolatedOutput)) {
-                    $arguments += '-p:OutDir=' + $isolatedOutput + '/'
-                }
-                $arguments += @(
-                    '--filter', $task.Filter,
-                    '--logger', 'console;verbosity=minimal',
-                    '--logger', "trx;LogFileName=$($task.Name).trx",
-                    '--results-directory', (Join-Path $resultsRoot $task.Name))
-                if ($task.ProjectParallelism -gt 0) {
-                    $arguments += "/m:$($task.ProjectParallelism)"
-                }
-                $arguments = Add-SharpProofCoverageArguments `
-                    -Arguments $arguments `
-                    -Enabled $coverageEnabled `
-                    -Settings $resolvedCoverageSettings
-            }
-            $startInfo = New-SharpProofParallelProcessStartInfo `
-                -FileName 'dotnet' `
-                -WorkingDirectory $repositoryRoot `
+            $arguments = Add-SharpProofCoverageArguments `
                 -Arguments $arguments `
-                -Environment $environment
-            $process = [Diagnostics.Process]::new()
-            $process.StartInfo = $startInfo
-            if (-not $process.Start()) {
-                $process.Dispose()
-                throw "Could not start semantic test task '$($task.Name)'."
-            }
-            $running.Add([pscustomobject]@{
-                Task = $task
-                Process = $process
-                StartedUtc = $process.StartTime.ToUniversalTime()
-                StandardOutput = $process.StandardOutput.ReadToEndAsync()
-                StandardError = $process.StandardError.ReadToEndAsync()
-            })
-            $activeSlots += $task.Slots
+                -Enabled $coverageEnabled `
+                -Settings $resolvedCoverageSettings
         }
-
-        if ([DateTime]::UtcNow -ge $deadline) {
-            foreach ($active in @($running)) {
-                if (-not $active.Process.HasExited) {
-                    $active.Process.Kill($true)
-                }
-            }
-            throw "Parallel semantic tests exceeded $TimeoutSeconds seconds."
+        return [pscustomobject]@{
+            Arguments = $arguments
+            Environment = $environment
         }
-
-        $completed = @($running | Where-Object { $_.Process.HasExited })
-        if ($completed.Count -eq 0) {
-            Start-Sleep -Milliseconds 100
-            continue
-        }
-        foreach ($active in $completed) {
-            $active.Process.WaitForExit()
-            $stdout = $active.StandardOutput.GetAwaiter().GetResult()
-            $stderr = $active.StandardError.GetAwaiter().GetResult()
-            $exitCode = $active.Process.ExitCode
-            $elapsed = [long](
-                ($active.Process.ExitTime.ToUniversalTime() -
-                    $active.StartedUtc).TotalMilliseconds)
-            if (-not $Quiet -or $exitCode -ne 0) {
-                Write-Host "--- Semantic test $($active.Task.Name) ---"
-                if ($Quiet) {
-                    Write-SharpProofFailureOutput (
-                        [string]$stdout + [string]$stderr)
-                }
-                else {
-                    if (-not [string]::IsNullOrWhiteSpace($stdout)) {
-                        Write-Host $stdout.TrimEnd()
-                    }
-                    if (-not [string]::IsNullOrWhiteSpace($stderr)) {
-                        Write-Host $stderr.TrimEnd()
-                    }
-                }
-            }
-            $timings.Add([pscustomobject]@{
-                name = $active.Task.Name
-                elapsedMilliseconds = $elapsed
-                exitCode = $exitCode
-            })
-            if ($exitCode -ne 0) {
-                $failures.Add(
-                    "$($active.Task.Name) exited $exitCode.")
-            }
-            [void]$running.Remove($active)
-            $activeSlots -= $active.Task.Slots
-            $active.Process.Dispose()
-        }
+    }.GetNewClosure()
+    $testRun = Invoke-SharpProofParallelDotnetTests `
+        -Tests $tasks `
+        -RepositoryRoot $repositoryRoot `
+        -Parallelism $parallelism `
+        -TimeoutSeconds $TimeoutSeconds `
+        -Prepare $prepareSemanticTest `
+        -Label 'Semantic test' `
+        -Quiet:$Quiet
+    foreach ($result in @($testRun.Completed)) {
+        $timings.Add([pscustomobject]@{
+            name = $result.Test.Name
+            elapsedMilliseconds = $result.ElapsedMilliseconds
+            exitCode = $result.ExitCode
+        })
+    }
+    foreach ($failure in @($testRun.Failures)) {
+        $failures.Add(
+            "$($failure.Test.Name) exited $($failure.ExitCode).")
     }
 }
 finally {
-    foreach ($active in @($running)) {
-        if (-not $active.Process.HasExited) {
-            $active.Process.Kill($true)
-            $active.Process.WaitForExit()
-        }
-        $active.Process.Dispose()
-    }
     if ($temporaryResults -and [IO.Directory]::Exists($resultsRoot)) {
         [IO.Directory]::Delete($resultsRoot, $true)
     }
