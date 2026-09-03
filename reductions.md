@@ -13770,3 +13770,18 @@ checks.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1172 | **`OperationCompletionEvaluator` rechecks a deconstruction value already proven complete.** `CanCompleteDeconstruction` validates `deconstruction.Value`, then the root non-static deconstruction phase routes the same value through `CanCompleteInvocation`, whose instance guard calls `CanCompleteNormally(value)` again. A prevalidated-instance completion seam can retain static/reduced and nested phase distinctions while removing the duplicate check. | `SharpProof.Effects/OperationCompletionEvaluator.cs:631-649,918-969` |
+
+## Second survey, part four hundred ninety-five: R1173 - with-clone operand completion is rechecked
+
+`CanCompleteWithClone` first validates `withOperation.Operand` with
+`CanCompleteNormally` and then checks its known-null state. If the clone method
+is not a record copy constructor, it calls `CanCompleteInvocation` with that
+same operand as the instance. The invocation guard calls `CanCompleteNormally`
+on the instance again, while the record-copy-constructor branch has no instance
+and therefore does not repeat this particular check. Passing the validated
+operand state into the non-copy clone path can remove the duplicate completion
+traversal while retaining nullness, dispatch, and copy-constructor behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1173 | **`OperationCompletionEvaluator.CanCompleteWithClone` rechecks the clone operand on the ordinary clone-method path.** After `CanCompleteWithClone` has completed `withOperation.Operand`, its call to `CanCompleteInvocation(clone, withOperation.Operand, ...)` invokes the same instance-completion check again. A prevalidated-instance seam can eliminate that repeat without changing the separate record copy-constructor path. | `SharpProof.Effects/OperationCompletionEvaluator.cs:631-649,717-741` |
