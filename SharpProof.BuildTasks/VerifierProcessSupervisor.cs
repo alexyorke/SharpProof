@@ -119,7 +119,7 @@ internal static partial class VerifierProcessSupervisor
             var cleanup = StopDescendants(
                 Environment.ProcessId,
                 CleanupMilliseconds,
-                descriptorReserves: descriptorReserves.Skip(1).ToArray(),
+                descriptorReserves: descriptorReserves.Skip(1),
                 supervisorPidFd: descriptorReserves[0],
                 managedProcessId: process.Id);
             cleanup = RetryCleanup(
@@ -215,7 +215,7 @@ internal static partial class VerifierProcessSupervisor
         int maximumMilliseconds,
         Func<int, int>? openPidFd = null,
         Func<int, int, int>? sendSignal = null,
-        IReadOnlyList<int>? descriptorReserves = null,
+        IEnumerable<int>? descriptorReserves = null,
         int supervisorPidFd = -1,
         int managedProcessId = -1)
     {
