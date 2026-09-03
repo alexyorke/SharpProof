@@ -16511,3 +16511,8 @@ ordering. ProofKernelTests passes (14 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1366 | **Three parameter-remapping tests repeat the same write-summary oracle.** Extract the common parameter-zero/non-unknown/complete assertions and keep the first test's additional projection checks local. | `SharpProof.Effects.Test/EffectAnalysisTests.cs:4501-4512,4535-4540,4555-4560` |
+
+R415 is applied: query encoding creates the fixed integer constants once per
+query and reuses them for bounds, division, and overflow predicates, reducing
+native Z3 handle allocation while preserving expression ownership. The complete
+IrSmtBackendTests suite passes (29 passed).

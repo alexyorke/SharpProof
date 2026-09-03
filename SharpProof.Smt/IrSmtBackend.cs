@@ -171,11 +171,9 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 meter.Consume();
                 var expression = (ArithExpr)encoder.GetVariable(variable);
                 solver.Assert(owner.Own(_context.MkGe(
-                    expression,
-                    owner.Own(_context.MkInt(long.MinValue)))));
+                    expression, encoder.LongMin)));
                 solver.Assert(owner.Own(_context.MkLe(
-                    expression,
-                    owner.Own(_context.MkInt(long.MaxValue)))));
+                    expression, encoder.LongMax)));
             }
 
             var tracked = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -381,6 +379,10 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private readonly Dictionary<IrVarId, Expr> _variables = [];
         private readonly IrFactory _factory;
         private readonly CancellationToken _cancellationToken;
+        private readonly ArithExpr _longMin;
+        private readonly ArithExpr _longMax;
+        private readonly ArithExpr _zero;
+        private readonly ArithExpr _minusOne;
 
         internal QueryEncoder(
             Context context,
@@ -393,6 +395,10 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             _owner = owner;
             _factory = query.Factory;
             _cancellationToken = cancellationToken;
+            _longMin = _owner.Own(_context.MkInt(long.MinValue));
+            _longMax = _owner.Own(_context.MkInt(long.MaxValue));
+            _zero = _owner.Own(_context.MkInt(0));
+            _minusOne = _owner.Own(_context.MkInt(-1));
             var maximumDepths = new Dictionary<IrId, int>();
             foreach (var assumption in query.Assumptions)
             {
@@ -465,6 +471,11 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         {
             get;
         }
+
+        internal ArithExpr LongMin => _longMin;
+        internal ArithExpr LongMax => _longMax;
+        internal ArithExpr Zero => _zero;
+        internal ArithExpr MinusOne => _minusOne;
 
         internal Expr GetVariable(IrVarId variable)
         {
@@ -674,11 +685,9 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private EncodedValue Bounded(ArithExpr expression, BoolExpr defined)
         {
             var lowerBound = _owner.Own(_context.MkGe(
-                expression,
-                _owner.Own(_context.MkInt(long.MinValue))));
+                expression, LongMin));
             var upperBound = _owner.Own(_context.MkLe(
-                expression,
-                _owner.Own(_context.MkInt(long.MaxValue))));
+                expression, LongMax));
             return new(expression, _owner.Own(_context.MkAnd(
                 defined,
                 lowerBound,
@@ -692,7 +701,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
         private ArithExpr DivideTowardZero(ArithExpr left, ArithExpr right)
         {
-            var zero = _owner.Own(_context.MkInt(0));
+            var zero = Zero;
             var leftMagnitude = (ArithExpr)_owner.Own(_context.MkITE(
                 _owner.Own(_context.MkGe(left, zero)),
                 left,
@@ -714,15 +723,12 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private BoolExpr DivisionDefined(ArithExpr left, ArithExpr right)
         {
             var nonzero = _owner.Own(_context.MkNot(_owner.Own(_context.MkEq(
-                right,
-                _owner.Own(_context.MkInt(0))))));
+                right, Zero))));
             var notOverflow = _owner.Own(_context.MkNot(_owner.Own(_context.MkAnd(
                 _owner.Own(_context.MkEq(
-                    left,
-                    _owner.Own(_context.MkInt(long.MinValue)))),
+                    left, LongMin)),
                 _owner.Own(_context.MkEq(
-                    right,
-                    _owner.Own(_context.MkInt(-1))))))));
+                    right, MinusOne))))));
             return _owner.Own(_context.MkAnd(nonzero, notOverflow));
         }
     }
