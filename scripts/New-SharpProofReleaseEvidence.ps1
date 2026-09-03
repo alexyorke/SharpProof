@@ -157,7 +157,11 @@ function Test-PackageThirdPartyInventory {
 
         [Parameter(Mandatory = $true)]
         [AllowEmptyCollection()]
-        [object[]]$Components
+        [object[]]$Components,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [object[]]$NoticeComponents
     )
 
     $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
@@ -197,6 +201,31 @@ function Test-PackageThirdPartyInventory {
         $notice = Get-ArchiveText `
             -Archive $archive `
             -EntryName 'THIRD-PARTY-NOTICES.txt'
+        $actualNoticePackages = @(
+            [regex]::Matches(
+                $notice,
+                '(?m)^Package:\s*(?<id>\S+)\s+(?<version>\S+)\s*$') |
+                ForEach-Object {
+                    $_.Groups['id'].Value + ' ' +
+                        $_.Groups['version'].Value
+                } |
+                Sort-Object -Unique
+        )
+        $declaredNoticePackages = @(
+            $NoticeComponents |
+                ForEach-Object {
+                    [string]$_.id + ' ' + [string]$_.version
+                } |
+                Sort-Object -Unique
+        )
+        if (($actualNoticePackages -join '|') -ne
+            ($declaredNoticePackages -join '|')) {
+            throw "Third-party notice for '$PackageId' does not match " +
+                'the declared component set. Actual: ' +
+                ($actualNoticePackages -join ', ') +
+                '. Declared: ' +
+                ($declaredNoticePackages -join ', ') + '.'
+        }
         foreach ($component in $Components) {
             $id = [string]$component.id
             $version = [string]$component.version
@@ -398,6 +427,10 @@ if (($thirdPartyPackages -join '|') -ne ($expectedIds -join '|')) {
     throw 'Third-party component manifest must cover the exact package graph.'
 }
 $thirdPartyComponents = [Collections.Generic.List[object]]::new()
+$thirdPartyNoticeComponents = @(
+    $thirdPartyManifest.packages.PSObject.Properties |
+        ForEach-Object { @($_.Value) }
+)
 foreach ($item in $identities |
         Where-Object { $_.File.Extension -eq '.nupkg' }) {
     $packageId = $item.Identity.Id
@@ -407,7 +440,8 @@ foreach ($item in $identities |
     Test-PackageThirdPartyInventory `
         -PackagePath $item.File.FullName `
         -PackageId $packageId `
-        -Components $components
+        -Components $components `
+        -NoticeComponents $thirdPartyNoticeComponents
     foreach ($component in $components) {
         $thirdPartyComponents.Add([pscustomobject][ordered]@{
             packageId = $packageId
