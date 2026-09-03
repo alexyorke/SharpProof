@@ -216,8 +216,7 @@
           "SharpProof.CompilerArtifact": "[1.0.0-preview.1, )",
           "SharpProof.CompilerCollector": "[1.0.0-preview.1, )",
           "SharpProof.Worker": "[1.0.0-preview.1, )",
-          "SharpProof.Worker.Launcher": "[1.0.0-preview.1, )",
-          "System.Collections.Immutable": "[9.0.18, )"
+          "SharpProof.Worker.Launcher": "[1.0.0-preview.1, )"
         }
       },
       "sharpproof.host": {

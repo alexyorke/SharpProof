@@ -10002,11 +10002,13 @@ in two projects and `RS1035;RS2008` in one. Move R732 and R733 to applied.
 
 ### Status (part two hundred sixteen)
 
-R986 is `pending`. The `net9.0` case (`SharpProof.Gates`) is a clean deletion -
-`SharpProof.Worker` already proves the reference is unnecessary on that framework.
-The four `net8.0` cases need a decision first, because the reference is currently
-supplying a newer assembly than the target framework's own, and nothing in the
-repository records whether that was intended.
+R986 is partially applied. The clean `net9.0` case is complete: the direct
+`SharpProof.Gates` reference and its lock-file direct edge are gone, while the
+same package remains available transitively through the project graph. Gates.Test
+restore and build validation passed after regenerating its dependent lock entry;
+the two existing advisory package-policy failures are unrelated. The four
+`net8.0` cases remain pending because removing their direct references would
+change the currently selected 9.0.18 assembly and needs an owner decision.
 
 ## Second survey, part two hundred seventeen: pipeline composition and script reachability - no new finding
 
