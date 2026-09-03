@@ -9726,3 +9726,100 @@ solver session setup in both domain-specific implementations.
 R976 is `deferred`: this is a fuzz-infrastructure reduction only. The finite
 domain and partial-term semantics should not be merged; the candidate is the
 shared native solver-session boundary around them.
+
+## Second survey, part two hundred seven: R977 - six ways to ask one question
+
+A census of all 347 PowerShell function definitions across 76 files: verb
+vocabulary, noun prefixing, and module export surface.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R977 | **"Does this object have exactly these properties?" is implemented six times under three verbs, and the six do not agree on ordering, case, or failure mode.** The implementations are `Assert-ExactJsonObjectProperties` (`Assert-SharpProofFuzzRunnerResult.ps1:3`), `Assert-ExactJsonProperties` (`Assert-SharpProofStandaloneGateResult.ps1:3`), `Assert-ExactProperties` (`Generate-ApiSpecCatalog.ps1:159`), `Assert-ExactMembers` (`Generate-DiagnosticDescriptors.ps1:20`), `Require-ExactProperties` (`Complete-SharpProofPilotReview.ps1:23`), and `Test-SharpProofExactProperties` (`SharpProof.PublicationPlanIdentity.psm1:27`). **Three axes diverge.** *Ordering*: `Assert-ExactMembers` and `Require-ExactProperties` `Sort-Object` both sides before joining on `\|`, so property order is irrelevant; `Test-SharpProofExactProperties` joins **unsorted** and compares with `-ceq`, so it rejects a correct object whose properties are in a different order. *Case*: `Assert-ExactMembers` compares with `-ne` (case-insensitive) while `Require-ExactProperties` - otherwise line-for-line the same sort-join-compare - uses `-cne` (case-sensitive), so a property differing only in case passes one and fails the other. This is the same case-sensitivity split R325 records for the exact-commit check, on a different predicate. *Failure mode*: five `throw`, one returns a `bool`. **Even the parameter names diverge three ways each**: the subject is `Object` or `Value`, the expected set is `Expected` or `Names`, and the label is `Description`, `Context`, or `Label`. A shared home already exists - one of the six is already a module function in `SharpProof.PublicationPlanIdentity.psm1`, and it is the one with the most surprising semantics. | `scripts/Assert-SharpProofFuzzRunnerResult.ps1:3-12`; `scripts/Assert-SharpProofStandaloneGateResult.ps1:3-12`; `scripts/Generate-ApiSpecCatalog.ps1:159-168`; `scripts/Generate-DiagnosticDescriptors.ps1:20-29`; `scripts/Complete-SharpProofPilotReview.ps1:23-30`; `scripts/SharpProof.PublicationPlanIdentity.psm1:27-34` |
+
+### Checked and not proposed (part two hundred seven)
+
+- **`Require-ExactSet` and `Assert-Exact` are different predicates and are not part
+  of R977.** `Test-SharpProofReleaseConfiguration.ps1:59` `Require-ExactSet`
+  compares two string collections rather than an object's property names, and
+  `Test-SharpProofContainerContract.ps1:41` `Assert-Exact` compares two scalars.
+  Similar names, different questions.
+- **Nine functions use verbs outside PowerShell's approved list** - four `Require-*`,
+  three `Emit-*`, and `Reset-Packages` - against 338 that use approved verbs. Five
+  functions have no `Verb-Noun` shape at all: `Snippet` in
+  `Generate-ProjectionCatalog.ps1:17` and `Required`, `Identifier`, `TypeName`,
+  `NamespaceName` in `GeneratedFileHelpers.ps1:157-185`. These are minor and are
+  **not** filed separately: the `Require-*` verb is subsumed by R977, which
+  proposes one name for that family, and the five bare nouns are local helpers in
+  dot-sourced files where the `Verb-Noun` convention buys nothing.
+- **Noun prefixing is split 230 bare to 112 `SharpProof`-prefixed** across the 342
+  `Verb-Noun` functions. This is **not** proposed: the prefixed ones are
+  predominantly module-exported or cross-script functions where a global name needs
+  disambiguating, and the bare ones are predominantly file-local helpers. That is a
+  defensible rule even though it is unwritten, unlike the field-naming split in
+  R970 where both styles appear in the same role.
+- **A correction to this part's own first pass.** A parser written for this census
+  reported that five of the seven `.psm1` modules export **zero** functions. That
+  is wrong: **all seven contain an `Export-ModuleMember` call**, and the parser only
+  recognised the `-Function @( ... )` array form. No module lacks an export
+  declaration, and no finding should be filed on that basis.
+
+### Status (part two hundred seven)
+
+R977 is `pending`. The consolidation is easy - one function in the module that
+already hosts a copy - but it must not be done mechanically: the six differ on
+ordering and case, so choosing one implementation changes what at least two callers
+accept. The ordering question is the one to settle first, because
+`Test-SharpProofExactProperties` is order-sensitive and its five siblings are not.
+
+## Second survey, part two hundred eight: R978 - two worker counts and four parallelism postures
+
+A census of test-parallelism configuration: assembly-level attributes, per-fixture
+attributes, and runsettings, across all 19 test projects.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R978 | **Test parallelism is declared in two places with two different worker counts, and which one applies depends on how the tests are invoked.** Four of the nineteen test projects carry an `AssemblyInfo.cs`, and all four declare `[assembly: LevelOfParallelism(4)]`. Separately, `eng/test/architecture-parallel.runsettings` declares `<NumberOfTestWorkers>8</NumberOfTestWorkers>`, and `scripts/Invoke-SharpProofSemanticTests.ps1:40` passes it when running the shards. NUnit's runsettings `NumberOfTestWorkers` takes precedence over the assembly's `LevelOfParallelism`, so `SharpProof.ArchitectureTest` runs with **8 workers under the semantic-test scheduler and 4 under a direct `dotnet test`** - two numbers for one property, neither derived from the other, and no comment in either file mentioning the other. **The opt-in posture also differs four ways across the four projects that configure it at all.** `SharpProof.Analyzer.Test` is the only one with `[assembly: Parallelizable(ParallelScope.Fixtures)]`, and correspondingly has **zero** per-fixture attributes - a clean assembly-wide opt-in. `SharpProof.ArchitectureTest` has no assembly-level opt-in and **7** per-fixture `[Parallelizable]`. `SharpProof.Package.Test` has **3**. `SharpProof.Worker.Test` has **1** - it declares a four-worker parallelism level for a single parallelizable fixture. The remaining fifteen test projects declare nothing, including `SharpProof.Gates.Test`, which owns the performance and corpus gates and has **no** `[Parallelizable]` anywhere. Repository-wide the balance is **12 `[Parallelizable]` against 41 `[NonParallelizable]`**, so the suite predominantly opts out - which makes the four assemblies that declare a worker count the exception rather than the rule, and makes the 4-versus-8 disagreement invisible to anyone reading either file alone. | `SharpProof.Analyzer.Test/AssemblyInfo.cs:3-4`; `SharpProof.ArchitectureTest/AssemblyInfo.cs:3`; `SharpProof.Package.Test/AssemblyInfo.cs:3`; `SharpProof.Worker.Test/AssemblyInfo.cs:3`; `eng/test/architecture-parallel.runsettings:4`; `scripts/Invoke-SharpProofSemanticTests.ps1:40`; `SharpProof.ArchitectureTest/BuildSchedulingTests.cs:903` |
+
+### Checked and not proposed (part two hundred eight)
+
+- **The four `AssemblyInfo.cs` files are not otherwise duplicated.** Each is three
+  or four lines containing only the parallelism attributes and a `using`. There is
+  no assembly metadata, no `InternalsVisibleTo`, and no versioning in them - all of
+  that is generated from the csproj or from `SharpProof.Release.props`. Only the
+  `LevelOfParallelism(4)` line is repeated, which is R978.
+- **`SharpProof.Gates.Test` having no parallelism configuration is correct.** Its
+  fixtures run the performance, corpus, and coverage gates, which are timing- and
+  resource-sensitive; `PerformanceGateTests.cs` carries three
+  `[NonParallelizable]` attributes explicitly. Sequential execution there is the
+  intended behaviour and should not be "fixed" by adding an assembly attribute for
+  consistency.
+- **`SHARPPROOF_TEST_PROJECT_PARALLELISM` is a third parallelism control but a
+  different one, and is not part of R978.** `compose.yaml` exposes it and
+  `SharpProof.ContainerExecution.psm1` derives per-project lane budgets from it -
+  that governs how many *test projects* run concurrently, not how many workers each
+  NUnit assembly uses. Two distinct levels of a nested budget, correctly separate.
+
+### Status (part two hundred eight)
+
+R978 is `pending`. The worker-count half is the concrete one: either the
+runsettings should be the single source and the four assembly attributes removed,
+or the attributes should be authoritative and the runsettings dropped, but 4 and 8
+should not both exist unmentioned by the other. The posture half is a decision
+rather than a defect - assembly-wide opt-in versus per-fixture opt-in are both
+defensible, and the repository currently uses each in different projects with
+nothing recording why.
+
+## Second survey, part two hundred nine: R979 - a third ambiguous-capture table
+
+A follow-up to R449 compared the third flow-capture tracker used by the same
+effect scanner with the two operation-valued trackers already recorded there.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R979 | **`CreationFlowCaptures` repeats the same capture-ID ambiguity state machine already duplicated by `CoalesceAssignmentFlowCaptures` and `ConditionalTruthOperatorFlowCaptures`.** All three classes own a `HashSet<CaptureId>` for ambiguous IDs and a dictionary keyed by `CaptureId`; they retain the first eligible definition, reject or mark a later conflicting definition, and refuse to resolve an ambiguous capture. The creation tracker deliberately differs at the value boundary - it strips implicit conversions, converts object/array creation into an `EffectRegionSet`, and treats any non-creation definition as ambiguity - while the two classes in R449 retain `IOperation` values and follow capture-reference chains. Those semantic differences should remain local. The common first-definition/ambiguous-ID table can nevertheless be extracted as a small generic or callback-backed component, leaving each tracker to decide eligibility, canonical value construction, identity comparison, and reference resolution. `OperationEffectScanner.ScanFlowCapture` currently feeds all three trackers side by side, so a shared state primitive would remove a third copy of the merge-safety bookkeeping without conflating their domain rules. | `SharpProof.Effects/CreationFlowCaptures.cs:5-47`; existing operation-valued trackers `SharpProof.Effects/CoalesceAssignmentFlowCaptures.cs:6-35` and `ConditionalTruthOperatorFlowCaptures.cs:6-38`; parallel registration `SharpProof.Effects/OperationEffectScanner.cs:531-533`; R449 records the first two copies |
+
+### Status (part two hundred nine)
+
+R979 is `deferred`: the candidate is limited to the reusable ambiguous-capture
+table. Creation provenance and operation-reference-chain resolution remain
+separate because their soundness conditions are not identical.
