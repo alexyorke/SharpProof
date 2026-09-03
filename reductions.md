@@ -15112,6 +15112,12 @@ their independent policies. Effect analysis tests pass (147 passed).
 |---|---|---|
 | R1247 | **`VerifierProcessSupervisor.Run` double-closes reserve descriptors on acquisition failure.** The descriptor-probe failure path closes the shared reserve array and returns, but `finally` closes the same non-invalidated entries again. Make one scope own that cleanup or clear the entries after the early close while retaining the failure result. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:39-56,152-155` |
 
+### Status (part five hundred sixty-nine)
+
+R1247 is deferred as stale: descriptor acquisition and its failure return occur
+before the `try/finally` cleanup scope, so the reported duplicate close does not
+occur in the current control flow. No cleanup change is warranted.
+
 ## Second survey, part five hundred seventy: R1248 - clause ownership is queried twice per recognized invocation
 
 `ContractClauseInventoryBuilder.CreateCore` first checks whether a recognized invocation belongs to the callable while deciding whether to record rejected API usage. For a known contract clause it then calls `Classify`, whose first operation is the same `IsOwnedByCallable` query with the same callable, invocation, semantic model, and cancellation token. The enclosing traversal has not changed those inputs, so passing the ownership fact into classification can remove one semantic-model lookup for every recognized clause while keeping nested-callable classification and rejected-API handling separate.
