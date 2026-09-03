@@ -16145,3 +16145,11 @@ MemberInitializersStopAfterNonCompletingOperands, MemberInitializerSequencesStop
 | ID | Finding | Evidence |
 |---|---|---|
 | R1344 | **Three member-initializer tests duplicate the identical `Guard.Fail`/`Guard.Positive` source fixture. Share that fragment while preserving each test's distinct initializer layout and partial-syntax-tree boundary.** | `SharpProof.Analyzer.Test/RequiresAndControlTests.cs:350-366,377-397,408-419` |
+
+## Second survey, continued: R1345 - probe snapshot tests leak temporary JSON files
+
+Three CompilerProbeSnapshotTests cases pass Path.Combine(Path.GetTempPath(), Guid.NewGuid() + '.json') directly to CaptureSnapshotAsync and never remove the file. The two tests that need multiple snapshots already use TempDirectory, which provides the intended lifetime boundary. Routing the single-snapshot cases through the same disposable fixture, or deleting the path in a finally block inside the helper, removes accumulating test artifacts and unifies the output-file lifecycle.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1345 | **Three probe snapshot tests create global-temp JSON files without cleanup. Reuse the existing `TempDirectory` fixture or add helper-owned finally cleanup, preserving snapshot contents while removing test-run debris.** | `SharpProof.Package.Test/CompilerProbeSnapshotTests.cs:14-24,27-50,70-90,137-167` |
