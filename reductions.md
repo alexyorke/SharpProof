@@ -15436,12 +15436,9 @@ another pass to claim the same number. Numbers are free; duplicate IDs are not.
 
 ### Status (part five hundred eighty-seven)
 
-R1301 is `pending` and is a four-line deletion across two files with no behavioural
-change - the properties govern an empty compile item list either way. It is worth
-doing for the same reason R1152 is: both findings are about a packaging project
-carrying declarations that describe a project it is not, and a reader has to run
-the build to discover that neither the metadata block nor the language settings do
-anything.
+R1301 is applied: the inert nullable and implicit-using overrides were removed
+from both sourceless packaging projects. The package project builds with zero
+warnings and zero errors; central language defaults remain unchanged.
 
 ## Second survey, part five hundred eighty-eight: R1302 - sixteen negative fixtures are pinned to documentation wording by silent string match
 
