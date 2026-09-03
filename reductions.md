@@ -20526,3 +20526,86 @@ R1921 is applied for every matching current call site: the 15 mutation-evidence
 reads that share the baseline mutation arguments now use one splatted hashtable.
 The other reads intentionally use a different baseline, method name, or exit code;
 the behavioral mutation-evidence script passes.
+
+## Second survey, part six hundred twenty-seven: R1900's drift risk measured, and three quiet test projects examined for setup repetition
+
+No new ID. R1900 asserted that nothing would notice if three of the four copies of
+the source-location property group drifted. That claim was filed on the strength of
+the schema tests' shape; this part measures the consumer side and finds it stronger
+than filed.
+
+### Evidence update: the source-location group has no uniform handler and a sentinel that five files depend on
+
+- **The four types share no interface and no base.**
+  `CompilerLocationAuthorityArtifact`, `CompilerEffectAuthorityArtifact`,
+  `CompilerEffectReplayEventArtifact` and `CompilerDiagnosticArtifact` are each
+  `internal sealed class` with no common ancestor and no marker interface. Nothing
+  can enumerate "the source-located artifacts", so nothing can compare their
+  property groups at runtime or by reflection.
+- **The generated output repeats the defaults too, four times.**
+  `CompilerArtifactModel.generated.cs:200,244,301,458` each declare
+  `public int SourceTreeOrdinal { get; set; } = -1;` followed by
+  `public string SourceTreePath { get; set; } = string.Empty;`. That is correct for
+  C# - sealed classes cannot share a property group without inheritance - and it is
+  why the reduction belongs in the schema rather than in the emitted code.
+- **The `-1` default is a sentinel with meaning, and five production files encode
+  that meaning per type rather than once.** `CompilerEffectAuthority.cs:40,61` sets
+  it, `:105-115` branches on `SourceTreeOrdinal < 0` and on the exact pair
+  `== -1 &&`; `CompilerEffectClaimArtifactCodec.cs:169-170` rejects `< 0` and
+  requires `SourceTreeOrdinal == SyntaxTreeOrdinal`;
+  `CompilerManifestArtifact.cs:820` tests `== -1`;
+  `CompilerSourceLocationAuthority.cs:233,253` sets it both ways; and
+  `EffectCounterexampleReplayer.cs:104-107` compares it against a recomputed
+  ordinal. **So "-1 means no source tree" is a contract asserted in five files
+  against four types whose declaration of that default is written four times, with
+  nothing relating the four.** A schema edit that changed one type's default -
+  to `0`, or to a non-sentinel - would regenerate cleanly, pass
+  `CompilerArtifactModelSchemaTests` because both sides move together, and leave
+  the five consumers' `< 0` and `== -1` branches quietly wrong for one type.
+- This does not change R1900's remedy - a named property group the generator
+  expands - but it does raise its priority: the duplicated block is not inert data,
+  it is where a sentinel's meaning is declared.
+
+### Checked and not proposed (part six hundred twenty-seven)
+
+- **The three projects with no near-duplicate pairs have no setup repetition
+  either.** Classifying every test in `SharpProof.Dataflow.Test`,
+  `SharpProof.Frontend.Test` and `SharpProof.Specs.Test` by the set of calls its
+  body makes gives **45 tests / 43 distinct shapes**, **103 / 93** and **63 / 54**
+  respectively. Almost every test builds its fixture differently, which is the
+  opposite of the `RequiresAndControlTests` picture where 41 of 86 shared one
+  shape. The only repeats are three `DomainLawAssertions.AssertConservativeHavoc`
+  calls in `Dataflow.Test` - the shared law helper working as intended - and small
+  clusters of two to four in the other two. There is no table-driven opportunity in
+  any of the three.
+- **`Frontend.Test`'s abstention oracle is a near-even split and is left alone.**
+  Fourteen assertions project `Abstentions.Select(value => value.Reason)` and use
+  `Does.Contain`; fifteen use `Is.EqualTo` or `Is.EquivalentTo`. Thirteen of the
+  fourteen containment cases are in `ProgramLoweringTests.cs`, and reading them
+  shows why: each asserts that a specific reason - typically
+  `FrontendAbstention.UnsupportedMutation` - is among the reasons a lowering
+  produced, while the surrounding assertions check the havoc kind, the havoced
+  parameters and the emitted instructions. Those lowerings legitimately produce
+  more than one abstention, so containment is a defensible choice rather than the
+  one-sided pattern R1940 records at 59 to 1. It is recorded because the same
+  reservation applies - nothing states whether an additional abstention would be
+  acceptable - but the evidence does not support filing it.
+- **`AnalyzerGateHost.MethodOutcomeKey` is not a fifth copy of the group.** It
+  declares `int SourceTreeOrdinal` alongside `SyntaxTree? SourceTree`,
+  `string SourceFilePath`, `MethodName`, `Accessibility` and `SourceStart` - a
+  grouping key for diagnostic outcomes, not an artifact provenance block. It shares
+  one field name with R1900's group and nothing else.
+
+### Status (part six hundred twenty-seven)
+
+No new ID. R1900 stands with a stronger consequence: the four duplicated
+declarations are where a `-1` sentinel's meaning is set, five production files
+branch on that meaning per type, and the four types share no ancestor through which
+anything could compare them.
+
+### Applied reduction follow-up
+
+R1920 is applied: `Invoke-SharpProofContainer.ps1` now routes both `security` and
+`dependency-audit` through one `Invoke-DependencyAudit` helper, while `security`
+retains its Release build with `--no-restore`. The canonical container contract
+validation passes.

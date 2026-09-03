@@ -125,6 +125,18 @@ function Invoke-SharpProofSolutionBuild(
     Invoke-DotNet $buildArguments
 }
 
+function Invoke-DependencyAudit {
+    Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
+    $output = Join-Path $repositoryRoot (
+        'artifacts/dependency-audit/dependency-audit.json')
+    Invoke-RequiredScript 'scripts/Test-SharpProofDependencyAudit.ps1' `
+        'Dependency audit failed.' `
+        @{
+            SolutionPath = Join-Path $repositoryRoot 'SharpProof.sln'
+            NuGetConfigurationPath = Join-Path $repositoryRoot 'NuGet.Config'; OutputPath = $output
+        }
+}
+
 switch ($Command) {
     'quick' {
         Invoke-PipelineCommand 'test-changed' 'Debug' @('-Fast')
@@ -139,15 +151,7 @@ switch ($Command) {
         Invoke-PipelineCommand 'fuzz-nightly' 'Release'
     }
     'security' {
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
-        $output = Join-Path $repositoryRoot (
-            'artifacts/dependency-audit/dependency-audit.json')
-        Invoke-RequiredScript 'scripts/Test-SharpProofDependencyAudit.ps1' `
-            'Dependency audit failed.' `
-            @{
-                SolutionPath = Join-Path $repositoryRoot 'SharpProof.sln'
-                NuGetConfigurationPath = Join-Path $repositoryRoot 'NuGet.Config'; OutputPath = $output
-            }
+        Invoke-DependencyAudit
         Invoke-DotNet @(
             'build', 'SharpProof.sln', '--configuration', 'Release',
             '--no-restore')
@@ -499,15 +503,7 @@ switch ($Command) {
             @{ OutputDirectory = 'artifacts/fuzz/nightly' }
     }
     'dependency-audit' {
-        Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')
-        $output = Join-Path $repositoryRoot (
-            'artifacts/dependency-audit/dependency-audit.json')
-        Invoke-RequiredScript 'scripts/Test-SharpProofDependencyAudit.ps1' `
-            'Dependency audit failed.' `
-            @{
-                SolutionPath = Join-Path $repositoryRoot 'SharpProof.sln'
-                NuGetConfigurationPath = Join-Path $repositoryRoot 'NuGet.Config'; OutputPath = $output
-            }
+        Invoke-DependencyAudit
     }
     'acceptance' {
         Invoke-RequiredScript 'eng/acceptance/Verify.ps1' `
