@@ -18451,3 +18451,60 @@ R1620 is `pending` and is four call-site migrations plus a decision on
 `--object-format`; the decision is the substantive half, because the shared helper
 pins the hash algorithm and four fixtures do not. R1621 is `pending` and is one
 method moved into a file that both callers already reference.
+
+## Second survey, part six hundred seven: R1640 - the parallelism gate names six fixtures and seven carry the attribute, and two more test-tree lenses close empty
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1640 | **`BuildSchedulingTests.ExpensiveScriptFixturesUseBoundedCaseParallelism` hard-codes six fixture types and asserts each carries `[Parallelizable(ParallelScope.Children)]`; seven fixtures in that assembly carry it, and the seventh is pinned by nothing.** The gate's array at `:943-951` names `BoundaryEnforcementTests`, `CoverageScriptTests`, `DocumentationSupportContractTests`, `PackageDependencyAuthorityTests`, `PublicationDestinationAuthorityTests` and `PublicationPlanIdentityTests`. `SharpProof.ArchitectureTest/ReleaseCoverageBaselineTests.cs:8` also carries `[Parallelizable(ParallelScope.Children)]` and appears in neither the array nor any other assertion. The failure is one-directional and silent in the direction that matters: the gate can catch an attribute being **removed** from one of its six, and cannot catch one being **added** anywhere - which is what already happened. **The gate's name states a membership rule it does not define.** "Expensive script fixtures" is not a property the test computes; the six are a list, and nothing says what makes a fixture expensive or how a seventh should have been classified. This is the same shape as R362's production-project array and R973's ratchet manifest: a hand-written set standing in for a derivable one, checked only against itself. Here the derivable version is two lines - enumerate the assembly's types carrying `ParallelizableAttribute` by reflection and assert the set, exactly as `SemanticArchitectureShardsCoverEveryFixture` in the same file already does for `[TestFixture]` types. **This is the residual of R978 rather than a restatement of it.** R978 records the four-way opt-in posture, the 7/3/1 per-fixture counts, and the worker-count conflict between `LevelOfParallelism(4)` and the runsettings' `NumberOfTestWorkers` 8. An earlier part then recorded that the attribute is *asserted by reflection* for two of the four assemblies, noting the gate "asserts that six named fixtures carry `[Parallelizable(ParallelScope.Children)]`" - counting the gate's six without measuring the population of seven. | `SharpProof.ArchitectureTest/BuildSchedulingTests.cs:940-978`; `SharpProof.ArchitectureTest/ReleaseCoverageBaselineTests.cs:8`; the six named fixtures; `BuildSchedulingTests.SemanticArchitectureShardsCoverEveryFixture` for the reflection pattern already in the file; related R978, R362, R973 |
+
+### Checked and not proposed (part six hundred seven)
+
+- **R978's measurements are confirmed unchanged at HEAD and nothing about them is
+  re-filed.** Across **18** test projects there are **235** `[TestFixture]` classes,
+  of which **12** carry `[Parallelizable]`, **10** carry `[NonParallelizable]`, and
+  **213** carry neither. Four projects declare `[assembly: LevelOfParallelism(4)]`;
+  only `SharpProof.Analyzer.Test` pairs it with `[assembly:
+  Parallelizable(ParallelScope.Fixtures)]`, so its 28 unmarked fixtures do run in
+  parallel while the other three projects' unmarked fixtures - 23 in
+  `ArchitectureTest`, 6 in `Package.Test`, **27 of 29** in `Worker.Test` - do not.
+  `SharpProof.Worker.Test` therefore declares a four-worker level for exactly one
+  parallelizable fixture. Every one of those figures is already in R978, including
+  the observation that `SharpProof.Gates.Test` declaring nothing is correct because
+  its fixtures are timing-sensitive. R1640 is the one thing R978 does not contain.
+- **`[TestCase]` data duplication is negligible.** **915** `[TestCase(...)]` rows
+  across the test tree carry **862** distinct argument lists. **41** rows repeat and
+  only **15** span more than one file, and every cross-file repeat is a single
+  shared token from the language or domain vocabulary - `"nint"`, `"nuint"`,
+  `"float"`, `"ref readonly"`, `"effects"`, `"kind"`, `"canonical", true`. There is
+  no duplicated case table anywhere; the shared strings are the type and mode names
+  the product itself defines, and two suites naming `"nint"` is agreement, not
+  duplication.
+- **Embedded fixture-source duplication was measured in part six hundred six and
+  is 1.6 percent**: 1,182 raw-string blocks of four or more lines, 21 exact
+  repeats, 186 redundant lines, largest case already R309.
+- **The private-helper signature axis is fully accounted for**: 371 declarations,
+  14 repeated signatures, every one now mapped to an existing finding or to R1620
+  and R1621.
+- **Test-tree lens summary, so the next pass can start elsewhere.** Six independent
+  measurements over the test tree now return either zero or an already-filed
+  finding: exact method-body duplication (R296, two survivors both filed),
+  near-duplicate bodies at Jaccard 0.85 (six pairs, all deliberate accept/reject
+  designs), embedded fixture sources (1.6 percent, largest is R309), `[TestCase]`
+  data (no duplicated tables), private helper signatures (14, all mapped), and
+  fixture parallelization (R978 plus R1640). The remaining uncited test files are
+  single-subject regression suites whose distinctness these six measurements have
+  now established from several directions.
+
+### Status (part six hundred seven)
+
+R1640 is `pending` and is a two-line change: replace the six-element array with a
+reflection query over `ParallelizableAttribute`, which the same file already
+demonstrates for `TestFixtureAttribute`. It is filed because the drift it names has
+already occurred - the population is seven and the list is six - rather than as a
+hypothetical.
+
+R1512 is applied: the repeated unsupported `Map` implementation body in the
+ContractFor self-cycle and mutual-cycle fixtures now comes from one shared
+constant, while cycle topology and diagnostic assertions remain distinct.
+`ContractForCycleAnalyzerTests` pass (5/5).
