@@ -18778,3 +18778,11 @@ retaining their distinct fixtures and assertions. Both affected tests pass
 | ID | Finding | Evidence |
 |---|---|---|
 | R1655 | The post-R1399 collector path leaves `ThrowIfRuntimeEvaluationEnabled` unreferenced; remove the dead wrapper or give it a tested caller instead of retaining duplicate runtime-policy plumbing. | `SharpProof.Analyzer.Core/ContractRuntimePolicy.cs:37-47`; active predicate callers at `SharpProof.CompilerCollector/FinalCompilationCollector.cs:25` and `SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs:75` |
+
+## Second survey, continued: R1656 - `EffectContractMappings.ToContractEffects` is now an orphaned wrapper
+
+`EffectContractMappings.ToContractEffects` remains as an internal one-line wrapper around `ProjectCapabilities(source).Effects`, but a repository-wide search finds no call site beyond its declaration. `EffectSummaryProjector.Project` now consumes the paired `ProjectCapabilities` result after R764, and the effects parity tests exercise `ToContractCapabilities` but not this effects-only wrapper. The unused method preserves the pre-R764 single-field API shape and makes it look like callers should project effects independently, even though that would reintroduce the traversal R764 removed. Remove the orphaned wrapper, or add a deliberate caller/test if a separate projection boundary is still required.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1656 | After R764, `ToContractEffects` has no repository caller; remove the dead single-field wrapper and keep the paired `ProjectCapabilities` projection as the sole production seam. | `SharpProof.Effects/EffectContractMappings.cs:40-43`; paired production use at `SharpProof.Effects/EffectProjection.cs:30-31`; parity callers at `SharpProof.Effects.Test/EffectContractWireParityTests.cs:99-117` |
