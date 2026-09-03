@@ -21144,3 +21144,11 @@ CFG consumers, while their block processing remains separate. The full
 | ID | Finding | Evidence |
 |---|---|---|
 | R2000 | Invoke-SharpProofReleaseContainer Publish validates the same release bundle once before invoking a publisher that fully validates it again. | scripts/Invoke-SharpProofReleaseContainer.ps1:239-258; scripts/Test-SharpProofReleaseArtifacts.ps1:19-162; scripts/Publish-SharpProofRelease.ps1:175-404 |
+
+## Second survey, continued: R2001 - pack repeats deep package validation after release evidence generation
+
+`Invoke-SharpProofContainer -Command pack` runs `New-SharpProofReleaseEvidence`, then immediately runs `Test-SharpProofReleaseArtifacts` over the same output directory. During generation, the evidence script calls `Test-SharpProofPackagePayload` and `Test-SharpProofSymbolPackagePair` for every main/symbol package before writing `SharpProof.release.json`; the final validator calls those same validators again for every package using the just-written manifest's payload entries. The final validator has a distinct manifest/topology/byte round-trip role, so retain that boundary, but carry forward the already-validated package results or make only one stage own the deep payload and symbol inspections to avoid repeating them.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2001 | pack revalidates every package payload and symbol pair immediately after New-SharpProofReleaseEvidence validated the same packages. | scripts/Invoke-SharpProofContainer.ps1:560-568; scripts/New-SharpProofReleaseEvidence.ps1:420-462; scripts/Test-SharpProofReleaseArtifacts.ps1:133-162 |
