@@ -11294,7 +11294,9 @@ In `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs`, `CallDocumentationComm
 
 ### Status (part two hundred ninety-six)
 
-R1065 is deferred: pass `startIndex` to `IndexOf` instead of taking a substring in `CallDocumentationCommentId`.
+R1065 is applied: documentation-comment ID parsing now searches for the
+delimiter from the prefix offset directly, removing the intermediate substring
+and offset adjustment. PortableIrGraphCodecTests pass (54 passed).
 
 ## Second survey, part two hundred ninety-seven: R1066 - two-graph JSON serialization to test canonical equality in IR codec
 

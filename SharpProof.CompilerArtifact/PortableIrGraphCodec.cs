@@ -157,13 +157,10 @@ internal static partial class PortableIrGraphCodec
             return null;
         }
 
-        var delimiterIndex = name.Substring(prefix.Length).IndexOf(
+        var delimiterIndex = name.IndexOf(
             delimiter,
+            prefix.Length,
             StringComparison.Ordinal);
-        if (delimiterIndex >= 0)
-        {
-            delimiterIndex += prefix.Length;
-        }
         if (delimiterIndex <= prefix.Length)
         {
             return null;
