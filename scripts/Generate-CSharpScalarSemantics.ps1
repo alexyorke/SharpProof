@@ -460,6 +460,38 @@ if (@($unaryRows.Kind | Select-Object -Unique).Count -ne $unaryRows.Count) {
     throw 'unaryOperators contains duplicate kinds.'
 }
 
+function Assert-IrOperatorCatalogRows {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Rows,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$Operators,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $rowCount = @($Rows).Count
+    if (@($Rows.Operator | Select-Object -Unique).Count -ne $rowCount) {
+        throw "$Name contains duplicate operators."
+    }
+    if (@($Rows.Key | Select-Object -Unique).Count -ne $rowCount) {
+        throw "$Name contains duplicate keys."
+    }
+    if (@(Compare-Object `
+            -ReferenceObject $Operators `
+            -DifferenceObject @($Rows.Operator)).Count -ne 0) {
+        throw "$Name must cover every IR operator exactly once."
+    }
+    $orderedKeys = @($Rows.Key | Sort-Object)
+    for ($index = 0; $index -lt $rowCount; $index++) {
+        if ($orderedKeys[$index] -ne $index) {
+            throw "$Name keys must be contiguous from zero."
+        }
+    }
+}
+
 $specialRows = foreach ($special in @($catalog.specialBinaryOperators)) {
     Assert-Properties `
         -Value $special `
@@ -507,25 +539,10 @@ $irUnaryRows = foreach ($operator in @($catalog.irUnaryOperators)) {
             -Context "IR unary '$name'.token"
     }
 }
-if (@($irUnaryRows.Operator | Select-Object -Unique).Count -ne
-    $irUnaryRows.Count) {
-    throw 'irUnaryOperators contains duplicate operators.'
-}
-if (@($irUnaryRows.Key | Select-Object -Unique).Count -ne
-    $irUnaryRows.Count) {
-    throw 'irUnaryOperators contains duplicate keys.'
-}
-if (@(Compare-Object `
-        -ReferenceObject $irUnaryOperators `
-        -DifferenceObject @($irUnaryRows.Operator)).Count -ne 0) {
-    throw 'irUnaryOperators must cover every IR unary operator exactly once.'
-}
-$orderedIrUnaryKeys = @($irUnaryRows.Key | Sort-Object)
-for ($index = 0; $index -lt $irUnaryRows.Count; $index++) {
-    if ($orderedIrUnaryKeys[$index] -ne $index) {
-        throw 'irUnaryOperators keys must be contiguous from zero.'
-    }
-}
+Assert-IrOperatorCatalogRows `
+    -Rows @($irUnaryRows) `
+    -Operators $irUnaryOperators `
+    -Name 'irUnaryOperators'
 
 $irBinaryRows = foreach ($operator in @($catalog.irBinaryOperators)) {
     Assert-Properties `
@@ -562,25 +579,10 @@ $irBinaryRows = foreach ($operator in @($catalog.irBinaryOperators)) {
             -Context "IR binary '$name'.token"
     }
 }
-if (@($irBinaryRows.Operator | Select-Object -Unique).Count -ne
-    $irBinaryRows.Count) {
-    throw 'irBinaryOperators contains duplicate operators.'
-}
-if (@($irBinaryRows.Key | Select-Object -Unique).Count -ne
-    $irBinaryRows.Count) {
-    throw 'irBinaryOperators contains duplicate keys.'
-}
-if (@(Compare-Object `
-        -ReferenceObject $irBinaryOperators `
-        -DifferenceObject @($irBinaryRows.Operator)).Count -ne 0) {
-    throw 'irBinaryOperators must cover every IR binary operator exactly once.'
-}
-$orderedIrBinaryKeys = @($irBinaryRows.Key | Sort-Object)
-for ($index = 0; $index -lt $irBinaryRows.Count; $index++) {
-    if ($orderedIrBinaryKeys[$index] -ne $index) {
-        throw 'irBinaryOperators keys must be contiguous from zero.'
-    }
-}
+Assert-IrOperatorCatalogRows `
+    -Rows @($irBinaryRows) `
+    -Operators $irBinaryOperators `
+    -Name 'irBinaryOperators'
 
 $mappedUnaryOperators = @(
     $unaryRows |
