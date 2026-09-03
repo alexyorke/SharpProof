@@ -234,6 +234,21 @@ if (($authorityProjectNames -join [Environment]::NewLine) -cne
         'Coverage baseline project floors do not match the independently ' +
         'evaluated production inventory.')
 }
+$authorityProjectsByName = [Collections.Generic.Dictionary[string,
+    Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
+foreach ($authorityProject in $recomputedAuthority.projects) {
+    $authorityProjectName = [string]$authorityProject.name
+    $authorityProjectMatches = $null
+    if (-not $authorityProjectsByName.TryGetValue(
+            $authorityProjectName,
+            [ref]$authorityProjectMatches)) {
+        $authorityProjectMatches = [Collections.Generic.List[object]]::new()
+        $authorityProjectsByName.Add(
+            $authorityProjectName,
+            $authorityProjectMatches)
+    }
+    $authorityProjectMatches.Add($authorityProject)
+}
 $expectedAuthorityModules = @($recomputedAuthority.modules | Sort-Object project)
 $expectedModuleIdentities = @(
     $expectedAuthorityModules |
@@ -499,13 +514,19 @@ $productionPathSet = [Collections.Generic.HashSet[string]]::new(
 foreach ($property in $baseline.projects.PSObject.Properties |
         Sort-Object Name) {
     $projectName = $property.Name
-    $authorityProjects = @(
-        $recomputedAuthority.projects |
-            Where-Object { $_.name -ceq $projectName })
-    if ($authorityProjects.Count -ne 1) {
+    $authorityProjects = $null
+    $authorityProjectCount = if ($authorityProjectsByName.TryGetValue(
+            $projectName,
+            [ref]$authorityProjects)) {
+        $authorityProjects.Count
+    }
+    else {
+        0
+    }
+    if ($authorityProjectCount -ne 1) {
         throw (
             "Coverage authority expected exactly one production project " +
-            "named '$projectName', but found $($authorityProjects.Count).")
+            "named '$projectName', but found $authorityProjectCount.")
     }
     $projectPath = [string]$authorityProjects[0].projectPath
     $projectDirectory =
