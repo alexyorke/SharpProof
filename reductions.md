@@ -11834,3 +11834,15 @@ R1112 is deferred: retain one authoritative closure-path deduplication mechanism
 ### Status (part three hundred forty-four)
 
 R1113 is deferred: use one namespace-neutral linked UTF-16 helper, preserving the separate assembly dependency boundaries.
+
+## Second survey, part three hundred forty-five: R1114 - repeated mutation scans in managed-flow proofs
+
+`ManagedAbstractFlow.ProvesNoSignedDivisionOverflow` first calls `ManagedMutationFacts.HasMutation(right)` to reject a mutating divisor, then passes that same `right` operation to `TryEvaluate`, whose first guard calls `HasMutation(value)` again. `ProvesArrayAccess` has the same shape for its sole index: the explicit mutation guard is followed by `TryEvaluate` on the identical operation. The explicit guards preserve short-circuiting before the other operand or array is evaluated, so the reduction should pass the known mutation result into a narrowly scoped evaluation overload or let `TryEvaluate` expose the precheck rather than deleting the safety condition.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1114 | **Managed-flow proof helpers traverse the same operation subtree twice.** Division-overflow proof scans `right` for mutation and `TryEvaluate` immediately rescans `right`; array-access proof does the equivalent for `element.Indices[0]`. Threading the already-computed mutation fact through an evaluation helper removes duplicate `DescendantsAndSelf()` work while retaining the early-rejection ordering. | `SharpProof.Effects/ManagedAbstractFlow.cs:1396-1410,1458-1475`; `SharpProof.Effects/ManagedMutationFacts.cs:5-18` |
+
+### Status (part three hundred forty-five)
+
+R1114 is deferred: preserve the explicit mutation short circuits, but reuse their result when evaluating the same operand or index.
