@@ -13644,3 +13644,21 @@ the same fact twice.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1166 | **`OperationEffectScanner.ScanDelegateCreation` queries one instance's nullness twice.** The method first calls `IsProvenNonNull(instance, methodReference)` and, on the false branch, immediately calls `IsProvenNull(instance, methodReference)` for the same inputs. A tri-state result can retain the separate known-null, known-non-null, and unknown outcomes while removing the repeated nullness analysis. | `SharpProof.Effects/OperationEffectScanner.cs:813-843`; `SharpProof.Effects/OperationNullnessEvaluator.cs:17-27,110-125` |
+
+## Second survey, part four hundred eighty-nine: R1167 - assignment targets evaluated again for the write
+
+The assignment scanner separates target-location evaluation from the eventual
+write projection, but the write projection currently re-enters the full target
+scanner. `ScanSimpleAssignment` calls `ScanWriteTargetEvaluation` and then
+`ScanWriteTarget`; the compound, read-modify-write, and coalesce paths first
+scan the target for its read phase and later call the same write helper. For
+field, array-element, and property targets, that helper calls `ScanField`,
+`ScanArrayElement`, or `ScanProperty`, which scans the same receiver, indices,
+or property arguments again. The local/reference-only write cases do not have
+this duplication. A target-location result carried into a write-only
+projection can preserve C# target-before-value ordering and separate read/write
+effects while avoiding a second receiver/index/argument traversal.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1167 | **`OperationEffectScanner` re-evaluates effectful assignment targets during the write phase.** `ScanSimpleAssignment` evaluates the target location and then passes the unchanged target to `ScanWriteTarget`; the compound, read-modify-write, and coalesce paths likewise scan a target read before calling that helper. The field, array-element, and property branches of `ScanWriteTarget` re-scan their receiver, indices, or arguments, so the same target expression is traversed twice. Splitting location evaluation from write-state projection, or carrying the first `EffectStep` forward, removes that duplicate while retaining the distinct access summaries and target/value order. | `SharpProof.Effects/OperationEffectScanner.Assignments.cs:5-95,97-170,198-255`; target scanners `SharpProof.Effects/OperationEffectScanner.cs:307-452,474-528` |
