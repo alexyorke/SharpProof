@@ -315,12 +315,14 @@ the smallest relevant containerized test target passes.
 | R521 | Share IR factory nullable-type validation | `SharpProof.Ir.Test`: 114 passed |
 | R522 | Cache response hash validity during protocol validation | `SharpProof.Worker.Test`: protocol tests passed |
 | R523 | Reuse the cache filename hexadecimal-digit predicate | `SharpProof.Worker.Test`: 695 passed |
+| R527 | Aggregate worker callable and claim reasons in one pass | `SharpProof.Worker.Test`: 695 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
 | R524 | Share callable proof-label normalization | `SharpProof.Worker.Test`: 695 passed |
 | R526 | Share order-insensitive assumption comparison across protocol layers | `SharpProof.Worker.Test`: 695 passed |
 | R539 | Aggregate trusted-boundary assumption flags in one protocol pass | `SharpProof.Worker.Test`: 695 passed |
+| R512 | Share analyzer global and tree configuration validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R513 | Share conditional truth operator return-expression extraction | `SharpProof.Effects.Test`: 323 passed |
 | R532 | Reuse compiler source-location copy/equality helpers during replay | `SharpProof.Worker.Test`: 695 passed |
 | R533 | Share the zero source-location sentinel predicate | `SharpProof.Worker.Test`: 695 passed |
