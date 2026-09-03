@@ -16840,6 +16840,8 @@ R1383 is applied: dot-segment validation now exits directly from a segment loop,
 |---|---|---|
 | R1384 | `WorkerProtocolJson.EnsureObjectShape` materializes every object's properties with `EnumerateObject().ToArray()` even though the expected shape is a fixed ordered array; validate count, name/order, and child values in one indexed enumeration with no per-object property array. | `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:92-120`; shape metadata `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:463-650` |
 
+R1384 is applied: strict object-shape validation now enumerates properties directly against the generated ordered shape, eliminating the per-object property array while retaining exact-count, order, duplicate, and value checks. `ProtocolJsonTests` pass (108/108).
+
 ## Second survey, continued: R1385 - Launcher response validation materializes incomplete-callable results for count and first item
 
 `ValidateAndReport` filters `response.CallableResults` into an array, then uses only its length, the first incomplete callable's ID, and the length again to format the diagnostic and compute the policy error. A single pass can retain the first incomplete callable and count while preserving the existing diagnostic location, message, and `RequireProven` decision, avoiding a response-sized temporary array on every launcher result.
