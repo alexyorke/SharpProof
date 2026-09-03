@@ -7,9 +7,29 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.MutationBaselines.psm1') -Force
 
 function Assert-Throws {
-    param([scriptblock]$Action, [string]$Message)
+    param(
+        [scriptblock]$Action,
+        [string]$Message,
+        [type]$ExpectedType = [Management.Automation.RuntimeException],
+        [string]$ExpectedMessage
+    )
     try { & $Action }
-    catch { return }
+    catch {
+        if (-not ($_.Exception -is $ExpectedType)) {
+            throw (
+                "$Message Unexpected exception type: " +
+                $_.Exception.GetType().FullName)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ExpectedMessage) -and
+            -not $_.Exception.Message.Contains(
+                $ExpectedMessage,
+                [StringComparison]::Ordinal)) {
+            throw (
+                "$Message Unexpected exception message: " +
+                $_.Exception.Message)
+        }
+        return
+    }
     throw $Message
 }
 
@@ -54,15 +74,21 @@ try {
     Assert-Throws {
         Assert-SharpProofMutationBaselineResult `
             -ExitCode 1 -TrxPath $fixture -EvidenceName failed
-    } 'A failed focused baseline was accepted.'
+    } 'A failed focused baseline was accepted.' `
+        ([Management.Automation.RuntimeException]) `
+        'failed with exit code 1.'
     Assert-Throws {
         Assert-SharpProofMutationBaselineResult `
             -ExitCode 124 -TrxPath $fixture -EvidenceName timeout
-    } 'A timed-out focused baseline was accepted.'
+    } 'A timed-out focused baseline was accepted.' `
+        ([Management.Automation.RuntimeException]) `
+        'timed out.'
     Assert-Throws {
         Assert-SharpProofMutationBaselineResult `
             -ExitCode 0 -TrxPath ($fixture + '.missing') -EvidenceName missing
-    } 'A baseline without TRX evidence was accepted.'
+    } 'A baseline without TRX evidence was accepted.' `
+        ([Management.Automation.RuntimeException]) `
+        'did not produce TRX evidence.'
 
     # A batched invocation could pass after First initializes shared state. The
     # exact plan necessarily invokes Second alone, exposing the setup failure.
@@ -78,7 +104,9 @@ try {
         Assert-SharpProofMutationBaselineResult `
             -ExitCode $outcomes[$secondInvocation.Invocation.Filter] `
             -TrxPath $fixture -EvidenceName order-contamination
-    } 'Focused setup/order contamination was hidden by batching.'
+    } 'Focused setup/order contamination was hidden by batching.' `
+        ([Management.Automation.RuntimeException]) `
+        'failed with exit code 1.'
 }
 finally {
     Remove-Item -LiteralPath $fixture -Force -ErrorAction SilentlyContinue
