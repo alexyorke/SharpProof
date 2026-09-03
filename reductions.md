@@ -14884,3 +14884,11 @@ weakening exact membership validation.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1236 | **`TransferCore` performs a separate mutation walk before transferring and evaluating the same value.** The declarator, flow-capture, and simple-assignment cases compute `HasMutation`/`valueHasMutation`, traverse the value through `Transfer` or `TransferMany`, and then re-traverse it through `EvaluateCore`. A combined transfer result can retain the required ordering while eliminating the redundant structural mutation scan. | `SharpProof.Effects/ManagedAbstractFlow.cs:230-250,252-262,263-285` |
+
+## Second survey, part five hundred fifty-nine: R1237 - acyclic analysis repeats included-block membership checks
+
+`ManagedAbstractFlow.IsAcyclic` uses an optional `included` block set both in the outer `graph.Blocks.Where(...)` filter and at the start of the recursive `Visit` function. When `included` is non-null, every root block that passes the filter performs the same membership lookup again; recursive destinations still need the visitor-side check. A single visitor entry path that owns reachability and inclusion filtering, or a root loop that calls a separate unchecked core while recursive calls use the checked wrapper, can preserve the included-subgraph semantics while removing the duplicate lookup for roots.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1237 | **`IsAcyclic` checks `included.Contains` twice for each included root block.** The outer `Where` filters on `included`, then `Visit` immediately repeats the same set membership before inspecting marks; the recursive check remains necessary for branch destinations. Restructuring the root/recursive entry points can keep the reachability filter and remove the guaranteed root-level duplicate. | `SharpProof.Effects/ManagedAbstractFlow.cs:1037-1069` |
