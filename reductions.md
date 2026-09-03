@@ -15098,6 +15098,12 @@ resolver fallback. Requires-call-site discovery and requires/control tests pass
 |---|---|---|
 | R1246 | **`ScanInterpolatedString` recomputes formatted-value resolution for the same operand.** The effect and completion calls use identical inputs back-to-back, and each reaches `ResolveFormattedValueCall` plus its conversion/nullness/type-resolution work. Threading one resolved fact through both consumers removes the duplicate operation walk without changing formatting effects or normal-completion policy. | `SharpProof.Effects/OperationEffectScanner.Expressions.cs:726-742`; `SharpProof.Effects/StringConcatenationEffectResolver.cs:110-174,198-233` |
 
+### Status (part five hundred sixty-eight)
+
+R1246 is applied: interpolation scanning resolves each formatted value once and
+shares that projection between effect and normal-completion consumers, retaining
+their independent policies. Effect analysis tests pass (147 passed).
+
 ## Second survey, part five hundred sixty-nine: R1247 - reserve descriptors are closed again after early failure
 
 `VerifierProcessSupervisor.Run` initializes a fixed reserve array and, if opening or probing one descriptor fails, explicitly calls `CloseDescriptors(cleanupDescriptorReserves)` before returning. The enclosing `finally` then calls `CloseDescriptors(cleanupDescriptorReserves)` unconditionally, while the array still contains the descriptors that the early branch closed. The early path therefore performs duplicate native closes; ownership can be transferred to `finally` or the entries can be invalidated after the early cleanup so a later descriptor reuse cannot be affected by a stale handle.
