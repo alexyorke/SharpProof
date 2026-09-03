@@ -940,7 +940,8 @@ public sealed class ArchitectureTests
                 pilotProps.Descendants("Import")
                     .Select(static element =>
                         element.Attribute("Project")?.Value),
-                Does.Contain(@"..\..\SharpProof.Release.props"));
+                Does.Contain(
+                    "$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))"));
             Assert.That(
                 pilotProps.Descendants("SharpProofPilotVersion")
                     .Single()

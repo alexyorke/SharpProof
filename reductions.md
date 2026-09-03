@@ -195,6 +195,7 @@ the smallest relevant containerized test target passes.
 | R918 | Cache the constant runtime type used by canonical identity writing | `SharpProof.Worker.Test`: ClaimManifestBuilderTests passed |
 | R962 | Remove the unused virtual dispatch from the closed abstract domain | `SharpProof.Dataflow.Test`: full suite passed |
 | R901 | Materialize canonical manifest target ordering once | `SharpProof.Worker.Test`: ClaimManifestBuilderTests passed |
+| R965 | Import root build defaults from samples and pilots, retaining fixture overrides | `SharpProof.ArchitectureTest`: focused build-policy tests; samples and pilots validation passed |
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
@@ -9341,11 +9342,10 @@ root, so it missed the new conditional default. The correct figure is **zero**.
 
 ### Status (part one hundred eighty-nine)
 
-R965 is `pending` and is two lines of MSBuild. It is filed now rather than
-folded into R749 because the cost stopped being hypothetical this week: the
-repository made a change that reduced duplication by 23 lines and increased it by
-2 in the one place the mechanism does not reach, and it will do so again for the
-next default.
+R965 is `applied`: the samples and pilots build props now import the root
+`Directory.Build.props` and retain only fixture-specific overrides, removing
+duplicated language/nullability/determinism/packability declarations. The pilot
+authority test, sample validation, and pilot validation passed.
 
 ## Second survey, part one hundred ninety: R966 - duplicated frontend abstention validation
 
@@ -9354,3 +9354,43 @@ next default.
 ### Status (part one hundred ninety)
 
 R966 is `deferred`: the common enum guard is straightforward, but the helper should be introduced with constructor tests that pin the current invalid-value and `None`-sentinel exception ordering.
+
+## Second survey, part one hundred ninety-one: R967 - a filter gated at one end
+
+Test-fixture organisation across all 264 test files: lifecycle attributes, inline
+fixture duplication, and the category vocabulary that the build system filters on.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R967 | **`scripts/Invoke-SharpProofCoverage.ps1` selects tests by a category that exactly one test carries, and the gate protecting that correspondence checks the filter string but not the attribute.** `Invoke-SharpProofCoverage.ps1:231` runs `dotnet test --filter 'TestCategory=Coverage'`. The **only** `[Category("Coverage")]` in the repository is on `PerformanceGateTests.ReleasePerformanceProtocolProducesStructuralEvidence` (`SharpProof.Gates.Test/PerformanceGateTests.cs:879-882`). `ArchitectureTests.cs:1824` asserts that the coverage script **contains the string** `"TestCategory=Coverage"` - it gates the filter and not the attribute. So if that single attribute is deleted or renamed, the targeted coverage run matches **zero tests**, exits successfully, and produces structural-coverage evidence for nothing, while the architecture test still passes because the filter text is still in the script. **The sibling categories are gated at both ends, which is what makes this an omission rather than a policy.** For `Performance`, `ArchitectureTests.cs:1714-1716` asserts the attribute occurs **exactly twice** (`Split(...)` has length 3) *and* `:1753` asserts `ci.yml` does **not** contain `TestCategory=Performance`. For `Corpus`, `:1717-1722` asserts `[Category("Corpus")]` sits on a specific named test. Only `Coverage` has its attribute end unchecked - and the test that omits it is named `PerformanceContractIsIsolatedFromBroadTestAndCoverageRuns`. The whole category vocabulary is four attributes on four tests, referenced by twenty `TestCategory` filter expressions across scripts and workflows, so each attribute carries a great deal of build behaviour for one line of source. | `scripts/Invoke-SharpProofCoverage.ps1:231`; `SharpProof.Gates.Test/PerformanceGateTests.cs:822,843,879-882`; `SharpProof.Gates.Test/CorpusGateTests.cs:557`; `SharpProof.ArchitectureTest/ArchitectureTests.cs:1702-1760,1824` |
+
+### Checked and not proposed (part one hundred ninety-one)
+
+- **There is essentially no test fixture setup to duplicate.** Across **264 test
+  files and 2,117 `[Test]` methods** there is **one `[SetUp]`, one `[TearDown]`,
+  four `[OneTimeSetUp]`, and one `[OneTimeTearDown]`**. Tests construct their own
+  state per case rather than sharing mutable fixture state, which is why a
+  setup-duplication search finds nothing: the pattern that would be duplicated
+  barely exists. `ArchitectureTests:1971` reinforces it by asserting
+  `PackagedProductFeed` does **not** use `[OneTimeSetUp]`.
+- **Inline test fixtures are 99 percent unique.** The test tree contains **1,232
+  distinct raw-string C# fixtures** in 1,267 occurrences. Only **13 are repeated
+  across two test projects**, accounting for **120 duplicated lines** in total -
+  about 1 percent. Each of the thirteen is a small input program (9 to 18 lines)
+  that legitimately exercises two subsystems, such as the partial-method
+  `Subject.Identity` fixture used by both `Contracts.Test/PartialMethodContractTests.cs`
+  and `Worker.Test/ClaimManifestBuilderTests.cs`. Extracting 120 lines would couple
+  two test projects through a shared source for no behavioural gain. Not proposed.
+- The 47 ten-line windows an earlier pass reported as "shared across test projects"
+  **overstate this**: they are overlapping sliding windows over the same thirteen
+  fixtures, not 47 distinct duplications. The deduplicated figure is 13. Recorded
+  so the larger number is not repeated.
+
+### Status (part one hundred ninety-one)
+
+R967 is `pending` and the fix is one assertion in a test that already loads the
+file it needs: `PerformanceGateTests.cs` is already read at
+`ArchitectureTests.cs:1705-1708` for the `Performance` check, so asserting
+`[Category("Coverage")]` beside it is a two-line addition. It is worth doing
+because the failure mode is a coverage gate that passes while measuring nothing,
+which is the one class of failure a coverage gate cannot self-detect.
