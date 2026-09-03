@@ -20471,7 +20471,7 @@ performs an exact or set comparison or only a containment or count check.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R1940 | **`ProtocolJsonTests.AssertErrorCode` asserts that each expected error code is *among* the validator's errors and never that it is *all* of them, and it is the oracle for 59 of the file's assertions against a single explicit exact-set check.** `:2096-2111` takes `params string[] expected`, projects `validation.Errors.Select(error => error.Code)` into `actual`, and inside an `Assert.EnterMultipleScope()` loops the expected codes asserting `Assert.That(actual, Does.Contain(code))`. It never compares lengths and never bounds `actual`. So `AssertErrorCode(validation, "a", "b")` - which reads as *the errors are a and b* - passes when the validator returns `a`, `b` and three more. Counting the whole 55-test file: **59** `AssertErrorCode` call sites, **1** explicit `Is.EqualTo` over the error-code sequence, **2** explicit `Is.Empty`. **The subject makes this matter more than the ratio suggests.** `WorkerProtocolJson.Validate` is the worker protocol's input validator and these tests exist to pin exactly which typed error each malformed field produces; a change that made the validator additionally report an unrelated code on the same input would leave all 59 green, and the protocol's error surface is what the launcher, the MSBuild task and the SARIF projection all branch on. **This is not a regression from applied R1068**, which consolidated hand-rolled error assertions into this helper: that work was done carefully, and its status note records that it routed "repeated single- and multi-code **containment** checks" while "exact-set and empty-result assertions remain explicit". R1068 made a pre-existing shape uniform; R1940 is about which shape the shared helper should have implemented. The fix is inside the helper - compare `actual` to `expected` with `Is.EqualTo`, or `Is.EquivalentTo` if the validator's error order is not part of its contract - and give the containment form a separate name for the cases that genuinely want it, which the single explicit `Is.EqualTo` site suggests are few. | `SharpProof.Worker.Test/ProtocolJsonTests.cs:2096-2111` and its 59 call sites; the one `Is.EqualTo` and two `Is.Empty` explicit assertions in the same file; `SharpProof.Worker.Protocol/ProtocolJson.cs`; applied R1068; related R1780, R1720 |
+| R1940 | **`ProtocolJsonTests.AssertErrorCode` asserts that each expected error code is *among* the validator's errors and never that it is *all* of them, and it is the oracle for 59 of the file's assertions against a single explicit exact-set check.** `:2096-2111` takes `params string[] expected`, projects `validation.Errors.Select(error => error.Code)` into `actual`, and inside an `Assert.EnterMultipleScope()` loops the expected codes asserting `Assert.That(actual, Does.Contain(code))`. It never compares lengths and never bounds `actual`. So `AssertErrorCode(validation, "a", "b")` - which reads as *the errors are a and b* - passes when the validator returns `a`, `b` and three more. Counting the whole 55-test file: **59** `AssertErrorCode` call sites, **1** explicit `Is.EqualTo` over the error-code sequence, **2** explicit `Is.Empty`. **The subject makes this matter more than the ratio suggests.** `WorkerProtocolJson.Validate` is the worker protocol's input validator and these tests exist to pin exactly which typed error each malformed field produces; a change that made the validator additionally report an unrelated code on the same input would leave all 59 green, and the protocol's error surface is what the launcher, the MSBuild task and the SARIF projection all branch on. **This is not a regression from applied R1068**, which consolidated hand-rolled error assertions into this helper: that work was done carefully, and its status note records that it routed "repeated single- and multi-code **containment** checks" while "exact-set and empty-result assertions remain explicit". R1068 made a pre-existing shape uniform; R1940 is about which shape the shared helper should have implemented. The fix is inside the helper - compare `actual` to `expected` with `Is.EqualTo`, or `Is.EquivalentTo` if the validator's error order is not part of its contract - and give the containment form a separate name for the cases that genuinely want it, which the single explicit `Is.EqualTo` site suggests are few. **The helper is 59 of a larger surface.** A repository-wide scan for the same shape written inline - `Assert.That(<something>.Errors...Code..., Does.Contain(...))` without going through the helper - finds **18** more across five files: **11 in `SharpProof.Worker.Test/WorkerTests.cs`**, 4 in `WorkerMsBuildIntegrationTests.cs`, and one each in `BuildTaskTests.cs`, `LauncherArgumentTests.cs` and `WorkerProgramTests.cs`. So the validator's error set is checked by containment at **77** sites, and fixing the helper reaches 59 of them; the remaining 18 are exactly the sites applied R1068 did not consolidate, because R1068's scope was `ProtocolJsonTests`. | `SharpProof.Worker.Test/ProtocolJsonTests.cs:2096-2111` and its 59 call sites; the one `Is.EqualTo` and two `Is.Empty` explicit assertions in the same file; `SharpProof.Worker.Protocol/ProtocolJson.cs`; applied R1068; related R1780, R1720 |
 
 ### Checked and not proposed (part six hundred twenty-six)
 
@@ -20617,3 +20617,183 @@ validation passes.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1941 | **`Generate-CSharpScalarSemantics.ps1` emits three near-identical single-key catalog scans; share the typed lookup strategy or generate direct maps while retaining the distinct APIs and fail-closed defaults.** | `scripts/Generate-CSharpScalarSemantics.ps1:817-827,901-911,920-930`; generated arrays `SharpProof.Frontend/CSharpScalarSemantics.generated.cs`; consumers in `SharpProof.Frontend/RoslynOperationLowerer.cs:687-704,823-844` |
+## Second survey, part six hundred twenty-eight: the weak-oracle pattern measured repository-wide, and R1940's surface is seventy-seven rather than fifty-nine
+
+No new ID. R1940 was found through a census of assertion *helpers*. This part asks
+the complementary question - how often is the same shape written **inline**, without
+a helper - and answers it for every test project.
+
+### The measurement
+
+Every `Assert.That` statement in test code whose subject is a projected collection
+(`.Select(`, `.Keys`, `.Values`, `ToArray()`, `ToImmutableArray()`) was classified
+by its constraint. Repository-wide: **93 containment** (`Does.Contain`, `Has.Some`,
+`Is.SupersetOf`) against **317 exact** (`Is.EqualTo`, `Is.EquivalentTo`,
+`Is.Empty`, `Is.SubsetOf`, `Is.Unique`) - the exact form dominates **3.4 to 1**.
+
+| project | containment | exact |
+|---|---|---|
+| Worker.Test | 18 | 99 |
+| Analyzer.Test | 7 | 75 |
+| Package.Test | 13 | 37 |
+| Frontend.Test | 15 | 18 |
+| Effects.Test | 21 | 16 |
+| Meta.Analyzers.Test | 10 | 7 |
+| ContractForGenerator.Test | 5 | 9 |
+| ArchitectureTest | 2 | 9 |
+| Specs.Test | 2 | 9 |
+| Contracts.Test, Ir.Test, Gates.Test, Attributes.Test, Summaries.Test, eng/testing | **0** | 41 |
+
+**Six projects use containment on a projected collection zero times.** No project
+is one-sided the way R1940's helper is at 59 to 1; the closest are `Effects.Test`
+at 21 to 16 and `Meta.Analyzers.Test` at 10 to 7, both of which are ratios rather
+than monocultures.
+
+### Evidence update: R1940's surface is 77 sites, and its remedy reaches 59
+
+Filtering the containment sites to those whose subject is a validator's error-code
+projection - the exact shape `AssertErrorCode` implements - finds **18 written
+inline**, outside the helper:
+
+- **11 in `SharpProof.Worker.Test/WorkerTests.cs`**, including `:162`
+  (`validation.Errors.Select(error => error.Code)`, `Does.Contain("budgets.rlimit_order")`),
+  `:175` (`"project.compiler_manifest"`) and `:213`
+  (`response.Errors...`, `"budgets.query_rlimit_mismatch"`);
+- **4 in `SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs`**;
+- one each in `BuildTaskTests.cs`, `LauncherArgumentTests.cs` and
+  `WorkerProgramTests.cs`.
+
+So the worker protocol's error set is checked by containment at **77** sites, not
+59. R1940's remedy - strengthening `AssertErrorCode` - reaches 59 of them. The
+remaining 18 are precisely the sites applied R1068 left alone, because its scope was
+`ProtocolJsonTests`; they are in three other projects and would need either the
+helper extended to them or the same change made inline. R1940's row has been
+updated in place to say so.
+
+### Checked and not proposed (part six hundred twenty-eight)
+
+- **The two other containment concentrations are defensible and were read, not
+  inferred.** `WorkerTests.cs:943` asserts
+  `result.Assumptions.Select(item => item.Kind)` contains
+  `WorkerAssumptionKind.TrustedBoundary`, and `:2998` asserts
+  `summary.DependencyEvidence.Select(item => item.Origin)` contains
+  `CompilerSummaryOrigin.ImplementationIl` - both on collections that legitimately
+  carry several members where the test's subject is one of them.
+  `ProgramLoweringTests.cs`'s fifteen were examined in part six hundred twenty-seven
+  and are the same case for abstention reasons.
+- **`Effects.Test`'s 21 containment sites are spread thin** - six in
+  `EffectAnalysisTests.cs`, three in `ModuleInitializerEffectTests.cs`, two each in
+  two regression files, one each elsewhere. No file concentrates them and no helper
+  mediates them, so there is nothing to strengthen in one place.
+- **This closes the weak-oracle dimension.** Three independent measurements now
+  bound it: the suppression mechanism exists in one test host and nowhere else
+  (part six hundred eighteen), the assertion-helper surface is 166 declarations of
+  which one is genuinely weak (part six hundred twenty-six), and the inline surface
+  is 93 containment against 317 exact with six projects at zero (this part). The
+  filed findings - R1780 for the suppression, R1720 for the count-only oracle,
+  R1940 for the containment helper and its 18 inline siblings - are the whole of
+  it.
+
+### Status (part six hundred twenty-eight)
+
+No new ID. R1940 now reads 77 sites with a remedy covering 59, and the pattern it
+belongs to is measured rather than suspected: containment is the minority form
+everywhere in this repository except inside one helper.
+
+## Second survey, part six hundred twenty-nine: R1960 - the meta-analyzer's forty-one known types are matched to an enum by position, and neither the alignment nor the resolution is checked
+
+A production initialization census that had not been run: every field initializer
+in hand-written production code - **321** across **263** files - grouped by type
+and initializer expression, plus every static collection initializer of ten or
+more elements.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1960 | **`SharpProofSoundnessAnalyzer` maps a 41-entry array of metadata names onto a 41-member enum by array position, resolves each name with an API that returns `null` on failure, and nothing checks either the alignment or the resolution - so a renamed type or a misplaced insertion silently disables or rekeys the soundness rules that consult it.** `:14-26` declares `private static readonly ImmutableArray<string> KnownTypeNames` with 41 entries; `:1027-1040` declares `internal enum KnownType` with 41 members in the same order. `:1052-1059` binds them **positionally** - `types[index] = compilation.GetTypeByMetadataName(KnownTypeNames[index])` in an index loop - and `:1081` reads them back as `internal INamedTypeSymbol? this[KnownType type] => _types[(int)type]`. **Both failure modes are silent.** `GetTypeByMetadataName` returns `null` for a name it cannot resolve, the indexer's return type is nullable, and the rules consume it through `IsSameType(candidate, symbols[KnownType.X])` - at `:208`, `:216-217`, `:224`, `:237`, `:249`, `:262` and beyond - where a null right-hand side simply never matches. A type that moves assembly, gets renamed, or drops out of the referenced set turns its rule into a no-op that reports nothing and fails nothing. The insertion hazard is worse: adding a name to the array without adding the enum member at the same position shifts every later pairing, so rules silently key on the **wrong** types while both lists remain 41 long. **Nothing checks either property.** No assertion compares `KnownTypeNames.Length` to `Enum.GetNames(typeof(KnownType)).Length`, and none requires any entry to resolve. The one test that touches the array, `SharpProofSoundnessAnalyzerTests.ForbiddenCatalogIncludesInternalCSharpSpeculativeVariants:3023-3050`, reaches it by reflection and asserts `Does.Contain("Microsoft.CodeAnalysis.CSharp.CSharpSemanticModel")` - one entry's presence, by containment. **What is at stake is the checker rather than the product.** This analyzer enforces `SPMETA001` through `SPMETA011` over SharpProof's own soundness-critical layers - the banned-API boundary, semantic-cache classification, cancellation handling - so a rule that quietly stops firing is a hole in the thing that watches for holes. **The technique to fix it is in the repository twice.** `BuildSchedulingTests.SemanticArchitectureShardsCoverEveryFixture` compares a hand-written roster to a reflected type set; `SharpProof.Gates/AnalyzerGateHost.cs:34-38` avoids the problem entirely by *deriving* its diagnostic-id list from `GeneratedDiagnosticDescriptors.SupportedDiagnostics` under a comment saying a descriptor "cannot be silently omitted from the gate". Two assertions - lengths equal, and every resolved type non-null against the analyzer's own compilation - would close both modes. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:14-26,1027-1040,1052-1059,1081` and the rule sites at `:208,216-217,224,237,249,262`; `SharpProof.Meta.Analyzers.Test/SharpProofSoundnessAnalyzerTests.cs:3023-3050`; `SharpProof.ArchitectureTest/BuildSchedulingTests.cs` and `SharpProof.Gates/AnalyzerGateHost.cs:34-38,50-54` for the two working techniques; related R1720, R1860, R1640, R362 |
+
+### Checked and not proposed (part six hundred twenty-nine)
+
+- **Production field initialization is essentially free of duplication, which is
+  what made the one outlier findable.** 321 initializers across 263 hand-written
+  files yield only **four** repeated (type, expression) pairs, and three of the four
+  are the shared helper working as intended: `IrFactory = ArgumentNullGuard.NotNull(factory,
+  nameof(factory))` at six sites, `Compilation = ArgumentNullGuard.NotNull(compilation,
+  nameof(compilation))` at two, and `HashSet<IMethodSymbol> = new(SymbolEqualityComparer.Default)`
+  at four - the last being the correct comparer for symbol sets, used consistently
+  rather than duplicated carelessly. The fourth is `bool IsSuccess => Failure ==
+  ContractBindingFailure.None` on two different result types, one line each. None is
+  worth filing, and together they are further evidence for part six hundred twenty's
+  conclusion that `ArgumentNullGuard` adoption is real.
+- **`KnownTypeNames` is the only large static collection initializer in production
+  hand-written code.** Scanning for `static readonly` collection initializers of ten
+  or more elements across all 263 files returns exactly one: this 41-entry array.
+  Every other production table of that size lives in a generated file, where its
+  authority is a schema and its correspondence is checked by the model tests. That
+  is precisely why this one is worth an assertion - it is the sole hand-written
+  table of its size, and the sole one outside the generated-model gate.
+- **The containment assertion on `KnownTypeNames` is a third oracle shape in a file
+  that already carries two.** `SharpProofSoundnessAnalyzerTests.cs` holds R1720's
+  eleven count-only `SPMETA010` assertions, R1664's repeated fixture prelude, and now
+  this reflected containment check. The file is 3,564 lines and its oracles are
+  uniformly weaker than its subject deserves; R1720, R1664 and R1960 should be
+  considered together.
+
+### Status (part six hundred twenty-nine)
+
+R1960 is `pending` and is two assertions in a test project that already reaches the
+field by reflection, so the access pattern it needs is written and working. It is
+filed above its size because the failure it admits is silent in both directions and
+the component it affects is the one that checks everything else.
+
+## Second survey, part six hundred thirty: R1980 - eleven whole-file analyzer relaxations with no recorded reason, in a repository that documents every other kind
+
+The configuration-file surface is six files - `.editorconfig`, `.globalconfig`,
+`samples/Diagnostics/.globalconfig`, `NuGet.Config` and two `.runsettings` - and
+there is no XSD or hand-written XML anywhere. All six are cited in this ledger.
+Measuring their content rather than their existence turns up one asymmetry.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1980 | **`.editorconfig` turns eleven analyzer rules off for whole files and records a reason for none of them, while every other suppression mechanism in the repository carries one.** The eleven, each `dotnet_diagnostic.<rule>.severity = none` under a path section: `CA1515` for four `SharpProof.BuildTasks` files and again for `SharpProof.Worker/SharpProofWorker.cs`; `CA1822` for `IntervalDomain.cs`; `CA1036` for `EffectRegions.cs`; `CA2217` for `EffectValues.cs`; `CA1815` for `FrontendSubset.cs`; `CA1032`, `CA1064` and `CA2000` for `IrSmtBackend.cs`; `CA1849` for both `Program.cs` entry points; and `CA1308` for three Worker files. The whole file contains **two** comment lines, both explaining the expression-bodied style block, and **zero** attached to a suppression. **The contrast is with four other mechanisms in the same repository, all of which explain themselves.** `.globalconfig` comments why `IDE0005` is `none` and `CS8019` takes its place, and why the dead-code family sits where it does; ten of the fourteen `#pragma warning disable` sites carry an inline rationale on the same line - *"Build-only compiler evidence must hash final reference images."*, *"Stream ownership transfers to the retained snapshot list."*; `.github/dependabot.yml` explains its `>= 4.15.0` ignores by naming the Roslyn 4.14 host they protect; and `Directory.Build.props:19` and `Directory.Build.targets:20-21` each comment their analyzer settings. **The eleven are also the broadest suppressions the repository has.** A `#pragma` covers a region and is visible at the code it excuses; an `.editorconfig` section covers an entire file and is invisible from it. `CA2000` - dispose objects before losing scope - is off for all of `IrSmtBackend.cs`, the file that owns Z3 native handles, while the same rule is suppressed **with** an explanation and for four lines in `CompilerManifestArtifact.cs:72-112`. `CA1308` is off for three files that do lowercase hexadecimal encoding, which is almost certainly the reason, and nothing says so. One comment per section - eleven lines - makes each relaxation reviewable and would have made the two `CA1515` entries' relationship visible. | `.editorconfig:44-69` (the eleven suppressions, nine sections, two comment lines in the file); `.globalconfig:3-10`; the fourteen `#pragma warning disable` sites, notably `SharpProof.CompilerArtifact/CompilerManifestArtifact.cs:72,112` suppressing `CA2000` **with** a reason; `.github/dependabot.yml` ignore rationale; `Directory.Build.props:19`; `Directory.Build.targets:20-21`; related applied R236, applied R157, R950 |
+
+### Checked and not proposed (part six hundred thirty)
+
+- **The suppressions are all live and correctly targeted, which is already
+  recorded.** Applied R236 consolidated them into brace globs and its status note
+  confirms "9 per-file sections remain, and all 15 glob-expanded targets exist";
+  applied R157 removed the one section that pointed at a deleted file; and an
+  earlier part records that every diagnostic ID appearing in configuration is a
+  real rule. R1980 is about the missing rationale only - the entries themselves are
+  sound.
+- **`.editorconfig` and `.globalconfig` do not overlap at all.** Parsing both for
+  `dotnet_diagnostic.*.severity` and `dotnet_code_quality.*` assignments gives 11
+  rules in one and 7 in the other with an intersection of **zero**. The split is
+  clean: `.globalconfig` owns the repository-wide dead-code family that
+  `Directory.Build.props` escalates, `.editorconfig` owns style plus the file-scoped
+  relaxations. That is a better separation than R284 assumed when it noted the two
+  files share a rule list - they share the *concept*, not any rule.
+- **There is no XSD, and no hand-written XML outside MSBuild.** The configuration
+  surface is six files totalling 144 lines. `SharpProof.Attributes.xml`, the
+  268-line hand-maintained documentation file R295 was about, is gone from HEAD -
+  it is one of the paths `docs/code-usefulness-audit.md` still lists that part six
+  hundred nine confirmed as correctly historical.
+- **`samples/Diagnostics/.globalconfig` remains correct.** Five lines, `is_global`
+  with `global_level = 100` so it outranks the root file, downgrading `SP0045` and
+  `SP0047` to warning for the one sample whose purpose is to emit diagnostics -
+  paired with that project's `TreatWarningsAsErrors=false`, which part five hundred
+  ninety-five established is a necessary second mechanism rather than a duplicate.
+
+### Status (part six hundred thirty)
+
+R1980 is `pending` and is eleven comment lines. It is filed because the repository
+has an evident and otherwise uniform convention - relaxations explain themselves -
+and the eleven exceptions are the widest-scoped and least visible relaxations it
+has.
+
+### Applied reduction follow-up
+
+R1940 is applied: `ProtocolJsonTests.AssertErrorCode` now compares the complete
+error-code multiset with `Is.EquivalentTo`, while the cases that intentionally
+accept additional validation errors use the explicitly named
+`AssertContainsErrorCode` helper. The full `ProtocolJsonTests` class passes
+108/108 tests with zero warnings or errors.
