@@ -10448,3 +10448,15 @@ R998 is deferred: the vocabulary is tiny and stable today; add a shared descript
 ### Status (part two hundred thirty)
 
 R999 is deferred: configuration is a low-frequency path, so combine the read only if the option registry grows or the provider lookup becomes measurable; preserve the current explicit alias policy.
+
+## Second survey, part two hundred thirty-one: R1000 - repeated protocol effect-manifest fixture
+
+`ProtocolJsonTests` has a dedicated `CreateEffectManifest` helper that starts from `CreateManifest`, selects the Effects feature and explicit-annotation reason, converts the first claim to an attribute-backed effect claim, assigns `DoesNotThrow`, seals the manifest, and returns it. Three earlier tests nevertheless reproduce that same mutation sequence inline: `EffectClaimShapeIsClosedAndPartOfManifestIdentity`, `EffectCertaintyMustAgreeWithOutcomeAndUnknownReason`, and the effect branch inside `VacuityEvidenceIsClosedAndRequiresProofCore`. The first test also needs the pre-mutation hash, so its setup cannot be replaced by a zero-argument helper without a small option or a helper that returns both base and effect manifests; the other two can use the existing factory directly. The effect-specific assertions and later mutations remain intentionally different. Reusing or parameterizing the existing fixture removes a local protocol-shape authority and keeps future changes to effect-claim admission synchronized across these tests. This is distinct from the production response-validation scans already recorded in R539 and the broader fixture-envelope items.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1000 | **Protocol JSON tests rebuild an effect manifest even though the class already owns an exact factory.** The effect setup at `:515-523` and `:551-559` is repeated again at `:718-732`, while `CreateEffectManifest` centralizes the same feature, reason, claim-kind, evidence, contract-kind, sealing, and return steps at `:2044-2057`. A configurable base/effect fixture can preserve the first test's pre-seal hash assertion and each test's distinct mutations while removing the repeated manifest-shape construction. | `SharpProof.Worker.Test/ProtocolJsonTests.cs:511-523,547-560,718-732,759-797,799-843,2044-2057`; existing production validation distinction R539 |
+
+### Status (part two hundred thirty-one)
+
+R1000 is deferred: the helper exists already, so route the two direct users through it first; decide separately whether the hash-sensitive test needs an optional pre-seal snapshot rather than adding a second factory.
