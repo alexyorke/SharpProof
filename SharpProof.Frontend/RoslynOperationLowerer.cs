@@ -694,6 +694,11 @@ public sealed class RoslynOperationLowerer
                     FrontendAbstention.UnsupportedOperationKind);
             }
 
+            if (CompilerConstantAdmission.IsLiteralIntegerNegation(operation))
+            {
+                return _owner.LowerConstant(operation);
+            }
+
             if (semantics.IsIdentity)
             {
                 if (!CSharpScalarSemantics.IsSupportedInteger(
@@ -706,11 +711,6 @@ public sealed class RoslynOperationLowerer
                 }
 
                 return operand;
-            }
-
-            if (CompilerConstantAdmission.IsLiteralIntegerNegation(operation))
-            {
-                return _owner.LowerConstant(operation);
             }
 
             if (semantics.RequiresExactIntegerDomain &&

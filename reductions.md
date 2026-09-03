@@ -16444,3 +16444,8 @@ and distinct witness metadata, so the proposed indirection is not a safe reducti
 | ID | Finding | Evidence |
 |---|---|---|
 | R1362 | **Production PDB inventory re-scans completed document state for presence and then re-scans projected sequence-point arrays for the total count.** Carry the count from the existing point walk or projection to remove the postprocessing traversals without changing filtering or output. | `scripts/Get-SharpProofProductionInventory.ps1:247-300,443-446` |
+
+R1360 is applied: literal integer negation is admitted before lowering its operand,
+after the operator, lifted, and supported-semantics guards; all non-literal unary
+paths retain their existing operand classification and checked-arithmetic handling.
+The focused unary/default lowering suite passes (22 passed).
