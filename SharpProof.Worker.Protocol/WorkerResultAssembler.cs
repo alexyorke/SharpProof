@@ -235,31 +235,18 @@ internal static class WorkerResultAssembler
             .Select(static result => result.Reason).ToArray() ?? [];
         var claimReasons = claims?.OfType<WorkerClaimResult>()
             .Select(static result => result.Reason).ToArray() ?? [];
-        var callableFailure = callableReasons.Contains(WorkerCallableCoverageReason.InfrastructureFailure)
-            ? WorkerRunFailureReason.InfrastructureFailure
-            : callableReasons.Contains(WorkerCallableCoverageReason.MissingClaimResult)
-                ? WorkerRunFailureReason.MalformedResult
-                : WorkerRunFailureReason.None;
-        var claimFailure = claimReasons.Contains(WorkerClaimReason.BackendUnavailable)
-            ? WorkerRunFailureReason.BackendUnavailable
-            : claimReasons.Contains(WorkerClaimReason.InfrastructureFailure)
-                ? WorkerRunFailureReason.InfrastructureFailure
-                : claimReasons.Contains(WorkerClaimReason.MalformedBackendResult)
-                    ? WorkerRunFailureReason.MalformedResult
-                    : claimReasons.Contains(WorkerClaimReason.CounterexampleReplayFailed)
-                        ? WorkerRunFailureReason.CounterexampleReplayFailed
-                        : WorkerRunFailureReason.None;
+        var callableSummary = SummarizeCallableReasons(callableReasons);
+        var claimSummary = SummarizeClaimReasons(claimReasons);
+        var callableFailure = callableSummary.Failure;
+        var claimFailure = claimSummary.Failure;
         var failure = claimFailure is WorkerRunFailureReason.BackendUnavailable or
                 WorkerRunFailureReason.MalformedResult
             ? claimFailure
             : callableFailure != WorkerRunFailureReason.None
                 ? callableFailure
                 : claimFailure;
-        var canceled = callableReasons.Contains(WorkerCallableCoverageReason.Canceled) ||
-            claimReasons.Contains(WorkerClaimReason.Canceled);
-        var timedOut = callableReasons.Any(static reason => reason is
-                WorkerCallableCoverageReason.MethodTimeout or WorkerCallableCoverageReason.ProjectTimeout) ||
-            claimReasons.Any(static reason => reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout);
+        var canceled = callableSummary.Canceled || claimSummary.Canceled;
+        var timedOut = callableSummary.TimedOut || claimSummary.TimedOut;
         var status = failure != WorkerRunFailureReason.None ? WorkerRunStatus.Failed
             : canceled ? WorkerRunStatus.Canceled
             : timedOut ? WorkerRunStatus.TimedOut
@@ -267,6 +254,61 @@ internal static class WorkerResultAssembler
         return (status, failure,
             callableFailure != WorkerRunFailureReason.None, claimFailure != WorkerRunFailureReason.None,
             timedOut, canceled);
+    }
+
+    private static (WorkerRunFailureReason Failure, bool Canceled, bool TimedOut) SummarizeCallableReasons(
+        WorkerCallableCoverageReason[] reasons)
+    {
+        var infrastructureFailure = false;
+        var missingClaimResult = false;
+        var canceled = false;
+        var timedOut = false;
+        foreach (var reason in reasons)
+        {
+            infrastructureFailure |= reason == WorkerCallableCoverageReason.InfrastructureFailure;
+            missingClaimResult |= reason == WorkerCallableCoverageReason.MissingClaimResult;
+            canceled |= reason == WorkerCallableCoverageReason.Canceled;
+            timedOut |= reason is WorkerCallableCoverageReason.MethodTimeout or
+                WorkerCallableCoverageReason.ProjectTimeout;
+        }
+
+        var failure = infrastructureFailure
+            ? WorkerRunFailureReason.InfrastructureFailure
+            : missingClaimResult
+                ? WorkerRunFailureReason.MalformedResult
+                : WorkerRunFailureReason.None;
+        return (failure, canceled, timedOut);
+    }
+
+    private static (WorkerRunFailureReason Failure, bool Canceled, bool TimedOut) SummarizeClaimReasons(
+        WorkerClaimReason[] reasons)
+    {
+        var backendUnavailable = false;
+        var infrastructureFailure = false;
+        var malformedBackendResult = false;
+        var counterexampleReplayFailed = false;
+        var canceled = false;
+        var timedOut = false;
+        foreach (var reason in reasons)
+        {
+            backendUnavailable |= reason == WorkerClaimReason.BackendUnavailable;
+            infrastructureFailure |= reason == WorkerClaimReason.InfrastructureFailure;
+            malformedBackendResult |= reason == WorkerClaimReason.MalformedBackendResult;
+            counterexampleReplayFailed |= reason == WorkerClaimReason.CounterexampleReplayFailed;
+            canceled |= reason == WorkerClaimReason.Canceled;
+            timedOut |= reason is WorkerClaimReason.MethodTimeout or WorkerClaimReason.ProjectTimeout;
+        }
+
+        var failure = backendUnavailable
+            ? WorkerRunFailureReason.BackendUnavailable
+            : infrastructureFailure
+                ? WorkerRunFailureReason.InfrastructureFailure
+                : malformedBackendResult
+                    ? WorkerRunFailureReason.MalformedResult
+                    : counterexampleReplayFailed
+                        ? WorkerRunFailureReason.CounterexampleReplayFailed
+                        : WorkerRunFailureReason.None;
+        return (failure, canceled, timedOut);
     }
 
     internal static bool TryProjectRunState(
