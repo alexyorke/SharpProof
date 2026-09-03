@@ -16819,3 +16819,19 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 | ID | Finding | Evidence |
 |---|---|---|
 | R1389 | `Get-SharpProofPackageDependencyGraph` applies three separate extension filters to the same package-model array; partition models once by extension and reuse the two collections for validation and edge construction. | `scripts/Test-SharpProofPackageDependencies.ps1:137-153,220-235` |
+
+## Second survey, continued: R1390 - Canonical JSON matching performs a redundant property-name precheck
+
+`Assert-SharpProofCanonicalMatch` sorts and joins both objects' property names, then serializes those same objects to compact JSON and compares the complete strings. The latter comparison already includes property names, order, and values, and both branches throw the same message, so the name arrays and first comparison do not change acceptance or diagnostics. Removing that precheck leaves the canonical serialization equality as the single comparison and avoids two sorted property-name arrays at each release-plan/projection check.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1390 | `Assert-SharpProofCanonicalMatch` separately sorts property names before comparing the complete JSON serialization, even though the serialization comparison already rejects any name/set/order mismatch; retain one canonical serialization comparison. | `scripts/SharpProof.ReleaseJson.ps1:54-69`; callers `scripts/SharpProof.PublicationDestination.ps1:221,309` and `scripts/Test-SharpProofPackageDependencies.ps1:305` |
+
+## Second survey, continued: R1391 - Third-party component projection scans actual properties before its own projection
+
+`Test-SharpProofThirdPartyComponentProjection` first sorts and checks every actual component's property names, then immediately enumerates the same actual components again through `ConvertTo-ComponentRecord`. The converter can own the property-shape check before projecting fields, preserving the fail-closed schema validation and canonical entry sorting while removing one complete pass over the actual component inventory and its temporary property-name arrays.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1391 | `Test-SharpProofThirdPartyComponentProjection` validates each actual component's property set in a separate pass before converting the same rows; fold the shape check into `ConvertTo-ComponentRecord` and retain the canonical comparison. | `scripts/Test-SharpProofPackageDependencies.ps1:268-307` |
