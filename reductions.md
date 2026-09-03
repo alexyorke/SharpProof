@@ -14278,6 +14278,12 @@ distinct setter-effect policy.
 |---|---|---|
 | R1195 | **`ExceptionHandlerReachability` recomputes coalesce-assignment target facts before scheduling children.** The main `ICoalesceAssignmentOperation` case calls `canCompleteNormally(coalesce.Target)` and derives target non-nullness, then `PushChildrenCore` repeats both computations to decide whether to push `coalesce.Value`. Sharing that target projection can remove the duplicate completion/nullness work without changing setter exception handling or target-first order. | `SharpProof.Effects/ExceptionHandlerReachability.cs:437-460,1292-1306` |
 
+### Status (part five hundred seventeen)
+
+R1195 is applied: coalesce-assignment target completion and non-nullness facts
+are cached per operation and reused by child scheduling. The Effects test suite
+passes (323/323).
+
 ## Second survey, part five hundred eighteen: R1196 - compound-assignment prerequisites are replayed
 
 Compound-assignment exception analysis computes target completion and calls
