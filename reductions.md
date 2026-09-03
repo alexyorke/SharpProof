@@ -10680,3 +10680,15 @@ R1016 is deferred: table-drive only the common substitution invocation, and reta
 ### Status (part two hundred forty-eight)
 
 R1017 is deferred: share only the `1 / 0 == 0` expression fixture, and retain each test's distinct branch placement and expected totality.
+
+## Second survey, part two hundred forty-nine: R1018 - duplicated effect-region test mapping
+
+`RegionProjectionUsesAnExplicitNamedMapping` declares seven region-to-read/write mappings in NUnit `[TestCase]` attributes. `RegionCatalogIsClosedAndDrivesBothDirections` immediately repeats those same seven region values and read/write contract values in its `expected` tuple array, adding only reverse-region metadata and the parameter-region flag. The two tests have different purposes - direct projection and catalog closure/round-trip validation - but they can consume one independent mapping table, with the additional reverse metadata kept alongside it, so a mapping update does not require synchronized edits in two test-data authorities.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1018 | **Effect-region wire mappings are hard-coded twice in one parity suite.** The seven `[TestCase]` rows for Receiver, Parameter, Captured, Static, Ambient, Fresh, and Unknown repeat the same expected read/write `EffectContractKind` values already present in `RegionCatalogIsClosedAndDrivesBothDirections`'s seven-row `expected` array. A shared `TestCaseSource`/table can feed the direct projection check and the catalog round-trip check while retaining the second test's reverse-region and parameter-expansion fields. | `SharpProof.Effects.Test/EffectContractWireParityTests.cs:123-143,167-211` |
+
+### Status (part two hundred forty-nine)
+
+R1018 is deferred: share the independent region mapping data, but keep direct projection checks and catalog reverse-direction checks as separate assertions.
