@@ -317,6 +317,7 @@ the smallest relevant containerized test target passes.
 | R523 | Reuse the cache filename hexadecimal-digit predicate | `SharpProof.Worker.Test`: 695 passed |
 | R527 | Aggregate worker callable and claim reasons in one pass | `SharpProof.Worker.Test`: 695 passed |
 | R991 | Share the contract-owned solution-test timeout fallback across direct runners | PowerShell parsing and module helper validation |
+| R955 | Guard effect-contract catalog generation with an explicit schema version | Generator verification passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -9051,10 +9052,9 @@ pin, and a reader; then a comparison of every generator's input validation.
 
 ### Status (part one hundred seventy-seven)
 
-R955 is `pending` and is small - a `schemaVersion` in the catalog and a
-three-line guard in the generator, matching what the other fourteen already do.
-It is worth doing because the catalog it protects drives effect-contract mappings,
-where a silently skipped key means a missing mapping rather than a build failure.
+R955 is applied: the effect-contract catalog now declares schema version 1 and
+the generator rejects unsupported versions before emitting mappings. The
+generated output remains deterministic under verification.
 
 ## Second survey, part one hundred eighty-two: R957 - duplicated compiler model decoders
 
@@ -10285,3 +10285,40 @@ the seam is the internal write path, not the response contract itself.
 R992 is `deferred`: retain defensive canonicalization for public and
 standalone serializers, but give trusted internal output paths an explicit
 already-canonical contract.
+
+## Second survey, part two hundred twenty-four: R993 - repeated package-artifact evidence projection
+
+The package-consumer gates independently construct the same small evidence
+record for the package directory. The `package-consumers` branch of
+`Invoke-SharpProofContainer.ps1` enumerates regular files under
+`$PackageSource`, filters `.nupkg` and `.snupkg`, sorts by `Name`, and maps
+each file to an ordered `{ fileName, bytes }` object. The standalone portable
+consumer script repeats the same filter, sort, and two-field projection before
+adding only its OS-family field. The release-container qualification path
+reconstructs the same sorted projection from its six package files and
+serializes it as the comparison value used against all package-backed gate
+receipts. `Write-SharpProofQualificationReceipt.ps1` then normalizes and
+validates the rows again for package-consumers, pilots, and portable gates.
+
+The surrounding evidence policies are intentionally different: package
+consumers record a relative package source, portable consumers record an OS
+family, pilots add package identity metadata, and the release matrix compares
+the selected receipts against the release package set. Those fields and
+identity checks should remain at their gate boundaries. The redundant seam is
+the base package-file projection itself. A helper returning the canonical
+`fileName`/`bytes` rows, or a typed package-artifact record consumed by the
+evidence writers and release comparison, would leave those gate-specific
+fields and exact-six validation local while removing multiple independent
+enumerations and keeping artifact ordering/size representation synchronized.
+This is producer-side duplication, not the receipt validator's repeated
+validation already recorded under R562.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R993 | **Package-backed qualification paths independently rebuild the same sorted package-artifact rows.** `Invoke-SharpProofContainer.ps1`'s `package-consumers` branch and `Test-SharpProofPortableConsumer.ps1` both enumerate package-source files, retain `.nupkg`/`.snupkg`, sort by name, and emit ordered `fileName` plus `bytes` objects. `Invoke-SharpProofReleaseContainer.ps1` repeats that projection from the six release files to compare receipt package sets. The gate-specific source, OS-family, package-identity, and exact-six checks should remain distinct, but a shared package-artifact projection would remove the repeated producer logic and keep ordering/size semantics aligned. This is distinct from R562, which concerns the receipt validator rescanning already-produced evidence. | `scripts/Invoke-SharpProofContainer.ps1:386-413`; `scripts/Test-SharpProofPortableConsumer.ps1:18-40`; `scripts/Invoke-SharpProofReleaseContainer.ps1:158-177,202-214`; `scripts/Write-SharpProofQualificationReceipt.ps1:31-50`; producer identity extension `scripts/Get-SharpProofPilotPackageAuthority.ps1:14-38` |
+
+### Status (part two hundred twenty-four)
+
+R993 is `deferred`: centralize only the canonical package-file row
+projection; preserve each gate's source, platform, identity, receipt, and
+exact-six validation policies.
