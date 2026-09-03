@@ -1395,7 +1395,20 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal bool TryEvaluate(IOperation origin, IOperation value, out ManagedAbstractValue result)
     {
-        if (!ManagedMutationFacts.HasMutation(value) &&
+        return TryEvaluate(
+            origin,
+            value,
+            ManagedMutationFacts.HasMutation(value),
+            out result);
+    }
+
+    private bool TryEvaluate(
+        IOperation origin,
+        IOperation value,
+        bool hasMutation,
+        out ManagedAbstractValue result)
+    {
+        if (!hasMutation &&
             (TryGetState(value, out var state) ||
              TryGetState(origin, out state)))
         {
@@ -1458,9 +1471,10 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
     internal bool ProvesNoSignedDivisionOverflow(
         IOperation origin, IOperation left, IOperation right, long minimum)
     {
-        return !ManagedMutationFacts.HasMutation(right) &&
+        var rightHasMutation = ManagedMutationFacts.HasMutation(right);
+        return !rightHasMutation &&
         TryEvaluate(origin, left, out var leftValue) &&
-        TryEvaluate(origin, right, out var rightValue) &&
+        TryEvaluate(origin, right, rightHasMutation, out var rightValue) &&
         leftValue.TryGetInteger(out var leftInterval) &&
         rightValue.TryGetInteger(out var rightInterval) &&
         (!leftInterval.Contains(minimum) || !rightInterval.Contains(-1));
@@ -1468,13 +1482,19 @@ internal sealed class ManagedFlowResult(ManagedAbstractFlow flow)
 
     internal bool ProvesArrayAccess(IArrayElementReferenceOperation element)
     {
-        return element.Indices.Length == 1 &&
-        !ManagedMutationFacts.HasMutation(element.Indices[0]) &&
+        if (element.Indices.Length != 1)
+        {
+            return false;
+        }
+
+        var index = element.Indices[0];
+        var indexHasMutation = ManagedMutationFacts.HasMutation(index);
+        return !indexHasMutation &&
         TryEvaluate(element, element.ArrayReference, out var array) &&
-        TryEvaluate(element, element.Indices[0], out var index) &&
+        TryEvaluate(element, index, indexHasMutation, out var indexValue) &&
         array.IsDefinitelyNonNull &&
         array.TryGetCardinality(out var length) && length.LowerBound.HasValue &&
-        index.TryGetInteger(out var interval) &&
+        indexValue.TryGetInteger(out var interval) &&
         interval.LowerBound >= 0 && interval.UpperBound < length.LowerBound;
     }
 
