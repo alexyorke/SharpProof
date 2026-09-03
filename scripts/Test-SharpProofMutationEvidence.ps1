@@ -515,6 +515,13 @@ try {
         throw 'Passing baseline evidence was not projected correctly.'
     }
 
+    $mutationArguments = @{
+        Mode = 'Mutation'
+        ProcessExitCode = 1
+        ExpectedMethodName = 'ExpectedTest'
+        ExpectedLedger = $baseline.testLedger
+    }
+
     $batchFirst = New-TestParts `
         -Outcome Passed `
         -Message '' `
@@ -755,10 +762,7 @@ try {
     $mutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $assertionPath `
         -EvidenceName assertion `
-        -Mode Mutation `
-        -ProcessExitCode 1 `
-        -ExpectedMethodName ExpectedTest `
-        -ExpectedLedger $baseline.testLedger
+        @mutationArguments
     if ($mutation.assertionFailureCount -ne 1) {
         throw 'Assertion kill was not recognized.'
     }
@@ -783,10 +787,7 @@ try {
             Read-SharpProofMutationTestEvidence `
                 -TrxPath $path `
                 -EvidenceName $forgery.Name `
-                -Mode Mutation `
-                -ProcessExitCode 1 `
-                -ExpectedMethodName ExpectedTest `
-                -ExpectedLedger $baseline.testLedger
+                @mutationArguments
         }
     }
 
@@ -800,10 +801,7 @@ try {
     $contextEvidence = Read-SharpProofMutationTestEvidence `
         -TrxPath $contextPath `
         -EvidenceName user-context `
-        -Mode Mutation `
-        -ProcessExitCode 1 `
-        -ExpectedMethodName ExpectedTest `
-        -ExpectedLedger $baseline.testLedger
+        @mutationArguments
     if ($contextEvidence.assertionFailureCount -ne 1) {
         throw 'Benign user assertion context was rejected.'
     }
@@ -822,10 +820,7 @@ try {
         Read-SharpProofMutationTestEvidence `
             -TrxPath $missingStructuredStackPath `
             -EvidenceName missing-structured-stack `
-            -Mode Mutation `
-            -ProcessExitCode 1 `
-            -ExpectedMethodName ExpectedTest `
-            -ExpectedLedger $baseline.testLedger
+            @mutationArguments
     }
 
     $multilineAssertion = New-TestParts `
@@ -844,10 +839,7 @@ try {
     $multilineMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $multilinePath `
         -EvidenceName multiline-assertion `
-        -Mode Mutation `
-        -ProcessExitCode 1 `
-        -ExpectedMethodName ExpectedTest `
-        -ExpectedLedger $baseline.testLedger
+        @mutationArguments
     if ($multilineMutation.assertionFailureCount -ne 1) {
         throw 'Multiline assertion kill was not recognized.'
     }
@@ -865,10 +857,7 @@ try {
     $identifierContinuationMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $identifierContinuationPath `
         -EvidenceName identifier-continuation `
-        -Mode Mutation `
-        -ProcessExitCode 1 `
-        -ExpectedMethodName ExpectedTest `
-        -ExpectedLedger $baseline.testLedger
+        @mutationArguments
     if ($identifierContinuationMutation.assertionFailureCount -ne 1) {
         throw 'Assertion code identifier continuation was not recognized.'
     }
@@ -883,10 +872,7 @@ try {
     $prefixedMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $prefixedPath `
         -EvidenceName prefixed-assertion `
-        -Mode Mutation `
-        -ProcessExitCode 1 `
-        -ExpectedMethodName ExpectedTest `
-        -ExpectedLedger $baseline.testLedger
+        @mutationArguments
     if ($prefixedMutation.assertionFailureCount -ne 1) {
         throw 'Prefixed assertion kill was not recognized.'
     }
@@ -901,10 +887,7 @@ try {
     $collectionMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $collectionPath `
         -EvidenceName collection `
-        -Mode Mutation `
-        -ProcessExitCode 1 `
-        -ExpectedMethodName ExpectedTest `
-        -ExpectedLedger $baseline.testLedger
+        @mutationArguments
     if ($collectionMutation.assertionFailureCount -ne 1) {
         throw 'Collection assertion kill was not recognized.'
     }
@@ -928,10 +911,7 @@ try {
     $nunitCollectionMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $nunitCollectionPath `
         -EvidenceName nunit-collection `
-        -Mode Mutation `
-        -ProcessExitCode 1 `
-        -ExpectedMethodName ExpectedTest `
-        -ExpectedLedger $baseline.testLedger
+        @mutationArguments
     if ($nunitCollectionMutation.assertionFailureCount -ne 1) {
         throw 'NUnit collection assertion kill was not recognized.'
     }
@@ -954,10 +934,7 @@ try {
     $multipleMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $multiplePath `
         -EvidenceName multiple-assertion `
-        -Mode Mutation `
-        -ProcessExitCode 1 `
-        -ExpectedMethodName ExpectedTest `
-        -ExpectedLedger $baseline.testLedger
+        @mutationArguments
     if ($multipleMutation.assertionFailureCount -ne 1) {
         throw 'Multiple assertion kill was not recognized.'
     }
@@ -978,10 +955,7 @@ try {
     $multipleCollectionMutation = Read-SharpProofMutationTestEvidence `
         -TrxPath $multipleCollectionPath `
         -EvidenceName multiple-collection-assertion `
-        -Mode Mutation `
-        -ProcessExitCode 1 `
-        -ExpectedMethodName ExpectedTest `
-        -ExpectedLedger $baseline.testLedger
+        @mutationArguments
     if ($multipleCollectionMutation.assertionFailureCount -ne 1) {
         throw 'Multiple collection assertion kill was not recognized.'
     }
@@ -1004,10 +978,7 @@ try {
         Read-SharpProofMutationTestEvidence `
             -TrxPath $multipleMixedPath `
             -EvidenceName multiple-mixed `
-            -Mode Mutation `
-            -ProcessExitCode 1 `
-            -ExpectedMethodName ExpectedTest `
-            -ExpectedLedger $baseline.testLedger
+            @mutationArguments
     }
 
     $crash = New-TestParts `
@@ -1024,10 +995,7 @@ try {
         Read-SharpProofMutationTestEvidence `
             -TrxPath $crashPath `
             -EvidenceName crash `
-            -Mode Mutation `
-            -ProcessExitCode 1 `
-            -ExpectedMethodName ExpectedTest `
-            -ExpectedLedger $baseline.testLedger
+            @mutationArguments
     }
 
     $other = New-TestParts -Outcome Passed -Message '' -Method OtherTest
@@ -1078,10 +1046,7 @@ try {
         Read-SharpProofMutationTestEvidence `
             -TrxPath $timeoutPath `
             -EvidenceName timeout `
-            -Mode Mutation `
-            -ProcessExitCode 1 `
-            -ExpectedMethodName ExpectedTest `
-            -ExpectedLedger $baseline.testLedger
+            @mutationArguments
     }
 
     Assert-Throws `
@@ -1123,10 +1088,7 @@ try {
         Read-SharpProofMutationTestEvidence `
             -TrxPath $mixedPath `
             -EvidenceName mixed `
-            -Mode Mutation `
-            -ProcessExitCode 1 `
-            -ExpectedMethodName ExpectedTest `
-            -ExpectedLedger $baseline.testLedger
+            @mutationArguments
     }
 
     $foreignXml = [IO.File]::ReadAllText($passingPath).Replace(

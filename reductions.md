@@ -20460,3 +20460,69 @@ are findings; the rest are data tables or already-filed material.
 R1920 is `pending` and is small, but it should be applied by the route R816's own
 text describes rather than by re-composing naively, or the double restore returns.
 R1921 is `pending` and is a mechanical splat.
+
+## Second survey, part six hundred twenty-six: R1940 - the protocol validator's error oracle is containment in fifty-nine places and exact in one
+
+R1780 found that the analyzer test host narrows what a test can observe. The
+obvious next question is whether any other test project's assertion helper has the
+same property. Every assertion-named helper in test code was enumerated - **166**
+declarations across seventeen projects - and each body classified by whether it
+performs an exact or set comparison or only a containment or count check.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1940 | **`ProtocolJsonTests.AssertErrorCode` asserts that each expected error code is *among* the validator's errors and never that it is *all* of them, and it is the oracle for 59 of the file's assertions against a single explicit exact-set check.** `:2096-2111` takes `params string[] expected`, projects `validation.Errors.Select(error => error.Code)` into `actual`, and inside an `Assert.EnterMultipleScope()` loops the expected codes asserting `Assert.That(actual, Does.Contain(code))`. It never compares lengths and never bounds `actual`. So `AssertErrorCode(validation, "a", "b")` - which reads as *the errors are a and b* - passes when the validator returns `a`, `b` and three more. Counting the whole 55-test file: **59** `AssertErrorCode` call sites, **1** explicit `Is.EqualTo` over the error-code sequence, **2** explicit `Is.Empty`. **The subject makes this matter more than the ratio suggests.** `WorkerProtocolJson.Validate` is the worker protocol's input validator and these tests exist to pin exactly which typed error each malformed field produces; a change that made the validator additionally report an unrelated code on the same input would leave all 59 green, and the protocol's error surface is what the launcher, the MSBuild task and the SARIF projection all branch on. **This is not a regression from applied R1068**, which consolidated hand-rolled error assertions into this helper: that work was done carefully, and its status note records that it routed "repeated single- and multi-code **containment** checks" while "exact-set and empty-result assertions remain explicit". R1068 made a pre-existing shape uniform; R1940 is about which shape the shared helper should have implemented. The fix is inside the helper - compare `actual` to `expected` with `Is.EqualTo`, or `Is.EquivalentTo` if the validator's error order is not part of its contract - and give the containment form a separate name for the cases that genuinely want it, which the single explicit `Is.EqualTo` site suggests are few. | `SharpProof.Worker.Test/ProtocolJsonTests.cs:2096-2111` and its 59 call sites; the one `Is.EqualTo` and two `Is.Empty` explicit assertions in the same file; `SharpProof.Worker.Protocol/ProtocolJson.cs`; applied R1068; related R1780, R1720 |
+
+### Checked and not proposed (part six hundred twenty-six)
+
+- **The assertion-helper surface is 166 declarations and only one other is weak.**
+  Distribution: `Worker.Test` 48, `Package.Test` 28, `Effects.Test` 21,
+  `Analyzer.Test` 12, `ArchitectureTest` 11, `Frontend.Test` 8, `Ir.Test` 8,
+  `Specs.Test` 7, `Contracts.Test` 6, `eng/testing` 6, and one to three in each
+  remaining project. Classifying every body, six flagged as containment-or-count
+  without an exact comparison; five of the six are false positives or negligible -
+  `AssertStage`, `AssertCompilerCeiling` and `AssertPackedBuildOutcome` have one to
+  three callers each, `AssertRuntimeEvaluationRejected` has three. **The remaining
+  false positive is worth naming because it is the pattern done right.**
+  `ContractApiIdentityAnalyzerTests.AssertRejected:335-347` looked weak to the
+  classifier because its exact check is delegated: it calls
+  `AnalyzerTestHost.AssertIds(diagnostics, "SP0047")` for the exact id sequence,
+  then `diagnostics.Single()`, then requires the message to contain both the
+  method name and `ContractApiIdentityRejected`. Exact set, exact count, and two
+  message constraints across 24 callers - the strongest helper measured.
+- **`AssertIds` itself is a strong helper and R1780 is not about it.** Its two
+  overloads at `AnalyzerTestHost.cs:19-34` assert an exact ordered id sequence and
+  expand a repeated-count form. 146 callers. What R1780 records is that the
+  *compilation* those callers build suppresses every id they did not list, which
+  narrows the universe the exact assertion ranges over - a different defect in a
+  different place.
+- **No other project's helper narrows what its test can observe.** The
+  `WithSpecificDiagnosticOptions` census in part six hundred eighteen already
+  established that only the analyzer host has a suppression mechanism; this census
+  adds that no assertion helper elsewhere achieves the same effect by asserting a
+  subset. R1940 is the only instance, and it is containment by construction rather
+  than by suppression.
+- **`Requires` at 399 call sites in two files is not an assertion helper.** The
+  most-called name in the census is the product's own `Contract.Requires` appearing
+  inside test fixture source strings; the regex caught its declaration in two test
+  files that define synthetic contract surfaces. It is fixture text, not test
+  machinery.
+
+### Status (part six hundred twenty-six)
+
+R1940 is `pending` and is a change inside one helper, but it will fail tests when
+made - any of the 59 sites whose validator genuinely returns more codes than the
+call lists will surface, and each is then a real question about what the validator
+should report. That is the point of making it, and it is why the change is larger
+than its diff.
+
+### Applied reduction follow-up
+
+R1881 is applied: `ContractBinderTests.ContractSubject` no longer implements
+`IDisposable`, its empty `Dispose` was removed, and 53 no-op `using` declarations
+are ordinary locals. The focused binder suite passes (89/89).
+
+R1921 is applied for every matching current call site: the 15 mutation-evidence
+reads that share the baseline mutation arguments now use one splatted hashtable.
+The other reads intentionally use a different baseline, method name, or exit code;
+the behavioral mutation-evidence script passes.
