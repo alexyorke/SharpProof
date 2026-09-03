@@ -16835,3 +16835,27 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 | ID | Finding | Evidence |
 |---|---|---|
 | R1391 | `Test-SharpProofThirdPartyComponentProjection` validates each actual component's property set in a separate pass before converting the same rows; fold the shape check into `ConvertTo-ComponentRecord` and retain the canonical comparison. | `scripts/Test-SharpProofPackageDependencies.ps1:268-307` |
+
+## Second survey, continued: R1392 - Fixture package-state projection performs two catalog filters
+
+`Get-SharpProofPublicationFixturePackageState` first materializes all non-null catalog entries, then immediately filters that array again for the requested package ID and version. The identity predicate can include the null guard in one pass, preserving the null-tolerant catalog contract and the later main/symbol role checks while removing one intermediate array and traversal for every package-state query.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1392 | `Get-SharpProofPublicationFixturePackageState` filters the catalog once for nulls and again for package/version identity; combine those predicates in one pass before deriving role states. | `scripts/SharpProof.PublicationDestination.ps1:125-149` |
+
+## Second survey, continued: R1393 - Fixture archive-role detection scans each archive entry list twice
+
+`Get-SharpProofPublicationFixtureArchiveCatalog` computes `hasDll` and `hasPdb` with two independent `Where-Object` enumerations over the same archive entry collection. One loop can set both flags and stop once both are known, retaining the ambiguous-role rejection and the requirement that a main archive contain DLLs while a symbol archive contains PDBs, without two pipeline result arrays per archive.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1393 | `Get-SharpProofPublicationFixtureArchiveCatalog` walks each ZIP's entries separately to detect DLL and PDB presence; combine the two flags in one entry pass while preserving ambiguous-role rejection. | `scripts/SharpProof.PublicationDestination.ps1:57-120` |
+
+## Second survey, continued: R1394 - Publication-plan identity derives fixture role states through duplicate filters
+
+`Test-SharpProofPublicationPlanIdentity` has already narrowed `fixtureArchives` to one package/version match, but then runs two separate `Where-Object` pipelines over that same matching set to count `main` and `symbols` rows. A single role-count loop can derive both expected states while preserving the exact-one rule and the distinct action checks for each role.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1394 | `Test-SharpProofPublicationPlanIdentity` filters `matchingFixtureArchives` separately for main and symbol roles; accumulate both role counts in one pass and retain the exact-one fixture-state contract. | `scripts/SharpProof.PublicationPlanIdentity.psm1:320-357` |
