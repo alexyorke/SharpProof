@@ -10705,3 +10705,15 @@ R1018 is deferred: share the independent region mapping data, but keep direct pr
 ### Status (part two hundred fifty)
 
 R1019 is deferred: keep the specific exception assertion and message check, and remove only the inherited-base-type assertion if the test is simplified.
+
+## Second survey, part two hundred fifty-one: R1020 - duplicated factory-lock comparer fixtures
+
+`ProgressCheckingHashComparer` and `ProgressCheckingEqualityComparer` in the IR factory regression tests duplicate the same comparer class shape and the same `IrFactory` progress helper call. One invokes the helper from `GetHashCode` and returns a constant hash; the other invokes it from `Equals`, returns `true`, and supplies the same constant hash. A single configurable test comparer, or two small callback adapters around one implementation, can retain the separate hash-path and equality-path concurrency coverage while removing the duplicated comparer plumbing.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1020 | **IR factory lock-concurrency tests duplicate their comparer implementation.** The hash and equality test doubles each carry an `IrFactory`, implement the same `IEqualityComparer<object>` contract, return constant hash/equality values, and call the same progress assertion from one callback; only the callback placement differs. Consolidating the common comparer shell preserves both lock-release tests and their distinct trigger paths. | `SharpProof.Ir.Test/IrFactoryInvariantRegressionTests.cs:232-252,255-297` |
+
+### Status (part two hundred fifty-one)
+
+R1020 is deferred: share the comparer shell only, and keep separate tests that force hashing and equality while the factory is interning an external identity.
