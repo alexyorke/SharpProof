@@ -18716,3 +18716,11 @@ R1650 is applied: the independent projection oracle now expresses precedence
 with compact ordered guards instead of a second switch-shaped implementation,
 while still checking every five-flag combination against the generated tuple.
 `EffectEvaluationProjectionsTests` pass (2/2).
+
+## Second survey, continued: R1652 - `SharpProofSoundnessAnalyzer` repeats the shared operation-wrapper unwrapping walk
+
+`SharpProofSoundnessAnalyzer` has a pending-operation walker for semantic string shapes. After handling literals, its switch has the same two wrapper arms as the existing `OperationUnwrapping.Unwrap`: parenthesized operations push `Operand`, and built-in conversions (`OperatorMethod: null`) push `Operand`. The analyzer is in the same assembly as the helper, so it can unwrap the current operation through that utility (or expose a stack-friendly variant) while leaving binary/string-concat handling and the `\0` fallback local. Keeping both loops means a future wrapper-policy change can make semantic-shape analysis disagree with the analyzer-wide unwrapping contract.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1652 | `SharpProofSoundnessAnalyzer` repeats the shared parenthesis and built-in-conversion unwrapping loop; route this path through `OperationUnwrapping` while retaining the string-shape-specific cases. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:474-493`; shared helper at `SharpProof.Meta.Analyzers/OperationUnwrapping.cs:8-24` |
