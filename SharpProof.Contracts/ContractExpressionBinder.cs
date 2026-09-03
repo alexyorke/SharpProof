@@ -10,6 +10,7 @@ internal sealed class ContractExpressionBinder
         new(SymbolEqualityComparer.Default);
     private readonly HashSet<IrVarId> _receiverVariables = [];
     private readonly Dictionary<IrVarId, IrVarId> _preState = [];
+    private readonly HashSet<IrVarId> _preStateValues = [];
     private IrVarId? _result;
 
     internal ContractExpressionBinder(
@@ -86,6 +87,7 @@ internal sealed class ContractExpressionBinder
                         System.Globalization.CultureInfo.InvariantCulture),
                     info.Type);
                 _preState.Add(variable, preState);
+                _preStateValues.Add(preState);
             }
             substitutions[variable] = _factory.Variable(preState);
         }
@@ -114,7 +116,7 @@ internal sealed class ContractExpressionBinder
         {
             if (boundVariables.Contains(variable) ||
                 variable == _result ||
-                _preState.ContainsValue(variable))
+                _preStateValues.Contains(variable))
             {
                 continue;
             }
