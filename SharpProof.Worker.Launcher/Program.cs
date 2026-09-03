@@ -1015,6 +1015,7 @@ internal sealed partial class LauncherArguments
             cacheDirectory = OptionalFullPath("cache-directory");
         }
         var workerPath = WorkerPath;
+        var launcherRuntimePaths = LauncherArguments.LauncherRuntimePaths;
         if (Directory.Exists(ResultPath))
         {
             throw new ArgumentException(
@@ -1035,7 +1036,7 @@ internal sealed partial class LauncherArguments
             LinuxPathIdentity.RequireLocalPath(publicationPath);
         }
         var runtimeDirectories = runtimeRoots
-            .Concat(LauncherArguments.LauncherRuntimePaths)
+            .Concat(launcherRuntimePaths)
             .Select(static path => Path.GetDirectoryName(
                 LinuxPathIdentity.Canonicalize(path))!)
             .Distinct(StringComparer.Ordinal)
@@ -1054,7 +1055,7 @@ internal sealed partial class LauncherArguments
                 "SharpProof writable paths must be outside the worker runtime directory.");
         }
         string?[] candidates = [..runtimeRoots,
-            ..LauncherArguments.LauncherRuntimePaths,
+            ..launcherRuntimePaths,
             cacheDirectory, RequestPath, ResultPath, CompilerManifestPath,
             ..publicationPaths,
             ..publicationPaths.Select(
@@ -1062,7 +1063,7 @@ internal sealed partial class LauncherArguments
         var paths = candidates.OfType<string>()
             .Concat(runtimeSnapshot?.ComponentPaths.Where(path =>
                 !runtimeRoots.Contains(path, StringComparer.Ordinal) &&
-                !LauncherArguments.LauncherRuntimePaths.Contains(
+                !launcherRuntimePaths.Contains(
                     path, StringComparer.Ordinal)) ?? [])
             .Select(LinuxPathIdentity.Canonicalize)
             .ToArray();
