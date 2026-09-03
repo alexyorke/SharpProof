@@ -19987,3 +19987,11 @@ than assumed: the conditional option map exists four times and nowhere else, the
 suppression mechanism exists in one test host and nowhere else, the sibling file
 that looked like a second instance is not one, and production's version of the
 same weakness is the tier-C list part six hundred eight already enumerates.
+
+## Second survey, continued: R1821 - Generated-code initializer tests repeat the same Positive guard fixture
+
+Four source literals in `RequiresAndControlTests` repeat the same `using SharpProof.Attributes`, `Guard.Positive(int)` contract, and return body: twice inside `GeneratedCodeAttributeSuppressesMemberInitializerCalls`, then in `NonGeneratedConstructorRetainsMemberInitializerCalls` and `GeneratedPartialConstructorSuppressesMemberInitializerCalls`. The surrounding subjects intentionally differ - type-level generated code, member-level generated code, a generated constructor that must not suppress the initializer, and a partial generated syntax tree - so those assertions should stay separate. Extracting only the invariant positive-guard declaration into a source fragment or local builder would remove a fourth fixture authority without collapsing those boundary cases. This is distinct from R1344's `Guard.Fail`/`Guard.Positive` non-completion fixture.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1821 | Four generated/initializer tests duplicate the same Positive guard source; share only that invariant source fragment and retain each suppression boundary. | `SharpProof.Analyzer.Test/RequiresAndControlTests.cs:735-766,834-895`; related R1344 |
