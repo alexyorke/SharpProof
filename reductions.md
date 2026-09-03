@@ -14909,6 +14909,13 @@ distinct enum-field policies. Meta analyzer tests pass (162 passed).
 |---|---|---|
 | R1233 | **`AnalyzeControlFlowGraph` rebuilds the same CFG region set for two maps.** The exceptional-region and finally-entry helpers independently execute `graph.Blocks.SelectMany(EnclosingRegions).Distinct().ToArray()` before applying their distinct projections. Compute that immutable region snapshot once at the caller and reuse it in both helpers to remove one full CFG region walk. | `SharpProof.Effects/EffectMethodNodeBuilder.cs:720-733,955-963,1012-1018` |
 
+### Status (part five hundred fifty-five)
+
+R1233 is applied: control-flow region extraction is now shared by exceptional
+region and finally-entry mapping, preserving each map's ordering and filtering
+while removing the duplicate CFG region walk. Exception-handler and using-
+initializer effects tests pass (2 and 1 passed, respectively).
+
 ## Second survey, part five hundred fifty-six: R1234 - initializer ordering rebuilds a compilation-wide map per call
 
 `EffectMethodNodeBuilder.GetMemberInitializerReferences` derives a `SyntaxTree`-to-ordinal dictionary by enumerating every syntax tree in the compilation each time the helper is called. The map depends only on the compilation, while the requested type and static/instance policy vary per call. A builder-scoped lazy map, or an explicit compilation ordering context passed to this helper, can preserve deterministic cross-tree ordering and the fallback ordinal for unlisted references while removing repeated compilation-wide enumeration during constructor/static-initializer analysis.
