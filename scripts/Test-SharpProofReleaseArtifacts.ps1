@@ -78,25 +78,19 @@ foreach ($kind in @('package', 'symbols')) {
         throw "Release evidence does not contain the exact $kind package graph."
     }
 }
-$expectedNames = @($artifacts |
-    ForEach-Object { [string]$_.fileName } |
-    Sort-Object)
-$actualNames = @(
-    Get-ChildItem -LiteralPath $resolvedSource -File |
-        Where-Object {
-            $_.Extension -in @('.nupkg', '.snupkg')
-        } |
-        ForEach-Object { $_.Name } |
-        Sort-Object
-)
-if (($actualNames -join '|') -ne ($expectedNames -join '|')) {
-    throw 'Release directory artifacts do not exactly match the evidence manifest.'
-}
 foreach ($artifact in $artifacts) {
-    $path = Join-Path $resolvedSource ([string]$artifact.fileName)
+    $fileName = [string]$artifact.fileName
+    $kind = [string]$artifact.kind
+    $expectedExtension = if ($kind -ceq 'package') { '.nupkg' } else { '.snupkg' }
+    if (-not $fileName.EndsWith(
+            $expectedExtension,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Release artifact extension is invalid: $fileName"
+    }
+    $path = Join-Path $resolvedSource $fileName
     $file = Get-Item -LiteralPath $path -ErrorAction Stop
     if ([int64]$file.Length -ne [int64]$artifact.bytes) {
-        throw "Release artifact size mismatch: $($artifact.fileName)"
+        throw "Release artifact size mismatch: $fileName"
     }
 }
 $payloadSets = @($manifest.packagePayloads)

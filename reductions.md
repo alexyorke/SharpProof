@@ -21196,3 +21196,9 @@ the existing 200/404/other-status projection while removing the temporary
 file and discarded package download. The publication destination fixture and
 the canonical NuGet endpoint HEAD probe both pass; the focused architecture
 run still reports its pre-existing publisher-text assertion failure.
+
+R2003 is applied: release-artifact validation now checks each manifest
+artifact's package/symbol extension while it already walks the loaded artifact
+rows, leaving exact file-set ownership with `Test-SharpProofReleaseBundleTopology`
+and removing the redundant directory rescan. The release-authority closure
+fixtures pass.
