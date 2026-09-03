@@ -2583,17 +2583,27 @@ internal sealed class ExceptionHandlerReachability(
         HashSet<IMethodSymbol> activeMethods,
         int depth)
     {
-        if (!StringConcatenationEffectResolver.TryResolveFormattedValueMethod(
-                operand,
-                origin,
-                compilation,
-                abstractFlow,
-                out var target,
-                out var dispatchUncertain))
+        return GetFormattedValueExceptions(
+            operand,
+            origin,
+            activeMethods,
+            depth,
+            ResolveFormattedValueMethod(operand, origin));
+    }
+
+    private PotentialExceptions GetFormattedValueExceptions(
+        IOperation operand,
+        IOperation origin,
+        HashSet<IMethodSymbol> activeMethods,
+        int depth,
+        FormattedValueResolution resolution)
+    {
+        if (!resolution.IsRequired)
         {
             return EmptyPotential;
         }
-        if (target == null || dispatchUncertain)
+        if (resolution.Target is not { } target ||
+            resolution.DispatchUncertain)
         {
             return UnknownPotential;
         }
@@ -2608,7 +2618,10 @@ internal sealed class ExceptionHandlerReachability(
         }
         return Union(
             result,
-            GetCallableExceptions(target, activeMethods, depth + 1));
+            GetCallableExceptions(
+                target,
+                activeMethods,
+                depth + 1));
     }
 
     private bool AddFormattedValuePotential(
@@ -2618,29 +2631,41 @@ internal sealed class ExceptionHandlerReachability(
         int depth,
         Action<PotentialExceptions, IOperation> add)
     {
+        var resolution = ResolveFormattedValueMethod(operand, origin);
         add(
             GetFormattedValueExceptions(
                 operand,
                 origin,
                 activeMethods,
-                depth),
+                depth,
+                resolution),
             origin);
-        if (!StringConcatenationEffectResolver
+
+        return !resolution.IsRequired ||
+            resolution.Target is not { } target ||
+            resolution.DispatchUncertain ||
+            canMethodCompleteNormally(target);
+    }
+
+    private FormattedValueResolution ResolveFormattedValueMethod(
+        IOperation operand,
+        IOperation origin)
+    {
+        var isRequired = StringConcatenationEffectResolver
             .TryResolveFormattedValueMethod(
                 operand,
                 origin,
                 compilation,
                 abstractFlow,
                 out var target,
-                out var dispatchUncertain))
-        {
-            return true;
-        }
-
-        return target == null ||
-            dispatchUncertain ||
-            canMethodCompleteNormally(target);
+                out var dispatchUncertain);
+        return new(isRequired, target, dispatchUncertain);
     }
+
+    private readonly record struct FormattedValueResolution(
+        bool IsRequired,
+        IMethodSymbol? Target,
+        bool DispatchUncertain);
 
     internal ReturnNullability GetReturnNullability(IMethodSymbol method)
     {
