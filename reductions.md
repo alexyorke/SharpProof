@@ -13847,6 +13847,12 @@ callers.
 |---|---|---|
 | R1175 | **`OperationCompletionEvaluator.CanCompleteSwitchExpression` validates the switch value twice.** Its explicit `CanCompleteNormally(switchExpression.Value)` guard is immediately followed by `SwitchExpressionFacts.GetReachableArms`, whose `GetArms` implementation invokes the same callback for `operation.Value` before selecting arms. A prevalidated arm-selection entry point can remove the duplicate completion traversal without changing reachability rules. | `SharpProof.Effects/OperationCompletionEvaluator.cs:158-169`; `SharpProof.Effects/SwitchExpressionFacts.cs:92-122` |
 
+### Status (part four hundred ninety-seven)
+
+R1175 is applied: switch completion passes its validated value into arm
+selection, while other reachability callers retain the default value check.
+The Effects test suite passes (323/323).
+
 ## Second survey, part four hundred ninety-eight: R1176 - switch scanning rechecks one value through three queries
 
 `OperationEffectScanner.ScanSwitchExpression` invokes
