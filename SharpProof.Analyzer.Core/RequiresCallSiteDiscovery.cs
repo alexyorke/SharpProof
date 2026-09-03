@@ -223,7 +223,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                             hasFlowState,
                             flowAnalysis.IsComplete),
                         hasFlowState ? flowResult : null,
-                        flowAnalysis.Status);
+                        flowAnalysis.Status,
+                        cancellationToken);
                     AddOrUpgrade(
                         callSites,
                         candidate,
@@ -258,7 +259,8 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     call,
                     canReplay: false,
                     flow: null,
-                    ManagedFlowStatus.BudgetExceeded));
+                    ManagedFlowStatus.BudgetExceeded,
+                    cancellationToken));
             }
         }
 
@@ -296,8 +298,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                         hasFlowState: false,
                         flowAnalysisIsComplete:
                             flowAnalysis.IsComplete),
-                    flow: null,
-                    flowAnalysis.Status);
+                        flow: null,
+                        flowAnalysis.Status,
+                        cancellationToken);
                 AddOrUpgrade(
                     callSites,
                     candidate,
@@ -316,8 +319,13 @@ internal sealed partial class RequiresCallSiteDiscovery(
         RequiresCallTarget call,
         bool canReplay,
         ManagedFlowResult? flow,
-        ManagedFlowStatus flowStatus)
+        ManagedFlowStatus flowStatus,
+        CancellationToken cancellationToken)
     {
+        var resolvedTarget = RequiresCallSiteDispatch.ResolveExactTarget(
+            call.TargetMethod,
+            call.Instance,
+            cancellationToken);
         return new RequiresCallSiteCandidate(
             operation,
             operation.Syntax,
@@ -328,7 +336,10 @@ internal sealed partial class RequiresCallSiteDiscovery(
             call.ImplicitIntegerArguments,
             canReplay,
             flow,
-            flowStatus);
+            flowStatus)
+        {
+            ResolvedTargetMethod = resolvedTarget
+        };
     }
 
     private static void AddOrUpgrade(
