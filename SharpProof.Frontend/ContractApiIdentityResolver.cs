@@ -409,10 +409,21 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol contract,
         string name)
     {
-        var members = contract.GetMembers(name).OfType<IMethodSymbol>()
-            .ToImmutableArray();
-        return members.Length == 1 &&
-            members[0] is
+        IMethodSymbol? member = null;
+        var count = 0;
+        foreach (var candidate in contract.GetMembers(name))
+        {
+            if (candidate is not IMethodSymbol method)
+            {
+                continue;
+            }
+
+            count++;
+            member ??= method;
+        }
+
+        return count == 1 &&
+            member is
             {
                 MethodKind: MethodKind.Ordinary,
                 DeclaredAccessibility: Accessibility.Public,
@@ -439,17 +450,27 @@ internal sealed class ContractApiIdentityResolver
             return false;
         }
 
-        var attributes = method.GetAttributes()
-            .Where(attribute => HasMetadataName(
-                attribute.AttributeClass,
-                ContractApiMetadata.ConditionalAttribute))
-            .ToImmutableArray();
-        return attributes.Length == 1 &&
+        AttributeData? attribute = null;
+        var count = 0;
+        foreach (var candidate in method.GetAttributes())
+        {
+            if (!HasMetadataName(
+                    candidate.AttributeClass,
+                    ContractApiMetadata.ConditionalAttribute))
+            {
+                continue;
+            }
+
+            count++;
+            attribute ??= candidate;
+        }
+
+        return count == 1 &&
             SymbolEqualityComparer.Default.Equals(
-                attributes[0].AttributeClass?.OriginalDefinition,
+                attribute!.AttributeClass?.OriginalDefinition,
                 _conditionalAttribute.OriginalDefinition) &&
-            attributes[0].ConstructorArguments.Length == 1 &&
-            attributes[0].ConstructorArguments[0] is
+            attribute.ConstructorArguments.Length == 1 &&
+            attribute.ConstructorArguments[0] is
             {
                 Kind: TypedConstantKind.Primitive,
                 Value: ContractApiMetadata.ConditionalSymbol
@@ -475,12 +496,21 @@ internal sealed class ContractApiIdentityResolver
         string name,
         int parameterCount)
     {
-        var members = contract
-            .GetMembers(name)
-            .OfType<IMethodSymbol>()
-            .ToImmutableArray();
-        return members.Length == 1 &&
-            members[0] is
+        IMethodSymbol? member = null;
+        var count = 0;
+        foreach (var candidate in contract.GetMembers(name))
+        {
+            if (candidate is not IMethodSymbol method)
+            {
+                continue;
+            }
+
+            count++;
+            member ??= method;
+        }
+
+        return count == 1 &&
+            member is
             {
                 MethodKind: MethodKind.Ordinary,
                 DeclaredAccessibility: Accessibility.Public,
