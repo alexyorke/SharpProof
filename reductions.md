@@ -16193,6 +16193,12 @@ Three CompilerProbeSnapshotTests cases pass Path.Combine(Path.GetTempPath(), Gui
 |---|---|---|
 | R1345 | **Three probe snapshot tests create global-temp JSON files without cleanup. Reuse the existing `TempDirectory` fixture or add helper-owned finally cleanup, preserving snapshot contents while removing test-run debris.** | `SharpProof.Package.Test/CompilerProbeSnapshotTests.cs:14-24,27-50,70-90,137-167` |
 
+### Status (continued)
+
+R1345 is applied: single-snapshot probe cases use a helper-owned temporary
+directory, so generated JSON is cleaned up automatically. Probe snapshot tests
+pass (5 passed).
+
 ## Second survey, continued: R1346 - Repeated compiler-location authority assertion plumbing
 
 In `CompilerSourceLocationAuthorityTests`, three tests independently pass the same six authority fields (`Location`, source-tree ordinal/path/hash/line-map hash, and compilation) into `CompilerSourceLocationAuthority.IsBound`: direct diagnostic binding, generic manifest authorities, and mapped diagnostic arrays. The assertions differ only in the source of the authority or quantifier. A local `AssertBound` helper (or artifact-aware overload) can centralize the argument plumbing while preserving each test's semantics and the separate `allowNone` sentinel case. This is test-only duplication; production validation should remain unchanged.
