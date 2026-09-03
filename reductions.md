@@ -11964,3 +11964,15 @@ When `Publish-SharpProofRelease.ps1` runs with `PlanOnly` and a `PlanOutputPath`
 ### Status (part three hundred fifty-four)
 
 R1123 is deferred: preserve a deliberate serialized-plan boundary check if required, but avoid replaying the complete identity validation after the in-memory plan has already passed.
+
+## Second survey, part three hundred fifty-five: R1124 - hard-coded package graph in release artifact validation
+
+`Test-SharpProofReleaseArtifacts.ps1` dot-sources the package dependency helpers, which import `SharpProof.PackageIdentity.psm1` and expose the canonical `$SharpProofPackageIds` array. Nevertheless, the release-artifact validator creates its own sorted `expectedPackageIds` array with the same three literals (`SharpProof`, `SharpProof.Attributes`, and `SharpProof.Verifier`). `New-SharpProofReleaseEvidence.ps1` and `Test-SharpProofPackageConsumers.ps1` already consume the exported set, while `Publish-SharpProofRelease.ps1` consumes the separate intentional push-order array. A release package added or renamed can therefore update the identity module and some validators while leaving this artifact gate stale. Reusing the canonical set here keeps the artifact membership authority in one place without conflating it with the distinct publication order.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1124 | **Release-artifact validation repeats the canonical three-package ID set as literals.** `Test-SharpProofReleaseArtifacts.ps1` hard-codes the package IDs despite importing the module that exports `$SharpProofPackageIds`; neighboring release evidence and consumer validators use that shared variable. Replace the local literal set with the canonical membership set, retaining `$SharpProofPackagePushOrder` separately for ordering semantics. | `scripts/Test-SharpProofReleaseArtifacts.ps1:58-63`; `scripts/SharpProof.PackageIdentity.psm1:4-8,108-110`; `scripts/New-SharpProofReleaseEvidence.ps1:327`; `scripts/Test-SharpProofPackageConsumers.ps1:56` |
+
+### Status (part three hundred fifty-five)
+
+R1124 is deferred: make release-artifact membership consume `$SharpProofPackageIds`, while preserving the distinct push-order contract for publication sequencing.
