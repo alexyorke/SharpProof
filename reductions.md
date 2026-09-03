@@ -19056,3 +19056,8 @@ operator, conversion, and nullness-specific behavior remains in each caller.
 R1670 is applied: the term-depth and type-depth encoder rejection cases now
 share one parameterized encode/reject test, with explicit builders for the two
 nested-value shapes. Both cases pass (2/2).
+
+R1672 and R1673 are applied together: effect-replay tests now share one
+object/array event roster and reuse the linked `AllocationWitnessKinds.Managed`
+wire vocabulary for fixture mapping and concurrent result counts. The affected
+`EffectCounterexampleReplayTests` class passes (31/31).

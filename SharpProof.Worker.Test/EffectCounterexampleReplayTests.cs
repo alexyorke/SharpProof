@@ -8,14 +8,16 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class EffectCounterexampleReplayTests
 {
+    private static readonly CompilerEffectReplayEventKind[]
+        s_allocationEventKinds = [
+            CompilerEffectReplayEventKind.ManagedObjectAllocation,
+            CompilerEffectReplayEventKind.ManagedArrayAllocation
+        ];
+
     [Test]
     public void UnconditionalObjectAndArrayAllocationsAreIndependentlyConfirmed()
     {
-        foreach (var kind in new[]
-                 {
-                     CompilerEffectReplayEventKind.ManagedObjectAllocation,
-                     CompilerEffectReplayEventKind.ManagedArrayAllocation
-                 })
+        foreach (var kind in s_allocationEventKinds)
         {
             var fixture = CreateFixture(kind);
             var result = EffectClaimResultAssembler.Assemble(
@@ -399,13 +401,7 @@ public sealed class EffectCounterexampleReplayTests
     [Test]
     public void CanceledReplayDoesNotPoisonTheNextReplay()
     {
-        foreach (var kind in new[]
-                 {
-                     CompilerEffectReplayEventKind
-                         .ManagedObjectAllocation,
-                     CompilerEffectReplayEventKind
-                         .ManagedArrayAllocation
-                 })
+        foreach (var kind in s_allocationEventKinds)
         {
             var fixture = CreateFixture(kind);
             using var cancellation =
@@ -508,12 +504,12 @@ public sealed class EffectCounterexampleReplayTests
             Assert.That(
                 results.Count(static result =>
                     result.EffectWitness?.Kind ==
-                    "managed-allocation"),
+                    AllocationWitnessKinds.Managed[0]),
                 Is.EqualTo(16));
             Assert.That(
                 results.Count(static result =>
                     result.EffectWitness?.Kind ==
-                    "managed-array-allocation"),
+                    AllocationWitnessKinds.Managed[1]),
                 Is.EqualTo(16));
         }
     }
@@ -692,9 +688,9 @@ public sealed class EffectCounterexampleReplayTests
             Witness = new WorkerEffectViolationWitness
             {
                 Kind = isObject
-                    ? "managed-allocation"
+                    ? AllocationWitnessKinds.Managed[0]
                     : isArray
-                        ? "managed-array-allocation"
+                        ? AllocationWitnessKinds.Managed[1]
                         : isThrow
                             ? "explicit-throw"
                             : isMonitor
