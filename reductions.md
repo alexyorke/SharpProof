@@ -9345,7 +9345,10 @@ root, so it missed the new conditional default. The correct figure is **zero**.
 R965 is `applied`: the samples and pilots build props now import the root
 `Directory.Build.props` and retain only fixture-specific overrides, removing
 duplicated language/nullability/determinism/packability declarations. The pilot
-authority test, sample validation, and pilot validation passed.
+authority test, full sample validation, and direct pilot MSBuild property
+evaluation passed. The end-to-end pilot command remains blocked before build by
+the pre-existing stale package source in `artifacts/container-packages` (its
+embedded commit is `63a3bf...`, not the current HEAD).
 
 ## Second survey, part one hundred ninety: R966 - duplicated frontend abstention validation
 
