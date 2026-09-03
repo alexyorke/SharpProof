@@ -53,7 +53,7 @@ function Get-SharpProofPayloadSpecifications {
                 Entry = 'lib/netstandard2.0/SharpProof.Attributes.xml'
                 Source = Join-Path `
                     $RepositoryRoot `
-                    'SharpProof.Attributes/SharpProof.Attributes.xml'
+                    'SharpProof.Attributes/bin/Release/netstandard2.0/SharpProof.Attributes.xml'
             }
             [pscustomobject][ordered]@{
                 Entry = 'LICENSE'

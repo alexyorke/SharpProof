@@ -4,6 +4,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <IsPackable>true</IsPackable> 
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>SharpProof.Attributes</PackageId>
     <Description>Contains SharpProof contracts for compiler-bound Requires, Ensures, Assume, Result, and Old expressions; closed contract attributes; suppressions and trust declarations; and composable method effects.</Description>
     <PackageTags>SharpProof;Attributes;Contracts;Purity;StaticAnalysis;MethodEffects;Capabilities;ZeroAllocations;Exceptions;Preconditions;Postconditions</PackageTags>
@@ -18,10 +19,6 @@
     <None Include="..\LICENSE">
       <Pack>True</Pack>
       <PackagePath>/</PackagePath>
-    </None>
-    <None Include="SharpProof.Attributes.xml">
-      <Pack>True</Pack>
-      <PackagePath>lib/netstandard2.0/</PackagePath>
     </None>
   </ItemGroup>
 </Project> 

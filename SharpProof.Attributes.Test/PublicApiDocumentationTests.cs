@@ -176,20 +176,14 @@ internal sealed class PublicApiDocumentationTests
 
     private static string GetDocumentationPath()
     {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory != null;
-             directory = directory.Parent)
+        var candidate = Path.Combine(
+            AppContext.BaseDirectory,
+            "SharpProof.Attributes.xml");
+        if (File.Exists(candidate))
         {
-            var candidate = Path.Combine(
-                directory.FullName,
-                "SharpProof.Attributes",
-                "SharpProof.Attributes.xml");
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
+            return candidate;
         }
         throw new InvalidOperationException(
-            "Could not find SharpProof.Attributes.xml.");
+            "Could not find generated SharpProof.Attributes.xml.");
     }
 }

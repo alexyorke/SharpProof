@@ -4,5 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Attributes\SharpProof.Attributes.csproj" />
+    <None Include="..\SharpProof.Attributes\bin\$(Configuration)\netstandard2.0\SharpProof.Attributes.xml"
+          Link="SharpProof.Attributes.xml"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
