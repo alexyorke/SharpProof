@@ -13692,6 +13692,12 @@ analysis.
 |---|---|---|
 | R1168 | **`ConversionOwnershipClassifier.MethodMayIntroduceUnknownRefAlias` traverses each method operation tree twice.** It separately enumerates all ref assignments and all ref-like invocations from the same `root.DescendantsAndSelf()` sequence, even though both checks only inspect that immutable tree. A combined accumulator walk can preserve the distinct assignment and recursive-invocation policies, including cycle/depth fallbacks, while eliminating the duplicate traversal. | `SharpProof.Effects/ConversionOwnershipClassifier.cs:673-723` |
 
+### Status (part four hundred ninety)
+
+R1168 is applied: ref assignments and ref-like invocations now share one
+operation-tree traversal, while assignment validation still precedes recursive
+invocation analysis. The Effects test suite passes (323/323).
+
 ## Second survey, part four hundred ninety-one: R1169 - ref-alias method analysis is re-run across the fixed point
 
 `ConversionOwnershipClassifier.BuildLocalRegions` iterates its entire relevant
