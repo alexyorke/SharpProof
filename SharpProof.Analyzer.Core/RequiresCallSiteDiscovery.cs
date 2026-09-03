@@ -1700,6 +1700,19 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operationFacts);
         }
 
+        IEnumerable<IOperation> DescendOptional(IOperation? child)
+        {
+            if (child is null)
+            {
+                yield break;
+            }
+
+            foreach (var descendant in Descend(child))
+            {
+                yield return descendant;
+            }
+        }
+
         IEnumerable<IOperation> DescendInputs(
             IOperation? instance,
             IEnumerable<IArgumentOperation> arguments)
@@ -1844,13 +1857,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 var branch = factCondition
                     ? factConditional.WhenTrue
                     : factConditional.WhenFalse;
-                if (branch != null)
+                foreach (var descendant in DescendOptional(branch))
                 {
-                    foreach (var descendant in
-                             Descend(branch))
-                    {
-                        yield return descendant;
-                    }
+                    yield return descendant;
                 }
                 yield break;
             }
@@ -1860,12 +1869,7 @@ internal sealed partial class RequiresCallSiteDiscovery(
                          factConditional.WhenFalse
                      })
             {
-                if (branch == null)
-                {
-                    continue;
-                }
-                foreach (var descendant in
-                         Descend(branch))
+                foreach (var descendant in DescendOptional(branch))
                 {
                     yield return descendant;
                 }
@@ -1965,13 +1969,9 @@ internal sealed partial class RequiresCallSiteDiscovery(
             var branch = condition
                 ? conditional.WhenTrue
                 : conditional.WhenFalse;
-            if (branch != null)
+            foreach (var descendant in DescendOptional(branch))
             {
-                foreach (var descendant in
-                         Descend(branch))
-                {
-                    yield return descendant;
-                }
+                yield return descendant;
             }
             yield break;
         }

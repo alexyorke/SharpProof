@@ -20949,3 +20949,9 @@ The second R1780 batch removes another twelve redundant `SP0027` filters from
 precondition replay, flow, constructor, and extension-call cases. The same
 92-test class passes with zero warnings or errors; one flow fixture exposed an
 intentional `SP0047` companion diagnostic and remains filtered.
+
+R1988 is applied: `RequiresCallSiteDiscovery` now uses one `DescendOptional`
+iterator for nullable conditional branches, while preserving the distinct
+fact-aware and ordinary traversal policies. The focused
+`RequiresCallSiteDiscoveryTests` suite passes 44/44 with zero warnings or
+errors.
