@@ -9,47 +9,58 @@ public sealed class ApiSpecConditionalNullInstantiationTests
 {
     private static readonly SpecEvidence Evidence =
         new(SpecEvidenceKind.Observed, "conditional-null-instantiation");
+    private static readonly SpecVariableDeclaration Condition =
+        new(SpecVariableRole.Parameter, 0, IrTypeKind.Boolean);
+    private static readonly SpecVariableDeclaration Reference =
+        new(SpecVariableRole.Parameter, 1, IrTypeKind.Reference);
+    private static readonly SpecNullDeclaration NullReference =
+        new(IrTypeKind.Reference);
+    private static readonly ApiSpecTarget Target = new(
+        "conditional-null-" + Guid.NewGuid().ToString("N"),
+        "M:ConditionalNull.Target",
+        "ConditionalNull",
+        SpecTargetMemberKind.Method,
+        "Target",
+        true,
+        0,
+        null,
+        [IrTypeKind.Boolean, IrTypeKind.Reference],
+        null,
+        [new ApiSpecAssemblyIdentity("ConditionalNull", string.Empty)]);
+    private static readonly ApiSpecFacets Facets = NeutralFacets(Evidence);
+    private static readonly IrFactory Factory = new();
+    private static readonly IrTerm ConditionTerm = Factory.Variable(
+        Factory.CreateVariable("condition", Factory.BooleanType));
+    private static readonly IrTerm ReferenceTerm = Factory.Variable(
+        Factory.CreateVariable(
+            "reference",
+            Factory.GetOrCreateReferenceType(
+                Factory.CreateIdentity(),
+                "Widget")));
 
     [TestCase(true)]
     [TestCase(false)]
     public void ReferenceNullBranchUsesExactSubstitutedPeerType(
         bool nullWhenTrue)
     {
-        var condition = new SpecVariableDeclaration(
-            SpecVariableRole.Parameter,
-            0,
-            IrTypeKind.Boolean);
-        var reference = new SpecVariableDeclaration(
-            SpecVariableRole.Parameter,
-            1,
-            IrTypeKind.Reference);
-        var nullReference = new SpecNullDeclaration(IrTypeKind.Reference);
         var conditional = new SpecConditionalDeclaration(
-            condition,
-            nullWhenTrue ? nullReference : reference,
-            nullWhenTrue ? reference : nullReference,
+            Condition,
+            nullWhenTrue ? NullReference : Reference,
+            nullWhenTrue ? Reference : NullReference,
             IrTypeKind.Reference);
         var template = CreateTemplate(new SpecBinaryDeclaration(
             IrBinaryOperator.NotEqual,
             conditional,
-            nullReference,
+            NullReference,
             IrTypeKind.Boolean));
-        var factory = new IrFactory();
-        var widgetType = factory.GetOrCreateReferenceType(
-            factory.CreateIdentity(),
-            "Widget");
-        var conditionTerm = factory.Variable(
-            factory.CreateVariable("condition", factory.BooleanType));
-        var referenceTerm = factory.Variable(
-            factory.CreateVariable("reference", widgetType));
 
         var result = ApiSpecInstantiator.InstantiatePostconditions(
             template,
-            factory,
+            Factory,
             new Dictionary<SpecVarId, IrTerm>
             {
-                [template.Parameters[0]] = conditionTerm,
-                [template.Parameters[1]] = referenceTerm
+                [template.Parameters[0]] = ConditionTerm,
+                [template.Parameters[1]] = ReferenceTerm
             });
 
         Assert.That(
@@ -61,9 +72,9 @@ public sealed class ApiSpecConditionalNullInstantiationTests
         Assert.That(instantiated, Is.Not.Null);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(instantiated!.Type, Is.EqualTo(widgetType));
-            Assert.That(instantiated.WhenTrue.Type, Is.EqualTo(widgetType));
-            Assert.That(instantiated.WhenFalse.Type, Is.EqualTo(widgetType));
+            Assert.That(instantiated!.Type, Is.EqualTo(ReferenceTerm.Type));
+            Assert.That(instantiated.WhenTrue.Type, Is.EqualTo(ReferenceTerm.Type));
+            Assert.That(instantiated.WhenFalse.Type, Is.EqualTo(ReferenceTerm.Type));
             Assert.That(
                 nullWhenTrue
                     ? instantiated.WhenTrue
@@ -76,19 +87,8 @@ public sealed class ApiSpecConditionalNullInstantiationTests
         SpecTermDeclaration postcondition)
     {
         var declaration = new ApiSpecDeclaration(
-            new ApiSpecTarget(
-                "conditional-null-" + Guid.NewGuid().ToString("N"),
-                "M:ConditionalNull.Target",
-                "ConditionalNull",
-                SpecTargetMemberKind.Method,
-                "Target",
-                true,
-                0,
-                null,
-                [IrTypeKind.Boolean, IrTypeKind.Reference],
-                null,
-                [new ApiSpecAssemblyIdentity("ConditionalNull", string.Empty)]),
-            NeutralFacets(Evidence),
+            Target,
+            Facets,
             [new SpecPostconditionDeclaration(postcondition, Evidence)]);
         return ApiSpecTable.Create([declaration]).Templates.Single();
     }

@@ -18648,3 +18648,8 @@ pass (2/2).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1649 | The outer `Execute` repeats all eight run-state inputs in its `new Run` forwarding call, while the nested primary constructor redeclares them | `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:20-45` |
+
+R1603 is applied: the conditional-null IR cases now share immutable declarations,
+API-spec target/facets, and one factory-backed term fixture while retaining the
+true/false branch construction and assertions. `ApiSpecConditionalNullInstantiationTests`
+pass (2/2).
