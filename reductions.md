@@ -11928,3 +11928,15 @@ R1119 is deferred: have `Get-RequiredArrayProperty` reuse `Get-RequiredProperty`
 ### Status (part three hundred fifty-one)
 
 R1120 is deferred: give the analyzer-to-protocol tuple bridge one declarative, validated vocabulary while preserving the separate internal analyzer and worker-wire enum types.
+
+## Second survey, part three hundred fifty-two: R1121 - duplicate declarative-model verification in acceptance
+
+`eng/acceptance/Verify.ps1` invokes `Test-SharpProofGeneratedOutputs.ps1` during static validation. That helper's 14-entry `$generatorScripts` list already includes `Generate-DeclarativeModels.ps1`, and runs every entry with `-Verify`. `Verify.ps1` then invokes `Generate-DeclarativeModels.ps1 -Verify` again on the next command line. The second call reparses the same catalog and rechecks the same generated outputs without changing the working tree or adding a distinct malformed-input case. Removing the direct acceptance call, or making the generated-output helper expose a narrowly scoped standalone mode when needed, retains the helper's standalone coverage while avoiding one full generator verification pass in acceptance.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1121 | **Acceptance verifies `Generate-DeclarativeModels.ps1` twice in one static-validation phase.** `Test-SharpProofGeneratedOutputs.ps1` already runs the declarative-model generator in its complete 14-generator `-Verify` loop; `Verify.ps1` immediately invokes it again. Keep the reusable helper's standalone behavior, but remove or gate only the redundant acceptance invocation. | `eng/acceptance/Verify.ps1:247-260`; `scripts/Test-SharpProofGeneratedOutputs.ps1:8-27` |
+
+### Status (part three hundred fifty-two)
+
+R1121 is deferred: retain the 14-generator verification helper and eliminate its duplicate declarative-model call from the acceptance path.
