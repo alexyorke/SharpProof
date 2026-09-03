@@ -20891,3 +20891,11 @@ eight unresolved output values once at entry, so the two early-failure branches
 and the source-lookup boundary no longer repeat the same defaults. The affected
 Worker test groups pass (50 `ClaimManifestBuilderTests` and 91
 `CompilerManifestArtifactTests`) with zero build warnings or errors.
+
+## Second survey, continued: R1986 - AnalyzerFeaturePipeline repeats the rejected-contract abstention branch
+
+AnalyzerFeaturePipeline.ValidateMethodAttributes, AnalyzeOperationBlock, and AnalyzeLambdaEffects each test a locally computed rejectedContractApi flag and then perform the same three-step action: record AnalyzerSemanticOutcome.Abstained for the method and return. The flags are intentionally computed in different ways - method attributes alone in two paths, and attributes plus rejected contract clauses in the operation-block path - and the surrounding selection/suppression ordering must remain distinct. A small TryRecordRejectedContractAbstention helper returning whether it consumed the method can centralize only the common outcome-and-return decision without changing when each caller computes or reports rejection. As written, a change to the rejected-contract semantic outcome or its bookkeeping must be repeated in three pipeline entry points.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1986 | AnalyzerFeaturePipeline repeats the same rejectedContractApi -> record Abstrained -> return branch in three entry points; share the outcome bookkeeping while retaining their distinct rejection detection and ordering. | SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:133-144,245-251,382-388 |
