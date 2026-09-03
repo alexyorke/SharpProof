@@ -774,25 +774,47 @@ internal static class CancellationBoundaryAnalyzer
             return false;
         }
 
+        var projections = new Dictionary<string, CancellationProjection>(
+            StringComparer.Ordinal);
+        foreach (var argument in create.Arguments)
+        {
+            var parameterName = argument.Parameter?.Name;
+            if (parameterName is not
+                    ("status" or "callableReason" or "claimReason") ||
+                projections.ContainsKey(parameterName))
+            {
+                continue;
+            }
+
+            var conditional = Unwrap(argument.Value) as IConditionalOperation;
+            var condition = conditional == null
+                ? null
+                : Unwrap(conditional.Condition) as ILocalReferenceOperation;
+            projections.Add(
+                parameterName,
+                new CancellationProjection(
+                    condition != null &&
+                    SymbolEqualityComparer.Default.Equals(condition.Local, canceled),
+                    conditional?.WhenTrue,
+                    conditional?.WhenFalse));
+        }
+
         return IsCancellationProjection(
-                   create,
+                   projections,
                    "status",
-                   canceled,
                    symbols[SharpProofSoundnessAnalyzer.KnownType.WorkerRunStatus],
                    "Canceled",
                    "TimedOut") &&
                IsCancellationProjection(
-                   create,
+                   projections,
                    "callableReason",
-                   canceled,
                    symbols[
                        SharpProofSoundnessAnalyzer.KnownType.WorkerCallableCoverageReason],
                    "Canceled",
                    "ProjectTimeout") &&
                IsCancellationProjection(
-                   create,
+                   projections,
                    "claimReason",
-                   canceled,
                    symbols[
                        SharpProofSoundnessAnalyzer.KnownType.WorkerClaimReason],
                    "Canceled",
@@ -800,37 +822,28 @@ internal static class CancellationBoundaryAnalyzer
     }
 
     private static bool IsCancellationProjection(
-        IInvocationOperation invocation,
+        IReadOnlyDictionary<string, CancellationProjection> projections,
         string parameterName,
-        ILocalSymbol canceled,
         INamedTypeSymbol? expectedType,
         string canceledName,
         string timeoutName)
     {
-        var argument = invocation.Arguments.FirstOrDefault(candidate =>
-            string.Equals(
-                candidate.Parameter?.Name,
-                parameterName,
-                StringComparison.Ordinal));
-        if (Unwrap(argument?.Value) is not IConditionalOperation conditional ||
-            Unwrap(conditional.Condition) is not
-                ILocalReferenceOperation condition ||
-            !SymbolEqualityComparer.Default.Equals(
-                condition.Local,
-                canceled))
-        {
-            return false;
-        }
-
-        return IsNamedStaticField(
-                   conditional.WhenTrue,
+        return projections.TryGetValue(parameterName, out var projection) &&
+               projection.ConditionMatches &&
+               IsNamedStaticField(
+                   projection.WhenTrue,
                    expectedType,
                    canceledName) &&
                IsNamedStaticField(
-                   conditional.WhenFalse,
+                   projection.WhenFalse,
                    expectedType,
                    timeoutName);
     }
+
+    private readonly record struct CancellationProjection(
+        bool ConditionMatches,
+        IOperation? WhenTrue,
+        IOperation? WhenFalse);
 
     private static bool IsNamedStaticField(
         IOperation? operation,
