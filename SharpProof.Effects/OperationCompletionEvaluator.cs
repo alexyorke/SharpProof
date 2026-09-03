@@ -300,13 +300,10 @@ internal sealed class OperationCompletionEvaluator
         {
             return false;
         }
-        var requiredLength = pattern.Patterns.Count(
-            static item => item is not ISlicePatternOperation);
-        var hasSlice = pattern.Patterns.Any(
-            static item => item is ISlicePatternOperation);
-        if (!TryGetGoverningListLength(pattern, out var length))
+        var shape = GetListPatternShape(pattern);
+        if (!shape.HasKnownLength)
         {
-            if (requiredLength != 0 || !hasSlice ||
+            if (shape.RequiredLength != 0 || !shape.HasSlice ||
                 pattern.Patterns.Length != 1 ||
                 pattern.Patterns[0] is not ISlicePatternOperation
                 { Pattern: { } slicePattern } totalSlice)
@@ -321,7 +318,7 @@ internal sealed class OperationCompletionEvaluator
                         totalSlice.SliceSymbol));
         }
 
-        if (hasSlice ? length < requiredLength : length != requiredLength)
+        if (shape.HasLengthMismatch)
         {
             return true;
         }
@@ -398,13 +395,8 @@ internal sealed class OperationCompletionEvaluator
             }
         }
 
-        var requiredLength = pattern.Patterns.Count(
-            static item => item is not ISlicePatternOperation);
-        var hasSlice = pattern.Patterns.Any(
-            static item => item is ISlicePatternOperation);
-        var hasKnownLength = TryGetGoverningListLength(pattern, out var length);
-        if (hasKnownLength &&
-            (hasSlice ? length < requiredLength : length != requiredLength))
+        var shape = GetListPatternShape(pattern);
+        if (shape.HasLengthMismatch)
         {
             return methods;
         }
@@ -442,6 +434,16 @@ internal sealed class OperationCompletionEvaluator
             }
         }
         return methods;
+    }
+
+    private ListPatternShape GetListPatternShape(IListPatternOperation pattern)
+    {
+        var requiredLength = pattern.Patterns.Count(
+            static item => item is not ISlicePatternOperation);
+        var hasSlice = pattern.Patterns.Any(
+            static item => item is ISlicePatternOperation);
+        var hasKnownLength = TryGetGoverningListLength(pattern, out var length);
+        return new(requiredLength, hasSlice, hasKnownLength, length);
     }
 
     private bool CanDirectListPatternMemberCompleteNormally(
@@ -521,6 +523,17 @@ internal sealed class OperationCompletionEvaluator
 
         length = 0;
         return false;
+    }
+
+    private readonly record struct ListPatternShape(
+        int RequiredLength,
+        bool HasSlice,
+        bool HasKnownLength,
+        long Length)
+    {
+        internal bool HasLengthMismatch =>
+            HasKnownLength &&
+            (HasSlice ? Length < RequiredLength : Length != RequiredLength);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(

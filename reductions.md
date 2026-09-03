@@ -13534,8 +13534,9 @@ early-stop behavior; only the repeated structural query should be shared.
 
 ### Status (part four hundred eighty-three)
 
-R1161 is `pending`: share only the list-pattern structural facts and mismatch
-predicate; retain the separate completion and reachable-member traversals.
+R1161 is applied: both list-pattern consumers now use one structural shape
+projection and mismatch predicate while retaining their separate completion and
+reachable-member traversals. The Effects test suite passes (323/323).
 
 ## Second survey, part four hundred eighty-four: R1162 - method completion tail repeated
 
