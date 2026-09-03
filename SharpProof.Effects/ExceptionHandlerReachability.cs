@@ -26,6 +26,8 @@ internal sealed class ExceptionHandlerReachability(
         _abruptExitCache = new();
     private readonly Dictionary<IObjectCreationOperation, bool>
         _objectCreationArgumentsCache = new();
+    private readonly Dictionary<ILockOperation, bool>
+        _lockValueCompletionCache = new();
     private readonly INamedTypeSymbol? _exceptionType =
         compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
     private readonly INamedTypeSymbol? _nullReferenceExceptionType =
@@ -1024,7 +1026,7 @@ internal sealed class ExceptionHandlerReachability(
             }
             if (operation is ILockOperation @lock)
             {
-                if (canCompleteNormally(@lock.LockedValue))
+                if (CanCompleteLockValue(@lock))
                 {
                     var definitelyNull = IsDefinitelyNull(
                         @lock,
@@ -1388,7 +1390,7 @@ internal sealed class ExceptionHandlerReachability(
                     childrenAlreadyComplete: argumentsComplete);
                 return;
             case ILockOperation @lock:
-                if (canCompleteNormally(@lock.LockedValue) &&
+                if (CanCompleteLockValue(@lock) &&
                     !IsDefinitelyNull(@lock, @lock.LockedValue))
                 {
                     remaining.Push(@lock.Body);
@@ -1498,6 +1500,18 @@ internal sealed class ExceptionHandlerReachability(
         var complete = creation.Arguments.All(argument =>
             canCompleteNormally(argument.Value));
         _objectCreationArgumentsCache.Add(creation, complete);
+        return complete;
+    }
+
+    private bool CanCompleteLockValue(ILockOperation @lock)
+    {
+        if (_lockValueCompletionCache.TryGetValue(@lock, out var cached))
+        {
+            return cached;
+        }
+
+        var complete = canCompleteNormally(@lock.LockedValue);
+        _lockValueCompletionCache.Add(@lock, complete);
         return complete;
     }
 
