@@ -136,15 +136,30 @@ public sealed class EffectAnalysisSession
         var moduleInitializers = GetModuleInitializers(cancellationToken);
         EnsureAnalyzed(methods, cancellationToken);
         var summaries = _summaries;
+        var initializationByMethod =
+            new Dictionary<IMethodSymbol, EffectStep>(
+                SymbolEqualityComparer.Default);
+        var finalInitialization =
+            new EffectStep(EffectSummary.Bottom, true);
+        foreach (var initializer in moduleInitializers)
+        {
+            initializationByMethod[initializer.Method] = finalInitialization;
+            finalInitialization = finalInitialization.Then(new EffectStep(
+                summaries.TryGetValue(initializer.Method, out var summary)
+                    ? summary
+                    : EffectSummaryOperations.UnknownBoundary(
+                        EffectUncertainty.UnsupportedOperation),
+                initializer.CompletesNormally));
+        }
         lock (_gate)
         {
             return [.. methods.Select(method =>
             {
-                var initialization =
-                    EffectModuleInitialization.SummarizeBeforeEntry(
+                var initialization = initializationByMethod.TryGetValue(
                         method,
-                        moduleInitializers,
-                        summaries);
+                        out var beforeInitializer)
+                    ? beforeInitializer
+                    : finalInitialization;
                 return new EffectMethodResult(
                     method,
                     initialization.Then(new EffectStep(
