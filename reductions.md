@@ -21202,3 +21202,9 @@ artifact's package/symbol extension while it already walks the loaded artifact
 rows, leaving exact file-set ownership with `Test-SharpProofReleaseBundleTopology`
 and removing the redundant directory rescan. The release-authority closure
 fixtures pass.
+
+R2004 is applied: the broad PR evidence upload now excludes
+`artifacts/ci/performance*.json`, leaving the existing dedicated
+`fast-pr-performance` artifact as the sole owner of those files. The
+performance-isolation architecture test passes 1/1; the workflow retains its
+artifact name and retention contract.
