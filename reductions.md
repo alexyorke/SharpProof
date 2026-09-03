@@ -10717,3 +10717,15 @@ R1019 is deferred: keep the specific exception assertion and message check, and 
 ### Status (part two hundred fifty-one)
 
 R1020 is deferred: share the comparer shell only, and keep separate tests that force hashing and equality while the factory is interning an external identity.
+
+## Second survey, part two hundred fifty-two: R1021 - repeated frontend batch-isolation harness
+
+`CompileInvalidSemanticEdgeDoesNotPoisonValidPeer`, `CompileSuccessfulSemanticEdgeInjectionDoesNotPoisonValidPeer`, `NonnumericSemanticEdgeInjectionDoesNotEscapeBatchIsolation`, `StaticInitializerInjectionDoesNotPoisonValidPeer`, and `TopLevelInitializerInjectionDoesNotPoisonValidPeer` all submit the same valid `Exact("long", "", "0L")` case beside one injected second case, call `CompareSemanticEdges`, and assert that result zero agrees while result one mismatches. Their second expressions deliberately target different isolation boundaries, so those inputs and test names should remain separate, but a helper accepting the injected expression can own the common two-case batch and status assertions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1021 | **Five frontend semantic-edge isolation tests duplicate the complete oracle harness.** Each test rebuilds the same valid peer, invokes `CompareSemanticEdges` on a two-item array, and repeats identical agreement/mismatch assertions; only the malicious second expression differs. A test helper or case source can centralize the shared batch while retaining distinct invalid-code, extra-method, nonnumeric, static-initializer, and module-initializer inputs. | `SharpProof.Fuzz.Test/FrontendSemanticEdgeCaseTests.cs:154-249` |
+
+### Status (part two hundred fifty-two)
+
+R1021 is deferred: share the valid-peer batch and invariant status assertions, but keep every injection form as an independent case.
