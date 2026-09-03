@@ -16207,6 +16207,12 @@ In `CompilerSourceLocationAuthorityTests`, three tests independently pass the sa
 |---|---|---|
 | R1346 | **`CompilerSourceLocationAuthorityTests` repeats the six-argument `IsBound` assertion plumbing in three tests.** A local authority assertion helper can centralize the location, source-tree ordinal/path/hash, line-map hash, and compilation arguments while retaining the direct, all-authority, and mapped-diagnostic assertion shapes. | `SharpProof.Worker.Test/CompilerSourceLocationAuthorityTests.cs:60-67,96-104,208-216` |
 
+### Status (continued)
+
+R1346 is applied: diagnostic and manifest authority checks use artifact-aware
+helpers for the shared `IsBound` plumbing, preserving direct and quantified
+assertions. The authority test class passes (13 passed).
+
 ## Second survey, continued: R1347 - Duplicated qualification package-artifact fixture
 
 In `ReleaseQualificationMatrixTests`, both receipt tests build the same six-element anonymous `packageArtifacts` array (`package-{index}.nupkg`, `bytes = 1`) before serializing different evidence schemas. A small `CreatePackageArtifacts()` helper or shared test fixture can own that invariant; the tests should retain their distinct gate payloads and assertions. This removes repeated fixture setup without changing receipt coverage.
