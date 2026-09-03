@@ -15702,6 +15702,12 @@ Get-DiscoveredTestMethods parses, sorts, and de-duplicates the names reported by
 |---|---|---|
 | R1309 | **Invoke-SharpProofPackageTests.Get-DiscoveredTestMethods performs repeated linear membership checks against a sorted name array. Convert the already unique discovery result to an ordinal set for reflection filtering, then retain the existing sorted output projection and minimum-count validation.** | scripts/Invoke-SharpProofPackageTests.ps1:176-206 |
 
+### Status (continued)
+
+R1309 is applied: discovered vstest names are copied into one ordinal hash set
+for reflection filtering, with the existing sorted projection and minimum-count
+checks retained. Package script architecture coverage passes (1 passed).
+
 ## Second survey, continued: R1310 - TRX timing queries rescan the cached rows per class
 
 Get-TestMethodTimings caches parsed TRX rows for a results root, but every call still allocates a new millisecond map and scans every cached row to select one class. The package-test caller immediately invokes it twice for the worker and package-layout classes. Indexing the cached rows by class while parsing, or returning both class projections from one aggregation, can preserve per-method duration summing and sorting without traversing the complete TRX row list twice.
