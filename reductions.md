@@ -18973,3 +18973,11 @@ R1666 is applied: `PublicationWorkspace.CopyAllPackages` now owns the shared
 package-feed archive population used by the four release scenarios, while
 selective package mutations remain in their individual tests. The complete
 `ReleasePublicationScriptTests` class passes (24/24).
+
+## Second survey, continued: R1667 - IR identifier tests duplicate the kind-by-kind formatting matrix
+
+`IrIdentifierTests` has two parallel hand-written matrices: `DefaultIdentifiersPreserveKindSpecificFormatting` lists nine identifier types and their default spellings (`identity0`, `ir0`, `v0`, `t0`, `m0`, `s0`, `op0`, `b0`, `i0`), while `FactoryIdentifiersExposeStableNondefaultFormatting` constructs the same nine kinds and repeats the corresponding nondefault prefix assertions (`identity`, `ir`, `v`, `t`, `m`, `s`, `op`, `b`, `i`). The default-versus-allocated contract is legitimate, but each new identifier kind requires edits in both blocks and an omission can pass silently. A table-driven kind/prefix fixture or centralized formatting assertion can own that matrix while retaining the allocation and hash-specific checks that are unique to the second test.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1667 | The IR identifier formatting tests repeat a nine-kind default/nondefault matrix; centralize kind-to-prefix data while retaining allocation and hash-specific assertions. | `SharpProof.Ir.Test/IrIdentifierTests.cs:8-20,37-95` |
