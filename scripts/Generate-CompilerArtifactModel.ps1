@@ -559,13 +559,23 @@ $allowedSlotRoles = @(
         ForEach-Object { [string]$_ })
 $actualSlotDomains = @($slotMappings.PSObject.Properties.Name)
 $declaredSlotDomains = @($slotDomains | ForEach-Object { $_.Key })
+$actualSlotDomainSet = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
 foreach ($domainName in $actualSlotDomains) {
-    if ($domainName -notin $declaredSlotDomains) {
+    [void]$actualSlotDomainSet.Add([string]$domainName)
+}
+$declaredSlotDomainSet = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal)
+foreach ($domainName in $declaredSlotDomains) {
+    [void]$declaredSlotDomainSet.Add([string]$domainName)
+}
+foreach ($domainName in $actualSlotDomains) {
+    if (-not $declaredSlotDomainSet.Contains([string]$domainName)) {
         throw "Portable IR slot mappings contain unsupported domain '$domainName'."
     }
 }
 foreach ($domainName in $declaredSlotDomains) {
-    if ($domainName -notin $actualSlotDomains) {
+    if (-not $actualSlotDomainSet.Contains([string]$domainName)) {
         throw "Portable IR slot mappings are missing domain '$domainName'."
     }
 }
