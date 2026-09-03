@@ -15814,6 +15814,12 @@ Emit-Class already traverses all constructor parameters to validate their names 
 | ID | Finding | Evidence |
 |---|---|---|
 | R1317 | **Generate-DeclarativeModels.Emit-Class re-scans constructor parameters for every assignment after the parameter list has been parsed. Reuse an ordinal parameter-name index while retaining assignment order and the unknown-parameter failure.** | scripts/Generate-DeclarativeModels.ps1:120-150 |
+
+### Status (continued)
+
+R1317 is applied: declarative constructor parameter names are counted once in
+an ordinal dictionary and assignments query that index. Deterministic declarative
+model verification passes.
 ## Second survey, continued: R1318 - trusted-mutation target validation rereads shared files per registration
 
 Test-SharpProofTrustedMutations registers 248 mutations across 108 distinct target files. The live-tree preflight reads each target file with Get-Content once per mutation before checking its Original needle, and the archived-source preflight later reads each archived target with ReadAllText once per mutation before running the same per-entry guard. Different mutations in one file therefore pay repeated file I/O in each materialization even though the file content is immutable during that pass. A per-pass content cache keyed by normalized target path can retain per-mutation diagnostics and the separate live/archive trust boundaries while reading each distinct file once.
