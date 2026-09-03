@@ -16459,3 +16459,11 @@ R1362 is applied: the PDB point walk now carries the unique production sequence
 point count through module construction, eliminating the document-state presence
 scan and the later projected-document recount without changing inventory shape.
 PowerShell parsing and the inventory authority fixture test pass (1 passed).
+
+## Second survey, continued: R1363 - SummaryAccumulator performs a second dictionary lookup for existing counters and assumptions
+
+`WorkerResultAssembler.SummaryAccumulator` first probes `_assumptions` with `TryGetValue` and then assigns the updated aggregate through the indexer, and `Increment` probes a count dictionary with `TryGetValue` before assigning through its indexer. For existing keys both paths therefore perform two dictionary lookups per update. A ref-based update (`CollectionsMarshal.GetValueRefOrAddDefault`) or a carefully scoped helper using one lookup can remove the repeated probe while preserving first-kind/conflict semantics and the current count output.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1363 | **`SummaryAccumulator` double-probes dictionaries when updating existing entries.** Combine the lookup and update for assumption aggregates and outcome/reason counters, preserving the current first-kind and count semantics. | `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:156-164,197-201` |
