@@ -16820,6 +16820,8 @@ ClosedVirtualDispatchUsesTheExactExceptionSet and OnlyAuthenticatedRuntimeRefLik
 |---|---|---|
 | R1382 | Two reachability tests repeat the same method lookup, handler construction, and catch-clause query; share that test-only helper while retaining the distinct fixtures and expected outcomes. | SharpProof.Effects.Test/ExceptionHandlerReachabilityTests.cs:60-70,120-130 |
 
+R1382 is applied: both reachability fixtures now call one class-level catch-query helper while retaining their separate compilations and expected outcomes. `ExceptionHandlerReachabilityTests` pass (2/2).
+
 ## Second survey, continued: R1383 - TCB path validation materializes dot-segment matches only to test existence
 
 Get-SharpProofTcbPaths splits every candidate path into segments, invokes the PowerShell collection Where method to build the matching dot-segment collection, and then reads only its Count. For the hundreds of trusted-kernel/TCB paths processed during acceptance and coverage, this creates a transient result array for a Boolean existence check and hides the early-exit intent. A direct segment loop, or a Boolean predicate that stops after the first '.'/'..' segment, can preserve the canonical-path rejection while removing the per-path materialization and making the validation rule explicit.

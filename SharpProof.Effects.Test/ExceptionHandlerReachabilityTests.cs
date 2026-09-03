@@ -52,21 +52,15 @@ public sealed class ExceptionHandlerReachabilityTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(IsCatchReachable("SealedMethod"), Is.False);
-            Assert.That(IsCatchReachable("SealedType"), Is.False);
-            Assert.That(IsCatchReachable("OpenDispatch"), Is.True);
-        }
-
-        bool IsCatchReachable(string methodName)
-        {
-            var method = EffectTestHost.SampleMethod(compilation, methodName);
-            return EffectTestHost.CreateHandlerReachability(
-                    compilation,
-                    method,
-                    session)
-                .IsReachable(
-                    EffectTestHost.CatchClauseIn(method),
-                    inFilter: false);
+            Assert.That(
+                IsCatchReachable(compilation, session, "SealedMethod"),
+                Is.False);
+            Assert.That(
+                IsCatchReachable(compilation, session, "SealedType"),
+                Is.False);
+            Assert.That(
+                IsCatchReachable(compilation, session, "OpenDispatch"),
+                Is.True);
         }
     }
 
@@ -113,20 +107,27 @@ public sealed class ExceptionHandlerReachabilityTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(IsCatchReachable("ReadExternal"), Is.True);
-            Assert.That(IsCatchReachable("ReadRuntime"), Is.False);
+            Assert.That(
+                IsCatchReachable(compilation, session, "ReadExternal"),
+                Is.True);
+            Assert.That(
+                IsCatchReachable(compilation, session, "ReadRuntime"),
+                Is.False);
         }
+    }
 
-        bool IsCatchReachable(string methodName)
-        {
-            var method = EffectTestHost.SampleMethod(compilation, methodName);
-            return EffectTestHost.CreateHandlerReachability(
-                    compilation,
-                    method,
-                    session)
-                .IsReachable(
-                    EffectTestHost.CatchClauseIn(method),
-                    inFilter: false);
-        }
+    private static bool IsCatchReachable(
+        Compilation compilation,
+        EffectAnalysisSession session,
+        string methodName)
+    {
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
+        return EffectTestHost.CreateHandlerReachability(
+                compilation,
+                method,
+                session)
+            .IsReachable(
+                EffectTestHost.CatchClauseIn(method),
+                inFilter: false);
     }
 }
