@@ -95,6 +95,7 @@ $fileOptionSignatures = [Collections.Generic.Dictionary[string, object]]::new(
 $generatedByPath = [Collections.Generic.Dictionary[string, bool]]::new(
     [StringComparer]::Ordinal)
 foreach ($project in $projects) {
+    $signature = $project.parseOptions | ConvertTo-Json -Compress
     foreach ($file in @($project.compile)) {
         $path = [string]$file.path
         if (-not $path.EndsWith('.cs', [StringComparison]::OrdinalIgnoreCase)) {
@@ -106,7 +107,6 @@ foreach ($project in $projects) {
                 [Collections.Generic.HashSet[string]]::new(
                     [StringComparer]::Ordinal)
         }
-        $signature = $project.parseOptions | ConvertTo-Json -Compress
         if ($fileOptionSignatures[$path].Add($signature)) {
             $fileOptions[$path].Add($project.parseOptions)
         }

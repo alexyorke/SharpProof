@@ -17030,3 +17030,10 @@ one ordered pass and validates each closed range without rescanning the full
 document. Service ordering, tooling presence, shared-anchor checks, and
 override rejection remain unchanged. `ContainerAuthorityScriptTests` pass
 (15/15).
+
+R1388 is applied: production-complexity validation now serializes each
+project's immutable parse-options object once before its compile-file loop,
+retaining per-file option deduplication. The focused rationale test passes
+(1/1). The canonical inventory gate still reports the pre-existing members
+ceiling breach (5973/5808); this PowerShell-only change does not alter the C#
+inventory metrics.
