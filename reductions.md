@@ -18696,3 +18696,8 @@ assertions. `ContractForValidatorGeneratorTests` pass (120/120).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1651 | The scalar-semantics test duplicates all eight generated integer metadata rows and the Int64 policy in an independent expected dictionary; reduce the second row-by-row authority while retaining an independent catalog/oracle check. | `SharpProof.Frontend.Test/CSharpScalarSemanticsTests.cs:11-32,34-85`; generated catalog at `SharpProof.Frontend/CSharpScalarSemantics.generated.cs:71-82,118-129` |
+
+R1648 is applied: the unmanaged-function-pointer generator matrices now share
+one source builder while retaining their separate exact-count and
+single-diagnostic assertions. `ContractForValidatorGeneratorTests` pass
+(120/120).

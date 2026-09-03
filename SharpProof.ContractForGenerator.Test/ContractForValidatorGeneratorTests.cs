@@ -719,19 +719,7 @@ public sealed class ContractForValidatorGeneratorTests
         string companionPointer,
         int expectedDiagnostics)
     {
-        var run = Run(
-            $$"""
-            using SharpProof.Attributes;
-            public unsafe interface ITarget {
-                {{targetPointer}} Map({{targetPointer}} value);
-            }
-            [ContractFor(typeof(ITarget))]
-            public static unsafe class TargetContracts {
-                public static {{companionPointer}} Map(
-                    ITarget receiver,
-                    {{companionPointer}} value) => value;
-            }
-            """);
+        var run = Run(CreateUnmanagedFunctionPointerSource(targetPointer, companionPointer));
 
         Assert.That(run.Diagnostics, Has.Length.EqualTo(expectedDiagnostics));
         Assert.That(
@@ -749,8 +737,16 @@ public sealed class ContractForValidatorGeneratorTests
         string targetPointer,
         string companionPointer)
     {
-        var run = Run(
-            $$"""
+        var run = Run(CreateUnmanagedFunctionPointerSource(targetPointer, companionPointer));
+
+        AssertSingle(run, "SPCF0005");
+    }
+
+    private static string CreateUnmanagedFunctionPointerSource(
+        string targetPointer,
+        string companionPointer)
+    {
+        return $$"""
             using SharpProof.Attributes;
             public unsafe interface ITarget {
                 {{targetPointer}} Map({{targetPointer}} value);
@@ -761,9 +757,7 @@ public sealed class ContractForValidatorGeneratorTests
                     ITarget receiver,
                     {{companionPointer}} value) => value;
             }
-            """);
-
-        AssertSingle(run, "SPCF0005");
+            """;
     }
 
     [TestCase(
