@@ -196,6 +196,7 @@ the smallest relevant containerized test target passes.
 | R962 | Remove the unused virtual dispatch from the closed abstract domain | `SharpProof.Dataflow.Test`: full suite passed |
 | R901 | Materialize canonical manifest target ordering once | `SharpProof.Worker.Test`: ClaimManifestBuilderTests passed |
 | R965 | Import root build defaults from samples and pilots, retaining fixture overrides | `SharpProof.ArchitectureTest`: focused build-policy tests; samples and pilots validation passed |
+| R940 | Cache analyzer supported-diagnostic arrays | `SharpProof.Analyzer.Test`: 55; `SharpProof.Package.Test`: 6 compiler-probe tests passed |
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
@@ -8739,8 +8740,9 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred fifty)
 
-R940 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R940 is `applied`: the collector and compiler-probe analyzers now return stable
+static diagnostic arrays instead of allocating a new one-element array per
+query. The focused collector and package compiler-probe suites passed.
 
 ## Second survey, part four hundred fifty-one: R941 - quadratic local-alias membership checks
 
@@ -9552,3 +9554,67 @@ this records that the per-file one also governs the wrong sixteen files. Any wor
 on the ratchets should settle all three together - direction, headroom reporting,
 and coverage - because fixing one without the others leaves a gate that is precise
 about the wrong thing.
+
+## Second survey, part two hundred one: two corrections to this ledger's own claims
+
+An independent check of the assertion made in part one hundred eighty-seven that
+unused private members are structurally impossible here. The assertion is
+**mostly right and was stated too strongly**, and the scan written to test it had a
+methodological flaw worth recording. No new ID.
+
+### Correction 1: "a successful build proves no unused private members" is too strong
+
+Part one hundred eighty-seven observed that `Directory.Build.props:21` promotes
+`CA1811`, `IDE0051`, `IDE0052`, `IDE0060` and `CS8019` to **errors**, and concluded
+that "a build that succeeds is a proof that none of those five categories has an
+instance." **That overstates it.** These rules carry documented exclusions, and one
+of them is exercised here: `SharpProof.Host/LinuxPathIdentity.cs:973-992` declares
+`[StructLayout(LayoutKind.Sequential)] private struct LinuxStat` containing four
+private fields that are **never read and carry no suppression** - `_padding` at
+`:981` and `_reserved0`, `_reserved1`, `_reserved2` at `:989-991`. They compile
+because the unused-member analyzers do not report fields of a type carrying
+`StructLayoutAttribute`, exactly so that interop padding survives. The correct
+statement is therefore: **a successful build proves there is no rule-visible
+instance**, not that there is no instance. The five categories remain covered for
+everything the rules do look at, which is the great majority; the claim just needs
+its boundary.
+
+### Correction 2: the "declared once in its own file" test does not work here
+
+The scan written to verify Correction 1 flagged 42 private members whose
+identifier appears exactly once in the file that declares them, on the premise
+that a private member can only be used from within its own file. **That premise is
+false in this repository**, which has **60 files declaring `partial` types**. A
+private method declared in `SharpProof.Effects/OperationEffectScanner.Assignments.cs`
+is called from `OperationEffectScanner.cs`; `TypeRow`, `VariableRow`, `MemberRow`
+and `OperationRow` in `PortableIrModel.generated.cs` are called from
+`PortableIrGraphCodec.cs`. Of the 42, the only ones that are genuinely unread are
+the four `LinuxStat` layout fields above, and those are correct. Any future pass
+using this technique must resolve partial types first.
+
+### Checked and not proposed (part two hundred one)
+
+- **The four `LinuxStat` padding fields must not be removed.** `_padding`,
+  `_reserved0`, `_reserved1` and `_reserved2` exist to make the managed struct
+  match the kernel's `struct stat` layout for the `[LibraryImport]` calls in the
+  same file. Deleting them would silently corrupt every field after them. They are
+  the one case in this codebase where an unused private field is required, and
+  they are recorded here because both a dead-code sweep and a "remove unused
+  member" analyzer pass would otherwise arrive at them.
+- **The recursion census is too noisy to file anything from, and recursion is not
+  a defect here anyway.** A crude scan reported 335 directly self-recursive
+  methods, concentrated in `ManagedAbstractFlow.cs` (17), `CacheSoundnessRules.cs`
+  (14) and `RequiresCallSiteDiscovery.cs` (10). The figure is unreliable - the
+  body-extent heuristic over-captures past a method's closing brace, and a
+  same-named call on another receiver counts as a self-call. More importantly,
+  recursive descent is the correct shape for operation-tree and term-tree walking,
+  and this codebase bounds it deliberately: `ManagedAbstractFlow`'s
+  `[ThreadStatic]` walk guard (part one hundred ninety-seven) and
+  `MaximumTermDepth` (R968) are both explicit depth limits. Nothing is proposed.
+
+### Status (part two hundred one)
+
+No ID allocated. Both corrections narrow claims this ledger previously made rather
+than adding new work, which is the point: part one hundred eighty-seven's
+conclusion was used to close three analytical techniques at once, so its boundary
+needed to be exact before anyone relies on it.
