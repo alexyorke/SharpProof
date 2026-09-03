@@ -18553,3 +18553,7 @@ R1525 is applied: the terminal-initializer and infeasible-branch case matrices
 now reuse immutable fixture compilations while each case retains its selected
 type and independent analysis session. `BranchingExpressionEffectRegressionTests`
 pass (5/5).
+
+R1526 is applied: the two analyzer-session cancellation cases now share one
+immutable compilation while each case retains its own cancellation source and
+session. `AnalyzerSessionCancellationTests` pass (2/2).
