@@ -66,6 +66,28 @@ if ($sourceCommit -ne $ExpectedCommit) {
     throw "Mutation source commit '$sourceCommit' does not match '$ExpectedCommit'."
 }
 
+function Get-MutationTargetIssue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Content,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Needle
+    )
+
+    $first = $Content.IndexOf($Needle, [StringComparison]::Ordinal)
+    if ($first -lt 0) {
+        return 'target text was not found'
+    }
+    if ($Content.IndexOf(
+            $Needle,
+            $first + $Needle.Length,
+            [StringComparison]::Ordinal) -ge 0) {
+        return 'target text is not unique'
+    }
+    return $null
+}
+
 $mutations = @(
     [pscustomobject]@{
         Name = 'scalar-int32-upper-bound'
@@ -2203,20 +2225,12 @@ foreach ($mutation in $mutations) {
     }
 
     $content = Get-Content -LiteralPath $targetPath -Raw
-    $needle = [string]$mutation.Original
-    $first = $content.IndexOf($needle, [StringComparison]::Ordinal)
-    if ($first -lt 0) {
+    $issue = Get-MutationTargetIssue `
+        -Content $content `
+        -Needle ([string]$mutation.Original)
+    if ($null -ne $issue) {
         $invalidTargets.Add(
-            ([string]$mutation.Name) + ': target text was not found')
-        continue
-    }
-
-    if ($content.IndexOf(
-            $needle,
-            $first + $needle.Length,
-            [StringComparison]::Ordinal) -ge 0) {
-        $invalidTargets.Add(
-            ([string]$mutation.Name) + ': target text was not unique')
+            ([string]$mutation.Name) + ': ' + $issue)
     }
 }
 if ($invalidTargets.Count -ne 0) {
@@ -2410,16 +2424,9 @@ function Assert-UniqueMutationTarget {
         [string]$Name
     )
 
-    $first = $Content.IndexOf($Needle, [StringComparison]::Ordinal)
-    if ($first -lt 0) {
-        throw "Mutation '$Name' target text was not found."
-    }
-    $second = $Content.IndexOf(
-        $Needle,
-        $first + $Needle.Length,
-        [StringComparison]::Ordinal)
-    if ($second -ge 0) {
-        throw "Mutation '$Name' target text is not unique."
+    $issue = Get-MutationTargetIssue -Content $Content -Needle $Needle
+    if ($null -ne $issue) {
+        throw "Mutation '$Name' $issue."
     }
 }
 
