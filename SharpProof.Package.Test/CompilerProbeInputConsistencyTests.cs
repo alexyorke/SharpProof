@@ -4,7 +4,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
-using SharpProof.Attributes;
 using SharpProof.CompilerProbe.TestAsset;
 
 namespace SharpProof.Package.Test;
@@ -70,22 +69,13 @@ public sealed class CompilerProbeInputConsistencyTests
     private static CSharpCompilation CreateCompilation(
         CSharpParseOptions parseOptions)
     {
-        var trustedAssemblies =
-            AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string ??
-            throw new InvalidOperationException(
-                "The runtime did not expose trusted platform assemblies.");
-        var references = trustedAssemblies
-            .Split(Path.PathSeparator)
-            .Select(static path => MetadataReference.CreateFromFile(path))
-            .Append(MetadataReference.CreateFromFile(
-                typeof(Contract).Assembly.Location));
         return CSharpCompilation.Create(
             "ProbeInputConsistency",
             [CSharpSyntaxTree.ParseText(
                 "internal static class Subject { }",
                 parseOptions,
                 "Subject.cs")],
-            references,
+            TestMetadataReferences.WithSharpProof,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 deterministic: true));

@@ -102,6 +102,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'SharpProof.Contracts.Test' OR
+                        '$(MSBuildProjectName)' == 'SharpProof.Package.Test' OR
                         '$(MSBuildProjectName)' == 'SharpProof.Worker.Test'">
     <Compile Include="$(MSBuildThisFileDirectory)eng\testing\TestMetadataReferences.cs"
              Link="TestMetadataReferences.cs" />

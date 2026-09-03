@@ -19102,3 +19102,8 @@ passes (108/108).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1676 | A new package-test compiler-probe helper duplicates platform-reference construction and adds another null-handling/error-message variant; extend or deliberately scope the shared metadata-reference helper. | `SharpProof.Package.Test/CompilerProbeInputConsistencyTests.cs:70-91`; `Directory.Build.props:104-110`; related R341, R729, R730 |
+
+R1676 is applied: the package compiler-probe test now reuses the shared
+`TestMetadataReferences.WithSharpProof` platform-reference factory, removing
+its local trusted-assembly parsing and error-message variant. The focused
+`CompilerProbeInputConsistencyTests` test passes (1/1).
