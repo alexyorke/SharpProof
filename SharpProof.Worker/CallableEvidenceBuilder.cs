@@ -72,6 +72,7 @@ internal static class CallableEvidenceBuilder
             assumptionOrdinal++;
         }
 
+        var uncheckedAssumptionStart = assumptions.Count;
         foreach (var specAssumption in body.SpecAssumptions)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -167,12 +168,16 @@ internal static class CallableEvidenceBuilder
             body.SpecResultProjections,
             assumptions,
             labels);
-        if (assumptions.Any(assumption =>
-                GetDepth(assumption.Predicate) >
-                maximumExpressionDepth))
+        for (var index = uncheckedAssumptionStart;
+             index < assumptions.Count;
+             index++)
         {
-            return CallableEvidenceBuildResult.Fail(
-                WorkerClaimReason.UnsupportedExpression);
+            if (GetDepth(assumptions[index].Predicate) >
+                maximumExpressionDepth)
+            {
+                return CallableEvidenceBuildResult.Fail(
+                    WorkerClaimReason.UnsupportedExpression);
+            }
         }
 
         var evidence = assumptions.ToImmutable();

@@ -18958,3 +18958,8 @@ Four release scenarios rebuild the same package-source fixture by iterating `fee
 | ID | Finding | Evidence |
 |---|---|---|
 | R1666 | Four release scenarios duplicate the all-packages-to-fixture copy loop; centralize population of `PublicationWorkspace.PackageSource` while retaining selective single-package mutations separately. | `SharpProof.Package.Test/ReleasePublicationScriptTests.cs:120-129,238-246,331-340,629-638` |
+R1146 is applied: callable-evidence depth validation now starts at the first
+assumption path that was not already checked by `NormalizeDirectClause`, so
+the final guard preserves coverage for projected, domain, and completion
+assumptions without rescanning direct clauses. `SharpProof.Worker.Test` passes
+(695/695).
