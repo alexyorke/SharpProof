@@ -337,49 +337,39 @@ public sealed class IrProgramTests
                 IrHavocKind.VariablesAndMemory)));
     }
 
-    [Test]
-    public void InterpreterDistinguishesAssumptionAndAssertionFailures()
+    [TestCase(IrInstructionKind.Assume, IrProgramExecutionStatus.AssumptionViolated)]
+    [TestCase(IrInstructionKind.Assert, IrProgramExecutionStatus.AssertionFailed)]
+    public void InterpreterDistinguishesAssumptionAndAssertionFailures(
+        IrInstructionKind instructionKind,
+        IrProgramExecutionStatus expectedStatus)
     {
         var factory = new IrFactory();
-        var assumptionBuilder = new IrProgramBuilder(factory);
-        var assumptionEntry = assumptionBuilder.CreateBlock("entry");
-        var assumptionOperation = factory.CreateOperation("assume");
-        assumptionBuilder.Assume(
-            assumptionEntry,
-            assumptionOperation,
-            factory.Boolean(false));
-        assumptionBuilder.Return(
-            assumptionEntry,
-            factory.CreateOperation("return"));
-        var assertionBuilder = new IrProgramBuilder(factory);
-        var assertionEntry = assertionBuilder.CreateBlock("entry");
-        var assertionOperation = factory.CreateOperation("assert");
-        assertionBuilder.Assert(
-            assertionEntry,
-            assertionOperation,
-            factory.Boolean(false));
-        assertionBuilder.Return(
-            assertionEntry,
-            factory.CreateOperation("return"));
+        var builder = new IrProgramBuilder(factory);
+        var entry = builder.CreateBlock("entry");
+        var operation = factory.CreateOperation(
+            instructionKind == IrInstructionKind.Assume ? "assume" : "assert");
+        switch (instructionKind)
+        {
+            case IrInstructionKind.Assume:
+                builder.Assume(entry, operation, factory.Boolean(false));
+                break;
+            case IrInstructionKind.Assert:
+                builder.Assert(entry, operation, factory.Boolean(false));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(instructionKind));
+        }
+        builder.Return(entry, factory.CreateOperation("return"));
         var interpreter = new IrProgramInterpreter(factory);
 
-        var assumption =
-            interpreter.Execute(assumptionBuilder.Build());
-        var assertion =
-            interpreter.Execute(assertionBuilder.Build());
+        var result = interpreter.Execute(builder.Build());
 
         Assert.That(
-            assumption.Status,
-            Is.EqualTo(IrProgramExecutionStatus.AssumptionViolated));
+            result.Status,
+            Is.EqualTo(expectedStatus));
         Assert.That(
-            assumption.Instruction!.Operation,
-            Is.EqualTo(assumptionOperation));
-        Assert.That(
-            assertion.Status,
-            Is.EqualTo(IrProgramExecutionStatus.AssertionFailed));
-        Assert.That(
-            assertion.Instruction!.Operation,
-            Is.EqualTo(assertionOperation));
+            result.Instruction!.Operation,
+            Is.EqualTo(operation));
     }
 
     [Test]
