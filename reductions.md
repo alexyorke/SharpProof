@@ -14268,3 +14268,18 @@ checks.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1198 | **`ExceptionHandlerReachability.GetAccessors` has a redundant coalesce/compound/increment branch.** After the simple-assignment target guard, the conditional branch yields `property.Property.GetMethod` and exits, while its fallback yields the identical value; only the simple-assignment `yield break` changes the result. The middle parent-kind test can be removed without changing accessor enumeration. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1977-1996` |
+
+## Second survey, part five hundred twenty-one: R1199 - IL leader validation builds a second index
+
+`Translator.Translate` collects every decoded instruction offset into a
+`HashSet<int>` solely to validate that computed leaders exist. Immediately
+afterward it builds `instructionIndexes`, a dictionary keyed by the same
+offsets, for the block-emission loop. The dictionary's key set subsumes the
+earlier membership query. Build one offset-to-index table with the existing
+duplicate/failure policy and use its `ContainsKey` for leader validation, or
+carry a single validated instruction index projection, so the translator does
+not allocate and populate two tables over the same decoded instruction list.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1199 | **`CompilerImplementationIlSummaryLowerer.Translator.Translate` materializes duplicate instruction-offset indexes.** It creates `offsets` as a `HashSet<int>` for `leaders.Contains` validation, then creates `instructionIndexes` as a dictionary from the same `instructions.Select(item => item.Offset)` projection before using it for block starts. Reusing one dictionary-backed index can preserve malformed-leader rejection and contiguous block lookup while removing the redundant offset set and enumeration. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:549-583` |
