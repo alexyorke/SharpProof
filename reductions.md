@@ -17019,3 +17019,8 @@ R1385 is applied: launcher response validation now counts incomplete callables a
 | ID | Finding | Evidence |
 |---|---|---|
 | R1406 | The two recycled-PID tests repeat fake descriptor callbacks and the same `opened == false`/`Complete == true` assertions; factor a parameterized test helper. | `SharpProof.Package.Test/VerifierProcessSupervisorBug202Tests.cs:10-24,61-89` |
+
+R1386 is applied: Dockerfile authority validation now collects all known ARG
+declarations in one line pass while preserving exact image text, uniqueness,
+pre-`FROM` placement, and diagnostics. `ContainerAuthorityScriptTests` pass
+(15/15).

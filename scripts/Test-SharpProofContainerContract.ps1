@@ -136,21 +136,36 @@ function Assert-DockerfileAuthority {
         throw 'The Dockerfile must contain the canonical build stages.'
     }
 
+    $authorityArguments = (($authorities | ForEach-Object {
+                [regex]::Escape($_.Argument)
+            }) -join '|')
+    $argumentPattern = '^ARG\s+(?<argument>' + $authorityArguments + ')(?:=|$)'
+    $declarationsByArgument = @{}
     foreach ($authority in $authorities) {
-        $argumentPattern = '^ARG\s+' + [regex]::Escape($authority.Argument) + '(?:=|$)'
-        $declarations = @()
-        for ($index = 0; $index -lt $lines.Count; $index++) {
-            if ($lines[$index] -cmatch $argumentPattern) {
-                $declarations += [pscustomobject]@{
+        $declarationsByArgument[$authority.Argument] = [pscustomobject]@{
+            DeclarationCount = 0
+            First = $null
+        }
+    }
+    for ($index = 0; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -cmatch $argumentPattern) {
+            $declarations = $declarationsByArgument[$Matches.argument]
+            $declarations.DeclarationCount++
+            if ($declarations.DeclarationCount -eq 1) {
+                $declarations.First = [pscustomobject]@{
                     Index = $index
                     Text = $lines[$index]
                 }
             }
         }
+    }
+
+    foreach ($authority in $authorities) {
+        $declarations = $declarationsByArgument[$authority.Argument]
         $expected = "ARG $($authority.Argument)=$($authority.Image)"
-        if ($declarations.Count -cne 1 -or
-            $declarations[0].Index -ge $firstFrom -or
-            $declarations[0].Text -cne $expected) {
+        if ($declarations.DeclarationCount -cne 1 -or
+            $declarations.First.Index -ge $firstFrom -or
+            $declarations.First.Text -cne $expected) {
             throw (
                 "Dockerfile authority $($authority.Argument) must be declared " +
                 "exactly once globally as '$expected'.")
