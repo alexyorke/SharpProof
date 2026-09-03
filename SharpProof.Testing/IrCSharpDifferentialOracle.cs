@@ -574,15 +574,7 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         IrEvaluationResult interpreted,
         Exception actual)
     {
-        var kind = actual switch
-        {
-            DivideByZeroException => IrExceptionKind.DivideByZero,
-            OverflowException => IrExceptionKind.Overflow,
-            NullReferenceException => IrExceptionKind.NullReference,
-            IndexOutOfRangeException => IrExceptionKind.IndexOutOfRange,
-            InvalidCastException => IrExceptionKind.InvalidCast,
-            _ => (IrExceptionKind?)null
-        };
+        var kind = IrExceptionKindFacts.FromException(actual);
         var agrees = interpreted.Status == IrEvaluationStatus.Exception &&
                      kind != null &&
                      interpreted.Exception!.Kind == kind.Value;

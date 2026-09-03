@@ -21087,3 +21087,9 @@ its roster from those markers, including `SharpProof.Worker.Launcher`. The focus
 warnings or errors. A direct Worker.Launcher build still reaches the existing
 `ContainerNativeLibrary` SPMETA003 cancellation-handler violation; the central
 reference change preserves that pre-existing diagnostic.
+
+R1996 is applied: runtime exception-to-`IrExceptionKind` projection now lives in
+the shared internal `IrExceptionKindFacts` helper, used by both differential
+oracles while their agreement and mismatch policies remain separate.
+`SharpProof.Testing.Test` passes 13/13 and `SharpProof.Fuzz.Test` passes 39/39,
+with zero warnings or errors.

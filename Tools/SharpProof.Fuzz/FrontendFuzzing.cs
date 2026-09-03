@@ -1660,15 +1660,7 @@ public sealed class FrontendDifferentialOracle
     {
         if (actual.Exception != null)
         {
-            var kind = actual.Exception switch
-            {
-                DivideByZeroException => IrExceptionKind.DivideByZero,
-                OverflowException => IrExceptionKind.Overflow,
-                NullReferenceException => IrExceptionKind.NullReference,
-                IndexOutOfRangeException => IrExceptionKind.IndexOutOfRange,
-                InvalidCastException => IrExceptionKind.InvalidCast,
-                _ => (IrExceptionKind?)null
-            };
+            var kind = IrExceptionKindFacts.FromException(actual.Exception);
             if (interpreted.Status == IrEvaluationStatus.Exception &&
                 kind != null &&
                 interpreted.Exception!.Kind == kind)
