@@ -201,27 +201,29 @@ internal sealed class ExceptionHandlerReachability(
                 var definitelyNull =
                     abstractFlow?.ProvesNull(thrown, exception) == true ||
                     DefiniteOperationFacts.IsDefinitelyNull(exception);
-                if (!definitelyNull &&
-                    DefiniteOperationFacts.UnwrapHarmlessValue(exception).Type
-                    is INamedTypeSymbol type)
+                if (!definitelyNull)
                 {
-                    Add(
-                        Potential(type),
-                        thrown);
-                }
-                else if (!definitelyNull &&
-                    DefiniteOperationFacts.UnwrapHarmlessValue(exception).Type
-                    is ITypeParameterSymbol typeParameter &&
-                    _exceptionType is { } exceptionType &&
-                    compilation.ClassifyCommonConversion(
-                        typeParameter,
-                        exceptionType).IsImplicit)
-                {
-                    Add(UnknownPotential, thrown);
-                }
-                else if (!definitelyNull)
-                {
-                    Add(UnknownPotential, thrown);
+                    var unwrappedException =
+                        DefiniteOperationFacts.UnwrapHarmlessValue(exception);
+                    if (unwrappedException.Type is INamedTypeSymbol type)
+                    {
+                        Add(
+                            Potential(type),
+                            thrown);
+                    }
+                    else if (unwrappedException.Type is
+                                 ITypeParameterSymbol typeParameter &&
+                             _exceptionType is { } exceptionType &&
+                             compilation.ClassifyCommonConversion(
+                                 typeParameter,
+                                 exceptionType).IsImplicit)
+                    {
+                        Add(UnknownPotential, thrown);
+                    }
+                    else
+                    {
+                        Add(UnknownPotential, thrown);
+                    }
                 }
 
                 var definitelyNonNull =
