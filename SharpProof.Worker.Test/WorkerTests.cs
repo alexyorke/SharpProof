@@ -5105,8 +5105,10 @@ public sealed class WorkerTests
         }
     }
 
-    [Test]
-    public async Task ReparsePointCacheEntryFailsClosedWithoutTouchingTarget()
+    [TestCase("entry")]
+    [TestCase("lock")]
+    public async Task ReparsePointCacheFailsClosedWithoutTouchingTarget(
+        string cacheKind)
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
@@ -5115,46 +5117,24 @@ public sealed class WorkerTests
         var first = await worker.VerifyAsync(request);
         Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
 
-        var cacheFile = Directory.GetFiles(
-            project.CacheDirectory,
-            "*.sharp-proof-cache.json").Single();
-        var external = Path.Combine(project.DirectoryPath, "external-cache.json");
-        const string externalContents = "external cache target";
-        await File.WriteAllTextAsync(external, externalContents);
-        File.Delete(cacheFile);
-        if (!TryCreateFileSymbolicLink(cacheFile, external))
+        var (linkPath, externalName, externalContents) = cacheKind switch
         {
-            Assert.Ignore("The host does not permit symbolic-link creation.");
-        }
-
-        var second = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(backend.CallCount, Is.EqualTo(2));
-            Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
-            Assert.That(await File.ReadAllTextAsync(external), Is.EqualTo(externalContents));
-        }
-    }
-
-    [Test]
-    public async Task ReparsePointCacheLockFailsClosedWithoutTouchingTarget()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Written));
-
-        var lockPath = Path.Combine(
-            project.CacheDirectory,
-            ".sharp-proof-cache.lock");
-        var external = Path.Combine(project.DirectoryPath, "external-lock");
-        const string externalContents = "external lock target";
+            "entry" => (
+                Directory.GetFiles(
+                    project.CacheDirectory,
+                    "*.sharp-proof-cache.json").Single(),
+                "external-cache.json",
+                "external cache target"),
+            "lock" => (
+                Path.Combine(project.CacheDirectory, ".sharp-proof-cache.lock"),
+                "external-lock",
+                "external lock target"),
+            _ => throw new ArgumentOutOfRangeException(nameof(cacheKind))
+        };
+        var external = Path.Combine(project.DirectoryPath, externalName);
         await File.WriteAllTextAsync(external, externalContents);
-        File.Delete(lockPath);
-        if (!TryCreateFileSymbolicLink(lockPath, external))
+        File.Delete(linkPath);
+        if (!TryCreateFileSymbolicLink(linkPath, external))
         {
             Assert.Ignore("The host does not permit symbolic-link creation.");
         }
