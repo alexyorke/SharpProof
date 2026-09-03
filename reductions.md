@@ -12303,8 +12303,11 @@ for repeated scans independent of the build-context finding above.
 
 ### Status (part four hundred sixty-one)
 
-R1145-R1146 are `pending`: fuse the per-variable completeness and difference
-scan in summary merging, and make callable-evidence depth accounting cover new
+R1145 is applied: the summary merge now uses one per-variable pass to track
+missing bindings and term-ID differences while preserving the existing
+conditional construction. The focused Summary suite passes (14/14).
+
+R1146 remains `pending`: make callable-evidence depth accounting cover new
 assumptions without rechecking predicates that already passed the same limit.
 
 ## Second survey, part four hundred sixty-two: R1147, and the complete cross-assembly enum census
