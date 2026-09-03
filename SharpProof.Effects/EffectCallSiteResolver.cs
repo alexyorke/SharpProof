@@ -22,7 +22,8 @@ internal sealed class EffectCallSiteResolver(
         bool dispatchUncertain,
         IOperation origin,
         IOperation? instance,
-        IEnumerable<IArgumentOperation>? callArguments = null)
+        IEnumerable<IArgumentOperation>? callArguments = null,
+        bool? hasParamArray = null)
     {
         return Resolve(
             target,
@@ -33,7 +34,8 @@ internal sealed class EffectCallSiteResolver(
             dispatchUncertain,
             origin,
             instance,
-            callArguments);
+            callArguments,
+            hasParamArray);
     }
 
     internal EffectSummary Resolve(
@@ -45,7 +47,8 @@ internal sealed class EffectCallSiteResolver(
         bool dispatchUncertain,
         IOperation origin,
         IOperation? instance,
-        IEnumerable<IArgumentOperation>? callArguments = null)
+        IEnumerable<IArgumentOperation>? callArguments = null,
+        bool? hasParamArray = null)
     {
         var summary = _session.ResolveCall(
             _caller,
@@ -59,10 +62,13 @@ internal sealed class EffectCallSiteResolver(
             instance,
             actualArguments,
             _flow);
-        return callArguments == null
+        return hasParamArray == false ||
+            hasParamArray == null && callArguments == null
             ? summary
             : EffectSummaryOperations.Join(
-                ExpandedParamsEvidence(callArguments),
+                hasParamArray == true
+                    ? EffectSummaryOperations.Unsupported()
+                    : ExpandedParamsEvidence(callArguments!),
                 summary);
     }
 
@@ -89,7 +95,8 @@ internal sealed class EffectCallSiteResolver(
     internal EffectSummary ResolveConstruction(
         IObjectCreationOperation creation,
         EffectRegionSet receiver,
-        ImmutableArray<EffectRegionSet> arguments)
+        ImmutableArray<EffectRegionSet> arguments,
+        bool? hasParamArray = null)
     {
         var constructor = creation.Constructor;
         if (constructor == null)
@@ -145,7 +152,8 @@ internal sealed class EffectCallSiteResolver(
                 dispatchUncertain: false,
                 creation,
                 instance: null,
-                creation.Arguments));
+                creation.Arguments,
+                hasParamArray));
     }
 
     private bool HasExplicitSourceTypeInitialization(IMethodSymbol constructor)

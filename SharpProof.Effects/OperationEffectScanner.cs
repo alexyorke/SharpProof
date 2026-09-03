@@ -403,10 +403,11 @@ internal sealed partial class OperationEffectScanner
                     EffectSummaryOperations.Unsupported());
         }
 
-        var arguments = ClassifyArguments(property.Arguments, accessor.Parameters.Length);
-        var actualArguments = EffectCallSiteResolver.AlignActualArguments(
+        var argumentProjection = ProjectArguments(
             property.Arguments,
             accessor.Parameters.Length);
+        var arguments = argumentProjection.Regions;
+        var actualArguments = argumentProjection.ActualArguments;
         var storedValueRegion = assignedValueRegion;
         if (storedValueRegion == null && assignedValue != null)
         {
@@ -435,7 +436,8 @@ internal sealed partial class OperationEffectScanner
             actualArguments,
             PropertyDispatchFacts.IsUncertain(property, accessor),
             property,
-            evaluatedLocation: evaluatedLocation);
+            evaluatedLocation: evaluatedLocation,
+            hasParamArray: argumentProjection.HasParamArray);
     }
 
     private EffectSummary ScanIntrinsicProperty(
@@ -643,16 +645,18 @@ internal sealed partial class OperationEffectScanner
             return EffectSummary.Empty;
         }
 
+        var argumentProjection = ProjectArguments(
+            invocation.Arguments,
+            invocation.TargetMethod.Parameters.Length);
         return ScanCall(
             invocation.TargetMethod,
             invocation.Instance,
             invocation.Arguments,
-            ClassifyArguments(invocation.Arguments, invocation.TargetMethod.Parameters.Length),
-            EffectCallSiteResolver.AlignActualArguments(
-                invocation.Arguments,
-                invocation.TargetMethod.Parameters.Length),
+            argumentProjection.Regions,
+            argumentProjection.ActualArguments,
             IsDispatchUncertain(invocation),
-            invocation);
+            invocation,
+            hasParamArray: argumentProjection.HasParamArray);
     }
 
     private EffectSummary ScanCall(
@@ -664,7 +668,8 @@ internal sealed partial class OperationEffectScanner
         bool dispatchUncertain,
         IOperation origin,
         EffectRegionSet? receiver = null,
-        EffectStep? evaluatedLocation = null)
+        EffectStep? evaluatedLocation = null,
+        bool? hasParamArray = null)
     {
         return ScanCallStep(
             method,
@@ -675,7 +680,8 @@ internal sealed partial class OperationEffectScanner
             dispatchUncertain,
             origin,
             receiver,
-            evaluatedLocation).Summary;
+            evaluatedLocation,
+            hasParamArray).Summary;
     }
 
     private EffectStep ScanCallStep(
@@ -687,7 +693,8 @@ internal sealed partial class OperationEffectScanner
         bool dispatchUncertain,
         IOperation origin,
         EffectRegionSet? receiver = null,
-        EffectStep? evaluatedLocation = null)
+        EffectStep? evaluatedLocation = null,
+        bool? hasParamArray = null)
     {
         var result = evaluatedLocation ?? EffectStep.Empty;
         if (evaluatedLocation == null && instance != null)
@@ -740,7 +747,8 @@ internal sealed partial class OperationEffectScanner
             dispatchUncertain,
             origin,
             instance,
-            arguments);
+            arguments,
+            hasParamArray);
         return result.Then(new EffectStep(
             call,
             _completionEvaluator.CanCompleteInvocation(method, instance, origin)));
@@ -803,6 +811,9 @@ internal sealed partial class OperationEffectScanner
             return arguments.Summary;
         }
 
+        var argumentProjection = ProjectArguments(
+            creation.Arguments,
+            creation.Constructor?.Parameters.Length ?? 0);
         var construction = IsUnmodeledExternalExceptionConstruction(creation) &&
             creation.Syntax.AncestorsAndSelf().Any(static syntax =>
                 syntax is ThrowExpressionSyntax or ThrowStatementSyntax)
@@ -810,9 +821,8 @@ internal sealed partial class OperationEffectScanner
             : _callResolver.ResolveConstruction(
                 creation,
                 receiver,
-                ClassifyArguments(
-                    creation.Arguments,
-                    creation.Constructor?.Parameters.Length ?? 0));
+                argumentProjection.Regions,
+                argumentProjection.HasParamArray);
         var constructor = new EffectStep(
             EffectSummaryDomain.Instance.Join(allocation, construction),
             _completionEvaluator.CanCompleteConstructorCall(creation));
@@ -890,12 +900,14 @@ internal sealed partial class OperationEffectScanner
 
             var receiver = EffectRegionSet.Create(
                 EffectRegionId.Fresh(creation.Syntax.SpanStart));
+            var argumentProjection = ProjectArguments(
+                creation.Arguments,
+                creation.Constructor?.Parameters.Length ?? 0);
             var construction = _callResolver.ResolveConstruction(
                 creation,
                 receiver,
-                ClassifyArguments(
-                    creation.Arguments,
-                    creation.Constructor?.Parameters.Length ?? 0));
+                argumentProjection.Regions,
+                argumentProjection.HasParamArray);
             var result = arguments.Then(new EffectStep(
                 construction,
                 _completionEvaluator.CanCompleteConstructorCall(creation)));
@@ -1581,23 +1593,48 @@ internal sealed partial class OperationEffectScanner
             _completionEvaluator.CanCompleteNormally(thrown.Exception);
     }
 
-    private ImmutableArray<EffectRegionSet> ClassifyArguments(
-        IEnumerable<IArgumentOperation> arguments, int parameterCount)
+    private readonly record struct ArgumentProjection(
+        ImmutableArray<EffectRegionSet> Regions,
+        ImmutableArray<IOperation?> ActualArguments,
+        bool HasParamArray);
+
+    private ArgumentProjection ProjectArguments(
+        ImmutableArray<IArgumentOperation> arguments,
+        int parameterCount)
     {
-        var result = new EffectRegionSet[parameterCount];
+        var regions = new EffectRegionSet[parameterCount];
+        var actualArguments = ImmutableArray.CreateBuilder<IOperation?>(
+            parameterCount);
+        actualArguments.Count = parameterCount;
+        var hasInvalidOrdinal = false;
+        var hasParamArray = false;
         foreach (var argument in arguments)
         {
+            hasParamArray |= argument.ArgumentKind == ArgumentKind.ParamArray;
             var ordinal = argument.Parameter?.Ordinal ?? -1;
-            if (ordinal < 0 || ordinal >= result.Length)
+            if (ordinal < 0 || ordinal >= regions.Length)
             {
-                return [.. Enumerable.Repeat(EffectRegionSet.Unknown, parameterCount)];
+                hasInvalidOrdinal = true;
+                continue;
             }
 
-            result[ordinal] = result[ordinal].Union(
-                _conversionOwnership.ClassifyCallArgumentRegion(
-                    argument.Value));
+            if (!hasInvalidOrdinal)
+            {
+                regions[ordinal] = regions[ordinal].Union(
+                    _conversionOwnership.ClassifyCallArgumentRegion(
+                        argument.Value));
+            }
+            if (argument.ArgumentKind != ArgumentKind.ParamArray)
+            {
+                actualArguments[ordinal] = argument.Value;
+            }
         }
-        return [.. result];
+        return new(
+            hasInvalidOrdinal
+                ? [.. Enumerable.Repeat(EffectRegionSet.Unknown, parameterCount)]
+                : [.. regions],
+            actualArguments.MoveToImmutable(),
+            hasParamArray);
     }
 
     internal static bool IsDispatchUncertain(IInvocationOperation invocation)
