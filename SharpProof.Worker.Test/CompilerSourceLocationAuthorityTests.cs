@@ -56,15 +56,7 @@ public sealed class CompilerSourceLocationAuthorityTests
             Assert.That(
                 diagnostic.SourceLineMapSha256,
                 Is.EqualTo(tree.LineMapSha256));
-            Assert.That(
-                CompilerSourceLocationAuthority.IsBound(
-                    diagnostic.Location,
-                    diagnostic.SourceTreeOrdinal,
-                    diagnostic.SourceTreePath,
-                    diagnostic.SourceTreeSha256,
-                    diagnostic.SourceLineMapSha256,
-                    artifact.Compilation),
-                Is.True);
+            AssertBound(diagnostic, artifact.Compilation);
         }
     }
 
@@ -94,13 +86,7 @@ public sealed class CompilerSourceLocationAuthorityTests
                 Is.Ordered.By(nameof(CompilerLocationAuthorityArtifact.OwnerId)));
             Assert.That(
                 artifact.LocationAuthorities.All(authority =>
-                    CompilerSourceLocationAuthority.IsBound(
-                        authority.Location,
-                        authority.SourceTreeOrdinal,
-                        authority.SourceTreePath,
-                        authority.SourceTreeSha256,
-                        authority.SourceLineMapSha256,
-                        artifact.Compilation)),
+                    IsBound(authority, artifact.Compilation)),
                 Is.True);
         }
     }
@@ -206,14 +192,8 @@ public sealed class CompilerSourceLocationAuthorityTests
         Assert.That(mappedDiagnostics, Is.Not.Empty);
         Assert.That(
             mappedDiagnostics.All(diagnostic =>
-                CompilerSourceLocationAuthority.IsBound(
-                    diagnostic.Location,
-                    diagnostic.SourceTreeOrdinal,
-                    diagnostic.SourceTreePath,
-                    diagnostic.SourceTreeSha256,
-                    diagnostic.SourceLineMapSha256,
-                    artifact.Compilation)),
-            Is.True);
+                IsBound(diagnostic, artifact.Compilation)),
+                Is.True);
     }
 
     [Test]
@@ -322,6 +302,39 @@ public sealed class CompilerSourceLocationAuthorityTests
 
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(omitted)));
+    }
+
+    private static void AssertBound(
+        CompilerDiagnosticArtifact diagnostic,
+        CompilerCompilationSnapshot compilation)
+    {
+        Assert.That(IsBound(diagnostic, compilation), Is.True);
+    }
+
+    private static bool IsBound(
+        CompilerDiagnosticArtifact diagnostic,
+        CompilerCompilationSnapshot compilation)
+    {
+        return CompilerSourceLocationAuthority.IsBound(
+            diagnostic.Location,
+            diagnostic.SourceTreeOrdinal,
+            diagnostic.SourceTreePath,
+            diagnostic.SourceTreeSha256,
+            diagnostic.SourceLineMapSha256,
+            compilation);
+    }
+
+    private static bool IsBound(
+        CompilerLocationAuthorityArtifact authority,
+        CompilerCompilationSnapshot compilation)
+    {
+        return CompilerSourceLocationAuthority.IsBound(
+            authority.Location,
+            authority.SourceTreeOrdinal,
+            authority.SourceTreePath,
+            authority.SourceTreeSha256,
+            authority.SourceLineMapSha256,
+            compilation);
     }
 
     private static CompilerManifestArtifact CreateArtifact(string source)
