@@ -14853,6 +14853,12 @@ without intermediate filtered arrays. Contract binder tests pass (89 passed).
 |---|---|---|
 | R1229 | **`IsMutableStorageType` rechecks both special-type policies for its first loop item.** The outer guard rejects the starting named type when it is a known immutable or compilation-scoped weak cache, but the loop starts at the same symbol and calls both predicates again. A cached/propagated classification can preserve the base-type checks while eliminating the guaranteed duplicate queries. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:757-783` |
 
+### Status (part five hundred fifty-one)
+
+R1229 is applied: mutable-storage classification carries the initial type-policy
+results into the base-type loop, avoiding guaranteed rechecks while retaining
+later-base filtering. Meta analyzer tests pass (162 passed).
+
 ## Second survey, part five hundred fifty-two: R1230 - return-expression discovery traverses each syntax tree twice
 
 `CacheSoundnessRules.GetReturnExpressions` calls `syntax.DescendantNodesAndSelf()` once to collect arrow-expression bodies and a second time to collect return statements, then concatenates the two sequences and filters nested callables. The two result categories are deliberately kept in separate groups, but that ordering can be preserved by one traversal that appends each node to its corresponding bucket before concatenating the buckets. This removes one full syntax-tree walk without changing the existing arrow-then-return ordering or the unreachable-return and nested-callable filters.
