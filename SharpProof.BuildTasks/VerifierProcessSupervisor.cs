@@ -379,29 +379,52 @@ internal static partial class VerifierProcessSupervisor
         int supervisorId,
         Dictionary<int, int> parents)
     {
-        return parents.Keys
-            .Where(processId =>
-                IsDescendant(processId, supervisorId, parents))
-            .ToHashSet();
-    }
-
-    private static bool IsDescendant(
-        int processId,
-        int supervisorId,
-        Dictionary<int, int> parents)
-    {
-        var seen = new HashSet<int>();
-        for (var current = processId;
-             current > 1 && seen.Add(current) &&
-             parents.TryGetValue(current, out var parent);
-             current = parent)
+        var descendants = new HashSet<int>();
+        var states = new Dictionary<int, bool>();
+        var path = new List<int>();
+        var pathNodes = new HashSet<int>();
+        foreach (var processId in parents.Keys)
         {
-            if (parent == supervisorId)
+            if (!states.TryGetValue(processId, out var isDescendant))
             {
-                return true;
+                path.Clear();
+                pathNodes.Clear();
+                var current = processId;
+                isDescendant = false;
+                while (current > 1 &&
+                       !states.ContainsKey(current) &&
+                       parents.TryGetValue(current, out var parent))
+                {
+                    if (!pathNodes.Add(current))
+                    {
+                        break;
+                    }
+                    path.Add(current);
+                    if (parent == supervisorId)
+                    {
+                        isDescendant = true;
+                        break;
+                    }
+                    current = parent;
+                }
+                if (!isDescendant &&
+                    current > 1 &&
+                    states.TryGetValue(current, out var resolved))
+                {
+                    isDescendant = resolved;
+                }
+                foreach (var node in path)
+                {
+                    states[node] = isDescendant;
+                }
+            }
+
+            if (isDescendant)
+            {
+                descendants.Add(processId);
             }
         }
-        return false;
+        return descendants;
     }
 
     private static Dictionary<int, int> ReadProcessParents()
