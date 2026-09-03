@@ -26,7 +26,7 @@ internal sealed class ManagedAbstractFlow
     // Instances are shared per compilation across Roslyn's concurrent analysis
     // threads, so the recursion guard cannot live in an instance field.
     [ThreadStatic]
-    private static int _walkDepth;
+    private static int s_walkDepth;
 
     private static readonly ConditionalWeakTable<Compilation, ManagedAbstractFlow> Sessions = new();
     private readonly ResolvedApiSpecTable _apiSpecs;
@@ -567,18 +567,18 @@ internal sealed class ManagedAbstractFlow
 
     private static bool TryEnterWalk()
     {
-        if (_walkDepth >= MaximumWalkDepth)
+        if (s_walkDepth >= MaximumWalkDepth)
         {
             return false;
         }
 
-        _walkDepth++;
+        s_walkDepth++;
         return true;
     }
 
     private static void ExitWalk()
     {
-        _walkDepth--;
+        s_walkDepth--;
     }
 
     private ManagedAbstractValue EvaluateBounded(IOperation operation, ManagedFlowState state)

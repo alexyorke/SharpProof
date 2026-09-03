@@ -11,7 +11,7 @@ namespace SharpProof.BuildTasks;
 public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
     ICancelableTask
 {
-    private readonly object _synchronization = new();
+    private readonly object _gate = new();
     private Action? _cancelExecution;
     private bool _canceled;
 
@@ -19,7 +19,7 @@ public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
     {
         using var cancellation = new CancellationTokenSource();
         Action cancel = cancellation.Cancel;
-        lock (_synchronization)
+        lock (_gate)
         {
             if (_canceled)
             {
@@ -33,7 +33,7 @@ public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
         }
         finally
         {
-            lock (_synchronization)
+            lock (_gate)
             {
                 if (ReferenceEquals(_cancelExecution, cancel))
                 {
@@ -47,7 +47,7 @@ public abstract class CancelableBuildTask : Microsoft.Build.Utilities.Task,
 
     public void Cancel()
     {
-        lock (_synchronization)
+        lock (_gate)
         {
             _canceled = true;
             // Invoke while Execute still owns the linked source. Copying the

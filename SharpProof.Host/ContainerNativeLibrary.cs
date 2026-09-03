@@ -6,18 +6,18 @@ namespace SharpProof.Host;
 public static class ContainerNativeLibrary
 {
     private const string Z3ImportName = "libz3";
-    private static readonly object Synchronization = new();
-    private static Assembly? _z3Assembly;
-    private static IntPtr _z3Handle;
+    private static readonly object Gate = new();
+    private static Assembly? s_z3Assembly;
+    private static IntPtr s_z3Handle;
 
     public static void InstallZ3ResolverRequired(Assembly z3Assembly)
     {
         ArgumentNullException.ThrowIfNull(z3Assembly);
-        lock (Synchronization)
+        lock (Gate)
         {
-            if (_z3Handle != IntPtr.Zero)
+            if (s_z3Handle != IntPtr.Zero)
             {
-                if (!ReferenceEquals(_z3Assembly, z3Assembly))
+                if (!ReferenceEquals(s_z3Assembly, z3Assembly))
                 {
                     throw new InvalidOperationException(
                         "The verified Z3 resolver is already bound to another assembly.");
@@ -29,8 +29,8 @@ public static class ContainerNativeLibrary
                 ContainerContract.ResolveZ3LibraryRequired());
             try
             {
-                _z3Assembly = z3Assembly;
-                Volatile.Write(ref _z3Handle, handle);
+                s_z3Assembly = z3Assembly;
+                Volatile.Write(ref s_z3Handle, handle);
                 NativeLibrary.SetDllImportResolver(
                     z3Assembly,
                     ResolveZ3Import);
@@ -41,8 +41,8 @@ public static class ContainerNativeLibrary
             }
             catch
             {
-                Volatile.Write(ref _z3Handle, IntPtr.Zero);
-                _z3Assembly = null;
+                Volatile.Write(ref s_z3Handle, IntPtr.Zero);
+                s_z3Assembly = null;
                 NativeLibrary.Free(handle);
                 throw;
             }
@@ -64,6 +64,6 @@ public static class ContainerNativeLibrary
             throw new DllNotFoundException(
                 "The SharpProof verifier refuses ambient native libraries.");
         }
-        return Volatile.Read(ref _z3Handle);
+        return Volatile.Read(ref s_z3Handle);
     }
 }

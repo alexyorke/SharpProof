@@ -1,5 +1,6 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$script:SharpProofSolutionTestTimeoutFallbackSeconds = 1800
 
 function Get-SharpProofDotnetWrapperPath {
     param()
@@ -392,10 +393,30 @@ function Resolve-SharpProofSolutionTestTimeoutSeconds {
     )
 
     if (-not $WasSpecified) {
-        $contract = Get-Content -LiteralPath (Join-Path `
-            $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
-            ConvertFrom-Json
-        $TimeoutSeconds = [int]$contract.automation.solutionTestWallSeconds
+        $contractPath = Join-Path $RepositoryRoot 'eng/acceptance/contract.json'
+        if (Test-Path -LiteralPath $contractPath -PathType Leaf) {
+            $contract = Get-Content -LiteralPath $contractPath -Raw |
+                ConvertFrom-Json
+            $automation = $contract.PSObject.Properties['automation']
+            $solutionTestWall = if ($null -eq $automation) {
+                $null
+            }
+            else {
+                $automation.Value.PSObject.Properties[
+                    'solutionTestWallSeconds']
+            }
+            if ($null -ne $solutionTestWall) {
+                $TimeoutSeconds = [int]$solutionTestWall.Value
+            }
+            else {
+                $TimeoutSeconds = $script:SharpProofSolutionTestTimeoutFallbackSeconds
+            }
+        }
+        else {
+            # Changed-test selection fixtures intentionally contain only the
+            # files needed for dependency discovery, not the acceptance contract.
+            $TimeoutSeconds = $script:SharpProofSolutionTestTimeoutFallbackSeconds
+        }
     }
     if ($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 86400) {
         throw 'Solution-test timeout must be between 1 and 86400 seconds.'

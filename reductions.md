@@ -9500,13 +9500,10 @@ method.
 
 ### Status (part one hundred ninety-seven)
 
-R970 is `pending` and is cosmetic in three of its four instances. The
-substantive part is the `ContainerNativeLibrary` pair: two mutable process-wide
-native handles wearing the instance-field convention, in the one file where
-mistaking scope changes whether the surrounding synchronization looks necessary.
-The rest of the split is a rule that has never been written down - which the
-100-percent uniformity of instance-field naming shows this codebase is perfectly
-capable of holding once it is.
+R970 is applied: process-wide mutable fields now use the `s_` static-field
+convention (`s_z3Assembly`, `s_z3Handle`, `s_nextCleanupAnchor`, and
+`s_walkDepth`), while the immutable native-state lock uses the existing static
+Pascal-case style. This makes field scope explicit without changing behavior.
 
 ## Second survey, part one hundred ninety-eight: R971 - repeated protocol enum type discovery
 
@@ -10254,8 +10251,9 @@ changed-test invocation silently keeps the old deadline.
 
 R991 is applied: the four direct solution-test runners now resolve their
 unspecified timeout from `automation.solutionTestWallSeconds` through the
-container-execution module. Explicit timeout overrides and the narrower
-command-specific deadlines remain unchanged.
+container-execution module, with one module fallback for contract-less changed
+test fixtures. Explicit timeout overrides and the narrower command-specific
+deadlines remain unchanged.
 
 ## Second survey, part two hundred twenty-three: R992 - repeated response canonicalization at output boundaries
 

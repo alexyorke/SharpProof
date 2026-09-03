@@ -34,8 +34,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     private const string ProcessGroupLauncher = "/usr/bin/setsid";
     private static readonly ConcurrentDictionary<long, CleanupAnchor>
         RetainedCleanupAnchors = new();
-    private static long _nextCleanupAnchor;
-    private readonly object _synchronization = new();
+    private static long s_nextCleanupAnchor;
+    private readonly object _gate = new();
     private readonly ManualResetEventSlim _cancellationSignal = new();
     private readonly ManualResetEventSlim _outputLimitSignal = new();
     private Process? _process;
@@ -82,7 +82,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     {
         get
         {
-            lock (_synchronization)
+            lock (_gate)
             {
                 return _process != null && !_process.HasExited;
             }
@@ -179,7 +179,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             {
                 process.StartInfo.ArgumentList.Add(argument.ItemSpec);
             }
-            lock (_synchronization)
+            lock (_gate)
             {
                 if (_canceled)
                 {
@@ -342,7 +342,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         finally
         {
             var processGroupPidFd = -1;
-            lock (_synchronization)
+            lock (_gate)
             {
                 if (ReferenceEquals(_process, process))
                 {
@@ -708,7 +708,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         System.Threading.Tasks.Task? supervisorCleanupSignal = null,
         Action<string>? authenticationFailure = null)
     {
-        var token = Interlocked.Increment(ref _nextCleanupAnchor);
+        var token = Interlocked.Increment(ref s_nextCleanupAnchor);
         var anchor = new CleanupAnchor(
             process,
             processGroupPidFd,
@@ -995,7 +995,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         {
             return true;
         }
-        lock (_synchronization)
+        lock (_gate)
         {
             if (!ReferenceEquals(_process, process) ||
                 _processGroupId != processGroupId ||
@@ -1297,7 +1297,7 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
     {
         Process? process;
         int processGroupId;
-        lock (_synchronization)
+        lock (_gate)
         {
             _canceled = true;
             _cancellationSignal.Set();
