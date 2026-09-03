@@ -20166,3 +20166,63 @@ R1821 is applied: the four generated/initializer fixtures in
 `RequiresAndControlTests` now reuse one `PositiveGuardSource` fragment while
 retaining their distinct generated-code boundaries. The focused class suite
 passes (92/92).
+
+R1841 is applied: `GeneratedFileHelpers.ps1` now owns the shared Boolean type
+check, with a label parameter preserving the scalar and JSON-specific error
+messages. Both generator `-Verify` checks pass.
+
+## Second survey, part six hundred twenty-one: R1860 - the Roslyn setting that makes the product's own generated-code policy reachable is written four times and asserted nowhere
+
+A sub-method block census over production code, never run before: **263**
+hand-written production `.cs` files, 41 generated files skipped, **58,511**
+significant lines, scanned for contiguous six-line runs repeated anywhere.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1860 | **Every production `DiagnosticAnalyzer` must call `ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze \| ReportDiagnostics)` or the product's own generated-code policy never runs; four analyzers do it correctly by hand and nothing asserts that they do.** Roslyn's default excludes generated code from analysis, so an analyzer that omits the call - or writes `GeneratedCodeAnalysisFlags.None`, which one test fixture in this repository deliberately does at `ContractForValidatorGeneratorTests.cs:2034` - simply stops seeing generated files. That matters here more than in most projects because `SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs` is a **trusted-computing-base component** implementing the product's *own* classification of generated code, from four path suffixes (`.g.cs`, `.g.i.cs`, `.generated.cs`, `.designer.cs`) and four header tokens. The flags are what hand generated code to that policy; without them the policy is unreachable and the analyzer silently narrows its subject. **The four production sites**: `SharpProof.Analyzer/SharpProofAnalyzer.cs:29-31`, `SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs:17-19`, `SharpProof.CompilerProbe.TestAsset/CompilerProbeAnalyzer.cs:28-30` and `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:97-99`. All four agree, character for character. **No test reads the value.** A repository-wide search for `GeneratedCodeAnalysisFlags` or `ConfigureGeneratedCodeAnalysis` returns exactly these four plus the one deliberate `None` in a test fixture; no assertion, no reflection check, no architecture test. This is a repository that pins six fixture types' `[Parallelizable]` attributes by reflection (R1640), asserts an exact `InternalsVisibleTo` matrix, and requires every soundness-critical project to carry an analyzer reference with two named attributes (R1820) - and leaves unpinned the one Roslyn setting that decides whether its analyzers look at generated code at all. A fifth analyzer, or an edit to one of the four, diverges silently; `GeneratedCodeAnalyzerTests` would still pass, because it drives `SharpProofAnalyzer` specifically. The check is one reflection assertion over every `DiagnosticAnalyzer` in the production assemblies, which is the shape `SemanticArchitectureShardsCoverEveryFixture` already uses. | `SharpProof.Analyzer/SharpProofAnalyzer.cs:25-32`; `SharpProof.CompilerCollector/FinalCompilationCollectorAnalyzer.cs:12-19`; `SharpProof.CompilerProbe.TestAsset/CompilerProbeAnalyzer.cs:22-31`; `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:90-99`; `SharpProof.Analyzer.Core/AnalyzerGeneratedCodePolicy.cs` (TCB); `SharpProof.ContractForGenerator.Test/ContractForValidatorGeneratorTests.cs:2031-2036` (the deliberate `None`); `SharpProof.Analyzer.Test/GeneratedCodeAnalyzerTests.cs`; related R1640, R1820, R506 |
+
+### Checked and not proposed (part six hundred twenty-one)
+
+- **Production code has almost no repeated statement blocks, and the census that
+  found R1860 is the evidence.** Over 58,511 significant lines in 263 hand-written
+  files there are **118** repeated six-line runs, of which only **29** span more
+  than one file. After R1860 and the global-usings overlap, the remainder are
+  within-file and small.
+- **The largest single-file repeat is `ProtocolJson.cs` and it is a genuine
+  candidate that belongs to an existing finding's file rather than a new one.**
+  `:207-219` and `:245-257` repeat a twelve-line validation prologue verbatim -
+  reject `expectedRequest` whose `ComputeRequestHash` does not match
+  `expectedRequestHash`, reject invalid `expectedVersions`, then compute
+  `WorkerExecutionEnvelope.MaximumElapsedMilliseconds(expectedRequest,
+  terminationGraceMilliseconds)`. Two public entry points share it. `ProtocolJson.cs`
+  already carries six trusted-mutation entries and is cited throughout this ledger;
+  the prologue is a small, self-contained extraction and is recorded here rather
+  than given an ID because the file is under active edit by the applied-reduction
+  pass.
+- **The two hand-written null guards in the analyzer prologues are forced, not
+  bypasses, and the obvious reading is wrong.** `SharpProofAnalyzer` and
+  `FinalCompilationCollectorAnalyzer` write `ArgumentNullGuard.NotNull(context,
+  nameof(context))` while `CompilerProbeAnalyzer` and `SharpProofSoundnessAnalyzer`
+  write `if (context == null) { throw new ArgumentNullException(nameof(context)); }`,
+  which looks like R364's "hand-written guard beside the shared helper". It is not:
+  `ArgumentNullGuard` is `internal` in `SharpProof.Ir`, and `SharpProof.Ir`'s
+  nineteen-entry `InternalsVisibleTo` list contains neither
+  `SharpProof.Meta.Analyzers` - which does not reference `SharpProof.Ir` at all -
+  nor `SharpProof.CompilerProbe.TestAsset`. Both hand guards are the only option
+  those assemblies have.
+- **The `GlobalUsings.cs` overlap between `SharpProof.Analyzer.Core` and
+  `SharpProof.CompilerCollector` is not reducible.** Six identical `global using`
+  lines for the Roslyn namespaces appear in both; global usings are per-project by
+  definition and applied R234 already established that no redundant global using
+  remains. Two projects needing the same six Roslyn namespaces is agreement.
+- **MSBuild within-file repetition closes clean**, as recorded in part six hundred
+  twenty: 75 redundant lines over 14 files, essentially all inherent XML attribute
+  repetition, and the five files defining a property element twice all do so as the
+  deliberate default-then-override pattern.
+
+### Status (part six hundred twenty-one)
+
+R1860 is `pending` and is one assertion. It is filed at a higher priority than its
+size suggests because the setting it protects is the precondition for a
+trusted-computing-base component running at all, and because the repository's
+existing gates cover strictly less consequential configuration by reflection.

@@ -109,6 +109,21 @@ function Assert-EnumValue
     return [string]$Value
 }
 
+function Assert-Boolean
+{
+    param(
+        [AllowNull()][object]$Value,
+        [string]$Context,
+        [string]$TypeDescription = 'Boolean'
+    )
+
+    if ($Value -isnot [bool])
+    {
+        throw "$Context must be $TypeDescription."
+    }
+    return [bool]$Value
+}
+
 function Assert-EnumName([object]$Value, [string[]]$Allowed, [string]$Context)
 {
     return Assert-EnumValue $Value $Allowed $Context

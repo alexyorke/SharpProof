@@ -209,21 +209,6 @@ function Assert-Text {
     return [string]$Value
 }
 
-function Assert-JsonBoolean {
-    param(
-        [AllowNull()]
-        [object]$Value,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Context
-    )
-
-    if ($Value -isnot [bool]) {
-        throw "$Context must be a JSON boolean."
-    }
-    return [bool]$Value
-}
-
 function Assert-JsonInt64 {
     param(
         [AllowNull()]
@@ -398,9 +383,10 @@ function Format-Term {
             return "new SpecVariableDeclaration($role, $ordinal, $type)"
         }
         'boolean' {
-            $value = Assert-JsonBoolean `
+            $value = Assert-Boolean `
                 -Value (Get-RequiredProperty $Term 'value' $Context) `
-                -Context "$Context.value"
+                -Context "$Context.value" `
+                -TypeDescription 'a JSON boolean'
             $literal = if ($value) { 'true' } else { 'false' }
             if ($type -ne 'IrTypeKind.Boolean') {
                 throw "$Context boolean type must be Boolean."
@@ -914,9 +900,10 @@ foreach ($declaration in $declarations) {
         -Type 'IrTypeKind' `
         -Context "$context.target.resultType" `
         -Nullable
-    $isStaticValue = Assert-JsonBoolean `
+    $isStaticValue = Assert-Boolean `
         -Value (Get-RequiredProperty $target 'isStatic' "$context.target") `
-        -Context "$context.target.isStatic"
+        -Context "$context.target.isStatic" `
+        -TypeDescription 'a JSON boolean'
     $isStatic = if ($isStaticValue) {
         'true'
     }

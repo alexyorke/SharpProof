@@ -30,21 +30,6 @@ if (-not [IO.File]::Exists($CatalogPath)) {
     throw "C# scalar-semantics catalog not found: $CatalogPath"
 }
 
-function Assert-Boolean {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object]$Value,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Context
-    )
-
-    if ($Value -isnot [bool]) {
-        throw "$Context must be Boolean."
-    }
-    return [bool]$Value
-}
-
 function Assert-OptionalEnumName {
     param(
         [Parameter(Mandatory = $true)]
