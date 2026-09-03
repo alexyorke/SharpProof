@@ -14819,3 +14819,11 @@ RequiresAndControl analyzer tests pass (92 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1231 | **`GetPossibleDispatchTargets` re-walks all source types for each completed dispatch query.** Virtual/interface return analysis starts a fresh target builder and invokes `GetSourceTypes(compilation.Assembly.GlobalNamespace)` for every symbol; the local recursion set is not a memo of completed results. A compilation-scoped immutable dispatch cache can retain the existing target ordering and cycle behavior while avoiding repeated whole-compilation enumeration. | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1403-1422,1425-1463,1511-1529` |
+
+## Second survey, part five hundred fifty-four: R1232 - cancellation projection checks rescan one invocation
+
+`ReifiesWorkerVerificationCancellation` validates `status`, `callableReason`, and `claimReason` projections from the same `CreateIncomplete` invocation. Each `IsCancellationProjection` call independently performs `invocation.Arguments.FirstOrDefault` by parameter name, unwraps the conditional, and verifies the condition references the same local. The expected enum type and the two static-field names differ, so the policy checks should remain distinct, but one argument lookup/conditional-shape projection can be shared before applying those three field policies. This removes repeated scans of the same small argument list while preserving parameter-name matching and the three separate type/name requirements.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1232 | **`ReifiesWorkerVerificationCancellation` repeats argument and condition projection for three fields.** Its three `IsCancellationProjection` calls each search the same invocation arguments and unwrap/check the same conditional-local shape before applying different expected types and field names. A shared projection snapshot or one-pass validator can retain the distinct enum policies while removing the repeated structural work. | `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs:777-799,802-832` |
