@@ -10627,3 +10627,15 @@ R1012 is deferred: preserve warmup exception propagation, measured latency captu
 ### Status (part two hundred forty-four)
 
 R1013 is deferred: deduplicate only the pre-lock ancestor probes within one acquisition, and retain the post-lock identity confirmation and failure handling.
+
+## Second survey, part two hundred forty-five: R1014 - duplicated known-catch type relation
+
+`EffectExceptionFlow.GetTypeSelection` and `ExceptionHandlerReachability.GetKnownTypeSelection` independently classify the relation between a thrown exception type and a caught type. After each caller has resolved its own syntax-specific caught symbol, both return `Always` when the thrown type derives from the caught type, `Maybe` when the caught type derives from the thrown type, and `Never` otherwise. They also declare separate private `CatchSelection` enums with the same three values. The surrounding policies are not identical: `EffectExceptionFlow` treats an absent caught symbol as `Maybe`, while the reachability analyzer treats an untyped catch as `Always` and an unresolved declared type as `Maybe`; filter handling also differs because reachability accounts for abruptly completing filter operations. A shared type-relation helper and common result type can own only the inheritance classification, leaving those syntax and filter fallbacks at their current boundaries.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1014 | **Known exception-to-catch type selection is implemented twice across the Effects analyzers.** Once a caught `INamedTypeSymbol` is available, `EffectExceptionFlow` and `ExceptionHandlerReachability` contain the same derived-from / reverse-derived-from / unrelated decision tree and duplicate the `Never`/`Maybe`/`Always` enum. Centralize that symbol-only relation result, while retaining each caller's untyped-catch, unresolved-type, filter, and control-flow semantics. | `SharpProof.Effects/EffectExceptionFlow.cs:210-227,274-284`; `SharpProof.Effects/ExceptionHandlerReachability.cs:3041-3062,3109-3114`; filter-policy difference at `:3075-3098` | |
+
+### Status (part two hundred forty-five)
+
+R1014 is deferred: share only the resolved-symbol inheritance relation; do not merge the two analyzers' catch syntax, filter completion, or reachability policies.
