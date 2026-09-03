@@ -12140,7 +12140,10 @@ passes (23/23).
 
 ### Status (part three hundred sixty-six)
 
-R1135 is deferred: fold candidate-round termination into the existing group walk and retain ordering, diversity, and exact-count validation.
+R1135 is applied: candidate selection now tracks whether the current
+round-robin pass added a method and stops after the first empty round, removing
+the separate `byFile.Any` scan while preserving deterministic ordering and the
+exact-count failure. The focused corpus suite passes (23/23).
 
 ## Second survey, part three hundred sixty-seven: R1136 - repeated descendant membership proof
 
@@ -12152,7 +12155,10 @@ R1135 is deferred: fold candidate-round termination into the existing group walk
 
 ### Status (part three hundred sixty-seven)
 
-R1136 is deferred: use the existing descendant-set proof once per parent snapshot and retain all pidfd and signal safety checks.
+R1136 is applied: `StopDescendants` now signals the already-filtered
+descendant set directly, removing the second `IsDescendant` walk while keeping
+the per-pass parent snapshot, pidfd identity checks, and signal error handling.
+The focused `VerifierProcessSupervisor` package tests pass (3/3).
 
 ## Second survey, part three hundred sixty-eight: R1137 - repeated SMT model-variable type lookup
 
@@ -12741,3 +12747,168 @@ No new ID. R1143 should move to the refuted table with this part as its evidence
 and R1147's status improves from "one of several" to "the single ungated
 cross-assembly vocabulary pair in the product" - which makes it the more worthwhile
 of the two and the one that should carry the fix.
+
+## Second survey, part four hundred seventy-two: the reflection-gate census, and a correction to R978
+
+Having been wrong twice about "nothing checks this", I enumerated the gates a
+filename or identifier search cannot see: every test that asserts by reflection.
+The census corrects one of my findings and sharpens it, and confirms two others.
+
+### Correction: R978 understates the gating, and its real point is sharper than filed
+
+R978 recorded that all four `AssemblyInfo.cs` files declare
+`[assembly: LevelOfParallelism(4)]` while `eng/test/architecture-parallel.runsettings`
+declares `<NumberOfTestWorkers>8</NumberOfTestWorkers>`, and framed the
+configuration as unreconciled. **Two of those four assemblies do have the attribute
+asserted**, by reflection:
+`SharpProof.ArchitectureTest/BuildSchedulingTests.cs:953-978` pulls
+`LevelOfParallelismAttribute` off its own assembly and asserts its argument
+`Is.EqualTo(4)`, and also asserts that six named fixtures carry
+`[Parallelizable(ParallelScope.Children)]`;
+`SharpProof.Worker.Test/CompilerManifestArtifactTests.cs:98-115` does the same for
+its assembly. So the value is pinned, not merely written.
+
+**That makes the finding worse rather than better.** The same file -
+`BuildSchedulingTests.cs` - reads `architecture-parallel.runsettings` at `:903-909`
+inside `SemanticShardingAlwaysSplitsTheCoverageHotspot`, and asserts properties of
+the sharding script that consumes it. So one test file pins **4** as the assembly's
+worker count and separately loads the runsettings file that sets **8** for the same
+assembly, without either assertion referring to the other. R978 should be read with
+this: the two numbers are not merely unreconciled, they are each independently
+asserted, in one file, as if the other did not exist.
+
+### Checked and not proposed (part four hundred seventy-two)
+
+- **Thirty-five test files gate by reflection**, using two or more of
+  `Enum.GetNames`, `Enum.GetValues`, `typeof(...).Assembly`, `GetType`,
+  `GetMethod`, `GetField`, `GetProperties`, `GetTypes`, `GetCustomAttributes` and
+  `BindingFlags` - 168 `BindingFlags` uses and 90 `typeof(...).Assembly` uses in
+  total. The four heaviest are `CompilerArtifactModelSchemaTests`,
+  `ProtocolModelSchemaTests`, `IrModelSchemaTests` and `ContractApiTests`.
+  **Every `Enum.GetNames` call in the repository passes a variable** - `enumType`,
+  `type`, `types` - never a literal `typeof(SomeEnum)`, which is exactly why a
+  grep for an enum name does not find its gate. Any future claim in this ledger
+  that something is "not compared anywhere" must be checked against these 35 files
+  before it is filed.
+- **R967 survives the check.** No test reflects over `CategoryAttribute`: the nine
+  `GetCustomAttributes`/`GetCustomAttributesData` call sites look for
+  `TestFixtureAttribute`, `LevelOfParallelismAttribute`, `ParallelizableAttribute`,
+  `ConditionalAttribute`, `AttributeUsageAttribute` and `AssemblyMetadataAttribute` -
+  never `CategoryAttribute`. The `[Category("Coverage")]` gap R967 describes is
+  real and is not covered by a reflection gate.
+- **R1147 survives the check.** A search for `SummaryOrigin` across all tracked
+  files returns nineteen, of which the only test files are
+  `IrRelationalSummaryTests`, `AcyclicBlockPredicateExecutorTests`,
+  `CallableCounterexampleReplayerTests`, `CompilerCallableLowererTests` and
+  `WorkerTests` - all of which use the enum, none of which compares
+  `IrSummaryOrigin` to `CompilerSummaryOrigin`. It appears in none of the three
+  schema-test files. It remains the single ungated cross-assembly vocabulary pair.
+- Only **two** of the four assemblies declaring `LevelOfParallelism` have it
+  asserted - `SharpProof.ArchitectureTest` and `SharpProof.Worker.Test`.
+  `SharpProof.Analyzer.Test` and `SharpProof.Package.Test` declare the same value
+  with nothing checking it. That asymmetry is part of R978 rather than a new item.
+
+### Status (part four hundred seventy-two)
+
+No new ID. The census's value is methodological and retroactive: it explains two
+wrong conclusions this session, refutes the framing of a third, and gives the next
+pass a concrete precondition - **check the 35 reflection-gating files before
+claiming any correspondence is unchecked.** The three findings that survive it -
+R967, R1147, and R978 as re-framed above - are stronger for having been tested
+against it.
+
+## Second survey, part four hundred seventy-three: R1153 - empty SMT project item group
+
+`SharpProof.Smt/SharpProof.Smt.csproj` contains an empty `<ItemGroup>` at lines
+9-10 between its package, friend-assembly, and project-reference groups. The
+group has no items, conditions, metadata, or comments, so MSBuild derives no
+items or properties from it. Removing the empty XML reduces inert build-file
+structure without changing project evaluation; it should not be confused with
+the neighboring non-empty groups that carry package references, `InternalsVisibleTo`,
+and analyzer/reference edges.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1153 | **`SharpProof.Smt.csproj` contains an inert empty `<ItemGroup>`.** The group at lines 9-10 contributes no MSBuild items or conditions and can be removed without changing package, friend-assembly, or project-reference evaluation. | `SharpProof.Smt/SharpProof.Smt.csproj:5-20` |
+
+### Status (part four hundred seventy-three)
+
+R1153 is pending: remove the empty `<ItemGroup>` from `SharpProof.Smt.csproj`.
+
+## Second survey, part four hundred seventy-four: correcting R980 - generated-output coverage is much wider than I reported
+
+Applying the precondition established in the previous part - check the 35
+reflection-gating test files before claiming a correspondence is unchecked - to
+this session's most consequential finding.
+
+### Correction: R980 overstates the gap substantially
+
+R980 stated that generated-file staleness is checked for **fourteen of fifteen**
+generators only by the `acceptance` command, which pull requests never run, with
+`Generate-ApiSpecCatalog` the sole exception through
+`DefaultApiSpecCatalogGenerationTests`. **That is wrong.** At least four more
+generators have their output checked by ordinary tests that run in `pr-gates`, and
+they check it by reflection, which is why a search for generator names or `-Verify`
+did not find them:
+
+- **`Generate-IrModel`** - `SharpProof.Ir.Test/IrModelSchemaTests.cs:71`
+  `SchemaProjectionPreservesExactRuntimeShape` compares `IrModel.schema.json`
+  against the **compiled types**: declaration names (`:90`), kinds (`:101`), enum
+  member names via `Enum.GetNames(type)` (`:284`), enum numeric values (`:291`),
+  `IsAbstract`/`IsSealed`/`BaseType` (`:306-308`), constructor accessibility
+  (`:327`), constructor parameter names and types (`:338-342`), and the declared
+  property set with types and accessibilities (`:354-374`).
+- **`Generate-ProtocolModel`** - `SharpProof.Worker.Test/ProtocolModelSchemaTests.cs`,
+  the same eight-probe reflection shape.
+- **`Generate-CompilerArtifactModel`** -
+  `SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs`, likewise, and it is
+  the file that also refuted R1143.
+- **`Generate-BoundContractModel`** -
+  `SharpProof.Contracts.Test/BoundContractModelTests.cs:9`.
+
+Editing any of those schemas without regenerating leaves the compiled types
+disagreeing with the schema, and the test fails **in the pull-request lane**.
+
+### What survives, narrowed
+
+The distinction R980 missed is between **structural** and **byte-exact** currency.
+The schema tests assert that the generated *types* match the schema; the
+generators' `-Verify` mode asserts that the generated *file* matches byte for
+byte. A regeneration that changed header text, comment wording, member ordering
+within an unchanged set, or whitespace would pass every schema test and be caught
+only by `-Verify` in `acceptance`. So the accurate statement is: **structural drift
+in the model-shaped generators is caught on pull requests; byte-exact drift, and
+any drift in the generators whose output is not a type model, is not.** The
+pipeline facts behind R980 are unchanged and were verified independently -
+`ci.yml:34` runs only `tooling pr`, `pr-gates` invokes no generator with `-Verify`,
+and `acceptance` is reached only by `nightly` and `package-consumers.yml`.
+
+R980 should be re-scoped to that narrower claim rather than withdrawn, and its
+"fourteen of fifteen" figure removed.
+
+### Checked and not proposed (part four hundred seventy-four)
+
+- **Roughly ten of the fifteen generators have some PR-lane correspondence test**,
+  not one: the four above, plus `Generate-ApiSpecCatalog` and its delegated
+  `Generate-ApiSpecRuntimeWitnesses`, `Generate-DiagnosticDescriptors` through the
+  three `DiagnosticDescriptorCatalogTests` files, `Generate-ContractApiCatalog`
+  through `ContractApiCatalogTests` and `ContractApiCatalogParityTests`,
+  `Generate-CSharpScalarSemantics` through `CSharpScalarSemanticsTests`, and
+  `Generate-EffectContractMappings` through `EffectContractWireParityTests`. The
+  ones for which no corresponding test was found are the projection- and
+  catalog-shaped generators - `Generate-ProjectionCatalog`,
+  `Generate-DeclarativeModels`, `Generate-OperationSupportCatalog`,
+  `Generate-AnalyzerDiagnosticCatalog` and `Generate-LauncherArguments` - and those
+  are the ones a narrowed R980 should name.
+- **This is the third correction the reflection-gate rule has produced**, after
+  R1143 (refuted outright) and R978 (framing sharpened). All three had the same
+  cause: a search keyed on file names or identifiers cannot see an assertion that
+  reaches its subject through `typeof` and `Enum.GetNames`. The rule is now earning
+  its place rather than being a methodological note.
+
+### Status (part four hundred seventy-four)
+
+No new ID. R980 stays open in narrowed form; the byte-exact half is real and the
+pipeline evidence for it was independently verified. What changes is its size: the
+gap is five catalog-shaped generators and a formatting-drift class, not fourteen
+generators and everything about them.
