@@ -15787,6 +15787,12 @@ For each validation table, Generate-ProtocolModel adds the formatted pattern str
 |---|---|---|
 | R1315 | **Generate-ProtocolModel stores each validation row twice in parallel structures, patternSources and partRows. Replace them with one normalized row record and project the required representation for grouping or fallback emission.** | scripts/Generate-ProtocolModel.ps1:771-810,813-869 |
 
+### Status (continued)
+
+R1315 is applied: validation rows now use one record carrying both normalized
+parts and fallback pattern text; grouping and emission project from that record.
+Protocol model schema tests pass (5 passed).
+
 ## Second survey, continued: R1316 - declarative class emission re-reads validated properties
 
 Emit-Class first walks every property to validate its identifier and type and populate propertyNames for constructor-assignment checks. After assignments, it walks the same property objects again and re-resolves accessibility, type, and name solely to emit declarations. A normalized property record from the first pass can retain the validation facts and drive emission, while the separate assignment validation remains intact.
