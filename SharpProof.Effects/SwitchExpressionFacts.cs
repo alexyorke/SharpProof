@@ -86,18 +86,7 @@ internal static class SwitchExpressionFacts
         {
             return false;
         }
-
-        return runtimeType.GetMembers().Any(member => member switch
-        {
-            IMethodSymbol candidate => SymbolEqualityComparer.Default.Equals(
-                method.OriginalDefinition,
-                candidate.OriginalDefinition),
-            IPropertySymbol { GetMethod: { } getter } =>
-                SymbolEqualityComparer.Default.Equals(
-                    method.OriginalDefinition,
-                    getter.OriginalDefinition),
-            _ => false
-        });
+        return true;
     }
 
     internal static IReadOnlyList<ISwitchExpressionArmOperation> GetReachableArms(
