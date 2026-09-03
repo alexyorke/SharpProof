@@ -659,41 +659,23 @@ public sealed class IrRelationalSummaryTests
         var callResult = callee.Factory.CreateVariable(
             "caller:call-result",
             callee.Factory.IntegerType);
-        var callerBuilder = new IrProgramBuilder(callee.Factory);
-        var callerEntry = callerBuilder.CreateBlock("entry");
-        var call = callerBuilder.Call(
-            callerEntry,
-            callee.Factory.CreateOperation("call"),
-            callResult,
-            callee.Member,
-            receiver: null,
-            callee.Factory.Variable(callerBodyParameter));
-        callerBuilder.Return(
-            callerEntry,
-            callee.Factory.CreateOperation("return"),
-            callee.Factory.Binary(
+        var callerReturn = callee.Factory.Binary(
                 IrBinaryOperator.Add,
                 callee.Factory.Variable(callResult),
-                callee.Factory.Integer(1)));
-        var callerSignature = new IrSummarySignature(
+                callee.Factory.Integer(1));
+        var built = BuildCallerComposition(
+            callee,
+            calleeSummary,
             callerMember,
-            receiver: null,
-            [callerParameter],
+            callerParameter,
             callerResult,
-            Provenance('b'));
-
-        var built = IrRelationalSummaryBuilder.Build(
-            callerBuilder.Build(),
-            callerSignature,
-            new Dictionary<IrVarId, IrTerm>
-            {
-                [callerBodyParameter] =
-                    callee.Factory.Variable(callerParameter)
-            },
-            new Dictionary<IrInstructionId, IrRelationalSummary>
-            {
-                [call.Id] = calleeSummary
-            });
+            callerBodyParameter,
+            callResult,
+            callee.Factory.Variable(callerBodyParameter),
+            callerReturn,
+            entryName: "entry",
+            callOperationName: "call",
+            returnOperationName: "return");
 
         Assert.That(built.IsSuccess, Is.True);
         Assert.That(
@@ -761,37 +743,19 @@ public sealed class IrRelationalSummaryTests
         var callResult = fixture.Factory.CreateVariable(
             "caller:call-result",
             fixture.Factory.IntegerType);
-        var callerBuilder = new IrProgramBuilder(fixture.Factory);
-        var callerEntry = callerBuilder.CreateBlock("caller:entry");
-        var call = callerBuilder.Call(
-            callerEntry,
-            fixture.Factory.CreateOperation("caller:call"),
+        var built = BuildCallerComposition(
+            fixture,
+            calleeSummary,
+            fixture.CreateMember("Caller"),
+            fixture.Parameter,
+            fixture.Result,
+            callerBodyParameter,
             callResult,
-            fixture.Member,
-            receiver: null,
-            fixture.Factory.Variable(callerBodyParameter));
-        callerBuilder.Return(
-            callerEntry,
-            fixture.Factory.CreateOperation("caller:return"),
-            fixture.Factory.Variable(callResult));
-
-        var built = IrRelationalSummaryBuilder.Build(
-            callerBuilder.Build(),
-            new IrSummarySignature(
-                fixture.CreateMember("Caller"),
-                receiver: null,
-                [fixture.Parameter],
-                fixture.Result,
-                Provenance('b')),
-            new Dictionary<IrVarId, IrTerm>
-            {
-                [callerBodyParameter] =
-                    fixture.Factory.Variable(fixture.Parameter)
-            },
-            new Dictionary<IrInstructionId, IrRelationalSummary>
-            {
-                [call.Id] = calleeSummary
-            });
+            fixture.Factory.Variable(callerBodyParameter),
+            fixture.Factory.Variable(callResult),
+            entryName: "caller:entry",
+            callOperationName: "caller:call",
+            returnOperationName: "caller:return");
 
         Assert.That(built.IsSuccess, Is.True, built.Reason.ToString());
         var callValue = built.Summary!.ExistentialVariables.Single();
@@ -1065,6 +1029,53 @@ public sealed class IrRelationalSummaryTests
         Assert.That(
             built.Reason,
             Is.EqualTo(IrSummaryAbstentionReason.CyclicControlFlow));
+    }
+
+    private static IrRelationalSummaryBuildResult BuildCallerComposition(
+        SummaryFixture fixture,
+        IrRelationalSummary calleeSummary,
+        IrMemberId callerMember,
+        IrVarId callerParameter,
+        IrVarId callerResult,
+        IrVarId callerBodyParameter,
+        IrVarId callResult,
+        IrTerm callerArgument,
+        IrTerm callerReturn,
+        string entryName,
+        string callOperationName,
+        string returnOperationName)
+    {
+        var builder = new IrProgramBuilder(fixture.Factory);
+        var entry = builder.CreateBlock(entryName);
+        var call = builder.Call(
+            entry,
+            fixture.Factory.CreateOperation(callOperationName),
+            callResult,
+            calleeSummary.Signature.Member,
+            receiver: null,
+            callerArgument);
+        builder.Return(
+            entry,
+            fixture.Factory.CreateOperation(returnOperationName),
+            callerReturn);
+
+        return IrRelationalSummaryBuilder.Build(
+            builder.Build(),
+            new IrSummarySignature(
+                callerMember,
+                receiver: null,
+                [callerParameter],
+                callerResult,
+                Provenance('b')),
+            new Dictionary<IrVarId, IrTerm>
+            {
+                [callerBodyParameter] =
+                    fixture.Factory.Variable(callerParameter)
+            },
+            new Dictionary<IrInstructionId, IrRelationalSummary>
+            {
+                [call.Id] = calleeSummary
+            });
     }
 
     private static bool Evaluate(
