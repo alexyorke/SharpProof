@@ -1,3 +1,5 @@
+Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
+
 function ConvertTo-SharpProofPilotClaimEvidence {
     [CmdletBinding()]
     param(
@@ -102,23 +104,35 @@ function Test-SharpProofPilotReport {
         [int]$Report.pilotCount -ne 5 -or @($Report.pilots).Count -ne 5 -or
         @($Report.pilots.id | Select-Object -Unique).Count -ne 5 -or
         @($Report.packageArtifacts).Count -ne 6) { return $false }
+    $packageKeys = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
     $packageNames = @($Report.packageArtifacts | ForEach-Object {
-            if ([string]$_.fileName -cne [IO.Path]::GetFileName([string]$_.fileName) -or
-                @('SharpProof.Attributes', 'SharpProof', 'SharpProof.Verifier') -cnotcontains [string]$_.packageId -or
+            $fileName = [string]$_.fileName
+            $packageId = [string]$_.packageId
+            $extension = [IO.Path]::GetExtension($fileName)
+            if ($fileName -cne [IO.Path]::GetFileName($fileName) -or
+                $SharpProofPackageIds -cnotcontains $packageId -or
+                $extension -notin @('.nupkg', '.snupkg') -or
+                $fileName -cne "$packageId.$([string]$Report.packageVersion)$extension" -or
                 [string]$_.version -cne [string]$Report.packageVersion -or
                 [string]$_.repositoryCommit -cne $ExpectedCommit -or
-                [int64]$_.bytes -le 0) {
+                [int64]$_.bytes -le 0 -or
+                -not $packageKeys.Add("$packageId|$extension")) {
                 return $null
             }
-            [string]$_.fileName
+            $fileName
         })
-    if ($packageNames.Count -ne 6 -or @($packageNames | Select-Object -Unique).Count -ne 6) {
+    if ($packageNames.Count -ne 6 -or
+        @($packageNames | Select-Object -Unique).Count -ne 6 -or
+        $packageKeys.Count -ne 6) {
         return $false
     }
-    $expectedNames = @('SharpProof.Attributes', 'SharpProof', 'SharpProof.Verifier') |
-        ForEach-Object { "$_." + [string]$Report.packageVersion + '.nupkg'; "$_." + [string]$Report.packageVersion + '.snupkg' }
-    if (@($packageNames | Where-Object { $expectedNames -cnotcontains $_ }).Count -ne 0) {
-        return $false
+    foreach ($packageId in $SharpProofPackageIds) {
+        foreach ($extension in @('.nupkg', '.snupkg')) {
+            if (-not $packageKeys.Contains("$packageId|$extension")) {
+                return $false
+            }
+        }
     }
     foreach ($pilot in @($Report.pilots)) {
         if (@($pilot.PSObject.Properties.Name) -cnotcontains 'project' -or

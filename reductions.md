@@ -12509,3 +12509,140 @@ It is worth doing mainly because five files currently contain both forms, so a
 reader of those files sees two idioms for one operation with nothing distinguishing
 them - and `ApiSpecTests.cs`, which uses the minority form 22 times against 2, is
 the file most likely to propagate it.
+
+## Second survey, part four hundred sixty-eight: R1152 - package metadata declared twice, and the live copy is the hard-coded one
+
+Comparing the three shipping packages' metadata declarations against the files
+NuGet actually packs from.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1152 | **Two of the three packages declare their metadata twice - once in the `.csproj` and once in the `.nuspec` - and because both set `NuspecFile`, the csproj copy is inert.** `SharpProof.Package.csproj:9` sets `<NuspecFile>SharpProof.nuspec</NuspecFile>` and `SharpProof.Verifier.csproj:9` sets `<NuspecFile>SharpProof.Verifier.nuspec</NuspecFile>`, so NuGet packs from the nuspec and **ignores** the MSBuild packaging properties. Both projects nevertheless declare a full metadata block: `SharpProof.Package.csproj:13-21` carries `PackageId`, `Title`, `Description`, `PackageReleaseNotes`, `Copyright` and `PackageTags`, and `SharpProof.Verifier.csproj:14-21` the same six. Twelve properties, none of which reaches a package. The duplication is verbatim where it matters: the release-notes sentence *"SharpProof 1.0 preview with opt-in effect analysis, compiler-bound contracts, accountable bounded postcondition verification, fail-closed language gating, and conservative external boundaries."* appears identically in `SharpProof.Package.csproj:16` and `SharpProof.nuspec:12`, and the tag list is the same eleven tags with `;` separators in one and spaces in the other. **The description is the sharpest case, because it makes the live copy the wrong one.** `SharpProof.Release.props` defines `SharpProofProductDescription`; the csproj correctly references it as `$(SharpProofProductDescription)`; and `SharpProof.nuspec:11` **hard-codes the identical text as a literal** - verified byte-for-byte equal. So the value has three declarations, the one that references the single source is dead, and the one that ships is the copy. **The fix is already in use in these files**: both projects pass `NuspecProperties` at pack time - `version`, `configuration`, `repositorycommit`, and `nativeroot` for the verifier - so `description=$(SharpProofProductDescription)` and its siblings can be forwarded as `$description$` tokens the same way. | `SharpProof.Package/SharpProof.Package.csproj:9-10,13-21,44-49`; `SharpProof.Verifier/SharpProof.Verifier.csproj:9-10,14-21`; `SharpProof.Package/SharpProof.nuspec:6-15`; `SharpProof.Verifier/SharpProof.Verifier.nuspec:6-15`; `SharpProof.Release.props` |
+
+### Checked and not proposed (part four hundred sixty-eight)
+
+- **`SharpProof.Attributes` is correct and is the counter-example.** It has **no**
+  nuspec and packs from csproj metadata, so its `PackageId`, `Title`, `Description`
+  and `Copyright` are live rather than inert. That two of three packages use a
+  nuspec and one does not is a reasonable split - the two nuspec packages ship
+  `buildTransitive` payloads and a native Z3 binary that a csproj `<None>` set
+  would express far less clearly - and R1152 does not propose converging the
+  mechanisms, only removing the metadata the nuspec supersedes.
+- **The repeated four-attribute `ProjectReference` incantation is not proposed.**
+  `ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true"
+  PrivateAssets="all" TreatAsPackageReference="false"` appears seven times across
+  the two package projects - three in `SharpProof.Package`, four in
+  `SharpProof.Verifier`. An `ItemDefinitionGroup` could default it, but each
+  project also has one reference that deliberately differs (`SharpProof.Attributes`
+  and `SharpProof.Package` respectively, whose output *is* referenced), so a
+  blanket default would then need overriding. The repetition is close to forced.
+- **No gate compares the two metadata sources.** Thirteen files mention `nuspec`,
+  and they check payload *entries* - `Test-SharpProofPackagePayloads.ps1` asserts
+  specific files at specific paths, `PackageDependencyAuthorityTests` checks the
+  dependency graph - but none compares a csproj property against its nuspec
+  counterpart. That is consistent with R1152: there is nothing to compare, because
+  one side is inert; the point is that it looks maintained.
+
+### Status (part four hundred sixty-eight)
+
+R1152 is `pending`. Deleting the twelve inert properties is the safe half and
+changes no package. Forwarding the description and release notes as
+`NuspecProperties` tokens is the half that matters, because it is the only way the
+shipped text comes from `SharpProof.Release.props` rather than from a literal that
+happens to match it today.
+
+## Second survey, part four hundred sixty-nine: documentation links and layer separation - no finding
+
+Two techniques applied to areas the ledger has opinions about but had not measured:
+markdown link and anchor integrity across **all** 46 tracked documents, and the
+architecture-layer closure of the shipping analyzer. Both come back clean. **No ID
+is allocated.**
+
+### Checked and not proposed (part four hundred sixty-nine)
+
+- **Every internal link and anchor in every tracked markdown file resolves.**
+  Scanning all 46 documents (excluding this ledger) for `[text](target)` links:
+  **zero** point at a missing file, and **zero** point at a missing heading anchor -
+  checked both same-file `#fragment` links and cross-file `path#fragment` links,
+  with heading slugs computed the way GitHub computes them. This matters for R321
+  specifically. R321 records that `scripts/Generate-Readme.ps1` gates only 26 of
+  the 47 markdown files, leaving 21 - including `SECURITY.md`, `CONTRIBUTING.md`,
+  `AGENTS.md`, both `AnalyzerReleases` files and four of the ten
+  `docs/soundness-notes/` - under no link or anchor check at all. **Those 21 are
+  currently correct.** R321 therefore remains a finding about absent enforcement,
+  not about present staleness - the same distinction its own text draws for
+  `SEMANTICS.md`. Recorded so the ungated set is not later reported as broken.
+- **The shipping analyzer's layer separation is gated and holds.** The measured
+  transitive compile closure of `SharpProof.Analyzer` is exactly
+  `{Analyzer.Core, Contracts, Dataflow, Effects, Frontend, Ir, Specs}`.
+  `BoundaryEnforcementTests.cs:341-358` asserts that closure contains **none** of
+  `SharpProof.CompilerArtifact`, `SharpProof.Worker.Protocol`, `SharpProof.Smt`,
+  `SharpProof.Verify`, `Microsoft.Z3`, or `System.Text.Json`, and the measurement
+  agrees on every one. The separation that matters for this product - the portable
+  analyzer must not drag in the solver, the wire protocol, or the native Z3 binding
+  - is both true and enforced.
+- The two other closures measured for comparison are consistent with their roles
+  and need no rule of their own: `SharpProof.CompilerCollector` reaches ten
+  projects including `CompilerArtifact` and `Worker.Protocol`, which is its job as
+  the artifact producer; `SharpProof.Worker` reaches eight including `Smt`,
+  `Verify` and `Host`, which is its job as the out-of-process verifier. Neither
+  reaches anything belonging to the other's side of the boundary.
+
+### Status (part four hundred sixty-nine)
+
+No ID allocated. Both results are exhaustiveness statements: the documentation link
+graph has no broken edge anywhere, gated or not, and the one architectural
+separation the product depends on is asserted and satisfied. The open documentation
+item remains R321 - the gate's coverage - and the open architecture items remain
+the vocabulary duplications R1143 and R1147, which cross the boundary at the level
+of declarations rather than references.
+
+## Second survey, part four hundred seventy: test isolation - no finding, and a measurement to distrust
+
+Whether any test shares mutable state across fixtures, mutates process-wide
+settings, or depends on ordering. Clean. **No ID is allocated**, but the raw
+numbers this technique produces are misleading and the reason is recorded.
+
+### Checked and not proposed (part four hundred seventy)
+
+- **A naive scan reports 170 mutable static fields in the test assemblies. The real
+  figure is 11.** The regex matches inside the raw-string C# **fixtures** that
+  these tests feed to the analyzer - `SharpProof.Effects.Test` alone contributes
+  114, and a representative case is `AnalyzerModeAndEffectTests.cs:354`, which is
+  `private static int state;` inside a `"""public static class Fixture {...}"""`
+  literal describing code *under analysis*, not state of the test assembly.
+  Stripping raw-string literals first leaves eleven. Recorded so the 170 is not
+  quoted later.
+- **The strongest-looking candidate is not a field at all.**
+  `FinalCompilationProbeTests.cs:19` `IsSupportedWorkerHost` appeared as a mutable
+  static in a `[Parallelizable(ParallelScope.Children)]` fixture, which would be a
+  genuine isolation hazard. It is an **expression-bodied property** -
+  `private static bool IsSupportedWorkerHost => OperatingSystem.IsLinux() && ...` -
+  matched because the regex read `=>` as an assignment. It holds no state.
+- **The eleven real mutable statics are all in sequential fixtures, and seven are
+  deliberate.** `ApiSpecRuntimeOracleTests.cs:38-44` declares
+  `s_exceptionConstructorReceiver`, `s_invalidOperationExceptionConstructorReceiver`,
+  `s_objectConstructorReceiver`, `s_ghostProbe`, `s_stringSink`, `s_list` and
+  `s_integerSink`. They must be statics: `:887-888` uses `GC.KeepAlive(s_stringSink)`
+  and `_ = s_integerSink` around a
+  `GC.GetAllocatedBytesForCurrentThread()` measurement, so writes to them must not
+  be elided by the JIT. That fixture carries only `[TestFixture]`, and
+  `SharpProof.Specs.Test` has **no `AssemblyInfo.cs`**, so it has no assembly-level
+  `Parallelizable` opt-in and runs sequentially. The other four are two `Samples`
+  lists in the Dataflow domain tests and one field in a generated witness file.
+- **Process-wide mutation is confined and non-parallel.**
+  `Environment.SetEnvironmentVariable` appears 21 times in exactly two files -
+  `Worker.Test/ContainerContractTests.cs` (14) and
+  `Package.Test/BuildTaskTests.cs` (7) - and **neither carries
+  `[Parallelizable]`**. `Directory.SetCurrentDirectory` appears **nowhere** in the
+  test tree, so no test changes the process working directory out from under
+  another.
+
+### Status (part four hundred seventy)
+
+No ID allocated. Test isolation holds: the only shared mutable state in the suite
+is seven JIT-anchoring sinks in a sequential fixture, and the two files that touch
+process-wide environment state both opt out of parallelism. This composes with
+R978, which records that only four of nineteen test projects declare a parallelism
+level at all - the suite's isolation is currently guaranteed less by discipline
+than by the fact that most of it never runs concurrently.
