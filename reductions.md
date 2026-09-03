@@ -14839,6 +14839,12 @@ analyzer tests pass (162 passed).
 |---|---|---|
 | R1228 | **`ResolveCompanion` performs two successive filters and allocations for method selection.** It builds `named` from `GetOrdinaryMethods`, then scans that immutable array again to build `matches`; only `named.IsDefaultOrEmpty`, `matches.Length`, and `matches[0]` are consumed. A single pass that tracks name presence, match count, and the unique match removes the redundant buffers and traversal without changing ambiguity or missing-companion classification. | `SharpProof.Contracts/ContractForSymbolMatcher.cs:139-143,297-313` |
 
+### Status (part five hundred fifty)
+
+R1228 is applied: companion method resolution now tracks named and signature
+matches in one ordered pass, retaining ambiguity and missing-method outcomes
+without intermediate filtered arrays. Contract binder tests pass (89 passed).
+
 ## Second survey, part five hundred fifty-one: R1229 - mutable-storage classification repeats the initial type policy
 
 `SharpProofSoundnessAnalyzer.IsMutableStorageType` applies `IsKnownImmutableStorageType(named)` and `IsCompilationScopedWeakCache(named)` in its admission guard, then initializes the base-type loop with that same `named` symbol and evaluates both predicates again before inspecting its members. Any symbol that reaches the loop has already failed both predicates, so the first iteration repeats two type-policy queries; the checks remain necessary for later base types. Carrying the admission result into the loop, or structuring the initial and base-type cases through one classification path, removes only that first duplicate while preserving the early exit and recursive `visiting` behavior.
