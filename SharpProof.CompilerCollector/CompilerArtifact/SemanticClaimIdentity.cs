@@ -541,7 +541,7 @@ internal static partial class SemanticClaimIdentity
 
     private static bool HasSameSite(SyntaxNode left, SyntaxNode right)
     {
-        return left.SyntaxTree == right.SyntaxTree && left.Span == right.Span;
+        return SyntaxSite.IsSame(left, right);
     }
 
 }

@@ -21051,3 +21051,8 @@ R1993 is applied: dependency-evidence serialization now lives in
 compiler authority's empty unsupported-origin component and the worker's
 `InvalidDataException`. The full `SharpProof.Worker.Test` suite passes 696/696
 with zero warnings or errors.
+
+R1994 is applied: the exact syntax-tree and span identity predicate now lives
+in the shared `SharpProof.Frontend.SyntaxSite` helper, while both callers retain
+their traversal policies. The full `SharpProof.Contracts.Test` suite passes
+142/142 with zero warnings or errors.
