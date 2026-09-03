@@ -15201,6 +15201,12 @@ frontend-lowering tests pass (27 and 37 passed, respectively).
 |---|---|---|
 | R1253 | **`RoslynProgramLowerer.LoweringSession` scans all CFG blocks twice during selection.** `SelectBlocks` traverses `_graph.Blocks` to build the selected array, then `Lower` traverses it again for the omitted catch-handler check. Return the omitted-handler fact with the selection result or combine the projections while preserving selected ordering and reachability semantics. | `SharpProof.Frontend/RoslynProgramLowerer.cs:80-97`; `SharpProof.Frontend/RoslynProgramLowerer.cs:742-775` |
 
+### Status (part five hundred seventy-five)
+
+R1253 is applied: CFG selection now builds the ordered selected array and first
+omitted catch-handler observation in one block pass, preserving entry ordering
+and reachability filtering. Program-lowering tests pass (27 passed).
+
 ## Second survey, part five hundred seventy-six: R1254 - nested-operation prewalk repeats the lowering traversal
 
 For non-invocation, non-array-element values, `RoslynProgramLowerer.LowerValue` first calls `LowerNestedOperations`, which recursively walks the value's child-operation tree to find nested calls or array elements and lower their observable effects. If that prewalk finds no special child it still returns only after traversing the entire tree, and the method then calls `RoslynOperationLowerer.Lower`, which visits the same tree again; if it finds special children, the second lowering traversal still visits the whole tree with replacements. The prewalk is intentional for evaluation-order side effects, so the reduction needs a combined scheduling/lowering projection or a cached operation traversal rather than deleting it blindly; the opportunity is distinct from R595's stack-depth safety concern.
