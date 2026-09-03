@@ -168,25 +168,24 @@ internal static class CorpusGate
             }
         }
 
-        var immutableObservations = observations;
         failures.AddRange(
-            ValidateMetamorphicConsistency(cases, immutableObservations));
+            ValidateMetamorphicConsistency(cases, observations));
         var cacheFailures = await VerifyCacheReplayAsync(
                 cases,
-                immutableObservations,
+                observations,
                 cancellationToken)
             .ConfigureAwait(false);
         failures.AddRange(cacheFailures);
         var concurrencyFailures = await VerifyConcurrentReplayAsync(
                 cases,
-                immutableObservations,
+                observations,
                 cancellationToken)
             .ConfigureAwait(false);
         failures.AddRange(concurrencyFailures);
 
-        var unknownCount = immutableObservations.Count(static observation =>
+        var unknownCount = observations.Count(static observation =>
             observation.Verdict == CorpusVerdict.Unknown);
-        var silentUnknownCount = immutableObservations.Count(static observation =>
+        var silentUnknownCount = observations.Count(static observation =>
             observation.Verdict == CorpusVerdict.SilentUnknown);
         var totalUnknownCount = unknownCount + silentUnknownCount;
         var casesById = casesByIdBuilder.ToImmutable();
@@ -197,18 +196,18 @@ internal static class CorpusGate
             item.Support == CorpusSupport.Supported);
         var intentionallyUnsupportedCaseCount = cases.Count(static item =>
             item.Support == CorpusSupport.IntentionallyUnsupported);
-        var supportedUnknownCount = immutableObservations.Count(observation =>
+        var supportedUnknownCount = observations.Count(observation =>
             casesById[observation.CaseId].Support == CorpusSupport.Supported &&
             observation.Verdict is
                 CorpusVerdict.Unknown or CorpusVerdict.SilentUnknown);
         failures.AddRange(
             ValidateSupportedOutcomes(
                 cases,
-                [.. immutableObservations.Select(static observation =>
+                [.. observations.Select(static observation =>
                     (observation.CaseId, observation.Verdict))],
                 supportedUnknownCount));
 
-        var unknownReasons = CountUnknownReasons(immutableObservations);
+        var unknownReasons = CountUnknownReasons(observations);
         ValidateUnknownReasonRatchet(
             unknownReasonRatchet,
             unknownReasons,
@@ -216,7 +215,7 @@ internal static class CorpusGate
             supportedCaseCount,
             supportedOpenSourceMethodCount,
             failures);
-        var observationCount = immutableObservations.Length;
+        var observationCount = observations.Length;
         return new CorpusGateResult(
             failures.Count == 0,
             cases.Length,

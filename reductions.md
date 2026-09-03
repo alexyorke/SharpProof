@@ -18302,3 +18302,67 @@ eight tests belong - the two signed-`Int64` interval tests already share a helpe
 after applied R1071, so they move together. It is filed at this size because the
 convention it breaks is otherwise 42 for 42, which makes the two exceptions
 decidable rather than a matter of taste.
+
+## Second survey, part six hundred five: the schema-model test surface, closed with no finding
+
+No new ID. Three declarative model schemas, three generators, and two independently
+written type-name implementations looked like a duplication family and are not one.
+Recorded with the measurements so the next pass does not repeat the derivation.
+
+### Checked and not proposed (part six hundred five)
+
+- **`SchemaModelTestHelpers.SchemaType` and `IrModelSchemaTests.ResolveType` are
+  inverse functions over different vocabularies, not two copies of one function.**
+  `SharpProof.Worker.Test/SchemaModelTestHelpers.cs:24-83` maps a CLR `Type` to a
+  schema type string; `SharpProof.Ir.Test/IrModelSchemaTests.cs:402-431` maps a
+  schema type string back to a CLR `Type`. They run in opposite directions, in two
+  assemblies that cannot see each other's model types, over vocabularies that do not
+  coincide: the IR schema's 47 distinct type strings use `ImmutableArray<T>` and
+  `ImmutableDictionary<K, V>` and contain no `[]` and no `uint`, while
+  `ProtocolModel.schema.json` (54 strings) uses both `[]` and `uint` and
+  `CompilerArtifactModel.schema.json` (109) uses `[]`. `SchemaType` is not even a
+  drop-in replacement in the direction it does cover - it falls through to
+  `type.Name` for unrecognised types, so `typeof(object)` renders as `Object` where
+  the IR schema writes `object`. Merging them would mean building the union of two
+  grammars neither side needs.
+- **The three collection conventions live in the authored schemas, not in the
+  generators, so there is nothing to centralise.** `scripts/Generate-IrModel.ps1`
+  contains **zero** occurrences of `ImmutableArray`, `ImmutableDictionary` or `[]`
+  - it carries the collection type through from `IrModel.schema.json` as data. The
+  other two generators appear to hard-code `[]` fourteen and twenty-eight times,
+  which reads like the opposite policy; inspecting every occurrence shows they are
+  PowerShell parameter annotations (`[string[]]$Alternatives`), literal C# being
+  emitted for hand-written scaffolding (`WorkerManifestIdentityField[] RootFields`),
+  and one grammar parse at `Generate-ProtocolModel.ps1:258`
+  (`TrimEnd('?').TrimEnd('[]')`). None applies a collection convention to a
+  schema-driven property. The IR model using immutable collections and the wire
+  models using arrays is a property of the models themselves and is defensible on
+  both sides.
+- **Both project-local test-assertion helpers are fully adopted within their
+  projects.** `SharpProof.Dataflow.Test/DomainLawAssertions.cs` (155 lines) is used
+  by all four domain suites - `IntervalDomainTests`, `NullnessDomainTests`,
+  `SequenceCardinalityDomainTests` and `GeneratedDomainPropertyTests`;
+  `SharpProof.Worker.Test/SchemaModelTestHelpers.cs` (86 lines, and previously
+  uncited anywhere in this ledger) is used by both schema suites in its project.
+  Neither has a bypassing caller.
+- **The three large test hosts do not duplicate each other**, as measured in part
+  six hundred three: 16 to 21 shared normalized lines out of 205 to 242, all of them
+  the unavoidable Roslyn idiom. The only genuine pair is R1580.
+- **The remaining unexamined surface is 52 uncited test files**, of which this
+  stretch worked through the `SharpProof.Effects.Test` regression family (37 files,
+  R1600), the schema-model family (4 files, nothing), and the shared-helper family
+  (`DomainLawAssertions`, `SchemaModelTestHelpers`, nothing). What remains uncited
+  is mostly single-subject regression suites whose bodies the near-duplicate scan
+  has already shown to be distinct.
+
+### Status (part six hundred five)
+
+No new ID. Four hypotheses were tested in this part and all four were refuted by
+measurement rather than by judgement: that the two type-name implementations were
+duplicates, that the generators owned the collection convention, that the schema
+test helpers were partly adopted, and that the large test hosts overlapped. The
+schema-model axis is closed.
+
+R1509 is applied: the redundant `immutableObservations` alias was removed from
+`CorpusGate.RunAsync`; all downstream checks use the existing immutable array
+directly. `CorpusGateTests` pass (23/23).
