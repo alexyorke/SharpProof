@@ -65,19 +65,19 @@ $shardRoot = Join-Path (Split-Path -Parent $output) (
     'shards/' + $ExpectedCommit + '/' + $Configuration.ToLowerInvariant() +
     '-weighted-v3-focused-baseline-' + $parallelism)
 [IO.Directory]::CreateDirectory($shardRoot) | Out-Null
-$shards = @()
+$shards = [Collections.Generic.List[object]]::new($parallelism)
 for ($index = 0; $index -lt $parallelism; $index++) {
     $fileName = 'shard-' + ($index + 1).ToString(
         'D2', [Globalization.CultureInfo]::InvariantCulture) + '.json'
-    $shards += [pscustomobject]@{
+    $shards.Add([pscustomobject]@{
         Index = $index
         Path = Join-Path $shardRoot $fileName
         RelativePath = [IO.Path]::GetRelativePath(
             $repositoryRoot, (Join-Path $shardRoot $fileName))
-    }
+    })
 }
 $campaignTimer = [Diagnostics.Stopwatch]::StartNew()
-$shardTimings = [Collections.Generic.List[object]]::new()
+$shardTimings = [Collections.Generic.List[object]]::new($parallelism)
 
 function Resolve-ShardReceiptPath {
     param(

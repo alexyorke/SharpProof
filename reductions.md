@@ -16449,3 +16449,8 @@ R1360 is applied: literal integer negation is admitted before lowering its opera
 after the operator, lifted, and supported-semantics guards; all non-literal unary
 paths retain their existing operand classification and checked-arithmetic handling.
 The focused unary/default lowering suite passes (22 passed).
+
+R1361 is applied: trusted-mutation shard descriptors and timing records now use
+pre-sized generic lists based on validated parallelism, avoiding repeated array
+growth while preserving shard order and serialized output. PowerShell parsing and
+the project-scoped concurrency architecture test pass.
