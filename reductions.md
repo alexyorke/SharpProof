@@ -13267,7 +13267,7 @@ resolved rather than merely deduplicated.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R1157 | **"Delete this directory, but only if it is inside the temporary root I own" is implemented eight times - once as a shared helper that is already on every test project's compile line, and seven more times by hand, under seven messages and three mutually inequivalent containment tests.** The shared `TestRepository.DeleteOwnedTemporaryDirectory` even takes the message as an **optional parameter**, so six of the seven copies exist to vary a value the helper already accepts. The containment tests are not equivalent. **(a) `StartsWith(root + DirectorySeparatorChar, Ordinal)`** - the helper, plus `DefaultApiSpecCatalogGenerationTests.cs:782-799` and `WorkerPerformanceProbe.cs:797-812`. **(b) `GetRelativePath` + reject rooted, `"."`, `".."`, `".." + sep`** - `PackagedProductFeed.cs:111-129`, `FinalCompilationProbeTests.cs:874-894`, `DependencyAuditScriptTests.cs:519-546`, `ReleasePublicationScriptTests.cs:1009-1028`. Form (b) is the **stronger** test: it rejects `..` traversal that form (a) admits whenever the traversal re-enters the prefix. The four sites using the stronger check are all copies; the shared helper uses the weaker one. **(c) `StartsWith(..., OrdinalIgnoreCase)` with no existence guard** - `FinalCompilationCollectorTests.cs:1469-1481`, alone in two respects: it is the only case-insensitive comparison, which on this repository's Linux-only container admits a root the filesystem treats as distinct, and the only site that calls `Directory.Delete(resolved, recursive: true)` **unconditionally**, so a second disposal throws `DirectoryNotFoundException` out of `Dispose` where every other site is a no-op. The clearest single signal that the helper is known and bypassed: `FinalCompilationProbeTests.cs:887` throws `"Refusing to remove an unexpected test directory."` - character-for-character the helper's own **default** `errorMessage` at `TestRepository.cs:62`. Six of the seven copies are in projects that already reference `TestRepository` elsewhere (`SharpProof.Package.Test` at 8 files, `SharpProof.Analyzer.Test` at 2, `SharpProof.Specs.Test` at 1), so they can call it with no build change at all. The seventh, `WorkerPerformanceProbe`, is **production** code in `SharpProof.Gates` and cannot see an `eng/testing` source - the same production/test boundary R725 recorded for the process runner. | `eng/testing/TestRepository.cs:59-78`; callers at `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:3173,3212`, `WorkerMsBuildIntegrationTests.cs:4179`, `SharpProof.Worker.Test/ScalarDifferentialMatrixTests.cs:959`, `WorkerTests.cs:7092`; copies at `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:797-812`, `SharpProof.Analyzer.Test/FinalCompilationCollectorTests.cs:1469-1481`, `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:782-799`, `SharpProof.Package.Test/PackagedProductFeed.cs:111-129`, `FinalCompilationProbeTests.cs:874-894`, `DependencyAuditScriptTests.cs:519-546`, `ReleasePublicationScriptTests.cs:1009-1028` |
+| R1300 | **"Delete this directory, but only if it is inside the temporary root I own" is implemented eight times - once as a shared helper that is already on every test project's compile line, and seven more times by hand, under seven messages and three mutually inequivalent containment tests.** The shared `TestRepository.DeleteOwnedTemporaryDirectory` even takes the message as an **optional parameter**, so six of the seven copies exist to vary a value the helper already accepts. The containment tests are not equivalent. **(a) `StartsWith(root + DirectorySeparatorChar, Ordinal)`** - the helper, plus `DefaultApiSpecCatalogGenerationTests.cs:782-799` and `WorkerPerformanceProbe.cs:797-812`. **(b) `GetRelativePath` + reject rooted, `"."`, `".."`, `".." + sep`** - `PackagedProductFeed.cs:111-129`, `FinalCompilationProbeTests.cs:874-894`, `DependencyAuditScriptTests.cs:519-546`, `ReleasePublicationScriptTests.cs:1009-1028`. Form (b) is the **stronger** test: it rejects `..` traversal that form (a) admits whenever the traversal re-enters the prefix. The four sites using the stronger check are all copies; the shared helper uses the weaker one. **(c) `StartsWith(..., OrdinalIgnoreCase)` with no existence guard** - `FinalCompilationCollectorTests.cs:1469-1481`, alone in two respects: it is the only case-insensitive comparison, which on this repository's Linux-only container admits a root the filesystem treats as distinct, and the only site that calls `Directory.Delete(resolved, recursive: true)` **unconditionally**, so a second disposal throws `DirectoryNotFoundException` out of `Dispose` where every other site is a no-op. The clearest single signal that the helper is known and bypassed: `FinalCompilationProbeTests.cs:887` throws `"Refusing to remove an unexpected test directory."` - character-for-character the helper's own **default** `errorMessage` at `TestRepository.cs:62`. Six of the seven copies are in projects that already reference `TestRepository` elsewhere (`SharpProof.Package.Test` at 8 files, `SharpProof.Analyzer.Test` at 2, `SharpProof.Specs.Test` at 1), so they can call it with no build change at all. The seventh, `WorkerPerformanceProbe`, is **production** code in `SharpProof.Gates` and cannot see an `eng/testing` source - the same production/test boundary R725 recorded for the process runner. | `eng/testing/TestRepository.cs:59-78`; callers at `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:3173,3212`, `WorkerMsBuildIntegrationTests.cs:4179`, `SharpProof.Worker.Test/ScalarDifferentialMatrixTests.cs:959`, `WorkerTests.cs:7092`; copies at `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:797-812`, `SharpProof.Analyzer.Test/FinalCompilationCollectorTests.cs:1469-1481`, `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:782-799`, `SharpProof.Package.Test/PackagedProductFeed.cs:111-129`, `FinalCompilationProbeTests.cs:874-894`, `DependencyAuditScriptTests.cs:519-546`, `ReleasePublicationScriptTests.cs:1009-1028` |
 
 ### ID collision: the hex-encoding finding is renumbered R1156
 
@@ -15289,6 +15289,13 @@ exact-one and fail-closed semantics. Contract API identity tests pass (6 passed)
 |---|---|---|
 | R1259 | **`IsIntrinsicSequenceLength` duplicates the common property-accessor shape test.** The string and array paths independently validate the same five property-definition fields before applying their type-specific checks. One shared guard can preserve both intrinsic-length domains and their current metadata tests. | `SharpProof.Frontend/CompilerIdentityBridge.cs:50-94` |
 
+### Status (part five hundred eighty-one)
+
+R1259 is applied: intrinsic sequence-length recognition now validates the shared
+readable, non-static, non-indexer, parameterless property shape once before
+applying its string- and array-specific rules. Frontend lowering tests pass (37
+passed).
+
 ## Second survey, part five hundred eighty-two: R1260 - generated API catalogs store descriptor keys twice
 
 The contract API generator emits full `Methods` and `Attributes` descriptor arrays, then emits `ContractMethodCandidateNames` from the same method rows and `AttributeMetadataNames` from the same attribute rows. The second arrays contain only fields already present in the descriptors (`Name` and `MetadataName` respectively); the generator source loops over the same `$methods` and `$attributes` inputs to write both projections, and parity tests explicitly prove they remain equal. The separate string arrays may be convenient for a hash-set or membership hot path, but they are a second generated data authority and can be derived once from the descriptor arrays or replaced by dedicated lookup structures.
@@ -15328,3 +15335,74 @@ The contract API generator emits full `Methods` and `Attributes` descriptor arra
 | ID | Finding | Evidence |
 |---|---|---|
 | R1264 | **`InvalidatePublishedResult.ExecuteCore` rebuilds the publication/input conflict sequence for multiple alias flags.** The worker-tree, cache, and compiler-output checks independently chain the same path arrays before testing conflicts. Materialize one shared candidate set (or use one pairwise evaluator) while preserving each separately reported error category and the protected-tool paths. | `SharpProof.BuildTasks/InvalidatePublishedResult.cs:126-156` |
+
+## Second survey, part five hundred eighty-seven: R1301 - two projects with no C# source spend four lines configuring C#; and two ID collisions resolved
+
+### R1301
+
+`Directory.Build.props:14-16` sets the language defaults for all sixty projects -
+`LangVersion 12.0`, `Nullable enable`, `ImplicitUsings enable`. Two projects
+override two of the three locally. Neither contains any C#.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1301 | **`SharpProof.Package` and `SharpProof.Verifier` contain zero `.cs` files, and each spends two lines disabling C# language features for source that does not exist - while the central build file already lists both by name, three lines away, in the regex that classifies them as not-source projects.** Both are pure packaging projects: `IsPackable=true`, `IncludeBuildOutput=false`, a `NuspecFile`, and nothing else. `git ls-files` returns **0** `.cs` files for each, and nothing puts source into them - the only project-name allow-lists in `Directory.Build.props` that mention either are the *exclusion* at `:36` and an unrelated group naming `SharpProof.Package.Test`. Yet `SharpProof.Package.csproj:4-5` and `SharpProof.Verifier.csproj:4-5` each declare `<Nullable>disable</Nullable>` and `<ImplicitUsings>disable</ImplicitUsings>`. Both properties govern the C# compiler; with no compile items there is nothing for them to govern. The cost is not four lines of build time, it is that the lines assert something false about the project: a reader who sees `Nullable disable` reasonably concludes the project holds legacy C# that has not been annotated, and goes looking for it. **The correct expression of the same intent already exists in the same `PropertyGroup` that sets the defaults.** `Directory.Build.props:33-36` computes `SharpProofProductionProject` and excludes exactly `^SharpProof\.(Testing\|Package\|Verifier\|Smoke\.Net472\|CompilerProbe\.TestAsset)$` - so the central file already knows both projects are outside the production source policy. This is the same file, and the same two project names, as the classification that R070 and R233 are about. Note the contrast that makes the finding decidable rather than stylistic: `SharpProof.CompilerProbe.TestAsset` also sets `ImplicitUsings disable`, and there it is **correct and load-bearing** - it has 8 source files and a 13-line `GlobalUsings.cs` whose first nine lines hand-declare the SDK's implicit set. One project turns the feature off and replaces it; two turn it off and have nothing to replace. | `SharpProof.Package/SharpProof.Package.csproj:4-5`; `SharpProof.Verifier/SharpProof.Verifier.csproj:4-5`; `Directory.Build.props:14-16,33-36`; `SharpProof.CompilerProbe.TestAsset/GlobalUsings.cs:1-13` for the contrasting correct case |
+
+### ID collisions: R1157 and R1156
+
+Two IDs have been issued twice, because more than one pass appends here and each
+allocates `max + 1` from the file as it stood when it was read.
+
+- **R1157 is issued twice.** The earlier row (line ~13203) is
+  *"`IrRelationalSummaryInstantiator` repeats the full substitution setup for both
+  summary predicates"* and **keeps R1157**. The later row (line ~13270) is mine -
+  *"'Delete this directory, but only if it is inside the temporary root I own' is
+  implemented eight times"* - and is **hereby renumbered R1300**: same text, same
+  evidence, same `pending` status. **Cite the guarded-delete finding as R1300.**
+- **R1156 is issued twice, and the two rows have different owners.** The earlier
+  (line ~12933) is the SHA-256 lowercase-hex census, which **retains R1156**; it
+  has already been renumbered once (it was issued as R1154 and moved in part four
+  hundred seventy-nine), and moving it a third time would leave one finding with
+  three citations. The later (line ~13181) is *"`DefiniteOperationFacts`
+  duplicates harmless-wrapper recursion"*, which is not mine to renumber. **Until
+  its author reassigns it, cite it as R1156-b.** R1155 was left unallocated in
+  part four hundred seventy-nine and is still free if that author wants it.
+
+R1301 and R1300 are deliberately taken from above the current maximum (1264)
+rather than at `max + 1`. Allocating at `max + 1` is what produced both collisions:
+the window between reading the maximum and writing the block is wide enough for
+another pass to claim the same number. Numbers are free; duplicate IDs are not.
+
+### Checked and not proposed (part five hundred eighty-seven)
+
+- **No `global using` in the repository restates an SDK implicit using
+  incorrectly.** `ImplicitUsings` is `enable` centrally
+  (`Directory.Build.props:16`) with exactly three local `disable`s. Nineteen
+  `GlobalUsings.cs` files declare 47 distinct namespaces between them, and all
+  five declarations of an SDK-implicit namespace - `System`,
+  `System.Collections.Generic`, `System.IO`, `System.Linq`, `System.Threading` -
+  are in `SharpProof.CompilerProbe.TestAsset/GlobalUsings.cs`, the one project
+  with source that turns the feature off. `System.Net.Http` and
+  `System.Threading.Tasks` are declared nowhere. **Applied R234 is confirmed
+  complete on this axis** and no redundant global using remains.
+- **The remaining inert configuration on the two sourceless projects is central
+  and should not be touched.** `EnableNETAnalyzers`, `AnalysisLevel latest-all`,
+  `EnforceCodeStyleInBuild`, `LangVersion 12.0`, and the five C# rule IDs in
+  `WarningsAsErrors` (`CA1811`, `CS8019`, `IDE0051`, `IDE0052`, `IDE0060`) all
+  reach `SharpProof.Package` and `SharpProof.Verifier` and all govern nothing
+  there. They are unconditional defaults that serve the other 58 projects
+  correctly, and adding exclusions for two projects would trade four inert lines
+  for more conditional logic in the file R233 is already about. R1301 proposes
+  deleting the **local** overrides only.
+- **`SharpProof.Smoke.Net472` is not part of R1301.** It appears in the same
+  exclusion regex and is easy to group with the other two, but it has one source
+  file, `SmokeMath.cs`, so its language properties are live.
+
+### Status (part five hundred eighty-seven)
+
+R1301 is `pending` and is a four-line deletion across two files with no behavioural
+change - the properties govern an empty compile item list either way. It is worth
+doing for the same reason R1152 is: both findings are about a packaging project
+carrying declarations that describe a project it is not, and a reader has to run
+the build to discover that neither the metadata block nor the language settings do
+anything.
