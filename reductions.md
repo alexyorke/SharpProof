@@ -14600,6 +14600,12 @@ behavior. Build-task tests pass (63 passed).
 |---|---|---|
 | R1211 | **`SharpProof.Worker.Launcher.ValidateAndReport` traverses claim results three times for reporting.** It calls `Any` for `refuted`, iterates `response.ClaimResults` to print each result, and calls `Count` for `unknownClaims`. Combining these operations in the existing result-order loop can preserve per-claim output, incomplete diagnostics, and final exit-code policy while removing two array traversals. | `SharpProof.Worker.Launcher/Program.cs:449-460` |
 
+### Status (part five hundred thirty-three)
+
+R1211 is applied: launcher claim reporting now prints results and accumulates
+refuted and unknown outcomes in one traversal. Launcher argument tests pass (75
+passed).
+
 ## Second survey, part five hundred thirty-four: R1212 - rollback snapshots a stable member list unnecessarily
 
 `RestorePreviousPublication` copies the private `members` list to `restoreMembers` and then enumerates that array twice: once to stage backups and once to publish them. Neither loop changes the collection; `PublishMember` only updates each member's `Temporary` property, and the same list is passed through the private publication workflow. Reusing the `IReadOnlyList<PublicationMember>` for both passes, or introducing a narrowly scoped stable-list helper, can remove the array allocation without changing rollback order or the final staging cleanup.
