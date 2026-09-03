@@ -123,24 +123,24 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
             foreach (var invocation in root.DescendantsAndSelf().OfType<IInvocationOperation>())
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var ownedByCallable = IsOwnedByCallable(
+                    callable,
+                    invocation,
+                    model,
+                    cancellationToken);
                 if (_api?.GetClauseKind(invocation.TargetMethod) is not { } kind)
                 {
-                    hasRejectedContractApiUsage |=
-                        IsOwnedByCallable(
-                            callable,
-                            invocation,
-                            model,
-                            cancellationToken) &&
+                    hasRejectedContractApiUsage |= ownedByCallable &&
                         _identity.IsRejectedClauseMethod(
                             invocation.TargetMethod);
                     continue;
                 }
 
                 found.Add((kind, Classify(
-                    callable,
                     invocation,
                     model,
                     body,
+                    ownedByCallable,
                     cancellationToken), invocation,
                     GetTreeOrdinal(invocation.Syntax.SyntaxTree)));
             }
@@ -203,17 +203,13 @@ public sealed class ContractClauseInventoryBuilder(Compilation compilation)
     }
 
     private ContractClausePlacement Classify(
-        IMethodSymbol callable,
         IInvocationOperation invocation,
         SemanticModel model,
         SyntaxNode body,
+        bool ownedByCallable,
         CancellationToken cancellationToken)
     {
-        if (!IsOwnedByCallable(
-                callable,
-                invocation,
-                model,
-                cancellationToken))
+        if (!ownedByCallable)
         {
             return ContractClausePlacement.NestedCallable;
         }
