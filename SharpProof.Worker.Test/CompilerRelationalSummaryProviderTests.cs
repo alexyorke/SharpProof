@@ -14,6 +14,30 @@ namespace SharpProof.Worker.Test;
 [TestFixture]
 public sealed class CompilerRelationalSummaryProviderTests
 {
+    private static readonly CSharpCompilation ClosedFormsCompilation =
+        CreateCompilation(
+            """
+            using SharpProof.Attributes;
+
+            internal static class Outer<T> {
+                internal static class Inner {
+                    internal static int F(int value) => value;
+                }
+            }
+
+            internal static class Subject {
+                internal static int VerifyInt(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return Outer<int>.Inner.F(value);
+                }
+
+                internal static int VerifyLong(int value) {
+                    Contract.Ensures(Contract.Result<int>() == value);
+                    return Outer<long>.Inner.F(value);
+                }
+            }
+            """);
+
     [Test]
     public void LongSourceDependencyChainAbstainsAtResourceLimit()
     {
@@ -69,28 +93,7 @@ public sealed class CompilerRelationalSummaryProviderTests
         string firstMethod,
         string secondMethod)
     {
-        var compilation = CreateCompilation(
-            """
-            using SharpProof.Attributes;
-
-            internal static class Outer<T> {
-                internal static class Inner {
-                    internal static int F(int value) => value;
-                }
-            }
-
-            internal static class Subject {
-                internal static int VerifyInt(int value) {
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    return Outer<int>.Inner.F(value);
-                }
-
-                internal static int VerifyLong(int value) {
-                    Contract.Ensures(Contract.Result<int>() == value);
-                    return Outer<long>.Inner.F(value);
-                }
-            }
-            """);
+        var compilation = ClosedFormsCompilation;
         var factory = new IrFactory();
         var provider = new CompilerRelationalSummaryProvider(
             compilation,

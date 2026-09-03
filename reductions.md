@@ -18724,3 +18724,8 @@ while still checking every five-flag combination against the generated tuple.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1652 | `SharpProofSoundnessAnalyzer` repeats the shared parenthesis and built-in-conversion unwrapping loop; route this path through `OperationUnwrapping` while retaining the string-shape-specific cases. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:474-493`; shared helper at `SharpProof.Meta.Analyzers/OperationUnwrapping.cs:8-24` |
+
+R1641 is applied: the two generic closed-form cache-order cases now reuse one
+immutable Roslyn compilation while retaining independent providers, caches,
+and method-order assertions. `CompilerRelationalSummaryProviderTests` pass
+(3/3).
