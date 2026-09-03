@@ -20840,3 +20840,11 @@ instead of repeating count-only assertions. Specialized fixture sources remain
 local where their enum/cache shapes differ. The full
 `SharpProof.Meta.Analyzers.Test` project passes 163/163 tests with zero warnings
 or errors.
+
+## Second survey, continued: R1982 - RequiresCallSiteTreeAnalyzer duplicates tuple-component name lookup in deconstruction and recursive-pattern paths
+
+RequiresCallSiteTreeAnalyzer resolves a tuple-path component in two production paths with the same name-resolution algorithm. TryGetDeconstructionDestination scans sourceType.TupleElements and accepts either element.Name or element.CorrespondingTupleField?.Name with ordinal comparison before returning the matching index; the local TupleComponentPatterns helper repeats the same scan against recursive.InputType.TupleElements before selecting the deconstruction subpattern. The callers differ in what they do with the index - one descends an assignment target and the other yields a pattern - but the tuple-name/backing-field policy is identical and sits in one 1,600-line soundness analyzer. A small FindTupleElementIndex(INamedTypeSymbol, string) helper can own the shared search and return -1 for the existing failure path, while leaving the later property-subpattern member check separate because it matches operation members rather than tuple-element indexes. Today a change to tuple-name normalization or CorrespondingTupleField handling requires two edits in the same analyzer and can make assignment descent and pattern descent disagree.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1982 | RequiresCallSiteTreeAnalyzer repeats the same tuple element/backing-field name-to-index search in assignment deconstruction and recursive-pattern traversal; centralize the search helper while retaining the distinct descent and pattern-yield policies. | SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1014-1033,1477-1514 |
