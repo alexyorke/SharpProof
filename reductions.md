@@ -18706,3 +18706,8 @@ R1651 is applied: the scalar-semantics oracle now owns only the independent
 primitive-type set and derives widths, signedness, and bounds from those CLR
 types, while retaining exhaustive catalog and lowering assertions.
 `CSharpScalarSemanticsTests` pass (2/2).
+
+R1649 is applied: `AcyclicBlockPredicateExecutor.Run` now receives one
+`RunInputs` context for its immutable execution state instead of redeclaring
+and forwarding eight individual state parameters; resource limits remain
+explicit. `AcyclicBlockPredicateExecutorTests` pass (14/14).

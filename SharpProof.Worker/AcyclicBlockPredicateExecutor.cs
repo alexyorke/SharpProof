@@ -29,20 +29,28 @@ internal sealed partial class AcyclicBlockPredicateExecutor
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(program);
         cancellationToken.ThrowIfCancellationRequested();
-        return new Run(variables, factory, program, specCalls, summaryCalls, initialEnvironment,
-            parameterBindings, _maximumExpressionDepth, _maximumSymbolicOperations,
-            cancellationToken).Execute();
+        return new Run(
+            new RunInputs(
+                variables, factory, program, specCalls, summaryCalls,
+                initialEnvironment, parameterBindings, cancellationToken),
+            _maximumExpressionDepth,
+            _maximumSymbolicOperations).Execute();
     }
 
+    private readonly record struct RunInputs(
+        ImmutableArray<CompilerCanonicalVariable> Variables,
+        IrFactory Factory,
+        IrProgram Program,
+        ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> SpecCalls,
+        ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> SummaryCalls,
+        ImmutableDictionary<IrVarId, IrTerm> InitialEnvironment,
+        ImmutableDictionary<IrVarId, IrVarId> ParameterBindings,
+        CancellationToken CancellationToken);
+
     private sealed partial class Run(
-        ImmutableArray<CompilerCanonicalVariable> variables,
-        IrFactory factory, IrProgram program,
-        ImmutableDictionary<IrInstructionId, CompilerPreparedSpecCall> specCalls,
-        ImmutableDictionary<IrInstructionId, CompilerPreparedSummaryCall> summaryCalls,
-        ImmutableDictionary<IrVarId, IrTerm> initialEnvironment,
-        ImmutableDictionary<IrVarId, IrVarId> parameterBindings,
-        int maximumExpressionDepth, int remainingOperations,
-        CancellationToken cancellationToken)
+        RunInputs inputs,
+        int maximumExpressionDepth,
+        int remainingOperations)
     {
         private readonly Dictionary<IrBlockId, List<FlowState>> _incoming = [];
         private readonly ImmutableArray<SymbolicReturn>.Builder _returns = ImmutableArray.CreateBuilder<SymbolicReturn>();
@@ -56,7 +64,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
         internal SymbolicBodyExecution Execute()
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            inputs.CancellationToken.ThrowIfCancellationRequested();
             var order = CreateOrder();
             if (order.IsDefault)
             {
@@ -65,7 +73,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
             foreach (var blockId in order)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                inputs.CancellationToken.ThrowIfCancellationRequested();
                 var state = Merge(blockId);
                 if (state == null)
                 {
@@ -76,12 +84,12 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
                     continue;
                 }
-                if (!ExecuteBlock(program.GetBlock(blockId), state.Value))
+                if (!ExecuteBlock(inputs.Program.GetBlock(blockId), state.Value))
                 {
                     return Failed();
                 }
             }
-            cancellationToken.ThrowIfCancellationRequested();
+            inputs.CancellationToken.ThrowIfCancellationRequested();
             return _returns.Count == 0 ? SymbolicBodyExecution.Failed(WorkerClaimReason.UnsupportedBody) :
                 new SymbolicBodyExecution(WorkerClaimReason.None, _returns.ToImmutable(),
                     _projections.ToImmutable(), _assumptions.ToImmutable(),
@@ -138,7 +146,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                         break;
                     case IrCallInstruction call:
                         SpecApplication? application = null;
-                        if (specCalls.TryGetValue(call.Id, out var preparedSpec))
+                        if (inputs.SpecCalls.TryGetValue(call.Id, out var preparedSpec))
                         {
                             application = ApplySpec(
                                 call,
@@ -146,7 +154,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                                 environment,
                                 predicate);
                         }
-                        else if (summaryCalls.TryGetValue(
+                        else if (inputs.SummaryCalls.TryGetValue(
                                      call.Id,
                                      out var preparedSummary))
                         {
@@ -216,7 +224,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             }
 
             var constrained = IrSemanticTerms.ConstrainSuccessfulEvaluation(
-                factory,
+                inputs.Factory,
                 predicate,
                 evaluated);
             return Supported(constrained) ? constrained : null;
@@ -227,7 +235,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             ImmutableDictionary<IrVarId, IrTerm> environment)
         {
             var condition = Substitute(branch.Condition, environment);
-            if (condition == null || condition.Type != factory.BooleanType)
+            if (condition == null || condition.Type != inputs.Factory.BooleanType)
             {
                 return false;
             }
@@ -254,10 +262,10 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 return false;
             }
 
-            var whenTrue = factory.Binary(
+            var whenTrue = inputs.Factory.Binary(
                 IrBinaryOperator.AndAlso, predicate, condition);
-            var whenFalse = factory.Binary(IrBinaryOperator.AndAlso, predicate,
-                factory.Unary(IrUnaryOperator.Not, condition));
+            var whenFalse = inputs.Factory.Binary(IrBinaryOperator.AndAlso, predicate,
+                inputs.Factory.Unary(IrUnaryOperator.Not, condition));
             if (!Supported(whenTrue) || !Supported(whenFalse))
             {
                 return false;
@@ -270,9 +278,9 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
         private FlowState? Merge(IrBlockId block)
         {
-            if (block == program.Entry)
+            if (block == inputs.Program.Entry)
             {
-                return new FlowState(0, factory.Boolean(true), initialEnvironment);
+                return new FlowState(0, inputs.Factory.Boolean(true), inputs.InitialEnvironment);
             }
 
             if (!_incoming.TryGetValue(block, out var values) || values.Count == 0)
@@ -287,7 +295,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             }
 
             var predicate = IrSemanticTerms.Disjoin(
-                factory, values.Select(static value => value.Predicate).ToArray());
+                inputs.Factory, values.Select(static value => value.Predicate).ToArray());
             if (!Supported(predicate))
             {
                 return null;
@@ -326,7 +334,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                     merged = values[^1].Environment[variable];
                     for (var index = values.Count - 2; index >= 0; index--)
                     {
-                        merged = factory.Conditional(values[index].Predicate,
+                        merged = inputs.Factory.Conditional(values[index].Predicate,
                             values[index].Environment[variable], merged);
                     }
                 }
@@ -354,7 +362,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 return null;
             }
 
-            var targetType = factory.GetVariableInfo(call.Target.Value).Type;
+            var targetType = inputs.Factory.GetVariableInfo(call.Target.Value).Type;
             if (!IsResultType(template.Target.ResultType, targetType) ||
                 call.Arguments.Length != template.Parameters.Length ||
                 template.Receiver.HasValue != (call.Receiver != null))
@@ -395,14 +403,14 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 guard = argumentGuard;
                 substitutions.Add(template.Parameters[index], argument);
             }
-            var resultVariable = factory.CreateVariable(
+            var resultVariable = inputs.Factory.CreateVariable(
                 "spec-call-result:" +
                 call.Id.Value.ToString(CultureInfo.InvariantCulture),
                 targetType);
-            var result = factory.Variable(resultVariable);
+            var result = inputs.Factory.Variable(resultVariable);
             substitutions.Add(template.Result.Value, result);
             if (!SpecResultDomainProjection.TryCreate(
-                    factory, template, resultVariable, out var projection,
+                    inputs.Factory, template, resultVariable, out var projection,
                      out var facetPredicates))
             {
                 return null;
@@ -416,7 +424,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 return null;
             }
 
-            var instantiated = ApiSpecInstantiator.InstantiatePostconditions(template, factory, substitutions);
+            var instantiated = ApiSpecInstantiator.InstantiatePostconditions(template, inputs.Factory, substitutions);
             if (instantiated.Status != SpecInstantiationStatus.Succeeded)
             {
                 return null;
@@ -428,7 +436,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                     resultVariable,
                     projection);
             var predicates = instantiated.Postconditions
-                .Select(predicate => SpecResultDomainProjection.Rewrite(factory, predicate, projectionMap))
+                .Select(predicate => SpecResultDomainProjection.Rewrite(inputs.Factory, predicate, projectionMap))
                 .Concat(facetPredicates)
                 .ToArray();
             if (predicates.Length == 0 || predicates.Any(predicate => !Supported(predicate)))
@@ -455,8 +463,8 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             if (!call.Target.HasValue ||
                 prepared.Instruction != call.Id ||
                 !Enum.IsDefined(prepared.Origin) ||
-                factory.GetVariableInfo(call.Target.Value).Type !=
-                factory.GetVariableInfo(prepared.Result).Type ||
+                inputs.Factory.GetVariableInfo(call.Target.Value).Type !=
+                inputs.Factory.GetVariableInfo(prepared.Result).Type ||
                 !WorkerProtocolJson.IsSha256(prepared.EvidenceSha256))
             {
                 return null;
@@ -505,7 +513,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                     prepared.NormalRelation,
                     environment,
                     freeVariables) is not { } relation ||
-                relation.Type != factory.BooleanType)
+                relation.Type != inputs.Factory.BooleanType)
             {
                 return null;
             }
@@ -519,7 +527,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 guard,
                 relation));
             return new SpecApplication(
-                factory.Variable(prepared.Result),
+                inputs.Factory.Variable(prepared.Result),
                 guard,
                 ConsumesMemoryHavoc: false);
         }
@@ -527,16 +535,16 @@ internal sealed partial class AcyclicBlockPredicateExecutor
         private ImmutableDictionary<IrVarId, IrTerm>? CreateCurrentStates(
             ImmutableDictionary<IrVarId, IrTerm> environment)
         {
-            if (!Spend(variables.Length + parameterBindings.Count))
+            if (!Spend(inputs.Variables.Length + inputs.ParameterBindings.Count))
             {
                 return null;
             }
 
-            var states = variables
+            var states = inputs.Variables
                 .Where(static variable => variable.Role == CompilerVariableRole.Parameter)
                 .ToImmutableDictionary(static variable => variable.Variable,
-                    variable => (IrTerm)factory.Variable(variable.Variable)).ToBuilder();
-            foreach (var binding in parameterBindings)
+                    variable => (IrTerm)inputs.Factory.Variable(variable.Variable)).ToBuilder();
+            foreach (var binding in inputs.ParameterBindings)
             {
                 if (environment.TryGetValue(binding.Key, out var value))
                 {
@@ -550,7 +558,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
         private ImmutableArray<IrBlockId> CreateOrder()
         {
             var result = IrBlockOrder.TryCreateAcyclicOrder(
-                program, Spend, out var failure);
+                inputs.Program, Spend, out var failure);
             if (result.IsDefault)
             {
                 _reason = failure switch
@@ -591,7 +599,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 return false;
             }
 
-            return factory.GetTypeInfo(resultType).Kind == specType.Value;
+            return inputs.Factory.GetTypeInfo(resultType).Kind == specType.Value;
         }
 
         private IrTerm? Substitute(
@@ -599,7 +607,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             IReadOnlyDictionary<IrVarId, IrTerm> environment,
             HashSet<IrVarId>? freeVariables = null)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            inputs.CancellationToken.ThrowIfCancellationRequested();
             if (!IrTraversal.CollectVariables(term).All(variable =>
                     environment.ContainsKey(variable) ||
                     freeVariables?.Contains(variable) == true))
@@ -609,8 +617,8 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
             try
             {
-                var result = IrSubstitution.Substitute(factory, term, environment);
-                cancellationToken.ThrowIfCancellationRequested();
+                var result = IrSubstitution.Substitute(inputs.Factory, term, environment);
+                inputs.CancellationToken.ThrowIfCancellationRequested();
                 return Supported(result) ? result : null;
             }
             catch (ArgumentException) { return null; }
@@ -618,13 +626,13 @@ internal sealed partial class AcyclicBlockPredicateExecutor
 
         private bool Supported(IrTerm term)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            inputs.CancellationToken.ThrowIfCancellationRequested();
             return IrTermAnalysis.GetDepth(term) <= maximumExpressionDepth;
         }
 
         private bool Spend(int amount = 1)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            inputs.CancellationToken.ThrowIfCancellationRequested();
             if (amount <= remainingOperations)
             {
                 remainingOperations -= amount;
