@@ -13,7 +13,7 @@ public sealed class ContractIntrinsicValidationTests
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ContractIntrinsicValidationFixtures.DirectContract,
             "contracts",
-            ["SP0024"]);
+            []);
 
         AssertNestingDiagnostic(diagnostics);
     }
@@ -49,7 +49,7 @@ public sealed class ContractIntrinsicValidationTests
             }
             """,
             "contracts",
-            ["SP0024"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024");
         Assert.That(
@@ -64,7 +64,7 @@ public sealed class ContractIntrinsicValidationTests
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             ContractIntrinsicValidationFixtures.IndirectIntrinsicCalls,
             "contracts",
-            ["SP0024"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0024", 2);
         var messages = diagnostics.Select(diagnostic =>

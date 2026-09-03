@@ -20356,3 +20356,107 @@ in a status report.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1881 | A private binder-test fixture implements `IDisposable` solely to provide an empty `Dispose`; dozens of `using var` declarations therefore add no-op lifecycle scaffolding. | `SharpProof.Contracts.Test/ContractBinderTests.cs:21-34,66-1609,1637-1645,1781-1783` |
+
+## Second survey, part six hundred twenty-four: R1900 - a fifth of the compiler-artifact schema's property declarations are byte-identical repeats, and the schema language has no way to say so
+
+A structural measurement across the repository's JSON data, never run: **37**
+parsed files, **3,642** objects walked, every non-trivial object hashed and
+compared within and across files.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1900 | **`CompilerArtifactModel.schema.json` declares 275 properties across 69 record types, of which only 216 are distinct - 33 declarations are repeated for **59 redundant copies**, about a fifth of the file's property surface - and the schema language it is written in has no construct for saying "these types share this group".** The clearest case is a four-property source-location block declared four times over. `CompilerLocationAuthorityArtifact`, `CompilerEffectAuthorityArtifact`, `CompilerEffectReplayEventArtifact` and `CompilerDiagnosticArtifact` each carry `SourceTreeSha256`, `SourceTreePath`, `SourceTreeOrdinal` and `SourceLineMapSha256`, byte-identical in every field - `accessibility`, `set`, `type`, `jsonName` and the `{"kind":"stringEmpty"}` default - and `CompilerSummaryEvidenceSnapshot` carries the first of the four. Sixteen declarations where one named group and four references would do. A second, smaller case is the file-identity pair `Path` and `Sha256` on `CompilerSyntaxTreeSnapshot`, `CompilerReferenceModuleSnapshot` and `CompilerAdditionalFileSnapshot`, and a third is `EvidenceSha256` on four evidence types. **The schema has no reuse mechanism at all**: its declaration vocabulary is `kind`, `name`, `properties`, `parameters`, `members`, `constants`, `constructor`, `readonly` and `maximumInstructions`, and the file contains zero occurrences of `$ref`, `extends`, `base`, `mixin`, `include`, `group`, `shared` or `fragment`. Every property is spelled out per type by construction. **The cost is not the JSON lines.** Each property object is eight lines pretty-printed, so the 59 copies are roughly 470 of the file's 4,455 lines - but the real cost is that a change to the source-location contract must be made in four places in a **trusted-computing-base** authority, and nothing would notice three of four. `CompilerArtifactModelSchemaTests` compares the *generated C#* against the *schema*, so an asymmetric edit moves both sides together and the test still passes; the tests that touch these properties - `ClaimManifestBuilderTests:1858,1867`, `CompilerEffectReplayArtifactCodecTests:65,68,383,386` - assert them on individual types and never that the four types agree. **The remedy is a schema construct, not a JSON edit**: a named property group the generator expands, which is the same move the repository already made for wire mappings and slot domains, both of which are declared once and referenced by name in the same file. | `SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json` (69 declarations, 275 properties, 216 distinct, 33 repeated, 59 redundant copies); the four source-location types named above; `scripts/Generate-CompilerArtifactModel.ps1`; `eng/acceptance/contract.json` (the schema is TCB-declared); `SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs`; related R255, R1143, R980 |
+
+### Checked and not proposed (part six hundred twenty-four)
+
+- **No JSON object of substance is shared between two files - the count is
+  exactly zero.** Hashing every object of 120 characters or more across all 37
+  parsed data files finds **no** structure appearing in two files. The schemas,
+  catalogs and contracts do not copy from one another; R1143's contract-enum
+  duplication is at the enum-member level, below this measurement's threshold, and
+  remains the only cross-file case in the ledger.
+- **The other three files with internal repeats are small and two are
+  deliberate.** `SharpProof.Specs/DefaultApiSpecCatalog.json` repeats three
+  effect-summary objects for six redundant copies - identical
+  `{"allocation":...,"cardinality":...}` blocks on different API specs, which is
+  data about different methods that happens to coincide, not a shared declaration.
+  `ProtocolModel.schema.json` repeats one object three times: the `protocolVersion`
+  property defaulting to `WorkerProtocolVersions.Current`, on the three envelope
+  types that each carry a version - correct, and the whole point is that they carry
+  it independently. `SharpProof.DeclarativeModels.catalog.json` has a single
+  two-copy repeat.
+- **The `.opencode` npm dependency tree is already recorded.** `.opencode/` holds a
+  6-line `package.json` with two dependencies, a **431-line** `package-lock.json`,
+  a one-line plugin re-export, and a `.gitignore` for `node_modules` and
+  `bun.lock`. `.github/dependabot.yml` configures only `nuget` and
+  `github-actions`, and `Test-SharpProofDependencyAudit.ps1` covers NuGet only - so
+  the lockfile has neither vulnerability reporting nor an update path. That exact
+  observation is already in this ledger as supporting detail for **R247**, which
+  retains the directory as a bound editor-integration fixture. Nothing to add.
+- **The three `PortableIr` repeats are coincidence, not a group.** `A`, `B`,
+  `Items` and `Type` appear identically on `PortableIrTerm`, `PortableIrLocation`
+  and `PortableIrInstruction`, but those are the generic slot names of a
+  three-address encoding - the same shape by design rather than a shared concept -
+  and R255 and the slot-domain tables already govern that part of the schema.
+  R1900 is scoped to the named, semantically coherent groups.
+
+### Status (part six hundred twenty-four)
+
+R1900 is `pending`. It is a generator feature rather than a data edit, which puts
+it above the usual size for a duplication finding; the argument for doing it is
+that the duplicated block is a provenance contract inside a trusted-computing-base
+authority, and the existing schema tests are structurally incapable of noticing if
+three of its four copies drift.
+
+### Applied reduction follow-up
+
+R1780 is partially applied: three `ContractIntrinsicValidationTests` now leave
+diagnostics at their catalog defaults so their exact `SP0024` assertions catch
+unexpected analyzer output. The companion fixture intentionally retains its
+`SP0024`-only filter because the unfiltered source also reports `SP0047`.
+The focused class suite passes (4/4).
+
+## Second survey, part six hundred twenty-five: R1920 - applying R816 traded a redundant restore for a duplicated body - and R1921, one fixture script invokes the same reader twenty-nine times with four constant arguments
+
+Within-file repetition in PowerShell had not been measured; only cross-file runs
+had. Across 101 scripts, counting contiguous four-line runs repeated **inside** a
+single file gives **27** files and roughly **772** redundant lines. Two of those
+are findings; the rest are data tables or already-filed material.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1920 | **The `security` and `dependency-audit` container commands share a ten-line body character-for-character, and that duplication is the residue of applying R816.** `Invoke-SharpProofContainer.ps1:141-150` and `:501-511` both run `Invoke-DotNet @('restore', 'SharpProof.sln', '--locked-mode')`, both build the same `artifacts/dependency-audit/dependency-audit.json` path, and both call `Invoke-RequiredScript 'scripts/Test-SharpProofDependencyAudit.ps1'` with the same failure message and the same three parameters. `dependency-audit` ends there; `security` continues with a Release build carrying `--no-restore`. **R816 is recorded `applied` and this is how.** It found that `security` restored the solution twice because it invoked `dependency-audit` as a child command and then `build`, and it offered two remedies: "a security-specific orchestration path can restore once, run the audit, and build with `--no-restore`, **or** let the child commands accept an explicit validated reuse flag while retaining the default standalone restore behavior." The first was taken, which removes the second restore - the goal - and inlines the child's body, which is the cost. The second remedy would have achieved both. **The composition mechanism the inlining bypassed is in the same file and in use.** `Invoke-PipelineCommand` is declared at `:89` and used four times by `nightly` at `:136-139`, including `Invoke-PipelineCommand 'dependency-audit' 'Release'` - so `nightly` composes exactly the command that `security` now duplicates. A `-SkipRestore` parameter on the audit arm, or a shared function the two arms call, restores the composition without reintroducing the double restore. | `scripts/Invoke-SharpProofContainer.ps1:89,136-139,141-153,501-511`; applied R816 and its two proposed remedies; `scripts/Test-SharpProofDependencyAudit.ps1` |
+| R1921 | **`Test-SharpProofMutationEvidence.ps1` calls `Read-SharpProofMutationTestEvidence` twenty-nine times, and four of its six arguments are the same literal in every call.** Every invocation passes `-Mode Mutation`, `-ProcessExitCode 1`, `-ExpectedMethodName ExpectedTest` and `-ExpectedLedger $baseline.testLedger`; only `-TrxPath` and `-EvidenceName` vary. That is **116** argument lines carrying no information, in a 4-line-repeat census that puts this file second in the repository at 148 redundant lines over 17 distinct blocks. PowerShell's splatting expresses it directly - one `$common` hashtable built once from `$baseline`, then `Read-SharpProofMutationTestEvidence -TrxPath $path -EvidenceName $name @common` - and the change is mechanical. **The file already demonstrates the better pattern**: its forgery cases at `:765-790` are table-driven, five records in a `foreach` supplying `Name`, `Message` and `Stack`, so the author reached for a table where the *inputs* varied and hand-wrote the call where only the *labels* did. The risk the repetition carries is small but real - four constants restated twenty-nine times can drift in one call and read as deliberate, and `-ExpectedLedger $baseline.testLedger` in particular is the argument that ties each assertion to the baseline it is meant to check. | `scripts/Test-SharpProofMutationEvidence.ps1` (29 invocations; `:755-761` and `:783-789` as representatives; `:765-790` for the table-driven contrast); related applied R073, R573, R574, R575 |
+
+### Checked and not proposed (part six hundred twenty-five)
+
+- **The largest within-file repeat is data, not logic.**
+  `scripts/Test-SharpProofTrustedMutations.ps1` shows 160 redundant lines over 29
+  blocks, all of them the `Project = '...'` / `Filter = '...'` / `},` /
+  `[pscustomobject]@{` boundary between catalog entries. Two hundred and
+  forty-eight records that share a target project necessarily repeat its path;
+  that is the catalog being a catalog. Its real problems are R1840 and R1880.
+- **`SharpProof.ContainerExecution.psm1`'s three repeated `param(` blocks are
+  R788.** That finding records four named parallelism wrappers each redeclaring a
+  cmdlet and mandatory `RepositoryRoot` parameter block before forwarding to one
+  policy engine, and explicitly asks that the four public semantic names survive
+  the consolidation. The measurement reproduces it at 100 redundant lines.
+- **`Generate-ApiSpecCatalog.ps1`'s four repeated `param(` blocks are the generator
+  family already covered by R249, R250 and R268**, which R305 assigns there rather
+  than counting them separately.
+- **`Invoke-SharpProofPackageTests.ps1` repeating a three-line timing projection
+  three times is R1111's shape** - the same shard-shape projection finding - and is
+  four lines each; too small to file separately and the same remedy.
+- **This is the third second-order effect of an applied remedy, and the first that
+  is duplication.** Part six hundred twenty audited twelve shared helpers and found
+  the consolidations sound, with two second-order effects: R1500, an
+  over-distributed helper, and R1580, two helpers that should be one. R1920 is a
+  third and a different kind - a remedy applied by inlining, where the finding
+  itself named the non-inlining alternative. The audit's conclusion stands, but the
+  count is three rather than two.
+
+### Status (part six hundred twenty-five)
+
+R1920 is `pending` and is small, but it should be applied by the route R816's own
+text describes rather than by re-composing naively, or the double restore returns.
+R1921 is `pending` and is a mechanical splat.
