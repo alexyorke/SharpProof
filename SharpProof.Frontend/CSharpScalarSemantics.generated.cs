@@ -141,12 +141,17 @@ internal static class CSharpScalarSemantics
             _ => null
         };
 
-    internal static bool TryGetInteger(
-        SpecialType type,
-        out CSharpIntegerSemantics semantics)
+    private static bool TryGet<TSemantics, TKey>(
+        ImmutableArray<TSemantics> candidates,
+        TKey key,
+        Func<TSemantics, TKey> keySelector,
+        out TSemantics semantics)
+        where TSemantics : struct
+        where TKey : struct
     {
-        foreach (var candidate in Integers)
-            if (candidate.SpecialType == type)
+        foreach (var candidate in candidates)
+            if (EqualityComparer<TKey>.Default.Equals(
+                keySelector(candidate), key))
             {
                 semantics = candidate;
                 return true;
@@ -154,6 +159,12 @@ internal static class CSharpScalarSemantics
         semantics = default;
         return false;
     }
+
+    internal static bool TryGetInteger(
+        SpecialType type,
+        out CSharpIntegerSemantics semantics) =>
+        TryGet(Integers, type,
+            static candidate => candidate.SpecialType, out semantics);
 
     internal static bool TryGetIrIntegerRange(
         SpecialType type,
@@ -230,17 +241,9 @@ internal static class CSharpScalarSemantics
 
     internal static bool TryGetUnary(
         UnaryOperatorKind kind,
-        out CSharpUnarySemantics semantics)
-    {
-        foreach (var candidate in UnaryOperators)
-            if (candidate.Kind == kind)
-            {
-                semantics = candidate;
-                return true;
-            }
-        semantics = default;
-        return false;
-    }
+        out CSharpUnarySemantics semantics) =>
+        TryGet(UnaryOperators, kind,
+            static candidate => candidate.Kind, out semantics);
 
     internal static bool SupportsBuiltInOperands(
         BinaryOperatorKind kind,
@@ -251,17 +254,9 @@ internal static class CSharpScalarSemantics
 
     private static bool TryGetBinary(
         BinaryOperatorKind kind,
-        out CSharpBinarySemantics semantics)
-    {
-        foreach (var candidate in BinaryOperators)
-            if (candidate.Kind == kind)
-            {
-                semantics = candidate;
-                return true;
-            }
-        semantics = default;
-        return false;
-    }
+        out CSharpBinarySemantics semantics) =>
+        TryGet(BinaryOperators, kind,
+            static candidate => candidate.Kind, out semantics);
 
     private static bool SupportsBuiltInEquality(ITypeSymbol? type) =>
 

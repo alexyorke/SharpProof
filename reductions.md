@@ -20797,3 +20797,8 @@ error-code multiset with `Is.EquivalentTo`, while the cases that intentionally
 accept additional validation errors use the explicitly named
 `AssertContainsErrorCode` helper. The full `ProtocolJsonTests` class passes
 108/108 tests with zero warnings or errors.
+
+R1941 is applied: `Generate-CSharpScalarSemantics.ps1` now emits one generic
+typed lookup helper for the integer, unary, and binary catalogs instead of
+repeating the same scan and fallback protocol three times. Generator
+verification and the full `SharpProof.Frontend.Test` project pass (121/121).
