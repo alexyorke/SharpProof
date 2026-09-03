@@ -11441,6 +11441,8 @@ R1071 is applied: both signed-int64 lowerer tests now share one interval asserti
 
 R1072 is deferred: adopt `AssertClaimVerdict` across single-claim tests in `WorkerTests`.
 
+R1072 is applied: the three identified single-claim integration cases now use `AssertClaimVerdict` while retaining their response-error and proof-core assertions. `WorkerTests` pass (148/148).
+
 ## Second survey, part three hundred four: R1073 - shadowing private ThrowingBackend class in WorkerTests
 
 R585 established a shared test fixture `SharpProof.Worker.Test/ThrowingBackend.cs` to eliminate duplicate throwing fakes across worker test suites. Despite this, `WorkerTests.cs` lines 6506-6515 defines its own `private sealed class ThrowingBackend : ISmtBackend` used by a single test. This private class shadows the assembly-internal `ThrowingBackend` test double. Aligning this test with the shared class removes the name collision and eliminates the redundant private fake.

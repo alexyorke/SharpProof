@@ -2789,17 +2789,14 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var result = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(
-                result.ProofCore.Any(static item => item.StartsWith(
-                    "il-summary:",
-                    StringComparison.Ordinal)),
-                Is.True);
-        }
+        var result = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Proven);
+        Assert.That(
+            result.ProofCore.Any(static item => item.StartsWith(
+                "il-summary:",
+                StringComparison.Ordinal)),
+            Is.True);
     }
 
     [Test]
@@ -3762,15 +3759,11 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var result = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                result.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-            Assert.That(result.ProofCore, Is.Empty);
-        }
+        var result = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.UnsupportedBody);
+        Assert.That(result.ProofCore, Is.Empty);
     }
 
     [Test]
@@ -3876,17 +3869,11 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-            Assert.That(record.ProofCore, Is.Empty);
-        }
+        var record = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.UnsupportedBody);
+        Assert.That(record.ProofCore, Is.Empty);
     }
 
     [Test]
