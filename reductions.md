@@ -19037,3 +19037,11 @@ operator, conversion, and nullness-specific behavior remains in each caller.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1671 | Two effect-replay tests duplicate the allocation-only `EnforcePure` setup and unknown-result assertions; centralize that prelude while retaining the distinct response-authority checks. | `SharpProof.Worker.Test/EffectCounterexampleReplayTests.cs:166-190,241-263` |
+
+## Second survey, continued: R1672 - Effect replay tests duplicate the allocation event-kind matrix
+
+`UnconditionalObjectAndArrayAllocationsAreIndependentlyConfirmed` and `CanceledReplayDoesNotPoisonTheNextReplay` each enumerate the exact same two `CompilerEffectReplayEventKind` values, `ManagedObjectAllocation` and `ManagedArrayAllocation`. Their assertions exercise different behavior and should remain separate, but the allocation-kind roster is shared contract test data; a common immutable `AllocationEventKinds` source would keep future allocation-event additions synchronized across both loops.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1672 | Two effect-replay tests repeat the same object/array allocation event-kind list; share the immutable test-data roster while retaining separate behavior assertions. | `SharpProof.Worker.Test/EffectCounterexampleReplayTests.cs:14-18,402-408` |
