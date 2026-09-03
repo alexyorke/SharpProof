@@ -13669,6 +13669,13 @@ effects while avoiding a second receiver/index/argument traversal.
 |---|---|---|
 | R1167 | **`OperationEffectScanner` re-evaluates effectful assignment targets during the write phase.** `ScanSimpleAssignment` evaluates the target location and then passes the unchanged target to `ScanWriteTarget`; the compound, read-modify-write, and coalesce paths likewise scan a target read before calling that helper. The field, array-element, and property branches of `ScanWriteTarget` re-scan their receiver, indices, or arguments, so the same target expression is traversed twice. Splitting location evaluation from write-state projection, or carrying the first `EffectStep` forward, removes that duplicate while retaining the distinct access summaries and target/value order. | `SharpProof.Effects/OperationEffectScanner.Assignments.cs:5-95,97-170,198-255`; target scanners `SharpProof.Effects/OperationEffectScanner.cs:307-452,474-528` |
 
+### Status (part four hundred eighty-nine)
+
+R1167 is applied: simple, compound, read-modify-write, and coalesce
+assignments now carry one target-location evaluation into their read/write
+projections, preserving target-before-value ordering. The Effects test suite
+passes (323/323).
+
 ## Second survey, part four hundred ninety: R1168 - alias analysis walks one method tree twice
 
 `ConversionOwnershipClassifier.MethodMayIntroduceUnknownRefAlias` obtains an
