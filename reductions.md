@@ -19089,3 +19089,8 @@ mutation action for both independent source artifacts. The focused
 R1675 is applied: portable-IR round-trip tests now use one canonical graph JSON
 equality helper, while the golden-wire test retains its explicit byte check.
 `PortableIrGraphCodecTests` passes (54/54).
+
+R1068 is applied: protocol validation tests now route repeated single- and
+multi-code containment checks through the shared `AssertErrorCode` helper;
+exact-set and empty-result assertions remain explicit. `ProtocolJsonTests`
+passes (108/108).

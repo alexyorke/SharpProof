@@ -274,12 +274,11 @@ public sealed class ProtocolJsonTests
         request.VerifyPolicy = WorkerVerifyPolicy.Unspecified;
         request.AssumptionPolicy = (WorkerAssumptionPolicy)999;
         request.CompilerManifest.Sha256 = InputHash.ToUpperInvariant();
-        Assert.That(
-            WorkerProtocolJson.Validate(request).Errors
-                .Select(static error => error.Code),
-            Does.Contain("policy.verify")
-                .And.Contain("policy.assumption")
-                .And.Contain("project.compiler_manifest"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(request),
+            "policy.verify",
+            "policy.assumption",
+            "project.compiler_manifest");
     }
 
     [Test]
@@ -409,10 +408,9 @@ public sealed class ProtocolJsonTests
         Assert.That(
             WorkerProtocolJson.ComputeManifestHash(manifest),
             Is.Not.EqualTo(hash));
-        Assert.That(
-            WorkerProtocolJson.Validate(CreateResponse(manifest)).Errors
-                .Select(static error => error.Code),
-            Does.Contain("manifest.hash"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(CreateResponse(manifest)),
+            "manifest.hash");
     }
 
     [Test]
@@ -526,18 +524,16 @@ public sealed class ProtocolJsonTests
         }
         manifest.Claims[0].Evidence = WorkerClaimEvidence.DirectClause;
         WorkerProtocolJson.SealManifest(manifest);
-        Assert.That(
-            WorkerProtocolJson.ValidateManifest(manifest).Errors
-                .Select(static error => error.Code),
-            Does.Contain("manifest.claim_shape"));
+        AssertErrorCode(
+            WorkerProtocolJson.ValidateManifest(manifest),
+            "manifest.claim_shape");
 
         manifest.Claims[0].Kind = WorkerClaimKind.Postcondition;
         manifest.Claims[0].Evidence = WorkerClaimEvidence.DirectClause;
         WorkerProtocolJson.SealManifest(manifest);
-        Assert.That(
-            WorkerProtocolJson.ValidateManifest(manifest).Errors
-                .Select(static error => error.Code),
-            Does.Contain("manifest.claim_shape"));
+        AssertErrorCode(
+            WorkerProtocolJson.ValidateManifest(manifest),
+            "manifest.claim_shape");
     }
 
     [Test]
@@ -556,33 +552,29 @@ public sealed class ProtocolJsonTests
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         response.ClaimResults[0].EffectWitness!.Effects =
             WorkerEffectSet.Allocates;
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.effect_witness"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.effect_witness");
         response.ClaimResults[0].EffectWitness = null;
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.effect_witness"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.effect_witness");
         response.ClaimResults[0].EffectWitness =
             CreateEffectWitness(manifest.Claims[0].Location);
         response.ClaimResults[0].EffectCertainty =
             WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.effect_certainty"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.effect_certainty");
         response.ClaimResults[0].Outcome = WorkerClaimOutcome.Proven;
         response.ClaimResults[0].EffectWitness = null;
         response.Summary = CreateSummary(response);
 
         response.ClaimResults[0].EffectCertainty =
             WorkerEffectEvidenceCertainty.IncompleteMayEffectSummary;
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.effect_certainty"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.effect_certainty");
 
         SetUnknown(response, WorkerClaimReason.EffectSummaryIncomplete);
         response.ClaimResults[0].EffectCertainty =
@@ -596,10 +588,9 @@ public sealed class ProtocolJsonTests
 
         response.ClaimResults[0].Reason =
             WorkerClaimReason.EffectContractNotEstablished;
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.effect_certainty"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.effect_certainty");
         response.ClaimResults[0].EffectCertainty =
             WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
         response.Summary = CreateSummary(response);
@@ -697,10 +688,9 @@ public sealed class ProtocolJsonTests
         response.CallableResults[0].Reason =
             WorkerCallableCoverageReason.SemanticUnknown;
         response.Summary = CreateSummary(response);
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.vacuity"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.vacuity");
 
         var effectManifest = CreateEffectManifest();
         response = CreateResponse(effectManifest);
@@ -714,20 +704,18 @@ public sealed class ProtocolJsonTests
             Is.True);
 
         response.ClaimResults[0].ProofCore = [];
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.vacuity_evidence"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.vacuity_evidence");
 
         response.ClaimResults[0].ProofCore = [
             "body:normal-completion"
         ];
         response.ClaimResults[0].Vacuity =
             WorkerVacuityKind.NoModeledNormalReturn;
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.vacuity"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.vacuity");
     }
 
     [Test]
@@ -741,10 +729,9 @@ public sealed class ProtocolJsonTests
         response.ClaimResults[0].ProofCore = [];
         response.Summary = CreateSummary(response);
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.effect_evidence"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.effect_evidence");
 
         response.ClaimResults[0].Vacuity =
             WorkerVacuityKind.ContradictoryPreconditions;
@@ -764,10 +751,9 @@ public sealed class ProtocolJsonTests
         response.ClaimResults[0].ProofCore = ["requires:0"];
         response.Summary = CreateSummary(response);
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.effect_evidence"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.effect_evidence");
     }
 
     [Test]
@@ -778,10 +764,9 @@ public sealed class ProtocolJsonTests
             WorkerEffectEvidenceCertainty.TrustedCompleteBoundary;
         response.Summary = CreateSummary(response);
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.effect_evidence"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.effect_evidence");
 
         foreach (var assumption in response.ClaimResults
                      .SelectMany(static result => result.Assumptions)
@@ -810,10 +795,9 @@ public sealed class ProtocolJsonTests
             WorkerEffectEvidenceCertainty.TrustedCompleteBoundary;
         response.Summary = CreateSummary(response);
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.effect_evidence"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.effect_evidence");
     }
 
     [Test]
@@ -823,10 +807,9 @@ public sealed class ProtocolJsonTests
         response.CallableResults[0].Assumptions[0].Used = true;
         response.Summary = CreateSummary(response);
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.callable_assumption_usage"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.callable_assumption_usage");
     }
 
     [Test]
@@ -837,10 +820,9 @@ public sealed class ProtocolJsonTests
             manifest.Callables[0].Assumptions[0].Id;
         WorkerProtocolJson.SealManifest(manifest);
 
-        Assert.That(
-            WorkerProtocolJson.ValidateManifest(manifest).Errors
-                .Select(static error => error.Code),
-            Does.Contain("manifest.assumption_identity"));
+        AssertErrorCode(
+            WorkerProtocolJson.ValidateManifest(manifest),
+            "manifest.assumption_identity");
     }
 
     [Test]
@@ -853,10 +835,9 @@ public sealed class ProtocolJsonTests
             WorkerAssumptionKind.TrustedBoundary;
         WorkerProtocolJson.SealManifest(manifest);
 
-        Assert.That(
-            WorkerProtocolJson.ValidateManifest(manifest).Errors
-                .Select(static error => error.Code),
-            Does.Contain("manifest.assumption_identity"));
+        AssertErrorCode(
+            WorkerProtocolJson.ValidateManifest(manifest),
+            "manifest.assumption_identity");
     }
 
     [Test]
@@ -867,10 +848,9 @@ public sealed class ProtocolJsonTests
             WorkerAssumptionKind.ApiSpecification;
         WorkerProtocolJson.SealManifest(manifest);
 
-        Assert.That(
-            WorkerProtocolJson.ValidateManifest(manifest).Errors
-                .Select(static error => error.Code),
-            Does.Contain("manifest.assumption_kind"));
+        AssertErrorCode(
+            WorkerProtocolJson.ValidateManifest(manifest),
+            "manifest.assumption_kind");
     }
 
     [Test]
@@ -894,29 +874,26 @@ public sealed class ProtocolJsonTests
             , "response.request_mismatch");
 
         response.ClaimResults = [];
-        Assert.That(
-            WorkerProtocolJson.Validate(response, InputHash, expected).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.claim_set"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response, InputHash, expected),
+            "response.claim_set");
 
         response = CreateResponse(expected);
         response.ClaimResults = [
             response.ClaimResults[0],
             response.ClaimResults[0]
         ];
-        Assert.That(
-            WorkerProtocolJson.Validate(response, InputHash, expected).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.result_claim_id"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response, InputHash, expected),
+            "response.result_claim_id");
 
         response = CreateResponse(expected);
         var other = CreateManifest();
         other.Claims[0].Location.Start++;
         WorkerProtocolJson.SealManifest(other);
-        Assert.That(
-            WorkerProtocolJson.Validate(response, InputHash, other).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.manifest_mismatch"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response, InputHash, other),
+            "response.manifest_mismatch");
         AssertErrorCode(WorkerProtocolJson.Validate(
                     response,
                     new string('b', InputHash.Length),
@@ -1165,10 +1142,9 @@ public sealed class ProtocolJsonTests
         SetUnknown(response, WorkerClaimReason.UnsupportedBody);
         response.Summary = CreateSummary(response);
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.unknown_coverage"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.unknown_coverage");
 
         response.CallableResults[0].Coverage = WorkerCallableCoverage.Incomplete;
         response.CallableResults[0].Reason =
@@ -1186,10 +1162,9 @@ public sealed class ProtocolJsonTests
             WorkerCallableCoverageReason.SemanticUnknown;
         response.Summary = CreateSummary(response);
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.run_projection"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.run_projection");
 
         response.RunStatus = WorkerRunStatus.Failed;
         response.FailureReason = WorkerRunFailureReason.BackendUnavailable;
@@ -1204,19 +1179,17 @@ public sealed class ProtocolJsonTests
         response.CallableResults[0].Reason =
             WorkerCallableCoverageReason.InfrastructureFailure;
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.run_projection"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.run_projection");
 
         response.CallableResults[0].Reason =
             WorkerCallableCoverageReason.MethodTimeout;
         SetUnknown(response, WorkerClaimReason.MethodTimeout);
         response.Summary = CreateSummary(response);
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.run_projection"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.run_projection");
 
         response.RunStatus = WorkerRunStatus.TimedOut;
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -1226,10 +1199,9 @@ public sealed class ProtocolJsonTests
             WorkerCallableCoverageReason.Canceled;
         SetUnknown(response, WorkerClaimReason.Canceled);
         response.Summary = CreateSummary(response);
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.run_projection"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.run_projection");
 
         response.RunStatus = WorkerRunStatus.Canceled;
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
@@ -1568,17 +1540,15 @@ public sealed class ProtocolJsonTests
         })
         {
             response.Errors[0].Code = "worker" + separator + "infrastructure";
-            Assert.That(
-                WorkerProtocolJson.Validate(response).Errors
-                    .Select(static error => error.Code),
-                Does.Contain("response.errors"));
+            AssertErrorCode(
+                WorkerProtocolJson.Validate(response),
+                "response.errors");
 
             response.Errors[0].Code = "worker.infrastructure";
             response.Errors[0].Message = "failure" + separator + "forged";
-            Assert.That(
-                WorkerProtocolJson.Validate(response).Errors
-                    .Select(static error => error.Code),
-                Does.Contain("response.errors"));
+            AssertErrorCode(
+                WorkerProtocolJson.Validate(response),
+                "response.errors");
             response.Errors[0].Message = "failure";
         }
     }
@@ -1612,10 +1582,9 @@ public sealed class ProtocolJsonTests
         Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
 
         used.Kind = WorkerAssumptionKind.TrustedBoundary;
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("summary.assumption_conflict"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "summary.assumption_conflict");
     }
 
     [Test]
@@ -1626,10 +1595,9 @@ public sealed class ProtocolJsonTests
             [.. response.ClaimResults[0].Assumptions.Skip(1)];
         response.Summary = CreateSummary(response);
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.claim_assumption_set"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.claim_assumption_set");
     }
 
     [Test]
@@ -1665,11 +1633,10 @@ public sealed class ProtocolJsonTests
             }
         ];
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-                Does.Contain("summary.totals")
-                .And.Contain("response.claim_payload"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "summary.totals",
+            "response.claim_payload");
     }
 
     [Test]
@@ -1723,11 +1690,10 @@ public sealed class ProtocolJsonTests
         WorkerProtocolJson.SealManifest(manifest);
         var response = CreateResponse(manifest);
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("manifest.dense_ordinals")
-                .And.Contain("manifest.claim_membership"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "manifest.dense_ordinals",
+            "manifest.claim_membership");
     }
 
     [Test]
@@ -1797,18 +1763,15 @@ public sealed class ProtocolJsonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                WorkerProtocolJson.Validate(missingManifest).Errors
-                    .Select(static error => error.Code),
-                Does.Contain("manifest.null"));
-            Assert.That(
-                WorkerProtocolJson.Validate(missingSummary).Errors
-                    .Select(static error => error.Code),
-                Does.Contain("response.summary"));
-            Assert.That(
-                WorkerProtocolJson.Validate(missingAssumptions).Errors
-                    .Select(static error => error.Code),
-                Does.Contain("summary.assumptions"));
+            AssertErrorCode(
+                WorkerProtocolJson.Validate(missingManifest),
+                "manifest.null");
+            AssertErrorCode(
+                WorkerProtocolJson.Validate(missingSummary),
+                "response.summary");
+            AssertErrorCode(
+                WorkerProtocolJson.Validate(missingAssumptions),
+                "summary.assumptions");
             AssertErrorCode(WorkerProtocolJson.Validate(
                         CreateResponse(CreateManifest()),
                         InputHash,
@@ -1885,10 +1848,9 @@ public sealed class ProtocolJsonTests
         response.Summary.ElapsedMilliseconds =
             WorkerExecutionEnvelope.MaximumProducerElapsedMilliseconds + 1;
 
-        Assert.That(
-            WorkerProtocolJson.Validate(response).Errors
-                .Select(static error => error.Code),
-            Does.Contain("response.elapsed_unrepresentable"));
+        AssertErrorCode(
+            WorkerProtocolJson.Validate(response),
+            "response.elapsed_unrepresentable");
     }
 
     [TestCase(101, 300001L)]
@@ -2133,11 +2095,18 @@ public sealed class ProtocolJsonTests
 
     private static void AssertErrorCode(
         WorkerProtocolValidationResult validation,
-        string expected)
+        params string[] expected)
     {
-        Assert.That(
-            validation.Errors.Select(static error => error.Code),
-            Does.Contain(expected));
+        var actual = validation.Errors
+            .Select(static error => error.Code)
+            .ToArray();
+        using (Assert.EnterMultipleScope())
+        {
+            foreach (var code in expected)
+            {
+                Assert.That(actual, Does.Contain(code));
+            }
+        }
     }
 
     private static TimeSpan MeasureCanonicalization(
