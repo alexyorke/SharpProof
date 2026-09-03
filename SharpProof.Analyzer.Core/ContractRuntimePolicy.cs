@@ -34,16 +34,4 @@ internal static class ContractRuntimePolicy
             "contracts; remove it before SharpProof analysis");
     }
 
-    internal static void ThrowIfRuntimeEvaluationEnabled(
-        Compilation compilation,
-        CancellationToken cancellationToken)
-    {
-        if (IsRuntimeEvaluationEnabled(compilation, cancellationToken))
-        {
-            throw new InvalidOperationException(
-                ContractApiMetadata.ConditionalSymbol +
-                " enables runtime evaluation of ghost contracts and is " +
-                "not supported during SharpProof verification.");
-        }
-    }
 }

@@ -18791,3 +18791,8 @@ R1654 is applied: operation and program lowering tests now share
 `FrontendTestHelpers.WrapSubjectMembers` for the nullable `Subject` source
 envelope while retaining separate compilation options and result wrappers.
 `FrontendLoweringTests` pass (37/37) and `ProgramLoweringTests` pass (27/27).
+
+R1655 is applied: the unreferenced `ContractRuntimePolicy.ThrowIfRuntimeEvaluationEnabled`
+wrapper is removed; active analyzer and collector paths continue using the
+shared predicate and configuration diagnostic. `ContractRuntimePolicyTests`
+pass (3/3).
