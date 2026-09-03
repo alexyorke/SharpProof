@@ -93,7 +93,7 @@ public sealed class ReleaseCoverageBaselineTests
                 Does.Contain("tooling coverage"));
             Assert.That(
                 qualification,
-                Does.Contain("tooling package-consumers"));
+                Does.Contain("Download package-consumer qualification evidence"));
             Assert.That(qualification, Does.Contain("tooling release-plan"));
             Assert.That(
                 qualification,

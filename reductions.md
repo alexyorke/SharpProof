@@ -16650,3 +16650,8 @@ coverage run passes (182 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1379 | `New-SharpProofReleaseEvidence` checks `$versions.Count -ne 1` and then invokes `Test-SharpProofReleaseVersionSet` over the same values. The helper already makes every version equal the release authority, which implies one nonempty value; keep one validation boundary and retain the distinct commit-consistency check. | `scripts/New-SharpProofReleaseEvidence.ps1:351-362`; helper `scripts/Get-SharpProofReleaseVersion.ps1:63-77` |
+
+R1373 is applied: `container-verifier` now publishes the package-consumer
+evidence and receipt, and tag qualification downloads them instead of rerunning
+the same exact-package consumer command. The focused release qualification and
+baseline architecture tests pass (16 passed).
