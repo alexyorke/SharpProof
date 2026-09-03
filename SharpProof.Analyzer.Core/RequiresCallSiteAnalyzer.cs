@@ -87,18 +87,29 @@ internal static partial class RequiresCallSiteAnalyzer
                 (arguments.IsDefaultOrEmpty ? null : arguments[0]);
             callSiteSyntax = initializer;
         }
-        if (target == null || initializer != null && origin == null ||
-            arguments.Any(static argument => argument == null))
+        if (target == null || initializer != null && origin == null)
         {
             return AnalyzerSemanticOutcome.Unknown;
         }
+        var validatedArgumentsBuilder =
+            ImmutableArray.CreateBuilder<IArgumentOperation>(arguments.Length);
+        foreach (var argument in arguments)
+        {
+            if (argument is not IArgumentOperation validatedArgument)
+            {
+                return AnalyzerSemanticOutcome.Unknown;
+            }
+
+            validatedArgumentsBuilder.Add(validatedArgument);
+        }
+        var validatedArguments = validatedArgumentsBuilder.MoveToImmutable();
 
         var baseCall = new RequiresCallSiteCandidate(
             origin,
             callSiteSyntax,
             target,
             Instance: null,
-            arguments.OfType<IArgumentOperation>().ToImmutableArray(),
+            validatedArguments,
             ImmutableDictionary<int, IOperation>.Empty,
             ImmutableDictionary<int, long>.Empty,
             CanReplay: true,
@@ -120,7 +131,7 @@ internal static partial class RequiresCallSiteAnalyzer
             semanticModel.Compilation,
             cancellationToken);
         var argumentsMayComplete = true;
-        foreach (var argument in arguments.OfType<IArgumentOperation>())
+        foreach (var argument in validatedArguments)
         {
             foreach (var operation in RequiresCallSiteDiscovery
                          .ExecutableUnflowedDescendantsAndSelf(
