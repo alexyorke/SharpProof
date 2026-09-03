@@ -3314,8 +3314,11 @@ continued in part fifty-four.
 
 ### Status (part sixty-eight)
 
-R512 remains `pending`; R513 shares only return-expression extraction for
-methods and operators, preserving the operator-only harmless-discard policy.
+R512 is applied: global and tree configuration validation now share one
+option/alias/retired-mode iterator, while the global accepted-value and tree
+placement policies remain distinct. R513 shares only return-expression
+extraction for methods and operators, preserving the operator-only harmless-
+discard policy.
 
 ## Second survey, part sixty-nine: R514-R517 - artifact validation and IR traversal seams
 

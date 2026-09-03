@@ -70,35 +70,7 @@ internal sealed class AnalyzerConfiguration
     private static ImmutableArray<InvalidAnalyzerConfigurationValue>
         GetInvalidGlobalConfigurationValues(AnalyzerConfigOptions options)
     {
-        var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
-        foreach (var option in AnalyzerConfigurationOptionRegistry.All)
-        {
-            if (TryGetConflictingAliases(options, option, out var conflict))
-            {
-                builder.Add(new(
-                    option.Key,
-                    conflict,
-                    "configuration aliases disagree; use one effective value"));
-                continue;
-            }
-            if (!TryGet(options, option, out var value) ||
-                AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value))
-            {
-                continue;
-            }
-
-            builder.Add(new(option.Key, value.Trim(),
-                "expected one of: " + string.Join(", ", option.AllowedValues)));
-        }
-        if (TryGetRetiredMode(options, out var retiredMode))
-        {
-            builder.Add(new(
-                "sharpproof_mode",
-                retiredMode.Trim(),
-                "option was removed; use sharpproof_profile and sharpproof_features"));
-        }
-
-        return builder.ToImmutable();
+        return [.. GetInvalidConfigurationValues(options, null, parseValues: true)];
     }
 
     private static bool TryGetConflictingAliases(
@@ -139,19 +111,41 @@ internal sealed class AnalyzerConfiguration
         AnalyzerConfigOptions options,
         AnalyzerConfigOptions? globalOptions = null)
     {
-        var builder = ImmutableArray.CreateBuilder<InvalidAnalyzerConfigurationValue>();
+        return [.. GetInvalidConfigurationValues(options, globalOptions, parseValues: false)];
+    }
+
+    private static IEnumerable<InvalidAnalyzerConfigurationValue>
+        GetInvalidConfigurationValues(
+            AnalyzerConfigOptions options,
+            AnalyzerConfigOptions? globalOptions,
+            bool parseValues)
+    {
         foreach (var option in AnalyzerConfigurationOptionRegistry.All)
         {
             if (TryGetConflictingAliases(options, option, out var conflict))
             {
-                builder.Add(new InvalidAnalyzerConfigurationValue(
+                yield return new InvalidAnalyzerConfigurationValue(
                     option.Key,
                     conflict,
-                    "configuration aliases disagree; use one effective value"));
+                    "configuration aliases disagree; use one effective value");
                 continue;
             }
             if (!TryGet(options, option, out var value))
             {
+                continue;
+            }
+
+            if (parseValues)
+            {
+                if (AnalyzerConfigurationOptionRegistry.IsAcceptedValue(option, value))
+                {
+                    continue;
+                }
+
+                yield return new(
+                    option.Key,
+                    value.Trim(),
+                    "expected one of: " + string.Join(", ", option.AllowedValues));
                 continue;
             }
 
@@ -162,17 +156,18 @@ internal sealed class AnalyzerConfiguration
                 continue;
             }
 
-            builder.Add(new InvalidAnalyzerConfigurationValue(option.Key, value.Trim(),
-                "option is compilation-global; set it in a global AnalyzerConfig or MSBuild property"));
+            yield return new(
+                option.Key,
+                value.Trim(),
+                "option is compilation-global; set it in a global AnalyzerConfig or MSBuild property");
         }
         if (TryGetRetiredMode(options, out var retiredMode))
         {
-            builder.Add(new InvalidAnalyzerConfigurationValue(
+            yield return new InvalidAnalyzerConfigurationValue(
                 "sharpproof_mode",
                 retiredMode.Trim(),
-                "option was removed; use sharpproof_profile and sharpproof_features"));
+                "option was removed; use sharpproof_profile and sharpproof_features");
         }
-        return builder.ToImmutable();
     }
 
     private static bool TryGetRetiredMode(
