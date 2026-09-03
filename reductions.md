@@ -21233,3 +21233,11 @@ R1980 is applied: each file-scoped analyzer relaxation in `.editorconfig` now
 has a nearby rationale describing its host, domain, wire-format, or resource
 ownership contract. The severity settings and their scopes are unchanged; this
 is documentation-only and passes the repository diff/format checks.
+
+## Second survey, continued: R2006 - root .globalconfig retains a removed effect-summary switch
+
+` .globalconfig` still sets `sharpproof_enable_effect_summary_json = false`. The option was introduced with the old packaged EffectSummary JSON artifact switch (`61da4979220d4a55e6186b69ee6fb70e1bf49c86`) and the feature's document facade was later removed (`cc70ff006e308007359b8399c03070eccbf6dbf8`). The current `AnalyzerConfigurationOptionRegistry.All` contains only `sharpproof_profile` and `sharpproof_features`, while an exact repository-wide search finds no reader, test, documentation, or build mapping for this key beyond `.globalconfig:2`. Because `.globalconfig` is global, the inert option is supplied to every analyzer invocation and advertises a configuration surface that cannot change behavior. Remove the stale line (or restore a deliberate reader plus registry/documentation entry if the option is meant to exist); do not conflate it with the live profile and feature settings.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2006 | Root `.globalconfig` supplies the obsolete `sharpproof_enable_effect_summary_json` option with no reader or registry entry; delete the stale global setting or restore its complete option contract. | .globalconfig:1-2; SharpProof.Analyzer.Core/Configuration/AnalyzerConfigurationOptionRegistry.cs:3-20; exact `git grep` census; feature history `61da4979220d` and `cc70ff006e3` |
