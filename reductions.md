@@ -14205,3 +14205,18 @@ distinct setter-effect policy.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1195 | **`ExceptionHandlerReachability` recomputes coalesce-assignment target facts before scheduling children.** The main `ICoalesceAssignmentOperation` case calls `canCompleteNormally(coalesce.Target)` and derives target non-nullness, then `PushChildrenCore` repeats both computations to decide whether to push `coalesce.Value`. Sharing that target projection can remove the duplicate completion/nullness work without changing setter exception handling or target-first order. | `SharpProof.Effects/ExceptionHandlerReachability.cs:437-460,1292-1306` |
+
+## Second survey, part five hundred eighteen: R1196 - compound-assignment prerequisites are replayed
+
+Compound-assignment exception analysis computes target completion and calls
+`AddCompoundCallablePotential` for the in-conversion. That helper includes a
+`canMethodCompleteNormally` check. After all operator and conversion effects
+are considered, `PushChildrenCore` independently asks whether the target
+completes and whether the same in-conversion method completes before it pushes
+the value. The scheduler can consume the existing target/method prerequisite
+facts, retaining its child ordering and null-method handling without replaying
+the completion work.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1196 | **`ExceptionHandlerReachability` rechecks compound-assignment target and in-conversion completion.** The main `ICompoundAssignmentOperation` case computes `targetCompletes` and `inConversionCompletes` through `AddCompoundCallablePotential`, whose method path calls `canMethodCompleteNormally`; `PushChildrenCore` then calls `canCompleteNormally(compound.Target)` and `canMethodCompleteNormally(compound.InConversion.MethodSymbol)` again before pushing the value. A shared prerequisite projection can preserve operator/effect semantics while removing the duplicate checks. | `SharpProof.Effects/ExceptionHandlerReachability.cs:463-485,1306-1316,2810-2828` |
