@@ -13806,3 +13806,19 @@ through a prevalidated target state; retain the nullness and value branch rules.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1174 | **`OperationCompletionEvaluator.CanCompleteCoalesceAssignment` can complete the assignment target twice.** It first validates `assignment.Target`, then the definitely-null branch calls `CanCompleteWriteTarget(assignment.Target)`, which repeats target completion for field, array, ref-return invocation, or property targets. A write-target seam that consumes the already-computed target completion can remove the duplicate while preserving nullness, RHS, and write-specific checks. | `SharpProof.Effects/OperationCompletionEvaluator.cs:801-818,862-901` |
+
+## Second survey, part four hundred ninety-seven: R1175 - switch-value completion is prechecked twice
+
+`CanCompleteSwitchExpression` first calls `CanCompleteNormally` for the switch
+value. When that succeeds, it passes `SwitchExpressionFacts.GetReachableArms`
+the same completion delegate; `GetReachableArms` routes to `GetArms`, whose
+first operation is another `canCompleteNormally(operation.Value)` check.
+Because this is the same evaluator and the same value, every successful switch
+completion check traverses the value twice before arm selection begins. Carry a
+validated-value result into the arm helper, or make the helper accept a
+prevalidated entry point, while preserving the helper's behavior for its other
+callers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1175 | **`OperationCompletionEvaluator.CanCompleteSwitchExpression` validates the switch value twice.** Its explicit `CanCompleteNormally(switchExpression.Value)` guard is immediately followed by `SwitchExpressionFacts.GetReachableArms`, whose `GetArms` implementation invokes the same callback for `operation.Value` before selecting arms. A prevalidated arm-selection entry point can remove the duplicate completion traversal without changing reachability rules. | `SharpProof.Effects/OperationCompletionEvaluator.cs:158-169`; `SharpProof.Effects/SwitchExpressionFacts.cs:92-122` |
