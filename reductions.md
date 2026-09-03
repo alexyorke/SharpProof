@@ -16313,3 +16313,11 @@ also include the writer's required release-json and package-identity scripts.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1353 | **`Generate-CompilerArtifactModel.Get-ParameterSource` appends each validated parameter string with `+=`; use a growable list or pre-sized array to avoid repeated generator-time array copying.** | `scripts/Generate-CompilerArtifactModel.ps1:86-124` |
+
+## Second survey, continued: R1354 - Reuse the immutable cancellation-test method fixture
+
+**`EffectCallGraphCancellationTests` reconstructs the same Roslyn method fixture in both tests.** Each test calls `Methods`, which creates the identical `Sample` compilation and returns the same three ordinally sorted ordinary methods; only the cancellation trigger and graph contents differ. A lazy/static fixture or one-time setup can reuse that immutable symbol array while keeping each test's independent cancellation source, graph, and cancellation boundary.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1354 | **`EffectCallGraphCancellationTests` calls `Methods()` twice even though it creates the same immutable compilation and method-symbol array; share that fixture while retaining per-test cancellation state.** | `SharpProof.Effects.Test/EffectCallGraphCancellationTests.cs:7-15,23-45,53-67` |
