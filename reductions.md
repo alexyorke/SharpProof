@@ -18729,3 +18729,8 @@ R1641 is applied: the two generic closed-form cache-order cases now reuse one
 immutable Roslyn compilation while retaining independent providers, caches,
 and method-order assertions. `CompilerRelationalSummaryProviderTests` pass
 (3/3).
+
+R1642 is applied: the two metadata-signature cases now reuse one immutable
+emitted-target reference and consumer compilation while retaining per-case
+method selection and binding assertions. `ContractForMetadataSignatureTests`
+pass (2/2).

@@ -13,10 +13,29 @@ namespace SharpProof.Contracts.Test;
 [TestFixture]
 public sealed class ContractForMetadataSignatureTests
 {
+    private static readonly CSharpCompilation CompoundMetadataCompilation =
+        CreateCompoundMetadataCompilation();
+
     [TestCase("ReadBounds")]
     [TestCase("ReadModified")]
     public void CompoundMetadataSignatureIdentityMustMatchExactly(
         string methodName)
+    {
+        var compilation = CompoundMetadataCompilation;
+        var target = compilation.GetTypeByMetadataName("MetadataTarget")!
+            .GetMembers(methodName)
+            .OfType<IMethodSymbol>()
+            .Single();
+
+        var result = new ContractBinder(compilation, new IrFactory())
+            .Bind(target);
+
+        Assert.That(
+            result.Failure,
+            Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
+    }
+
+    private static CSharpCompilation CreateCompoundMetadataCompilation()
     {
         var targetReference = MetadataReference.CreateFromImage(
             CreateMetadataTarget());
@@ -52,17 +71,7 @@ public sealed class ContractForMetadataSignatureTests
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
         TestCompilation.AssertNoErrors(compilation);
-        var target = compilation.GetTypeByMetadataName("MetadataTarget")!
-            .GetMembers(methodName)
-            .OfType<IMethodSymbol>()
-            .Single();
-
-        var result = new ContractBinder(compilation, new IrFactory())
-            .Bind(target);
-
-        Assert.That(
-            result.Failure,
-            Is.EqualTo(ContractBindingFailure.CompanionSignatureMismatch));
+        return compilation;
     }
 
     private static ImmutableArray<byte> CreateMetadataTarget()
