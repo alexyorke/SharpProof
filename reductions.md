@@ -15003,3 +15003,27 @@ initializer effects tests pass (2 and 1 passed, respectively).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1244 | **`ExternalEffectResolver` projects the same contract-region catalog separately for reads and writes.** The two adjacent `ToAnalysisRegions` calls repeat the catalog traversal and parameter expansion for one contract. A paired read/write projection can accumulate both outputs in one pass without changing the individual mapping API or region semantics. | `SharpProof.Effects/ExternalEffectResolver.cs:245-246`; `SharpProof.Effects/EffectContractMappings.cs:81-107` |
+
+## Second survey, part five hundred sixty-seven: R1245 - exact dispatch is recomputed between discovery and analysis
+
+`RequiresCallSiteDiscovery` resolves an exact target from the call's receiver before deciding whether the call has a potential precondition, but `CreateCandidate` stores the original target and receiver. When that candidate reaches `RequiresCallSiteAnalyzer.AnalyzeCallSite`, the analyzer invokes `ResolveExactTarget` again with the same target and instance before binding contracts. For candidates that survive discovery, carrying the resolved target in the candidate or in a discovery-side projection can remove the second receiver/type hierarchy walk while preserving the filter's dispatch semantics and the analyzer's later target checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1245 | **`RequiresCallSite` resolves exact virtual/interface dispatch twice for accepted calls.** Discovery computes `ResolveExactTarget` for precondition admission, then `CreateCandidate` retains the unresolved `call.TargetMethod`; analysis recomputes the same target from the unchanged instance before binding. Carry the resolved target across the candidate boundary to avoid the duplicate dispatch walk. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:59-78,314-331`; `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:302-327`; `SharpProof.Analyzer.Core/RequiresCallSiteDispatch.cs:5-47` |
+
+## Second survey, part five hundred sixty-eight: R1246 - formatted interpolation facts are resolved twice in one scan
+
+`OperationEffectScanner.ScanInterpolatedString` first calls `ResolveFormattedValue` for an interpolation expression and immediately calls `CanFormattedValueCompleteNormally` with the same expression, origin, compilation, and abstract-flow instance. Both resolver paths independently unwrap implicit conversions, test string/null/abstract-null cases, derive the receiver type, and resolve the formatting target and dispatch policy. A shared formatted-value projection can feed the effect summary and the completion check while leaving the call resolver and completion evaluator as separate consumers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1246 | **`ScanInterpolatedString` recomputes formatted-value resolution for the same operand.** The effect and completion calls use identical inputs back-to-back, and each reaches `ResolveFormattedValueCall` plus its conversion/nullness/type-resolution work. Threading one resolved fact through both consumers removes the duplicate operation walk without changing formatting effects or normal-completion policy. | `SharpProof.Effects/OperationEffectScanner.Expressions.cs:726-742`; `SharpProof.Effects/StringConcatenationEffectResolver.cs:110-174,198-233` |
+
+## Second survey, part five hundred sixty-nine: R1247 - reserve descriptors are closed again after early failure
+
+`VerifierProcessSupervisor.Run` initializes a fixed reserve array and, if opening or probing one descriptor fails, explicitly calls `CloseDescriptors(cleanupDescriptorReserves)` before returning. The enclosing `finally` then calls `CloseDescriptors(cleanupDescriptorReserves)` unconditionally, while the array still contains the descriptors that the early branch closed. The early path therefore performs duplicate native closes; ownership can be transferred to `finally` or the entries can be invalidated after the early cleanup so a later descriptor reuse cannot be affected by a stale handle.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1247 | **`VerifierProcessSupervisor.Run` double-closes reserve descriptors on acquisition failure.** The descriptor-probe failure path closes the shared reserve array and returns, but `finally` closes the same non-invalidated entries again. Make one scope own that cleanup or clear the entries after the early close while retaining the failure result. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:39-56,152-155` |
