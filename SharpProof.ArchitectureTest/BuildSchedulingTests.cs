@@ -840,6 +840,10 @@ public sealed class BuildSchedulingTests
             root,
             "scripts",
             "Invoke-SharpProofSemanticTests.ps1"));
+        var execution = File.ReadAllText(Path.Combine(
+            root,
+            "scripts",
+            "SharpProof.ContainerExecution.psm1"));
         var roster = Regex.Match(
             semantic,
             @"(?s)\$architectureFixtures\s*=\s*@\((?<body>.*?)\)");
@@ -874,9 +878,11 @@ public sealed class BuildSchedulingTests
                 Does.Contain("FullyQualifiedName!~"));
             Assert.That(semantic,
                 Does.Contain("Slots = $mainParallelism"));
-            Assert.That(semantic,
-                Does.Contain("$availableSlots = $parallelism - $activeSlots"));
-            Assert.That(semantic, Does.Contain("$pending.Remove($task)"));
+            Assert.That(execution,
+                Does.Contain("$availableSlots = $Parallelism - $activeSlots"));
+            Assert.That(execution, Does.Contain("$pending.Remove($next)"));
+            Assert.That(execution,
+                Does.Contain("Invoke-SharpProofParallelDotnetTests"));
             Assert.That(semantic,
                 Does.Contain("$architectureFixtureSlots"));
             Assert.That(semantic,
