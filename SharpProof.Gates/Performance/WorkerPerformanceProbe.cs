@@ -281,7 +281,7 @@ internal static class WorkerPerformanceProbe
         }
         catch
         {
-            TryKill(process);
+            GateProcess.KillTree(process);
             throw;
         }
     }
@@ -369,7 +369,7 @@ internal static class WorkerPerformanceProbe
         }
         catch
         {
-            TryKill(process);
+            GateProcess.KillTree(process);
             throw;
         }
         return new ProcessResult(
@@ -505,20 +505,6 @@ internal static class WorkerPerformanceProbe
         string value)
     {
         startInfo.ArgumentList.Add(value);
-    }
-
-    private static void TryKill(Process process)
-    {
-        try
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-            }
-        }
-        catch (InvalidOperationException)
-        {
-        }
     }
 
     private sealed class CancellationProbeBackend : ISmtBackend

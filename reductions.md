@@ -197,6 +197,7 @@ the smallest relevant containerized test target passes.
 | R901 | Materialize canonical manifest target ordering once | `SharpProof.Worker.Test`: ClaimManifestBuilderTests passed |
 | R965 | Import root build defaults from samples and pilots, retaining fixture overrides | `SharpProof.ArchitectureTest`: focused build-policy tests; samples and pilots validation passed |
 | R940 | Cache analyzer supported-diagnostic arrays | `SharpProof.Analyzer.Test`: 55; `SharpProof.Package.Test`: 6 compiler-probe tests passed |
+| R958 | Reuse `GateProcess.KillTree` from Worker performance cleanup paths | `SharpProof.Gates.Test`: forced-termination deadline test passed |
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
@@ -9108,12 +9109,10 @@ than applied.
 
 ### Status (part one hundred eighty-one)
 
-R958 is `pending`. The `TryKill` half is a deletion - one private helper
-replaced by the shared `GateProcess.KillTree` already used three times in the same
-assembly. The exception-list half is a decision that should be made once and
-applied to all four copies, because they are the last cleanup step before a real
-failure is reported, and three of the four currently let a secondary failure hide
-the primary one.
+R958 is `applied` for the `TryKill` half: both Worker performance cleanup paths
+now call the existing `GateProcess.KillTree`, and the duplicate private helper is
+gone. The exception-list half remains intentionally unchanged because its
+cross-component cleanup semantics need a separate decision and test matrix.
 
 ## Second survey, part one hundred eighty-three: R959 - per-claim target-variable rescans
 
