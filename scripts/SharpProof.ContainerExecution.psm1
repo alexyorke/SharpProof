@@ -618,20 +618,17 @@ function Invoke-SharpProofParallelDotnetBuilds {
                     SharedCompilationId = $sharedCompilationId
                     'MSBUILDDISABLENODEREUSE' = '1'
                 }
-            $process = [Diagnostics.Process]::new()
-            $process.StartInfo = $startInfo
-            if (-not $process.Start()) {
-                $process.Dispose()
-                throw "Could not start build $name."
-            }
+            $started = Start-SharpProofParallelProcess `
+                -StartInfo $startInfo `
+                -FailureMessage "Could not start build $name."
             $running.Add([pscustomobject]@{
                 Name = $name
                 Arguments = $effectiveArguments
                 SharedCompilationId = $sharedCompilationId
-                Process = $process
-                StartedUtc = $process.StartTime.ToUniversalTime()
-                StandardOutput = $process.StandardOutput.ReadToEndAsync()
-                StandardError = $process.StandardError.ReadToEndAsync()
+                Process = $started.Process
+                StartedUtc = $started.StartedUtc
+                StandardOutput = $started.StandardOutput
+                StandardError = $started.StandardError
             })
         }
 
@@ -680,11 +677,7 @@ function Invoke-SharpProofParallelDotnetBuilds {
     }
     finally {
         foreach ($active in $running) {
-            if (-not $active.Process.HasExited) {
-                $active.Process.Kill($true)
-                $active.Process.WaitForExit()
-            }
-            $active.Process.Dispose()
+            Stop-SharpProofParallelProcess -Process $active.Process
         }
     }
 }
@@ -776,19 +769,16 @@ function Invoke-SharpProofParallelDotnetTests {
                     else {
                         $null
                     })
-                $process = [Diagnostics.Process]::new()
-                $process.StartInfo = $startInfo
-                if (-not $process.Start()) {
-                    $process.Dispose()
-                    throw "Could not start $Label '$($test.Name)'."
-                }
+                $started = Start-SharpProofParallelProcess `
+                    -StartInfo $startInfo `
+                    -FailureMessage "Could not start $Label '$($test.Name)'."
                 $running.Add([pscustomobject]@{
                     Test = $test
                     Slots = $next.Slots
-                    Process = $process
-                    StartedUtc = $process.StartTime.ToUniversalTime()
-                    StandardOutput = $process.StandardOutput.ReadToEndAsync()
-                    StandardError = $process.StandardError.ReadToEndAsync()
+                    Process = $started.Process
+                    StartedUtc = $started.StartedUtc
+                    StandardOutput = $started.StandardOutput
+                    StandardError = $started.StandardError
                 })
                 $activeSlots += $next.Slots
             }
@@ -837,17 +827,13 @@ function Invoke-SharpProofParallelDotnetTests {
                 })
                 [void]$running.Remove($active)
                 $activeSlots -= $active.Slots
-                $active.Process.Dispose()
+                Stop-SharpProofParallelProcess -Process $active.Process
             }
         }
     }
     finally {
         foreach ($active in @($running)) {
-            if (-not $active.Process.HasExited) {
-                $active.Process.Kill($true)
-                $active.Process.WaitForExit()
-            }
-            $active.Process.Dispose()
+            Stop-SharpProofParallelProcess -Process $active.Process
         }
     }
 
@@ -888,6 +874,44 @@ function New-SharpProofParallelProcessStartInfo {
         [void]$startInfo.ArgumentList.Add($argument)
     }
     return $startInfo
+}
+
+function Start-SharpProofParallelProcess {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [Diagnostics.ProcessStartInfo]$StartInfo,
+
+        [Parameter(Mandatory = $true)]
+        [string]$FailureMessage
+    )
+
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $StartInfo
+    if (-not $process.Start()) {
+        $process.Dispose()
+        throw $FailureMessage
+    }
+    return [pscustomobject]@{
+        Process = $process
+        StartedUtc = $process.StartTime.ToUniversalTime()
+        StandardOutput = $process.StandardOutput.ReadToEndAsync()
+        StandardError = $process.StandardError.ReadToEndAsync()
+    }
+}
+
+function Stop-SharpProofParallelProcess {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [Diagnostics.Process]$Process
+    )
+
+    if (-not $Process.HasExited) {
+        $Process.Kill($true)
+        $Process.WaitForExit()
+    }
+    $Process.Dispose()
 }
 
 function New-SharpProofCoverageContext {
