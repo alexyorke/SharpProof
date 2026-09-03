@@ -638,7 +638,8 @@ internal static class Program
                     File.Copy(member.Path, backup);
                     backups.Add(member.Path, backup);
                 }
-                catch (IOException or UnauthorizedAccessException)
+                catch (Exception exception) when (
+                    exception is IOException or UnauthorizedAccessException)
                 {
                     AtomicFile.TryDeleteStaged(backup);
                     throw;
