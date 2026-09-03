@@ -13714,3 +13714,20 @@ retaining conservative recomputation when a cycle or depth boundary is active.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1169 | **`ConversionOwnershipClassifier.BuildLocalRegions` re-runs method-level ref-alias analysis on every fixed-point pass.** The invocation, setter, and getter branches call `MethodMayIntroduceUnknownRefAlias` inside `while (changed)`, and that helper reparses and recursively walks each target method from scratch. Memoizing only completed, context-independent method results can preserve the active-method cycle and maximum-depth fallbacks while avoiding repeated compilation/tree work across call sites and region iterations. | `SharpProof.Effects/ConversionOwnershipClassifier.cs:238-421,666-729` |
+
+## Second survey, part four hundred ninety-two: R1170 - call arguments projected by several independent passes
+
+The call-scanning boundary derives several facts from the same immutable
+argument collection independently. `ScanCallStep` enumerates argument values
+to scan their effects, while its callers separately build ownership regions
+with `ClassifyArguments` and ordinal actual arguments with
+`AlignActualArguments`. Construction paths add a fourth pass: the creation's
+arguments are passed to `Resolve`, which runs `ExpandedParamsEvidence` to find
+param-array expansion. These projections have different semantics, but a
+single argument-facts snapshot can produce all of them while preserving
+out-argument exclusion, invalid-ordinal fail-closed regions, parameter
+overwrites, and construction-specific implicit-layer handling.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1170 | **`OperationEffectScanner` projects one call's arguments through three or four independent enumerations.** Invocation and property calls scan values, classify regions, and align actual arguments in separate passes; object creation and external-exception construction also enumerate the same creation arguments for expanded-param-array evidence inside `EffectCallSiteResolver`. A shared argument-facts projection can retain those distinct outputs and fail-closed rules while removing repeated argument-list traversal; this is broader than R942's mutable-to-immutable alignment allocation and separate from R391's summary-join arrays. | `SharpProof.Effects/OperationEffectScanner.cs:406-409,638-724,778-815,880-898,1584-1601`; `SharpProof.Effects/EffectCallSiteResolver.cs:39-66,89-145,189-196` |
