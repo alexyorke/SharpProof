@@ -21166,3 +21166,11 @@ tests pass 7/7 with zero warnings or errors.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2002 | Invoke-SharpProofMainPackagePreflight performs a full GET into a temporary file even though it uses only the HTTP status and immediately deletes the body. | scripts/SharpProof.PublicationDestination.ps1:333-369; scripts/Publish-SharpProofRelease.ps1:493-522 |
+
+## Second survey, continued: R2003 - Test-SharpProofReleaseArtifacts rescans names after exact bundle topology validation
+
+`Test-SharpProofReleaseArtifacts` first calls `Test-SharpProofReleaseBundleTopology`, whose `Test-SharpProofExactRegularFileSet` walk proves that the directory contains exactly `SharpProof.release.json` plus every manifest artifact filename. It then builds `$expectedNames` and rescans the directory for `.nupkg`/`.snupkg` names solely to compare that same membership. The second pass adds one distinct semantic - artifact filenames must use package extensions - but no additional name-set check. Replace the full rescan with direct extension checks over the already-loaded artifact rows, or make the topology helper enforce the extension rule while retaining the separate manifest, byte, package-ID, and payload assertions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2003 | Test-SharpProofReleaseArtifacts repeats the exact artifact-name scan after the shared bundle-topology helper, adding only extension validation. | scripts/Test-SharpProofReleaseArtifacts.ps1:63-101; scripts/SharpProof.ReleaseBundle.ps1:52-73 |
