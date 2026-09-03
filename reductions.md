@@ -19081,3 +19081,7 @@ wire vocabulary for fixture mapping and concurrent result counts. The affected
 R1671 is applied: the allocation-only replay tests now share one sealed
 unknown-result assertion helper, while the forged-response authority scenario
 remains explicit. `EffectCounterexampleReplayTests` passes (31/31).
+
+R1674 is applied: the compiler-manifest authority test now reuses one evidence
+mutation action for both independent source artifacts. The focused
+`CompilerManifestArtifactTests` class passes (91/91).

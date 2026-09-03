@@ -1066,32 +1066,21 @@ public sealed class CompilerManifestArtifactTests
         Assert.That(unknownEvidence.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
         Assert.That(unknownEvidence.Reason, Is.EqualTo(WorkerClaimReason.EffectSummaryIncomplete));
 
-        Action<CompilerEffectClaimArtifact>[] transitions =
-        [
-            evidence =>
-            {
-                evidence.Outcome = WorkerClaimOutcome.Proven;
-                evidence.Reason = WorkerClaimReason.None;
-                evidence.Certainty = WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
-                evidence.Witness = null;
-                evidence.Replay = null;
-            },
-            evidence =>
-            {
-                evidence.Outcome = WorkerClaimOutcome.Proven;
-                evidence.Reason = WorkerClaimReason.None;
-                evidence.Certainty = WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
-                evidence.Witness = null;
-                evidence.Replay = null;
-            }
-        ];
+        Action<CompilerEffectClaimArtifact> transition = static evidence =>
+        {
+            evidence.Outcome = WorkerClaimOutcome.Proven;
+            evidence.Reason = WorkerClaimReason.None;
+            evidence.Certainty =
+                WorkerEffectEvidenceCertainty.CompleteMayEffectSummary;
+            evidence.Witness = null;
+            evidence.Replay = null;
+        };
 
         var transitionSources = new[] { refuted, unknown };
-        for (var index = 0; index < transitions.Length; index++)
+        foreach (var source in transitionSources)
         {
-            var artifact = CloneArtifact(transitionSources[index]);
-            transitions[index](
-                artifact.Callables.Single().EffectClaims.Single());
+            var artifact = CloneArtifact(source);
+            transition(artifact.Callables.Single().EffectClaims.Single());
             CompilerEffectClaimArtifactCodec.Seal(
                 artifact.Callables.Single().EffectClaims.Single());
 
