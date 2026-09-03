@@ -14670,6 +14670,12 @@ tests pass (44 passed).
 |---|---|---|
 | R1216 | **`AcyclicBlockPredicateExecutor.ApplySpec` repeats the target result-type lookup.** The same target variable info is queried for `IsResultType` and then for `factory.CreateVariable`; caching the type after the target-presence guard removes duplicate factory-table access while preserving the validation and synthetic-result type. | `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:348-355,393-397` |
 
+### Status (part five hundred thirty-eight)
+
+R1216 is applied: specification-call validation caches the target result type
+and reuses it for the synthetic result variable. Acyclic block predicate tests
+pass (14 passed).
+
 ## Second survey, part five hundred thirty-nine: R1217 - spec projection presence is tested three times
 
 `AcyclicBlockPredicateExecutor.ApplySpec` checks the same `projection != default` state when detecting a conflicting prior projection, when constructing the projection map, and when storing the new projection. The operations after `TryCreate` do not alter `projection`, so a `hasProjection` local can preserve the conflict, rewrite, and registration branches while removing repeated default-value comparisons.
