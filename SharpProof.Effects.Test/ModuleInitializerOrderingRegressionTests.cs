@@ -4,11 +4,13 @@ namespace SharpProof.Effects.Test;
 public sealed class ModuleInitializerOrderingRegressionTests
 {
     private static readonly string[] FirstExceptionOnly = ["FirstException"];
+    private static readonly CSharpCompilation TerminalCompilation =
+        CreateTerminalCompilation();
 
     [Test]
     public void TerminalInitializerSuppressesLaterInitializerAndEntryEffects()
     {
-        var compilation = CreateTerminalCompilation();
+        var compilation = TerminalCompilation;
         var session = new EffectAnalysisSession(compilation);
 
         var first = session.Analyze(EffectTestHost.RequireMethod(
@@ -87,7 +89,7 @@ public sealed class ModuleInitializerOrderingRegressionTests
     [Test]
     public void AnalyzeAllUsesTheSameOrderedTerminalInitializerPrefix()
     {
-        var compilation = CreateTerminalCompilation();
+        var compilation = TerminalCompilation;
 
         var results = new EffectAnalysisSession(compilation).AnalyzeAll();
 

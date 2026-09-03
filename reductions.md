@@ -18628,3 +18628,10 @@ now one shared `eng/testing/TestCompilation.cs`, with the existing project
 specific overload behavior preserved and both projects linked through the common
 test item group. `SharpProof.Contracts.Test` passes (142/142) and
 `SharpProof.Worker.Test` passes (695/695).
+
+R1600 is deferred: renaming regression files from development-wave labels is
+organizational cleanup, not a code reduction, and is left unchanged.
+
+R1601 is applied: the two terminal-module-initializer tests now share one
+immutable two-tree compilation while retaining separate analysis sessions and
+query paths. `ModuleInitializerOrderingRegressionTests` pass (3/3).
