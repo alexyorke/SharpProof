@@ -122,11 +122,10 @@ public sealed class PostconditionObligationBuilderTests
             IrBinaryOperator.GreaterThanOrEqual, factory.Variable(value),
             factory.Integer(0));
         var assumptions = ImmutableArray.CreateBuilder<Assumption>();
-        assumptions.Add((Assumption)typeof(Assumption)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single()
-            .Invoke([factory, predicate,
-                new UserAssumedJustification(new SourceLocationId(1))]));
+        assumptions.Add(CreateAssumption(
+            factory,
+            predicate,
+            new UserAssumedJustification(new SourceLocationId(1))));
         var labels = new Dictionary<ProofJustification, string>();
         var entry = ImmutableArray.CreateBuilder<Assumption>();
 
@@ -158,10 +157,10 @@ public sealed class PostconditionObligationBuilderTests
             new LoweredJustification(factory.CreateOperation(
                 "source-domain:result"));
         var assumptions = ImmutableArray.CreateBuilder<Assumption>();
-        assumptions.Add((Assumption)typeof(Assumption)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single()
-            .Invoke([factory, predicate, resultDomainJustification]));
+        assumptions.Add(CreateAssumption(
+            factory,
+            predicate,
+            resultDomainJustification));
         var labels = new Dictionary<ProofJustification, string>
         {
             [resultDomainJustification] = "domain:result"
@@ -249,5 +248,16 @@ public sealed class PostconditionObligationBuilderTests
             Assert.That(entryDomainAssumptions, Is.Empty);
             Assert.That(labels.Values, Is.EqualTo(["domain:result"]));
         }
+    }
+
+    private static Assumption CreateAssumption(
+        IrFactory factory,
+        IrTerm predicate,
+        ProofJustification justification)
+    {
+        return (Assumption)typeof(Assumption)
+            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Single()
+            .Invoke([factory, predicate, justification]);
     }
 }

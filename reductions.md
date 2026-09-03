@@ -10791,6 +10791,8 @@ R1023 is applied: the later module-initializer and entry-point results now share
 
 R1024 is deferred: centralize only the test-side constructor access, and keep the two justification policies and their assertions independent.
 
+R1024 is applied: the two postcondition-obligation tests now use one helper for non-public `Assumption` constructor access while retaining their distinct justifications and assertions. `PostconditionObligationBuilderTests` pass (5/5).
+
 ## Second survey, part two hundred fifty-six: R1025 - redundant namespace-member immutable conversion
 
 `INamespaceSymbol.GetNamespaceMembers()` already returns an `ImmutableArray<INamespaceSymbol>`. `ReferencedTypeSymbols.GetAll` immediately calls `ToImmutableArray()` on that result and then uses only the array's `Length` and indexer to push members in reverse order. The conversion therefore re-enumerates and copies an API-owned immutable array without changing the traversal contract; removing it preserves the current ordering and cancellation behavior while eliminating an unnecessary materialization.
