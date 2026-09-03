@@ -10517,3 +10517,15 @@ The acceptance verifier first runs `Generate-CompilerArtifactModel.ps1 -Verify` 
 ### Status (part two hundred thirty-five)
 
 R1004 is deferred: preserve the script's standalone canonical smoke test, and only bypass it when an explicit acceptance caller has already verified the checked-in compiler-artifact outputs.
+
+## Second survey, part two hundred thirty-six: R1005 - repeated physical-prefix walks in contained-path validation
+
+`Resolve-SharpProofContainedPath` performs a lexical child check and then resolves physical containment. The physical phase calls `Resolve-SharpProofPhysicalPath` once for the selected containment root and once for the candidate path. For the ordinary non-redirected case, the candidate walk reopens and resolves every existing component of the same root prefix that the first walk just visited; for the known `artifacts` redirect, the two walks still share their filesystem prefix before diverging at the redirect. Both final identities must remain independently derived because the candidate may contain a reparse point and the helper is a trust boundary. A per-call component cache, or a physical-walk result that carries reusable ancestor identities, can remove the repeated prefix I/O without collapsing lexical and physical checks or weakening unresolved-link handling.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1005 | **Contained-path validation physically traverses the shared root prefix twice.** Each `Resolve-SharpProofContainedPath` call resolves `rootForContainment` and `canonicalPath` through separate `Resolve-SharpProofPhysicalPath` walks; the second walk repeats the existing root components before checking the candidate's remaining components. Preserve the two independently derived final paths and reparse-point checks, but consider sharing validated ancestor identities within one call to reduce repeated filesystem inspection across the helper's many script callers. | `scripts/Resolve-SharpProofContainedPath.ps1:1-48,99-122`; callers across `scripts/*.ps1` and `eng/acceptance/Verify.ps1` | |
+
+### Status (part two hundred thirty-six)
+
+R1005 is deferred: physical containment is security-sensitive; only cache proven path-prefix observations within one validation call, and retain independent candidate resolution and fail-closed link handling.
