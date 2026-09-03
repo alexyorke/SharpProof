@@ -20929,3 +20929,10 @@ R1986 is applied: the three analyzer entry points now share
 early-return branch, while retaining their distinct rejection detection and
 ordering. The full `SharpProof.Analyzer.Test` project passes 476/476 tests with
 zero warnings or errors.
+
+R1780 is partially applied: fourteen `RequiresAndControlTests` cases now leave
+diagnostics at the catalog defaults instead of suppressing every ID except
+`SP0027`; their exact `AssertIds` expectations therefore observe newly emitted
+diagnostics as well. The focused `RequiresAndControlTests` suite passes 92/92
+tests with zero warnings or errors. Cases that assert emptiness or intentionally
+need unrelated diagnostics filtered remain unchanged for the next batch.
