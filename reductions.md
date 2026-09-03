@@ -9823,3 +9823,54 @@ effect scanner with the two operation-valued trackers already recorded there.
 R979 is `deferred`: the candidate is limited to the reusable ambiguous-capture
 table. Creation provenance and operation-reference-chain resolution remain
 separate because their soundness conditions are not identical.
+
+## Second survey, part two hundred ten: R980-R981 - generated staleness is not a pull-request gate
+
+Tracing where each of the fifteen generators' `-Verify` mode is actually invoked,
+and which pipeline commands reach it.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R980 | **Generated-file staleness is checked for fourteen of the fifteen generators only by the `acceptance` command, which pull requests do not run.** `eng/acceptance/Verify.ps1:249-261,271` invokes fourteen generators with `-Verify`, and `scripts/Generate-ApiSpecCatalog.ps1:1225-1228` forwards `-Verify:$Verify` to the fifteenth, so **all fifteen are covered by that one file**. But `acceptance` is reached only by the `nightly` composite (`Invoke-SharpProofContainer.ps1:135-140`) and by `.github/workflows/package-consumers.yml:150,155`, the release-qualification workflow. **`.github/workflows/ci.yml:34` runs exactly one command - `docker compose run --rm tooling pr`** - which expands to `pr-gates`, and `pr-gates` (`:244-266`) runs the container contract, the solution build, performance gate evidence, one `Gates.Test` filter, semantic tests and package tests. It never invokes `acceptance` and never passes `-Verify` to any generator. **Exactly one generator escapes this** because it has independent test coverage: `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:67` `CheckedInGeneratedOutputsAreCurrent` and `:134` `VerificationRejectsStaleGeneratedOutput` run in the ordinary test suite, so `Generate-ApiSpecCatalog` and its delegated witnesses are checked on every pull request. The other **fourteen generators and the ~39 files they own are not**. A pull request that edits `SharpProof.DeclarativeModels.catalog.json`, `IrModel.schema.json`, `ProtocolModel.schema.json` or `CompilerArtifactModel.schema.json` without regenerating passes CI and is caught only at nightly or at release qualification - after review, and in a lane whose failure is far more expensive to diagnose. The pattern `DefaultApiSpecCatalogGenerationTests` demonstrates is the fix, and it already exists in the repository for one of fifteen. | `.github/workflows/ci.yml:34`; `scripts/Invoke-SharpProofContainer.ps1:135-140,244-266`; `eng/acceptance/Verify.ps1:249-261,271`; `scripts/Generate-ApiSpecCatalog.ps1:1225-1228`; `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:67,134`; `.github/workflows/package-consumers.yml:148-155` |
+| R981 | **Ten consecutive statements in the acceptance gate are indented four spaces inside no block, which reads as a conditional that is not there.** `eng/acceptance/Verify.ps1:247-261` runs a contiguous run of top-level calls. Lines 247-248 (`Test-SharpProofContainerContract.ps1`, `Test-SharpProofReadme.ps1`) are unindented; lines **249-258** - the ten `Generate-*.ps1 -Verify` calls - are indented four spaces; lines **259-261** - three more `-Verify` calls of exactly the same kind - are unindented again. There is no enclosing `if`, `foreach`, or `try`: a byte-level check confirms leading spaces with no opening brace anywhere above them. The indentation suggests the ten staleness checks are conditional while the other four are unconditional, which is the opposite of harmless in the file that is this repository's acceptance authority and the subject of a deliberate two-person-rule convention recorded elsewhere in this ledger. | `eng/acceptance/Verify.ps1:247-261` |
+
+### Checked and not proposed (part two hundred ten)
+
+- **The fifteenth generator is correctly verified and my hypothesis that it was not
+  is wrong.** `SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1` does not
+  appear in `Verify.ps1`, which suggested it might be regenerated rather than
+  verified during an acceptance run. It is not:
+  `Generate-ApiSpecCatalog.ps1:1225-1228` invokes it with `-Verify:$Verify`, so the
+  switch propagates and the witnesses file is compared, not rewritten. Recorded so
+  the hypothesis is not re-derived.
+- **All fifteen generators implement `-Verify`**, each with an `[Alias('Check')]`
+  switch and a `Verified`/`Generated` verb in their completion message. There is no
+  generator lacking the mode; R980 is about invocation, not capability.
+- `SharpProof.ArchitectureTest/GeneratedFileHelperTests.cs` tests the *mechanism* -
+  that `-Verify` rejects CRLF byte drift, and that updates use atomic
+  same-directory replacement - rather than any particular generated file's
+  currency. It is the right test for what it covers and does not close R980.
+
+### Status (part two hundred ten)
+
+R980 is `pending` and is the most consequential gate-coverage gap found in this
+survey, alongside R967. The fix needs no new mechanism: fourteen tests shaped like
+`CheckedInGeneratedOutputsAreCurrent`, or one data-driven test over the generator
+list, would move staleness detection from the nightly lane into the pull-request
+lane where the edit is made. R981 is `pending`, is one indentation change, and
+is worth doing at the same time because it is in the same fifteen lines.
+
+## Second survey, part two hundred eleven: R982 - a parallel recursive IR rewriter
+
+A comparison of Worker projection rewriting with the canonical IR substitution
+path found a second traversal and memoization engine.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R982 | **`SpecResultDomainProjection.Rewrite` reimplements a recursive, memoized composite-term rewriter beside the canonical explicit-stack IR traversal.** It creates its own `Dictionary<IrId, IrTerm>`, recursively visits unary, binary, conditional, cast, and length children, and reconstructs each parent through `IrFactory`; `IrSubstitution` already routes the same DAG rewrite shape through `IrTraversal.FoldBottomUp`, which centralizes child enumeration, memo handling, opaque receivers/arguments, sequence-access children, and the repository's no-recursion safety boundary. The projection pass cannot be replaced by plain variable substitution because it has domain-specific equality and length-proxy rewrites, so those hooks should remain local. The reusable seam is the traversal/rebuild skeleton: a generic bottom-up rewrite callback would let projection supply its special cases while removing a second recursive walk and avoiding the current `_ => term` fallback, which silently skips projections nested under `IrOpaqueTerm` or `IrSequenceAccessTerm`. | `SharpProof.Worker/SpecResultDomainProjection.cs:91-148`; canonical bottom-up traversal `SharpProof.Ir/IrTraversal.cs:76-112`; substitution rewriter `SharpProof.Ir/IrSubstitution.cs:68-111`; existing no-recursion rationale `SharpProof.Ir/IrSubstitution.cs:60-66` |
+
+### Status (part two hundred eleven)
+
+R982 is `deferred`: preserve the projection-specific equality/nullness and
+length-proxy rules, but move child enumeration, DAG memoization, and deep-term
+traversal to the shared IR rewrite seam.
