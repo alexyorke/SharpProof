@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
 using NUnit.Framework;
+using SharpProof.Worker.Protocol;
 
 namespace SharpProof.Worker.Test;
 
@@ -19,6 +21,110 @@ internal static class SchemaModelTestHelpers
             Is.EqualTo(specifications.Select(static specification =>
                 specification.GetProperty("jsonName").GetString())),
             context);
+    }
+
+    internal static void AssertConstants(
+        Type type,
+        JsonElement declaration,
+        BindingFlags visibility,
+        bool optional = false)
+    {
+        if (!declaration.TryGetProperty("constants", out var constants))
+        {
+            if (optional)
+            {
+                return;
+            }
+
+            Assert.Fail($"{type.Name} does not declare constants.");
+        }
+
+        var specifications = constants.EnumerateArray().ToArray();
+        var fields = type.GetFields(
+                visibility |
+                BindingFlags.Static |
+                BindingFlags.DeclaredOnly)
+            .Where(static field => field.IsLiteral)
+            .OrderBy(static field => field.MetadataToken)
+            .ToArray();
+        Assert.That(
+            fields.Select(static field => field.Name),
+            Is.EqualTo(specifications.Select(static specification =>
+                specification.GetProperty("name").GetString())),
+            type.Name);
+        for (var index = 0; index < fields.Length; index++)
+        {
+            var expected = specifications[index].GetProperty("value");
+            var actual = fields[index].GetRawConstantValue();
+            if (expected.ValueKind == JsonValueKind.String)
+            {
+                Assert.That(actual, Is.EqualTo(expected.GetString()), fields[index].Name);
+            }
+            else
+            {
+                Assert.That(
+                    Convert.ToInt64(actual, CultureInfo.InvariantCulture),
+                    Is.EqualTo(expected.GetInt64()),
+                    fields[index].Name);
+            }
+        }
+    }
+
+    internal static void AssertEnum(
+        Type type,
+        JsonElement declaration,
+        bool validateWireNames = false)
+    {
+        Assert.That(type.IsEnum, Is.True, type.Name);
+        if (declaration.TryGetProperty("underlyingType", out var underlying))
+        {
+            Assert.That(
+                Enum.GetUnderlyingType(type),
+                Is.EqualTo(underlying.GetString() == "long"
+                    ? typeof(long)
+                    : typeof(int)),
+                type.Name);
+        }
+
+        if (declaration.TryGetProperty("flags", out var flags))
+        {
+            Assert.That(
+                type.IsDefined(typeof(FlagsAttribute), inherit: false),
+                Is.EqualTo(flags.GetBoolean()),
+                type.Name);
+        }
+
+        var members = declaration.GetProperty("members")
+            .EnumerateArray()
+            .ToArray();
+        Assert.That(
+            Enum.GetNames(type),
+            Is.EqualTo(members.Select(static member =>
+                member.GetProperty("name").GetString())),
+            type.Name);
+        Assert.That(
+            Enum.GetValues(type).Cast<object>().Select(static value =>
+                Convert.ToInt64(value, CultureInfo.InvariantCulture)),
+            Is.EqualTo(members.Select(static member =>
+                member.GetProperty("value").GetInt64())),
+            type.Name);
+        if (!validateWireNames)
+        {
+            return;
+        }
+
+        foreach (var member in members)
+        {
+            var name = member.GetProperty("name").GetString()!;
+            var value = Enum.Parse(type, name);
+            Assert.That(
+                JsonSerializer.Serialize(
+                    value,
+                    type,
+                    WorkerProtocolJson.Options),
+                Is.EqualTo(JsonSerializer.Serialize(name)),
+                $"{type.Name}.{name}");
+        }
     }
 
     internal static string SchemaType(

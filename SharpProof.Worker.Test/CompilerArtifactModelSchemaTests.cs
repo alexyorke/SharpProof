@@ -52,10 +52,13 @@ public sealed class CompilerArtifactModelSchemaTests
             {
                 case "staticClass":
                     Assert.That(type.IsAbstract && type.IsSealed, Is.True, name);
-                    AssertConstants(type, declaration);
+                    SchemaModelTestHelpers.AssertConstants(
+                        type,
+                        declaration,
+                        BindingFlags.NonPublic);
                     break;
                 case "enum":
-                    AssertEnum(type, declaration);
+                    SchemaModelTestHelpers.AssertEnum(type, declaration);
                     break;
                 case "class":
                     Assert.That(type.IsSealed, Is.True, name);
@@ -460,55 +463,6 @@ public sealed class CompilerArtifactModelSchemaTests
                 Is.True,
                 name + " target names");
         }
-    }
-
-    private static void AssertConstants(Type type, JsonElement declaration)
-    {
-        JsonElement[] specifications = [
-            .. declaration.GetProperty("constants").EnumerateArray()
-        ];
-        FieldInfo[] fields = [
-            .. type.GetFields(
-                BindingFlags.NonPublic |
-                BindingFlags.Static |
-                BindingFlags.DeclaredOnly)
-                .Where(static field => field.IsLiteral)
-                .OrderBy(static field => field.MetadataToken)
-        ];
-        Assert.That(
-            fields.Select(static field => field.Name),
-            Is.EqualTo(specifications.Select(static specification =>
-                specification.GetProperty("name").GetString())),
-            type.Name);
-        for (var index = 0; index < fields.Length; index++)
-        {
-            var expected = specifications[index].GetProperty("value");
-            Assert.That(
-                fields[index].GetRawConstantValue(),
-                Is.EqualTo(expected.ValueKind == JsonValueKind.String
-                    ? expected.GetString()
-                    : expected.GetInt32()),
-                fields[index].Name);
-        }
-    }
-
-    private static void AssertEnum(Type type, JsonElement declaration)
-    {
-        JsonElement[] members = [
-            .. declaration.GetProperty("members").EnumerateArray()
-        ];
-        Assert.That(type.IsEnum, Is.True, type.Name);
-        Assert.That(
-            Enum.GetNames(type),
-            Is.EqualTo(members.Select(static member =>
-                member.GetProperty("name").GetString())),
-            type.Name);
-        Assert.That(
-            Enum.GetValues(type).Cast<object>().Select(static value =>
-                Convert.ToInt32(value, CultureInfo.InvariantCulture)),
-            Is.EqualTo(members.Select(static member =>
-                member.GetProperty("value").GetInt32())),
-            type.Name);
     }
 
     private static void AssertRecord(Type type, JsonElement declaration)

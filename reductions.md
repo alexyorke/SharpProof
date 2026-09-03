@@ -18908,3 +18908,9 @@ class still has its pre-existing complexity-ratchet failure
 | ID | Finding | Evidence |
 |---|---|---|
 | R1663 | Two runtime-closure rejection tests repeat the same three property-name cases; share the matrix while retaining separate build-path assertions. | `SharpProof.Package.Test/WorkerMsBuildIntegrationTests.cs:147-151,171-175` |
+
+R1660 is applied in the safe shared portion: compiler-artifact and worker
+protocol schema tests now use one reflection-based constants/enums validator,
+with visibility, optional-constants, and protocol wire-name checks supplied by
+the callers. Their schema-specific property/default validators remain separate
+where the generated models differ. The combined schema-model tests pass (9/9).

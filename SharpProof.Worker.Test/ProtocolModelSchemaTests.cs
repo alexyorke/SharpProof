@@ -59,14 +59,25 @@ public sealed class ProtocolModelSchemaTests
             {
                 case "staticClass":
                     Assert.That(type.IsAbstract && type.IsSealed, Is.True, name);
-                    AssertConstants(type, declaration);
+                    SchemaModelTestHelpers.AssertConstants(
+                        type,
+                        declaration,
+                        BindingFlags.Public,
+                        optional: true);
                     break;
                 case "enum":
-                    AssertEnum(type, declaration);
+                    SchemaModelTestHelpers.AssertEnum(
+                        type,
+                        declaration,
+                        validateWireNames: true);
                     break;
                 case "class":
                     Assert.That(type.IsSealed, Is.True, name);
-                    AssertConstants(type, declaration);
+                    SchemaModelTestHelpers.AssertConstants(
+                        type,
+                        declaration,
+                        BindingFlags.Public,
+                        optional: true);
                     AssertProperties(type, declaration);
                     break;
                 default:
@@ -313,87 +324,6 @@ public sealed class ProtocolModelSchemaTests
         return s_protocolAssembly.GetType(
             "SharpProof.Worker.Protocol." + name,
             throwOnError: true)!;
-    }
-
-    private static void AssertConstants(Type type, JsonElement declaration)
-    {
-        if (!declaration.TryGetProperty("constants", out var constants))
-        {
-            return;
-        }
-
-        var expectedNames = constants.EnumerateArray()
-            .Select(static constant =>
-                constant.GetProperty("name").GetString())
-            .ToArray();
-        var fields = type.GetFields(
-                BindingFlags.Public |
-                BindingFlags.Static |
-                BindingFlags.DeclaredOnly)
-            .Where(static field => field.IsLiteral)
-            .OrderBy(static field => field.MetadataToken)
-            .ToArray();
-        Assert.That(
-            fields.Select(static field => field.Name),
-            Is.EqualTo(expectedNames),
-            type.Name);
-        var specifications = constants.EnumerateArray().ToArray();
-        for (var index = 0; index < fields.Length; index++)
-        {
-            var expected = specifications[index].GetProperty("value");
-            var actual = fields[index].GetRawConstantValue();
-            if (expected.ValueKind == JsonValueKind.String)
-            {
-                Assert.That(actual, Is.EqualTo(expected.GetString()), fields[index].Name);
-            }
-            else
-            {
-                Assert.That(
-                    Convert.ToInt64(actual, CultureInfo.InvariantCulture),
-                    Is.EqualTo(expected.GetInt64()),
-                    fields[index].Name);
-            }
-        }
-    }
-
-    private static void AssertEnum(Type type, JsonElement declaration)
-    {
-        Assert.That(type.IsEnum, Is.True, type.Name);
-        var underlying = declaration.GetProperty("underlyingType").GetString();
-        Assert.That(
-            Enum.GetUnderlyingType(type),
-            Is.EqualTo(underlying == "long" ? typeof(long) : typeof(int)),
-            type.Name);
-        Assert.That(
-            type.IsDefined(typeof(FlagsAttribute), inherit: false),
-            Is.EqualTo(declaration.GetProperty("flags").GetBoolean()),
-            type.Name);
-        var members = declaration.GetProperty("members")
-            .EnumerateArray()
-            .ToArray();
-        Assert.That(
-            Enum.GetNames(type),
-            Is.EqualTo(members.Select(static member =>
-                member.GetProperty("name").GetString())),
-            type.Name);
-        Assert.That(
-            Enum.GetValues(type).Cast<object>().Select(static value =>
-                Convert.ToInt64(value, CultureInfo.InvariantCulture)),
-            Is.EqualTo(members.Select(static member =>
-                member.GetProperty("value").GetInt64())),
-            type.Name);
-        foreach (var member in members)
-        {
-            var name = member.GetProperty("name").GetString()!;
-            var value = Enum.Parse(type, name);
-            Assert.That(
-                JsonSerializer.Serialize(
-                    value,
-                    type,
-                    WorkerProtocolJson.Options),
-                Is.EqualTo(JsonSerializer.Serialize(name)),
-                $"{type.Name}.{name}");
-        }
     }
 
     private static void AssertProperties(
