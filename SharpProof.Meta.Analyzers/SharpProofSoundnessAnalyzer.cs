@@ -791,8 +791,8 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                     return true;
                 }
 
-                foreach (var field in current.GetMembers()
-                             .OfType<IFieldSymbol>())
+                var members = current.GetMembers();
+                foreach (var field in members.OfType<IFieldSymbol>())
                 {
                     if (field.IsStatic || field.IsConst)
                     {
@@ -809,8 +809,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                     }
                 }
 
-                foreach (var property in current.GetMembers()
-                             .OfType<IPropertySymbol>())
+                foreach (var property in members.OfType<IPropertySymbol>())
                 {
                     if (property.IsStatic)
                     {
@@ -828,7 +827,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                     }
                 }
 
-                if (current.GetMembers().OfType<IEventSymbol>().Any(
+                if (members.OfType<IEventSymbol>().Any(
                         static @event => !@event.IsStatic))
                 {
                     return true;
