@@ -22,14 +22,39 @@ internal sealed class ContractApiSymbols(
         var selections =
             ContractSelectionInventory.ForCompilation(compilation);
 
-        var result = FindGenericIntrinsic(
-            clauses.ContractType,
-            ContractApiMetadata.ResultMethodName,
-            0);
-        var old = FindGenericIntrinsic(
-            clauses.ContractType,
-            ContractApiMetadata.OldMethodName,
-            1);
+        IMethodSymbol? result = null;
+        IMethodSymbol? old = null;
+        foreach (var member in clauses.ContractType.GetMembers())
+        {
+            if (member is not IMethodSymbol method ||
+                !method.IsStatic ||
+                method.Arity != 1)
+            {
+                continue;
+            }
+
+            if (method.Name == ContractApiMetadata.ResultMethodName &&
+                method.Parameters.Length == 0)
+            {
+                if (result != null)
+                {
+                    return null;
+                }
+
+                result = method;
+            }
+            else if (method.Name == ContractApiMetadata.OldMethodName &&
+                     method.Parameters.Length == 1)
+            {
+                if (old != null)
+                {
+                    return null;
+                }
+
+                old = method;
+            }
+        }
+
         if (result == null || old == null)
         {
             return null;
@@ -57,18 +82,6 @@ internal sealed class ContractApiSymbols(
         return SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, Old);
     }
 
-    private static IMethodSymbol? FindGenericIntrinsic(
-        INamedTypeSymbol contract,
-        string name,
-        int parameterCount)
-    {
-        return contract.GetMembers(name)
-            .OfType<IMethodSymbol>()
-            .SingleOrDefault(method =>
-                method.IsStatic &&
-                method.Arity == 1 &&
-                method.Parameters.Length == parameterCount);
-    }
 }
 
 internal sealed class ContractClauseSymbols(INamedTypeSymbol contractType)

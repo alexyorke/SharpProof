@@ -16402,3 +16402,8 @@ Worker tests pass (148 passed).
 R1359 is applied: the event-accessor subset is kept deferred for its single
 consumer instead of being copied into a temporary array. The focused test passes
 (1 passed).
+
+R1357 is applied: contract intrinsic discovery now enumerates the contract type
+once and categorizes the valid `Result` and `Old` methods, rejecting duplicate
+matches while preserving the existing shape checks. The focused contract identity
+suite passes (5 passed).
