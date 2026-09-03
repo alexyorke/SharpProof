@@ -61,10 +61,40 @@ $sourcePath = Join-Path $repositoryRoot $relativePath
 $sourceBytes = [IO.File]::ReadAllBytes($sourcePath)
 $overridePath = Join-Path ([IO.Path]::GetTempPath()) (
     'sharpproof-documentation-' + [Guid]::NewGuid().ToString('N') + '.txt')
+$acceptanceContract = Get-Content -LiteralPath (
+    Join-Path $repositoryRoot 'eng\acceptance\contract.json') -Raw |
+    ConvertFrom-Json
+$containerMemoryMiB = [int]$acceptanceContract.container.defaultMemoryMiB
+$containerResourceClaim =
+    "Containers use all CPUs available to Docker and up to " +
+    "$containerMemoryMiB MiB by default."
+
+function Replace-Required {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InputText,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OldValue,
+
+        [Parameter(Mandatory = $true)]
+        [string]$NewValue
+    )
+
+    $replacement = $InputText.Replace(
+        $OldValue,
+        $NewValue,
+        [StringComparison]::Ordinal)
+    if ($replacement -ceq $InputText) {
+        throw (
+            "Mutation '$Mutation' could not apply its expected text " +
+            "replacement in '$relativePath'.")
+    }
+    return $replacement
+}
+
 try {
     $text = [Text.Encoding]::UTF8.GetString($sourceBytes)
-    $containerResourceClaim =
-        'Containers use all CPUs available to Docker and up to 40960 MiB by default.'
     switch ($Mutation) {
         'stale-win-x64' {
             $text += "`nSharpProof.Verifier.Win-x64 is supported.`n"
@@ -75,10 +105,10 @@ try {
             $prefix = [string]$release.Project.PropertyGroup.SharpProofVersionPrefix
             $version = ([string]$release.Project.PropertyGroup.SharpProofPackageVersion).
                 Replace('$(SharpProofVersionPrefix)', $prefix)
-            $text = $text.Replace(
-                $version,
-                '99.99.99-stale',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue $version `
+                -NewValue '99.99.99-stale'
         }
         'support-drift' {
             $text += "`nThe verifier is supported only on Windows x64.`n"
@@ -89,100 +119,100 @@ try {
                 "disables contract analysis without a diagnostic.`n")
         }
         'old-eight-mutation-lanes' {
-            $text = $text.Replace(
-                'Trusted mutations use 4 deterministic weighted lanes.',
-                'Trusted mutations use 8 deterministic weighted lanes.',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue 'Trusted mutations use 4 deterministic weighted lanes.' `
+                -NewValue 'Trusted mutations use 8 deterministic weighted lanes.'
         }
         'wrong-container-cpu' {
-            $text = $text.Replace(
-                $containerResourceClaim,
-                'Containers use 12 CPUs and up to 40960 MiB by default.',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue $containerResourceClaim `
+                -NewValue 'Containers use 12 CPUs and up to 40960 MiB by default.'
         }
         'wrong-container-memory' {
-            $text = $text.Replace(
-                $containerResourceClaim,
-                'Containers use all CPUs available to Docker and up to 32768 MiB by default.',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue $containerResourceClaim `
+                -NewValue 'Containers use all CPUs available to Docker and up to 32768 MiB by default.'
         }
         'missing-resource-claim' {
-            $text = $text.Replace(
-                $containerResourceClaim,
-                '',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue $containerResourceClaim `
+                -NewValue ''
         }
         'duplicate-resource-claim' {
             $text += "`n$containerResourceClaim`n"
         }
         'resource-claim-case' {
-            $text = $text.Replace(
-                $containerResourceClaim,
-                'Containers use all cpus available to Docker and up to 40960 MiB by default.',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue $containerResourceClaim `
+                -NewValue 'Containers use all cpus available to Docker and up to 40960 MiB by default.'
         }
         'resource-claim-spacing' {
-            $text = $text.Replace(
-                $containerResourceClaim,
-                'Containers use all CPUs  available to Docker and up to 40960 MiB by default.',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue $containerResourceClaim `
+                -NewValue 'Containers use all CPUs  available to Docker and up to 40960 MiB by default.'
         }
         'catalog-resource-drift' {
-            $text = $text.Replace(
-                '"mutationParallelism": 4',
-                '"mutationParallelism": 5',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue '"mutationParallelism": 4' `
+                -NewValue '"mutationParallelism": 5'
         }
         'duplicate-acceptance-property' {
-            $text = $text.Replace(
-                '"mutationParallelism": 4',
-                '"mutationParallelism": 99,`n        "mutationParallelism": 4',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue '"mutationParallelism": 4' `
+                -NewValue '"mutationParallelism": 99,`n        "mutationParallelism": 4'
         }
         'check-plan-drift' {
-            $text = $text.Replace(
-                ('The default Debug check concurrently performs one Debug ' +
-                 'solution build and one Release package-product build, then ' +
-                 'runs 3'),
-                ('The default Debug check reuses one build for every package ' +
-                 'and test phase, with 3'),
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue ('The default Debug check concurrently performs one Debug ' +
+                    'solution build and one Release package-product build, then ' +
+                    'runs 3') `
+                -NewValue ('The default Debug check reuses one build for every package ' +
+                    'and test phase, with 3')
         }
         'missing-vacuous-entry' {
-            $text = $text.Replace(
-                '| `VacuousEntry` | Contradictory entry preconditions prove the effect claim vacuously |',
-                '',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue '| `VacuousEntry` | Contradictory entry preconditions prove the effect claim vacuously |' `
+                -NewValue ''
         }
         'wrong-unavailable-meaning' {
-            $text = $text.Replace(
-                '| `Unavailable` | An `Unknown` effect claim for any schema-admitted unknown reason when no more specific certainty applies |',
-                '| `Unavailable` | Only backend infrastructure failures |',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue '| `Unavailable` | An `Unknown` effect claim for any schema-admitted unknown reason when no more specific certainty applies |' `
+                -NewValue '| `Unavailable` | Only backend infrastructure failures |'
         }
         'extra-certainty-member' {
-            $text = $text.Replace(
-                '| `VacuousEntry` | Contradictory entry preconditions prove the effect claim vacuously |',
-                "| ``VacuousEntry`` | Contradictory entry preconditions prove the effect claim vacuously |`n| ``Future`` | Fabricated member |",
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue '| `VacuousEntry` | Contradictory entry preconditions prove the effect claim vacuously |' `
+                -NewValue "| ``VacuousEntry`` | Contradictory entry preconditions prove the effect claim vacuously |`n| ``Future`` | Fabricated member |"
         }
         'certainty-member-case' {
-            $text = $text.Replace(
-                '`VacuousEntry`',
-                '`vacuousEntry`',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue '`VacuousEntry`' `
+                -NewValue '`vacuousEntry`'
         }
         'certainty-member-order' {
-            $text = $text.Replace(
-                "| ``Unavailable`` | An ``Unknown`` effect claim for any schema-admitted unknown reason when no more specific certainty applies |`n| ``VacuousEntry`` | Contradictory entry preconditions prove the effect claim vacuously |",
-                "| ``VacuousEntry`` | Contradictory entry preconditions prove the effect claim vacuously |`n| ``Unavailable`` | An ``Unknown`` effect claim for any schema-admitted unknown reason when no more specific certainty applies |",
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue "| ``Unavailable`` | An ``Unknown`` effect claim for any schema-admitted unknown reason when no more specific certainty applies |`n| ``VacuousEntry`` | Contradictory entry preconditions prove the effect claim vacuously |" `
+                -NewValue "| ``VacuousEntry`` | Contradictory entry preconditions prove the effect claim vacuously |`n| ``Unavailable`` | An ``Unknown`` effect claim for any schema-admitted unknown reason when no more specific certainty applies |"
         }
         'protocol-certainty-schema-drift' {
-            $text = $text.Replace(
-                '["Proven","None","VacuousEntry"],',
-                '["Proven","None","VacuousEntry"],["Unknown","None","Unavailable"],',
-                [StringComparison]::Ordinal)
+            $text = Replace-Required `
+                -InputText $text `
+                -OldValue '["Proven","None","VacuousEntry"],' `
+                -NewValue '["Proven","None","VacuousEntry"],["Unknown","None","Unavailable"],'
         }
     }
     [IO.File]::WriteAllText(
