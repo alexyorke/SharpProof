@@ -9,18 +9,23 @@ namespace SharpProof.Analyzer.Test;
 [TestFixture]
 public sealed class NestedRequiresCallSiteTests
 {
+    private const string FixturePreamble =
+        """
+            private static int Positive(int value) {
+                Contract.Requires(value > 0);
+                return value;
+            }
+        """;
+
     [Test]
     public async Task BlockAndExpressionBodiedLocalFunctionsAreAnalyzed()
     {
         var diagnostics = await Analyze(
-            """
+            $$"""
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     int Block() {
@@ -42,16 +47,13 @@ public sealed class NestedRequiresCallSiteTests
     public async Task LambdasAndAnonymousMethodsAreAnalyzed()
     {
         var diagnostics = await Analyze(
-            """
+            $$"""
             using System;
             using System.Linq.Expressions;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     Func<int> block = () => {
@@ -75,15 +77,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task DeeplyNestedCallablesAreAnalyzedExactlyOnce()
     {
         var diagnostics = await Analyze(
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     int First() {
@@ -117,10 +116,7 @@ public sealed class NestedRequiresCallSiteTests
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     Func<int> alias0 = Reachable;
@@ -142,14 +138,11 @@ public sealed class NestedRequiresCallSiteTests
     {
         var factory = new RecordingSessionFactory();
         var diagnostics = await Analyze(
-            """
+            $$"""
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     int Nested() => Positive(-2);
@@ -179,15 +172,12 @@ public sealed class NestedRequiresCallSiteTests
     {
         var factory = new RecordingSessionFactory();
         var diagnostics = await Analyze(
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer(
                     int captured,
@@ -275,16 +265,13 @@ public sealed class NestedRequiresCallSiteTests
     public async Task ExpressionTreeBodiesAreNotTreatedAsExecutingDelegates()
     {
         var diagnostics = await Analyze(
-            """
+            $$"""
             using System;
             using System.Linq.Expressions;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static Expression<Func<int>> Quote() =>
                     () => Positive(-1);
@@ -298,15 +285,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task LambdasInUnreachableBlocksAreNotAnalyzed()
     {
         var diagnostics = await Analyze(
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     if (false) {
@@ -327,15 +311,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task LambdaBodiesRequireInvocationOrConservativeEscape()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 private static void Consume(Func<int> callback) { }
 
@@ -386,14 +367,11 @@ public sealed class NestedRequiresCallSiteTests
     public async Task UnreferencedLocalFunctionsAreNotAnalyzed()
     {
         const string source =
-            """
+            $$"""
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     return Reachable();
@@ -417,15 +395,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task DiscardedMethodGroupsAndLambdasDoNotReachNestedCallables()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     _ = (Func<int>)Dead;
@@ -446,14 +421,11 @@ public sealed class NestedRequiresCallSiteTests
     public async Task NameofReferencesDoNotReachLocalFunctions()
     {
         var diagnostics = await Analyze(
-            """
+            $$"""
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static string Outer() {
                     return nameof(Dead);
@@ -470,16 +442,13 @@ public sealed class NestedRequiresCallSiteTests
     public async Task GenericAndMethodGroupReferencesReachLocalFunctions()
     {
         const string source =
-            """
+            $$"""
             using System;
             using System.Linq.Expressions;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     Expression<Func<int>> quoted = () => Dead();
@@ -513,15 +482,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task OverwrittenMethodGroupsDoNotReachLocalFunctions()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer(bool condition) {
                     Func<int> overwritten = Dead;
@@ -551,7 +517,7 @@ public sealed class NestedRequiresCallSiteTests
     public async Task AssignmentTargetEvaluationConsumesDelegates()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
@@ -560,10 +526,7 @@ public sealed class NestedRequiresCallSiteTests
                     public int Value;
                 }
 
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 private static Holder Select(int value) => new();
 
@@ -598,15 +561,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task DelegateSubtractionDoesNotReachRemovedLocalFunctions()
     {
         var diagnostics = await Analyze(
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     Func<int> callback = () => 1;
@@ -625,15 +585,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task ObservingMethodGroupsDoesNotReachLocalFunctions()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     Func<int> value = Dead;
@@ -653,15 +610,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task OnlyExecutingOrEscapedDelegateUsesReachNestedCallables()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 private static void Replace(out Func<int> callback) =>
                     callback = () => 0;
@@ -713,15 +667,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task CoalesceAssignmentOnlyReachesLaterConsumedMethodGroups()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     Func<int>? unused = Dead;
@@ -749,15 +700,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task TupleMethodGroupsOnlyReachThroughTheirOwnComponent()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     var unused = (Callback: (Func<int>)Dead, Number: 1);
@@ -785,15 +733,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task TupleItemAliasesReachNamedDelegateComponents()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     var unused = (
@@ -824,15 +769,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task NestedTupleMethodGroupsTrackTheirFullProjectionPath()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     var unused = (Inner: (
@@ -864,15 +806,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task NestedTupleProjectionAliasDoesNotConsumeSiblingDelegate()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     var outer = (Inner: (
@@ -895,15 +834,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task TupleAssignmentsKillOnlyOverwrittenComponents()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int SiblingAssignment() {
                     var pair = (
@@ -952,15 +888,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task TupleComponentNullObservationsDoNotConsumeDelegates()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Equality() {
                     var pair = (
@@ -991,15 +924,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task TupleDeconstructionTracksOnlyTheDelegateDestination()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Unused() {
                     var pair = (Callback: (Func<int>)Dead, Number: 1);
@@ -1064,7 +994,7 @@ public sealed class NestedRequiresCallSiteTests
     public async Task NullMethodGroupOverwriteKeepsOldDelegateReachableInCatch()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
@@ -1073,10 +1003,7 @@ public sealed class NestedRequiresCallSiteTests
                     public int Read() => 0;
                 }
 
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int CatchUse() {
                     Func<int> callback = Reachable;
@@ -1103,7 +1030,7 @@ public sealed class NestedRequiresCallSiteTests
     public async Task ThrowingUserDefinedOperatorsKeepOldDelegateReachableInCatch()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
@@ -1125,10 +1052,7 @@ public sealed class NestedRequiresCallSiteTests
                         throw new InvalidOperationException();
                 }
 
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Conversion(Source source) {
                     Func<int> callback = Reachable;
@@ -1214,7 +1138,7 @@ public sealed class NestedRequiresCallSiteTests
     public async Task ExceptionHandlersCanConsumeTrackedDelegates()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
@@ -1226,10 +1150,7 @@ public sealed class NestedRequiresCallSiteTests
                     public Boom(int value) =>
                         throw new InvalidOperationException();
                 }
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
                 private static void Fail() =>
                     throw new InvalidOperationException();
                 private static Func<int> FailDelegate() =>
@@ -1412,15 +1333,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task NormalFinallyFlowCanConsumeTrackedDelegates()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int FinallyUse() {
                     Func<int> callback = Reachable;
@@ -1458,15 +1376,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task PatternAliasesReachLocalFunctions()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     Func<int> value = Reachable;
@@ -1487,15 +1402,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task NestedPatternAliasesReachOnlyTheirDelegateComponents()
     {
         const string source =
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Recursive() {
                     var pair = (
@@ -1546,15 +1458,12 @@ public sealed class NestedRequiresCallSiteTests
     {
         var factory = new RecordingSessionFactory();
         var diagnostics = await Analyze(
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     [SharpProofSuppress("reviewed local")]
@@ -1586,15 +1495,12 @@ public sealed class NestedRequiresCallSiteTests
     {
         var factory = new RecordingSessionFactory();
         var diagnostics = await Analyze(
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     [SharpProofSuppress("")]
@@ -1627,7 +1533,7 @@ public sealed class NestedRequiresCallSiteTests
     public async Task NestedCallableControlReasonsAreValidatedRegardlessOfReachability()
     {
         const string source =
-            """
+            $$"""
             using System;
             using System.Linq.Expressions;
             using SharpProof.Attributes;
@@ -1703,15 +1609,12 @@ public sealed class NestedRequiresCallSiteTests
     public async Task GeneratedNestedCallableControlReasonsRemainExcluded()
     {
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
-            """
+            $$"""
             using System;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static void Outer() {
                     [SharpProofSuppress("")]
@@ -1735,17 +1638,14 @@ public sealed class NestedRequiresCallSiteTests
     {
         var factory = new RecordingSessionFactory();
         var diagnostics = await Analyze(
-            """
+            $$"""
             using System;
             using System.CodeDom.Compiler;
             using System.Linq.Expressions;
             using SharpProof.Attributes;
 
             public static class Fixture {
-                private static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
+            {{FixturePreamble}}
 
                 public static int Outer() {
                     [GeneratedCode("test", "1")]

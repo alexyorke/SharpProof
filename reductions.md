@@ -372,6 +372,7 @@ the smallest relevant containerized test target passes.
 | R953 | Remove the redundant SMT copy of `ArgumentNullGuard` | `SharpProof.Smt.Test`: 30 passed |
 | R878 | Avoid duplicate atomic-file destination normalization | `SharpProof.Ir.Test`: AtomicFileTests, 7 passed |
 | R073 | Consolidate repeated TRX-fixture construction while keeping partial and timeout counters explicit | `Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
+| R058, R172 | Share the repeated analyzer `Fixture`/`Positive` raw-string preamble | `SharpProof.Analyzer.Test`: NestedRequiresCallSiteTests, 38 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -423,7 +424,7 @@ status document.
 | R038-R039, R041 | These alter soundness-sensitive traversal, pattern, or replay-candidate ordering; defer to a dedicated semantic refactor. |
 | R007-R009 | Compiler-probe JSON bytes, artifact authority, and IL opcode admission are compatibility/soundness boundaries; defer to focused format work. |
 | R027-R031 | Generalizing process, temporary-directory, and package-test setup changes cleanup/lifetime semantics across many fixtures; defer after the shared root/default work already removed the exact duplication. |
-| R057-R058, R060, R087-R096, R104-R105 | These parameterize or abstract large test fixtures; keep named failure isolation and local arrange/assert evidence in this reduction pass. |
+| R057, R060, R087-R096, R104-R105 | These parameterize or abstract large test fixtures; keep named failure isolation and local arrange/assert evidence in this reduction pass. |
 | R066-R070 | These change sample/pilot inheritance, scheduled validation, packaged imports, workflow setup, or automatic production-project classification. |
 | R072, R074, R076 | Shared shard/coverage/timing orchestration would centralize timeout, process, and atomic-publication semantics; treat as dedicated infrastructure work. |
 | R078-R080, R082-R085 | Soundness-critical recursive traversal, dispatch, alias, and abstract-value changes are deferred as requested. |
@@ -467,7 +468,7 @@ Merged IDs are not separate work items and must not be counted twice.
 
 ## Pending queue
 
-The active follow-up queue is R058, R060, R087-R094, R096, R104-R105,
+The active follow-up queue is R060, R087-R094, R096, R104-R105,
 R107, R149, R165, R169, R171-R185, R194, R211, R217-R218, and R221.
 Each still requires current-tree validation before implementation. The other
 items in the Deferred table are intentional behavior, public API, release
@@ -10602,3 +10603,15 @@ R1010 is deferred: retain the positional contiguous-ID contract; eliminate only 
 ### Status (part two hundred forty-two)
 
 R1011 is deferred: reuse validated syntax roots only within the same immutable document/run, and keep the independent hash, declaration, and compilation-boundary checks explicit.
+
+## Second survey, part two hundred forty-three: R1012 - duplicated IDE edit transition loops
+
+`PerformanceGate.MeasureIdeEditsAsync` has one loop for warmups and another for measured edits. Both invert `currentlyAllocates`, select the replacement and current-marker text, read the current tree text, apply one `TextChange`, create a changed tree and compilation, run the effects analyzer, validate the expected diagnostics, update the current tree/compilation/state, and repeat. The measured loop additionally records a stopwatch and converts diagnostic exceptions into `diagnosticFailures`; the warmup loop intentionally propagates validation failure. A private one-edit transition returning the new tree, compilation, allocation state, diagnostics, and elapsed-time boundary can own the shared state mutation while the two loops retain their distinct warmup/measurement error and timing policies. This is narrower than R775, which covers the duplicated setup/probe pipeline of `RunValidatedAsync` and `RunSmokeAsync`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1012 | **IDE performance warmups and samples duplicate the full edit/analyze state transition.** The warmup and measured loops independently build the replacement text, call `GetTextAsync`/`WithChanges`/`WithChangedText`/`ReplaceSyntaxTree`, analyze, validate diagnostics, and advance `currentTree`, `currentCompilation`, and `currentlyAllocates`; only timing and measured-error capture differ. Extracting the transition while keeping those two policies at the callers can remove a large local duplication without changing the benchmark protocol. | `SharpProof.Gates/Performance/PerformanceGate.cs:921-949,951-996`; diagnostic policy `:945,981-992` | |
+
+### Status (part two hundred forty-three)
+
+R1012 is deferred: preserve warmup exception propagation, measured latency capture, diagnostic-failure collection, and the alternating edit state when consolidating the shared transition.
