@@ -917,9 +917,21 @@ public static partial class WorkerProtocolJson
     internal static bool AreDefinedUnique<T>(T[]? values, T unspecified, bool nonEmpty)
             where T : struct, Enum
     {
-        return values != null && (!nonEmpty || values.Length > 0) &&
-            values.All(value => IsDefined(value, unspecified)) &&
-            values.Distinct().Count() == values.Length;
+        if (values == null || nonEmpty && values.Length == 0)
+        {
+            return false;
+        }
+
+        var seen = new HashSet<T>();
+        foreach (var value in values)
+        {
+            if (!IsDefined(value, unspecified) || !seen.Add(value))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     internal static bool AreValidModel(WorkerModelValue[]? values)
