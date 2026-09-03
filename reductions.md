@@ -11952,3 +11952,15 @@ R1121 is deferred: retain the 14-generator verification helper and eliminate its
 ### Status (part three hundred fifty-three)
 
 R1122 is deferred: either remove the misleading timeout parameter and argument or implement it in the process wrapper while preserving captured output and exit-code handling.
+
+## Second survey, part three hundred fifty-four: R1123 - duplicate publication-plan validation at serialization boundary
+
+When `Publish-SharpProofRelease.ps1` runs with `PlanOnly` and a `PlanOutputPath`, it first calls `Test-SharpProofPublicationPlanIdentity` on the newly constructed in-memory `$plan`. `Write-PublicationPlan` then serializes and writes that same plan, after which the script invokes `Test-SharpProofPublicationPlan.ps1`, whose only operation is to deserialize the file and call the same validator again. The second pass does test the serialized boundary and can be retained if that is an explicit artifact-integrity requirement, but otherwise it is a full duplicate of the plan identity walk immediately after construction. A validator that accepts the parsed round-trip result, or a narrowly scoped serialization/canonical-bytes check after the first validation, can preserve file-boundary coverage without repeating all package, destination, and artifact checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1123 | **Plan-only publication validates the same plan twice around file output.** The publisher validates `$plan` before writing it, then immediately launches `Test-SharpProofPublicationPlan.ps1`, which deserializes the file and runs the identical full identity validator. Keep the second pass only as an explicit serialization-boundary check; otherwise replace it with a focused round-trip comparison or reuse the first validation result. | `scripts/Publish-SharpProofRelease.ps1:788-797`; `scripts/Test-SharpProofPublicationPlan.ps1:8-12` |
+
+### Status (part three hundred fifty-four)
+
+R1123 is deferred: preserve a deliberate serialized-plan boundary check if required, but avoid replaying the complete identity validation after the in-memory plan has already passed.
