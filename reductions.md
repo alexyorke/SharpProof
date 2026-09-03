@@ -16569,3 +16569,7 @@ R1368/R1371 are applied together because they are duplicate findings: invocation
 object-creation, property-assignment, and property-reference input traversal now
 share one completion-gated iterator while preserving each branch's yield order and
 stop behavior. The focused RequiresCallSiteDiscoveryTests suite passes (44 passed).
+
+R1369 is applied: the four package-rejection tests now share one package cleanup
+and rejection-assertion helper while retaining their distinct malformed identity
+setups. The focused ApiSpecTests suite passes (33 passed).

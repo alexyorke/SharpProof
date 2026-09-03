@@ -373,59 +373,21 @@ public sealed class ApiSpecTests
     [Test]
     public void SharpProofPackageSpecsRejectContractWithoutConditionalElision()
     {
-        var package = CreateSharpProofPackageReference(
-            CreateContractSource(
-                typeof(Contract).Assembly.GetName().Version!,
-                includeConditionalAttributes: false));
-        try
-        {
-            var resolved = ResolveContractRequires(
-                package.Reference,
-                string.Empty);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(resolved.Specs, Is.Empty);
-                Assert.That(
-                    resolved.Failures.Single().Kind,
-                    Is.EqualTo(
-                        ApiSpecResolutionFailureKind
-                            .UnapprovedReferenceFamily));
-            }
-        }
-        finally
-        {
-            Directory.Delete(package.Root, recursive: true);
-        }
+        AssertSharpProofPackageSpecRejected(
+            () => CreateSharpProofPackageReference(
+                CreateContractSource(
+                    typeof(Contract).Assembly.GetName().Version!,
+                    includeConditionalAttributes: false)));
     }
 
     [Test]
     public void SharpProofPackageSpecsRejectVersionMismatch()
     {
-        var package = CreateSharpProofPackageReference(
-            CreateContractSource(
-                new Version(9, 0, 0, 0),
-                includeConditionalAttributes: true));
-        try
-        {
-            var resolved = ResolveContractRequires(
-                package.Reference,
-                string.Empty);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(resolved.Specs, Is.Empty);
-                Assert.That(
-                    resolved.Failures.Single().Kind,
-                    Is.EqualTo(
-                        ApiSpecResolutionFailureKind
-                            .UnapprovedReferenceFamily));
-            }
-        }
-        finally
-        {
-            Directory.Delete(package.Root, recursive: true);
-        }
+        AssertSharpProofPackageSpecRejected(
+            () => CreateSharpProofPackageReference(
+                CreateContractSource(
+                    new Version(9, 0, 0, 0),
+                    includeConditionalAttributes: true)));
     }
 
     [Test]
@@ -433,63 +395,23 @@ public sealed class ApiSpecTests
     {
         var publicKey = typeof(object).Assembly.GetName().GetPublicKey();
         Assert.That(publicKey, Is.Not.Null.And.Not.Empty);
-        var package = CreateSharpProofPackageReference(
-            CreateContractSource(
-                typeof(Contract).Assembly.GetName().Version!,
-                includeConditionalAttributes: true),
-            [.. publicKey!]);
-        try
-        {
-            var token = GetPublicKeyToken(package.Reference);
-            Assert.That(token, Is.Not.Empty);
-
-            var resolved = ResolveContractRequires(
-                package.Reference,
-                token);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(resolved.Specs, Is.Empty);
-                Assert.That(
-                    resolved.Failures.Single().Kind,
-                    Is.EqualTo(
-                        ApiSpecResolutionFailureKind
-                            .UnapprovedReferenceFamily));
-            }
-        }
-        finally
-        {
-            Directory.Delete(package.Root, recursive: true);
-        }
+        AssertSharpProofPackageSpecRejected(
+            () => CreateSharpProofPackageReference(
+                CreateContractSource(
+                    typeof(Contract).Assembly.GetName().Version!,
+                    includeConditionalAttributes: true),
+                [.. publicKey!]),
+            GetPublicKeyToken);
     }
 
     [Test]
     public void SharpProofPackageSpecsRejectMatchingIdentityAndContractShapeFromAnotherPayload()
     {
-        var package = CreateSharpProofPackageReference(
-            CreateContractSource(
-                typeof(Contract).Assembly.GetName().Version!,
-                includeConditionalAttributes: true));
-        try
-        {
-            var resolved = ResolveContractRequires(
-                package.Reference,
-                string.Empty);
-
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(resolved.Specs, Is.Empty);
-                Assert.That(
-                    resolved.Failures.Single().Kind,
-                    Is.EqualTo(
-                        ApiSpecResolutionFailureKind
-                            .UnapprovedReferenceFamily));
-            }
-        }
-        finally
-        {
-            Directory.Delete(package.Root, recursive: true);
-        }
+        AssertSharpProofPackageSpecRejected(
+            () => CreateSharpProofPackageReference(
+                CreateContractSource(
+                    typeof(Contract).Assembly.GetName().Version!,
+                    includeConditionalAttributes: true)));
     }
 
     [TestCase("netstandard2.0")]
@@ -1008,6 +930,41 @@ public sealed class ApiSpecTests
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.That(method, Is.Not.Null);
         return (bool)method!.Invoke(null, [symbol, target])!;
+    }
+
+    private static void AssertSharpProofPackageSpecRejected(
+        Func<(string Root, PortableExecutableReference Reference)> createPackage,
+        Func<PortableExecutableReference, string>? getPublicKeyToken = null)
+    {
+        var package = createPackage();
+        try
+        {
+            var publicKeyToken = getPublicKeyToken is null
+                ? string.Empty
+                : getPublicKeyToken(package.Reference);
+            if (getPublicKeyToken is not null)
+            {
+                Assert.That(publicKeyToken, Is.Not.Empty);
+            }
+
+            var resolved = ResolveContractRequires(
+                package.Reference,
+                publicKeyToken);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(resolved.Specs, Is.Empty);
+                Assert.That(
+                    resolved.Failures.Single().Kind,
+                    Is.EqualTo(
+                        ApiSpecResolutionFailureKind
+                            .UnapprovedReferenceFamily));
+            }
+        }
+        finally
+        {
+            Directory.Delete(package.Root, recursive: true);
+        }
     }
 
     private static ApiSpecAssemblyIdentity RuntimeAssemblyIdentity()
