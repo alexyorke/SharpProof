@@ -14895,6 +14895,12 @@ while avoiding repeated source-type walks. Meta analyzer tests pass (162 passed)
 |---|---|---|
 | R1232 | **`ReifiesWorkerVerificationCancellation` repeats argument and condition projection for three fields.** Its three `IsCancellationProjection` calls each search the same invocation arguments and unwrap/check the same conditional-local shape before applying different expected types and field names. A shared projection snapshot or one-pass validator can retain the distinct enum policies while removing the repeated structural work. | `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs:777-799,802-832` |
 
+### Status (part five hundred fifty-four)
+
+R1232 is applied: cancellation-boundary validation snapshots named conditional
+arguments and their cancellation-condition match once, then applies the three
+distinct enum-field policies. Meta analyzer tests pass (162 passed).
+
 ## Second survey, part five hundred fifty-five: R1233 - CFG region extraction is performed twice per analysis
 
 `EffectMethodNodeBuilder.AnalyzeControlFlowGraph` creates both `exceptionalRegionOperations` and `finallyEntries` from the same control-flow graph. `CreateExceptionalRegionOperations` and `CreateFinallyEntries` each begin by walking every graph block, expanding its enclosing-region chain, deduplicating the result, and materializing a region array. Their later filters and maps are intentionally different, but the region snapshot is identical for one analysis invocation. Passing one shared region snapshot into the two builders preserves each catch/finally ordering policy while removing the repeated block-and-region traversal.
