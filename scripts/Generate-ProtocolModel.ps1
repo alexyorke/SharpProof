@@ -289,11 +289,14 @@ function ConvertTo-ValidationConditionSource {
         'validPlan' {
             $plan = [string](
                 Get-RequiredMember $Condition 'plan' "validation '$operation'")
-            if (-not $validationPlanNames.Contains($plan) -or
-                $validationPlanTypes[$plan] -ne $property.Type.TrimEnd('?')) {
+            $planMetadata = $null
+            if (-not $validationPlansByName.TryGetValue(
+                    $plan,
+                    [ref]$planMetadata) -or
+                $planMetadata.Type -ne $property.Type.TrimEnd('?')) {
                 throw "Validation references incompatible plan '$plan'."
             }
-            if ($validationPlanModes[$plan] -eq 'predicate') {
+            if ($planMetadata.Mode -eq 'predicate') {
                 return "WorkerProtocolMetadata.Is${plan}Valid($($property.Source))"
             }
             return "WorkerProtocolMetadata.${plan}Rules.All(" +
@@ -398,11 +401,7 @@ foreach ($table in $validationTables) {
         throw "Duplicate validation table '$tableName'."
     }
 }
-$validationPlanNames = [Collections.Generic.HashSet[string]]::new(
-    [StringComparer]::Ordinal)
-$validationPlanTypes = [Collections.Generic.Dictionary[string, string]]::new(
-    [StringComparer]::Ordinal)
-$validationPlanModes = [Collections.Generic.Dictionary[string, string]]::new(
+$validationPlansByName = [Collections.Generic.Dictionary[string, object]]::new(
     [StringComparer]::Ordinal)
 foreach ($plan in $validationPlans) {
     $planName = [string](
@@ -410,7 +409,7 @@ foreach ($plan in $validationPlans) {
     $planType = [string](
         Get-RequiredMember $plan 'type' "validation plan '$planName'")
     Assert-Identifier $planName 'Validation plan name'
-    if (-not $validationPlanNames.Add($planName)) {
+    if ($validationPlansByName.ContainsKey($planName)) {
         throw "Duplicate validation plan '$planName'."
     }
     $modeMember = $plan.PSObject.Properties['mode']
@@ -418,8 +417,10 @@ foreach ($plan in $validationPlans) {
     if ($mode -notin @('rules', 'predicate')) {
         throw "Validation plan '$planName' has invalid mode '$mode'."
     }
-    $validationPlanTypes.Add($planName, $planType)
-    $validationPlanModes.Add($planName, $mode)
+    $validationPlansByName.Add($planName, [pscustomobject]@{
+        Type = $planType
+        Mode = $mode
+    })
 }
 $declarationByName = [Collections.Generic.Dictionary[string, object]]::new(
     [StringComparer]::Ordinal)
@@ -866,17 +867,12 @@ foreach ($table in $validationTables) {
         $patternSources.ToArray() ';'
 }
 $lines.Add('')
-$planNames = [Collections.Generic.HashSet[string]]::new(
-    [StringComparer]::Ordinal)
 foreach ($plan in $validationPlans) {
     $planName = [string](
         Get-RequiredMember $plan 'name' 'validation plan')
     $planType = [string](
         Get-RequiredMember $plan 'type' "validation plan '$planName'")
     Assert-Identifier $planName 'Validation plan name'
-    if (-not $planNames.Add($planName)) {
-        throw "Duplicate validation plan '$planName'."
-    }
     if (-not $declarationByName.ContainsKey($planType) -or
         [string](Get-RequiredMember `
             $declarationByName[$planType] 'kind' `
@@ -885,7 +881,7 @@ foreach ($plan in $validationPlans) {
     }
     $rules = @(
         Get-RequiredMember $plan 'rules' "validation plan '$planName'")
-    if ($validationPlanModes[$planName] -eq 'predicate') {
+    if ($validationPlansByName[$planName].Mode -eq 'predicate') {
         if ($rules.Count -ne 1) {
             throw "Predicate validation plan '$planName' must have one rule."
         }
