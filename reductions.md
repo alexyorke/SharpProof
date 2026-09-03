@@ -18598,3 +18598,27 @@ The two accessor-discovery tests compile the same Subject source twice. Both cre
 | ID | Finding | Evidence |
 |---|---|---|
 | R1645 | Two accessor-discovery tests rebuild identical property/event source and declaration setup before exercising different discovery APIs; cache the immutable fixture and keep discovery state case-local. | `SharpProof.Analyzer.Test/RequiresCallSiteDiscoveryTests.cs:200-232,266-310` |
+
+## Second survey, continued: R1646 - Worker tests duplicate unsupported-callable source fixtures across layers
+
+**`ClaimManifestBuilderTests` and `WorkerTests` carry two byte-identical unsupported-callable source fixtures.** The manifest test compiles the effect-callable fixture for claim construction while the end-to-end worker test sends the same source through the worker, and the corresponding contract-callable pair repeats the same relationship with a second identical source block. These are useful layer-specific assertions, but their immutable source text is maintained twice in the same test project. A shared test-source constant can supply both `Build` and `RunAsync` without sharing mutable compilation, worker state, or the distinct manifest/response assertions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1646 | Manifest and end-to-end Worker tests duplicate the same unsupported-effect and unsupported-contract source blocks; centralize immutable source constants while retaining separate pipelines and assertions. | `SharpProof.Worker.Test/ClaimManifestBuilderTests.cs:778-804,839-861`; `SharpProof.Worker.Test/WorkerTests.cs:1146-1172,1218-1240` |
+
+## Second survey, continued: R1647 - Generator default-value matrices repeat one interpolated source template
+
+**`DefaultValuesMustMatchExactly` and `EqualFloatingDefaultsRemainExact` duplicate the same interpolated `ITarget.Read` and `TargetContracts.Read` source template.** Their test-case values and expected diagnostic polarity differ, but both feed `type`, `targetDefault`, and `companionDefault` into identical source structure before making opposite success/failure assertions. A private source-builder or shared `RunDefaultValuePair` helper can own the template and leave each matrix responsible only for its values and expected result.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1647 | Two default-value test matrices interpolate the same target/companion source structure; share the fixture builder while preserving their different expected diagnostic outcomes. | `SharpProof.ContractForGenerator.Test/ContractForValidatorGeneratorTests.cs:53-104` |
+
+## Second survey, continued: R1648 - Generator unmanaged-pointer matrices repeat one interpolated source template
+
+**`DuplicateUnmanagedFunctionPointerMultiplicityIsExact` and `UnmanagedFunctionPointerConventionSetMustMatchExactly` duplicate the same interpolated unsafe interface/companion source.** Both substitute `targetPointer` and `companionPointer` into the same `ITarget.Map` and `TargetContracts.Map` declarations; only the number of cases and the assertion form differ. A shared fixture builder can generate the compilation input once per case while the two tests retain their distinct exact-count and single-diagnostic contracts.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1648 | Two unmanaged-function-pointer matrices rebuild identical interpolated target/companion source; centralize the source builder and retain the separate cardinality assertions. | `SharpProof.ContractForGenerator.Test/ContractForValidatorGeneratorTests.cs:710-770` |
