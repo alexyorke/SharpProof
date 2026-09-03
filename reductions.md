@@ -21221,3 +21221,10 @@ R2005 is applied: removed the two unconsumed product metadata properties from
 the globally imported release props file, retaining the live publisher,
 version, and project URL authorities. The canonical release-version fixture
 and focused release-authority architecture tests pass (7/7).
+
+R1860 is applied: the architecture suite now discovers every project marked
+`IsRoslynAnalyzer` (including the compiler probe asset), finds each analyzer
+declaration, and requires exactly one generated-code configuration containing
+both `Analyze` and `ReportDiagnostics`. The focused architecture test passes
+(1/1), while the deliberate test fixture that opts out is outside the
+production analyzer inventory.
