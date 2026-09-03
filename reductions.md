@@ -12084,3 +12084,15 @@ R1132 is deferred: remove the now-unconditional change flag and preserve the req
 ### Status (part three hundred sixty-four)
 
 R1133 is deferred: construct a per-file declaration index for OSS instrumentation while retaining exact-one-match validation and the existing instrumentation map.
+
+## Second survey, part three hundred sixty-five: R1134 - duplicate corpus-case uniqueness enforcement
+
+`CorpusGate.RunAsync` checks case-ID uniqueness by counting a `Distinct` projection and, on a duplicate, appends a human-readable failure. The run then unconditionally constructs `casesById` with `ToImmutableDictionary`, which throws on that same duplicate before the result can be returned. Thus the earlier check cannot provide its intended failure record for the invalid input; it performs an extra full projection and set traversal before a later dictionary construction rejects the same condition. Either build the keyed map once and convert its duplicate exception into the gate failure, or make the first check the only validation and pass a known-unique map to downstream consumers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1134 | **Corpus case-ID validation is both redundant and unreachable as a reported failure.** The explicit `Distinct` count detects duplicates, but the later `ToImmutableDictionary` throws on the same input before the accumulated failure can be returned. Share one uniqueness/index construction and preserve the gate's controlled diagnostic. | `SharpProof.Gates/Corpus/CorpusGate.cs:80-85,182-186` |
+
+### Status (part three hundred sixty-five)
+
+R1134 is deferred: use one case-ID index/uniqueness boundary so duplicates remain a controlled corpus-gate failure instead of a later dictionary exception.
