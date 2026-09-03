@@ -17048,3 +17048,9 @@ R1390 is applied: canonical release JSON matching now performs only the
 complete compact serialization comparison; the sorted property-name precheck
 was redundant and had the same rejection message. `ReleasePublicationScriptTests`
 pass (24/24).
+
+R1391 is applied: third-party component shape validation now runs inside the
+single conversion pass for actual components, while expected catalog rows
+retain their existing projection path. Fail-closed schema checks and the
+canonical comparison are unchanged. `PackageDependencyAuthorityTests` pass
+(45/45).

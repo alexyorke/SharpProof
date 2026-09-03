@@ -282,15 +282,19 @@ function Test-SharpProofThirdPartyComponentProjection {
     )
 
     $propertyNames = @('entries', 'id', 'license', 'packageId', 'version')
-    foreach ($component in $ActualComponents) {
-        $actualPropertyNames = @($component.PSObject.Properties.Name |
-            Sort-Object)
-        if (($actualPropertyNames -join '|') -cne
-            ($propertyNames -join '|')) {
-            throw 'Third-party component inventory has an invalid schema.'
+    function ConvertTo-ComponentRecord {
+        param(
+            [Parameter(Mandatory = $true)][object]$Component,
+            [Parameter()][switch]$ValidateShape)
+
+        if ($ValidateShape) {
+            $actualPropertyNames = @($Component.PSObject.Properties.Name |
+                Sort-Object)
+            if (($actualPropertyNames -join '|') -cne
+                ($propertyNames -join '|')) {
+                throw 'Third-party component inventory has an invalid schema.'
+            }
         }
-    }
-    function ConvertTo-ComponentRecord([object]$Component) {
         return [pscustomobject][ordered]@{
             packageId = [string]$Component.packageId
             id = [string]$Component.id
@@ -302,7 +306,7 @@ function Test-SharpProofThirdPartyComponentProjection {
         }
     }
     $actual = @($ActualComponents |
-        ForEach-Object { ConvertTo-ComponentRecord $_ } |
+        ForEach-Object { ConvertTo-ComponentRecord $_ -ValidateShape } |
         Sort-Object packageId, id, version)
     $expected = @($ExpectedComponents |
         ForEach-Object { ConvertTo-ComponentRecord $_ } |
