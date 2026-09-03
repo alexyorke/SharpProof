@@ -380,7 +380,6 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
         private readonly Dictionary<IrId, EncodedValue> _encoded = [];
         private readonly Dictionary<IrVarId, Expr> _variables = [];
         private readonly IrFactory _factory;
-        private readonly QueryResourceMeter _meter;
         private readonly CancellationToken _cancellationToken;
 
         internal QueryEncoder(
@@ -393,7 +392,6 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             _context = context;
             _owner = owner;
             _factory = query.Factory;
-            _meter = meter;
             _cancellationToken = cancellationToken;
             var maximumDepths = new Dictionary<IrId, int>();
             foreach (var assumption in query.Assumptions)

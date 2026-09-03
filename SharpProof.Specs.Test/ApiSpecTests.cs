@@ -28,7 +28,7 @@ public sealed class ApiSpecTests
         var firstA = first.Templates.Single(static row => row.Target.WitnessIdentifier == "a-row");
         var secondA = second.Templates.Single(static row => row.Target.WitnessIdentifier == "a-row");
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(firstA.Id.Value, Is.Zero);
             Assert.That(secondA.Id.Value, Is.Zero);
@@ -38,7 +38,7 @@ public sealed class ApiSpecTests
             Assert.That(firstA.Parameters.Single().Spec, Is.EqualTo(firstA.Id));
             Assert.That(first.ContentSha256, Is.EqualTo(second.ContentSha256));
             Assert.That(first.ContentSha256, Does.Match("^[0-9a-f]{64}$"));
-        });
+        }
     }
 
     [Test]
@@ -138,13 +138,13 @@ public sealed class ApiSpecTests
             ]
         };
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 ApiSpecTable.Create([invalidType]));
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 ApiSpecTable.Create([invalidOperator]));
-        });
+        }
     }
 
     [Test]
@@ -198,7 +198,7 @@ public sealed class ApiSpecTests
         var first = InstantiateStringLength(template, firstFactory);
         var second = InstantiateStringLength(template, secondFactory);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(first.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
             Assert.That(second.Status, Is.EqualTo(SpecInstantiationStatus.Succeeded));
@@ -213,7 +213,7 @@ public sealed class ApiSpecTests
                 typeof(ApiSpecTemplate).GetProperties()
                     .Any(static property => property.PropertyType.Assembly == typeof(IrTerm).Assembly),
                 Is.False);
-        });
+        }
     }
 
     [Test]
@@ -226,12 +226,12 @@ public sealed class ApiSpecTests
             new IrFactory(),
             ImmutableDictionary<SpecVarId, IrTerm>.Empty);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Status, Is.EqualTo(SpecInstantiationStatus.Failed));
             Assert.That(result.Failure!.Kind, Is.EqualTo(SpecInstantiationFailureKind.MissingSubstitution));
             Assert.That(result.Postconditions, Is.Empty);
-        });
+        }
     }
 
     [Test]
@@ -247,7 +247,7 @@ public sealed class ApiSpecTests
             .Single()
             .GetMethod!;
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(second, Is.SameAs(first));
             Assert.That(first.IsComplete, Is.True, string.Join(
@@ -257,7 +257,7 @@ public sealed class ApiSpecTests
             Assert.That(first.TryGet(length, out var spec), Is.True);
             Assert.That(spec!.Template.Target.WitnessIdentifier, Is.EqualTo("bcl.string.length"));
             Assert.That(spec.Symbol, Is.EqualTo(length.OriginalDefinition).Using(SymbolEqualityComparer.Default));
-        });
+        }
     }
 
     [Test]
@@ -278,7 +278,7 @@ public sealed class ApiSpecTests
             property,
             property.Target with { GenericArity = 1 });
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 () => ApiSpecTable.Create([staticConstructor]),
@@ -288,7 +288,7 @@ public sealed class ApiSpecTests
                 () => ApiSpecTable.Create([genericProperty]),
                 Throws.ArgumentException.With.Message.Contains(
                     "properties cannot declare generic arity"));
-        });
+        }
     }
 
     [Test]
@@ -313,11 +313,11 @@ public sealed class ApiSpecTests
             .Target with
         { GenericArity = 1 };
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(ResolverMatchesTarget(constructor, constructorTarget), Is.False);
             Assert.That(ResolverMatchesTarget(property, propertyTarget), Is.False);
-        });
+        }
     }
 
     [Test]
@@ -328,13 +328,13 @@ public sealed class ApiSpecTests
 
         var resolved = ResolveContractRequires(reference, string.Empty);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.Failures, Is.Empty);
             Assert.That(
                 resolved.Specs.Single().Template.Target.WitnessIdentifier,
                 Is.EqualTo("contract.requires.test"));
-        });
+        }
     }
 
     [Test]
@@ -383,7 +383,7 @@ public sealed class ApiSpecTests
                 package.Reference,
                 string.Empty);
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(resolved.Specs, Is.Empty);
                 Assert.That(
@@ -391,7 +391,7 @@ public sealed class ApiSpecTests
                     Is.EqualTo(
                         ApiSpecResolutionFailureKind
                             .UnapprovedReferenceFamily));
-            });
+            }
         }
         finally
         {
@@ -412,7 +412,7 @@ public sealed class ApiSpecTests
                 package.Reference,
                 string.Empty);
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(resolved.Specs, Is.Empty);
                 Assert.That(
@@ -420,7 +420,7 @@ public sealed class ApiSpecTests
                     Is.EqualTo(
                         ApiSpecResolutionFailureKind
                             .UnapprovedReferenceFamily));
-            });
+            }
         }
         finally
         {
@@ -447,7 +447,7 @@ public sealed class ApiSpecTests
                 package.Reference,
                 token);
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(resolved.Specs, Is.Empty);
                 Assert.That(
@@ -455,7 +455,7 @@ public sealed class ApiSpecTests
                     Is.EqualTo(
                         ApiSpecResolutionFailureKind
                             .UnapprovedReferenceFamily));
-            });
+            }
         }
         finally
         {
@@ -476,7 +476,7 @@ public sealed class ApiSpecTests
                 package.Reference,
                 string.Empty);
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(resolved.Specs, Is.Empty);
                 Assert.That(
@@ -484,7 +484,7 @@ public sealed class ApiSpecTests
                     Is.EqualTo(
                         ApiSpecResolutionFailureKind
                             .UnapprovedReferenceFamily));
-            });
+            }
         }
         finally
         {
@@ -501,7 +501,7 @@ public sealed class ApiSpecTests
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(
             CreateTargetFrameworkCompilation(targetFramework));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 resolved.Failures,
@@ -515,7 +515,7 @@ public sealed class ApiSpecTests
                 resolved.Specs.Length,
                 Is.EqualTo(ApiSpecTable.Default.Templates.Length),
                 targetFramework);
-        });
+        }
     }
 
     [Test]
@@ -529,7 +529,7 @@ public sealed class ApiSpecTests
             Declaration("missing-member", "M:System.Object.NotReal", "System.Object")
         ])).Resolve(compilation);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 missingType.Failures.Single().Kind,
@@ -539,7 +539,7 @@ public sealed class ApiSpecTests
                 Is.EqualTo(ApiSpecResolutionFailureKind.MissingMember));
             Assert.That(missingType.Specs, Is.Empty);
             Assert.That(missingMember.Specs, Is.Empty);
-        });
+        }
     }
 
     [Test]
@@ -560,13 +560,13 @@ public sealed class ApiSpecTests
         ]);
         var resolved = new ApiSpecResolver(table).Resolve(compilation);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.Specs, Is.Empty);
             Assert.That(
                 resolved.Failures.Single().Kind,
                 Is.EqualTo(ApiSpecResolutionFailureKind.AmbiguousContainingType));
-        });
+        }
     }
 
     [Test]
@@ -619,13 +619,13 @@ public sealed class ApiSpecTests
         var resolved = new ApiSpecResolver(ApiSpecTable.Create([declaration]))
             .Resolve(compilation);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.Specs, Is.Empty);
             Assert.That(
                 resolved.Failures.Single().Kind,
                 Is.EqualTo(ApiSpecResolutionFailureKind.UnapprovedReferenceFamily));
-        });
+        }
     }
 
     [Test]
@@ -661,13 +661,13 @@ public sealed class ApiSpecTests
             var resolved = new ApiSpecResolver(ApiSpecTable.Create([declaration]))
                 .Resolve(compilation);
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(resolved.Specs, Is.Empty);
                 Assert.That(
                     resolved.Failures.Single().Kind,
                     Is.EqualTo(ApiSpecResolutionFailureKind.UnapprovedReferenceFamily));
-            });
+            }
         }
         finally
         {
@@ -750,7 +750,7 @@ public sealed class ApiSpecTests
         ]);
         var resolved = new ApiSpecResolver(table).Resolve(CreatePlatformCompilation());
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.Specs, Is.Empty);
             Assert.That(resolved.Failures.Length, Is.EqualTo(2));
@@ -758,7 +758,7 @@ public sealed class ApiSpecTests
                 resolved.Failures,
                 Has.All.Property(nameof(ApiSpecResolutionFailure.Kind))
                     .EqualTo(ApiSpecResolutionFailureKind.DuplicateResolvedSymbol));
-        });
+        }
     }
 
     [Test]
@@ -777,7 +777,7 @@ public sealed class ApiSpecTests
             row.Target.WitnessIdentifier is "bcl.array.empty" or
                 "bcl.enumerable.empty");
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(lookup.Status, Is.EqualTo(ApiSpecLookupStatus.Unknown));
             Assert.That(lookup.Failure!.Kind, Is.EqualTo(ApiSpecLookupFailureKind.UnspecifiedMember));
@@ -788,7 +788,7 @@ public sealed class ApiSpecTests
                 cachedEmptyRows.Select(static row =>
                     row.Facets.Effects.Effects),
                 Is.All.EqualTo(SpecEffect.Unknown));
-        });
+        }
     }
 
     [Test]
@@ -879,7 +879,7 @@ public sealed class ApiSpecTests
             .OfType<IMethodSymbol>()
             .Single(static method => method.Parameters.Length == 0);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(resolved.IsPureAndAllocationFree(abs), Is.True);
             Assert.That(resolved.IsPureAndAllocationFree(concat), Is.False);
@@ -895,7 +895,7 @@ public sealed class ApiSpecTests
             Assert.That(resolved.IsSideEffectFree(arrayEmpty), Is.False);
             Assert.That(resolved.IsSideEffectFree(enumerableEmpty), Is.False);
             Assert.That(resolved.IsSideEffectFree(toUpper), Is.False);
-        });
+        }
     }
 
     [Test]
@@ -905,7 +905,7 @@ public sealed class ApiSpecTests
         var compilation = CreatePlatformCompilation();
         var resolved = new ApiSpecResolver(ApiSpecTable.Default).Resolve(compilation);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(templates.Length, Is.EqualTo(16));
             Assert.That(
@@ -915,7 +915,7 @@ public sealed class ApiSpecTests
                 templates.Select(static row => row.Target.DocumentationCommentId),
                 Has.All.Not.Empty);
             Assert.That(resolved.Failures, Is.Empty);
-        });
+        }
     }
 
     [Test]
@@ -933,12 +933,12 @@ public sealed class ApiSpecTests
         .Concat(ApiSpecTable.Default.Templates.SelectMany(
             static row => row.Postconditions.Select(static postcondition => postcondition.Evidence)));
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(evidence.Select(static item => item.Kind), Does.Contain(SpecEvidenceKind.Documented));
             Assert.That(evidence.Select(static item => item.Kind), Does.Contain(SpecEvidenceKind.Observed));
             Assert.That(evidence.Select(static item => item.Source), Has.All.Not.Empty);
-        });
+        }
     }
 
     private static SpecInstantiationResult InstantiateStringLength(

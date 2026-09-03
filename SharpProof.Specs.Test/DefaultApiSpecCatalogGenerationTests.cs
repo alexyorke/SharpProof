@@ -290,7 +290,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
         var expected = declaration.GetProperty("target");
         var actual = template.Target;
         var witness = actual.WitnessIdentifier;
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 actual.WitnessIdentifier,
@@ -355,7 +355,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
                 actual.ApprovedAssemblies,
                 Is.EqualTo(assemblies[assemblySet]),
                 witness);
-        });
+        }
 
         AssertFacets(
             declaration.GetProperty("facets"),
@@ -409,7 +409,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
         var nullness = expected.GetProperty("nullness");
         var cardinality = expected.GetProperty("cardinality");
         var exactCount = cardinality.GetProperty("exactCount");
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 actual.Effects.Effects,
@@ -485,12 +485,12 @@ public sealed class DefaultApiSpecCatalogGenerationTests
                         cardinality.GetProperty("evidence"),
                         evidence)),
                 witness);
-        });
+        }
 
         if (expected.TryGetProperty("termination", out var termination))
         {
             Assert.That(actual.Termination, Is.Not.Null, witness);
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(
                     actual.Termination!.Behavior,
@@ -505,7 +505,7 @@ public sealed class DefaultApiSpecCatalogGenerationTests
                             termination.GetProperty("evidence"),
                             evidence)),
                     witness);
-            });
+            }
         }
         else
         {

@@ -783,13 +783,13 @@ public sealed class BuildTaskTests
 
         task.Cancel();
 
-        Assert.Multiple((Action)(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(task, Is.InstanceOf<ICancelableTask>());
             Assert.That(task.Execute(), Is.True);
             Assert.That(task.ExitCode, Is.EqualTo(-1));
             Assert.That(engine.Errors, Is.Empty);
-        }));
+        }
     }
 
     [Test]
@@ -804,7 +804,7 @@ public sealed class BuildTaskTests
             "source.cs(x,3): warning SP0047: malformed location" + Environment.NewLine +
             "worker stderr");
 
-        Assert.Multiple((Action)(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 engine.Warnings.Select(static warning => warning.Code),
@@ -818,7 +818,7 @@ public sealed class BuildTaskTests
             Assert.That(
                 engine.Messages.Select(static message => message.Message),
                 Does.Contain("worker stderr"));
-        }));
+        }
     }
 
     [Test]
@@ -834,7 +834,7 @@ public sealed class BuildTaskTests
             Environment.NewLine +
             "SharpProof: error SP0048: strict assumptions");
 
-        Assert.Multiple((Action)(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(engine.Warnings, Has.Count.EqualTo(1));
             Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
@@ -855,7 +855,7 @@ public sealed class BuildTaskTests
             Assert.That(engine.Errors[1].Code, Is.EqualTo("SP0048"));
             Assert.That(engine.Errors[1].File, Is.Empty);
             Assert.That(task.HasStructuredError, Is.True);
-        }));
+        }
     }
 
     [Test]
@@ -891,7 +891,7 @@ public sealed class BuildTaskTests
             unknown + Environment.NewLine +
             VerifierDiagnosticTransport.Prefix + "{malformed");
 
-        Assert.Multiple((Action)(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(engine.Warnings, Has.Count.EqualTo(1));
             Assert.That(engine.Warnings[0].Code, Is.EqualTo("SP0048"));
@@ -906,7 +906,7 @@ public sealed class BuildTaskTests
             Assert.That(engine.Errors[0].File, Is.Empty);
             Assert.That(task.HasStructuredError, Is.True);
             Assert.That(engine.Messages, Has.Count.EqualTo(2));
-        }));
+        }
     }
 
     [TestCase(6, true)]
@@ -1830,7 +1830,7 @@ public sealed class BuildTaskTests
                 CachePath = Path.Combine(directory.FullName, "cache")
             };
 
-            Assert.Multiple((Action)(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(task.Execute(), Is.True);
                 Assert.That(File.Exists(result), Is.False);
@@ -1841,7 +1841,7 @@ public sealed class BuildTaskTests
                 Assert.That(File.ReadAllText(launcher), Is.EqualTo("launcher.dll"));
                 Assert.That(File.ReadAllText(protocol), Is.EqualTo("protocol.dll"));
                 Assert.That(engine.Errors, Is.Empty);
-            }));
+            }
         }
         finally
         {

@@ -291,7 +291,7 @@ public sealed class PackageLayoutSmokeTests
                     LanguageNames.CSharp));
             }
 
-            Assert.Multiple((Action)(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(failures, Is.Empty);
                 Assert.That(
@@ -314,7 +314,7 @@ public sealed class PackageLayoutSmokeTests
                 Assert.That(
                     generators,
                     Has.Count.EqualTo(1));
-            }));
+            }
         }
         finally
         {

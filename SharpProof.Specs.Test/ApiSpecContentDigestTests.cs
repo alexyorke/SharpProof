@@ -24,7 +24,7 @@ public sealed class ApiSpecContentDigestTests
             "System.InvalidOperationException"
         ]);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 reorderedWithDuplicates.ContentSha256,
@@ -32,7 +32,7 @@ public sealed class ApiSpecContentDigestTests
             Assert.That(
                 different.ContentSha256,
                 Is.Not.EqualTo(canonical.ContentSha256));
-        });
+        }
     }
 
     private static ApiSpecTable CreateTable(

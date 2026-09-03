@@ -93,7 +93,7 @@ public sealed class ApiSpecValidationTests
             SpecCardinality.Empty,
             []);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 Assert.Throws<ArgumentException>(() =>
@@ -103,7 +103,7 @@ public sealed class ApiSpecValidationTests
                 Assert.Throws<ArgumentException>(() =>
                     ApiSpecTable.Create([inapplicableCardinality]))!.Message,
                 Does.Contain("cardinality facet"));
-        });
+        }
     }
 
     [Test]
@@ -174,7 +174,7 @@ public sealed class ApiSpecValidationTests
                 SpecEffect.WritesArgumentState,
             parameterTypes: [IrTypeKind.Integer]);
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 ApiSpecTable.Create([receiver]).Templates,
@@ -182,7 +182,7 @@ public sealed class ApiSpecValidationTests
             Assert.That(
                 ApiSpecTable.Create([argument]).Templates,
                 Has.Length.EqualTo(1));
-        });
+        }
     }
 
     [Test]
@@ -257,7 +257,7 @@ public sealed class ApiSpecValidationTests
                 IrTypeKind.Boolean)
         };
 
-        Assert.Multiple(() =>
+        using (Assert.EnterMultipleScope())
         {
             foreach (var condition in reached)
             {
@@ -271,7 +271,7 @@ public sealed class ApiSpecValidationTests
                 Assert.Throws<ArgumentException>(() =>
                     ApiSpecTable.Create([declaration]));
             }
-        });
+        }
     }
 
     [Test]

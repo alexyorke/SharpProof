@@ -12533,11 +12533,10 @@ form, and message use.
 
 ### Status (part four hundred sixty-seven)
 
-R1151 is `pending` and is mechanical: 39 call sites, of which 9 also shed a cast.
-It is worth doing mainly because five files currently contain both forms, so a
-reader of those files sees two idioms for one operation with nothing distinguishing
-them - and `ApiSpecTests.cs`, which uses the minority form 22 times against 2, is
-the file most likely to propagate it.
+R1151 is applied: all 39 `Assert.Multiple` call sites now use
+`using (Assert.EnterMultipleScope())`, including removal of the nine redundant
+`(Action)` casts. The affected Package, SMT, Specs, and Worker test runs pass:
+Package 84/84, SMT 29/29, Specs 64/64, Worker 14/14.
 
 ## Second survey, part four hundred sixty-eight: R1152 - package metadata declared twice, and the live copy is the hard-coded one
 
@@ -13246,3 +13245,156 @@ No new ID. R974 was filed as worth acting on ahead of most of this ledger for a
 reason unrelated to line count - a guard whose negation was visually identical to
 itself, in a file that ships to consumers - and that specific hazard is now
 resolved rather than merely deduplicated.
+
+## Second survey, part four hundred seventy-nine: R1157 - one guarded recursive delete, seven hand-written copies, three different containment tests
+
+`eng/testing/TestRepository.cs:59-78` declares `DeleteOwnedTemporaryDirectory(path, rootName, errorMessage)` - resolve, compute the expected temp root, refuse if the target is not inside it, then delete recursively if it exists. It is linked into **every** test project by `Directory.Build.props:70-77` (`SharpProofTestProject == 'true'`) and has five real callers. Seven further places write the same guard by hand.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1157 | **"Delete this directory, but only if it is inside the temporary root I own" is implemented eight times - once as a shared helper that is already on every test project's compile line, and seven more times by hand, under seven messages and three mutually inequivalent containment tests.** The shared `TestRepository.DeleteOwnedTemporaryDirectory` even takes the message as an **optional parameter**, so six of the seven copies exist to vary a value the helper already accepts. The containment tests are not equivalent. **(a) `StartsWith(root + DirectorySeparatorChar, Ordinal)`** - the helper, plus `DefaultApiSpecCatalogGenerationTests.cs:782-799` and `WorkerPerformanceProbe.cs:797-812`. **(b) `GetRelativePath` + reject rooted, `"."`, `".."`, `".." + sep`** - `PackagedProductFeed.cs:111-129`, `FinalCompilationProbeTests.cs:874-894`, `DependencyAuditScriptTests.cs:519-546`, `ReleasePublicationScriptTests.cs:1009-1028`. Form (b) is the **stronger** test: it rejects `..` traversal that form (a) admits whenever the traversal re-enters the prefix. The four sites using the stronger check are all copies; the shared helper uses the weaker one. **(c) `StartsWith(..., OrdinalIgnoreCase)` with no existence guard** - `FinalCompilationCollectorTests.cs:1469-1481`, alone in two respects: it is the only case-insensitive comparison, which on this repository's Linux-only container admits a root the filesystem treats as distinct, and the only site that calls `Directory.Delete(resolved, recursive: true)` **unconditionally**, so a second disposal throws `DirectoryNotFoundException` out of `Dispose` where every other site is a no-op. The clearest single signal that the helper is known and bypassed: `FinalCompilationProbeTests.cs:887` throws `"Refusing to remove an unexpected test directory."` - character-for-character the helper's own **default** `errorMessage` at `TestRepository.cs:62`. Six of the seven copies are in projects that already reference `TestRepository` elsewhere (`SharpProof.Package.Test` at 8 files, `SharpProof.Analyzer.Test` at 2, `SharpProof.Specs.Test` at 1), so they can call it with no build change at all. The seventh, `WorkerPerformanceProbe`, is **production** code in `SharpProof.Gates` and cannot see an `eng/testing` source - the same production/test boundary R725 recorded for the process runner. | `eng/testing/TestRepository.cs:59-78`; callers at `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:3173,3212`, `WorkerMsBuildIntegrationTests.cs:4179`, `SharpProof.Worker.Test/ScalarDifferentialMatrixTests.cs:959`, `WorkerTests.cs:7092`; copies at `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:797-812`, `SharpProof.Analyzer.Test/FinalCompilationCollectorTests.cs:1469-1481`, `SharpProof.Specs.Test/DefaultApiSpecCatalogGenerationTests.cs:782-799`, `SharpProof.Package.Test/PackagedProductFeed.cs:111-129`, `FinalCompilationProbeTests.cs:874-894`, `DependencyAuditScriptTests.cs:519-546`, `ReleasePublicationScriptTests.cs:1009-1028` |
+
+### ID collision: the hex-encoding finding is renumbered R1156
+
+Two different findings currently carry **R1154**. The earlier row is the SHA-256
+lowercase-hex census; the later is `SequenceCardinalityDomain.Widen` validating
+its operands twice. The Widen row keeps **R1154**. **The hex-encoding finding is
+hereby renumbered R1156** - same text, same evidence, same `pending` status; cite
+it as R1156. R1155 is left unallocated to avoid a second collision with any
+in-flight numbering.
+
+### Checked and not proposed (part four hundred seventy-nine)
+
+- **Status update: the check R730 asked for now exists, and it passes.** R730
+  closed by saying "the missing mechanism is a check, not a helper", and spelled
+  out the check: *"a test asserting 'no file in a project that links
+  `TestMetadataReferences` also reads `TRUSTED_PLATFORM_ASSEMBLIES` directly'"*.
+  `SharpProof.ArchitectureTest/SharedTestInfrastructureTests.cs:8-35`
+  `SharedMetadataReferenceProjectsDoNotReadTrustedAssembliesDirectly` is exactly
+  that test. It also passes: **zero** files under `SharpProof.Contracts.Test` or
+  `SharpProof.Worker.Test` contain the string `TRUSTED_PLATFORM_ASSEMBLIES`, so
+  the five hand-rolled sites R730 named inside those two projects have been
+  converted. **Move R730 to applied.** The residual is that the gate names its two
+  projects as a C# string array (`:12-16`) rather than deriving them from the
+  `Directory.Build.props` condition that distributes the file - the same
+  two-project fact written twice in two languages, with nothing tying them
+  together, so adding a third linked project leaves the gate silently blind to it.
+  That residual is the shape of R326 (anchor slugs implemented twice in two
+  languages) applied to a project list, and is recorded here rather than filed,
+  because R233 already owns the underlying "the root build file has to know every
+  consumer" problem.
+- **R425 is applied.** No `.csproj` outside `artifacts/` references `eng/testing`
+  at all now; all eight shared sources are distributed centrally from
+  `Directory.Build.props:70-131`. The three duplicated `Compile Include` elements
+  R425 named are gone.
+- **R233 has drifted and its counts should be refreshed when it is acted on.** It
+  records "four further `ItemGroup`s gate `eng/testing` sources by explicit
+  project-name lists (12 more names)". There are now **six** such `ItemGroup`s,
+  covering `TempDirectory.cs`, `TestMetadataReferences.cs`,
+  `DictionaryAnalyzerConfigOptions.cs`, `DiagnosticDescriptorCatalogAssertions.cs`,
+  `ApiSpecTestFacets.cs` and `RuntimeAssemblyTestHost.cs`, naming **16** projects
+  between them - R425's fix moved two more lists into the file R233 is about. One
+  of the six is worth calling out on its own: the
+  `DictionaryAnalyzerConfigOptions.cs` group names `SharpProof.Gates`, a
+  **production** assembly, so `eng/testing/` is not a test-only directory and the
+  `SharpProofTestProject` property is not what governs it.
+- **The custom-exception surface is clean; no finding.** The repository declares
+  **14** types whose name ends in `Exception`, and **only four are in production**:
+  `DataflowConvergenceException`, `FuzzUsageException`,
+  `QueryResourceLimitException` and `UnsupportedIrEncodingException`. Each is both
+  thrown and caught. The other ten are test fixtures - `BoomException`,
+  `UserException`, `FirstException` and so on - existing to be observed by an
+  analyzer or replayed through the worker protocol. There is no unused exception
+  hierarchy and no production type declared but never thrown.
+- **Exception *message* duplication in production is near zero; no finding.**
+  Across **693** `throw new *Exception(...)` sites, exactly **one** message
+  literal is thrown as two different types - *"A specification-pack term is too
+  deep."*, as `ArgumentException` at
+  `CompilerSpecificationPackProvider.cs:268` and as `InvalidDataException` at
+  `:565` of the same file - and exactly **one** literal appears at four or more
+  sites, *"Trusted platform assemblies are unavailable."*, which **R729** already
+  records by name along with its 14-site/3-site message split. For a body of this
+  size that is a disciplined surface, and it is the reason no
+  message-consolidation finding is filed.
+- **The four production `TRUSTED_PLATFORM_ASSEMBLIES` reads are already filed.**
+  `AnalyzerGateHost.cs:157`, `WorkerPerformanceProbe.cs:726,841`,
+  `IrCSharpDifferentialOracle.cs:601` and
+  `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1773` are inside R729's 23 sites and
+  R341's 24, both of which already name `AnalyzerGateHost` and
+  `IrCSharpDifferentialOracle` explicitly, and R729 already records the ordering
+  divergence (5 files sort the split paths, 18 do not). No new ID.
+- **The temp-directory naming angle is R726 and was not re-filed.** R726 already
+  counts the 64 sites, the three conventions, and makes the
+  `Directory.CreateTempSubdirectory` atomicity/umask argument. R1157 is a
+  different axis - not how the directory is *named* or *created*, but how its
+  *deletion* is guarded - and none of the seven messages it names appears anywhere
+  else in this ledger.
+
+### Status (part four hundred seventy-nine)
+
+R1157 is `pending`, and six of its seven sites are a mechanical substitution with
+no build change: replace the hand-written block with
+`TestRepository.DeleteOwnedTemporaryDirectory(root, rootName, message)`. The
+decision that needs an owner is which containment test becomes canonical, because
+the four `GetRelativePath` sites are stricter than the helper they would be folded
+into - adopting the helper as written would **weaken** them. The honest sequence is
+to move the helper to form (b) first, then substitute. The seventh site is
+production code and needs the same production/test placement decision R725 left
+open.
+
+## Second survey, part four hundred eighty: R1158 - whether a script runs under strict mode depends on which helper it dot-sources
+
+101 PowerShell files, 33,298 lines. Every one declares `param(...)`; 85 use
+`[CmdletBinding()]`; **91 set `Set-StrictMode -Version Latest`** and **83 set
+`$ErrorActionPreference = 'Stop'`**, with **zero** value divergence in either -
+no `-Version 2.0`, no `'Continue'`. The convention is uniform where it is
+present. What is not uniform is *where* it is present, and the mechanism makes
+that consequential.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1158 | **`Set-StrictMode` is set by nine of the eighteen shared PowerShell libraries and omitted by the other nine, and because dot-sourcing executes in the caller's scope, a script's strictness is decided by which helpers it loads rather than by anything the script says.** Eighteen files are dot-sourced by two or more callers. Nine put `Set-StrictMode -Version Latest` on **line 1** - `SharpProof.ReleaseJson.ps1` (8 callers), `Test-SharpProofSymbolPackages.ps1` (4), `CSharpSourceMetrics.ps1` (3), `SharpProof.FuzzEvidenceLifecycle.ps1` (3), `Assert-SharpProofFuzzRunnerResult.ps1` (3), `SharpProof.ReleaseBundle.ps1` (3), `Test-SharpProofPackageDependencies.ps1` (3), `Test-SharpProofPackagePayloads.ps1` (3), `Assert-SharpProofStandaloneGateResult.ps1` (2). Nine do not, including the three most-loaded: `GeneratedFileHelpers.ps1` (15 callers), `Resolve-SharpProofContainedPath.ps1` (15), `Get-SharpProofReleaseVersion.ps1` (10). Top-level `Set-StrictMode` in a dot-sourced file applies to the current scope and its children, and a dot-source *is* the caller's scope, so each of the nine silently re-configures every consumer for the rest of the run. **The clearest demonstration is the repository's own generator set.** `scripts/GeneratedFileHelpers.ps1` is dot-sourced by **all fifteen** generators - the fourteen `scripts/Generate-*.ps1` plus `SharpProof.Specs.Test/Generate-ApiSpecRuntimeWitnesses.ps1` - and it is one of the nine that never calls `Set-StrictMode`, which reads as deliberate library discipline. Its **line 1** is `. (Join-Path $PSScriptRoot 'CSharpSourceMetrics.ps1')`, and **line 1 of `CSharpSourceMetrics.ps1` is `Set-StrictMode -Version Latest`**. So all fifteen generators do run strict, through a two-hop path that no generator states and that the restraint in `GeneratedFileHelpers.ps1` was apparently meant to avoid. The same shape occurs again at `SharpProof.PublicationDestination.ps1:5`, which dot-sources the strict `SharpProof.ReleaseJson.ps1`. **The control is that `$ErrorActionPreference` - identical mechanism, identical leak semantics - is set by *none* of the eighteen libraries and by 83 of the 101 files overall.** One preference variable has a consistent library rule and the adjacent one is a coin flip, with no comment, gate, or settings file distinguishing them: there is no PSScriptAnalyzer configuration and no `.psd1` in the repository, and no test asserts a script header. The practical cost is that an author reading `Get-SharpProofTcbPaths.ps1` cannot tell whether a misspelled `$variable` throws or evaluates to `$null`. | `scripts/GeneratedFileHelpers.ps1:1`; `scripts/CSharpSourceMetrics.ps1:1`; `scripts/SharpProof.PublicationDestination.ps1:1-5`; `scripts/SharpProof.ReleaseJson.ps1:1`; the fifteen generators listed above; nine strict-setting and nine non-setting libraries as enumerated; 101 `.ps1`/`.psm1` files |
+
+### Checked and not proposed (part four hundred eighty)
+
+- **92 of the 93 dot-source sites are unguarded, and the single guard sits one
+  line above an unguarded one.** `scripts/SharpProof.PublicationDestination.ps1:1-4`
+  wraps its load of `Get-SharpProofReleaseVersion.ps1` in
+  `if (-not (Get-Command Test-SharpProofReleaseVersionSyntax -CommandType Function -ErrorAction SilentlyContinue))`,
+  then loads `SharpProof.ReleaseJson.ps1` bare on line 5. Re-dot-sourcing is
+  idempotent for function definitions, so the guard buys little beyond a small
+  parse saving - which is why this is recorded rather than filed - but a reader
+  meeting the guarded form first will reasonably infer a convention that one file
+  in the repository follows once.
+- **The values are not the problem; only the placement is.** All 91
+  `Set-StrictMode` calls specify `-Version Latest` and all 83
+  `$ErrorActionPreference` assignments specify `'Stop'`. There is no version or
+  value drift to consolidate, which is why R1158 is about the library boundary
+  and not about the strings.
+- **The nine non-strict libraries are not simply unhardened.** Every one of them
+  is dot-sourced by two or more callers and none is an entry point, so declining
+  to mutate the caller's scope is a defensible library rule - the same rule they
+  all follow for `$ErrorActionPreference`. The finding is that the other nine
+  libraries do not follow it, not that these nine should start setting it.
+- **`SharpProof.Gates/Corpus/Import-OssCorpus.ps1` is the only `.ps1` outside
+  `scripts/` and `eng/`, and the only file in the repository that sets
+  `$ErrorActionPreference` without `Set-StrictMode`.** It is dot-sourced by
+  nothing and invoked by no other PowerShell file. It is not proposed for removal:
+  it is a 35-line operator entry point for corpus import, named in four non-script
+  files, and R951-style reachability arguments do not apply to a documented manual
+  tool. It is recorded because it is the single exception to a repository-wide
+  pairing, and an unpaired `$ErrorActionPreference` in an entry point is the one
+  place the pairing actually matters.
+
+### Status (part four hundred eighty)
+
+R1158 is `pending`, and the decision is one line of policy rather than a
+refactor: either shared libraries never set `Set-StrictMode` - matching what all
+eighteen already do for `$ErrorActionPreference`, and requiring the nine
+strict-setting libraries to drop line 1 while entry points keep theirs - or they
+always do, and the nine that abstain adopt it. The first is the smaller change and
+the one the `$ErrorActionPreference` precedent argues for, but it is the one that
+can *reduce* strictness at a call site, so it needs the owner's answer rather than
+a mechanical edit. Either way the two-hop path from
+`GeneratedFileHelpers.ps1` to `CSharpSourceMetrics.ps1` should be made explicit,
+because it is currently the sole reason fifteen code generators run strict.

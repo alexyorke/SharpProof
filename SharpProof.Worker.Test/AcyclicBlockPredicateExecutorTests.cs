@@ -332,7 +332,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        Assert.Multiple((Action)(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.Throws<OperationCanceledException>((Action)(() =>
                 new AcyclicBlockPredicateExecutor(
@@ -356,7 +356,7 @@ public sealed class AcyclicBlockPredicateExecutorTests
                     target,
                     WorkerBudgets.DefaultMaximumExpressionDepth,
                     cancellation.Token)));
-        }));
+        }
     }
 
     [Test]

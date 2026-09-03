@@ -59,7 +59,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
             var expectedFacets = ExpectedFacets(template);
             var actualFacets = row.Facets.Select(static witness => witness.Facet).ToArray();
 
-            Assert.Multiple(() =>
+            using (Assert.EnterMultipleScope())
             {
                 Assert.That(
                     actualFacets,
@@ -81,7 +81,7 @@ public sealed partial class ApiSpecRuntimeOracleTests
                     row.Postconditions.Select(static witness => witness.EdgeInputs),
                     Has.All.Not.Empty,
                     identifier + " has a postcondition witness without named edge inputs.");
-            });
+            }
         }
     }
 

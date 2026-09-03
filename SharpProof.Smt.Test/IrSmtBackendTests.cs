@@ -553,7 +553,7 @@ public sealed class IrSmtBackendTests
             new Dictionary<string, int>(StringComparer.Ordinal),
             static expression => expression.Label);
 
-        Assert.Multiple((Action)(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 success.Status,
@@ -565,7 +565,7 @@ public sealed class IrSmtBackendTests
                 failure.FailureReason,
                 Is.EqualTo(BackendFailureReason.MalformedResult));
             Assert.That(malformed.All(static item => item.IsDisposed), Is.True);
-        }));
+        }
     }
 
     [Test]
@@ -601,13 +601,13 @@ public sealed class IrSmtBackendTests
 
         owner.Dispose();
 
-        Assert.Multiple((Action)(() =>
+        using (Assert.EnterMultipleScope())
         {
             Assert.That(owner.OwnedCount, Is.Zero);
             Assert.That(expressions.All(static expression =>
                 NativeObject(expression) == IntPtr.Zero), Is.True);
             Assert.That(solver.Check(), Is.EqualTo(Z3Status.SATISFIABLE));
-        }));
+        }
     }
 
     [Test]
