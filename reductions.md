@@ -10789,3 +10789,15 @@ R1025 is deferred: remove only the redundant `ToImmutableArray()` call, and pres
 ### Status (part two hundred fifty-seven)
 
 R1026 is deferred: share only the divergent base declaration and completion-facts construction, and retain the separate runtime-override and base-qualified-call cases.
+
+## Second survey, part two hundred fifty-eight: R1027 - string-dispatched parameterized assertions
+
+`IndirectMutationDoesNotSuppressReceiverEffects` is parameterized with `ThroughRefAlias` and `ThroughLocalFunction`, but its assertion envelope changes inside the test by comparing `methodName` to the literal `ThroughRefAlias`. The two cases therefore do not advertise their different expected write/completeness contracts in the test data; adding or renaming a case can silently select the wrong assertions. Supplying expected values as test-case arguments, or splitting the cases when their contracts are intentionally different, removes the string branch while preserving the shared exception assertion.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1027 | **A parameterized nullness regression test hides unequal assertions behind a method-name branch.** Both cases enter the same test, but only `ThroughRefAlias` receives static-write and completeness checks because of `if (methodName == "ThroughRefAlias")`; the assertion contract is encoded in control flow rather than in the case data. Parameterized expected values or separate focused tests would make the distinction explicit and eliminate the name-coupled branch. | `SharpProof.Effects.Test/IndirectLocalMutationNullnessRegressionTests.cs:46-102` |
+
+### Status (part two hundred fifty-eight)
+
+R1027 is deferred: make the per-case write/completeness expectations explicit, and retain the shared exception assertion and both aliasing mechanisms.
