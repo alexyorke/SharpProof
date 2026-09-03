@@ -14656,6 +14656,12 @@ tests pass (44 passed).
 |---|---|---|
 | R1215 | **`CallableVerifier` evaluates the false-normal-completion pattern twice during setup.** The `normalCompletion is IrBooleanTerm { Value: false }` test is duplicated for `normalCompletionProofCore` and `noModeledNormalReturn`; factoring that result into one local removes a repeated match while keeping both downstream meanings explicit. | `SharpProof.Worker/CallableVerifier.cs:147-153` |
 
+### Status (part five hundred thirty-seven)
+
+R1215 is applied: verifier setup computes the false normal-completion pattern
+once and reuses it for both proof-core and modeled-return state. TCB edge-case
+tests pass (44 passed).
+
 ## Second survey, part five hundred thirty-eight: R1216 - spec-call result type is looked up twice
 
 `AcyclicBlockPredicateExecutor.ApplySpec` obtains the type of `call.Target` while validating the specification's declared result type, then performs the same `factory.GetVariableInfo(call.Target.Value).Type` lookup again when creating the synthetic `spec-call-result` variable. The target is already known to exist after the initial guard, so retaining the validated type in a local can feed both the admission check and result-variable construction without changing any spec-shape validation.
