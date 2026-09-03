@@ -21129,3 +21129,11 @@ iterator now owns cancellation polling and reachable-block filtering for both
 CFG consumers, while their block processing remains separate. The full
 `SharpProof.Analyzer.Test` suite passes 476/476 and
 `SharpProof.Meta.Analyzers.Test` passes 163/163, with zero warnings or errors.
+
+## Second survey, continued: R2000 - Invoke-SharpProofReleaseContainer Publish repeats full release validation
+
+`Invoke-SharpProofReleaseContainer -Mode Publish` runs `Test-SharpProofReleaseArtifacts.ps1` over `$packageRoot`, then immediately starts `Publish-SharpProofRelease.ps1` with the same source. The publisher's `Get-ValidatedRelease` rereads `SharpProof.release.json`, checks schema/version/authority/repository, runs `Test-SharpProofReleaseBundleTopology`, revalidates every artifact byte and package ID, payload, third-party graph, and symbol pair. Normal publication therefore performs two full release-bundle validations before any push; have the validator return a validated release projection and pass it into the publisher, or make the outer mode validate only the additional tag/qualification boundary. Preserve any outer expected-tag check and the publisher's pre-push freshness checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2000 | Invoke-SharpProofReleaseContainer Publish validates the same release bundle once before invoking a publisher that fully validates it again. | scripts/Invoke-SharpProofReleaseContainer.ps1:239-258; scripts/Test-SharpProofReleaseArtifacts.ps1:19-162; scripts/Publish-SharpProofRelease.ps1:175-404 |
