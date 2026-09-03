@@ -13996,6 +13996,12 @@ without changing the string-formatting policy.
 |---|---|---|
 | R1182 | **`ExceptionHandlerReachability.AddFormattedValuePotential` resolves the same formatted-value method twice.** `GetFormattedValueExceptions` and the method's completion check both call `StringConcatenationEffectResolver.TryResolveFormattedValueMethod` with identical inputs before the caller returns. A shared `(target, dispatchUncertain, resolved)` projection can remove the duplicate symbol/operation analysis while preserving unknown-potential and completion behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:2564-2627`; resolver `SharpProof.Effects/StringConcatenationEffectResolver.cs` |
 
+### Status (part five hundred four)
+
+R1182 is applied: formatted-value exception and completion paths share one
+resolution snapshot per operand, including required, target, and dispatch state.
+The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred five: R1183 - return nullability uses two aggregate passes
 
 `GetReturnNullability` has already collected the reachable returned values into a
