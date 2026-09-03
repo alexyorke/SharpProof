@@ -1084,6 +1084,23 @@ public sealed class IrKernelTests
             factory.String("fallback"));
     }
 
+    private static IrTerm BuildAdditionChain(
+        IrFactory factory,
+        IrTerm seed,
+        IrTerm operand,
+        int depth)
+    {
+        var term = seed;
+        for (var index = 0; index < depth; index++)
+        {
+            term = factory.Binary(
+                IrBinaryOperator.Add,
+                term,
+                operand);
+        }
+        return term;
+    }
+
     [Test]
     public void MemoizedSubtermsCannotBypassTheEvaluationDepthLimit()
     {
@@ -1144,14 +1161,12 @@ public sealed class IrKernelTests
 
         // A variable operand keeps the factory from constant-folding the chain
         // away, so the term really is 512 levels deep.
-        var term = (IrTerm)factory.Variable(value);
-        for (var index = 0; index < 512; index++)
-        {
-            term = factory.Binary(
-                IrBinaryOperator.Add,
-                term,
-                factory.Variable(value));
-        }
+        var variableTerm = (IrTerm)factory.Variable(value);
+        var term = BuildAdditionChain(
+            factory,
+            variableTerm,
+            variableTerm,
+            512);
 
         var environment = new Dictionary<IrVarId, IrValue>
         {
@@ -1174,14 +1189,12 @@ public sealed class IrKernelTests
     {
         var factory = new IrFactory();
         var value = factory.CreateVariable("value", factory.IntegerType);
-        var term = (IrTerm)factory.Variable(value);
-        for (var index = 0; index < 32; index++)
-        {
-            term = factory.Binary(
-                IrBinaryOperator.Add,
-                term,
-                factory.Variable(value));
-        }
+        var variableTerm = (IrTerm)factory.Variable(value);
+        var term = BuildAdditionChain(
+            factory,
+            variableTerm,
+            variableTerm,
+            32);
 
         var environment = new Dictionary<IrVarId, IrValue>
         {

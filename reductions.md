@@ -325,6 +325,7 @@ the smallest relevant containerized test target passes.
 | R970 | Use static-field naming for shared mutable state | Architecture and worker builds/tests passed |
 | R961 | Replace CompilerArtifact global usings with explicit per-file imports | CompilerArtifact build and generator verification passed |
 | R972 | Reuse scalar-catalog integer bounds in the IL lowerer | CompilerCollector build and Worker.Test: 695 passed |
+| R996 | Share the left-associated addition-chain fixture in IR depth tests | `SharpProof.Ir.Test`: 114 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -10408,7 +10409,9 @@ The IR kernel tests independently construct the same left-associated integer-add
 
 ### Status (part two hundred twenty-seven)
 
-R996 is deferred: the duplicated fixture is small and readable, so centralize it only if more depth-boundary tests are added or the chain shape changes.
+R996 is applied for the two identical left-associated depth-boundary fixtures:
+they now use one test-only chain builder. The memoized-subterm test retains its
+distinct right-nested construction because that shape is part of its assertion.
 
 ## Second survey, part two hundred twenty-eight: R997 - coincident unrelated workflow schedules
 
