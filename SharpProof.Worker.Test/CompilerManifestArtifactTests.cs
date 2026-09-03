@@ -1500,7 +1500,7 @@ public sealed class CompilerManifestArtifactTests
             .Instructions[^1];
         wrongReturn.A = wrongGraph.Roots[0];
 
-        var honest = CanonicalRoundTrip(CloneArtifact(valid));
+        var honest = CanonicalRoundTrip(valid);
 
         using (Assert.EnterMultipleScope())
         {
@@ -2686,18 +2686,10 @@ public sealed class CompilerManifestArtifactTests
     private static void AssertMalformedAdditionalFiles(
         params CompilerAdditionalFileSnapshot[] files)
     {
-        var artifact = CreateArtifact();
-        artifact.Compilation.AdditionalFiles = files;
-        artifact.CompilationSha256 =
-            CompilationFingerprint.ComputeSha256(artifact.Compilation, []);
-        var json = JsonSerializer.Serialize(
-                artifact,
-                WorkerProtocolJson.Options) +
-            "\n";
-
-        Assert.Throws<JsonException>(
-            (Action)(() =>
-                CompilerManifestArtifactJson.Deserialize(json)));
+        AssertMalformedCapture(compilation =>
+        {
+            compilation.AdditionalFiles = files;
+        });
     }
 
     private static void AssertMalformedCapture(
