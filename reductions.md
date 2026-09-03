@@ -14320,6 +14320,12 @@ operator-initialization and property-setter policies.
 |---|---|---|
 | R1197 | **`ExceptionHandlerReachability` recomputes increment/decrement target completion across three phases.** The `IIncrementOrDecrementOperation` case stores `priorPhasesComplete`, `CanThrowUnknownAfterPrerequisites` calls `canCompleteNormally(increment.Target)` again, and the subsequent generic `PushChildren` path reaches `PushSequentialCore`, which checks the target a third time. A shared target-completion fact can remove the repeated traversal without changing throw or child-order behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:534-577,3008-3034,1413-1427` |
 
+### Status (part five hundred nineteen)
+
+R1197 is applied: increment target completion is cached and reused by
+exception classification, unknown-throw checks, and child scheduling. The
+Effects test suite passes (323/323).
+
 ## Second survey, part five hundred twenty: R1198 - an accessor branch repeats the fallback
 
 `GetAccessors` has one meaningful exception: a property used as the target of
