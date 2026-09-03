@@ -16192,3 +16192,19 @@ Three CompilerProbeSnapshotTests cases pass Path.Combine(Path.GetTempPath(), Gui
 | ID | Finding | Evidence |
 |---|---|---|
 | R1345 | **Three probe snapshot tests create global-temp JSON files without cleanup. Reuse the existing `TempDirectory` fixture or add helper-owned finally cleanup, preserving snapshot contents while removing test-run debris.** | `SharpProof.Package.Test/CompilerProbeSnapshotTests.cs:14-24,27-50,70-90,137-167` |
+
+## Second survey, continued: R1346 - Repeated compiler-location authority assertion plumbing
+
+In `CompilerSourceLocationAuthorityTests`, three tests independently pass the same six authority fields (`Location`, source-tree ordinal/path/hash/line-map hash, and compilation) into `CompilerSourceLocationAuthority.IsBound`: direct diagnostic binding, generic manifest authorities, and mapped diagnostic arrays. The assertions differ only in the source of the authority or quantifier. A local `AssertBound` helper (or artifact-aware overload) can centralize the argument plumbing while preserving each test's semantics and the separate `allowNone` sentinel case. This is test-only duplication; production validation should remain unchanged.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1346 | **`CompilerSourceLocationAuthorityTests` repeats the six-argument `IsBound` assertion plumbing in three tests.** A local authority assertion helper can centralize the location, source-tree ordinal/path/hash, line-map hash, and compilation arguments while retaining the direct, all-authority, and mapped-diagnostic assertion shapes. | `SharpProof.Worker.Test/CompilerSourceLocationAuthorityTests.cs:60-67,96-104,208-216` |
+
+## Second survey, continued: R1347 - Duplicated qualification package-artifact fixture
+
+In `ReleaseQualificationMatrixTests`, both receipt tests build the same six-element anonymous `packageArtifacts` array (`package-{index}.nupkg`, `bytes = 1`) before serializing different evidence schemas. A small `CreatePackageArtifacts()` helper or shared test fixture can own that invariant; the tests should retain their distinct gate payloads and assertions. This removes repeated fixture setup without changing receipt coverage.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1347 | **`ReleaseQualificationMatrixTests` constructs the same six package-artifact fixture twice.** Both receipt scenarios independently generate `package-{index}.nupkg` rows with `bytes = 1`; a shared fixture helper can preserve the distinct portable and pilot evidence shapes while removing the repeated setup. | `SharpProof.ArchitectureTest/ReleaseQualificationMatrixTests.cs:100-104,178-183` |
