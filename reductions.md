@@ -19045,7 +19045,6 @@ operator, conversion, and nullness-specific behavior remains in each caller.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1672 | Two effect-replay tests repeat the same object/array allocation event-kind list; share the immutable test-data roster while retaining separate behavior assertions. | `SharpProof.Worker.Test/EffectCounterexampleReplayTests.cs:14-18,402-408` |
-
 ## Second survey, continued: R1673 - Effect replay fixtures bypass the shared allocation-witness vocabulary
 
 `EffectCounterexampleReplayTests.CreateFixture` maps allocation event kinds to the raw wire strings `managed-allocation` and `managed-array-allocation`, and `ConcurrentObjectAndArrayReplaysRemainIndependent` spells both strings again when counting results. The shared `AllocationWitnessKinds.Managed` test vocabulary introduced for the package and Worker suites is already linked into `SharpProof.Worker.Test`, so this remaining Worker consumer can derive its fixture kind and result counts from the same two-entry mapping. Keep the event-to-witness distinction and the concurrency assertions, but remove the third local authority for the wire names.
@@ -19053,3 +19052,7 @@ operator, conversion, and nullness-specific behavior remains in each caller.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1673 | Effect replay fixtures still duplicate allocation-witness wire strings in mapping and counts; adopt the existing shared `AllocationWitnessKinds.Managed` data. | `SharpProof.Worker.Test/EffectCounterexampleReplayTests.cs:488-517,692-702`; shared `eng/testing/AllocationWitnessKinds.cs` |
+
+R1670 is applied: the term-depth and type-depth encoder rejection cases now
+share one parameterized encode/reject test, with explicit builders for the two
+nested-value shapes. Both cases pass (2/2).

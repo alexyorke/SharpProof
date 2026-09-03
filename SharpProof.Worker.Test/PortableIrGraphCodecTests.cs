@@ -739,10 +739,25 @@ public sealed class PortableIrGraphCodecTests
             (Action)(() => PortableIrGraphCodec.Decode(graph)));
     }
 
-    [Test]
-    public void EncoderRejectsTermsDeeperThanTheDecoderLimit()
+    [TestCase(DeepGraphKind.Terms)]
+    [TestCase(DeepGraphKind.Types)]
+    public void EncoderRejectsValuesDeeperThanTheDecoderLimit(
+        DeepGraphKind kind)
     {
         var factory = new IrFactory();
+        var term = kind switch
+        {
+            DeepGraphKind.Terms => DeepTerm(factory),
+            DeepGraphKind.Types => DeepTypeTerm(factory),
+            _ => throw new AssertionException("Unknown graph kind.")
+        };
+
+        Assert.Throws<InvalidDataException>((Action)(() =>
+            PortableIrGraphCodec.Encode(factory, null, [term])));
+    }
+
+    private static IrTerm DeepTerm(IrFactory factory)
+    {
         IrTerm term = factory.Variable(
             factory.CreateVariable("value", factory.BooleanType));
         for (var index = 0;
@@ -751,15 +766,11 @@ public sealed class PortableIrGraphCodecTests
         {
             term = factory.Unary(IrUnaryOperator.Not, term);
         }
-
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            PortableIrGraphCodec.Encode(factory, null, [term])));
+        return term;
     }
 
-    [Test]
-    public void EncoderRejectsTypesDeeperThanTheDecoderLimit()
+    private static IrTerm DeepTypeTerm(IrFactory factory)
     {
-        var factory = new IrFactory();
         var type = factory.IntegerType;
         for (var index = 0;
              index < PortableIrGraphCodec.MaximumGraphDepth;
@@ -767,10 +778,7 @@ public sealed class PortableIrGraphCodecTests
         {
             type = factory.GetOrCreateSequenceType(type);
         }
-        var term = factory.Variable(factory.CreateVariable("value", type));
-
-        Assert.Throws<InvalidDataException>((Action)(() =>
-            PortableIrGraphCodec.Encode(factory, null, [term])));
+        return factory.Variable(factory.CreateVariable("value", type));
     }
 
     private static InvalidDataException AssertDecoderRejects(
