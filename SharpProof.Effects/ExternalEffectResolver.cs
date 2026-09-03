@@ -10,7 +10,7 @@ internal sealed class ExternalEffectResolver
 
     internal ExternalEffectResolver(Compilation compilation, ApiSpecTable apiSpecs)
         : this(
-            ArgumentNullGuard.NotNull(compilation, nameof(compilation)),
+            compilation,
             new ApiSpecResolver(ArgumentNullGuard.NotNull(apiSpecs, nameof(apiSpecs)))
                 .Resolve(compilation))
     {

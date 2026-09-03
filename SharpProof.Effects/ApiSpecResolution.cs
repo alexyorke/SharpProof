@@ -28,7 +28,9 @@ public sealed class ResolvedApiSpecTable(ImmutableDictionary<ISymbol, ResolvedAp
     ImmutableArray<ApiSpecResolutionFailure> failures)
 {
     private readonly ImmutableDictionary<ISymbol, ResolvedApiSpec> _specs = specs;
-    public ImmutableArray<ResolvedApiSpec> Specs => [.. _specs.Values.OrderBy(static spec => spec.Template.Id.Value)];
+    private readonly ImmutableArray<ResolvedApiSpec> _orderedSpecs =
+        [.. specs.Values.OrderBy(static spec => spec.Template.Id.Value)];
+    public ImmutableArray<ResolvedApiSpec> Specs => _orderedSpecs;
     public ImmutableArray<ApiSpecResolutionFailure> Failures { get; } = failures;
     public bool IsComplete => Failures.IsDefaultOrEmpty;
     public bool TryGet(
@@ -233,7 +235,10 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
             string.Equals(approved.PublicKeyToken, token, StringComparison.OrdinalIgnoreCase);
         }
 
-        if (!target.ApprovedAssemblies.Any(IdentityMatches))
+        var identityMatches = target.ApprovedAssemblies
+            .Where(IdentityMatches)
+            .ToArray();
+        if (identityMatches.Length == 0)
         {
             return (false, false, ApiSpecReferenceFamily.Unspecified, string.Empty);
         }
@@ -248,8 +253,7 @@ public sealed class ApiSpecResolver(ApiSpecTable table)
             path);
         return (
             true,
-            target.ApprovedAssemblies.Any(approved =>
-                IdentityMatches(approved) &&
+            identityMatches.Any(approved =>
                 (approved.ReferenceFamily == ApiSpecReferenceFamily.Unspecified ||
                  approved.ReferenceFamily == family)),
             family,

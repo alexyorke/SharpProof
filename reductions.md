@@ -12206,7 +12206,7 @@ polls remain unchanged. The focused `IrSmtBackend` suite passes (29/29).
 
 ### Status (part three hundred seventy)
 
-R1139-R1141 are deferred: remove only the repeated constructor guard, cache the immutable ordered API-spec projection, and share the approved-assembly identity scan while preserving direct-constructor validation, deterministic ordering, and the existing two-stage reference admission semantics.
+R1139-R1141 are applied. `ExternalEffectResolver` keeps validation in the receiving constructor, `ResolvedApiSpecTable` caches its deterministic template-ID ordering, and `ApiSpecResolver` reuses the identity-matching approvals for family admission. The focused `SharpProof.Effects.Test` suite passes (323/323).
 
 ## Second survey, part three hundred seventy-one: R1142 - repeated callable-reason passes
 
@@ -12954,3 +12954,113 @@ deleting the no-op `.ToUpperInvariant()`. The part that needs an owner's answer 
 the four uppercase sites: either they are outside the lowercase domain and should
 say so, or they are inside it and are currently producing values that
 `HashEncoding.IsSha256` would reject.
+## Second survey, part four hundred seventy-five: R734 and R735 are applied - the counts confirm it exactly
+
+Continuing to apply the reflection-gate precondition to this ledger's own open
+items. Two more turn out to be resolved rather than wrong.
+
+### Status update: R734 applied, and the arithmetic matches the prediction
+
+R734 identified **exactly three** `InternalsVisibleTo` grants whose grantee had no
+reference path to the granter, and therefore could never take effect:
+`SharpProof.Contracts` to `SharpProof.CompilerArtifact`, `SharpProof.Contracts` to
+`SharpProof.Worker`, and `SharpProof.Frontend` to `SharpProof.CompilerArtifact`.
+**All three are gone.** `SharpProof.Contracts.csproj` now grants four
+(`ContractForGenerator`, `Analyzer`, `Analyzer.Core`, `CompilerCollector`) where it
+granted six; `SharpProof.Frontend.csproj` now grants six where it granted seven.
+The repository-wide total has moved from **78 to 75** - the exact three, and
+nothing else.
+
+### Status update: R735 applied, by the mechanism it named
+
+R735 recorded that `InternalsVisibleTo` was the only part of the assembly boundary
+with no gate: 78 declarations across 18 projects, with the identifier appearing
+outside the csproj files only in an archived note and this ledger, while the
+*reference* graph was pinned hard by exact-set assertions. **That gap is closed.**
+`SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:388`
+`InternalsVisibleToMatchesApprovedAssemblyBoundary` reads every project's
+`<InternalsVisibleTo>` elements and compares them against
+`ExpectedInternalsVisibleTo` at `:32`, a per-project table of approved grantees.
+The commit that added it is titled **"Gate internal assembly access grants"**.
+R735 proposed "an exact-set assertion over the 78 grants in the same file that
+already pins the project list"; that is what exists.
+
+Both should move to the applied table.
+
+### Checked and not proposed (part four hundred seventy-five)
+
+- **This is the reflection-gate precondition working in the other direction.** The
+  previous two parts used it to refute R1143 and narrow R978 and R980 - claims of
+  "nothing checks this" that were wrong when filed. Here the same check finds a
+  claim that was **right** when filed and has since been fixed. Distinguishing the
+  two cases requires the git history, not just the current tree:
+  `InternalsVisibleToMatchesApprovedAssemblyBoundary` is absent from the commit
+  that R735 cites, and present now.
+- **R1152 survives the check.** No test reads a built package's metadata: the only
+  `nuspec` reference outside build files is
+  `SharpProof.Package.Test/PackagedProductFeed.cs:277`, which reports
+  *"Package nuspec metadata was not found"* while locating the file - it does not
+  compare `<description>`, `<releaseNotes>`, `<title>` or `<tags>` against the
+  csproj properties they duplicate. The twelve inert properties remain unchecked
+  and undetected.
+- **R967 and R1147 have now each been checked twice** against the reflection
+  gates - once in the previous part and once here - and neither has a
+  reflection-based gate. They stand.
+
+### Status (part four hundred seventy-five)
+
+No new ID. Of this session's findings, R734 and R735 join R732, R733, R949, R953
+(in part), R955, R958, R962, R970, R975 and R980 as applied or partly applied. The
+methodological result is that the reflection-gate precondition has now produced
+three corrections and two confirmations of application, which is a better return
+than any single new analytical technique in this session.
+
+## Second survey, part four hundred seventy-six: R984 is applied, and the generic surface is clean
+
+A census of every generic type and constrained generic method in production: type
+parameters, constraints, and variance.
+
+### Status update: R984 applied exactly as proposed
+
+R984 recorded that `SharpProof.Frontend` declared the same reference-identity
+comparer twice - `CompilationReferenceComparer : IEqualityComparer<Compilation>`
+and `OperationReferenceComparer : IEqualityComparer<IOperation>` - with identical
+three-member bodies, and proposed a single
+`internal sealed class ReferenceComparer<T> : IEqualityComparer<T> where T : class`.
+**That is now what exists.** `SharpProof.Frontend/CompilerIdentityBridge.cs:256`
+declares `internal sealed class ReferenceComparer<T> : IEqualityComparer<T>` with
+the `T : class` constraint the census reports, and neither of the two original
+names appears anywhere in the repository. Move R984 to applied.
+
+### Checked and not proposed (part four hundred seventy-six)
+
+- **The generic surface is small and uniformly constrained.** Production declares
+  **13 generic types** in total: five in `SharpProof.Dataflow` (the abstract-domain
+  family), two in `SharpProof.Ir` (`ExternalIdentityBucket<T>`,
+  `ExternalIdentityEntry<T>`, both `where T : notnull`), `ScopedIrId<TTag>`
+  (`where TTag : struct, IIrIdentifierTag`), `EncodingTable<TSource, TRow>`,
+  `EffectSymbolComparer<TSymbol>` (`where TSymbol : class, ISymbol`),
+  `OrdinalIdentityIndex<T>`, `WorkerProtocolRule<T>`, and the new
+  `ReferenceComparer<T>`. There is no deep generic hierarchy and no type with more
+  than two parameters.
+- **There are zero variance annotations.** No `in` or `out` type parameter appears
+  on any production interface, which is consistent with the small interface surface
+  measured earlier - thirteen interfaces, mostly framework contracts - and means
+  there is no variance inconsistency to reconcile.
+- **The 29 constrained generic methods use a coherent vocabulary**, dominated by
+  `where T : struct, Enum` (10 sites) and `where T : class` (4). The rest are
+  single-use domain constraints - `T : IrTerm`, `T : IrInstruction`, `T : ISymbol`,
+  `T : Expr`, `T : IDisposable`, `T : struct, IFormattable`.
+- **The two enum-validity helpers in `SharpProof.Worker.Protocol` are layered, not
+  duplicated.** `ProtocolModel.generated.cs:644` `IsKnown<T>` is the generated
+  primitive - a membership test against the generated `s_knownValues` array - and
+  `ProtocolJson.cs:1113` `IsDefined<T>(T value, T unspecified)` **calls it** and
+  adds the "and is not the Unspecified sentinel" condition. The call counts confirm
+  the layering: `IsKnown` has **one** caller, which is `IsDefined`; `IsDefined` has
+  **54** across 24 files. Do not propose merging them.
+
+### Status (part four hundred seventy-six)
+
+No new ID. With R984 applied, this session's applied or partly-applied set is
+R732, R733, R734, R735, R949, R953, R955, R958, R962, R970, R975, R980 and R984.
+The generic-type dimension is measured and clean, and its one finding is closed.
