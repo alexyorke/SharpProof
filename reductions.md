@@ -13534,3 +13534,23 @@ early-stop behavior; only the repeated structural query should be shared.
 
 R1161 is `pending`: share only the list-pattern structural facts and mismatch
 predicate; retain the separate completion and reachable-member traversals.
+
+## Second survey, part four hundred eighty-four: R1162 - method completion tail repeated
+
+`OperationCompletionEvaluator.CanCompleteInvocation` performs instance and
+argument checks and then evaluates the method's static-initialization and source
+completion conditions. `CanMethodCompleteNormally` evaluates that same final
+condition independently. Invocation has one intentional extension - an
+uncertain virtual dispatch can bypass the source-body completion test - so the
+shared helper should accept that already-computed exception rather than merging
+the two public policies. Keeping static-initialization validation in the shared
+tail also preserves the order of the existing checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1162 | **`OperationCompletionEvaluator` duplicates the terminal method-completion predicate.** `CanCompleteInvocation` and `CanMethodCompleteNormally` both call `StaticInitializationMayComplete` and then test `HasSourceCompletionFlow` against `_completionFacts.MethodCanCompleteNormally`; the invocation path only adds its distinct uncertain-virtual-dispatch escape. A small shared predicate with an explicit escape flag can remove this second completion authority without collapsing invocation receiver/argument validation or direct-method semantics. | `SharpProof.Effects/OperationCompletionEvaluator.cs:618-656` |
+
+### Status (part four hundred eighty-four)
+
+R1162 is `pending`: share the static-initialization/source-completion tail and
+retain the invocation-only uncertain-dispatch escape.
