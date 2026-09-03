@@ -1706,7 +1706,11 @@ internal sealed class ExceptionHandlerReachability(
         var labeledStatement = target is LabeledStatementSyntax labeledSyntax
             ? model.GetOperation(labeledSyntax.Statement)
             : null;
-        var labeledInvocations = target.DescendantNodes()
+        var methodSyntax = target.AncestorsAndSelf()
+            .OfType<BaseMethodDeclarationSyntax>()
+            .FirstOrDefault();
+        var invocationRoot = methodSyntax ?? target;
+        var allInvocations = invocationRoot.DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
             .Where(static syntax => !syntax.Ancestors().Any(static ancestor =>
                 ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
@@ -1714,19 +1718,15 @@ internal sealed class ExceptionHandlerReachability(
             .Where(static operation => operation != null)
             .Cast<IOperation>()
             .ToArray();
-        if (labeledInvocations.Length == 0 &&
-            target.AncestorsAndSelf()
-                .OfType<BaseMethodDeclarationSyntax>()
-                .FirstOrDefault() is { } methodSyntax)
+        var labeledInvocations = methodSyntax == null
+            ? allInvocations
+            : allInvocations
+                .Where(invocation => target.Span.Contains(invocation.Syntax.Span))
+                .ToArray();
+        if (labeledInvocations.Length == 0 && methodSyntax != null)
         {
-            labeledInvocations = methodSyntax.DescendantNodes()
-                .OfType<InvocationExpressionSyntax>()
-                .Where(invocation => invocation.SpanStart > target.Span.End)
-                .Where(static syntax => !syntax.Ancestors().Any(static ancestor =>
-                    ancestor is AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax))
-                .Select(syntax => model.GetOperation(syntax))
-                .Where(static operation => operation != null)
-                .Cast<IOperation>()
+            labeledInvocations = allInvocations
+                .Where(invocation => invocation.Syntax.SpanStart > target.Span.End)
                 .Take(1)
                 .ToArray();
         }
