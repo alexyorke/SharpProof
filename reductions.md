@@ -11963,7 +11963,7 @@ When `Publish-SharpProofRelease.ps1` runs with `PlanOnly` and a `PlanOutputPath`
 
 ### Status (part three hundred fifty-four)
 
-R1123 is deferred: preserve a deliberate serialized-plan boundary check if required, but avoid replaying the complete identity validation after the in-memory plan has already passed.
+R1123 is applied: preserve the serialized-plan boundary with a focused JSON round-trip check, avoiding a second complete identity validation; all 23 publication-plan tests pass.
 
 ## Second survey, part three hundred fifty-five: R1124 - hard-coded package graph in release artifact validation
 
@@ -11975,7 +11975,7 @@ R1123 is deferred: preserve a deliberate serialized-plan boundary check if requi
 
 ### Status (part three hundred fifty-five)
 
-R1124 is deferred: make release-artifact membership consume `$SharpProofPackageIds`, while preserving the distinct push-order contract for publication sequencing.
+R1124 is applied: make release-artifact membership consume `$SharpProofPackageIds`, while preserving the distinct push-order contract for publication sequencing; release-version authority tests pass.
 
 ## Second survey, part three hundred fifty-six: R1125 - repeated release-workflow YAML parsing
 
@@ -11987,7 +11987,7 @@ R1124 is deferred: make release-artifact membership consume `$SharpProofPackageI
 
 ### Status (part three hundred fifty-six)
 
-R1125 is deferred: separate one-time workflow-document parsing from per-job lookup and retain the explicit contract-job existence and alias checks.
+R1125 is applied: separate one-time workflow-document parsing from per-job lookup while retaining explicit contract-job existence and alias checks; the release-configuration fixture passes.
 
 ## Second survey, part three hundred fifty-seven: R1126 - duplicated pilot evidence-path scaffolding
 
@@ -11999,7 +11999,7 @@ R1125 is deferred: separate one-time workflow-document parsing from per-job look
 
 ### Status (part three hundred fifty-seven)
 
-R1126 is deferred: centralize the pilot evidence-path projection, preserving the distinct roots and negative-probe behavior.
+R1126 is applied: centralize the pilot evidence-path projection, preserving the distinct roots and negative-probe behavior; pilot authority and rooted-path tests pass.
 
 ## Second survey, part three hundred fifty-eight: R1127 - disconnected package identity projections in pilot reports
 
@@ -12174,3 +12174,91 @@ R1139-R1141 are deferred: remove only the repeated constructor guard, cache the 
 ### Status (part three hundred seventy-one)
 
 R1142 is deferred: classify unknown claim reasons in one pass, preserving the current unsupported-callable, unsupported-contract, infrastructure, and semantic-unknown precedence.
+
+## Second survey, part four hundred fifty-nine: R1143 - three contract vocabularies declared twice
+
+A cross-catalog duplication scan: every list of three or more strings, and every
+list of named objects, across all 32 product and engineering JSON files, grouped by
+content.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1143 | **Three contract enums are declared in full in two schemas under two names, and nothing compares them - unlike the IR enums in the same pair of schemas, which are gated by reflection.** `SharpProof.Contracts/BoundContractModel.schema.json` and `SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json` each declare the same three vocabularies: `BoundContractKind` / `CompilerContractKind` (`Requires`, `Ensures`, `Assume`), `BoundContractEvidence` / `CompilerContractEvidence` (`CompilerBoundInvocation`, `ClosedAttribute`, `Companion`), and `BoundContractVariableRole` / `CompilerVariableRole` (`Receiver`, `Parameter`, `Result`, `PreState`). Six declarations, ten member names, one concept each - the in-process contract model used by `SharpProof.Analyzer.Core` at six sites, and the wire model used by `SharpProof.CompilerArtifact` at eight. **The gap is specific because the same file pair is already gated for a different vocabulary.** `SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs:171-201` reflects the real `IrTermKind`, `IrLocationKind` and `IrInstructionKind` out of the `SharpProof.Ir` assembly and asserts `Enum.GetNames(enumType)` equals the schema's `kinds` list in order - so adding an `IrTermKind` member without updating the artifact schema fails a test. **No equivalent exists for the three contract enums**: no test file names `BoundContractModel.schema.json` except `BoundContractModelTests.cs`, which validates that schema alone; `Generate-BoundContractModel.ps1` contains no reference to `CompilerArtifactModel`, and `Generate-CompilerArtifactModel.ps1` contains no reference to `BoundContract`. Adding a fourth contract kind to one schema and not the other produces an analyzer that can express a clause the wire model cannot carry, and the failure surfaces late and indirectly - `CompilerLoweredArtifact.cs:427` rejects it with `!Enum.IsDefined(typeof(CompilerContractKind), row.Kind)`, so the symptom is a rejected artifact at the boundary rather than a build error at the edit. | `SharpProof.Contracts/BoundContractModel.schema.json`; `SharpProof.CompilerArtifact/CompilerArtifactModel.schema.json`; `SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs:171-201`; `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:427-474`; `SharpProof.Analyzer.Core/{AnalyzerSession,EffectCallPreconditionPolicy,ManagedContractFacts,RequiresCallSiteAnalyzer}.cs`; `scripts/Generate-BoundContractModel.ps1`; `scripts/Generate-CompilerArtifactModel.ps1` |
+
+### Checked and not proposed (part four hundred fifty-nine)
+
+- **Cross-catalog duplication is confined to six sequences, and three of them are
+  already gated.** Scanning all 32 product and engineering JSON files for repeated
+  value sequences of three or more finds exactly **six**. Three are R1143. The
+  other three are the IR vocabularies - `IrTermKind` (12 members), `IrInstructionKind`
+  (10), and the havoc-kind trio `Variables`/`Memory`/`VariablesAndMemory` - which
+  appear in both `IrModel.schema.json` and `CompilerArtifactModel.schema.json` and
+  **are** compared by `CompilerArtifactModelSchemaTests` against the compiled
+  enums. Those three should not be filed: they are the working example R1143 asks
+  to be extended.
+- The scan found **no** duplicated value sequence anywhere else across the JSON
+  estate - not between the two catalog files that drive the declarative-model and
+  projection generators, not between the release contracts, not between the
+  acceptance contract and the artifacts it pins. The six above are the whole set.
+
+### Status (part four hundred fifty-nine)
+
+R1143 is `pending`. It is the same shape as R315 - one concept duplicated across
+the analyzer/worker boundary where the two copies must agree for the system to be
+sound - but at the vocabulary rather than the rule level, and with a cheaper fix:
+the test that already reflects three IR enums out of a compiled assembly and
+compares them to the artifact schema can be extended to the three contract enums
+without new machinery.
+
+## Second survey, part four hundred sixty: R1144 - one script, two exclusion policies, opposite answers
+
+Comparing the three lists that answer "what is not source": `.gitignore`,
+`.dockerignore`, and the `tar --exclude` set in the container entrypoint.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1144 | **`eng/container/entrypoint.sh` materialises the source two ways under two different exclusion policies, and the two disagree in both directions - including about a directory whose exclusion was clearly deliberate.** The git branch (`:104-140`) copies untracked files with `git ls-files --others --exclude-standard`, which honours `.gitignore` - roughly two hundred patterns. The fallback branch (`:146-157`) uses a hand-written `tar` list of **eight** excludes: `./artifacts`, `./.git`, `*/bin`, `*/bin/*`, `*/obj`, `*/obj/*`, `./.vs`, `./.baseline-check`, `./.claude`, `./.claude/*`. **The tar branch is missing everything `.gitignore` and `.dockerignore` both exclude beyond those**: `TestResults`, `.env`, `*.binlog`, `*.nupkg`, `*.snupkg`, `*.trx`, `*.coverage`, `*.coveragexml`. So a repository without a Git checkout has package artifacts, test result files and build logs copied into the disposable task workspace, where a Git checkout would not. **The divergence runs the other way too, and this half is sharper.** `.claude/` is **untracked and not listed in `.gitignore`** - `git check-ignore` reports nothing for it and `git ls-files .claude` returns zero files. So `--others --exclude-standard` lists it, and the **git branch copies `.claude/` into every task workspace**, while the tar branch excludes it explicitly at `:155-156`. Someone added that exclusion deliberately, and added it to the branch that only runs when there is no Git checkout - which is the branch that almost never runs. The one-line fix for that half is a `.gitignore` entry, which would also make the two branches agree. | `eng/container/entrypoint.sh:104-140,146-157`; `.gitignore`; `.dockerignore`; `git check-ignore -v .claude` (no match); `git ls-files .claude` (empty) |
+
+### Checked and not proposed (part four hundred sixty)
+
+- **`.dockerignore` and `.gitignore` agree on everything they both mention.** The
+  fourteen `.dockerignore` entries - `**/bin`, `**/obj`, `**/TestResults`, `.vs`,
+  `.vscode/*.user`, `.env`, `artifacts`, `.baseline-check`, `*.binlog`,
+  `*.coverage`, `*.coveragexml`, `*.nupkg`, `*.snupkg`, `*.trx` - are each covered
+  by `.gitignore` as well. `.dockerignore` being the shorter list is correct: it
+  only needs to keep the build context small, not to describe every editor artifact.
+  There is no drift between those two.
+- **`.dockerignore` not excluding `.git` is not a defect.** The image it builds is
+  the toolchain image, whose `COPY` set is narrow; the repository is bind-mounted
+  at run time rather than copied at build time. Including `.git` in the context
+  costs transfer, not correctness, and the tar branch of the entrypoint excludes it
+  where it matters.
+- **`.opencode/` is tracked and therefore correctly copied by both branches**,
+  unlike `.claude/`. The asymmetry between the two agent-tool directories is not
+  itself a finding - one is part of the repository and one is local state - but it
+  is why only one of them needed a `tar` exclusion in the first place.
+
+### Status (part four hundred sixty)
+
+R1144 is `pending`. It composes with R747, which records that the source-snapshot
+policy is implemented twice across `entrypoint.sh` and `loop-command.sh`; this is
+the same duplication *inside one script*, with a measured consequence in both
+directions. The `.claude/` half is a single `.gitignore` line and should be done
+regardless of what happens to the rest, because it is the case where the
+deliberate fix landed in the unused branch.
+
+## Second survey, part four hundred sixty-one: R1145-R1146 - repeated merge and evidence-depth passes
+
+The next focused pass checks hot summary merging and callable-evidence assembly
+for repeated scans independent of the build-context finding above.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1145 | **`IrRelationalSummaryBuilder.Merge` scans every incoming state twice for each variable.** After ordering the incoming states, the merge first calls `values.Any` to determine whether a variable is missing from any environment, then calls `values.Any` again to determine whether the bound term IDs differ before potentially building the reverse conditional chain. One pass can record both completeness and ID divergence while preserving the intentional omission of partially bound variables and the existing conditional construction order. This is separate from R801: that entry concerns the analogous worker merge implementation, while this is the relational-summary builder's own flow-state merge. | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:655-729`; analogous worker implementation `R801` |
+| R1146 | **`CallableEvidenceBuilder.Build` repeats depth validation for assumptions already checked at insertion.** Direct clauses are depth-checked by `NormalizeDirectClause`, and projected specification and summary assumptions are checked before being added; after source-domain and normal-completion assumptions are added, the final `assumptions.Any(GetDepth)` walks the entire collection again. The final guard is still needed for those later-added assumption classes, but a depth-accounting helper or an explicit unchecked-additions boundary can retain that safety check without recomputing depths for all earlier assumptions. Keep the final check for any new assumption-producing path so the resource limit remains enforced. | `SharpProof.Worker/CallableEvidenceBuilder.cs:26-55,75-92,104-134,160-186,207-221` |
+
+### Status (part four hundred sixty-one)
+
+R1145-R1146 are `pending`: fuse the per-variable completeness and difference
+scan in summary merging, and make callable-evidence depth accounting cover new
+assumptions without rechecking predicates that already passed the same limit.
