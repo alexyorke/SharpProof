@@ -14585,3 +14585,11 @@ decision points.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1216 | **`AcyclicBlockPredicateExecutor.ApplySpec` repeats the target result-type lookup.** The same target variable info is queried for `IsResultType` and then for `factory.CreateVariable`; caching the type after the target-presence guard removes duplicate factory-table access while preserving the validation and synthetic-result type. | `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:348-355,393-397` |
+
+## Second survey, part five hundred thirty-nine: R1217 - spec projection presence is tested three times
+
+`AcyclicBlockPredicateExecutor.ApplySpec` checks the same `projection != default` state when detecting a conflicting prior projection, when constructing the projection map, and when storing the new projection. The operations after `TryCreate` do not alter `projection`, so a `hasProjection` local can preserve the conflict, rewrite, and registration branches while removing repeated default-value comparisons.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1217 | **`AcyclicBlockPredicateExecutor.ApplySpec` repeats one optional-projection test across three branches.** The `projection ==/!= default` checks at conflict detection, map construction, and registration all inspect the same immutable result. Factoring that state into one boolean reduces local branching noise without merging the distinct projection behaviors. | `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:406-423,433-436` |
