@@ -1,3 +1,5 @@
+using SharpProof.Frontend;
+
 namespace SharpProof.Frontend.Host;
 
 /// <summary>
@@ -32,7 +34,7 @@ public static class CompilationModelProvider
     {
         var pending = new Stack<Compilation>();
         var visited = new HashSet<Compilation>(
-            CompilationReferenceComparer.Instance);
+            ReferenceComparer<Compilation>.Instance);
         Compilation? owner = null;
         pending.Push(root);
         while (pending.Count != 0)
@@ -67,20 +69,4 @@ public static class CompilationModelProvider
         return owner;
     }
 
-    private sealed class CompilationReferenceComparer
-        : IEqualityComparer<Compilation>
-    {
-        internal static CompilationReferenceComparer Instance { get; } = new();
-
-        public bool Equals(Compilation? x, Compilation? y)
-        {
-            return ReferenceEquals(x, y);
-        }
-
-        public int GetHashCode(Compilation obj)
-        {
-            return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(
-                obj);
-        }
-    }
 }

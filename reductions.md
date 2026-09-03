@@ -9933,10 +9933,9 @@ interface implementation, across the 693 production types.
 
 ### Status (part two hundred fourteen)
 
-R984 is `pending` and is the most self-contained item filed in this session: one
-new generic class inside one assembly, two deletions, no cross-assembly seam, no
-convention to decide, and no behavioural question - `ReferenceEquals` and
-`RuntimeHelpers.GetHashCode` mean the same thing for both closed types.
+R984 is `applied`: `SharpProof.Frontend` now uses one internal generic
+`ReferenceComparer<T>` for compilation and operation identity maps. Frontend.Test
+passed all 121 tests.
 
 ## Second survey, part two hundred fifteen: R985 - a second built-in throw table
 
@@ -10131,3 +10130,38 @@ consumer-fixture generation.
 R988 is `deferred`: share only the typed SDK-policy projection and serialization
 shape; keep performance selection equality, release version restrictions,
 toolchain reconciliation, and minimum-SDK consumer overrides separate.
+
+## Second survey, part two hundred twenty: R989 - repeated closed-contract value walks
+
+The analyzer and contract binder each rediscover the same method-level input
+surface before applying the shared closed-contract validator. `ClosedContractDiagnostics.Validate`
+walks every parameter, passing its type, `RefKind`, attributes, and fallback
+location to a local validator, then does the same for the return type when the
+method is non-void. `ContractBinder.BindClosedAttributes` independently walks
+the same parameter array and return-attribute array, passing the same type and
+ref-kind facts into `BindValueAttributes`, which calls
+`ClosedContractAttributeValidator.Validate` again. For every recognized
+attribute, both paths branch on the same `IsRecognized`/`IsValid` result and
+convert invalid input into a policy outcome; the analyzer reports a diagnostic,
+while the binder returns `InvalidClosedAttribute` or builds a bound IR clause.
+
+The result and failure surfaces must remain different. The analyzer needs
+attribute-identity deduplication through `AnalyzerSession`, syntax-reference
+locations, and a diagnostic callback. The binder needs the canonical IR variable
+for each value, `requiresOnly` handling, and the attribute-specific condition
+construction. The reusable seam is the value-site projection: a shared iterator
+over parameter and return attribute sites, carrying type, ref-kind, attributes,
+and whether a return value exists, would let both consumers invoke the existing
+validator without maintaining two traversal/dispatch shells. This is a smaller
+and more concrete seam than R501/R543/R707, which cover symbol discovery and
+closed-attribute recognition itself.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R989 | **`ClosedContractDiagnostics` and `ContractBinder` repeat the method parameter/return walk around the same closed-contract validator.** The analyzer enumerates parameter and return attributes and calls `ClosedContractAttributeValidator.Validate` to report invalid recognized values; the binder enumerates the same value sites, calls the same validator again, and maps valid results into IR conditions or invalid results into `InvalidClosedAttribute`. Their diagnostic-deduplication and bound-IR policies are intentionally different, but a shared value-site iterator can remove the duplicated parameter/return traversal and keep type/ref-kind handling synchronized. | `SharpProof.Analyzer.Core/ClosedContractDiagnostics.cs:5-51`; `SharpProof.Contracts/ContractBinder.cs:336-454`; shared validator `SharpProof.Contracts/ClosedContractAttributeValidator.cs:27-91`; call sites `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:99` and `SharpProof.Contracts/ContractBinder.cs:240` |
+
+### Status (part two hundred twenty)
+
+R989 is `deferred`: share only the parameter/return value-site projection and
+validator invocation boundary; retain analyzer diagnostics/deduplication and
+binder IR construction/failure semantics locally.

@@ -57,7 +57,7 @@ public sealed class RoslynOperationLowerer
 
         var previousResults = _currentLoweringResults;
         _currentLoweringResults = new(
-            CompilerIdentityBridge.OperationReferenceComparer.Instance);
+            ReferenceComparer<IOperation>.Instance);
         try
         {
             var lowered = LowerCore(operation);

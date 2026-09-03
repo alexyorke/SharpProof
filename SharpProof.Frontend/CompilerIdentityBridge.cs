@@ -44,7 +44,7 @@ public static class CompilerIdentityBridge
 
         return factory.InternExternalIdentity(
             operation,
-            OperationReferenceComparer.Instance);
+            ReferenceComparer<IOperation>.Instance);
     }
 
     internal static bool IsIntrinsicSequenceLength(
@@ -221,22 +221,6 @@ public static class CompilerIdentityBridge
         return prefix + "/" + symbol.Kind + ":" + symbol.MetadataName;
     }
 
-    internal sealed class OperationReferenceComparer : IEqualityComparer<IOperation>
-    {
-        internal static OperationReferenceComparer Instance { get; } = new();
-
-        public bool Equals(IOperation? left, IOperation? right)
-        {
-            return ReferenceEquals(left, right);
-        }
-
-        public int GetHashCode(IOperation operation)
-        {
-            return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(
-                operation);
-        }
-    }
-
     private readonly struct OperationSemanticIdentity(
         OperationKind kind, IrIdentityId type, IrIdentityId typeOperand,
         BinaryOperatorKind? binaryOperator,
@@ -266,5 +250,21 @@ public static class CompilerIdentityBridge
         {
             return _value.GetHashCode();
         }
+    }
+}
+
+internal sealed class ReferenceComparer<T> : IEqualityComparer<T>
+    where T : class
+{
+    internal static ReferenceComparer<T> Instance { get; } = new();
+
+    public bool Equals(T? x, T? y)
+    {
+        return ReferenceEquals(x, y);
+    }
+
+    public int GetHashCode(T obj)
+    {
+        return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
     }
 }
