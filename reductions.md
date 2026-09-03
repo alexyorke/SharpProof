@@ -14362,6 +14362,12 @@ not allocate and populate two tables over the same decoded instruction list.
 |---|---|---|
 | R1199 | **`CompilerImplementationIlSummaryLowerer.Translator.Translate` materializes duplicate instruction-offset indexes.** It creates `offsets` as a `HashSet<int>` for `leaders.Contains` validation, then creates `instructionIndexes` as a dictionary from the same `instructions.Select(item => item.Offset)` projection before using it for block starts. Reusing one dictionary-backed index can preserve malformed-leader rejection and contiguous block lookup while removing the redundant offset set and enumeration. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:549-583` |
 
+### Status (part five hundred twenty-one)
+
+R1199 is applied: the IL offset-to-index dictionary now also validates leader
+membership, eliminating the redundant offset set. Focused implementation-IL
+tests pass (7/7).
+
 ## Second survey, part five hundred twenty-two: R1200 - IL leaders are enumerated twice
 
 The decoded instruction list is stable after leader discovery. `Translate`
