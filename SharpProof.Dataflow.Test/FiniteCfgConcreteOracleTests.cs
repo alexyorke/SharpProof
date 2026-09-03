@@ -63,18 +63,12 @@ public sealed class FiniteCfgConcreteOracleTests
         }
     }
 
-    [Test]
-    public void AllOneAndTwoBlockFinitePowersetCfgsMatchConcreteLeastFixpoints()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void FinitePowersetModelCheckMatchesConcreteLeastFixpoints(
+        bool reverseWorklist)
     {
-        var checkedCases = VerifyEveryFinitePowersetCase(reverseWorklist: false);
-
-        Assert.That(checkedCases, Is.EqualTo(80_200));
-    }
-
-    [Test]
-    public void FinitePowersetModelCheckIsWorklistOrderInvariant()
-    {
-        var checkedCases = VerifyEveryFinitePowersetCase(reverseWorklist: true);
+        var checkedCases = VerifyEveryFinitePowersetCase(reverseWorklist);
 
         Assert.That(checkedCases, Is.EqualTo(80_200));
     }
