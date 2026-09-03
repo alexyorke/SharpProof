@@ -15,10 +15,10 @@ internal static class IrBlockOrder
         Func<int, bool> spend,
         out IrAcyclicOrderFailure failure)
     {
-        var active = new HashSet<IrBlockId>();
-        var complete = new HashSet<IrBlockId>();
-        var pending = new Stack<(IrBlockId Block, bool Exit)>();
-        var result = new List<IrBlockId>();
+        var blockCapacity = program.Blocks.Length;
+        var states = new Dictionary<IrBlockId, byte>(blockCapacity);
+        var pending = new Stack<(IrBlockId Block, bool Exit)>(blockCapacity);
+        var result = new List<IrBlockId>(blockCapacity);
         pending.Push((program.Entry, false));
         while (pending.Count != 0)
         {
@@ -31,26 +31,24 @@ internal static class IrBlockOrder
             var frame = pending.Pop();
             if (frame.Exit)
             {
-                active.Remove(frame.Block);
-                if (complete.Add(frame.Block))
+                states[frame.Block] = 2;
+                result.Add(frame.Block);
+
+                continue;
+            }
+
+            if (states.TryGetValue(frame.Block, out var state))
+            {
+                if (state == 2)
                 {
-                    result.Add(frame.Block);
+                    continue;
                 }
 
-                continue;
-            }
-
-            if (complete.Contains(frame.Block))
-            {
-                continue;
-            }
-
-            if (!active.Add(frame.Block))
-            {
                 failure = IrAcyclicOrderFailure.CyclicControlFlow;
                 return default;
             }
 
+            states.Add(frame.Block, 1);
             pending.Push((frame.Block, true));
             switch (program.GetBlock(frame.Block).Terminator)
             {
