@@ -10433,3 +10433,15 @@ The analyzer's profile option has a small shared vocabulary in `SharpProofConfig
 ### Status (part two hundred twenty-nine)
 
 R998 is deferred: the vocabulary is tiny and stable today; add a shared descriptor or consistency assertion when the next feature is introduced rather than creating another abstraction for three current values.
+
+## Second survey, part two hundred thirty: R999 - duplicate analyzer-option alias probes
+
+`AnalyzerConfiguration.GetInvalidConfigurationValues` first calls `TryGetConflictingAliases` for each registered option. That helper probes the option's three accepted keys - the bare analyzer key, `build_property.` plus that key, and the configured MSBuild property name - trims and collects the present values, and determines whether aliases disagree. For every non-conflicting option, the method then calls `TryGet`, which rebuilds the same three-key array and probes the same provider again to obtain the effective value; an absent option is also probed twice. The conflict path intentionally stops after reporting the disagreement, and the tree path intentionally performs a separate global comparison, so those policies should remain. A single read result carrying the distinct values, conflict text, and first effective value can remove the local repeated array construction and provider calls without changing alias precedence or fail-closed conflict handling. This is the per-option probe duplication, not R512's larger duplication between global and tree validation scaffolds.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R999 | **Analyzer option validation reads each non-conflicting alias set twice.** `GetInvalidConfigurationValues` invokes `TryGetConflictingAliases` and then `TryGet` for the same option; both construct/probe `option.Key`, `build_property.` plus `option.Key`, and `build_property.` plus `option.BuildPropertyName`. A combined option-read result can retain conflict detection, the existing first-found precedence, and the separate tree/global policy while avoiding the second provider pass and temporary key array. | `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs:117-163,195-216`; alias descriptor `SharpProof.Analyzer.Core/Configuration/AnalyzerConfigurationOptionRegistry.cs:29-36`; broader validation duplication R512 |
+
+### Status (part two hundred thirty)
+
+R999 is deferred: configuration is a low-frequency path, so combine the read only if the option registry grows or the provider lookup becomes measurable; preserve the current explicit alias policy.
