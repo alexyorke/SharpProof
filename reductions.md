@@ -16747,3 +16747,19 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 | ID | Finding | Evidence |
 |---|---|---|
 | R1383 | The TCB helper builds a filtered segment collection solely for a nonempty check; use an early-exit loop/predicate to avoid one temporary array per path while preserving dot-segment rejection. | scripts/Get-SharpProofTcbPaths.ps1:28-45,54-63; callers eng/acceptance/Verify.ps1:594-601 and scripts/Test-SharpProofCoverage.ps1:590-601 |
+
+## Second survey, continued: R1384 - Worker protocol object-shape validation materializes every property
+
+`WorkerProtocolJson.EnsureObjectShape` converts every `JsonElement` object's properties to an array before checking the fixed count, exact order, and recursively validating each value. The generated object-shape metadata already supplies the expected property sequence, so a single indexed enumeration can reject extra/missing properties while comparing names and descending immediately; this removes one transient property array per nested object on every strict protocol validation without weakening duplicate/order rejection.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1384 | `WorkerProtocolJson.EnsureObjectShape` materializes every object's properties with `EnumerateObject().ToArray()` even though the expected shape is a fixed ordered array; validate count, name/order, and child values in one indexed enumeration with no per-object property array. | `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:92-120`; shape metadata `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:463-650` |
+
+## Second survey, continued: R1385 - Launcher response validation materializes incomplete-callable results for count and first item
+
+`ValidateAndReport` filters `response.CallableResults` into an array, then uses only its length, the first incomplete callable's ID, and the length again to format the diagnostic and compute the policy error. A single pass can retain the first incomplete callable and count while preserving the existing diagnostic location, message, and `RequireProven` decision, avoiding a response-sized temporary array on every launcher result.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1385 | `SharpProof.Worker.Launcher.Program.ValidateAndReport` creates an `incomplete` array solely for count/first-item access; accumulate the count and first callable during one pass, retaining the same diagnostic and exit-code semantics. | `SharpProof.Worker.Launcher/Program.cs:449-477` |
