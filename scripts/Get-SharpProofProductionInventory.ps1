@@ -242,8 +242,7 @@ function Get-PortablePdbModule {
         $pdbStream = [IO.File]::OpenRead($PdbPath)
         $pdbProvider = [System.Reflection.Metadata.MetadataReaderProvider]::FromPortablePdbStream($pdbStream)
         $pdb = $pdbProvider.GetMetadataReader()
-        $sourceLines = [Collections.Generic.Dictionary[string, Collections.Generic.HashSet[int]]]::new([StringComparer]::Ordinal)
-        $sourceRanges = [Collections.Generic.Dictionary[string, Collections.Generic.Dictionary[string, object]]]::new([StringComparer]::Ordinal)
+        $documentStates = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
         $documentPaths = [Collections.Generic.Dictionary[System.Reflection.Metadata.DocumentHandle, string]]::new()
         foreach ($debugHandle in $pdb.MethodDebugInformation) {
             $methodHandle = [System.Reflection.Metadata.Ecma335.MetadataTokens]::MethodDefinitionHandle(
@@ -267,29 +266,37 @@ function Get-PortablePdbModule {
                 if ($relativePath.Contains('/obj/', [StringComparison]::Ordinal) -or $relativePath.Contains('/bin/', [StringComparison]::Ordinal)) { continue }
                 if (-not $CompilePaths.Contains($relativePath)) { throw "Production inventory PDB source is not an evaluated Compile item: '$relativePath'." }
                 if ($point.StartLine -le 0 -or $point.EndLine -lt $point.StartLine) { throw "Production inventory PDB has an invalid sequence-point range for '$relativePath'." }
-                if (-not $isCompilerGenerated) {
-                    if (-not $sourceLines.ContainsKey($relativePath)) { $sourceLines[$relativePath] = [Collections.Generic.HashSet[int]]::new() }
-                    [void]$sourceLines[$relativePath].Add($point.StartLine)
+                $documentState = $null
+                if (-not $documentStates.TryGetValue($relativePath, [ref]$documentState)) {
+                    $documentState = [pscustomobject]@{
+                        SequencePoints = [Collections.Generic.HashSet[int]]::new()
+                        SequencePointRanges = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+                    }
+                    $documentStates.Add($relativePath, $documentState)
                 }
-                if (-not $sourceRanges.ContainsKey($relativePath)) { $sourceRanges[$relativePath] = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal) }
+                if (-not $isCompilerGenerated) {
+                    [void]$documentState.SequencePoints.Add($point.StartLine)
+                }
                 $rangeKey = ([string]$point.StartLine) + ':' + ([string]$point.EndLine)
-                if (-not $sourceRanges[$relativePath].ContainsKey($rangeKey)) {
-                    $sourceRanges[$relativePath][$rangeKey] = [pscustomobject][ordered]@{ startLine = $point.StartLine; endLine = $point.EndLine }
+                if (-not $documentState.SequencePointRanges.ContainsKey($rangeKey)) {
+                    $documentState.SequencePointRanges[$rangeKey] = [pscustomobject][ordered]@{ startLine = $point.StartLine; endLine = $point.EndLine }
                 }
             }
         }
-        if ($sourceLines.Count -eq 0) { throw "Production inventory PDB has no production sequence points: '$PdbPath'." }
-        $documents = foreach ($path in @($sourceRanges.Keys | Sort-Object)) {
-            $documentSequencePoints = if ($sourceLines.ContainsKey($path)) {
-                @($sourceLines[$path] | Sort-Object)
+        $hasProductionSequencePoints = $false
+        foreach ($documentState in $documentStates.Values) {
+            if ($documentState.SequencePoints.Count -gt 0) {
+                $hasProductionSequencePoints = $true
+                break
             }
-            else {
-                @()
-            }
+        }
+        if (-not $hasProductionSequencePoints) { throw "Production inventory PDB has no production sequence points: '$PdbPath'." }
+        $documents = foreach ($path in @($documentStates.Keys | Sort-Object)) {
+            $documentState = $documentStates[$path]
             [pscustomobject][ordered]@{
                 path = $path
-                sequencePoints = @($documentSequencePoints)
-                sequencePointRanges = @($sourceRanges[$path].Values | Sort-Object startLine, endLine)
+                sequencePoints = @($documentState.SequencePoints | Sort-Object)
+                sequencePointRanges = @($documentState.SequencePointRanges.Values | Sort-Object startLine, endLine)
             }
         }
         return [pscustomobject][ordered]@{
