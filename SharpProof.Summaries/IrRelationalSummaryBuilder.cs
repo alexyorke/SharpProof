@@ -689,16 +689,29 @@ public static class IrRelationalSummaryBuilder
                     return null;
                 }
 
-                if (values.Any(value =>
-                        !value.Environment.ContainsKey(variable)))
+                var first = values[0].Environment[variable];
+                var merged = first;
+                var hasMissing = false;
+                var hasDifferentValue = false;
+                for (var index = 0; index < values.Count; index++)
+                {
+                    if (!values[index].Environment.TryGetValue(
+                            variable,
+                            out var value))
+                    {
+                        hasMissing = true;
+                        break;
+                    }
+
+                    hasDifferentValue |= value.Id != first.Id;
+                }
+
+                if (hasMissing)
                 {
                     continue;
                 }
 
-                var first = values[0].Environment[variable];
-                var merged = first;
-                if (values.Any(value =>
-                        value.Environment[variable].Id != first.Id))
+                if (hasDifferentValue)
                 {
                     merged = values[values.Count - 1].Environment[variable];
                     for (var index = values.Count - 2; index >= 0; index--)
