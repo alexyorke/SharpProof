@@ -323,6 +323,7 @@ the smallest relevant containerized test target passes.
 | R969 | Cache protocol enum type resolution with a fail-closed sentinel | `SharpProof.Worker.Test`: 695 passed |
 | R960 | Normalize private synchronization lock names | Architecture and worker builds/tests passed |
 | R970 | Use static-field naming for shared mutable state | Architecture and worker builds/tests passed |
+| R961 | Replace CompilerArtifact global usings with explicit per-file imports | CompilerArtifact build and generator verification passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -9181,11 +9182,12 @@ Three of the four come back clean; two modest inconsistencies remain.
 ### Status (part one hundred eighty-four)
 
 R960 is applied: all production synchronization objects now use the `_gate`
-or `Gate` name, independent of assembly boundary. R961 remains `pending`
-because removing the CompilerArtifact global usings would require a broader
-source-portability migration. The substantive result of this part is the three
-clean sweeps, and in particular the 153-for-153 `ConfigureAwait` match, which is
-worth knowing before anyone proposes an async-hygiene pass.
+or `Gate` name, independent of assembly boundary. R961 is applied: the
+CompilerArtifact project now uses explicit per-file imports, and the generated
+model script emits the imports required by each generated output. The
+substantive result of this part is the three clean sweeps, and in particular the
+153-for-153 `ConfigureAwait` match, which is worth knowing before anyone
+proposes an async-hygiene pass.
 
 ## Second survey, part one hundred eighty-five: R962 - the only virtual member
 

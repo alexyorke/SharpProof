@@ -6,6 +6,8 @@
 // </auto-generated>
 #nullable enable
 
+using SharpProof.Ir;
+
 namespace SharpProof.CompilerArtifact;
 
 internal sealed class PortableIrGraph

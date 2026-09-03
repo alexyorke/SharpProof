@@ -1,3 +1,6 @@
+using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
+
 namespace SharpProof.CompilerArtifact;
 
 internal static partial class PortableIrGraphCodec

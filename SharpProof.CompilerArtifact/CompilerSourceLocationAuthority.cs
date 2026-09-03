@@ -1,3 +1,5 @@
+using SharpProof.Worker.Protocol;
+
 namespace SharpProof.CompilerArtifact;
 
 // Source locations are compiler evidence, not display-only hints.  Keep the

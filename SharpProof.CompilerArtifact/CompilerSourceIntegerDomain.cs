@@ -1,3 +1,5 @@
+using SharpProof.Ir;
+
 namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerSourceIntegerDomain

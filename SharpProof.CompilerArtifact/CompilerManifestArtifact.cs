@@ -1,6 +1,9 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
 using static System.IO.Path;
 
 namespace SharpProof.CompilerArtifact;

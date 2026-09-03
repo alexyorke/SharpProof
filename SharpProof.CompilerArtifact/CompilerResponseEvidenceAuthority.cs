@@ -1,3 +1,8 @@
+using System.Collections.Immutable;
+using System.Globalization;
+using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
+
 namespace SharpProof.CompilerArtifact;
 
 /// <summary>

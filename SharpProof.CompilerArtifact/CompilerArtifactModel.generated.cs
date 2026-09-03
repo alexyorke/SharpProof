@@ -6,6 +6,10 @@
 // </auto-generated>
 #nullable enable
 
+using System.Collections.Immutable;
+using SharpProof.Ir;
+using SharpProof.Worker.Protocol;
+
 namespace SharpProof.CompilerArtifact;
 
 internal static class CompilerManifestArtifactVersions

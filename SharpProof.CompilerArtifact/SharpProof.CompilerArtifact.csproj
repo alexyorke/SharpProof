@@ -17,12 +17,6 @@
     <ProjectReference Include="..\SharpProof.Worker.Protocol\SharpProof.Worker.Protocol.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Using Include="System.Collections.Immutable" />
-    <Using Include="System.Globalization" />
-    <Using Include="SharpProof.Ir" />
-    <Using Include="SharpProof.Worker.Protocol" />
-  </ItemGroup>
-  <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Analyzer.Test" />
     <InternalsVisibleTo Include="SharpProof.CompilerCollector" />
     <InternalsVisibleTo Include="SharpProof.Gates" />
