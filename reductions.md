@@ -14237,6 +14237,12 @@ post-label policies while avoiding the fallback rewalk.
 |---|---|---|
 | R1193 | **`ExceptionHandlerReachability.GetGotoTargetContinuation` can traverse the same syntax subtree twice in its no-invocation fallback.** It scans `target.DescendantNodes()` for invocations, then, when none are found, scans `methodSyntax.DescendantNodes()` and filters by `SpanStart > target.Span.End`; the second method walk includes the already-tested label subtree. Reusing one method-level invocation sequence with a post-label slice can remove that redundant syntax traversal without changing the fallback's first-invocation behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1590-1627` |
 
+### Status (part five hundred fifteen)
+
+R1193 is applied: the goto resolver builds one method-level invocation
+projection and reuses it for label-local and post-label fallback selection. The
+Effects test suite passes (323/323).
+
 ## Second survey, part five hundred sixteen: R1194 - lock completion is rechecked by the scheduler
 
 The lock branch first asks whether the locked value can complete before
