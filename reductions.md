@@ -15660,3 +15660,50 @@ the technique. It is worth more than its size because the artifact is a legal
 notice in a published package: the failure mode is not a broken build but a
 correct-looking attribution for software the product no longer redistributes, and
 nothing in the release pipeline would report it.
+## Second survey, continued: R1306 - coverage enablement rechecks both inputs
+
+New-SharpProofCoverageContext first tests whether either coverage argument is nonblank, then, when coverage is enabled, repeats both nonblank tests to reject a half-configured pair. The two stable input predicates can be stored once and reused for the enabled/mismatch decision, preserving the requirement that coverage settings and results are supplied together while removing repeated string checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1306 | **New-SharpProofCoverageContext recomputes its two coverage-input presence checks. The initial OR and the later mismatch guard call IsNullOrWhiteSpace on the same arguments again. Cache the two booleans while retaining the paired-input failure rule.** | scripts/SharpProof.ContainerExecution.psm1:932-940 |
+
+## Second survey, continued: R1307 - fuzz summary filters the same failures twice
+
+Invoke-SharpProofFuzzCampaign derives status by filtering the completed run records for a nonzero exit code or failed validation, then applies the identical predicate again to compute passed. Both fields are projections of the same immutable $runs snapshot, so one failed-run collection or count can drive both without changing the summary schema or fail-closed result.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1307 | **Invoke-SharpProofFuzzCampaign repeats its failed-run predicate for status and passed. Materialize one failed-run snapshot or count and reuse it for both summary fields, preserving the current rule that either process failure or validation failure makes the campaign fail.** | scripts/Invoke-SharpProofFuzzCampaign.ps1:237-253 |
+
+## Second survey, continued: R1308 - coverage authority projects are linearly re-found per baseline project
+
+Test-SharpProofCoverage already compares the sorted names from the baseline and independently recomputed authority before constructing the output. It then loops over every baseline project and runs Where-Object across the full recomputed project list to find the same exact-name record, validating that the result count is one. An ordinal name-to-project index built once after the name comparison can preserve the duplicate/missing-project check while removing the repeated full scans.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1308 | **Test-SharpProofCoverage rescans all recomputed authority projects for each baseline project. Build a case-sensitive project-name index once and retain the exact-one validation, rather than executing a full pipeline filter inside every project iteration.** | scripts/Test-SharpProofCoverage.ps1:223-235,497-510 |
+
+## Second survey, continued: R1309 - discovered test membership uses a linear array search
+
+Get-DiscoveredTestMethods parses, sorts, and de-duplicates the names reported by dotnet vstest, but keeps the result as an array. Reflection then checks every method in each requested class with -contains, which linearly scans that array before a second sort-and-unique projection. An ordinal HashSet[string] can provide the same membership semantics while leaving the returned method ordering and duplicate removal unchanged.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1309 | **Invoke-SharpProofPackageTests.Get-DiscoveredTestMethods performs repeated linear membership checks against a sorted name array. Convert the already unique discovery result to an ordinal set for reflection filtering, then retain the existing sorted output projection and minimum-count validation.** | scripts/Invoke-SharpProofPackageTests.ps1:176-206 |
+
+## Second survey, continued: R1310 - TRX timing queries rescan the cached rows per class
+
+Get-TestMethodTimings caches parsed TRX rows for a results root, but every call still allocates a new millisecond map and scans every cached row to select one class. The package-test caller immediately invokes it twice for the worker and package-layout classes. Indexing the cached rows by class while parsing, or returning both class projections from one aggregation, can preserve per-method duration summing and sorting without traversing the complete TRX row list twice.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1310 | **Invoke-SharpProofPackageTests.Get-TestMethodTimings re-filters the complete cached TRX row set for each class. Cache class-partitioned timing aggregates or compute the requested class projections together, keeping the existing duration parsing, summation, and name ordering intact.** | scripts/Invoke-SharpProofPackageTests.ps1:91-163,654-659 |
+
+## Second survey, continued: R1311 - production inventory keeps parallel per-document maps
+
+Get-PortablePdbModule builds $sourceLines and $sourceRanges as separate dictionaries keyed by the same repository-relative document path during one sequence-point walk. The first excludes compiler-generated methods while the second records all validated ranges; the document projection later has to synchronize the two maps by iterating the range keys and conditionally looking up the line set. A single per-document record containing both collections can retain those different inclusion rules while removing parallel-map initialization and key coordination.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1311 | **Get-SharpProofProductionInventory.Get-PortablePdbModule maintains two synchronized dictionaries for each source path. Combine the line set and range map in one document-state value, preserving compiler-generated filtering for sequencePoints and all-range retention for sequencePointRanges.** | scripts/Get-SharpProofProductionInventory.ps1:245-246,266-293 |
