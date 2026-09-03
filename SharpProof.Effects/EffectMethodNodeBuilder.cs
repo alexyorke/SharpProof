@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace SharpProof.Effects;
@@ -7,6 +8,10 @@ namespace SharpProof.Effects;
 /// </summary>
 internal sealed class EffectMethodNodeBuilder
 {
+    private static readonly ConditionalWeakTable<
+        Compilation,
+        Lazy<IReadOnlyDictionary<SyntaxTree, int>>>
+        SyntaxTreeOrders = new();
     private readonly EffectAnalysisSession _session;
     private readonly Compilation _compilation;
     private readonly ManagedAbstractFlow _managedFlow;
@@ -359,11 +364,7 @@ internal sealed class EffectMethodNodeBuilder
         INamedTypeSymbol type,
         bool staticInitializers)
     {
-        var syntaxTreeOrder = compilation.SyntaxTrees
-            .Select(static (tree, ordinal) => (tree, ordinal))
-            .ToDictionary(
-                static item => item.tree,
-                static item => item.ordinal);
+        var syntaxTreeOrder = GetSyntaxTreeOrder(compilation);
         return type.GetMembers()
             .Where(member => !member.IsImplicitlyDeclared &&
                 IsInitializableMember(member, staticInitializers))
@@ -374,6 +375,20 @@ internal sealed class EffectMethodNodeBuilder
                 ? ordinal
                 : int.MaxValue)
             .ThenBy(static reference => reference.Span.Start);
+    }
+
+    private static IReadOnlyDictionary<SyntaxTree, int> GetSyntaxTreeOrder(
+        Compilation compilation)
+    {
+        return SyntaxTreeOrders.GetValue(
+            compilation,
+            static value => new(
+                () => value.SyntaxTrees
+                    .Select(static (tree, ordinal) => (tree, ordinal))
+                    .ToDictionary(
+                        static item => item.tree,
+                        static item => item.ordinal),
+                LazyThreadSafetyMode.ExecutionAndPublication)).Value;
     }
 
     internal static IEnumerable<IOperation?> GetMemberInitializerOperations(
