@@ -15304,6 +15304,13 @@ The contract API generator emits full `Methods` and `Attributes` descriptor arra
 |---|---|---|
 | R1260 | **`Generate-ContractApiCatalog.ps1` emits duplicate key projections beside the descriptors that already contain them.** `Methods.Name` duplicates `ContractMethodCandidateNames`, and `Attributes.MetadataName` duplicates `AttributeMetadataNames`. Derive or index the keys from the descriptor arrays while retaining the catalog's membership and ordering consumers. | `scripts/Generate-ContractApiCatalog.ps1:246-281`; `SharpProof.Frontend/ContractApiMetadata.generated.cs:85-196`; `SharpProof.Frontend.Test/ContractApiCatalogParityTests.cs:31-74` |
 
+### Status (part five hundred eighty-two)
+
+R1260 is applied: the generated catalog now derives method and attribute name
+projections once from the authoritative descriptor arrays, removing duplicate
+generated key literals while preserving ordering and lookup behavior. Contract
+API catalog tests pass (8 passed).
+
 ## Second survey, part five hundred eighty-three: R1261 - descendant discovery allocates a cycle set per PID
 
 `VerifierProcessSupervisor.DescendantProcessIds` filters every PID in one `/proc` parent snapshot through `IsDescendant`. Each predicate call creates a fresh `HashSet<int>` solely to detect cycles while walking that PID's parent chain, then the outer query creates another set for the accepted IDs. Large process trees therefore repeat ancestry walks and allocate one short-lived cycle set per candidate, even though all walks share the same immutable parent map and many chains share ancestors. A snapshot-level traversal or memoized ancestry-state map can preserve the fail-closed cycle handling and exact descendant set while removing the per-PID temporary sets and repeated shared-prefix work.
@@ -15406,3 +15413,75 @@ doing for the same reason R1152 is: both findings are about a packaging project
 carrying declarations that describe a project it is not, and a reader has to run
 the build to discover that neither the metadata block nor the language settings do
 anything.
+
+## Second survey, part five hundred eighty-eight: R1302 - sixteen negative fixtures are pinned to documentation wording by silent string match
+
+`scripts/Test-SharpProofDocumentationSupportFixtures.ps1` is the negative half of
+the documentation gate: given one of 21 mutation names, it corrupts a checked-in
+file, writes the result to a temporary path, and runs
+`Test-SharpProofReadme.ps1 -TextOverrideRelativePath ... -TextOverridePath ...`,
+expecting the gate to reject it. `DocumentationSupportContractTests.cs:50` drives
+all 21. The corruption is always `String.Replace`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1302 | **Sixteen negative fixtures corrupt documentation by `String.Replace` with a literal needle copied from files the script does not own, and nothing checks that the replacement applied - `Replace` returns the input unchanged when the needle is absent, silently.** The script mutates **six** checked-in files edited by unrelated work: `README.md`, `docs\container-development.md`, `docs\unknown-reasons.md`, `docs\diagnostic-examples.md`, `eng\acceptance\contract.json` and `SharpProof.Worker.Protocol\ProtocolModel.schema.json` (`:32-59`). Reword any of the pinned passages and the corresponding mutation becomes a no-op: the gate then runs on a **clean** document and passes, and the fixture test fails saying the gate accepted a mutated document - a true failure, but one whose message points at the gate rather than at the stale needle three files away. **One case is worse than a misleading message.** `duplicate-resource-claim` (`:115-117`) appends `$containerResourceClaim` rather than replacing, so it always applies; and `$containerResourceClaim` at `:66-67` hard-codes `'Containers use all CPUs available to Docker and up to 40960 MiB by default.'` while the gate it drives **derives** that sentence from the acceptance contract - `Test-SharpProofReadme.ps1:864,883-890` reads `container.defaultMemoryMiB` and composes the expected text. Change `defaultMemoryMiB` in `eng/acceptance/contract.json:60` and the docs and the gate both move together, correctly; the fixture then appends a sentence carrying the **old** number, the gate rejects it for being a *wrong* claim rather than a *duplicate* one, and the fixture passes while no longer testing duplication. That is a negative test that keeps its green status and loses its meaning. The fix is two-part and small: assert after each replace that the text actually changed, which converts every silent no-op into a named failure; and derive `$containerResourceClaim` from the contract exactly as `Test-SharpProofReadme.ps1` already does, which is the step applied **R847** stopped one short of - it centralized the sentence into a single variable but left it a literal. | `scripts/Test-SharpProofDocumentationSupportFixtures.ps1:32-59,66-67,99-131,115-117,193-196`; `scripts/Test-SharpProofReadme.ps1:864,883-890`; `eng/acceptance/contract.json:60`; `SharpProof.ArchitectureTest/DocumentationSupportContractTests.cs:50`; applied R847 |
+
+### Checked and not proposed (part five hundred eighty-eight)
+
+- **The other eleven fixture scripts are not exposed, and the difference is
+  ownership of the mutated text.** Across the twelve `scripts/*Fixtures.ps1`
+  files there are **32 `.Replace(` sites and zero guards** that a replacement
+  applied, but only this script's sixteen are at risk.
+  `Test-SharpProofReleaseJsonFixtures.ps1` has fourteen, and every one mutates
+  `$manifestJson`, which line 81 builds in the same script by `ConvertTo-Json`
+  from a locally constructed object - its needles cannot drift because the script
+  authors both sides. `Test-SharpProofPilotAuthorityFixtures.ps1` has two: one is
+  path-separator normalisation, not a mutation, and the other edits a project file
+  the script itself just wrote. The remaining nine scripts contain no `.Replace`
+  at all. **The finding is about mutating text you do not own, not about
+  `String.Replace`.**
+- **The documentation resource claims are properly derived and are not a
+  duplication finding.** `README.md:208-211` and
+  `docs/container-development.md:196-200` state the same four operational facts
+  verbatim, which a prose-duplication scan flags. They are not hand-maintained:
+  `Test-SharpProofReadme.ps1:863-890` reads `container.defaultCpuLimit`,
+  `container.defaultMemoryMiB`, `automation.testProjectCpuDivisor`,
+  `automation.packageTestCpuPercent`, `automation.buildCpuPercent` and
+  `automation.mutationParallelism` from `eng/acceptance/contract.json`, validates
+  their ranges, and composes the expected sentences. Both documents are checked
+  against the same derived strings, so the duplication is enforced rather than
+  latent. This is the model the rest of the documentation gate is measured
+  against, and it is what makes R1302's single hard-coded copy visible.
+- **A prose-duplication scan over the 46 tracked markdown files found nothing
+  else worth filing.** Hashing every contiguous three-line window of forty
+  characters or more yields **six** windows shared across files. Three are the
+  MSBuild property block repeated between `README.md:99-101` and
+  `docs/getting-started.md:102-104`, which is a code sample two documents both
+  need; two are the container resource claims above; one is the dated-evidence
+  banner shared by six `docs/soundness-notes/` files, which is a deliberate
+  template. No stale or contradictory duplicate prose exists in the maintained
+  set.
+- **The soundness-note banner split is already R321 and was not re-filed.** Six
+  of the ten notes open with the `> Historical evidence: ...` blockquote, three
+  with a `> Dated evidence: ...` variant, and
+  `2026-08-08-relational-interprocedural-verification.md` with an unquoted
+  paragraph making the same three claims. Separately, `$datedEvidenceDocuments`
+  in `Test-SharpProofReadme.ps1:58-66` names seven documents, so four of the ten
+  notes are under no gate. **R321 already records exactly this** - "4 of the 10
+  `docs/soundness-notes/` files while the other 6 are gated - an inconsistent
+  split within single directories with no evident rule" - and the wording variants
+  are the same split seen from the document side rather than the gate side.
+- **`$containerResourceClaim` is the only literal of its kind left in the script**,
+  which is applied R847 working as intended: the sentence appears once as a
+  variable and is referenced at `:99,105,111,116,120,126` rather than being typed
+  seven times. R1302 asks for the next step, not for R847 to be redone.
+
+### Status (part five hundred eighty-eight)
+
+R1302 is `pending`. The guard half is mechanical and can be applied on its own -
+capture the text before each replace and throw when it is unchanged - and it would
+convert a class of misdirected failures into a one-line diagnosis. The derivation
+half touches the contract-reading code and should be sequenced with whoever owns
+`Test-SharpProofReadme.ps1`'s resource-claim block, since the sentence must be
+composed identically on both sides or the fixture stops corrupting anything.
