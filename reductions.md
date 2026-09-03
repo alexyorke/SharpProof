@@ -14543,6 +14543,12 @@ removing repeated projection work.
 |---|---|---|
 | R1208 | **`WorkerProtocolJson.CountsMatch` recomputes each count row's kind and count.** Its `actual.All` predicate evaluates `count(value)` twice and `kind(value)` three times for a valid row: before positivity/enum checks, for `seen.Add`, and again for dictionary lookup. Local `itemKind` and `itemCount` values inside an equivalent loop can preserve the existing validation order and fail-fast behavior without repeated generic delegate calls. | `SharpProof.Worker.Protocol/ProtocolJson.cs:809-821` |
 
+### Status (part five hundred thirty)
+
+R1208 is applied: count-row selectors are evaluated once per row while
+preserving validation order and fail-fast behavior. Focused ProtocolJson tests
+pass (108/108).
+
 ## Second survey, part five hundred thirty-one: R1209 - verifier cleanup is wired at multiple target levels
 
 `_SharpProofCleanupInvocation` is already the single target that validates and
