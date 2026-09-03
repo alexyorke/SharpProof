@@ -15126,6 +15126,13 @@ occur in the current control flow. No cleanup change is warranted.
 |---|---|---|
 | R1248 | **`ContractClauseInventoryBuilder` repeats the same callable-ownership lookup.** `CreateCore` uses `IsOwnedByCallable` to process a recognized clause, then `Classify` recomputes it before choosing `NestedCallable` versus direct placement. Thread the first boolean into `Classify` to avoid the duplicate enclosing-symbol query. | `SharpProof.Contracts/ContractClauseInventoryBuilder.cs:123-145,205-241,243-254` |
 
+### Status (part five hundred seventy)
+
+R1248 is applied: clause inventory computes callable ownership once per
+invocation and passes it into placement classification, retaining rejected-API,
+nested-callable, and reachability decisions. Contract clause inventory tests pass
+(14 passed).
+
 ## Second survey, part five hundred seventy-one: R1249 - declaration target groups repeat their common member mask
 
 `SharpProofAttributeTargets` defines `Contract` as the union of constructor, method, and property targets, then repeats those same three flags inside the broader `Declaration` constant alongside assembly, class, struct, and interface. The two constants are intentionally different sets, but `Declaration` can be expressed as the additional declaration-only flags plus `Contract`. Keeping the shared member mask in one constant reduces the chance that a new callable target is added to one attribute family and silently omitted from the other.
