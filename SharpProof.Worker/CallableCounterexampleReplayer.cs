@@ -120,7 +120,10 @@ internal static partial class CallableCounterexampleReplayer
                 evaluated.Value is { Kind: IrValueKind.Boolean, Boolean: false }
                     ? WorkerClaimReason.None : WorkerClaimReason.CounterexampleReplayFailed;
         }
-        catch (ArgumentException) { return WorkerClaimReason.CounterexampleReplayFailed; }
-        catch (InvalidOperationException) { return WorkerClaimReason.CounterexampleReplayFailed; }
+        catch (Exception exception) when (
+            exception is ArgumentException or InvalidOperationException)
+        {
+            return WorkerClaimReason.CounterexampleReplayFailed;
+        }
     }
 }

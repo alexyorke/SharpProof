@@ -21006,3 +21006,9 @@ ForwardDataflowAnalysis.AnalyzeCore initializes inputs and outputs with two inde
 | ID | Finding | Evidence |
 |---|---|---|
 | R1992 | AnalyzeCore repeats identical bottom-filled array construction for inputs and outputs; cache the immutable bottom value and retain two distinct mutable state arrays. | SharpProof.Dataflow/ForwardDataflowAnalysis.cs:104-118; SharpProof.Dataflow/IAbstractDomain.cs:3-21 |
+
+R1991 is applied: `CallableCounterexampleReplayer.Replay` now combines its
+identical `ArgumentException` and `InvalidOperationException` handlers into a
+single filtered catch without widening cancellation or other exception paths.
+The focused `CallableCounterexampleReplayerTests` suite passes 15/15 with zero
+warnings or errors.
