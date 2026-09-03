@@ -2183,7 +2183,8 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
         try
         {
-            var body = GetBody(normalized.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken));
+            var body = ExecutableBodySyntax.Get(
+                normalized.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken));
             if (body == null)
             {
                 return false;
@@ -2246,7 +2247,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             var model = SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(compilation, declaration.SyntaxTree);
             var operation = model.GetOperation(declaration, cancellationToken) ??
-                (GetBody(declaration) is { } methodBody
+                (ExecutableBodySyntax.Get(declaration) is { } methodBody
                     ? model.GetOperation(methodBody, cancellationToken)
                     : null);
             if (operation == null)
@@ -2368,7 +2369,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
             return true;
         }
 
-        var body = GetBody(declaration);
+        var body = ExecutableBodySyntax.Get(declaration);
         return body != null && body.DescendantNodesAndSelf(
                 descendIntoChildren: static node =>
                     node is not AnonymousFunctionExpressionSyntax and
@@ -2996,14 +2997,4 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
         !(conversion.Operand.Type?.IsValueType is true && conversion.Type?.IsReferenceType is true);
     }
 
-    private static SyntaxNode? GetBody(SyntaxNode declaration)
-    {
-        return declaration switch
-        {
-            BaseMethodDeclarationSyntax method => (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
-            AccessorDeclarationSyntax accessor => (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
-            LocalFunctionStatementSyntax local => (SyntaxNode?)local.Body ?? local.ExpressionBody?.Expression,
-            _ => null
-        };
-    }
 }

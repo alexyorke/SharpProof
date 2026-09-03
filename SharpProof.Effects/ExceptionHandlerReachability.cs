@@ -3133,16 +3133,7 @@ internal sealed class ExceptionHandlerReachability(
         SyntaxNode declaration,
         SemanticModel model)
     {
-        var body = declaration switch
-        {
-            BaseMethodDeclarationSyntax method =>
-                (SyntaxNode?)method.Body ?? method.ExpressionBody?.Expression,
-            AccessorDeclarationSyntax accessor =>
-                (SyntaxNode?)accessor.Body ?? accessor.ExpressionBody?.Expression,
-            LocalFunctionStatementSyntax local =>
-                (SyntaxNode?)local.Body ?? local.ExpressionBody?.Expression,
-            _ => null
-        };
+        var body = ExecutableBodySyntax.Get(declaration);
         return body == null ? null : model.GetOperation(body);
     }
 

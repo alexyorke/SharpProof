@@ -11607,6 +11607,8 @@ Current-tree reconciliation: R1083 is already applied; `IsRuntimeSpanMember` ret
 
 R1084 is deferred: hoist declaration body syntax extraction into a shared helper in `SharpProof.Effects`.
 
+R1084 is applied: `ExecutableBodySyntax` now owns method/accessor/local-function (and block) body extraction for the three Effects analyzers, preserving operation conversion at each caller. `SharpProof.Effects.Test` passes (323/323).
+
 ## Second survey, part three hundred sixteen: R1085 - duplicated flow capture ambiguity state machine in CreationFlowCaptures
 
 `CreationFlowCaptures` in `SharpProof.Effects` tracks flow capture operations and flags ambiguous captures when a capture ID is recorded with conflicting regions. R449 recognized the identical state machine between `CoalesceAssignmentFlowCaptures` and `ConditionalTruthOperatorFlowCaptures`, but missed that `CreationFlowCaptures` implements the exact same ambiguity detection and lookup pattern, differing only in payload type (`EffectRegionSet` vs `IOperation`). A generic flow capture table encapsulating ambiguity tracking and resolution can unify all three implementations while keeping syntax-specific filtering at callers.
@@ -11630,6 +11632,8 @@ In `SharpProof.Effects/ManagedAbstractFlow.cs`, `HasSameIdentity(IOperation oper
 ### Status (part three hundred seventeen)
 
 R1086 is deferred: add reference equality check and replace `.Equals` with `==` in `HasSameIdentity`.
+
+R1086 is already applied in the current tree: `HasSameIdentity` uses a reference-equality fast path and strongly typed tuple equality, and the full Effects suite passes (323/323).
 
 ## Second survey, part three hundred eighteen: R1087 - duplicated powerset model-check test body in dataflow oracle tests
 

@@ -1536,17 +1536,8 @@ internal sealed partial class OperationEffectScanner
 
     private static SyntaxNode? GetDirectSyntax(SyntaxNode declaration)
     {
-        return declaration switch
-        {
-            BaseMethodDeclarationSyntax method =>
-                (SyntaxNode?)method.ExpressionBody?.Expression ?? SingleStatement(method.Body),
-            AccessorDeclarationSyntax accessor =>
-                (SyntaxNode?)accessor.ExpressionBody?.Expression ?? SingleStatement(accessor.Body),
-            LocalFunctionStatementSyntax local =>
-                (SyntaxNode?)local.ExpressionBody?.Expression ?? SingleStatement(local.Body),
-            BlockSyntax block => SingleStatement(block),
-            _ => null
-        };
+        var body = ExecutableBodySyntax.Get(declaration);
+        return body is BlockSyntax block ? SingleStatement(block) : body;
     }
 
     private static StatementSyntax? SingleStatement(BlockSyntax? body)
