@@ -403,12 +403,13 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             substitutions.Add(template.Result.Value, result);
             if (!SpecResultDomainProjection.TryCreate(
                     factory, template, resultVariable, out var projection,
-                    out var facetPredicates))
+                     out var facetPredicates))
             {
                 return null;
             }
 
-            if (projection != default &&
+            var hasProjection = projection != default;
+            if (hasProjection &&
                 _projections.TryGetValue(resultVariable, out var existing) &&
                 existing != projection)
             {
@@ -421,7 +422,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 return null;
             }
 
-            var projectionMap = projection == default
+            var projectionMap = !hasProjection
                 ? ImmutableDictionary<IrVarId, SpecResultProjection>.Empty
                 : ImmutableDictionary<IrVarId, SpecResultProjection>.Empty.Add(
                     resultVariable,
@@ -435,7 +436,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 return null;
             }
 
-            if (projection != default)
+            if (hasProjection)
             {
                 _projections[resultVariable] = projection;
             }
