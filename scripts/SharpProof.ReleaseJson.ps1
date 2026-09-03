@@ -1,5 +1,33 @@
 Set-StrictMode -Version Latest
 
+function Write-SharpProofAtomicText {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+
+    $directory = [IO.Path]::GetDirectoryName($Path)
+    $leaf = [IO.Path]::GetFileName($Path)
+    $temporaryPath = Join-Path `
+        $directory `
+        ('.' + $leaf + '.' + [Guid]::NewGuid().ToString('N') + '.tmp')
+    try {
+        [IO.File]::WriteAllText(
+            $temporaryPath,
+            $Value,
+            [Text.UTF8Encoding]::new($false))
+        [IO.File]::Move($temporaryPath, $Path, $true)
+    }
+    finally {
+        if ([IO.File]::Exists($temporaryPath)) {
+            [IO.File]::Delete($temporaryPath)
+        }
+    }
+}
+
 function Invoke-SharpProofFixtureAssertion {
     param(
         [Parameter(Mandatory = $true)][string]$Name,

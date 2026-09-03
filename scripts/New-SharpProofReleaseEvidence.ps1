@@ -21,34 +21,6 @@ $resolvedOutput = $null
 . (Join-Path $PSScriptRoot 'Get-SharpProofReleaseVersion.ps1')
 Import-Module (Join-Path $PSScriptRoot 'SharpProof.PackageIdentity.psm1') -Force
 
-function Write-AtomicText {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Value
-    )
-
-    $directory = [IO.Path]::GetDirectoryName($Path)
-    $leaf = [IO.Path]::GetFileName($Path)
-    $temporaryPath = Join-Path `
-        $directory `
-        ('.' + $leaf + '.' + [Guid]::NewGuid().ToString('N') + '.tmp')
-    try {
-        [IO.File]::WriteAllText(
-            $temporaryPath,
-            $Value,
-            [Text.UTF8Encoding]::new($false))
-        [IO.File]::Move($temporaryPath, $Path, $true)
-    }
-    finally {
-        if ([IO.File]::Exists($temporaryPath)) {
-            [IO.File]::Delete($temporaryPath)
-        }
-    }
-}
-
 function Get-ArchiveText {
     param(
         [Parameter(Mandatory = $true)]
@@ -507,7 +479,7 @@ $manifest = [pscustomobject][ordered]@{
 $json = ($manifest | ConvertTo-Json -Depth 8) -replace "`r`n", "`n"
 $json += "`n"
 $manifestPath = Join-Path $resolvedOutput 'SharpProof.release.json'
-Write-AtomicText -Path $manifestPath -Value $json
+Write-SharpProofAtomicText -Path $manifestPath -Value $json
 $null = Read-SharpProofCanonicalReleaseJson `
     -Path $manifestPath `
     -DocumentType ReleaseManifest

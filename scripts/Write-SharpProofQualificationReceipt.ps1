@@ -16,6 +16,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'SharpProof.ReleaseJson.ps1')
 . (Join-Path $PSScriptRoot 'Test-SharpProofPilotReport.ps1')
 $commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
 $resolvedEvidence = (Resolve-Path -LiteralPath $EvidencePath).Path
@@ -128,7 +129,6 @@ if ($Gate -eq 'pilots') {
             [ordered]@{ id = [string]$_.id; evidence = @($_.evidence) }
         })
 }
-[IO.File]::WriteAllText(
-    (Join-Path $receiptDirectory "$Gate.json"),
-    (($receipt | ConvertTo-Json -Depth 5) + "`n"),
-    [Text.UTF8Encoding]::new($false))
+Write-SharpProofAtomicText `
+    -Path (Join-Path $receiptDirectory "$Gate.json") `
+    -Value (($receipt | ConvertTo-Json -Depth 5) + "`n")
