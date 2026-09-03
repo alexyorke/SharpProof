@@ -37,7 +37,7 @@ internal static class CallableVerificationPolicy
                         methodBoundary.Token)))
                 .OrderBy(result => ordinal[result.ClaimId])
                 .ToImmutableArray();
-            var reason = ProjectCallableReason(records);
+            var reason = WorkerResultAssembler.ProjectCallableReasons(records).Reason;
             return Result(target, reason, records);
         }
         catch (OperationCanceledException)
@@ -106,51 +106,8 @@ internal static class CallableVerificationPolicy
                     target.FailureReason)).ToImmutableArray();
         var reason = claims.Length == 0
             ? WorkerCallableCoverageReason.SemanticUnknown
-            : ProjectCallableReason(claims);
+            : WorkerResultAssembler.ProjectCallableReasons(claims).Reason;
         return Result(target, reason, claims);
-    }
-
-    private static WorkerCallableCoverageReason ProjectCallableReason(
-        ImmutableArray<WorkerClaimResult> claims)
-    {
-        var hasUnknown = false;
-        var allUnsupportedCallable = true;
-        var allUnsupportedContract = true;
-        var hasInfrastructureFailure = false;
-        foreach (var claim in claims)
-        {
-            if (claim.Outcome != WorkerClaimOutcome.Unknown)
-            {
-                continue;
-            }
-
-            hasUnknown = true;
-            allUnsupportedCallable &= claim.Reason == WorkerClaimReason.UnsupportedCallable;
-            allUnsupportedContract &= claim.Reason == WorkerClaimReason.UnsupportedContract;
-            hasInfrastructureFailure |= claim.Reason is
-                WorkerClaimReason.InfrastructureFailure or
-                WorkerClaimReason.BackendUnavailable or
-                WorkerClaimReason.MalformedBackendResult;
-        }
-
-        if (!hasUnknown)
-        {
-            return WorkerCallableCoverageReason.None;
-        }
-
-        if (allUnsupportedCallable)
-        {
-            return WorkerCallableCoverageReason.UnsupportedCallable;
-        }
-
-        if (allUnsupportedContract)
-        {
-            return WorkerCallableCoverageReason.UnsupportedContract;
-        }
-
-        return hasInfrastructureFailure
-            ? WorkerCallableCoverageReason.InfrastructureFailure
-            : WorkerCallableCoverageReason.SemanticUnknown;
     }
 
     private static CallableVerificationResult Result(

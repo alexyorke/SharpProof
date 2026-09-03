@@ -19497,3 +19497,9 @@ R1682 is applied: `Generate-BoundContractModel.ps1` now reuses the sourced
 `GeneratedFileHelpers.ps1::Required` accessor instead of maintaining a duplicate
 `Get-RequiredProperty` implementation. The generated bound-contract output is
 deterministic and the focused contract model test passes (1/1).
+
+R525 is applied: callable coverage projection now has one shared unknown-claim
+precedence pass, including infrastructure, timeout, and cancellation flags, used
+by both `CallableVerificationPolicy` and `WorkerResultAssembler`. Response-only
+compatibility fallbacks remain local. The focused worker projection and lowering
+tests pass (24/24).
