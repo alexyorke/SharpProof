@@ -1000,7 +1000,7 @@ internal sealed class ManagedAbstractFlow
             IParameterReferenceOperation parameter => parameter.Parameter,
             ILocalReferenceOperation local => local.Local,
             IFlowCaptureReferenceOperation capture => capture.Id,
-            _ => new object()
+            _ => null!
         };
         return operation is IParameterReferenceOperation or ILocalReferenceOperation or IFlowCaptureReferenceOperation;
     }
