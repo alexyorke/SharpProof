@@ -11467,6 +11467,10 @@ R1074 is applied: both malformed cache-envelope cases share one temporary-direct
 
 R1075 is deferred: adopt the linked `TempDirectory` helper across `ContainerContractTests` and `WorkerBinaryIdentityTests`.
 
+R1075 is applied: container-contract and binary-identity tests now use the shared `TempDirectory` lifecycle, removing manual temp-path creation and cleanup while preserving environment restoration. `ContainerContractTests` (5/5) and `WorkerBinaryIdentityTests` (8/8) pass.
+
+R1075 is applied: container-contract and binary-identity tests now use the shared `TempDirectory` lifecycle, removing manual temp-path creation and cleanup while preserving environment restoration. The focused test suites pass.
+
 ## Second survey, part three hundred seven: R1076 - uncached collection-expression spread in SharpProofAnalyzerEngine.SupportedDiagnostics
 
 `SharpProofAnalyzer.SupportedDiagnostics` delegates directly to `SharpProofAnalyzerEngine.SupportedDiagnostics`. In `SharpProofAnalyzerEngine.cs`, `SupportedDiagnostics` is declared with an expression-bodied getter `=> [ .. GeneratedDiagnosticDescriptors.SupportedDiagnostics, .. ContractForDiagnosticDescriptors.SupportedDiagnostics ];`. Every invocation from the Roslyn compiler driver, host test fixtures, or IDE analysis loops re-evaluates this getter, allocates a new backing array, and re-spreads both descriptor catalogs. Initializing `SupportedDiagnostics` as a static get-only property once ensures stable references and eliminates recurring array allocations.

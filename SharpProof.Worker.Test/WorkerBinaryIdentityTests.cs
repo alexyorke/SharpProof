@@ -52,20 +52,13 @@ public sealed class WorkerBinaryIdentityTests
     [Test]
     public void CompilerManifestReaderRejectsEmptyOpenedFile()
     {
-        var path = Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.EmptyManifest." + Guid.NewGuid().ToString("N"));
-        try
-        {
-            File.WriteAllBytes(path, []);
-            Assert.That(
-                (Action)(() => CompilerManifestArtifactFile.ReadAllBytes(path)),
-                Throws.TypeOf<InvalidDataException>());
-        }
-        finally
-        {
-            File.Delete(path);
-        }
+        using var temporaryWorkspace = new TempDirectory(
+            "SharpProof.EmptyManifest.");
+        var path = Path.Combine(temporaryWorkspace.FullName, "manifest.json");
+        File.WriteAllBytes(path, []);
+        Assert.That(
+            (Action)(() => CompilerManifestArtifactFile.ReadAllBytes(path)),
+            Throws.TypeOf<InvalidDataException>());
     }
 
     [Test]
