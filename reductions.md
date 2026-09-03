@@ -18942,3 +18942,11 @@ needs a focused failure-path test before changing behavior.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1664 | The semantic-cache matrix repeats the same `Answer` enum and `ProofCache.Write` source prefix across many fixtures; centralize that common synthetic prelude while retaining specialized cache shapes locally. | `SharpProof.Meta.Analyzers.Test/SharpProofSoundnessAnalyzerTests.cs:465-483,596-632,677-737,886-946,1009-1054,1063-1124,1171-1187` |
+
+## Second survey, continued: R1665 - Release-authority tests reread the same script set
+
+`ReleasePublicationScriptTests` has three contract tests that independently enumerate and reread the same three release scripts: `EveryReleaseAuthorityUsesStrictSymbolValidation`, `EveryReleaseAuthorityBindsExactPackageRoles`, and `EveryReleaseAuthorityUsesExactPackagePayloadValidation`. Each rebuilds the script path, performs `File.ReadAllTextAsync`, and opens its own multiple-assert scope; the latter two use the identical three-file set, while the first adds the package-consumer script. A cached script snapshot or declarative `(script set, required markers)` matrix can own the common file-loading and iteration while retaining the distinct symbol-pair, package-version, and payload requirements.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1665 | Three release-authority contract tests repeat script-name arrays, path construction, and file reads; share a snapshot/table-driven harness while preserving their distinct required markers and the first test's fourth script. | `SharpProof.Package.Test/ReleasePublicationScriptTests.cs:296-320,568-619` |
