@@ -18635,3 +18635,8 @@ organizational cleanup, not a code reduction, and is left unchanged.
 R1601 is applied: the two terminal-module-initializer tests now share one
 immutable two-tree compilation while retaining separate analysis sessions and
 query paths. `ModuleInitializerOrderingRegressionTests` pass (3/3).
+
+R1602 is applied: the two constructor-path tests now share one source-fixture
+builder for the guard, subject, and field initializer, while their root and
+delegating constructor declarations remain distinct. `MemberInitializerConstructorPathRegressionTests`
+pass (2/2).
