@@ -18755,3 +18755,8 @@ pass (2/2).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1654 | The two Frontend lowering helpers duplicate the `Subject` source envelope around caller-supplied members; share that small source builder while retaining separate compilation options and result wrappers. | `SharpProof.Frontend.Test/FrontendLoweringTests.cs:1202-1216`; `SharpProof.Frontend.Test/ProgramLoweringTests.cs:826-840` |
+
+R1643 is applied: analyzer and collector default dependency items now share one
+remove/reinclude projection, while their configuration fallbacks and role
+specific roots remain separate. `SourceConsumerAnalyzerDependenciesUseMappedConfiguration`
+passes (1/1).

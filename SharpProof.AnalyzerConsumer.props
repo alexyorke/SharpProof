@@ -85,12 +85,20 @@
       <_SharpProofMappedCollectorDependencyDirectory>$(_SharpProofAnalyzerConsumerDirectory)SharpProof.CompilerCollector\bin\$(_SharpProofMappedCollectorConfiguration)\netstandard2.0</_SharpProofMappedCollectorDependencyDirectory>
     </PropertyGroup>
     <ItemGroup Condition="'$(_SharpProofMappedAnalyzerDependencyDirectory)' != ''">
-      <Analyzer Remove="@(_SharpProofDefaultAnalyzerDependency)" />
-      <Analyzer Include="@(_SharpProofDefaultAnalyzerDependency->'$(_SharpProofMappedAnalyzerDependencyDirectory)\%(Filename)%(Extension)')" />
+      <_SharpProofRemappedAnalyzerDependency
+          Include="@(_SharpProofDefaultAnalyzerDependency)">
+        <MappedDirectory>$(_SharpProofMappedAnalyzerDependencyDirectory)</MappedDirectory>
+      </_SharpProofRemappedAnalyzerDependency>
     </ItemGroup>
     <ItemGroup Condition="'$(_SharpProofMappedCollectorDependencyDirectory)' != ''">
-      <Analyzer Remove="@(_SharpProofDefaultCollectorDependency)" />
-      <Analyzer Include="@(_SharpProofDefaultCollectorDependency->'$(_SharpProofMappedCollectorDependencyDirectory)\%(Filename)%(Extension)')" />
+      <_SharpProofRemappedAnalyzerDependency
+          Include="@(_SharpProofDefaultCollectorDependency)">
+        <MappedDirectory>$(_SharpProofMappedCollectorDependencyDirectory)</MappedDirectory>
+      </_SharpProofRemappedAnalyzerDependency>
+    </ItemGroup>
+    <ItemGroup Condition="'@(_SharpProofRemappedAnalyzerDependency)' != ''">
+      <Analyzer Remove="@(_SharpProofRemappedAnalyzerDependency)" />
+      <Analyzer Include="@(_SharpProofRemappedAnalyzerDependency->'%(MappedDirectory)\%(Filename)%(Extension)')" />
     </ItemGroup>
   </Target>
 
