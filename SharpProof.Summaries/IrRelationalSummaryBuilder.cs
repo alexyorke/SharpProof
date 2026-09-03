@@ -125,13 +125,20 @@ public static class IrRelationalSummaryBuilder
                 }
             }
 
-            var variables = signature.Parameters
-                .Concat(signature.Receiver.HasValue
-                    ? [signature.Receiver.Value]
-                    : [])
-                .Append(signature.Result)
-                .ToArray();
-            return variables.Distinct().Count() == variables.Length;
+            var variables = new HashSet<IrVarId>();
+            if (signature.Receiver is { } receiver &&
+                !variables.Add(receiver))
+            {
+                return false;
+            }
+            foreach (var parameter in signature.Parameters)
+            {
+                if (!variables.Add(parameter))
+                {
+                    return false;
+                }
+            }
+            return variables.Add(signature.Result);
         }
         catch (ArgumentException)
         {
