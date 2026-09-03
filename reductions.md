@@ -20293,3 +20293,58 @@ R1721 is applied: list-pattern member selection now lives in one
 `SwitchExpressionFacts` helper shared by analyzer call-site discovery and the
 three Effects consumers. `RequiresCallSiteDiscoveryTests` pass (44/44) and the
 focused Effects list-pattern tests pass (4/4).
+
+## Second survey, part six hundred twenty-three: R1880's count corrected from seventeen to thirty-two
+
+R1880 was filed against a partial parse. Its row has been corrected in place; this
+part records what changed and why, because the correction nearly doubles the
+finding and adds two cases that matter more than the rest.
+
+### What was wrong
+
+The first pass parsed only `Original` values written as a single-line
+single-quoted literal - **170** of the 248 entries - and reported **17** absent,
+stating explicitly that seventeen was a floor. The other 78 were skipped because
+they use a PowerShell here-string or a backtick-escaped double-quoted string. Two
+details made those hard and both are now handled:
+
+- the here-strings terminate with `'@).Trim()`, not a bare `'@`, and the `.Trim()`
+  means the needle is the trimmed body rather than the raw block;
+- the double-quoted literals carry `` ` ``-escapes, principally `` `n `` for the
+  newline that lets one entry pin two adjacent lines.
+
+With both handled the parse yields exactly **248** entries - 170 single-line, 65
+double-quoted, 13 here-strings - matching `mutationEvidence.expectedCatalogCount`.
+**216 match their target exactly once, 0 are non-unique, and 32 are absent.**
+
+### The two additions that matter most
+
+Both are among the fifteen the completed parse adds, both are double-quoted
+two-line pins, and both were verified independently rather than by the same
+parser:
+
+- **`cache-read-lock-coordination`** pins `cacheLock = AcquireLock(_directory);`
+  immediately followed by `ValidatePath(path);` in
+  `SharpProof.Worker/VerificationCache.cs`. The first line still exists, twice, at
+  `:50` and `:186` - but no longer immediately precedes the second. The mutation
+  exists to prove the cache lock is taken *before* the path is validated, and it
+  has no target.
+- **`standalone-build-stage-nonroot-contract`** pins
+  `COPY --chown=sharpproof:sharpproof . .` immediately followed by
+  `USER sharpproof` in `eng/container/Dockerfile`. `USER sharpproof` survives at
+  `:71`; the `COPY` line before it does not. The mutation exists to prove the
+  standalone build stage drops to a non-root user, and it has no target.
+
+Its sibling `cache-write-lock-coordination` is absent for the same reason as the
+first, and `verifier-supervisor-requires-subreaper`,
+`launcher-checks-discovered-runtime-paths`, `publication-complete-topology-preflight`
+and `build-task-active-symmetric-topology` are four more process- and
+publication-boundary mutants in the same state.
+
+### Status (part six hundred twenty-three)
+
+No new ID. R1880 now reads thirty-two rather than seventeen, its method section
+records that all 248 entries were checked rather than 170, and the two
+security-shaped cases are named in its row. The correction is recorded rather than
+silently applied because the first figure was published in this ledger and cited
+in a status report.
