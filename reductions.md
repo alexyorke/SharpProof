@@ -10529,3 +10529,15 @@ R1004 is deferred: preserve the script's standalone canonical smoke test, and on
 ### Status (part two hundred thirty-six)
 
 R1005 is deferred: physical containment is security-sensitive; only cache proven path-prefix observations within one validation call, and retain independent candidate resolution and fail-closed link handling.
+
+## Second survey, part two hundred thirty-seven: R1006 - duplicated standalone fixture assertion wrappers
+
+`Test-SharpProofStandaloneGateEvidence.ps1` exposes readable `Assert-Accepted` and `Assert-Rejected` functions, but both repeat the same `Invoke-SharpProofFixtureAssertion` call, fixture writer, standalone-result validator, expected commit, and expected MVID. Their only behavioral difference is the rejected path's `-ExpectRejected` switch. The corpus/performance envelope builders and the gate-specific validation arguments should remain separate; a small shared assertion helper with two thin wrappers can remove only the repeated assertion envelope. This is the standalone-gate counterpart to R855's release-JSON wrapper duplication, not a proposal to merge the different validator contracts.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1006 | **Standalone gate fixtures duplicate the accepted/rejected assertion envelope.** `Assert-Accepted` and `Assert-Rejected` each construct an identical `Invoke-SharpProofFixtureAssertion` call and `Assert-SharpProofStandaloneGateResult` callback; the rejected wrapper only adds `-ExpectRejected`. A parameterized private helper can centralize that plumbing while preserving the readable wrappers, distinct corpus/performance fixtures, and validator-specific expected values. | `scripts/Test-SharpProofStandaloneGateEvidence.ps1:77-106`; shared assertion primitive `scripts/SharpProof.ReleaseJson.ps1:3-23`; related release-JSON wrapper item R855 | |
+
+### Status (part two hundred thirty-seven)
+
+R1006 is deferred: keep the two public fixture names for readability and consolidate only their identical assertion plumbing if this test script is next maintained.
