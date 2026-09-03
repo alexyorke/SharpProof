@@ -14783,6 +14783,12 @@ discovery tests pass (44 passed).
 |---|---|---|
 | R1224 | **`Verify.ps1` duplicates the `preview-evidence` required-evidence list as a literal.** The verifier reads `previewEvidence.requiredEvidence` and then compares it to a separately typed comma string containing the same six IDs, creating two build-policy authorities. A catalog-driven assertion removes the drift surface while preserving order and exact membership checks. | `eng/acceptance/preview-evidence.v1.json:4-10`; `eng/acceptance/Verify.ps1:457-460` |
 
+### Status (part five hundred forty-six)
+
+R1224 remains deferred: the explicit ordered evidence list is a release-policy
+boundary, and no separate canonical source exists to replace it without
+weakening exact membership validation.
+
 ## Second survey, part five hundred forty-seven: R1225 - mutable-storage analysis enumerates type members three times
 
 `SharpProofSoundnessAnalyzer.IsMutableStorageType` walks each source-defined type and separately enumerates `current.GetMembers()` for instance fields, instance properties, and non-static events. The filters and recursive checks are intentionally different, but the member collection and Roslyn projection are the same immutable type-member set. Snapshotting `GetMembers()` once, or using one member-kind dispatch that preserves the existing field/property/event policies and `visiting` guard, removes two repeated member queries and keeps the mutable-storage decision in one traversal authority.
