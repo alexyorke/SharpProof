@@ -16621,3 +16621,11 @@ The `container-verifier` job runs `docker compose run --rm tooling package-consu
 | ID | Finding | Evidence |
 |---|---|---|
 | R1376 | `Get-CanonicalWorkflowJobs` performs a document-wide duplicate-heading grouping pass and then a second pass over the identical headings to build the canonical job map. Combine duplicate detection with dictionary insertion while preserving block boundaries and YAML-alias rejection. | `scripts/Test-SharpProofReleaseConfiguration.ps1:126-153` |
+
+## Second survey, continued: R1377 - Release configuration exact-set validation materializes side-effecting pipelines
+
+`Require-ExactSet` builds two hash sets, but expresses duplicate detection through `Where-Object` pipelines whose only purpose is the side effect of calling `.Add()`, materializes their results to inspect `.Count`, and then enumerates the actual set once more for a subset check. A pair of direct loops can record duplicate flags without pipeline arrays, followed by `HashSet.SetEquals` for the exact comparison. This keeps the current ordinal, duplicate-sensitive contract while reducing temporary collections and making the invariant easier to read; it is separate from the already-recorded empty-set wrapper and forwarding-wrapper issues.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1377 | `Require-ExactSet` uses three materializing PowerShell pipelines around hash-set insertion and a fourth to test the final subset, although the helper already owns both sets. Replace the side-effecting pipelines with direct loops and `SetEquals`, retaining duplicate rejection and ordinal semantics. | `scripts/Test-SharpProofReleaseConfiguration.ps1:59-80` |
