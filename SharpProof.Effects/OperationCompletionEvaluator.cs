@@ -270,21 +270,18 @@ internal sealed class OperationCompletionEvaluator
             SymbolEqualityComparer.Default.Equals(
                 recursive.MatchedType,
                 pattern.InputType);
-        var canComplete = true;
         foreach (var subpattern in recursive.DeconstructionSubpatterns)
         {
-            if (!canComplete)
-            {
-                isTotal &= SwitchExpressionFacts.IsTotalPattern(
-                    subpattern,
-                    subpattern.InputType);
-                continue;
-            }
-
             var facts = GetPatternCompletionFacts(subpattern, false);
             if (!facts.CanComplete)
             {
-                canComplete = false;
+                return facts.IsTotal
+                    ? new(
+                        false,
+                        SwitchExpressionFacts.IsTotalPattern(
+                            pattern,
+                            pattern.InputType))
+                    : new(true, false);
             }
             if (!facts.IsTotal)
             {
@@ -294,14 +291,6 @@ internal sealed class OperationCompletionEvaluator
         }
         foreach (var subpattern in recursive.PropertySubpatterns)
         {
-            if (!canComplete)
-            {
-                isTotal &= SwitchExpressionFacts.IsTotalPattern(
-                    subpattern.Pattern,
-                    subpattern.Pattern.InputType);
-                continue;
-            }
-
             if (!CanCompleteNormally(subpattern.Member))
             {
                 return new(
@@ -316,7 +305,13 @@ internal sealed class OperationCompletionEvaluator
                 false);
             if (!facts.CanComplete)
             {
-                canComplete = false;
+                return facts.IsTotal
+                    ? new(
+                        false,
+                        SwitchExpressionFacts.IsTotalPattern(
+                            pattern,
+                            pattern.InputType))
+                    : new(true, false);
             }
             if (!facts.IsTotal)
             {
@@ -324,7 +319,7 @@ internal sealed class OperationCompletionEvaluator
             }
             isTotal &= facts.IsTotal;
         }
-        return new(canComplete, isTotal);
+        return new(true, isTotal);
     }
 
     private readonly record struct PatternCompletionFacts(
