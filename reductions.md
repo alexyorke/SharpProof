@@ -11810,3 +11810,15 @@ R1110 is deferred: initialize the six package-version entries with array multipl
 ### Status (part three hundred forty-two)
 
 R1111 is deferred: share only the shard-shape formatter, and keep the two independent scheduler runs and their equality assertion.
+
+## Second survey, part three hundred forty-three: R1112 - duplicated closure queue deduplication
+
+`Get-SharpProofReleaseAuthorityClosure` uses `$seen.Add($path)` at the top of the queue loop as the authoritative processed-path gate. The reference-enqueue branch also checks `-not $seen.Contains($canonical)` before adding to `$pending`, but that check cannot prevent a path from being enqueued twice before either copy is processed; the dequeue gate then discards the duplicate. Removing the second check preserves the closure and leaves only one deduplication rule, while a separate queued set would be needed only if eliminating pending-queue churn is important.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1112 | **The release-authority closure walker repeats path deduplication at enqueue and dequeue without deduplicating pending work.** `$seen.Add($path)` already guarantees each canonical path is processed once, while `-not $seen.Contains($canonical)` only filters paths processed before enqueue and cannot stop duplicate references queued during the same pass. Remove the redundant enqueue-time check or replace both with an explicit queued/processed state if queue-size reduction is required. | `scripts/Get-SharpProofReleaseAuthorityClosure.ps1:33-36,94-98` |
+
+### Status (part three hundred forty-three)
+
+R1112 is deferred: retain one authoritative closure-path deduplication mechanism and avoid a partial second guard that does not cover pending entries.
