@@ -233,11 +233,13 @@ $completedCommit = Get-SharpProofCleanFuzzSourceCommit `
 if ($completedCommit -cne $sourceCommit) {
     throw 'Fuzz source changed during the campaign.'
 }
+$failedRuns = @($runs | Where-Object {
+        $_.exitCode -ne 0 -or -not $_.validationPassed
+    })
+$campaignPassed = $failedRuns.Count -eq 0
 $summary = [pscustomobject][ordered]@{
     schemaVersion = 4
-    status = if (@($runs | Where-Object {
-                $_.exitCode -ne 0 -or -not $_.validationPassed
-    }).Count -eq 0) { 'passed' } else { 'failed' }
+    status = if ($campaignPassed) { 'passed' } else { 'failed' }
     commit = $sourceCommit
     rotatingSeed = $RotatingSeed
     rotatingCases = $effectiveRotatingCases
@@ -247,9 +249,7 @@ $summary = [pscustomobject][ordered]@{
     totalCases = [int](@($runs |
         Measure-Object -Property observedCases -Sum).Sum)
     runs = @($runs)
-    passed = @($runs | Where-Object {
-            $_.exitCode -ne 0 -or -not $_.validationPassed
-        }).Count -eq 0
+    passed = $campaignPassed
 }
 Complete-SharpProofFuzzEvidence `
     -OutputDirectory $resolvedOutput `
