@@ -13753,3 +13753,20 @@ semantics while removing repeated nullness analysis.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1171 | **`OperationCompletionEvaluator` repeats the proven-null/proven-non-null ladder in conditional access and coalescing.** `CanCompleteConditionalAccess`, `CanCompleteCoalesceAssignment`, and `CanCompleteCoalesce` query both predicates for the same operation/origin instead of sharing one tri-state result. The helper must retain each construct's branch order and unknown behavior, but can eliminate repeated abstract-flow/nullness work. | `SharpProof.Effects/OperationCompletionEvaluator.cs:884-916,1224-1238` |
+
+## Second survey, part four hundred ninety-four: R1172 - deconstruction value completion is rechecked
+
+`CanCompleteDeconstruction` first calls `CanCompleteNormally` for the whole
+deconstruction value. It then enters `DeconstructionPhasesMayComplete`; for a
+root instance deconstruct method, that routine calls `CanCompleteInvocation`
+with the same value as the receiver, and `CanCompleteInvocation` calls
+`CanCompleteNormally` on that receiver again. The repeated check occurs only
+for a non-static, non-reduced root method, while static and nested conversion
+phases retain their separate method-completion policies. Passing the already
+validated root-value state into that invocation path can remove the duplicate
+completion traversal without weakening phase ordering or method dispatch
+checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1172 | **`OperationCompletionEvaluator` rechecks a deconstruction value already proven complete.** `CanCompleteDeconstruction` validates `deconstruction.Value`, then the root non-static deconstruction phase routes the same value through `CanCompleteInvocation`, whose instance guard calls `CanCompleteNormally(value)` again. A prevalidated-instance completion seam can retain static/reduced and nested phase distinctions while removing the duplicate check. | `SharpProof.Effects/OperationCompletionEvaluator.cs:631-649,918-969` |
