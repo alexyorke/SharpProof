@@ -15730,6 +15730,13 @@ Get-PortablePdbModule builds $sourceLines and $sourceRanges as separate dictiona
 | ID | Finding | Evidence |
 |---|---|---|
 | R1311 | **Get-SharpProofProductionInventory.Get-PortablePdbModule maintains two synchronized dictionaries for each source path. Combine the line set and range map in one document-state value, preserving compiler-generated filtering for sequencePoints and all-range retention for sequencePointRanges.** | scripts/Get-SharpProofProductionInventory.ps1:245-246,266-293 |
+
+### Status (continued)
+
+R1311 is applied: portable-PDB documents now use one state record containing
+both the non-generated line set and all sequence-point ranges. Compiler-generated
+filtering and range retention are preserved. Inventory coverage test passes (1
+passed).
 ## Second survey, continued: R1312 - slot-domain membership uses two linear array passes
 
 Generate-CompilerArtifactModel materializes the actual slot-mapping keys and declared slot-domain keys as arrays, then checks every actual key with -notin against the declared array and every declared key with -notin against the actual array. These collections are stable after construction and the two loops only differ in which missing-side diagnostic they produce. Ordinal sets built once can retain both fail-closed checks while removing repeated linear membership scans.
