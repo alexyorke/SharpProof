@@ -18843,3 +18843,11 @@ authority. `SharpProof.Contracts.Test` passes (142/142).
 R1658 is applied: the unused `ProbeArtifact.SyntaxTreeCount` convenience property
 is removed; probe path assertions continue using `SyntaxTrees` and
 `SyntaxTreePaths`. `FinalCompilationProbeTests` pass (7/7).
+
+## Second survey, continued: R1659 - The requires-call-site entrypoint is a pure forwarding cycle
+
+`AnalyzerFeaturePipeline` calls `RequiresCallSiteAnalyzer.Analyze`, but that method only forwards every argument to `RequiresCallSiteTreeAnalyzer.Analyze`. The tree analyzer then calls back into `RequiresCallSiteAnalyzer.AnalyzeCallable` for its no-potential-owner path, leaving two internal types coupled through an unnecessary facade. Calling the tree analyzer directly from the pipeline, or moving the entrypoint into one owner, would remove the forwarding seam while preserving the fallback into the existing analysis helpers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1659 | `RequiresCallSiteAnalyzer.Analyze` is a pure forwarder into `RequiresCallSiteTreeAnalyzer`, which calls back into the companion; collapse the internal entrypoint cycle. | `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:5-22`; `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:5-40`; pipeline callers at `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:60-69,300-310` |
