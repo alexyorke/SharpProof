@@ -30,6 +30,8 @@ internal sealed class ExceptionHandlerReachability(
         _lockValueCompletionCache = new();
     private readonly Dictionary<ICompoundAssignmentOperation, bool>
         _compoundAssignmentTargetCompletionCache = new();
+    private readonly Dictionary<IIncrementOrDecrementOperation, bool>
+        _incrementTargetCompletionCache = new();
     private readonly Dictionary<IMethodSymbol, bool> _methodCompletionCache =
         new(SymbolEqualityComparer.Default);
     private readonly Dictionary<
@@ -561,7 +563,7 @@ internal sealed class ExceptionHandlerReachability(
             if (operation is IIncrementOrDecrementOperation increment)
             {
                 var priorPhasesComplete =
-                    canCompleteNormally(increment.Target);
+                    GetIncrementTargetCompletion(increment);
                 var operatorInitializationCompletes = true;
                 if (priorPhasesComplete &&
                     !ConversionEffectClassifier.SkipsLiftedOperator(
@@ -1347,6 +1349,13 @@ internal sealed class ExceptionHandlerReachability(
                 }
                 remaining.Push(compound.Target);
                 return;
+            case IIncrementOrDecrementOperation increment:
+                PushSequentialCore(
+                    increment.ChildOperations,
+                    remaining,
+                    childrenAlreadyComplete:
+                        GetIncrementTargetCompletion(increment));
+                return;
             case IConditionalAccessOperation access:
                 var receiverCompletes = canCompleteNormally(
                     access.Operation);
@@ -1523,6 +1532,21 @@ internal sealed class ExceptionHandlerReachability(
 
         var complete = canCompleteNormally(compound.Target);
         _compoundAssignmentTargetCompletionCache.Add(compound, complete);
+        return complete;
+    }
+
+    private bool GetIncrementTargetCompletion(
+        IIncrementOrDecrementOperation increment)
+    {
+        if (_incrementTargetCompletionCache.TryGetValue(
+                increment,
+                out var cached))
+        {
+            return cached;
+        }
+
+        var complete = canCompleteNormally(increment.Target);
+        _incrementTargetCompletionCache.Add(increment, complete);
         return complete;
     }
 
@@ -3216,7 +3240,7 @@ internal sealed class ExceptionHandlerReachability(
                 canCompleteNormally(binary.LeftOperand) &&
                 canCompleteNormally(binary.RightOperand),
             IIncrementOrDecrementOperation increment =>
-                canCompleteNormally(increment.Target),
+                GetIncrementTargetCompletion(increment),
             IArrayCreationOperation array => array.DimensionSizes.All(
                 canCompleteNormally),
             IArrayElementReferenceOperation element =>
