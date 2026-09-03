@@ -14667,3 +14667,11 @@ decision points.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1221 | **`AnalyzeAbstractCallSite` and `AnalyzeConcreteCall` duplicate the receiver/nullness/argument prerequisite gate.** Each constructs `DefiniteOperationFacts`, checks an optional receiver, applies the non-static definitely-null rule, and scans `Arguments` for incomplete values; only the abstract/concrete completion predicate and failure sentinel differ. A policy-parameterized helper can centralize the shape without changing either analysis mode's soundness boundary. | `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:360-381,453-478` |
+
+## Second survey, part five hundred forty-four: R1222 - operator call extraction allocates a params array
+
+`RequiresCallSiteDiscovery.GetCalls` routes compound assignment, increment/decrement, binary, unary, and user-defined conversion operations through `CreateImplicitOperatorCalls`. That helper declares `params IOperation[] operands`, so each dispatch arm allocates a temporary operand array even though the arity is statically one or two and the caller already has the individual operation properties. The helper then forwards the array to the final factory. Fixed-arity overloads or a non-allocating operand view can remove this per-operation allocation while preserving lifted-null filtering, flow-result checks, and argument order.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1222 | **`GetCalls` creates a `params IOperation[]` for every implicit-operator candidate.** Five operation arms pass one or two known operands into `CreateImplicitOperatorCalls`, which packages them into a new array before the common lifted/null and call-target logic runs. Fixed-arity overloads can retain the shared policy without allocating a params array in the CFG operation walk. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:748-794,859-875` |
