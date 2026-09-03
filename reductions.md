@@ -9618,3 +9618,112 @@ No ID allocated. Both corrections narrow claims this ledger previously made rath
 than adding new work, which is the point: part one hundred eighty-seven's
 conclusion was used to close three analytical techniques at once, so its boundary
 needed to be exact before anyone relies on it.
+
+## Second survey, part two hundred three: R974 - one condition, five copies, one of them inverted
+
+A structural analysis of `SharpProof.Verifier.targets`, the largest build file in
+the repository at 283 lines: its targets, its repeated conditions, and its internal
+duplication.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R974 | **A five-clause MSBuild condition is written out five times in one file, and the fifth differs from the other four by two characters that invert it.** `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets` repeats `'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'` **verbatim at `:34`, `:91`, `:97` and `:252`** - a 220-character string, four times. At **`:279`** the same 220 characters appear with a single clause negated - `'$(_SharpProofVerifierHostSupported)' != 'true'` - guarding `SharpProofRejectUnsupportedWorkerHost`, the target that errors when the host is unsupported. **The guard and its complement are distinguishable only by `==` versus `!=` at roughly character 110 of an unbroken line.** Any change to the other four clauses must be made five times with the polarity kept straight, and a mistake produces either a verifier that silently does nothing or one that rejects every supported host - neither of which a reader would catch by eye. Two further variants of the same family live in the sibling package: `SharpProof.Package/buildTransitive/SharpProof.targets:42` is the same condition minus the host clause, and `:72` substitutes `_SharpProofVerifierPackagePresent`. **The repository already demonstrates the fix in these very files**: `_SharpProofProfileNormalized` is computed once at `SharpProof.ConsumerContract.props:5` and `_SharpProofVerifierHostSupported` once at `SharpProof.Verifier.props:6`, precisely so that a normalization is not repeated. One further derived property - `_SharpProofVerifyActive` - would replace all five occurrences, and the negated site would become a readable `'$(_SharpProofVerifyActive)' != 'true'`. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:34,91,97,252,279`; `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.props:6`; `SharpProof.Package/buildTransitive/SharpProof.targets:42,72`; `SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props:5` |
+
+### Checked and not proposed (part two hundred three)
+
+- **The file has no textual duplication at all.** A four-line sliding window over
+  all 283 lines finds **zero** repeated runs. The eight targets -
+  `_SharpProofValidateRuntimeClosure`, `_SharpProofResolveVerificationPaths`,
+  `_SharpProofInitializeVerify`, `_SharpProofCleanupInvocation`,
+  `_SharpProofVerifyCore`, `SharpProofVerify`,
+  `SharpProofResetPublishedVerification`, and
+  `SharpProofRejectUnsupportedWorkerHost` - each do distinct work and are wired
+  through `DependsOnTargets`/`BeforeTargets`/`AfterTargets` rather than by copied
+  bodies. R974 is about a repeated *condition string*, which a line-based
+  duplication scan does not see.
+- **The four parallel `'$(_SharpProofConfiguredX)' != '' AND '$(TargetFrameworks)' != ''`
+  conditions are not duplication.** They guard the Request, Result,
+  CompilerManifest and Sarif path properties respectively - four different
+  properties needing the same shape of check, which is a parallel structure rather
+  than a repeated one. Collapsing them would require indirection through item
+  metadata for no gain.
+- **R263 covers a different repetition in this file** - the invocation-directory
+  containment check duplicated between `_SharpProofInitializeVerify` and
+  `_SharpProofCleanupInvocation` with a `Cleanup` prefix on nine derived
+  properties. R974 does not overlap it: R263 is a duplicated *computation*,
+  this is a duplicated *guard*, and fixing either leaves the other.
+
+### Status (part two hundred three)
+
+R974 is `pending` and is one property definition plus five substitutions. It is
+worth doing ahead of most items in this ledger for a reason unrelated to line
+count: this is the guard that decides whether verification runs at all, it is
+written five times in a form where the negated copy is visually identical to the
+positive ones, and it sits in a file that ships to consumers.
+
+## Second survey, part two hundred five: R949 is applied, and R975 - four definitions of "the canonical container"
+
+The condition-string technique that produced R974 for MSBuild, transferred to
+PowerShell: every `if`/`while` guard of forty characters or more, normalised on
+whitespace and grouped.
+
+### Status update: R949 is applied, and more completely than proposed
+
+R949 recorded that the `prctl` P/Invoke was declared twice across
+`SharpProof.Host` and `SharpProof.BuildTasks`, that `ChildSubreaper = 36` and
+`SetDumpable = 4` sat privately in `VerifierProcessSupervisor` while
+`ParentDeathSignal = 1` sat in the shared `LinuxProcessControlConstants`, and that
+the call sites passed bare `1` and `0` where the sibling passed a named constant.
+**All three are fixed.** `SharpProof.Host/LinuxWorkerProcess.cs:349-357` now
+declares `internal static partial class LinuxPrctl` holding the single
+declaration - **`EntryPoint = "prctl"` now appears exactly once in the
+repository** - and `LinuxProcessControlConstants` has absorbed `ChildSubreaper`
+and `SetDumpable` **and** gained `Enable = 1` and `Disable = 0`, which replace the
+bare arguments R949 flagged. That last pair goes beyond what the item asked for.
+Move R949 to applied.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R975 | **"Are we inside the canonical container?" is answered in four languages by four different predicates, no two of which check the same things, and the two that omit the architecture check are the two that run most often.** The repository's most fundamental precondition is expressed as: **PowerShell** - `-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1'`, at **eight sites across seven files**, checking OS and environment variable; **MSBuild** - `Directory.Build.targets:7`, `'$(SHARPPROOF_CONTAINER)' != '1' Or !Exists('$(SHARPPROOF_CONTAINER_CONTRACT)')`, checking environment variable and contract file; **shell** - `eng/container/entrypoint.sh:31`, `uname -s != Linux \|\| uname -m != x86_64`, checking OS and **architecture**; and **C#** - `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:20-21`, `!OperatingSystem.IsLinux() \|\| RuntimeInformation.ProcessArchitecture != Architecture.X64`, also checking OS and **architecture**. Between them they test four properties - OS, architecture, environment variable, contract file - and **each predicate checks exactly two**. `eng/container/toolchain.json:4,36` declares `"platform": "linux/amd64"` and `"arm64Supported": false`, so architecture is a hard requirement; yet **neither the eight PowerShell guards nor the MSBuild condition tests it**. On linux/arm64 with `SHARPPROOF_CONTAINER=1` exported, every PowerShell entry point and the MSBuild gate would admit the build while the shell entrypoint and the C# supervisor refuse it. **Two of the eight PowerShell copies are inside the shared module itself** - `SharpProof.ContainerExecution.psm1:528` and `:768` - so the module that exists to centralise container execution repeats the container check twice internally and exports no function for it, exactly the gap R740 identified for its async process runner. The eight differ only in their message text, one per caller. | `scripts/SharpProof.ContainerExecution.psm1:528,768`; `scripts/Invoke-SharpProofChangedTests.ps1:22`; `Invoke-SharpProofDevCheck.ps1:16`; `Invoke-SharpProofDotnet.ps1:17`; `Invoke-SharpProofPackageTests.ps1:28`; `Invoke-SharpProofReleaseContainer.ps1:17`; `Invoke-SharpProofSemanticTests.ps1:28`; `Directory.Build.targets:7`; `eng/container/entrypoint.sh:31`; `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:19-22`; `eng/container/toolchain.json:4,36` |
+
+### Checked and not proposed (part two hundred five)
+
+- **Most repeated PowerShell guards are trivial idioms, not duplication.** Of 45
+  guard expressions of forty characters or more appearing twice or more,
+  the large majority are `[string]::IsNullOrWhiteSpace($X)` over different
+  variables (10 sites for `$PackageSource`, 8 for `$TestFilter`, 4 each for
+  `$stdout` and `$stderr`) or single-file repetitions such as
+  `$publicationDestination.mode -ceq 'fixture'` seven times inside
+  `Publish-SharpProofRelease.ps1`. A null-or-whitespace test on a different
+  variable is not a duplicated concept.
+- **`$LASTEXITCODE -ne 0 -or $head -notmatch '^[0-9a-f]{40}$'` at three sites in
+  three files is already R325**, the exact-commit validation filed as being spelled
+  five ways across 27 sites. Not re-filed.
+- The four `-not [string]::IsNullOrWhiteSpace($stdout)` / `($stderr)` pairs across
+  the three parallel schedulers and the shared module belong to **R741**, which
+  already proposes moving that coverage plumbing into the module. Not re-filed.
+
+### Status (part two hundred five)
+
+R975 is `pending`. The PowerShell half is straightforward - one exported
+`Assert-SharpProofContainer` in the module that already contains two copies of the
+check, taking the caller's message. The harder half is the decision the four
+predicates currently avoid: which of OS, architecture, environment variable and
+contract file each layer is responsible for. The architecture gap is the concrete
+part - `arm64Supported: false` is declared in the toolchain contract and enforced
+by two of the four layers.
+
+## Second survey, part two hundred six: R976 - duplicated SMT oracle sessions
+
+A focused comparison of the two SMT-backed fuzz oracles found the same native
+solver session setup in both domain-specific implementations.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R976 | **`FiniteDomainSmtDifferentialOracle` and `PartialTermSmtDifferentialOracle` each assemble the same Z3-backed verification session locally.** The finite-domain path installs the Z3 resolver, creates an `IrSmtBackend`, constructs a `ProofKernel`, and verifies one query; the partial-term path repeats the resolver installation, backend construction, and kernel construction before verifying each scenario through the same kernel. Their query shapes and outcome mappings are intentionally different - finite-domain negates the formula and maps `Proven`/`Refuted` to satisfiable/unsatisfiable, while partial-term verifies the original formula repeatedly and maps proof outcomes to defined true/false/undefined - so those semantics should remain at the callers. The resolver/backend/kernel lifetime, however, is shared session infrastructure. A small fuzz-only SMT session helper can own native resolver installation, backend disposal, and kernel creation while allowing each oracle to build its own query and retain one session across a comparison. This removes a second resource-lifetime recipe and prevents the two fuzz paths from drifting in native setup or cleanup behavior. | `Tools/SharpProof.Fuzz/FiniteDomainSmtFuzzing.cs:189-194`; `Tools/SharpProof.Fuzz/PartialTermSmtFuzzing.cs:145-150,197-200`; finite-domain outcome mapping `FiniteDomainSmtFuzzing.cs:195-231`; partial-term mapping `PartialTermSmtFuzzing.cs:201-232` |
+
+### Status (part two hundred six)
+
+R976 is `deferred`: this is a fuzz-infrastructure reduction only. The finite
+domain and partial-term semantics should not be merged; the candidate is the
+shared native solver-session boundary around them.
