@@ -21064,3 +21064,11 @@ their traversal policies. The full `SharpProof.Contracts.Test` suite passes
 | ID | Finding | Evidence |
 |---|---|---|
 | R1995 | `OperationCompletionEvaluator` and `OperationEffectScanner` duplicate the `ConditionalAnd`/`ConditionalOr` left-value-to-right-skip rule; centralize only that short-circuit predicate while retaining each consumer's distinct completion and effect handling. | `SharpProof.Effects/OperationCompletionEvaluator.cs:1443-1453`; `SharpProof.Effects/OperationEffectScanner.Expressions.cs:560-571`; related R614 |
+
+## Second survey, continued: R1996 - IrCSharpDifferentialOracle and FrontendFuzzing duplicate runtime-exception kind mapping
+
+`IrCSharpDifferentialOracle.CompareException` and `FrontendFuzzing` independently map the same five runtime exception types (`DivideByZeroException`, `OverflowException`, `NullReferenceException`, `IndexOutOfRangeException`, and `InvalidCastException`) to `IrExceptionKind`, with the same nullable fallback. Their surrounding comparison policies and result types differ, so a shared narrow exception-kind classifier should preserve each caller's mismatch/agreement handling while preventing this projection from drifting.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1996 | **`IrCSharpDifferentialOracle.CompareException` and `FrontendFuzzing` duplicate the five-case runtime exception-to-`IrExceptionKind` projection; share only the classifier while retaining their distinct result policies.** | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:577-585`; `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1663-1671` |
