@@ -15963,6 +15963,12 @@ Get-SharpProofWeightedMutationShards validates ShardCount and then initializes $
 | ID | Finding | Evidence |
 |---|---|---|
 | R1328 | **Get-SharpProofWeightedMutationShards grows its fixed-size shard-bucket array with `+=`. Allocate the bucket container at the validated ShardCount or use a growable list so setup does not repeatedly copy the container.** | scripts/SharpProof.MutationScheduling.psm1:10-12,22-30,65-73 |
+
+### Status (continued)
+
+R1328 is applied: mutation shard buckets are allocated at the validated shard
+count, removing repeated array growth while preserving weighted assignment.
+Mutation scheduling setup remains covered by the canonical tooling path.
 ## Second survey, continued: R1329 - IR block ordering leaves known-capacity collections unbounded
 
 IrBlockOrder derives its result only from program blocks, yet it creates active and complete hash sets, a pending stack, and a result list with default capacities. The program's immutable Blocks collection supplies a known upper bound for every one of these structures. Supplying that capacity (or using a block-indexed state representation) can avoid growth reallocations while preserving cycle detection, resource spending, reverse postorder, and failure behavior.
