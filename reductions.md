@@ -14413,3 +14413,17 @@ separate.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1206 | **`CompilerLoweredArtifact.DecodeBody` rescans each summary call's free-variable list four times.** The `free` result-plus-existentials array is passed through `Distinct().Count()` and then through separate `Any` predicates for `canonical`, `programVariables`, and `summaryVariables`. One set-building pass can preserve all four rejection rules and the later `summaryVariables.UnionWith(free)` behavior without repeating the same bounded sequence traversal. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:888-907` |
+
+## Second survey, part five hundred twenty-nine: R1207 - claim membership validation reprojects sorted claims
+
+`ValidateClaimMembership` sorts one callable's claims once, but then projects
+that same array to ordinals for dense-index validation, projects it again to
+claim IDs for membership comparison, and walks it again for the effect-before-
+postcondition ordering rule. Materializing the ordered IDs while one loop
+checks ordinals and tracks the ordering state can preserve the three
+independent diagnostics and the current tie-break order without repeatedly
+enumerating the sorted claim rows.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1207 | **`WorkerProtocolJson.ValidateClaimMembership` traverses one sorted claim array three times.** The `expected` rows are separately mapped for dense ordinals and callable claim IDs, then passed through `HasVerifierCompatibleClaimOrder`, which walks the same rows again. A single projection can retain the ordinal, membership, and claim-kind checks while preserving their separate `Validator.Check` results and sort order. | `SharpProof.Worker.Protocol/ProtocolJson.cs:563-580` |
