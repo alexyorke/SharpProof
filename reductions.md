@@ -12000,3 +12000,15 @@ R1125 is deferred: separate one-time workflow-document parsing from per-job look
 ### Status (part three hundred fifty-seven)
 
 R1126 is deferred: centralize the pilot evidence-path projection, preserving the distinct roots and negative-probe behavior.
+
+## Second survey, part three hundred fifty-eight: R1127 - disconnected package identity projections in pilot reports
+
+`Test-SharpProofPilotReport` validates each `packageArtifacts` row by checking that its package ID is one of three allowed strings, its version and commit match the report, and its filename is one of six independently constructed expected names. Those predicates are not joined: the validator never requires the filename stem to equal the row's `packageId`, never requires one `.nupkg` and one `.snupkg` row for each ID, and therefore accepts a report whose six filenames are valid but whose package-ID fields are duplicated or attached to the wrong files. `Get-SharpProofPilotPackageAuthority` performs the stronger per-file identity check when producing the report, but the report validator is also called on serialized evidence and should not rely on the producer having been trusted. A package-keyed artifact projection can replace the disconnected checks while retaining the exact-six and version/commit rules.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1127 | **Pilot-report package IDs and filenames are validated independently rather than as one identity.** The report gate permits any allowed `packageId` on each row and separately permits any expected six filenames, without enforcing filename/package-ID pairing or one main/symbol pair per package. Reuse the package authority's keyed identity projection when validating the serialized report. | `scripts/Test-SharpProofPilotReport.ps1:102-126`; producer check `scripts/Get-SharpProofPilotPackageAuthority.ps1:14-35` |
+
+### Status (part three hundred fifty-eight)
+
+R1127 is deferred: validate the report's six package rows through a keyed package-ID and extension projection, preserving the independent producer-side source checks.
