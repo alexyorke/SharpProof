@@ -14754,6 +14754,13 @@ focused RequiresAndControl analyzer suite passes (92 passed).
 |---|---|---|
 | R1222 | **`GetCalls` creates a `params IOperation[]` for every implicit-operator candidate.** Five operation arms pass one or two known operands into `CreateImplicitOperatorCalls`, which packages them into a new array before the common lifted/null and call-target logic runs. Fixed-arity overloads can retain the shared policy without allocating a params array in the CFG operation walk. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:748-794,859-875` |
 
+### Status (part five hundred forty-four)
+
+R1222 is applied: implicit operator call extraction now accepts fixed one- or
+two-operand arguments, eliminating the per-candidate params array while keeping
+lifted-null filtering and argument truncation. Requires-call-site discovery
+tests pass (44 passed).
+
 ## Second survey, part five hundred forty-five: R1223 - list-pattern argument projection allocates a params array
 
 `RequiresCallSiteDiscovery.GetListPatternCalls` invokes `CreateImplicitListPatternArguments` once for each callable indexer or slice member it emits. The helper accepts `params long?[] values`, although the indexed branch supplies one value and the slice branch supplies at most two. Each call therefore creates a short-lived nullable-value array before building the immutable argument map. Fixed-arity overloads can preserve the existing parameter-count truncation and nullable filtering while removing that repeated per-member allocation.
