@@ -20,6 +20,7 @@ public sealed partial class ContractClauseInventory
 {
     public bool HasPlacementErrors =>
         Clauses.Any(static clause =>
-            !clause.IsValid &&
-            clause.Placement != ContractClausePlacement.NestedCallable);
+            clause.Placement is not (
+                ContractClausePlacement.ValidPrologue or
+                ContractClausePlacement.NestedCallable));
 }
