@@ -16342,3 +16342,7 @@ shared by both tests. The focused test passes (3 passed).
 R1352 is applied: getter and setter property cases share one parameterized test
 envelope while retaining their distinct method and accessor expectations. The
 focused test passes (2 passed).
+
+R1353 is applied: compiler-artifact parameter-source emission uses a pre-sized
+generic list instead of repeated PowerShell array appends. Generator validation
+passes, including canonical and malformed-schema cases.

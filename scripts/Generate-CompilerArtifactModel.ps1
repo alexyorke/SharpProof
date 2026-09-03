@@ -85,7 +85,7 @@ function New-GeneratedOutput {
 function Get-ParameterSource {
     param([object[]]$Parameters, [string]$Context)
 
-    $sources = @()
+    $sources = [Collections.Generic.List[string]]::new($Parameters.Count)
     $names = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
     foreach ($parameter in $Parameters) {
@@ -107,7 +107,7 @@ function Get-ParameterSource {
             }
             " = $value"
         }
-        $sources += "$type $name$default"
+        $sources.Add("$type $name$default")
     }
     return $sources
 }
