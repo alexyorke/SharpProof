@@ -9951,3 +9951,104 @@ conservatism.
 R985 is `deferred`: extract only the shared built-in operation classification.
 Retain `RoslynCfgThrowFacts`'s user-defined/explicit-throw cases and the Effects
 layer's unknown-exception and prerequisite filtering.
+
+## Second survey, part two hundred sixteen: R732 and R733 are applied, and R986 - one package, three resolutions
+
+A census of every `PackageReference` across the 60 projects: which packages, with
+what asset settings, on which target frameworks, and how each resolves.
+
+### Status update: R732 and R733 are both applied
+
+R732 recorded that `SharpProof.Analyzer.Core` was the only one of six analyzer
+projects without `IsRoslynAnalyzer`, so `EnforceExtendedAnalyzerRules` did not
+apply to the assembly holding the analysis. R733 recorded that the same six
+projects each repeated a four-line `Microsoft.CodeAnalysis.Analyzers`
+`PackageReference` block. **Both are fixed, and by the mechanism R733 named.**
+`SharpProof.Analyzer.Core.csproj:4` now declares `<IsRoslynAnalyzer>true</IsRoslynAnalyzer>`,
+and `Directory.Build.props:94-99` now carries the package block once inside
+`<ItemGroup Condition="'$(IsRoslynAnalyzer)' == 'true'">` - the marker-driven
+`ItemGroup` pattern R733 pointed at. **A search for
+`Microsoft.CodeAnalysis.Analyzers` across all 60 `.csproj` files now returns
+nothing.** The release-tracking half also narrowed: the `RS2002;RS2003`
+suppressions are gone from all three projects that carried them, leaving `RS2008`
+in two projects and `RS1035;RS2008` in one. Move R732 and R733 to applied.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R986 | **`System.Collections.Immutable` is resolved three different ways in one repository, and the repository contains its own proof that five of the references are unnecessary.** Twenty-one projects carry a direct `PackageReference`. **Sixteen target `netstandard2.0`**, where the package is genuinely required. **Five target `net8.0` or `net9.0`**: `SharpProof.Gates` (net9.0), and `SharpProof.Testing`, `SharpProof.Analyzer.Test`, `SharpProof.Effects.Test`, `SharpProof.ContractForGenerator.Test` (net8.0). All five resolve `Direct 9.0.18` in their lock files. **`SharpProof.Worker` is the counter-example that settles it**: it also targets `net9.0`, uses `ImmutableArray`/`ImmutableDictionary`/`ImmutableHashSet` at **96 sites across 12 files**, and carries **no direct reference at all** - its lock file records `CentralTransitive`. So two net9.0 projects in the same repository both use immutable collections, one referencing the package directly and one not, which demonstrates the direct reference is not needed on that target framework. The four `net8.0` cases are the more consequential ones: a **9.0.18 package on an 8.x target framework** resolves a newer assembly than that framework provides, so removing the reference there is not a pure deletion - it changes which `System.Collections.Immutable` is loaded, and that is a decision rather than tidying. | 21 `.csproj` files; `SharpProof.Gates/SharpProof.Gates.csproj:13`; `SharpProof.Testing/SharpProof.Testing.csproj:8`; `SharpProof.Analyzer.Test/SharpProof.Analyzer.Test.csproj:9`; `SharpProof.Effects.Test/SharpProof.Effects.Test.csproj:7`; `SharpProof.ContractForGenerator.Test/SharpProof.ContractForGenerator.Test.csproj:7`; `SharpProof.Worker/packages.lock.json`; `Directory.Packages.props:22` |
+
+### Checked and not proposed (part two hundred sixteen)
+
+- **A correction to this part's own first pass.** A text scan for the string
+  `System.Collections.Immutable` in csproj files reported **22** referencing
+  projects including `SharpProof.Worker`. That is wrong:
+  `SharpProof.Worker.csproj:12` contains the string only inside a
+  `'%(RuntimeCopyLocalItems.NuGetPackageId)' == 'System.Collections.Immutable'`
+  condition, not a `PackageReference`. The correct count is 21, and Worker's
+  absence from it is what makes R986 demonstrable.
+- **Package asset settings are consistent across all 16 distinct packages except
+  one, and that one is defensible.** `Microsoft.CodeAnalysis.CSharp` is referenced
+  18 times, 17 with default assets and once with `PrivateAssets="all"` - by
+  `SharpProof.Package.Test`, whose subject is the *packaged* output and which
+  therefore has reason not to let a compile-time Roslyn reference flow. Every other
+  package has one uniform shape across all its uses.
+- **Only the five pilot fixtures carry an inline `Version=` on a
+  `PackageReference`**, plus the two sample projects that pin
+  `$(SharpProofSamplePackageVersion)`. That is required, not drift: R749 records
+  that both fixture trees disable central package management, so an inline version
+  is the only option there. No product or test project bypasses
+  `Directory.Packages.props`.
+
+### Status (part two hundred sixteen)
+
+R986 is `pending`. The `net9.0` case (`SharpProof.Gates`) is a clean deletion -
+`SharpProof.Worker` already proves the reference is unnecessary on that framework.
+The four `net8.0` cases need a decision first, because the reference is currently
+supplying a newer assembly than the target framework's own, and nothing in the
+repository records whether that was intended.
+
+## Second survey, part two hundred seventeen: pipeline composition and script reachability - no new finding
+
+Two techniques applied to the build pipeline itself: the composition of all 32
+container commands, and the reachability of all 104 tracked scripts. Both come back
+clean. No ID is allocated.
+
+### Checked and not proposed (part two hundred seventeen)
+
+- **Every one of the 104 tracked `.ps1`, `.psm1` and `.sh` files is reachable, and
+  the two exceptions are already adjudicated.** A scan of every tracked text file
+  for each script's name finds exactly **two** scripts referenced only from
+  markdown: `SharpProof.Gates/Corpus/Import-OssCorpus.ps1` and
+  `scripts/Format-CSharp.ps1`. Both already carry a verdict in
+  `docs/code-usefulness-audit.md` - the first at `:589` *"Retained as independent
+  behavioral, packaging, or integration evidence"*, the second at `:938`
+  *"Retained after MSBuild import, workflow, package, release, or dynamic
+  invocation review"* - so both were reviewed as manually invoked tools and kept
+  deliberately. **There is no orphaned script in this repository.** Recorded
+  because script-orphan scanning is a technique that will be re-attempted, and its
+  answer is now established with its two exceptions named.
+- **The one apparently duplicated pipeline invocation is deliberate and must not be
+  collapsed.** Parsing all 32 commands in `scripts/Invoke-SharpProofContainer.ps1`
+  shows `package-consumers` invoking `Test-SharpProofPackageConsumers.ps1`
+  **twice**. The two calls differ in their arguments: the first validates consumers
+  against the current SDK; the second passes
+  `ConsumerSdkVersion = $toolchain.dotnet.minimumSdkVersion` and
+  `FrameworkConsumersOnly = $true` to validate against the **minimum supported**
+  SDK from `eng/container/toolchain.json`. Two different validations sharing one
+  script, which is the correct shape. No other command invokes any script twice.
+- **Shared script invocation across commands is minimal and each case is a genuine
+  reuse rather than duplicated work.** Only eight scripts are invoked from more
+  than one of the 32 commands, and every pair is a narrow command plus a composite
+  that includes it - `Test-SharpProofDependencyAudit.ps1` from `dependency-audit`
+  and `security`, `Invoke-SharpProofPackageTests.ps1` from `package-tests` and
+  `pr-gates`, `Test-SharpProofPilots.ps1` from `pilots` and `self-apply`, and so
+  on. No command chain runs the same script twice through different paths.
+
+### Status (part two hundred seventeen)
+
+No ID allocated. Both results are exhaustiveness statements for their corpora
+rather than findings: the script set has no dead members, and the pipeline has no
+redundant invocation. The open items concerning the pipeline remain R980 - that the
+generated-staleness checks live only in the `acceptance` command, which pull
+requests do not reach - and R978 on test-parallelism configuration; neither is a
+composition problem, which is why this pass does not add to them.
