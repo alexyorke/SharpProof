@@ -15169,3 +15169,43 @@ The binary lowerer probes every equality or inequality through `GetNullCompariso
 | ID | Finding | Evidence |
 |---|---|---|
 | R1255 | **`RoslynOperationLowerer.VisitBinaryOperator` may unwrap equality operands twice.** The preliminary null-comparison probe walks both operands before the later reference-comparison branch repeats conversion unwrapping, even when the probe finds no null constant. Thread one normalized comparison projection through both decisions while preserving the broader unwrapping needed to recognize converted null literals. | `SharpProof.Frontend/RoslynOperationLowerer.cs:742-785`; `SharpProof.Frontend/RoslynOperationLowerer.cs:236-268` |
+
+## Second survey, part five hundred seventy-eight: R1256 - compilation-reference membership is rescanned per API symbol
+
+`ContractApiIdentityResolver.IsTrustedReferenceType` invokes `IsCompilationReference` for the contract type and for each resolved contract attribute. That helper enumerates every compilation reference and calls `GetAssemblyOrModuleSymbol` before comparing the candidate assembly, even though the compilation reference set is immutable for the resolver's lifetime. Attribute resolutions are cached by metadata name, but the cache does not retain the stable reference-assembly membership fact, so a compilation with several contract attributes repeats the same reference walk. A resolver-scoped reference-assembly set can preserve symbol-equality semantics and fail-closed handling while eliminating the repeated scan.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1256 | **`ContractApiIdentityResolver` rescans all compilation references for each trusted API candidate.** `IsTrustedReferenceType` calls `IsCompilationReference` during contract and attribute validation, and the latter reprojects every reference on each call. Cache the reference-assembly membership for the immutable compilation without changing the trusted-reference predicate. | `SharpProof.Frontend/ContractApiIdentityResolver.cs:47-54,128-161,164-174` |
+
+## Second survey, part five hundred seventy-nine: R1257 - metadata names are reparsed on every symbol comparison
+
+`ContractApiIdentityResolver.HasMetadataName` parses its immutable metadata-name argument with `LastIndexOf('.')`, creates two `Substring` values, and passes the namespace portion to `NamespaceMatches`, which calls `Split('.')` again. The same routine is reached while resolving each catalog attribute, rejecting shadowed attributes, checking clause ownership, and scanning the known-attribute list. These names come from the generated closed catalog and do not change during analysis, so pre-parsing namespace/type components or caching them by metadata name can remove repeated string work while preserving ordinal comparisons and namespace-boundary checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1257 | **`ContractApiIdentityResolver.HasMetadataName` reparses stable metadata names for every comparison.** Each call repeats separator lookup, substring creation, and namespace splitting for catalog strings used across several symbol-validation paths. Cache parsed metadata-name parts while retaining the current exact namespace and type matching rules. | `SharpProof.Frontend/ContractApiIdentityResolver.cs:94-125,128-139,532-588` |
+
+## Second survey, part five hundred eighty: R1258 - contract-shape cardinality checks copy immutable Roslyn collections
+
+`HasSingleClause` and `HasSingleGenericIdentityMethod` each call `GetMembers(name).OfType<IMethodSymbol>().ToImmutableArray()` only to test `Length == 1` and inspect the one method. `HasOnlyElidingConditionalAttribute` applies the same filtered-`ToImmutableArray` pattern to `method.GetAttributes()` before testing that exactly one matching attribute exists. Roslyn already supplies immutable member and attribute collections, and the validation needs only a bounded cardinality scan; a shared single-match helper or direct loop can retain the exact shape predicates and exception-free fail-closed behavior without allocating filtered copies.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1258 | **`ContractApiIdentityResolver` materializes filtered arrays solely for one-item checks.** Contract methods and conditional attributes are copied into new immutable arrays before checking cardinality and indexing the sole match. A bounded single-match projection removes those temporary arrays while preserving the current exact-one validation semantics. | `SharpProof.Frontend/ContractApiIdentityResolver.cs:401-425,428-450,466-500` |
+
+## Second survey, part five hundred eighty-one: R1259 - intrinsic-length detection repeats its property-shape guard
+
+`CompilerIdentityBridge.IsIntrinsicSequenceLength` checks the same readable, non-static, non-indexer, parameterless property shape in both the string branch and the array branch: `IsStatic`, `IsIndexer`, `GetMethod`, `SetMethod`, and empty parameters are tested twice. Only the containing-type/name/type rules differ after that common admission. Factoring the shared property-shape predicate keeps the distinct string and array length policies while removing repeated structural pattern matching.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1259 | **`IsIntrinsicSequenceLength` duplicates the common property-accessor shape test.** The string and array paths independently validate the same five property-definition fields before applying their type-specific checks. One shared guard can preserve both intrinsic-length domains and their current metadata tests. | `SharpProof.Frontend/CompilerIdentityBridge.cs:50-94` |
+
+## Second survey, part five hundred eighty-two: R1260 - generated API catalogs store descriptor keys twice
+
+The contract API generator emits full `Methods` and `Attributes` descriptor arrays, then emits `ContractMethodCandidateNames` from the same method rows and `AttributeMetadataNames` from the same attribute rows. The second arrays contain only fields already present in the descriptors (`Name` and `MetadataName` respectively); the generator source loops over the same `$methods` and `$attributes` inputs to write both projections, and parity tests explicitly prove they remain equal. The separate string arrays may be convenient for a hash-set or membership hot path, but they are a second generated data authority and can be derived once from the descriptor arrays or replaced by dedicated lookup structures.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1260 | **`Generate-ContractApiCatalog.ps1` emits duplicate key projections beside the descriptors that already contain them.** `Methods.Name` duplicates `ContractMethodCandidateNames`, and `Attributes.MetadataName` duplicates `AttributeMetadataNames`. Derive or index the keys from the descriptor arrays while retaining the catalog's membership and ordering consumers. | `scripts/Generate-ContractApiCatalog.ps1:246-281`; `SharpProof.Frontend/ContractApiMetadata.generated.cs:85-196`; `SharpProof.Frontend.Test/ContractApiCatalogParityTests.cs:31-74` |
