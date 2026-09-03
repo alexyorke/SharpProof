@@ -27,16 +27,30 @@ public enum FrontendAbstention
     ExpressionDepthLimit
 }
 
+internal static class FrontendAbstentionValidation
+{
+    internal static FrontendAbstention RequireDefined(
+        FrontendAbstention value,
+        string parameterName)
+    {
+        if (!Enum.IsDefined(typeof(FrontendAbstention), value))
+        {
+            throw new ArgumentOutOfRangeException(parameterName);
+        }
+
+        return value;
+    }
+}
+
 public readonly struct FrontendSubsetClassification
 {
     public FrontendSubsetClassification(
         FrontendSubsetDecision decision,
         FrontendAbstention abstention)
     {
-        if (!Enum.IsDefined(typeof(FrontendAbstention), abstention))
-        {
-            throw new ArgumentOutOfRangeException(nameof(abstention));
-        }
+        FrontendAbstentionValidation.RequireDefined(
+            abstention,
+            nameof(abstention));
 
         var valid = decision switch
         {
@@ -117,10 +131,7 @@ public readonly struct FrontendProgramAbstention
                 nameof(operation));
         }
 
-        if (!Enum.IsDefined(typeof(FrontendAbstention), reason))
-        {
-            throw new ArgumentOutOfRangeException(nameof(reason));
-        }
+        FrontendAbstentionValidation.RequireDefined(reason, nameof(reason));
 
         if (reason == FrontendAbstention.None)
         {

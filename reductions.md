@@ -319,6 +319,7 @@ the smallest relevant containerized test target passes.
 | R991 | Share the contract-owned solution-test timeout fallback across direct runners | PowerShell parsing and module helper validation |
 | R955 | Guard effect-contract catalog generation with an explicit schema version | Generator verification passed |
 | R964 | Use an exhaustive analyzer outcome rank instead of generic enum reflection | `SharpProof.Analyzer.Test`: 476 passed |
+| R966 | Share Frontend abstention enum validation while retaining sentinel policies | `SharpProof.Frontend.Test`: 121 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -9368,7 +9369,9 @@ embedded commit is `63a3bf...`, not the current HEAD).
 
 ### Status (part one hundred ninety)
 
-R966 is `deferred`: the common enum guard is straightforward, but the helper should be introduced with constructor tests that pin the current invalid-value and `None`-sentinel exception ordering.
+R966 is applied: both public abstention value objects now share one defined-enum
+guard while retaining their distinct `None` sentinel rules and constructor
+exception ordering. Frontend tests passed (121 tests).
 
 ## Second survey, part one hundred ninety-one: R967 - a filter gated at one end
 
