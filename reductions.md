@@ -15716,6 +15716,13 @@ Get-TestMethodTimings caches parsed TRX rows for a results root, but every call 
 |---|---|---|
 | R1310 | **Invoke-SharpProofPackageTests.Get-TestMethodTimings re-filters the complete cached TRX row set for each class. Cache class-partitioned timing aggregates or compute the requested class projections together, keeping the existing duration parsing, summation, and name ordering intact.** | scripts/Invoke-SharpProofPackageTests.ps1:91-163,654-659 |
 
+### Status (continued)
+
+R1310 is applied: TRX timing rows are partitioned by ordinal class name while
+parsing, so each timing query scans only its class. Duration parsing, method
+aggregation, and name ordering remain unchanged. Package layout tests pass (21
+passed).
+
 ## Second survey, continued: R1311 - production inventory keeps parallel per-document maps
 
 Get-PortablePdbModule builds $sourceLines and $sourceRanges as separate dictionaries keyed by the same repository-relative document path during one sequence-point walk. The first excludes compiler-generated methods while the second records all validated ranges; the document projection later has to synchronize the two maps by iterating the range keys and conditionally looking up the line set. A single per-document record containing both collections can retain those different inclusion rules while removing parallel-map initialization and key coordination.
