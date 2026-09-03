@@ -188,18 +188,33 @@ exit $LASTEXITCODE
     }
 }
 
+function Get-PilotEvidencePaths {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root
+    )
+
+    return [pscustomobject][ordered]@{
+        Request = Join-Path $Root 'request.json'
+        Result = Join-Path $Root 'result.json'
+        Manifest = Join-Path $Root 'compiler-manifest.json'
+        Sarif = Join-Path $Root 'result.sarif'
+    }
+}
+
 $results = @()
 foreach ($pilot in $catalog.pilots) {
     $project = Join-Path $pilotRoot ([string]$pilot.project)
     $projectDirectory = Split-Path $project
     $artifactDirectory = Join-Path $projectDirectory 'obj\Release\net8.0\SharpProof'
-    $sarifPath = Join-Path $artifactDirectory 'result.sarif'
+    $evidence = Get-PilotEvidencePaths -Root $artifactDirectory
+    $requestPath = $evidence.Request
+    $resultPath = $evidence.Result
+    $manifestPath = $evidence.Manifest
+    $sarifPath = $evidence.Sarif
     $cachePath = Join-Path $runRoot "cache/$($pilot.id)"
     $logDirectory = Join-Path $runRoot 'logs'
     [IO.Directory]::CreateDirectory($logDirectory) | Out-Null
-    $requestPath = Join-Path $artifactDirectory 'request.json'
-    $resultPath = Join-Path $artifactDirectory 'result.json'
-    $manifestPath = Join-Path $artifactDirectory 'compiler-manifest.json'
     foreach ($stale in @($requestPath, $resultPath, $manifestPath, $sarifPath)) {
         if (Test-Path -LiteralPath $stale) {
             Remove-Item -LiteralPath $stale -Force
@@ -259,10 +274,12 @@ foreach ($pilot in $catalog.pilots) {
     if ([string]$pilot.category -eq 'contract-heavy') {
         $negativeArtifactDirectory = Join-Path $runRoot "negative/$($pilot.id)"
         [IO.Directory]::CreateDirectory($negativeArtifactDirectory) | Out-Null
-        $negativeRequestPath = Join-Path $negativeArtifactDirectory 'request.json'
-        $negativeResultPath = Join-Path $negativeArtifactDirectory 'result.json'
-        $negativeManifestPath = Join-Path $negativeArtifactDirectory 'compiler-manifest.json'
-        $negativeSarifPath = Join-Path $negativeArtifactDirectory 'result.sarif'
+        $negativeEvidence = Get-PilotEvidencePaths `
+            -Root $negativeArtifactDirectory
+        $negativeRequestPath = $negativeEvidence.Request
+        $negativeResultPath = $negativeEvidence.Result
+        $negativeManifestPath = $negativeEvidence.Manifest
+        $negativeSarifPath = $negativeEvidence.Sarif
         $negativeLog = Join-Path $logDirectory "$($pilot.id)-negative.log"
         $negative = Invoke-PilotDotNet `
             -WorkingDirectory $projectDirectory `
