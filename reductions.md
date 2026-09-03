@@ -14155,3 +14155,18 @@ continuation.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1192 | **`ExceptionHandlerReachability.GetGotoTargetContinuation` linearly rescans its continuation for every candidate.** `IncludeLabeledStatement` calls `result.Any(operation => ReferenceEquals(operation, candidate))` once for the label and once per reversed invocation before inserting at index one, so a long labeled continuation performs repeated identity scans over the same growing list. A `HashSet<IOperation>` using reference identity can preserve deduplication and insertion order while removing the avoidable quadratic membership work. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1629-1647` |
+
+## Second survey, part five hundred fifteen: R1193 - goto fallback rewalks the label subtree
+
+The goto continuation resolver first enumerates invocation syntax beneath the
+target label. If that query returns no invocations, its fallback enumerates
+the entire containing method to find the first invocation after the label.
+That method-level enumeration necessarily visits the label subtree again,
+only to discard it with the span predicate. A single method-level ordered
+invocation projection, or a traversal that continues after the label subtree
+without restarting at the method root, can preserve the nested-callable and
+post-label policies while avoiding the fallback rewalk.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1193 | **`ExceptionHandlerReachability.GetGotoTargetContinuation` can traverse the same syntax subtree twice in its no-invocation fallback.** It scans `target.DescendantNodes()` for invocations, then, when none are found, scans `methodSyntax.DescendantNodes()` and filters by `SpanStart > target.Span.End`; the second method walk includes the already-tested label subtree. Reusing one method-level invocation sequence with a post-label slice can remove that redundant syntax traversal without changing the fallback's first-invocation behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1590-1627` |
