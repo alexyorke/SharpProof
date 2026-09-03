@@ -18575,3 +18575,8 @@ R1528 is applied: the array-access, assignable-recursive-pattern, binary-pattern
 and nullable-pattern matrices now each reuse one immutable fixture compilation
 while retaining per-case method selection and analysis facts. The complete
 `SharpProof.Effects.Test` project passes (323/323).
+
+R1529 is applied (also tracked by duplicate finding R1541): the two
+indirect-mutation matrices now each reuse one immutable source compilation while
+retaining per-case method selection and expected-effect assertions.
+`IndirectLocalMutationNullnessRegressionTests` pass (4/4).

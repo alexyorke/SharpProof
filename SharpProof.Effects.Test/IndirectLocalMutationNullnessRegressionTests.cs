@@ -3,12 +3,37 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class IndirectLocalMutationNullnessRegressionTests
 {
+    private static readonly Compilation RefAliasCompilation =
+        CreateRefAliasCompilation();
+
+    private static readonly Compilation ReceiverEffectsCompilation =
+        CreateReceiverEffectsCompilation();
+
     [TestCase("WriteThroughAlias")]
     [TestCase("ReadThroughAlias")]
     public void RefAliasesDoNotPreserveStalePointeeFacts(
         string methodName)
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = RefAliasCompilation;
+        var result = EffectTestHost.AnalyzeSample(compilation, methodName);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Throws.Types.Select(static type =>
+                    type.ToDisplayString()),
+                Does.Contain("System.DivideByZeroException"),
+                methodName);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                methodName);
+        }
+    }
+
+    private static Compilation CreateRefAliasCompilation()
+    {
+        return EffectTestHost.CreateCompilation(
             """
             public static class Sample {
                 public static int WriteThroughAlias() {
@@ -27,20 +52,6 @@ public sealed class IndirectLocalMutationNullnessRegressionTests
                 }
             }
             """);
-        var result = EffectTestHost.AnalyzeSample(compilation, methodName);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                result.Summary.Throws.Types.Select(static type =>
-                    type.ToDisplayString()),
-                Does.Contain("System.DivideByZeroException"),
-                methodName);
-            Assert.That(
-                result.Summary.Completeness,
-                Is.EqualTo(EffectCompleteness.Complete),
-                methodName);
-        }
     }
 
     [TestCase("ThroughRefAlias", true, EffectCompleteness.Complete)]
@@ -50,7 +61,37 @@ public sealed class IndirectLocalMutationNullnessRegressionTests
         bool? expectedStaticWrite,
         EffectCompleteness? expectedCompleteness)
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = ReceiverEffectsCompilation;
+        var result = EffectTestHost.AnalyzeSample(compilation, methodName);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Throws.Types.Select(static type =>
+                    type.ToDisplayString()),
+                Does.Contain("System.ApplicationException"),
+                methodName);
+            if (expectedStaticWrite is { } staticWrite)
+            {
+                Assert.That(
+                    result.Summary.Writes.Regions.Contains(
+                        EffectRegionId.Static()),
+                    Is.EqualTo(staticWrite),
+                    methodName);
+            }
+            if (expectedCompleteness is { } completeness)
+            {
+                Assert.That(
+                    result.Summary.Completeness,
+                    Is.EqualTo(completeness),
+                    methodName);
+            }
+        }
+    }
+
+    private static Compilation CreateReceiverEffectsCompilation()
+    {
+        return EffectTestHost.CreateCompilation(
             """
             using System;
 
@@ -82,30 +123,5 @@ public sealed class IndirectLocalMutationNullnessRegressionTests
                 }
             }
             """);
-        var result = EffectTestHost.AnalyzeSample(compilation, methodName);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                result.Summary.Throws.Types.Select(static type =>
-                    type.ToDisplayString()),
-                Does.Contain("System.ApplicationException"),
-                methodName);
-            if (expectedStaticWrite is { } staticWrite)
-            {
-                Assert.That(
-                    result.Summary.Writes.Regions.Contains(
-                        EffectRegionId.Static()),
-                    Is.EqualTo(staticWrite),
-                    methodName);
-            }
-            if (expectedCompleteness is { } completeness)
-            {
-                Assert.That(
-                    result.Summary.Completeness,
-                    Is.EqualTo(completeness),
-                    methodName);
-            }
-        }
     }
 }
