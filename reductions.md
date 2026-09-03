@@ -10655,3 +10655,15 @@ R1014 is deferred: share only the resolved-symbol inheritance relation; do not m
 ### Status (part two hundred forty-six)
 
 R1015 is deferred: share only the common IR havoc fixture and invariant assertions, and keep the variable-invalidation and memory-preservation expectations explicit.
+
+## Second survey, part two hundred forty-seven: R1016 - repeated API-spec invalid-substitution setup
+
+`SubstitutionOwnershipAndTypesFailClosedWithTypedReasons` calls `ApiSpecInstantiator.InstantiatePostconditions` three times with the same template and owning factory, each time constructing a one-entry dictionary inline. The cases vary only the foreign variable key, foreign IR-term value, or wrong-type value, and the following assertions already identify the three expected failure kinds. A local helper or table of `(key, value, expectedKind)` cases can own the common invocation and reduce the repeated dictionary and argument plumbing without merging the distinct ownership/type boundaries.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1016 | **API-spec invalid-substitution coverage repeats the same instantiation envelope three times.** The foreign-variable, foreign-term, and wrong-type cases independently pass the same `template` and `factory` to `InstantiatePostconditions` and allocate identical one-entry `Dictionary<SpecVarId, IrTerm>` wrappers; only the key/value pair and expected `SpecInstantiationFailureKind` differ. A small case table or local helper can remove the repeated call scaffolding while keeping all three fail-closed reasons explicit. | `SharpProof.Specs.Test/ApiSpecInstantiationCoverageTests.cs:203-241` |
+
+### Status (part two hundred forty-seven)
+
+R1016 is deferred: table-drive only the common substitution invocation, and retain separate expected reasons for foreign variables, foreign IR terms, and type mismatches.
