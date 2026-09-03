@@ -4525,7 +4525,8 @@ public sealed class WorkerTests
     {
         using var project = TestProject.Create(TautologySource);
         var request = project.CreateRequest(cacheEnabled: false);
-        using var worker = new SharpProofWorker(new ThrowingBackend());
+        using var worker = new SharpProofWorker(
+            new ThrowingBackend("Injected unexpected backend failure."));
 
         var response = await worker.VerifyAsync(request);
 
@@ -6455,17 +6456,6 @@ public sealed class WorkerTests
             return Task.FromResult(
                 BackendCheckResult.Satisfiable(
                     new BackendModel(assignments)));
-        }
-    }
-
-    private sealed class ThrowingBackend : ISmtBackend
-    {
-        public Task<BackendCheckResult> CheckAsync(
-            VerificationQuery query,
-            CancellationToken cancellationToken)
-        {
-            throw new NotSupportedException(
-                "Injected unexpected backend failure.");
         }
     }
 

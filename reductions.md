@@ -11435,6 +11435,10 @@ R585 established a shared test fixture `SharpProof.Worker.Test/ThrowingBackend.c
 
 R1073 is deferred: reuse the shared `ThrowingBackend` in `WorkerTests` and delete the private shadowing class.
 
+R1073 is applied: the worker infrastructure-failure test now uses the shared assertion-backed `ThrowingBackend`, and the private shadow implementation is removed. `UnexpectedBackendExceptionBecomesTypedInfrastructureFailure` passes (1/1).
+
+R1073 is applied: the worker infrastructure-failure test now uses the shared assertion-backed `ThrowingBackend`, and the private shadow implementation is removed. `WorkerTests` pass.
+
 ## Second survey, part three hundred five: R1074 - duplicated cache envelope read-rejection harness in TCB tests
 
 In `SharpProof.Worker.Test/WorkerTcbEdgeCaseTests.cs`, `CacheRejectsAHashedPayloadWithNullCallableResults` and `CacheRejectsPayloadSealedForADifferentManifest` duplicate an entire 20-line test harness: creating a temporary directory, sealing a manifest, calling `WriteCacheEnvelopeAsync`, constructing `VerificationCache`, invoking `TryReadAsync`, and asserting null response. The only difference is the payload arguments passed to `WriteCacheEnvelopeAsync`. Parameterizing the test with `[TestCase]` consolidates the duplicate scaffolding while preserving coverage for both corruption modes.
