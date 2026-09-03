@@ -15897,6 +15897,11 @@ ValidateCanonicalData first calls Any(!IsCanonicalData) over every data line; on
 | ID | Finding | Evidence |
 |---|---|---|
 | R1323 | **CorpusSnapshotFormat.ValidateCanonicalData scans the entire data array twice and materializes a sorted copy to check order. Combine canonical-data validation with adjacent ordinal-order checking in one pass, retaining the current failure behavior.** | SharpProof.Gates/Corpus/CorpusSnapshotFormat.cs:74-90,138-142 |
+
+### Status (continued)
+
+R1323 is applied: corpus validation checks canonical rows and ordinal adjacency
+in one pass, with the same invalid-data failure. Canonical row-order test passes.
 ## Second survey, continued: R1324 - dev-check architecture tests duplicate configuration command lists
 
 DevCheckCommandPlanTests keeps DebugCommandIds and ReleaseCommandIds as separate arrays even though Release is the same ordered sequence minus only package-product-build. Both arrays are consumed only by one conditional expected-value assertion. A shared base sequence plus a configuration-specific insertion or derived expected array can retain exact order and count while eliminating duplicated literals and drift surface.
