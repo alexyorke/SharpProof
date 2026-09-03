@@ -2707,14 +2707,28 @@ internal sealed class ExceptionHandlerReachability(
             {
                 return ReturnNullability.MaybeNull;
             }
-            if (returnedValues.All(
-                    DefiniteOperationFacts.IsDefinitelyNonNull))
+            var hasNull = false;
+            var hasNonNull = false;
+            foreach (var returnedValue in returnedValues)
             {
-                return ReturnNullability.NonNull;
+                if (DefiniteOperationFacts.IsDefinitelyNonNull(returnedValue))
+                {
+                    hasNonNull = true;
+                }
+                else if (DefiniteOperationFacts.IsDefinitelyNull(returnedValue))
+                {
+                    hasNull = true;
+                }
+                else
+                {
+                    return ReturnNullability.MaybeNull;
+                }
             }
-            return returnedValues.All(DefiniteOperationFacts.IsDefinitelyNull)
-                ? ReturnNullability.Null
-                : ReturnNullability.MaybeNull;
+            return hasNonNull && hasNull
+                ? ReturnNullability.MaybeNull
+                : hasNonNull
+                    ? ReturnNullability.NonNull
+                    : ReturnNullability.Null;
         }
         catch (ArgumentException)
         {
