@@ -17069,3 +17069,8 @@ R1394 is applied: fixture publication identity validation now counts main and
 symbol roles in one pass over the already-matched archives, preserving the
 exact-one state contract and role-specific actions. `ReleasePublicationScriptTests`
 pass (24/24).
+
+R1395 is applied: retained fuzz-seed parsing now tracks duplicates in an
+ordinal integer set during the existing JSON loop, preserving ordered seeds
+and the original validation-error precedence without a second scan.
+`FuzzRunnerEvidenceTests` pass (2/2).

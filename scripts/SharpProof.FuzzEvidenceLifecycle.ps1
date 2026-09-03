@@ -138,6 +138,8 @@ function Read-SharpProofRetainedFuzzSeedManifest {
             throw 'Retained fuzz seeds must be an array.'
         }
         $seeds = [Collections.Generic.List[int]]::new()
+        $seenSeeds = [Collections.Generic.HashSet[int]]::new()
+        $hasDuplicateSeed = $false
         foreach ($element in $seedValues.EnumerateArray()) {
             [int]$seed = 0
             if ($element.ValueKind -ne [Text.Json.JsonValueKind]::Number -or
@@ -145,13 +147,16 @@ function Read-SharpProofRetainedFuzzSeedManifest {
                 throw 'Every retained fuzz seed must be an exact Int32.'
             }
             $seeds.Add($seed)
+            if (-not $seenSeeds.Add($seed)) {
+                $hasDuplicateSeed = $true
+            }
         }
         if ($schemaVersion -ne 1 -or $casesPerSeed -le 0 -or
             $casesPerSeed -gt 1000000 -or
             $seeds.Count -eq 0 -or $seeds.Count -gt 1024) {
             throw 'Invalid retained fuzz seed manifest.'
         }
-        if (@($seeds | Select-Object -Unique).Count -ne $seeds.Count) {
+        if ($hasDuplicateSeed) {
             throw 'The retained fuzz seed manifest contains duplicate seeds.'
         }
         if ($null -ne $AfterValidation) {
