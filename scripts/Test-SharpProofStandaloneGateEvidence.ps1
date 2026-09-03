@@ -110,6 +110,22 @@ try {
     Assert-Accepted (New-Envelope 'performance') 'performance' 'valid-performance'
     Assert-Rejected ([ordered]@{}) 'corpus' 'empty-object'
 
+    $duplicateJson = (New-Envelope 'corpus' | ConvertTo-Json -Depth 12).Replace(
+        '"SchemaVersion": 1,',
+        '"SchemaVersion": 1,"SchemaVersion": 1,')
+    $duplicatePath = Join-Path $temporaryRoot 'duplicate-key.json'
+    [IO.File]::WriteAllText($duplicatePath, $duplicateJson)
+    $duplicateRejected = $false
+    try {
+        Assert-SharpProofStandaloneGateResult `
+            -Path $duplicatePath -ExpectedGate corpus `
+            -ExpectedCommit $commit -ExpectedMvid $mvid | Out-Null
+    }
+    catch { $duplicateRejected = $true }
+    if (-not $duplicateRejected) {
+        throw 'Duplicate standalone gate JSON properties were accepted.'
+    }
+
     $fixture = New-Envelope 'corpus'; $fixture.SchemaVersion = 2
     Assert-Rejected $fixture 'corpus' 'wrong-schema'
     $fixture = New-Envelope 'corpus'; $fixture.Gate = 'performance'

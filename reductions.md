@@ -12077,7 +12077,11 @@ The focused fuzz evidence architecture tests pass (3/3).
 
 ### Status (part three hundred sixty-two)
 
-R1131 is deferred: validate standalone gate JSON from a duplicate-aware parse boundary, preserving existing gate-specific result validation and diagnostics.
+R1131 is applied: `Assert-SharpProofStandaloneGateResult.ps1` now decodes
+strict UTF-8 with `JsonDocument`, recursively rejects duplicate properties,
+and only then projects to PowerShell objects for the existing gate checks.
+The standalone evidence fixture now covers a duplicate top-level key, and the
+focused standalone-gate architecture tests pass (2/2).
 
 ## Second survey, part three hundred sixty-three: R1132 - unconditional coverage-report save branch
 

@@ -1,5 +1,33 @@
 Set-StrictMode -Version Latest
 
+function Assert-UniqueJsonElementProperties {
+    param(
+        [Parameter(Mandatory = $true)][Text.Json.JsonElement]$Value,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    if ($Value.ValueKind -eq [Text.Json.JsonValueKind]::Array) {
+        $index = 0
+        foreach ($item in $Value.EnumerateArray()) {
+            Assert-UniqueJsonElementProperties $item "$Description[$index]"
+            $index++
+        }
+        return
+    }
+    if ($Value.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
+        return
+    }
+    $names = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($property in $Value.EnumerateObject()) {
+        if (-not $names.Add($property.Name)) {
+            throw "$Description contains duplicate property '$($property.Name)'."
+        }
+        Assert-UniqueJsonElementProperties `
+            $property.Value "$Description.$($property.Name)"
+    }
+}
+
 function Assert-ExactJsonProperties {
     param(
         [Parameter(Mandatory = $true)][object]$Value,
@@ -24,15 +52,33 @@ function Assert-SharpProofStandaloneGateResult {
         [Parameter(Mandatory = $true)][string]$ExpectedMvid
     )
 
+    $jsonDocument = $null
     try {
-        $document = Get-Content -LiteralPath $Path -Raw |
-            ConvertFrom-Json -ErrorAction Stop
+        $bytes = [IO.File]::ReadAllBytes($Path)
+        if ($bytes.Length -eq 0) {
+            throw 'The standalone gate result is empty.'
+        }
+        if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and
+            $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+            throw 'The standalone gate result must be UTF-8 without a BOM.'
+        }
+        $json = [Text.UTF8Encoding]::new($false, $true).GetString($bytes)
+        $jsonDocument = [Text.Json.JsonDocument]::Parse($json)
+        if ($jsonDocument.RootElement.ValueKind -ne
+                [Text.Json.JsonValueKind]::Object) {
+            throw 'The standalone gate result must be an object.'
+        }
+        Assert-UniqueJsonElementProperties `
+            $jsonDocument.RootElement 'Standalone gate result'
+        $document = $json | ConvertFrom-Json -ErrorAction Stop
     }
     catch {
         throw "The standalone gate result is not canonical JSON: $($_.Exception.Message)"
     }
-    if ($null -eq $document) {
-        throw 'The standalone gate result must be an object.'
+    finally {
+        if ($null -ne $jsonDocument) {
+            $jsonDocument.Dispose()
+        }
     }
     Assert-ExactJsonProperties -Value $document -Description 'Gate envelope' `
         -Expected @(
