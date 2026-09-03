@@ -28,6 +28,51 @@ public static class IrSubstitution
         ArgumentNullGuard.NotNull(replacements, nameof(replacements));
 
         factory.EnsureTerm(root, nameof(root));
+        var replacementMap = CreateReplacementMap(factory, replacements);
+        if (replacementMap.Count == 0)
+        {
+            return root;
+        }
+
+        var memo = new Dictionary<IrId, IrTerm>();
+        return Rewrite(factory, root, replacementMap, memo);
+    }
+
+    public static ImmutableArray<IrTerm> SubstituteMany(
+        IrFactory factory,
+        IReadOnlyList<IrTerm> roots,
+        IReadOnlyDictionary<IrVarId, IrTerm> replacements)
+    {
+        ArgumentNullGuard.NotNull(factory, nameof(factory));
+        ArgumentNullGuard.NotNull(roots, nameof(roots));
+        ArgumentNullGuard.NotNull(replacements, nameof(replacements));
+
+        foreach (var root in roots)
+        {
+            ArgumentNullGuard.NotNull(root, nameof(roots));
+            factory.EnsureTerm(root, nameof(roots));
+        }
+
+        var replacementMap = CreateReplacementMap(factory, replacements);
+        if (replacementMap.Count == 0)
+        {
+            return [.. roots];
+        }
+
+        var memo = new Dictionary<IrId, IrTerm>();
+        var result = ImmutableArray.CreateBuilder<IrTerm>(roots.Count);
+        foreach (var root in roots)
+        {
+            result.Add(Rewrite(factory, root, replacementMap, memo));
+        }
+
+        return result.MoveToImmutable();
+    }
+
+    private static Dictionary<IrVarId, IrTerm> CreateReplacementMap(
+        IrFactory factory,
+        IReadOnlyDictionary<IrVarId, IrTerm> replacements)
+    {
         // Materialize the caller-supplied view once. IReadOnlyDictionary is an
         // interface, not an immutable snapshot; validation and rewriting must
         // operate on the same mapping.
@@ -45,13 +90,8 @@ public static class IrSubstitution
                     nameof(replacements));
             }
         }
-        if (replacementMap.Count == 0)
-        {
-            return root;
-        }
 
-        var memo = new Dictionary<IrId, IrTerm>();
-        return Rewrite(factory, root, replacementMap, memo);
+        return replacementMap;
     }
 
     /// <summary>

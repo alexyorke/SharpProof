@@ -79,16 +79,14 @@ public static class IrRelationalSummaryInstantiator
             replacements.Add(variable, factory.Variable(replacement));
         }
 
+        var predicates = IrSubstitution.SubstituteMany(
+            factory,
+            [summary.NormalCompletion, summary.NormalRelation],
+            replacements);
         return new IrSummaryInstantiation(
             result,
-            IrSubstitution.Substitute(
-                factory,
-                summary.NormalCompletion,
-                replacements),
-            IrSubstitution.Substitute(
-                factory,
-                summary.NormalRelation,
-                replacements),
+            predicates[0],
+            predicates[1],
             fresh.MoveToImmutable());
     }
 

@@ -13199,7 +13199,10 @@ remain separate.
 
 ### Status (part four hundred eighty)
 
-R1157 is pending: expose a validated/batched substitution path for the two summary roots, retaining separate output terms and fail-closed replacement checks.
+R1157 is applied: `IrRelationalSummaryInstantiator` now uses one validated
+replacement-map snapshot and shared rewrite memo for both summary roots while
+returning separate predicates. The IR and Summaries test suites pass (115/115
+and 14/14).
 
 ## Second survey, part four hundred seventy-eight: R974 is applied, and two open items re-verified
 
