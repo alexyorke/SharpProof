@@ -596,28 +596,9 @@ internal sealed class CompilerResponseEvidenceAuthority :
     private static string DependencyEvidenceLabel(
         ImmutableArray<CompilerPreparedSummaryEvidence> evidence)
     {
-        if (evidence.IsDefaultOrEmpty)
-        {
-            return string.Empty;
-        }
-
-        var values = evidence.Select(item =>
-        {
-            var prefix = CompilerSpecificationPackAuthorityValidation
-                .GetSummaryPrefix(item.Origin);
-            if (prefix == null)
-            {
-                return string.Empty;
-            }
-
-            var evidencePrefix = item.Origin ==
-                    CompilerSummaryOrigin.SpecificationPack
-                ? prefix + ":" + item.EvidenceIdentity
-                : prefix;
-            return evidencePrefix + ":" + item.CallIdentity + ":" +
-                item.EvidenceSha256;
-        });
-        return ":deps=" + string.Join(";", values);
+        return CompilerDependencyEvidenceFormatter.Format(
+            evidence,
+            throwOnUnsupportedOrigin: false);
     }
 
     private static bool HasLiteralFalsePrecondition(

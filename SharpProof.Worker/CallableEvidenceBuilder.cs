@@ -228,29 +228,9 @@ internal static class CallableEvidenceBuilder
     private static string BuildDependencyEvidenceLabel(
         ImmutableArray<CompilerPreparedSummaryEvidence> evidence)
     {
-        if (evidence.IsDefaultOrEmpty)
-        {
-            return string.Empty;
-        }
-
-        var values = evidence.Select(item =>
-        {
-            var prefix = CompilerSpecificationPackAuthorityValidation
-                .GetSummaryPrefix(item.Origin);
-            if (prefix == null)
-            {
-                throw new InvalidDataException(
-                    "A summary dependency has an unsupported origin.");
-            }
-
-            var evidencePrefix = item.Origin ==
-                    CompilerSummaryOrigin.SpecificationPack
-                ? prefix + ":" + item.EvidenceIdentity
-                : prefix;
-            return evidencePrefix + ":" + item.CallIdentity + ":" +
-                item.EvidenceSha256;
-        });
-        return ":deps=" + string.Join(";", values);
+        return CompilerDependencyEvidenceFormatter.Format(
+            evidence,
+            throwOnUnsupportedOrigin: true);
     }
 
     internal static CallableEntryEvidenceBuildResult BuildEntry(

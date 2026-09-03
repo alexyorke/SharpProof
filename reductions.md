@@ -21045,3 +21045,9 @@ passed 476/476 tests after these oracle changes.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1994 | `SemanticClaimIdentity.HasSameSite` and `ContractClauseInventoryBuilder.HasSameSite` duplicate the exact Roslyn syntax-tree/object and span equality predicate; centralize this two-part site comparison in a shared frontend helper while retaining each caller's traversal policy. | `SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs:542-545`; `SharpProof.Contracts/ContractClauseInventoryBuilder.cs:443-446`; shared dependency `SharpProof.Frontend/SharpProof.Frontend.csproj`; related R286 |
+
+R1993 is applied: dependency-evidence serialization now lives in
+`CompilerDependencyEvidenceFormatter`, with an explicit policy preserving the
+compiler authority's empty unsupported-origin component and the worker's
+`InvalidDataException`. The full `SharpProof.Worker.Test` suite passes 696/696
+with zero warnings or errors.
