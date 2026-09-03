@@ -17064,3 +17064,8 @@ R1393 is applied: fixture archive role detection now scans each ZIP entry list
 once, setting DLL and PDB flags and stopping when both are known. Ambiguous
 role rejection and main/symbol requirements are unchanged.
 `ReleasePublicationScriptTests` pass (24/24).
+
+R1394 is applied: fixture publication identity validation now counts main and
+symbol roles in one pass over the already-matched archives, preserving the
+exact-one state contract and role-specific actions. `ReleasePublicationScriptTests`
+pass (24/24).

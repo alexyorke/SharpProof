@@ -328,16 +328,20 @@ function Test-SharpProofPublicationPlanIdentity {
                         [string]$package.version,
                         [StringComparison]::OrdinalIgnoreCase)
                 })
-                $expectedMainState = if (@(
-                        $matchingFixtureArchives | Where-Object {
-                            $_.role -ceq 'main'
-                        }).Count -eq 1) {
+                $mainCount = 0
+                $symbolsCount = 0
+                foreach ($archive in $matchingFixtureArchives) {
+                    if ($archive.role -ceq 'main') {
+                        $mainCount++
+                    }
+                    elseif ($archive.role -ceq 'symbols') {
+                        $symbolsCount++
+                    }
+                }
+                $expectedMainState = if ($mainCount -eq 1) {
                     'FixturePresent'
                 } else { 'FixtureAbsent' }
-                $expectedSymbolsState = if (@(
-                        $matchingFixtureArchives | Where-Object {
-                            $_.role -ceq 'symbols'
-                        }).Count -eq 1) {
+                $expectedSymbolsState = if ($symbolsCount -eq 1) {
                     'FixturePresent'
                 } else { 'FixtureAbsent' }
                 if ($null -ne $package.remoteState -or
