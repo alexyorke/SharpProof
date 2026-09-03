@@ -15895,3 +15895,18 @@ Test-SharpProofMutationBaselines.Assert-Throws catches any exception and returns
 | ID | Finding | Evidence |
 |---|---|---|
 | R1327 | **Test-SharpProofMutationBaselines.Assert-Throws accepts every exception as the expected failure. Check the exception type and relevant message/condition, preserving the four distinct negative-fixture contracts instead of allowing unrelated errors to pass.** | scripts/Test-SharpProofMutationBaselines.ps1:9-14,52-65,77-81 |
+
+## Second survey, continued: R1328 - mutation scheduler grows a fixed bucket container
+
+Get-SharpProofWeightedMutationShards validates ShardCount and then initializes $buckets as a PowerShell array, appending one List[object] per shard with $buckets +=. Each append reallocates and copies the array even though the final length is known before the loop and bounded to 16. A pre-sized object array or generic list can hold the same per-shard lists while leaving weighted ordering, load assignment, and output shape unchanged.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1328 | **Get-SharpProofWeightedMutationShards grows its fixed-size shard-bucket array with `+=`. Allocate the bucket container at the validated ShardCount or use a growable list so setup does not repeatedly copy the container.** | scripts/SharpProof.MutationScheduling.psm1:10-12,22-30,65-73 |
+## Second survey, continued: R1329 - IR block ordering leaves known-capacity collections unbounded
+
+IrBlockOrder derives its result only from program blocks, yet it creates active and complete hash sets, a pending stack, and a result list with default capacities. The program's immutable Blocks collection supplies a known upper bound for every one of these structures. Supplying that capacity (or using a block-indexed state representation) can avoid growth reallocations while preserving cycle detection, resource spending, reverse postorder, and failure behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1329 | **IrBlockOrder creates four growable traversal collections without using the known program block count as capacity. Pre-size the active/complete sets, pending stack, and result list from `program.Blocks.Length` (or use an equivalent indexed state) while preserving traversal semantics.** | SharpProof.Ir/IrBlockOrder.cs:18-22,23-74; SharpProof.Ir/IrProgram.cs:18-23 |
