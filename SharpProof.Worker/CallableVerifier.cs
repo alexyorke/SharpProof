@@ -206,6 +206,15 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                 body.SpecResultProjections);
         }
         var records = ImmutableArray.CreateBuilder<WorkerClaimResult>(ensures.Length);
+        void AddResourceLimitRecords(int startIndex)
+        {
+            records.AddRange(
+                CallableClaimResultAssembler.PostconditionUnknowns(
+                    target,
+                    WorkerClaimReason.ResourceLimit)
+                .Skip(startIndex));
+        }
+
         for (var index = 0; index < ensures.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -246,7 +255,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             }
             if (!resourceBudget.TryStartQuery())
             {
-                records.AddRange(CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.ResourceLimit).Skip(index));
+                AddResourceLimitRecords(index);
                 break;
             }
             var query = new VerificationQuery(factory, assumptions,
@@ -257,7 +266,7 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
             cancellationToken.ThrowIfCancellationRequested();
             if (resourceLimitExceeded)
             {
-                records.AddRange(CallableClaimResultAssembler.PostconditionUnknowns(target, WorkerClaimReason.ResourceLimit).Skip(index));
+                AddResourceLimitRecords(index);
                 break;
             }
             if (outcome is ProvenOutcome &&

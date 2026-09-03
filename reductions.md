@@ -16467,3 +16467,8 @@ PowerShell parsing and the inventory authority fixture test pass (1 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1363 | **`SummaryAccumulator` double-probes dictionaries when updating existing entries.** Combine the lookup and update for assumption aggregates and outcome/reason counters, preserving the current first-kind and count semantics. | `SharpProof.Worker.Protocol/WorkerResultAssembler.cs:156-164,197-201` |
+
+R410 is applied: the worker's public backend constructor reuses `ReadResources`,
+and both postcondition resource-limit exits share one recovery helper while
+preserving the same suffix of unknown claims. The full WorkerTests class passes
+(148 passed).

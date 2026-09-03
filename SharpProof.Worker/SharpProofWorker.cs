@@ -18,7 +18,7 @@ public sealed class SharpProofWorker : IDisposable
     // potentially poisoned instance to a later request.
     private bool _injectedBackendPoisoned;
     public SharpProofWorker(ISmtBackend backend) : this(
-        backend, backend is IrSmtBackend concrete ? () => concrete.ConsumedResourceCount : null)
+        backend, ReadResources(backend))
     {
     }
     internal SharpProofWorker(ISmtBackend backend, Func<long>? readConsumedResourceCount)
