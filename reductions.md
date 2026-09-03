@@ -193,6 +193,7 @@ the smallest relevant containerized test target passes.
 | R883 | Reuse the stateless IR interpreter across differential comparisons | `SharpProof.Testing.Test`: 13 passed |
 | R899 | Remove the repeated source declaration-count check after candidate admission | `SharpProof.Worker.Test`: CompilerRelationalSummaryProviderTests passed |
 | R918 | Cache the constant runtime type used by canonical identity writing | `SharpProof.Worker.Test`: ClaimManifestBuilderTests passed |
+| R962 | Remove the unused virtual dispatch from the closed abstract domain | `SharpProof.Dataflow.Test`: full suite passed |
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
@@ -9208,7 +9209,7 @@ sealing and inheritance discipline is total; one member is the exception to it.
 
 ### Status (part one hundred eighty-five)
 
-R962 is `pending` and is one word. Its value is that it is the last exception to
-an otherwise complete convention: this codebase expresses polymorphism through
-`abstract` members and interfaces, seals every concrete class, and calls `base.`
-twice. One unused `virtual` is what remains.
+R962 is `applied`: the closed abstract domain's equivalence implementation had
+no overrides across the repository, so it is now non-virtual while preserving
+the interface contract and all concrete domain behavior. The full Dataflow test
+suite passed.
