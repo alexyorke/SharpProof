@@ -13178,7 +13178,7 @@ at their respective call sites.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R1156 | **`DefiniteOperationFacts` duplicates harmless-wrapper recursion.** `IsHarmlessValue` and `UnwrapHarmlessValue` repeat the same recursive `IConversionOperation`/`IParenthesizedOperation` traversal and `HarmlessConversion` predicate. Sharing that wrapper-stripping core removes one maintenance copy without conflating boolean terminal classification with operation passthrough. | `SharpProof.Effects/ManagedAbstractFlow.cs:2828-2859,2916-2925` |
+| R1304 | **`DefiniteOperationFacts` duplicates harmless-wrapper recursion.** `IsHarmlessValue` and `UnwrapHarmlessValue` repeat the same recursive `IConversionOperation`/`IParenthesizedOperation` traversal and `HarmlessConversion` predicate. Sharing that wrapper-stripping core removes one maintenance copy without conflating boolean terminal classification with operation passthrough. | `SharpProof.Effects/ManagedAbstractFlow.cs:2828-2859,2916-2925` |
 
 ### Status (part four hundred seventy-nine)
 
@@ -15334,6 +15334,13 @@ tests pass (3 passed).
 |---|---|---|
 | R1262 | **`VerifierProcessSupervisor.Run` materializes a reserve-descriptor suffix solely for `StopDescendants` cleanup.** The `Skip(1).ToArray()` result is consumed once by `CloseDescriptors` and has no independent lifetime or indexing requirement. Use a close-only enumerable or allocation-free segment while retaining the supervisor pidfd separately. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:117-124,213-223,350-357` |
 
+### Status (part five hundred eighty-four)
+
+R1262 is applied: `StopDescendants` accepts a close-only enumerable and the
+reserve suffix is passed lazily, removing the per-run `Skip(1).ToArray()` copy
+while retaining the first pidfd identity. Verifier supervisor tests pass (3
+passed).
+
 ## Second survey, part five hundred eighty-five: R1263 - present-path helper calls allocate params arrays
 
 `CancelableBuildTask.Present` is declared with `params string?[]`, so every call with literal path arguments first allocates a temporary array before filtering empty values. `ResetPublishedVerification.ExecuteCore` calls it once, while `InvalidatePublishedResult.ExecuteCore` calls it for publication, compiler, and input groups; these are short-lived build-task executions, but the helper is exactly the shared boundary where the allocation is introduced. A non-`params` collection overload, or callers that pass one reused local collection when several projections are needed, can remove this incidental array creation while keeping the filtering policy centralized.
@@ -15492,3 +15499,108 @@ convert a class of misdirected failures into a one-line diagnosis. The derivatio
 half touches the contract-reading code and should be sequenced with whoever owns
 `Test-SharpProofReadme.ps1`'s resource-claim block, since the sentence must be
 composed identically on both sides or the fixture stops corrupting anything.
+
+## Second survey, part five hundred eighty-nine: R1303 - fourteen recursion budgets, thirteen names, and the two that are four times tighter than the rest
+
+Every recursion or nesting limit in production, collected. The interesting fact is
+not that there are many; it is that eight of them are the same number under eight
+names, and two are a quarter of it.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1303 | **Fourteen recursion budgets are declared under thirteen names across thirteen production files, eight of them are `256`, two are `64`, and nothing states the relationship - so a structure nested between 65 and 256 deep is accepted by eight walkers and rejected by two, by arrangement no file records.** The eight at **256** are `PortableIrGraphCodec.MaximumGraphDepth`, `SemanticClaimIdentity.MaximumFingerprintDepth`, `ManagedAbstractFlow.MaximumWalkDepth`, `OperationEffectScanner.MaximumOperationNestingDepth`, `RoslynOperationLowerer.MaximumLoweringDepth`, `IrInterpreter.MaximumEvaluationDepth`, `IrSmtBackend.MaximumEncodingDepth` and `ApiSpecTermValidator.MaximumExpressionDepth` - eight assemblies, eight names, one number, no shared declaration. The two at **64** are `CompilerSpecificationPackProvider.MaximumTermDepth` and `CompilerRelationalSummaryProvider.MaximumDependencyDepth`, both in `SharpProof.CompilerCollector`. The remaining four are deliberately different and correctly so: `ProtocolJson.MaximumJsonDepth = 32` bounds an untrusted wire format, `EffectCallGraph.MaximumCallGraphDepth = 512` bounds a call graph rather than a term, and `IrPrinter.MaxFormatDepth = 1024` bounds only string formatting. **The reduction is not to merge them** - a JSON nesting bound, an IR term depth and a call-graph depth are different budgets over different structures, and collapsing them would be a defect. It is that the repository's *effective* term-nesting budget is **64**, not 256, for anything that reaches the specification-pack provider, and that fact appears in no document, no test and no comment; a reader of `RoslynOperationLowerer` sees 256 and has no way to learn that a term surviving it can still be refused four times earlier downstream. One assertion that the collector-side limits are less than or equal to the lowering-side limits would state the intended ordering and fail if a future edit inverts it. **A secondary detail worth fixing while the file is open**: `MaxFormatDepth` is the only one of the fourteen spelled `Max` rather than `Maximum`, so a grep for the repository's own convention misses it - which is how it stayed out of this ledger until now. | `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs:8`; `SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs:166`; `CompilerSpecificationPackProvider.cs:13`; `CompilerRelationalSummaryProvider.cs:21`; `SharpProof.Effects/ManagedAbstractFlow.cs:24`, `OperationEffectScanner.cs:40`, `EffectCallGraph.cs:11`; `SharpProof.Frontend/RoslynOperationLowerer.cs:5`; `SharpProof.Ir/IrInterpreter.cs:100`, `IrPrinter.cs:5`; `SharpProof.Smt/IrSmtBackend.cs:5`; `SharpProof.Specs/ApiSpecTermValidator.cs:9`; `SharpProof.Worker.Protocol/ProtocolJson.cs:11` |
+
+### Checked and not proposed (part five hundred eighty-nine)
+
+- **The prior code-usefulness audit's verdicts are fully discharged, and this is
+  the strongest independent evidence in the survey that no *adjudicated* dead code
+  remains.** `docs/code-usefulness-audit.md` pins baseline commit
+  `18083cd7783146f7b5d7a4db26b31b1f41f3561b`, 838 files, and a per-file verdict.
+  Parsing its manifest yields 784 machine-readable rows: **761 `retained`, 15
+  `removed`, 3 `simplified`, 3 `corrected`, 2 `strengthened`**. **All fifteen
+  paths marked `removed` are gone from HEAD.** The eight rows whose paths still
+  exist are exactly the `simplified`, `corrected` and `strengthened` verdicts,
+  which are supposed to survive. Nineteen `retained` paths have since gone, and
+  every one is explained by a later applied reduction - twelve `AssemblyInfo.cs`
+  files (central `InternalsVisibleTo`), two `GlobalUsings.cs` (applied R234), two
+  `eng/coverage/*.runsettings`, `.cursorrules`, an unused composite action, and one
+  test file. Nothing was removed that the audit wanted kept for a stated reason.
+- **The audit's line counts disagreeing with HEAD is not staleness.** Its row for
+  `scripts/SharpProof.MutationBaselines.psm1` says 100 lines against 87 today, and
+  many rows differ similarly. The document states its contract in its own header -
+  a manifest of "every Git-tracked file at the exact commit above", with blob
+  SHA-1 and line count fixed *before* inspection - and it is listed in
+  `$datedEvidenceDocuments`, which `Test-SharpProofReadme.ps1` deliberately exempts
+  from currency checks. It is a correctly dated snapshot, not a stale table, and
+  proposing to refresh it would destroy the evidence it exists to preserve.
+- **`ApiSpecExpressionDepthTests` re-declaring `MaximumExpressionDepth = 256` is
+  not a finding.** The production constant at `ApiSpecTermValidator.cs:9` is
+  `private`, and `SharpProof.Specs` declares **no** `InternalsVisibleTo` at all, so
+  the test cannot reference it and must restate it. More importantly the coupling
+  is safe: the fixture pins **both** sides of the boundary -
+  `ExpressionAtDepthLimitValidatesDigestsAndInstantiates` at `N` and
+  `ExpressionBeyondDepthLimitIsRejectedBeforeDigesting` at `N + 1` - so raising the
+  production limit makes the second test fail loudly rather than silently stop
+  testing the boundary. This was checked specifically because the opposite
+  conclusion looked plausible from the duplicated literal alone.
+- **Only nine non-test, non-generated production files of fifty lines or more
+  remain uncited by name anywhere in this ledger**, down from a much larger set
+  earlier in the survey: `SharpProof.Ir/IrPrinter.cs`, `IrBlockOrder.cs`,
+  `SharpProof.Attributes/EffectContractAttribute.cs`, five `scripts/` files and
+  `THIRD-PARTY-NOTICES.txt`. `IrPrinter` was read in full for this part - it is a
+  `partial` class paired with `IrPrinterProjections.generated.cs`, consumes
+  `ArgumentNullGuard` correctly, and has seven callers; nothing in it is
+  duplicated elsewhere. The citation ranking is recorded again because it keeps
+  paying: it produced `SharpProof.Summaries` for R1159 and `IrPrinter` for the
+  `MaxFormatDepth` half of R1303.
+- **`SharpProof.MutationBaselines.psm1`'s `|`-joined invocation identity is
+  correct and its collision guard is live, not dead.**
+  `Get-SharpProofMutationBaselineInvocation:19` builds `Identity` as
+  `[string]::Join('|', $arguments)`, which is not injective if a field contains a
+  literal `|` - and `$Filter` is an NUnit filter expression, a grammar in which
+  `|` is the OR operator. The module knows this: `:47-54` re-compares all three
+  fields on a hash hit and throws `'Mutation baseline invocation identities
+  collided.'` All **217** distinct filters in
+  `Test-SharpProofTrustedMutations.ps1` are plain `FullyQualifiedName~<Name>`
+  forms containing no `|`, so the guard is currently unreachable, but it is the
+  right guard and should stay.
+- **R1158's scope excluded `.psm1` modules correctly.** `Set-StrictMode` on line 1
+  of `SharpProof.MutationBaselines.psm1` looked at first like a fifteenth instance
+  of the leak R1158 describes. It is not: modules imported with `Import-Module` get
+  their own session state, so a module's strict mode does not reach its caller.
+  R1158 measured dot-source edges specifically and all eighteen libraries it names
+  are `.ps1` files loaded with `.`, so the finding stands as written.
+
+### Status (part five hundred eighty-nine)
+
+R1303 is `pending` and deliberately asks for less than it could. The eight `256`s
+should **not** be merged into one constant; what is missing is a statement of the
+ordering between the collector-side `64`s and everything downstream of them, which
+is one assertion in an existing architecture test. Renaming `MaxFormatDepth` to
+`MaximumFormatDepth` is independent, mechanical, and makes the fourteenth budget
+findable by the same grep as the other thirteen.
+
+## Second survey, part five hundred ninety: R1156 collision closed
+
+Part five hundred eighty-seven left one duplicate ID open, on the grounds that the
+later row was not mine to renumber. That was the wrong call: a live duplicate is a
+defect in the ledger, and deferring it only means the next reader meets it.
+
+**R1156 was issued twice and is now resolved by moving the later row.** The earlier
+row (line ~12933), the SHA-256 lowercase-hex census, **keeps R1156**. The later row
+(line ~13181), *"`DefiniteOperationFacts` duplicates harmless-wrapper recursion"*,
+is now **R1304**. Only the four characters of the ID changed - the finding text,
+evidence column and status are untouched, and the row has not moved position. If
+its author prefers a different number, reassigning it costs one edit; what mattered
+was ending the ambiguity.
+
+The interim spelling **R1156-b** proposed in part five hundred eighty-seven is
+withdrawn and should not be used. R1155 remains unallocated.
+
+### Status (part five hundred ninety)
+
+No new ID. Every ID this pass has issued now names exactly one finding: R1156,
+R1158, R1159, R1300, R1301, R1302 and R1303, plus R1304 assigned here to close the
+collision. Both collisions this session came from allocating `max + 1` against a
+file another pass is appending to; both were caught by re-reading immediately after
+writing, which remains the cheap mitigation.
