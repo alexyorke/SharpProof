@@ -18544,3 +18544,7 @@ facts and session. `ConstantTrueLoopCompletionTests` pass (8/8).
 R1523 is applied: the four false-switch guard cases now share one immutable
 fixture compilation while each test keeps its selected method and independent
 analysis session. `FalseSwitchGuardPatternRegressionTests` pass (4/4).
+
+R1524 is applied: the fixed-truth and truth-operator case matrices now reuse
+their immutable fixture compilations while each case still creates its own
+analysis session. `ConditionalTruthOperatorEffectTests` pass (6/6).

@@ -3,6 +3,12 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class ConditionalTruthOperatorEffectTests
 {
+    private static readonly Compilation FixedTruthCompilation =
+        CreateFixedTruthCompilation();
+
+    private static readonly Compilation TruthOperatorCompilation =
+        CreateTruthOperatorCompilation();
+
     [TestCase("AndRightNeverCompletes", false)]
     [TestCase("OrRightNeverCompletes", false)]
     [TestCase("AndOperatorNeverCompletes", false)]
@@ -11,7 +17,19 @@ public sealed class ConditionalTruthOperatorEffectTests
         string methodName,
         bool suffixIsReachable)
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = FixedTruthCompilation;
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
+
+        var result = new EffectAnalysisSession(compilation).Analyze(method);
+
+        Assert.That(
+            result.Summary.Writes.Contains(EffectRegionId.Parameter(1)),
+            Is.EqualTo(suffixIsReachable));
+    }
+
+    private static Compilation CreateFixedTruthCompilation()
+    {
+        return EffectTestHost.CreateCompilation(
             """
             public sealed class Cell {
                 public int Value;
@@ -83,13 +101,6 @@ public sealed class ConditionalTruthOperatorEffectTests
                     NonReturningGate value) => value;
             }
             """);
-        var method = EffectTestHost.SampleMethod(compilation, methodName);
-
-        var result = new EffectAnalysisSession(compilation).Analyze(method);
-
-        Assert.That(
-            result.Summary.Writes.Contains(EffectRegionId.Parameter(1)),
-            Is.EqualTo(suffixIsReachable));
     }
 
     [TestCase("And")]
@@ -97,7 +108,38 @@ public sealed class ConditionalTruthOperatorEffectTests
     public void TruthOperatorEffectsPrecedeTheRightOperandAndReachCatches(
         string methodName)
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = TruthOperatorCompilation;
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
+        var result = new EffectAnalysisSession(compilation).Analyze(method);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsUnknown, Is.False);
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True,
+                "the truth operator writes its operand");
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Parameter(1)),
+                Is.False,
+                "the throwing truth operator prevents right evaluation");
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Parameter(2)),
+                Is.True,
+                "the matching truth-operator catch is reachable");
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Parameter(3)),
+                Is.True,
+                "execution continues after the matching catch");
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    private static Compilation CreateTruthOperatorCompilation()
+    {
+        return EffectTestHost.CreateCompilation(
             """
             using System;
 
@@ -158,31 +200,5 @@ public sealed class ConditionalTruthOperatorEffectTests
                 }
             }
             """);
-        var method = EffectTestHost.SampleMethod(compilation, methodName);
-        var result = new EffectAnalysisSession(compilation).Analyze(method);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Summary.Writes.IsUnknown, Is.False);
-            Assert.That(
-                result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
-                Is.True,
-                "the truth operator writes its operand");
-            Assert.That(
-                result.Summary.Writes.Contains(EffectRegionId.Parameter(1)),
-                Is.False,
-                "the throwing truth operator prevents right evaluation");
-            Assert.That(
-                result.Summary.Writes.Contains(EffectRegionId.Parameter(2)),
-                Is.True,
-                "the matching truth-operator catch is reachable");
-            Assert.That(
-                result.Summary.Writes.Contains(EffectRegionId.Parameter(3)),
-                Is.True,
-                "execution continues after the matching catch");
-            Assert.That(
-                result.Summary.Completeness,
-                Is.EqualTo(EffectCompleteness.Complete));
-        }
     }
 }
