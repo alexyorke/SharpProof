@@ -19201,3 +19201,9 @@ R633 is applied: frontend differential and semantic-edge comparisons now share
 one collectible generated-assembly load/unload wrapper, while each path keeps
 its own method-shape validation, callback-specific results, cancellation, and
 image ownership. The focused fuzz comparison tests pass (7/7).
+
+R544 is applied: finite-domain "all assignments" and "some satisfying
+assignment” checks now share one short-circuiting assignment search, with
+separate leaf predicates and polarity. Boolean/integer ordering, cancellation,
+unsupported-type fallback, and environment cleanup remain unchanged. The
+focused finite-domain tests pass (2/2).

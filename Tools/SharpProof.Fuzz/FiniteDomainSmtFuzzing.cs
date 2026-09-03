@@ -22,6 +22,7 @@ public sealed record FiniteDomainDifferentialResult(
 public sealed class FiniteDomainSmtDifferentialOracle
 {
     private const int MaximumAssignmentCount = 65_536;
+    private static readonly bool[] BooleanDomain = [false, true];
 
     public static ImmutableArray<long> IntegerDomain
     {
@@ -48,59 +49,15 @@ public sealed class FiniteDomainSmtDifferentialOracle
             return false;
         }
 
-        var interpreter = new IrInterpreter(factory);
-        var environment = new Dictionary<IrVarId, IrValue>();
-        return Check(0);
-
-        bool Check(int index)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (index == variables.Length)
-            {
-                var evaluated = interpreter.Evaluate(
-                    formula,
-                    environment,
-                    cancellationToken);
-                return evaluated.Status == IrEvaluationStatus.Value &&
-                       evaluated.Value is { Kind: IrValueKind.Boolean };
-            }
-
-            var variable = variables[index];
-            var type = factory.GetTypeInfo(
-                factory.GetVariableInfo(variable).Type).Kind;
-            if (type == IrTypeKind.Boolean)
-            {
-                environment[variable] = factory.CreateBooleanValue(false);
-                if (!Check(index + 1))
-                {
-                    return false;
-                }
-
-                environment[variable] = factory.CreateBooleanValue(true);
-                if (!Check(index + 1))
-                {
-                    return false;
-                }
-            }
-            else if (type == IrTypeKind.Integer)
-            {
-                foreach (var value in IntegerDomain)
-                {
-                    environment[variable] =
-                        factory.CreateIntegerValue(value);
-                    if (!Check(index + 1))
-                    {
-                        return false;
-                    }
-                }
-            }
-            else
-            {
-                return false;
-            }
-            environment.Remove(variable);
-            return true;
-        }
+        return SearchFiniteDomain(
+            factory,
+            formula,
+            variables,
+            cancellationToken,
+            static evaluated =>
+                evaluated.Status == IrEvaluationStatus.Value &&
+                evaluated.Value is { Kind: IrValueKind.Boolean },
+            requireMatch: true);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -171,11 +128,19 @@ public sealed class FiniteDomainSmtDifferentialOracle
                             variable.Value))));
         }
 
-        var expected = IsSatisfiableByEnumeration(
+        var expected = SearchFiniteDomain(
             factory,
             formula,
             variables,
-            cancellationToken)
+            cancellationToken,
+            static evaluated =>
+                evaluated.Status == IrEvaluationStatus.Value &&
+                evaluated.Value is
+                {
+                    Kind: IrValueKind.Boolean,
+                    Boolean: true
+                },
+            requireMatch: false)
             ? FiniteDomainSatisfiability.Satisfiable
             : FiniteDomainSatisfiability.Unsatisfiable;
         var query = new VerificationQuery(
@@ -246,11 +211,13 @@ public sealed class FiniteDomainSmtDifferentialOracle
         }
     }
 
-    private static bool IsSatisfiableByEnumeration(
+    private static bool SearchFiniteDomain(
         IrFactory factory,
         IrTerm formula,
         ImmutableArray<IrVarId> variables,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<IrEvaluationResult, bool> matches,
+        bool requireMatch)
     {
         var interpreter = new IrInterpreter(factory);
         var environment = new Dictionary<IrVarId, IrValue>();
@@ -265,12 +232,7 @@ public sealed class FiniteDomainSmtDifferentialOracle
                     formula,
                     environment,
                     cancellationToken);
-                return evaluated.Status == IrEvaluationStatus.Value &&
-                       evaluated.Value is
-                       {
-                           Kind: IrValueKind.Boolean,
-                           Boolean: true
-                       };
+                return matches(evaluated);
             }
 
             var variable = variables[index];
@@ -278,16 +240,16 @@ public sealed class FiniteDomainSmtDifferentialOracle
                 factory.GetVariableInfo(variable).Type).Kind;
             if (type == IrTypeKind.Boolean)
             {
-                environment[variable] = factory.CreateBooleanValue(false);
-                if (Search(index + 1))
+                foreach (var value in BooleanDomain)
                 {
-                    return true;
-                }
-
-                environment[variable] = factory.CreateBooleanValue(true);
-                if (Search(index + 1))
-                {
-                    return true;
+                    environment[variable] =
+                        factory.CreateBooleanValue(value);
+                    var child = Search(index + 1);
+                    if (requireMatch ? !child : child)
+                    {
+                        environment.Remove(variable);
+                        return requireMatch ? false : true;
+                    }
                 }
             }
             else if (type == IrTypeKind.Integer)
@@ -296,9 +258,11 @@ public sealed class FiniteDomainSmtDifferentialOracle
                 {
                     environment[variable] =
                         factory.CreateIntegerValue(value);
-                    if (Search(index + 1))
+                    var child = Search(index + 1);
+                    if (requireMatch ? !child : child)
                     {
-                        return true;
+                        environment.Remove(variable);
+                        return requireMatch ? false : true;
                     }
                 }
             }
@@ -307,7 +271,7 @@ public sealed class FiniteDomainSmtDifferentialOracle
                 return false;
             }
             environment.Remove(variable);
-            return false;
+            return requireMatch;
         }
     }
 
