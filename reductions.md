@@ -20976,3 +20976,11 @@ The full `SharpProof.Analyzer.Test` project passes 475/475 unaffected cases
 plus the one intentionally filtered `SP0024` fixture (476 total) with zero
 warnings or errors; that fixture remains narrowed because its source emits a
 placement diagnostic outside the call-site assertion.
+
+## Second survey, continued: R1990 - CallableCounterexampleReplayer repeats target-variable scans by role
+
+CallableCounterexampleReplayer.Replay traverses target.Variables once to materialize result variables, again to restore every pre-state variable, and a third time to validate source-integer intervals for all variables with final values. The target variable metadata is immutable for the replay, so a single partition pass can retain the result and pre-state sequences plus an interval-bearing sequence (or descriptors) before execution; the later phases can then use those prepared views without re-enumerating the full variable list. Keep the current exact-one result rule, pre-state type checks, insertion order, and fail-closed validation for every final value.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1990 | CallableCounterexampleReplayer.Replay rescans the immutable target-variable list for result, pre-state, and interval phases; pre-partition those roles once while retaining exact-one-result, type, order, and fail-closed checks. | SharpProof.Worker/CallableCounterexampleReplayer.cs:65-114 |
