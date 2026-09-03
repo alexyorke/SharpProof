@@ -21174,3 +21174,11 @@ tests pass 7/7 with zero warnings or errors.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2003 | Test-SharpProofReleaseArtifacts repeats the exact artifact-name scan after the shared bundle-topology helper, adding only extension validation. | scripts/Test-SharpProofReleaseArtifacts.ps1:63-101; scripts/SharpProof.ReleaseBundle.ps1:52-73 |
+
+## Second survey, continued: R2004 - ci.yml uploads performance evidence twice
+
+`container-pr-evidence` uploads the entire `artifacts` directory, which includes `artifacts/ci/performance*.json`, and the next step uploads that same performance glob again as `fast-pr-performance`. The dedicated artifact may be intentional for quick discovery, so this is a cautious storage/maintenance reduction: either narrow the broad artifact to exclude the performance evidence or remove the dedicated upload if no consumer needs the separate artifact. Before changing it, confirm the retention and download UX requirement; the workflow's architecture test explicitly expects the dedicated artifact name, so preserve that contract if it is externally consumed.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2004 | `ci.yml` uploads `artifacts/ci/performance*.json` once inside `container-pr-evidence` and again as `fast-pr-performance`; narrow one upload or document the intentional duplicate after checking consumers. | .github/workflows/ci.yml:36-52; SharpProof.ArchitectureTest/ArchitectureTests.cs:1768-1790 |
