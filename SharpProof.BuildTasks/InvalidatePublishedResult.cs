@@ -101,6 +101,10 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
                 InvocationManifestPath)
             .Select(ResolvePath)
             .ToArray();
+        var publicationInputConflictPaths = publicationPaths
+            .Concat(publicationMarkerPaths)
+            .Concat(inputPaths)
+            .ToArray();
         var resolvedToolPaths = toolPaths
             .Append(WorkerProtocolPath)
             .Select(ResolvePath)
@@ -125,28 +129,22 @@ public sealed class InvalidatePublishedResult : CancelableBuildTask
                 LinuxPathIdentity.PathsConflict(output, input)));
         var aliasesWorkerTree = workerTreeExists &&
             !string.IsNullOrWhiteSpace(workerDirectory) &&
-            publicationPaths
-                .Concat(publicationMarkerPaths)
-                .Concat(inputPaths)
-                .Any(path => LinuxPathIdentity.PathsConflict(
+            publicationInputConflictPaths.Any(path =>
+                LinuxPathIdentity.PathsConflict(
                     path,
                     workerDirectory));
         var aliasesCache = resolvedCachePath != null &&
-            (publicationPaths
-                 .Concat(publicationMarkerPaths)
-                 .Concat(inputPaths)
-                 .Any(path => LinuxPathIdentity.PathsConflict(
-                     path,
-                     resolvedCachePath)) ||
+            (publicationInputConflictPaths.Any(path =>
+                LinuxPathIdentity.PathsConflict(
+                    path,
+                    resolvedCachePath)) ||
              workerTreeExists &&
              !string.IsNullOrWhiteSpace(workerDirectory) &&
              LinuxPathIdentity.PathsConflict(
                  resolvedCachePath,
                  workerDirectory));
-        var aliasesCompilerOutput = publicationPaths
-            .Concat(inputPaths)
-            .Concat(publicationMarkerPaths)
-            .Any(publication => compilerOutputPaths.Any(compilerOutput =>
+        var aliasesCompilerOutput = publicationInputConflictPaths.Any(
+            publication => compilerOutputPaths.Any(compilerOutput =>
                 string.Equals(
                     publication,
                     compilerOutput,
