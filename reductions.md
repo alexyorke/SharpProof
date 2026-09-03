@@ -17037,3 +17037,9 @@ retaining per-file option deduplication. The focused rationale test passes
 (1/1). The canonical inventory gate still reports the pre-existing members
 ceiling breach (5973/5808); this PowerShell-only change does not alter the C#
 inventory metrics.
+
+R1389 is applied: package dependency validation now partitions the parsed
+models by extension once and reuses those collections for exact graph checks
+and edge construction. Extension-specific metadata, dependency, ordering,
+and pairing rules remain unchanged. `PackageDependencyAuthorityTests` pass
+(45/45).

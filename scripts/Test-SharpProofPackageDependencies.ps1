@@ -141,10 +141,17 @@ function Get-SharpProofPackageDependencyGraph {
             Nuspec = Get-SharpProofNuspecDependencyModel -PackagePath $_
         }
     })
+    $modelsByExtension = @{
+        '.nupkg' = [Collections.Generic.List[object]]::new()
+        '.snupkg' = [Collections.Generic.List[object]]::new()
+    }
+    foreach ($model in $models) {
+        if ($modelsByExtension.ContainsKey($model.Extension)) {
+            $null = $modelsByExtension[$model.Extension].Add($model)
+        }
+    }
     foreach ($extension in @('.nupkg', '.snupkg')) {
-        $extensionModels = @($models | Where-Object {
-            $_.Extension -eq $extension
-        })
+        $extensionModels = $modelsByExtension[$extension]
         $actualIds = @($extensionModels.Nuspec.Id | Sort-Object)
         if ($extensionModels.Count -ne $expectedPackages.Count -or
             ($actualIds -join '|') -ne ($expectedPackageIds -join '|')) {
@@ -218,9 +225,7 @@ function Get-SharpProofPackageDependencyGraph {
     }
 
     $edges = [Collections.Generic.List[object]]::new()
-    foreach ($model in @($models | Where-Object {
-            $_.Extension -eq '.nupkg'
-        })) {
+    foreach ($model in $modelsByExtension['.nupkg']) {
         foreach ($group in @($model.Nuspec.DependencyGroups)) {
             foreach ($dependency in @($group.Dependencies)) {
                 $edges.Add([pscustomobject][ordered]@{
