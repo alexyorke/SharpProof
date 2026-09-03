@@ -235,6 +235,8 @@ public sealed class RoslynOperationLowerer
 
     private static bool TryGetNullComparisonValue(
         IBinaryOperation operation,
+        IOperation left,
+        IOperation right,
         out IOperation value)
     {
         if (operation.OperatorKind is not (
@@ -243,29 +245,36 @@ public sealed class RoslynOperationLowerer
             value = null!;
             return false;
         }
-        var left = UnwrapImplicitConversions(operation.LeftOperand);
-        var right = UnwrapImplicitConversions(operation.RightOperand);
         value = IsNullConstant(right)
             ? left
             : IsNullConstant(left) ? right : null!;
         return value != null;
     }
 
-    private static IOperation UnwrapImplicitConversions(
-        IOperation operation,
-        bool referenceOnly = false)
+    private static (IOperation Any, IOperation ReferenceOnly)
+        UnwrapComparisonOperand(IOperation operation)
     {
-        while (operation is IConversionOperation
+        var any = operation;
+        var referenceOnly = operation;
+        var canUnwrapReference = true;
+        while (any is IConversionOperation
             {
                 IsImplicit: true,
                 OperatorMethod: null
-            } conversion &&
-            (!referenceOnly || conversion.Conversion.IsReference))
+            } conversion)
         {
-            operation = conversion.Operand;
+            any = conversion.Operand;
+            if (canUnwrapReference && conversion.Conversion.IsReference)
+            {
+                referenceOnly = any;
+            }
+            else
+            {
+                canUnwrapReference = false;
+            }
         }
 
-        return operation;
+        return (any, referenceOnly);
     }
 
     private static bool IsNullConstant(IOperation operation)
@@ -752,16 +761,21 @@ public sealed class RoslynOperationLowerer
                 return OpaqueBinary(operation, FrontendAbstention.LiftedOperator);
             }
 
-            if (GetNullComparison(operation) is { } nullComparison)
-            {
-                return nullComparison;
-            }
             var leftOperand = operation.LeftOperand;
             var rightOperand = operation.RightOperand;
             ITypeSymbol? referenceComparisonType = null;
             if (operation.OperatorKind is
-                BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals)
+                 BinaryOperatorKind.Equals or BinaryOperatorKind.NotEquals)
             {
+                var leftOperands = UnwrapComparisonOperand(leftOperand);
+                var rightOperands = UnwrapComparisonOperand(rightOperand);
+                if (GetNullComparison(
+                        operation,
+                        leftOperands.Any,
+                        rightOperands.Any) is { } nullComparison)
+                {
+                    return nullComparison;
+                }
                 if (leftOperand.Type?.IsReferenceType == true &&
                     SymbolEqualityComparer.Default.Equals(
                         leftOperand.Type,
@@ -769,12 +783,8 @@ public sealed class RoslynOperationLowerer
                 {
                     referenceComparisonType = leftOperand.Type;
                 }
-                leftOperand = UnwrapImplicitConversions(
-                    leftOperand,
-                    referenceOnly: true);
-                rightOperand = UnwrapImplicitConversions(
-                    rightOperand,
-                    referenceOnly: true);
+                leftOperand = leftOperands.ReferenceOnly;
+                rightOperand = rightOperands.ReferenceOnly;
                 if (ChangesReferenceEqualityToString(leftOperand) ||
                     ChangesReferenceEqualityToString(rightOperand))
                 {
@@ -1064,9 +1074,11 @@ public sealed class RoslynOperationLowerer
         }
 
         private LoweredExpression? GetNullComparison(
-            IBinaryOperation operation)
+            IBinaryOperation operation,
+            IOperation left,
+            IOperation right)
         {
-            if (!TryGetNullComparisonValue(operation, out var compared))
+            if (!TryGetNullComparisonValue(operation, left, right, out var compared))
             {
                 return null;
             }
