@@ -18739,3 +18739,11 @@ R1644 is applied: the two terminal-object-initializer cases now share one
 immutable metadata reference and compilation while retaining per-test effect
 sessions and constructor selection. `TerminalObjectInitializerEffectTests`
 pass (2/2).
+
+## Second survey, continued: R1653 - Effects runtime-oracle and static-analysis suites duplicate the arithmetic exception fixture
+
+`RuntimeEffectOracleTests.ImplicitExceptionSummariesContainRuntimeEdgeCases` and `EffectAnalysisTests.ExplicitAndImplicitExceptionsRemainResolved` each embed the same core methods: ordinary and nullable divide/remainder, native signed and unsigned divide/remainder, compound divide/remainder, checked increment, array allocation, and locking. The surrounding classes and assertions differ because one emits and invokes the methods while the other checks summaries and adds explicit/nullness cases, so the tests should keep separate behavior assertions. A composable shared source fragment or test fixture builder for the common methods would remove this repeated operation inventory and keep the runtime/static edge-case sets synchronized when another arithmetic form is added.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1653 | Two Effects suites maintain the same divide/remainder, native arithmetic, compound assignment, checked increment, array, and lock source methods; share the common fixture fragment while retaining distinct runtime and summary assertions. | `SharpProof.Effects.Test/RuntimeEffectOracleTests.cs:246-282`; `SharpProof.Effects.Test/EffectAnalysisTests.cs:4010-4041,4046-4057` |
