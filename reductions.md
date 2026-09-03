@@ -18985,3 +18985,11 @@ R1147 is applied: `CompilerCallableLowererTests` now compares the member names
 and ordinal values of `IrSummaryOrigin` and `CompilerSummaryOrigin`, making the
 cross-assembly vocabulary drift fail in the Worker test lane instead of only
 at a runtime conversion site. The focused parity test passes (1/1).
+
+## Second survey, continued: R1668 - Frontend abstention tests repeat invalid-enum rejection plumbing
+
+`FrontendAbstentionValueTests` has three negative tests for the same `UndefinedReason` sentinel: each invokes a different public constructor or factory and expects `ArgumentOutOfRangeException`; two of the tests then repeat the parameter-name assertion with only `abstention` versus `reason` differing, while the factory test omits that assertion. The three entry points should remain independently covered, and this is distinct from the production validator sharing already recorded in R966, but a local `AssertUndefinedReasonRejected(Action, string?)` helper or small test-case source can centralize the exception envelope and optional parameter-name check.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1668 | Three frontend abstention boundary tests repeat the same invalid-enum exception harness; share the negative-test helper while retaining independent constructor/factory coverage. | `SharpProof.Frontend.Test/FrontendAbstentionValueTests.cs:7-35` |
