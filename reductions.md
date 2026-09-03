@@ -15256,3 +15256,35 @@ The contract API generator emits full `Methods` and `Attributes` descriptor arra
 | ID | Finding | Evidence |
 |---|---|---|
 | R1260 | **`Generate-ContractApiCatalog.ps1` emits duplicate key projections beside the descriptors that already contain them.** `Methods.Name` duplicates `ContractMethodCandidateNames`, and `Attributes.MetadataName` duplicates `AttributeMetadataNames`. Derive or index the keys from the descriptor arrays while retaining the catalog's membership and ordering consumers. | `scripts/Generate-ContractApiCatalog.ps1:246-281`; `SharpProof.Frontend/ContractApiMetadata.generated.cs:85-196`; `SharpProof.Frontend.Test/ContractApiCatalogParityTests.cs:31-74` |
+
+## Second survey, part five hundred eighty-three: R1261 - descendant discovery allocates a cycle set per PID
+
+`VerifierProcessSupervisor.DescendantProcessIds` filters every PID in one `/proc` parent snapshot through `IsDescendant`. Each predicate call creates a fresh `HashSet<int>` solely to detect cycles while walking that PID's parent chain, then the outer query creates another set for the accepted IDs. Large process trees therefore repeat ancestry walks and allocate one short-lived cycle set per candidate, even though all walks share the same immutable parent map and many chains share ancestors. A snapshot-level traversal or memoized ancestry-state map can preserve the fail-closed cycle handling and exact descendant set while removing the per-PID temporary sets and repeated shared-prefix work.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1261 | **`VerifierProcessSupervisor.DescendantProcessIds` allocates a cycle-detection set for every candidate PID.** The outer `parents.Keys` filter calls `IsDescendant`, whose new `HashSet<int>` and parent-chain walk are repeated for every PID in the snapshot before the result set is built. Compute descendant membership with one snapshot-level traversal or memoized parent states while retaining cycle termination and the same PID set. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:373-405` |
+
+## Second survey, part five hundred eighty-four: R1262 - reserve descriptors are copied to satisfy a close-only parameter
+
+`VerifierProcessSupervisor.Run` retains the first reserve descriptor as `supervisorPidFd` and passes the remaining descriptors to `StopDescendants` as `descriptorReserves.Skip(1).ToArray()`. `StopDescendants` immediately forwards that value to `CloseDescriptors`, which only enumerates it once; it does not index, retain, or mutate the list. The two-element array is therefore a shape adapter rather than a required snapshot. Accepting an enumerable close list or passing an allocation-free array segment can preserve descriptor ownership and the first-descriptor identity boundary without creating a per-run copy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1262 | **`VerifierProcessSupervisor.Run` materializes a reserve-descriptor suffix solely for `StopDescendants` cleanup.** The `Skip(1).ToArray()` result is consumed once by `CloseDescriptors` and has no independent lifetime or indexing requirement. Use a close-only enumerable or allocation-free segment while retaining the supervisor pidfd separately. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:117-124,213-223,350-357` |
+
+## Second survey, part five hundred eighty-five: R1263 - present-path helper calls allocate params arrays
+
+`CancelableBuildTask.Present` is declared with `params string?[]`, so every call with literal path arguments first allocates a temporary array before filtering empty values. `ResetPublishedVerification.ExecuteCore` calls it once, while `InvalidatePublishedResult.ExecuteCore` calls it for publication, compiler, and input groups; these are short-lived build-task executions, but the helper is exactly the shared boundary where the allocation is introduced. A non-`params` collection overload, or callers that pass one reused local collection when several projections are needed, can remove this incidental array creation while keeping the filtering policy centralized.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1263 | **`CancelableBuildTask.Present` pays a `params`-array allocation at every path-group call.** The helper only filters its input and is invoked repeatedly by both publication tasks with fixed literal groups. Replace the `params` boundary or reuse caller-owned collections if profiling justifies it, without moving the shared whitespace policy into each task. | `SharpProof.BuildTasks/CancelableBuildTask.cs:59-62`; `SharpProof.BuildTasks/ResetPublishedVerification.cs:25-30`; `SharpProof.BuildTasks/InvalidatePublishedResult.cs:53-62,96-103` |
+
+## Second survey, part five hundred eighty-six: R1264 - publication conflict candidates are rebuilt for each policy flag
+
+`InvalidatePublishedResult.ExecuteCore` constructs the same concatenated candidate sequence of publication paths, publication marker paths, and input paths independently for `aliasesWorkerTree` and `aliasesCache`; `aliasesCompilerOutput` then reconstructs the same three groups in a different order even though `PathsConflict` is symmetric for these checks. The path arrays are already stable locals for the execution, and these predicates only return booleans, so a single materialized conflict-candidate array can feed all three policy checks while leaving the distinct protected-tool paths and compiler-output comparison intact.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1264 | **`InvalidatePublishedResult.ExecuteCore` rebuilds the publication/input conflict sequence for multiple alias flags.** The worker-tree, cache, and compiler-output checks independently chain the same path arrays before testing conflicts. Materialize one shared candidate set (or use one pairwise evaluator) while preserving each separately reported error category and the protected-tool paths. | `SharpProof.BuildTasks/InvalidatePublishedResult.cs:126-156` |
