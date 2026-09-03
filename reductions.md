@@ -10421,3 +10421,15 @@ Two independent scheduled workflows use the exact same cron expression. `nightly
 ### Status (part two hundred twenty-eight)
 
 R997 is deferred: the collision is operational rather than semantic, and the scheduling change should be made only if hosted-runner or issue-action bursts are observed to matter.
+
+## Second survey, part two hundred twenty-nine: R998 - split feature-option vocabulary
+
+The analyzer's profile option has a small shared vocabulary in `SharpProofConfigurationCatalog`, but the feature option does not. `AnalyzerConfigurationOptionRegistry.Features` hard-codes the configuration key, MSBuild property name, and allowed values; `AnalyzerConfiguration.ParseFeatures` repeats the value strings as parser branches; and `SharpProof.ConsumerContract.props` repeats the normalized values in both its validation condition and error message. The acceptance contract also owns the default `all` value independently. These layers intentionally serve different boundaries - analyzer parsing, package-side MSBuild validation, and release contract validation - but they should consume one declarative feature-option vocabulary or be checked against one. Otherwise adding or renaming a feature requires synchronized edits across C#, MSBuild, and JSON, while the profile's partial centralization makes the asymmetry easy to miss. This is distinct from R512's duplicated validation traversal and R738's repeated property-list declarations.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R998 | **The `SharpProofFeatures` option has no equivalent to the profile's shared key/value constants.** The registry repeats `sharpproof_features`, `SharpProofFeatures`, and `effects`/`contracts`/`all`; the parser repeats the same value literals; the packaged consumer props repeats them in MSBuild conditions and diagnostics; and the acceptance contract independently pins `defaultFeatures: all`. A generated or shared option descriptor, or a focused cross-boundary consistency test, can remove this drift surface without merging the analyzer and MSBuild validation implementations. | `SharpProof.Analyzer.Core/Configuration/AnalyzerConfigurationOptionRegistry.cs:5-12`; `SharpProof.Analyzer.Core/Configuration/AnalyzerConfiguration.cs:226-230`; `SharpProof.Package/buildTransitive/SharpProof.ConsumerContract.props:4,6,22-23`; `eng/acceptance/contract.json:10-18`; profile constants `SharpProof.Contracts/SharpProofConfigurationCatalog.cs:3-7` |
+
+### Status (part two hundred twenty-nine)
+
+R998 is deferred: the vocabulary is tiny and stable today; add a shared descriptor or consistency assertion when the next feature is introduced rather than creating another abstraction for three current values.
