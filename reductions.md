@@ -18701,3 +18701,8 @@ R1648 is applied: the unmanaged-function-pointer generator matrices now share
 one source builder while retaining their separate exact-count and
 single-diagnostic assertions. `ContractForValidatorGeneratorTests` pass
 (120/120).
+
+R1651 is applied: the scalar-semantics oracle now owns only the independent
+primitive-type set and derives widths, signedness, and bounds from those CLR
+types, while retaining exhaustive catalog and lowering assertions.
+`CSharpScalarSemanticsTests` pass (2/2).

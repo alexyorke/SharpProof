@@ -8,27 +8,17 @@ namespace SharpProof.Frontend.Test;
 [TestFixture]
 public sealed class CSharpScalarSemanticsTests
 {
-    private static readonly Dictionary<
-        SpecialType,
-        (bool IsSigned, int BitWidth, long Minimum, long Maximum)> Expected =
+    private static readonly Dictionary<SpecialType, Type> ExpectedIntegerTypes =
         new()
         {
-            [SpecialType.System_SByte] =
-                (true, 8, sbyte.MinValue, sbyte.MaxValue),
-            [SpecialType.System_Byte] =
-                (false, 8, byte.MinValue, byte.MaxValue),
-            [SpecialType.System_Int16] =
-                (true, 16, short.MinValue, short.MaxValue),
-            [SpecialType.System_UInt16] =
-                (false, 16, ushort.MinValue, ushort.MaxValue),
-            [SpecialType.System_Char] =
-                (false, 16, char.MinValue, char.MaxValue),
-            [SpecialType.System_Int32] =
-                (true, 32, int.MinValue, int.MaxValue),
-            [SpecialType.System_UInt32] =
-                (false, 32, uint.MinValue, uint.MaxValue),
-            [SpecialType.System_Int64] =
-                (true, 64, long.MinValue, long.MaxValue)
+            [SpecialType.System_SByte] = typeof(sbyte),
+            [SpecialType.System_Byte] = typeof(byte),
+            [SpecialType.System_Int16] = typeof(short),
+            [SpecialType.System_UInt16] = typeof(ushort),
+            [SpecialType.System_Char] = typeof(char),
+            [SpecialType.System_Int32] = typeof(int),
+            [SpecialType.System_UInt32] = typeof(uint),
+            [SpecialType.System_Int64] = typeof(long)
         };
 
     [Test]
@@ -40,7 +30,7 @@ public sealed class CSharpScalarSemanticsTests
             Is.Unique);
         foreach (var type in Enum.GetValues<SpecialType>())
         {
-            var expected = Expected.TryGetValue(type, out var values);
+            var expected = ExpectedIntegerTypes.TryGetValue(type, out var expectedType);
             var actual = CSharpScalarSemantics.TryGetInteger(
                 type,
                 out var semantics);
@@ -54,6 +44,7 @@ public sealed class CSharpScalarSemanticsTests
                 continue;
             }
 
+            var expectedSemantics = GetExpectedSemantics(expectedType!);
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(
@@ -62,23 +53,23 @@ public sealed class CSharpScalarSemanticsTests
                     type.ToString());
                 Assert.That(
                     semantics.IsSigned,
-                    Is.EqualTo(values.IsSigned),
+                    Is.EqualTo(expectedSemantics.IsSigned),
                     type.ToString());
                 Assert.That(
                     semantics.BitWidth,
-                    Is.EqualTo(values.BitWidth),
+                    Is.EqualTo(expectedSemantics.BitWidth),
                     type.ToString());
                 Assert.That(
                     semantics.Minimum,
-                    Is.EqualTo(values.Minimum),
+                    Is.EqualTo(expectedSemantics.Minimum),
                     type.ToString());
                 Assert.That(
                     semantics.Maximum,
-                    Is.EqualTo(values.Maximum),
+                    Is.EqualTo(expectedSemantics.Maximum),
                     type.ToString());
                 Assert.That(
                     semantics.SupportsExactIrArithmetic,
-                    Is.EqualTo(type == SpecialType.System_Int64),
+                    Is.EqualTo(expectedType == typeof(long)),
                     type.ToString());
             }
         }
@@ -96,7 +87,7 @@ public sealed class CSharpScalarSemanticsTests
         var factory = new IrFactory();
         var lowerer = new RoslynOperationLowerer(factory);
 
-        foreach (var type in Expected.Keys)
+        foreach (var type in ExpectedIntegerTypes.Keys)
         {
             Assert.That(
                 lowerer.GetTypeId(compilation.GetSpecialType(type)),
@@ -115,5 +106,24 @@ public sealed class CSharpScalarSemanticsTests
                 Is.Not.EqualTo(factory.IntegerType),
                 type.ToString());
         }
+    }
+
+    private static (bool IsSigned, int BitWidth, long Minimum, long Maximum)
+        GetExpectedSemantics(Type type)
+    {
+        var typeCode = Type.GetTypeCode(type);
+        var bitWidth = typeCode switch
+        {
+            TypeCode.SByte or TypeCode.Byte => 8,
+            TypeCode.Int16 or TypeCode.UInt16 or TypeCode.Char => 16,
+            TypeCode.Int32 or TypeCode.UInt32 => 32,
+            TypeCode.Int64 => 64,
+            _ => throw new ArgumentException("Expected an integer primitive.", nameof(type))
+        };
+        return (
+            typeCode is TypeCode.SByte or TypeCode.Int16 or TypeCode.Int32 or TypeCode.Int64,
+            bitWidth,
+            Convert.ToInt64(type.GetField("MinValue")!.GetValue(null)),
+            Convert.ToInt64(type.GetField("MaxValue")!.GetValue(null)));
     }
 }
