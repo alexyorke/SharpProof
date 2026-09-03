@@ -16098,6 +16098,11 @@ EnsureValueShape repeatedly calls EndsWith, StartsWith, and Substring on the sam
 |---|---|---|
 | R1338 | **`EnsureValueShape` reparses generated type-descriptor strings at every JSON node. Cache structured shape descriptors for nullability, collections, primitives, objects, and enums so recursive validation reuses metadata instead of creating repeated substrings.** | `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:87-146`; generated descriptor vocabulary at `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:463-650` |
 
+### Status (continued)
+
+R1338 is applied: generated JSON type descriptors are normalized into a lazy
+shared cache before recursive validation. Protocol JSON tests pass (108 passed).
+
 ## Second survey, continued: R1339 - one analyzer regression test repeats the same switch-arm fixture
 
 UnflowedCallDiscoverySkipsNonexecutedOperations launches five separate analyzer compilations for switch-arm cases. Each raw source repeats the same Guard.Positive contract method, the same Base(int) declaration, and the same primary-constructor Derived wrapper; only the governing switch expression and which arm contains Guard.Positive(-1) vary. A local source factory or parameterized case table can retain one compilation per syntax shape and its independent expected result while removing the repeated fixture preamble and reducing drift across the five cases.
