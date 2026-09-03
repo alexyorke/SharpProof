@@ -14461,6 +14461,12 @@ return the existing reachable set alongside it) for the omission test.
 |---|---|---|
 | R1204 | **`RoslynProgramLowerer.LoweringSession` performs linear selected-block membership scans.** `SelectBlocks` materializes an ordered `BasicBlock[]`, but `Lower` calls `selected.Contains(block)` while enumerating every graph block to find an omitted catch handler. Reusing the `HashSet<BasicBlock>` already built during reachability, or returning a membership set alongside the ordered array, preserves emission order and equality semantics while removing the repeated linear search. | `SharpProof.Frontend/RoslynProgramLowerer.cs:80-88,741-762` |
 
+### Status (part five hundred twenty-six)
+
+R1204 is applied: CFG selection returns both ordered blocks and its
+reachability set, so omitted-handler checks use constant-time membership. The
+Frontend test suite passes (121/121).
+
 ## Second survey, part five hundred twenty-seven: R1205 - artifact identity validation uses two scans
 
 At the start of lowered-artifact decoding, the callable artifact array must be
