@@ -40,7 +40,6 @@
     <file src="..\SharpProof.BuildTasks\bin\$configuration$\net9.0\SharpProof.BuildTasks.deps.json" target="tools\net9" />
     <file src="..\SharpProof.BuildTasks\bin\$configuration$\net9.0\SharpProof.BuildTasks.runtimeconfig.json" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.dll" target="tools\net9" />
-    <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.pdb" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.deps.json" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\SharpProof.Worker.runtimeconfig.json" target="tools\net9" />
     <file src="..\SharpProof.Worker\bin\$configuration$\net9.0\System.Collections.Immutable.dll" target="tools\net9" />
