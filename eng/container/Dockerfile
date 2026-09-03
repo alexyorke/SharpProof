@@ -65,9 +65,7 @@ RUN groupadd --gid "${USER_GID}" sharpproof \
         /home/sharpproof/.nuget/NuGet \
         /home/sharpproof/.nuget/packages \
         /home/sharpproof/.dotnet \
-        /workspace/SharpProof \
-        /workspace/artifacts \
-        /src
+        /workspace/SharpProof
 ENV SHARPPROOF_REPO_ROOT=/workspace/SharpProof
 WORKDIR /workspace/SharpProof
 USER sharpproof

@@ -33,48 +33,57 @@ $archivePath = Join-Path $resolvedDownload $archiveName
 $extractRoot = Join-Path $resolvedDownload "z3-$($z3.version)-extract"
 
 [System.IO.Directory]::CreateDirectory($resolvedDownload) | Out-Null
-if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
-    Invoke-WebRequest -Uri ([string]$z3.archiveUrl) -OutFile $archivePath
+try {
+    if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+        Invoke-WebRequest -Uri ([string]$z3.archiveUrl) -OutFile $archivePath
+    }
+
+    if (Test-Path -LiteralPath $extractRoot) {
+        Remove-Item -LiteralPath $extractRoot -Recurse -Force
+    }
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $extractRoot)
+
+    $sourceLibrary = Join-Path $extractRoot ([string]$z3.archiveLibraryPath)
+    $sourceManaged = Join-Path $extractRoot ([string]$z3.archiveManagedAssemblyPath)
+    if (-not (Test-Path -LiteralPath $sourceLibrary -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $sourceManaged -PathType Leaf)) {
+        throw 'The verified Z3 archive did not contain the catalog-owned payload paths.'
+    }
+
+    $library = Get-Item -LiteralPath $sourceLibrary
+    $managed = Get-Item -LiteralPath $sourceManaged
+    Assert-Equal ([int64]$library.Length) ([int64]$z3.libraryBytes) 'libz3.so byte length'
+    Assert-Equal ([int64]$managed.Length) ([int64]$z3.managedAssemblyBytes) 'Microsoft.Z3.dll byte length'
+
+    $payloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/linux-x64"
+    [System.IO.Directory]::CreateDirectory($payloadDirectory) | Out-Null
+    Copy-Item -LiteralPath $sourceLibrary -Destination (Join-Path $payloadDirectory 'libz3.so') -Force
+    Copy-Item -LiteralPath $sourceManaged -Destination (Join-Path $payloadDirectory 'Microsoft.Z3.dll') -Force
+
+    $manifest = [ordered]@{
+        schemaVersion = 1
+        platform = [string]$catalog.platform
+        version = [string]$z3.version
+        sourceUrl = [string]$z3.archiveUrl
+        files = @(
+            [ordered]@{
+                name = 'libz3.so'
+                bytes = [int64]$z3.libraryBytes
+            },
+            [ordered]@{
+                name = 'Microsoft.Z3.dll'
+                bytes = [int64]$z3.managedAssemblyBytes
+            }
+        )
+    }
+    $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $payloadDirectory 'payload.json') -Encoding utf8NoBOM
 }
-
-if (Test-Path -LiteralPath $extractRoot) {
-    Remove-Item -LiteralPath $extractRoot -Recurse -Force
-}
-[System.IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $extractRoot)
-
-$sourceLibrary = Join-Path $extractRoot ([string]$z3.archiveLibraryPath)
-$sourceManaged = Join-Path $extractRoot ([string]$z3.archiveManagedAssemblyPath)
-if (-not (Test-Path -LiteralPath $sourceLibrary -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $sourceManaged -PathType Leaf)) {
-    throw 'The verified Z3 archive did not contain the catalog-owned payload paths.'
-}
-
-$library = Get-Item -LiteralPath $sourceLibrary
-$managed = Get-Item -LiteralPath $sourceManaged
-Assert-Equal ([int64]$library.Length) ([int64]$z3.libraryBytes) 'libz3.so byte length'
-Assert-Equal ([int64]$managed.Length) ([int64]$z3.managedAssemblyBytes) 'Microsoft.Z3.dll byte length'
-
-$payloadDirectory = Join-Path $resolvedDestination "z3/$($z3.version)/linux-x64"
-[System.IO.Directory]::CreateDirectory($payloadDirectory) | Out-Null
-Copy-Item -LiteralPath $sourceLibrary -Destination (Join-Path $payloadDirectory 'libz3.so') -Force
-Copy-Item -LiteralPath $sourceManaged -Destination (Join-Path $payloadDirectory 'Microsoft.Z3.dll') -Force
-
-$manifest = [ordered]@{
-    schemaVersion = 1
-    platform = [string]$catalog.platform
-    version = [string]$z3.version
-    sourceUrl = [string]$z3.archiveUrl
-    files = @(
-        [ordered]@{
-            name = 'libz3.so'
-            bytes = [int64]$z3.libraryBytes
-        },
-        [ordered]@{
-            name = 'Microsoft.Z3.dll'
-            bytes = [int64]$z3.managedAssemblyBytes
+finally {
+    foreach ($temporaryPath in @($extractRoot, $archivePath)) {
+        if (Test-Path -LiteralPath $temporaryPath) {
+            Remove-Item -LiteralPath $temporaryPath -Recurse -Force
         }
-    )
+    }
 }
-$manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $payloadDirectory 'payload.json') -Encoding utf8NoBOM
 
 Write-Output $payloadDirectory
