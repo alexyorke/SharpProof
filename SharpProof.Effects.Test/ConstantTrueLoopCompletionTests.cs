@@ -19,9 +19,7 @@ public sealed class ConstantTrueLoopCompletionTests
         var (compilation, helper, caller) = CreateCase(
             helperName,
             callerName);
-        var completion = new DefiniteOperationFacts(
-            compilation,
-            CancellationToken.None);
+        var completion = EffectTestHost.CreateCompletionFacts(compilation);
         var summary = new EffectAnalysisSession(compilation)
             .Analyze(caller)
             .Summary;

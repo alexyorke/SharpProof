@@ -40,9 +40,7 @@ public sealed class ForeachElementConversionReachabilityRegressionTests
                 }
             }
             """);
-        var method = EffectTestHost.SampleMethod(compilation, "Convert");
-
-        var result = new EffectAnalysisSession(compilation).Analyze(method);
+        var result = EffectTestHost.AnalyzeSample(compilation, "Convert");
 
         using (Assert.EnterMultipleScope())
         {

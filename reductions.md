@@ -11657,6 +11657,8 @@ R1087 is already applied in the current tree: the powerset model-check fixture i
 
 R1088 is deferred: adopt `EffectTestHost` analysis and assertion helpers in completion regression tests.
 
+R1088 is applied: completion regression tests now share `EffectTestHost.CreateCompletionFacts`, and the foreach conversion fixture uses `AnalyzeSample`; the cited pattern suites retain their existing shared analysis helpers. The six affected fixtures pass (16/16).
+
 ## Second survey, part three hundred twenty: R1089 - hardcoded aggregate parameter assertions in ArgumentNullGuard boundary tests
 
 In `SharpProof.Dataflow.Test/ArgumentNullGuardBoundaryTests.cs`, `PublicAndInternalGuardsPreserveEveryParameterName` declares an array of 7 expected parameter names, manually constructs an array of 7 `Assert.Throws<ArgumentNullException>` calls, and asserts that the collected parameter names match the expected array. If any guard fails, the aggregate assertion fails on the array comparison rather than isolating the failing guard. Table-driving the test with NUnit `[TestCaseSource]` provides per-guard failure isolation and eliminates manual array aggregation.

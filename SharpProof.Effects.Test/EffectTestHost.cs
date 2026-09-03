@@ -201,6 +201,12 @@ internal static class EffectTestHost
             .Analyze(SampleMethod(compilation, methodName));
     }
 
+    internal static DefiniteOperationFacts CreateCompletionFacts(
+        Compilation compilation)
+    {
+        return new DefiniteOperationFacts(compilation, CancellationToken.None);
+    }
+
     internal static IOperation RootOperation(
         Compilation compilation,
         IMethodSymbol method)

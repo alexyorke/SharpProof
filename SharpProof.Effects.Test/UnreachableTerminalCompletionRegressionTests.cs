@@ -28,9 +28,7 @@ public sealed class UnreachableTerminalCompletionRegressionTests
             """);
         var returnValue = EffectTestHost.SampleMethod(compilation, "ReturnValue");
         var run = EffectTestHost.SampleMethod(compilation, "Run");
-        var completion = new DefiniteOperationFacts(
-            compilation,
-            CancellationToken.None);
+        var completion = EffectTestHost.CreateCompletionFacts(compilation);
         var summary = new EffectAnalysisSession(compilation)
             .Analyze(run)
             .Summary;

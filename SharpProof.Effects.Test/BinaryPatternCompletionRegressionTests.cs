@@ -31,9 +31,7 @@ public sealed class BinaryPatternCompletionRegressionTests
             }
             """);
         var method = EffectTestHost.SampleMethod(compilation, methodName);
-        var completion = new DefiniteOperationFacts(
-            compilation,
-            CancellationToken.None);
+        var completion = EffectTestHost.CreateCompletionFacts(compilation);
         var summary = EffectTestHost.AnalyzeSample(compilation, methodName).Summary;
 
         using (Assert.EnterMultipleScope())

@@ -42,7 +42,7 @@ public sealed class VirtualDispatchCompletionRegressionTests
             "Invoke");
         var caller = EffectTestHost.SampleMethod(compilation, "Run");
         var invocation = GetInvocation(compilation, caller);
-        var completion = CreateCompletionFacts(compilation);
+        var completion = EffectTestHost.CreateCompletionFacts(compilation);
 
         using (Assert.EnterMultipleScope())
         {
@@ -84,7 +84,7 @@ public sealed class VirtualDispatchCompletionRegressionTests
             "Derived",
             "Run");
         var invocation = GetInvocation(compilation, caller);
-        var completion = CreateCompletionFacts(compilation);
+        var completion = EffectTestHost.CreateCompletionFacts(compilation);
 
         using (Assert.EnterMultipleScope())
         {
@@ -104,12 +104,6 @@ public sealed class VirtualDispatchCompletionRegressionTests
     {
         return EffectTestHost.CreateCompilation(
             DivergingBaseDeclaration + Environment.NewLine + source);
-    }
-
-    private static DefiniteOperationFacts CreateCompletionFacts(
-        Compilation compilation)
-    {
-        return new DefiniteOperationFacts(compilation, CancellationToken.None);
     }
 
     private static IInvocationOperation GetInvocation(
