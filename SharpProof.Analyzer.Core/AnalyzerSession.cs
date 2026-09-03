@@ -82,7 +82,7 @@ internal sealed class AnalyzerSession
         _contractIntrinsics = CreateLazy(
             () => new ContractIntrinsicValidator(compilation));
         _contractBinder = CreateLazy(
-            () => new ContractBinder(
+            () => ContractBinder.CreateWithContractSources(
                 compilation,
                 IrFactory,
                 GetValue(_contractClauses),

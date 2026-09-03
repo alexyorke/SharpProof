@@ -25,19 +25,19 @@ public sealed class ContractBinder
     {
     }
 
-    internal ContractBinder(
+    internal static ContractBinder CreateWithContractSources(
         Compilation compilation,
         IrFactory factory,
         ContractClauseInventoryBuilder clauseInventory,
         EffectiveContractSourceResolver contractSources)
-        : this(
+    {
+        return new ContractBinder(
             compilation,
             factory,
             clauseInventory,
             ArgumentNullGuard.NotNull(
                 contractSources,
-                nameof(contractSources)))
-    {
+                nameof(contractSources)));
     }
 
     private ContractBinder(
