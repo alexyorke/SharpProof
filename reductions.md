@@ -19158,3 +19158,8 @@ R622 is applied in its safe shared portion: corpus transaction staging and
 synchronous recovery now use one durable-file stream factory, while their
 asynchronous cancellation and synchronous flush-to-disk operations remain
 distinct. `CorpusGateTests` passes (23/23).
+
+R540 is applied: `MatchesCallableProjection` now aggregates unknown claim
+reasons in one pass, preserving unsupported, infrastructure, timeout,
+cancellation, and semantic-unknown precedence while removing the repeated
+materialized scans. `ProtocolJsonTests` passes (108/108).

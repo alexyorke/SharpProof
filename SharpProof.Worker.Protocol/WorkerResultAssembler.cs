@@ -394,38 +394,51 @@ internal static class WorkerResultAssembler
                 ? WorkerCallableCoverageReason.MissingClaimResult
                 : WorkerCallableCoverageReason.InfrastructureFailure;
         }
-        else if (owned.All(static claim =>
-            claim.Outcome != WorkerClaimOutcome.Unknown))
-        {
-            expected = WorkerCallableCoverageReason.None;
-        }
         else
         {
-            var reasons = owned.Where(static claim =>
-                    claim.Outcome == WorkerClaimOutcome.Unknown)
-                .Select(static claim => claim.Reason)
-                .ToArray();
-            expected = reasons.All(static reason =>
-                    reason == WorkerClaimReason.UnsupportedCallable)
-                ? WorkerCallableCoverageReason.UnsupportedCallable
-                : reasons.All(static reason =>
-                    reason == WorkerClaimReason.UnsupportedContract)
-                    ? WorkerCallableCoverageReason.UnsupportedContract
-                    : reasons.Any(static reason =>
-                        reason is WorkerClaimReason.InfrastructureFailure or
-                            WorkerClaimReason.BackendUnavailable or
-                            WorkerClaimReason.MalformedBackendResult)
-                        ? WorkerCallableCoverageReason.InfrastructureFailure
-                        : reasons.Any(static reason =>
-                            reason == WorkerClaimReason.MethodTimeout)
-                        ? WorkerCallableCoverageReason.MethodTimeout
-                        : reasons.Any(static reason =>
-                            reason == WorkerClaimReason.ProjectTimeout)
-                            ? WorkerCallableCoverageReason.ProjectTimeout
-                            : reasons.Any(static reason =>
-                                reason == WorkerClaimReason.Canceled)
-                                ? WorkerCallableCoverageReason.Canceled
-                                : WorkerCallableCoverageReason.SemanticUnknown;
+            var hasUnknown = false;
+            var allUnsupportedCallable = true;
+            var allUnsupportedContract = true;
+            var hasInfrastructureFailure = false;
+            var hasMethodTimeout = false;
+            var hasProjectTimeout = false;
+            var hasCanceled = false;
+            foreach (var claim in owned)
+            {
+                if (claim.Outcome != WorkerClaimOutcome.Unknown)
+                {
+                    continue;
+                }
+
+                hasUnknown = true;
+                allUnsupportedCallable &=
+                    claim.Reason == WorkerClaimReason.UnsupportedCallable;
+                allUnsupportedContract &=
+                    claim.Reason == WorkerClaimReason.UnsupportedContract;
+                hasInfrastructureFailure |= claim.Reason is
+                    WorkerClaimReason.InfrastructureFailure or
+                    WorkerClaimReason.BackendUnavailable or
+                    WorkerClaimReason.MalformedBackendResult;
+                hasMethodTimeout |= claim.Reason == WorkerClaimReason.MethodTimeout;
+                hasProjectTimeout |= claim.Reason == WorkerClaimReason.ProjectTimeout;
+                hasCanceled |= claim.Reason == WorkerClaimReason.Canceled;
+            }
+
+            expected = !hasUnknown
+                ? WorkerCallableCoverageReason.None
+                : allUnsupportedCallable
+                    ? WorkerCallableCoverageReason.UnsupportedCallable
+                    : allUnsupportedContract
+                        ? WorkerCallableCoverageReason.UnsupportedContract
+                        : hasInfrastructureFailure
+                            ? WorkerCallableCoverageReason.InfrastructureFailure
+                            : hasMethodTimeout
+                                ? WorkerCallableCoverageReason.MethodTimeout
+                                : hasProjectTimeout
+                                    ? WorkerCallableCoverageReason.ProjectTimeout
+                                    : hasCanceled
+                                        ? WorkerCallableCoverageReason.Canceled
+                                        : WorkerCallableCoverageReason.SemanticUnknown;
         }
 
         var matchesExpected = callable.Coverage ==
