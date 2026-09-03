@@ -20226,3 +20226,70 @@ R1860 is `pending` and is one assertion. It is filed at a higher priority than i
 size suggests because the setting it protects is the precondition for a
 trusted-computing-base component running at all, and because the repository's
 existing gates cover strictly less consequential configuration by reflection.
+
+## Second survey, part six hundred twenty-two: R1880 - seventeen trusted-mutation entries pin source text that no longer exists, and the preflight that compares them runs only after merge
+
+R1840 established that the mutation catalog pins exact source text and that the
+lane which checks it never runs on a pull request. This part asks the obvious next
+question - are any of the pins already stale - and reproduces the repository's own
+comparison to answer it.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1880 | **Thirty-two of the 248 trusted-mutation entries name source text that is absent from the file they target at HEAD, so the preflight those entries feed rejects the catalog on every run of `tooling mutation`.** The check is `Get-MutationTargetIssue` at `Test-SharpProofTrustedMutations.ps1:69-89`: `Content.IndexOf(Needle, StringComparison.Ordinal)`, returning *"target text was not found"* at `-1` and *"target text is not unique"* if a second occurrence follows. `:2221-2257` runs it over **every** entry - the loop is unconditional, it reads each target with `Get-Content -Raw`, and the only earlier gate is `:2211-2216` comparing the catalog size to `mutationEvidence.expectedCatalogCount`, which is 248 and passes. Reproducing that comparison exactly against `git show HEAD:<file>` for the **170** entries whose `Original` is a single-line literal - the remaining 78 use here-strings or escaped double-quoted forms and were not checked - finds 17 absent among those; completing the parse to cover PowerShell here-strings and backtick-escaped double-quoted literals brings the total to **all 248 entries parsed - 170 single-line, 65 double-quoted, 13 here-strings - of which 216 match exactly once, 0 are non-unique, and 32 are absent**. Five were verified independently, by closest-line comparison rather than by the same parser: `nightly-fuzz-command-connected` pins `docker compose run --rm tooling fuzz-nightly` in `.github/workflows/nightly.yml`, which now runs `tooling nightly` because the fuzz campaign moved inside that pipeline command at `Invoke-SharpProofContainer.ps1:139`; `analyzer-rejects-retired-mode` pins `return (options.TryGetValue("sharpproof_mode", out value!) ||` in `AnalyzerConfiguration.cs`, which now looks options up through a `key` parameter; `smt-strict-less-than` pins `_context.MkLt(Integer(left), Integer(right))), defined)` in `IrSmtBackend.cs`, where the operands were renamed to `leftInteger, rightInteger`; `cache-read-lock-coordination` pins the adjacent pair `cacheLock = AcquireLock(_directory);` and `ValidatePath(path);` in `VerificationCache.cs`, where the first line still exists at `:50` and `:186` but no longer immediately precedes the second; and `standalone-build-stage-nonroot-contract` pins `COPY --chown=sharpproof:sharpproof . .` followed by `USER sharpproof` in `eng/container/Dockerfile`, where `USER sharpproof` survives at `:71` without that preceding `COPY`. Each is a refactor that left the catalog behind, and the last two are the ones worth naming twice: one proves a cache lock is taken before a path is validated, the other proves the container build stage drops to a non-root user. **The seventeen single-line cases**: `smt-strict-less-than`, `advisory-contract-candidate-detection`, `contract-api-duplicate-json-rejection`, `advisory-lazy-state-creation`, `effect-replay-allocation-constraint`, `worker-parent-death-boundary`, `release-configuration-empty-expected-set`, `closure-retains-each-component-path-once`, `launcher-checks-launcher-runtime-paths`, `verifier-supervisor-reports-incomplete-cleanup`, `runtime-closure-validates-before-invalidation`, `nightly-fuzz-command-connected`, `contract-constructed-function-pointer-preserves-ref-modifiers`, `analyzer-rejects-retired-mode`, `package-rejects-retired-mode`, `relational-source-call-admission`, `container-archive-source-materialization`. **The fifteen further cases the completed parse adds**: `portable-codec-unused-slot-fails-closed`, `lowering-global-constant-bypass`, `external-contract-closed-precondition-boundary`, `effect-direct-witness-prebody-completion`, `effect-system-object-approved-identity`, `effect-collector-subset-admission`, `contract-api-exported-attribute-parity`, `cache-read-lock-coordination`, `cache-write-lock-coordination`, `launcher-checks-discovered-runtime-paths`, `verifier-supervisor-requires-subreaper`, `relational-summary-instantiation-binding`, `publication-complete-topology-preflight`, `build-task-active-symmetric-topology`, `standalone-build-stage-nonroot-contract`. **Why it was not noticed is R1840's mechanism.** `mutation` runs in exactly two places - the `nightly` pipeline at `Invoke-SharpProofContainer.ps1:136` and the `release-qualification` job at `package-consumers.yml:194`, whose condition at `:124-127` requires a `refs/tags/v` push - so no pull request executes the preflight, and the seventeen refactors that broke these pins each merged green. **What is lost is not the preflight but the mutations.** Each of the seventeen names a soundness property a test is supposed to discriminate - the SMT strict-less-than encoding, the retired analyzer mode rejection, the launcher runtime-path check, the verifier supervisor's incomplete-cleanup report, the container archive materialization branch. Until the pins are refreshed none of those thirty-two mutants can be applied, so the discriminating power the catalog exists to prove is unverified for all of them. | `scripts/Test-SharpProofTrustedMutations.ps1:69-89,2211-2257` and the seventeen entries; `eng/acceptance/contract.json` `mutationEvidence.expectedCatalogCount = 248`; `scripts/Invoke-SharpProofTrustedMutationsParallel.ps1:249-255,316-322` (both invocations reach the same preflight); `scripts/Invoke-SharpProofContainer.ps1:136,478-491`; `.github/workflows/package-consumers.yml:122-127,194`; `.github/workflows/nightly.yml:28`; related R1840, R748, R757 |
+
+### Method and its limits
+
+- The comparison is the repository's own: ordinal `IndexOf` of the entry's
+  `Original` in the raw content of its `File`, run against `git show HEAD:<path>`
+  so that the concurrent applied-reduction pass's uncommitted edits cannot affect
+  the result.
+- **All 248 entries were checked.** An initial pass covered only the 170
+  single-line literals; completing it required handling PowerShell here-strings,
+  whose terminator here is `'@).Trim()` rather than a bare `'@`, and
+  backtick-escaped double-quoted literals. With those handled the parse yields
+  exactly 248 entries - matching `expectedCatalogCount` - of which **216 match
+  exactly once and 32 are absent**. That 216 match is itself evidence the parse is
+  faithful: a broken unescaper would mismatch far more than 13 percent.
+- **Zero entries have non-unique text**, so the catalog's other failure mode -
+  a needle matching twice, which `Get-MutationTargetIssue` also rejects - does not
+  occur among the 170.
+- This survey cannot execute the container, so what is established is that the
+  preflight's own comparison fails for seventeen entries at HEAD. That the
+  `mutation` command therefore throws is a consequence of the code read at
+  `:2253-2257`, not an observed run.
+
+### Checked and not proposed (part six hundred twenty-two)
+
+- **Five pairs of entries share an identical `File` and `Original`**, which is
+  normal mutation testing rather than a defect: two mutants of one expression, each
+  replacing the same text differently. They are in
+  `ContractApiMetadata.generated.cs`, `CompilerLoweredArtifact.cs`,
+  `ProtocolJson.cs`, `SharpProof.SymbolPackageValidator.cs` and
+  `SharpProof.PublicationDestination.ps1`. All 248 entry **names** are distinct.
+- **Every `File` path in the catalog resolves**, and part six hundred nineteen
+  established that all 108 distinct target files are cited in this ledger. The
+  staleness is in the pinned text, not in the target selection.
+- **The preflight cannot be skipped or narrowed.** The parallel runner invokes
+  `Test-SharpProofTrustedMutations.ps1` twice - once with `-BaselineOnly` and once
+  per shard with `-MutationShardIndex` - and in both cases the preflight loop at
+  `:2221` runs over the full `$mutations` array before any shard filtering, because
+  the `expectedCatalogCount` assertion immediately above it requires that array to
+  hold all 248.
+
+### Status (part six hundred twenty-two)
+
+R1880 is `pending` and is the most consequential item this survey has filed: it is
+not a missing check but a check that is currently failing, and thirty-two soundness
+mutants that cannot run until their pins are refreshed - among them the two that
+prove a cache lock precedes path validation and that the container build stage runs
+as a non-root user. It should be applied with
+R1840, whose remedy - making the pins resilient, or running the preflight where a
+pull request can see it - is what prevents the eighteenth.
+
+### Applied reduction follow-up
+
+R1721 is applied: list-pattern member selection now lives in one
+`SwitchExpressionFacts` helper shared by analyzer call-site discovery and the
+three Effects consumers. `RequiresCallSiteDiscoveryTests` pass (44/44) and the
+focused Effects list-pattern tests pass (4/4).

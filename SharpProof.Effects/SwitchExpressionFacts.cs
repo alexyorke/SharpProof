@@ -44,6 +44,17 @@ internal static class SwitchExpressionFacts
         };
     }
 
+    internal static IMethodSymbol? GetCallableListPatternMember(
+        IListPatternOperation pattern,
+        IPatternOperation item)
+    {
+        return item is ISlicePatternOperation slice
+            ? slice.Pattern == null
+                ? null
+                : GetCallableListPatternMember(slice.SliceSymbol)
+            : GetCallableListPatternMember(pattern.IndexerSymbol);
+    }
+
     internal static bool IsCompilerIntrinsicListPatternMember(
         Compilation compilation,
         IListPatternOperation pattern,

@@ -462,13 +462,9 @@ internal sealed class OperationCompletionEvaluator
 
         foreach (var item in pattern.Patterns)
         {
-            var member = item is ISlicePatternOperation slice
-                ? slice.Pattern == null
-                    ? null
-                    : SwitchExpressionFacts.GetCallableListPatternMember(
-                        slice.SliceSymbol)
-                : SwitchExpressionFacts.GetCallableListPatternMember(
-                    pattern.IndexerSymbol);
+            var member = SwitchExpressionFacts.GetCallableListPatternMember(
+                pattern,
+                item);
             if (member != null)
             {
                 methods.Add(member);

@@ -1101,13 +1101,9 @@ internal sealed partial class OperationEffectScanner
             var nestedPattern = item is ISlicePatternOperation slice
                 ? slice.Pattern
                 : item;
-            var member = item is ISlicePatternOperation sliceMember
-                ? sliceMember.Pattern == null
-                    ? null
-                    : SwitchExpressionFacts.GetCallableListPatternMember(
-                        sliceMember.SliceSymbol)
-                : SwitchExpressionFacts.GetCallableListPatternMember(
-                    pattern.IndexerSymbol);
+            var member = SwitchExpressionFacts.GetCallableListPatternMember(
+                pattern,
+                item);
             if (member != null &&
                 (!TryScanReachableListPatternMember(
                         pattern,

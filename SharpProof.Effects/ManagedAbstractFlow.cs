@@ -2591,13 +2591,9 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
         foreach (var item in pattern.Patterns)
         {
-            var method = item is ISlicePatternOperation slice
-                ? slice.Pattern == null
-                    ? null
-                    : SwitchExpressionFacts.GetCallableListPatternMember(
-                        slice.SliceSymbol)
-                : SwitchExpressionFacts.GetCallableListPatternMember(
-                    pattern.IndexerSymbol);
+            var method = SwitchExpressionFacts.GetCallableListPatternMember(
+                pattern,
+                item);
             if (method != null && !MethodCanCompleteNormally(method))
             {
                 return false;
