@@ -10406,3 +10406,15 @@ The IR kernel tests independently construct the same left-associated integer-add
 ### Status (part two hundred twenty-seven)
 
 R996 is deferred: the duplicated fixture is small and readable, so centralize it only if more depth-boundary tests are added or the chain shape changes.
+
+## Second survey, part two hundred twenty-eight: R997 - coincident unrelated workflow schedules
+
+Two independent scheduled workflows use the exact same cron expression. `nightly.yml` runs the repository's container soundness profile and uploads evidence, while `stale-issues.yml` mutates issue state through the stale-issue action; both are scheduled for `17 8 * * *` and neither declares a cross-workflow concurrency group. The overlap is not functional duplication and the workflows should remain separate, but it couples a resource-heavy build/soundness run to issue-maintenance traffic at one predictable burst. Staggering one schedule, or documenting the deliberate coincidence, would remove an accidental operational dependency without changing either workflow's job logic. This is distinct from R497's repeated container-image builds and R980's generated-file gate placement.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R997 | **Nightly soundness and stale-issue maintenance are scheduled for the same minute without a stated reason.** `.github/workflows/nightly.yml` and `.github/workflows/stale-issues.yml` both use `17 8 * * *`, but one starts a four-CPU Docker soundness run and artifact upload while the other writes issue labels/comments through `actions/stale`; no shared concurrency policy or comment explains the collision. A staggered cron (or explicit rationale) can reduce predictable workflow bursts while preserving the two independent workflows. | `.github/workflows/nightly.yml:4-5,12-13,27-36`; `.github/workflows/stale-issues.yml:3-4,6-16`; distinct security schedule `.github/workflows/security.yml:8-9` |
+
+### Status (part two hundred twenty-eight)
+
+R997 is deferred: the collision is operational rather than semantic, and the scheduling change should be made only if hosted-runner or issue-action bursts are observed to matter.
