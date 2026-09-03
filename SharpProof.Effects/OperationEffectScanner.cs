@@ -304,16 +304,19 @@ internal sealed partial class OperationEffectScanner
         };
     }
 
-    private EffectSummary ScanField(IFieldReferenceOperation field, EffectAccess access)
+    private EffectSummary ScanField(
+        IFieldReferenceOperation field,
+        EffectAccess access,
+        EffectStep? evaluatedLocation = null)
     {
         if (field.Field.IsConst)
         {
             return EffectSummary.Empty;
         }
 
-        var instance = field.Instance == null
+        var instance = evaluatedLocation ?? (field.Instance == null
             ? EffectStep.Empty
-            : ScanStep(field.Instance);
+            : ScanStep(field.Instance));
         if (!instance.CompletesNormally)
         {
             return instance.Summary;
@@ -350,18 +353,19 @@ internal sealed partial class OperationEffectScanner
         IPropertyReferenceOperation property,
         EffectAccess access,
         IOperation? assignedValue = null,
-        EffectRegionSet? assignedValueRegion = null)
+        EffectRegionSet? assignedValueRegion = null,
+        EffectStep? evaluatedLocation = null)
     {
         if (PrimaryConstructorParameterOwnership
             .IsPositionalRecordProperty(property.Property))
         {
-            return ScanIntrinsicProperty(property, access);
+            return ScanIntrinsicProperty(property, access, evaluatedLocation);
         }
 
         if (access == EffectAccess.Read &&
             IsIntrinsicArrayCardinalityProperty(property))
         {
-            return ScanIntrinsicProperty(property, access);
+            return ScanIntrinsicProperty(property, access, evaluatedLocation);
         }
 
         var accessor = access == EffectAccess.Read
@@ -412,16 +416,18 @@ internal sealed partial class OperationEffectScanner
             arguments,
             actualArguments,
             PropertyDispatchFacts.IsUncertain(property, accessor),
-            property);
+            property,
+            evaluatedLocation: evaluatedLocation);
     }
 
     private EffectSummary ScanIntrinsicProperty(
         IPropertyReferenceOperation property,
-        EffectAccess access)
+        EffectAccess access,
+        EffectStep? evaluatedLocation = null)
     {
-        var instance = property.Instance == null
+        var instance = evaluatedLocation ?? (property.Instance == null
             ? EffectStep.Empty
-            : ScanStep(property.Instance);
+            : ScanStep(property.Instance));
         if (!instance.CompletesNormally)
         {
             return instance.Summary;
@@ -474,16 +480,12 @@ internal sealed partial class OperationEffectScanner
     private EffectSummary ScanArrayElement(
         IArrayElementReferenceOperation element,
         EffectAccess access,
-        IOperation? assignedValue = null)
+        IOperation? assignedValue = null,
+        EffectStep? evaluatedLocation = null)
     {
-        var array = ScanStep(element.ArrayReference);
-        if (!array.CompletesNormally)
-        {
-            return array.Summary;
-        }
-
-        var indices = ScanSequence(element.Indices);
-        var evaluation = array.Then(indices);
+        var evaluation = evaluatedLocation ??
+            ScanStep(element.ArrayReference).Then(
+                ScanSequence(element.Indices));
         if (!evaluation.CompletesNormally)
         {
             return evaluation.Summary;
@@ -643,7 +645,8 @@ internal sealed partial class OperationEffectScanner
         ImmutableArray<IOperation?> actualArguments,
         bool dispatchUncertain,
         IOperation origin,
-        EffectRegionSet? receiver = null)
+        EffectRegionSet? receiver = null,
+        EffectStep? evaluatedLocation = null)
     {
         return ScanCallStep(
             method,
@@ -653,7 +656,8 @@ internal sealed partial class OperationEffectScanner
             actualArguments,
             dispatchUncertain,
             origin,
-            receiver).Summary;
+            receiver,
+            evaluatedLocation).Summary;
     }
 
     private EffectStep ScanCallStep(
@@ -664,10 +668,11 @@ internal sealed partial class OperationEffectScanner
         ImmutableArray<IOperation?> actualArguments,
         bool dispatchUncertain,
         IOperation origin,
-        EffectRegionSet? receiver = null)
+        EffectRegionSet? receiver = null,
+        EffectStep? evaluatedLocation = null)
     {
-        var result = EffectStep.Empty;
-        if (instance != null)
+        var result = evaluatedLocation ?? EffectStep.Empty;
+        if (evaluatedLocation == null && instance != null)
         {
             result = result.Then(ScanStep(instance));
             if (!result.CompletesNormally)
@@ -676,12 +681,15 @@ internal sealed partial class OperationEffectScanner
             }
         }
 
-        foreach (var argument in arguments)
+        if (evaluatedLocation == null)
         {
-            result = result.Then(ScanStep(argument.Value));
-            if (!result.CompletesNormally)
+            foreach (var argument in arguments)
             {
-                return result;
+                result = result.Then(ScanStep(argument.Value));
+                if (!result.CompletesNormally)
+                {
+                    return result;
+                }
             }
         }
 

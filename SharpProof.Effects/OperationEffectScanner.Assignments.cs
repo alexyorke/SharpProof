@@ -5,27 +5,34 @@ internal sealed partial class OperationEffectScanner
     private EffectSummary ScanWriteTarget(
         IOperation target,
         IOperation value,
-        bool valueIsStoredDirectly = true)
+        bool valueIsStoredDirectly = true,
+        EffectStep? evaluatedLocation = null)
     {
         target = _coalesceCaptures.Resolve(target);
         return target switch
         {
-            IFieldReferenceOperation field => ScanField(field, EffectAccess.Write),
+            IFieldReferenceOperation field => ScanField(
+                field,
+                EffectAccess.Write,
+                evaluatedLocation),
             IArrayElementReferenceOperation element =>
                 ScanArrayElement(
                     element,
                     EffectAccess.Write,
-                    valueIsStoredDirectly ? value : null),
+                    valueIsStoredDirectly ? value : null,
+                    evaluatedLocation),
             IPropertyReferenceOperation property =>
                 valueIsStoredDirectly
                     ? ScanProperty(
                         property,
                         EffectAccess.Write,
-                        assignedValue: value)
+                        assignedValue: value,
+                        evaluatedLocation: evaluatedLocation)
                     : ScanProperty(
                         property,
                         EffectAccess.Write,
-                        assignedValueRegion: EffectRegionSet.Unknown),
+                        assignedValueRegion: EffectRegionSet.Unknown,
+                        evaluatedLocation: evaluatedLocation),
             IParameterReferenceOperation parameter
                 when parameter.Parameter.RefKind is RefKind.Ref or RefKind.Out ||
                      PrimaryConstructorParameterOwnership.IsReceiverBacked(
@@ -49,7 +56,8 @@ internal sealed partial class OperationEffectScanner
     private EffectSummary ScanSimpleAssignment(
         ISimpleAssignmentOperation assignment)
     {
-        var result = ScanWriteTargetEvaluation(assignment.Target);
+        var evaluatedLocation = ScanWriteTargetEvaluation(assignment.Target);
+        var result = evaluatedLocation;
         if (!result.CompletesNormally)
         {
             return result.Summary;
@@ -64,7 +72,10 @@ internal sealed partial class OperationEffectScanner
             }
             ? result.Summary
             : result.Then(new EffectStep(
-                ScanWriteTarget(assignment.Target, assignment.Value),
+                ScanWriteTarget(
+                    assignment.Target,
+                    assignment.Value,
+                    evaluatedLocation: evaluatedLocation),
                 true)).Summary;
     }
 
