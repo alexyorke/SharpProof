@@ -340,6 +340,7 @@ the smallest relevant containerized test target passes.
 | R919 | Aggregate compiler-probe parse-option sets in one pass | `SharpProof.Package.Test`: CompilerProbe filter, 6 passed |
 | R936 | Avoid the intermediate runtime-component path array | `SharpProof.Worker.Test`: WorkerBinaryIdentityTests, 8 passed |
 | R934 | Compute effect-violation facts only for the selected contract rule | `SharpProof.Worker.Test`: 695 passed |
+| R949 | Share the native `prctl` binding and control constants across Host and BuildTasks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -8811,3 +8812,79 @@ build-file changes were made during this audit.
 
 R948 is `deferred`: this is a ledger-only observation, and no implementation or
 build-file changes were made during this audit.
+
+## Second survey, part one hundred thirteen: R949-R950 - native interop, and what one analyzer rule costs
+
+Two techniques not previously applied: duplicated production string literals of 25
+characters or more, and a census of every diagnostic suppression by rule.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R949 | **The `prctl` P/Invoke is declared twice across an assembly boundary that is already open and already in daily use.** `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:499-507` and `SharpProof.Host/LinuxWorkerProcess.cs:338-346` each declare a `private static partial class NativeMethods` containing a byte-identical `ControlProcess` declaration - same `[LibraryImport("libc", EntryPoint = "prctl", SetLastError = true)]`, same `[DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]`, same five-`nuint` signature, same parameter names. This is not a case where the seam needs opening: `SharpProof.BuildTasks.csproj:16` has a `ProjectReference` to `SharpProof.Host`, `SharpProof.Host.csproj:15` grants it `InternalsVisibleTo`, and **`SharpProof.BuildTasks` already consumes `LinuxProcessControlConstants` from `SharpProof.Host` at 20 call sites** - 13 in `VerifierProcessSupervisor.cs` and 7 in `RunVerifier.cs`. Two things were left outside that shared class. First, the prctl **option** numbers are split by accident of location: `ParentDeathSignal = 1` is in the shared `LinuxProcessControlConstants` (`LinuxWorkerProcess.cs:358-367`, eight constants), while `ChildSubreaper = 36` and `SetDumpable = 4` - the same category of value - are private at `VerifierProcessSupervisor.cs:10-11`. Second, the **arguments** are named on one side and bare on the other: `LinuxWorkerProcess.cs:118-123` passes `LinuxProcessControlConstants.SignalKill`, while `VerifierProcessSupervisor.cs:22-27,31-36` passes literal `1` and `0`. This is TCB native interop in the shipping path, and two declarations of one libc entry point are exactly the pair that diverges quietly - one side gaining a marshalling attribute, or losing `SetLastError`, with no compiler complaint. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:10-11,22-36,499-507`; `SharpProof.Host/LinuxWorkerProcess.cs:118-123,338-346,358-367`; `SharpProof.BuildTasks/SharpProof.BuildTasks.csproj:16`; `SharpProof.Host/SharpProof.Host.csproj:15`; `SharpProof.BuildTasks/RunVerifier.cs:1031-1106` |
+| R950 | **One disabled-by-default analyzer rule accounts for seven accommodations across six files, and two of them changed the shape of production code.** `Directory.Build.props:20` sets `AnalysisLevel=latest-all` with the comment *"Run every built-in .NET analyzer rule, including rules disabled by default."* CA1508 (*Avoid dead conditional code*) is one of those rules, and it appears in **no** configuration file - not `.editorconfig`, not `.globalconfig`, not `Directory.Build.props` - so it is live solely by that policy. What it costs, measured: **five `SuppressMessage` attributes** across four files, whose justifications describe what should be one false positive in **three different wordings** - *"misreads the multi-branch nullable assignment above the null check as unreachable"* appears **verbatim three times** (`RequiresCallSiteDiscovery.cs:1569-1573`, `OperationCompletionEvaluator.cs:454-458` and again at `:526-530`), alongside *"does not track the nullable expression assignment across the two declaration forms"* and *"does not track the nullable expression selected from the declaration syntax"*. **And two structural accommodations**, which are the substantive half: `ContractCanonicalization.cs:17-19` keeps recursive specialization *"in an object instead of captured local functions"* because *"CA1508 otherwise builds a pathological dataflow graph for this code during every qualifying compilation"*, and `ExceptionHandlerReachability.cs:1195-1197` keeps a large control-flow dispatcher *"out of the captured traversal closure"* because *"CA1508 otherwise constructs an expensive interprocedural flow graph for the local function during every qualifying build"*. Two production classes in two assemblies are shaped by one analyzer's cost model rather than by their domain, and the reason survives only in a comment. That is accidental complexity in the strict sense. Scoping CA1508 - `dotnet_diagnostic.CA1508.severity = none` in `.globalconfig`, or per-file in `.editorconfig` beside the eleven suppressions already there - would remove five attributes and free two files to be shaped by what they do. The trade is real and should be stated when it is made: CA1508 is off by default upstream because of exactly this false-positive rate, but turning it off forfeits whatever true positives it finds in a codebase whose entire subject is dead-branch analysis. | `Directory.Build.props:18-20`; `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1569-1573`; `SharpProof.Effects/OperationCompletionEvaluator.cs:454-458,526-530`; `SharpProof.Effects/ConditionalTruthOperatorFacts.cs:39-43`; `SharpProof.Effects/ManagedAbstractFlow.cs:2188-2192`; `SharpProof.Contracts/ContractCanonicalization.cs:17-19`; `SharpProof.Effects/ExceptionHandlerReachability.cs:1195-1197` |
+
+### Checked and not proposed (part one hundred thirteen)
+
+- **Two other duplicated suppression justifications are correct as written and
+  should stay.** `"Checked-in corpus manifests publish SHA-256 values in lowercase
+  hexadecimal."` accompanies CA1308 at four sites in
+  `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:63,72,330` and
+  `OpenSourceCorpusImporter.cs:82`; `"MSBuild task item parameters use ITaskItem
+  arrays."` accompanies CA1819 at `InvalidatePublishedResult.cs:42` and
+  `RunVerifier.cs:65`. Both are per-member attributes that must sit on the member
+  they excuse - C# offers no way to share the text - and both justify a genuine,
+  stable reason rather than a tool defect. Unlike R950 they cost nothing beyond
+  their own lines.
+- **The single-implementer interface angle is exhausted and was already checked.**
+  A scan of the seven production interfaces found two with at most one
+  implementation, `ICompilerAdditionalTextSnapshot` and
+  `IWorkerResponseEvidenceAuthority` - and both are already recorded in this
+  ledger's earlier "checked and not proposed" material, the first as implemented by
+  a test double and the second as a deliberate dependency inversion out of
+  `Worker.Protocol`. No new item; noted so a third pass does not re-derive it.
+- The duplicated literals in `*.generated.cs` files - the descriptor
+  `defaultSeverity`/`isEnabledByDefault`/`description` block shared by
+  `GeneratedDiagnosticDescriptors.generated.cs` and
+  `MetaDiagnosticDescriptors.generated.cs`, 14 sites - are **generator output from
+  one shared emitter**, not hand-copied text. Correctly excluded.
+
+### Status (part one hundred thirteen)
+
+R949 is `applied`: the Host-owned `LinuxPrctl` binding and shared control
+constants now serve both the Linux host and BuildTasks supervisor, preserving
+the waitpid/kill bindings and all containment arguments. R950 remains `pending`
+as a policy question rather than a code change.
+
+## Second survey, part one hundred seventy-two: R951 - the project reference graph
+
+A full transitive analysis of all 60 project files, correcting for the one thing
+that makes a naive version of this measurement wrong.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R951 | **The repository is split almost exactly in half between two opposite conventions for declaring project references, and nothing records which is intended.** Of 39 projects holding at least one compile-visible `ProjectReference`, **19 declare only what is not already reachable transitively** and **20 additionally declare references that another of their own direct references already provides**. Across 118 direct compile references, **42 - 36 percent - are transitively redundant**: removing them changes nothing about what compiles, because SDK-style `ProjectReference` flows to consumers. The concentration is uneven in a way that looks like drift rather than policy: `SharpProof.Worker.Test` has 8 of 13 redundant, `SharpProof.CompilerCollector` 6 of 9, `SharpProof.Worker` 4 of 8, `SharpProof.Analyzer.Core` 3 of 5, while nineteen projects have none. **The naive form of this measurement is wrong and the correction matters**: a first pass that treated every `ProjectReference` as flowing reported 68 redundancies. Twenty-six of those were false, because references carrying `ReferenceOutputAssembly="false"` - the analyzer-injection form this repository uses for `SharpProof.Meta.Analyzers` at fourteen sites - do **not** propagate to consumers, so a direct reference to `Meta.Analyzers` is never redundant with an indirect one. The figure of 42 excludes them. **Neither convention is wrong, and this is not a proposal to delete 42 lines.** Explicit references document real usage and survive an intermediate project dropping a dependency; minimal ones keep the graph small and honest. The repository has in fact already taken the explicit position in one place - `BoundaryEnforcementTests.ThinAnalyzerHasOnlyCurrentFrontendDependencies:226-232` pins `SharpProof.Analyzer`'s **direct** reference set by exact equality, which only means something if direct references are deliberate. The finding is that this is pinned for exactly one project out of 39, and the other 38 are evenly divided with no stated rule, so a reviewer cannot tell whether an added redundant reference is intentional documentation or an oversight. | 60 `.csproj` files; 118 direct compile references, 42 transitively redundant; `SharpProof.Worker.Test/SharpProof.Worker.Test.csproj`; `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj`; `SharpProof.Worker/SharpProof.Worker.csproj`; `SharpProof.Analyzer.Core/SharpProof.Analyzer.Core.csproj`; `SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:226-260` |
+
+### Checked and not proposed (part one hundred seventy-two)
+
+- **The 34 projects that nothing references are all correct.** They are the 19 test
+  projects, the 13 sample and pilot fixtures, `SharpProof.Smoke.Net472`, and
+  `SharpProof.Verifier` - every one an entry point or a leaf consumer by design.
+  There is no orphaned library in the graph.
+- **The fan-in distribution shows no anomaly.** `SharpProof.Ir` is referenced by
+  21 projects, `SharpProof.Meta.Analyzers` by 18 (as an analyzer), and
+  `SharpProof.Attributes` by 12 - the three things one would expect to be
+  ubiquitous in this product: the IR vocabulary, the self-applied meta-analyzer,
+  and the public attribute surface. Nothing is referenced far more widely than its
+  role suggests, which is the shape that would indicate a god-assembly.
+- **`SharpProof.Meta.Analyzers`' 18 incoming references are not duplication.**
+  Every one is the `OutputItemType="Analyzer" ReferenceOutputAssembly="false"`
+  form, and `BoundaryEnforcementTests.EverySoundnessCriticalProjectRunsTheMetaAnalyzer:262-285`
+  requires exactly that breadth. Do not propose narrowing it.
+
+### Status (part one hundred seventy-two)
+
+R951 is `pending` and is a convention decision rather than a defect: whichever
+answer is chosen, the work is to state it once and extend the existing
+direct-reference assertion beyond the single project it currently covers. The
+measurement is recorded here mainly so that a future pass does not repeat the
+naive version of it and report 68.

@@ -115,7 +115,7 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             expectedParentProcessId,
             1);
         EnsureLinux();
-        if (NativeMethods.ControlProcess(
+        if (LinuxPrctl.ControlProcess(
                 LinuxProcessControlConstants.ParentDeathSignal,
                 LinuxProcessControlConstants.SignalKill,
                 0,
@@ -336,15 +336,6 @@ public sealed partial class LinuxWorkerProcess : IDisposable
 
     private static partial class NativeMethods
     {
-        [LibraryImport("libc", EntryPoint = "prctl", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial int ControlProcess(
-            int option,
-            nuint argument2,
-            nuint argument3,
-            nuint argument4,
-            nuint argument5);
-
         [LibraryImport("libc", EntryPoint = "getppid")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int GetParentProcessId();
@@ -355,9 +346,25 @@ public sealed partial class LinuxWorkerProcess : IDisposable
     }
 }
 
+internal static partial class LinuxPrctl
+{
+    [LibraryImport("libc", EntryPoint = "prctl", SetLastError = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+    internal static partial int ControlProcess(
+        int option,
+        nuint argument2,
+        nuint argument3,
+        nuint argument4,
+        nuint argument5);
+}
+
 internal static class LinuxProcessControlConstants
 {
     internal const int ParentDeathSignal = 1;
+    internal const int ChildSubreaper = 36;
+    internal const int SetDumpable = 4;
+    internal const int Enable = 1;
+    internal const int Disable = 0;
     internal const int PidFdOpenSystemCall = 434;
     internal const int PidFdSendSignalSystemCall = 424;
     internal const int SignalNone = 0;

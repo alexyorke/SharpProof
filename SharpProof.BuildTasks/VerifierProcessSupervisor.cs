@@ -7,8 +7,6 @@ namespace SharpProof.BuildTasks;
 
 internal static partial class VerifierProcessSupervisor
 {
-    private const int ChildSubreaper = 36;
-    private const int SetDumpable = 4;
     private const int ProcessNotFound = 3;
     private const int CleanupMilliseconds = 750;
     private const int RetryCleanupMilliseconds = 100;
@@ -19,18 +17,18 @@ internal static partial class VerifierProcessSupervisor
     {
         if (!OperatingSystem.IsLinux() ||
             RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
-            NativeMethods.ControlProcess(
-                ChildSubreaper,
-                1,
+            LinuxPrctl.ControlProcess(
+                LinuxProcessControlConstants.ChildSubreaper,
+                LinuxProcessControlConstants.Enable,
                 0,
                 0,
                 0) != 0)
         {
             return 125;
         }
-        if (NativeMethods.ControlProcess(
-                SetDumpable,
-                0,
+        if (LinuxPrctl.ControlProcess(
+                LinuxProcessControlConstants.SetDumpable,
+                LinuxProcessControlConstants.Disable,
                 0,
                 0,
                 0) != 0)
@@ -179,7 +177,7 @@ internal static partial class VerifierProcessSupervisor
         // supervisor is killed abruptly, Linux reparents the worker (and any
         // verifier it starts) to init; PDEATHSIG makes the kernel terminate
         // the whole inherited launch chain instead.
-        if (NativeMethods.ControlProcess(
+        if (LinuxPrctl.ControlProcess(
                 LinuxProcessControlConstants.ParentDeathSignal,
                 LinuxProcessControlConstants.SignalKill,
                 0,
@@ -497,15 +495,6 @@ internal static partial class VerifierProcessSupervisor
 
     private static partial class NativeMethods
     {
-        [LibraryImport("libc", EntryPoint = "prctl", SetLastError = true)]
-        [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial int ControlProcess(
-            int option,
-            nuint argument2,
-            nuint argument3,
-            nuint argument4,
-            nuint argument5);
-
         [LibraryImport("libc", EntryPoint = "waitpid", SetLastError = true)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int WaitForProcess(
