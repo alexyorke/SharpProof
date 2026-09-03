@@ -15991,6 +15991,11 @@ The exact C# duplication census notes this helper pair but leaves it without an 
 |---|---|---|
 | R1330 | **`NativeTestBootstrapTests.CountOrdinal` and `BoundaryEnforcementTests.Count` are exact copies of the same ordinal-occurrence loop. Move the loop to shared architecture-test infrastructure and keep the two callers' distinct assertion contexts.** | SharpProof.ArchitectureTest/NativeTestBootstrapTests.cs:40-53; SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:615-628 |
 
+### Status (continued)
+
+R1330 is applied: both architecture tests use a shared ordinal-occurrence
+helper. Native bootstrap and boundary enforcement tests pass (14 passed).
+
 ## Second survey, continued: R1331 - launcher contains an unreferenced marker type
 
 LauncherMarker.cs contains only an internal static class declaration and a repository-wide search finds no type reference, reflection string, project condition, or generated-file dependency for LauncherMarker. The launcher project already compiles Program, SarifProjection, generated arguments/projections, and other source files, so the sentinel does not appear to be needed to keep the project non-empty or to mark an assembly. If no external build convention consumes the file, deleting the unused type removes dead code and its maintenance surface.
