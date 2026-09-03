@@ -18812,3 +18812,11 @@ historical-record banner, making its frozen procedures clearly non-live.
 R1504 is applied: the dead-code severity comment now distinguishes warning-level
 diagnostics from the build's optional `WarningsAsErrors` promotion, removing
 the stale claim that the rules remain warnings during builds.
+
+## Second survey, continued: R1657 - `ContractSelectionInventory.ContractForMetadataName` is an orphaned metadata alias
+
+`ContractSelectionInventory` declares `ContractForMetadataName` as an internal constant equal to `ContractApiMetadata.ContractFor`, but a repository-wide search finds no caller or reflection lookup. The inventory constructor and candidate predicate use `ContractApiMetadata.ContractFor` directly, so the alias adds an unused metadata name and suggests a second source of truth. Remove it, or route a deliberate consumer through it if the alias is meant to be a stable boundary.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1657 | The unused `ContractForMetadataName` constant duplicates `ContractApiMetadata.ContractFor`; remove the dead alias or establish a real consumer. | `SharpProof.Contracts/ContractSelectionInventory.cs:16-17,25,56` |
