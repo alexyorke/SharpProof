@@ -37,10 +37,28 @@ function Resolve-RepositoryPath {
     return $relative
 }
 
+function Get-RepositoryFilePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RelativePath,
+        [Parameter(Mandatory = $true)]
+        [string]$MissingMessage
+    )
+
+    $fullPath = Join-Path $resolvedRepositoryRoot (
+        $RelativePath.Replace('/', $pathSeparator))
+    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        throw $MissingMessage
+    }
+    return $fullPath
+}
+
 function Get-CanonicalFileRecord {
     param([Parameter(Mandatory = $true)] [string]$RelativePath, [Parameter()] [bool]$Generated = $false, [Parameter()] [string]$GeneratedReason = '')
-    $fullPath = Join-Path $resolvedRepositoryRoot ($RelativePath.Replace('/', $pathSeparator))
-    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) { throw "Production inventory source file is missing: '$RelativePath'." }
+    Get-RepositoryFilePath `
+        -RelativePath $RelativePath `
+        -MissingMessage "Production inventory source file is missing: '$RelativePath'." |
+        Out-Null
     return [pscustomobject][ordered]@{ path = $RelativePath; generated = $Generated; generatedReason = $GeneratedReason }
 }
 
@@ -127,8 +145,10 @@ function Get-GeneratedManifest {
     foreach ($value in @($manifest.outputs)) {
         $item = ([string]$value).Replace('\', '/')
         if ([string]::IsNullOrWhiteSpace($item) -or [IO.Path]::IsPathRooted($item) -or $item.Contains('//') -or $item.Split('/') -contains '.' -or $item.Split('/') -contains '..' -or -not $paths.Add($item)) { throw "The approved generated-output manifest contains an invalid or duplicate path: '$item'." }
-        $full = Join-Path $resolvedRepositoryRoot ($item.Replace('/', $pathSeparator))
-        if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { throw "Approved generated output is missing: '$item'." }
+        Get-RepositoryFilePath `
+            -RelativePath $item `
+            -MissingMessage "Approved generated output is missing: '$item'." |
+            Out-Null
     }
     return [pscustomobject][ordered]@{ paths = $paths }
 }

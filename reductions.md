@@ -19189,3 +19189,10 @@ R1680 is applied: the async and iterator deferred-call fixtures now use one
 shared source builder for their `Sample`/state/Run shell, with only the
 deferred method declaration supplied per case. `DeferredCallCompletionTests`
 passes (3/3).
+
+R560 is applied in its safe shared portion: production inventory now uses one
+repository-file resolver for manifest and compile-record leaf checks, while
+manifest canonicality/uniqueness, repository containment, and each caller's
+context-specific diagnostics remain explicit. The three focused inventory
+authority tests pass (3/3); the fourth test in the broader class still hits
+the pre-existing production-complexity member limit.
