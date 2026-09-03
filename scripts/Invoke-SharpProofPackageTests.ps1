@@ -95,7 +95,8 @@ function Get-TestMethodTimings {
     )
 
     if (-not $script:SharpProofTrxTimingRowsCache.ContainsKey($ResultsRoot)) {
-        $rows = [Collections.Generic.List[object]]::new()
+        $rowsByClass = [Collections.Generic.Dictionary[string,
+            Collections.Generic.List[object]]]::new([StringComparer]::Ordinal)
         foreach ($trx in Get-ChildItem `
                 -LiteralPath $ResultsRoot -Recurse -Filter *.trx) {
             [xml]$document = Get-Content -LiteralPath $trx.FullName -Raw
@@ -122,21 +123,32 @@ function Get-TestMethodTimings {
                     continue
                 }
                 $definition = $definitions[$testId]
-                $rows.Add([pscustomobject]@{
+                $classRows = $null
+                if (-not $rowsByClass.TryGetValue(
+                        $definition.ClassName,
+                        [ref]$classRows)) {
+                    $classRows = [Collections.Generic.List[object]]::new()
+                    $rowsByClass.Add(
+                        $definition.ClassName,
+                        $classRows)
+                }
+                $classRows.Add([pscustomobject]@{
                     ClassName = $definition.ClassName
                     MethodName = $definition.MethodName
                     Duration = [string]$result.duration
                 })
             }
         }
-        $script:SharpProofTrxTimingRowsCache[$ResultsRoot] = $rows
+        $script:SharpProofTrxTimingRowsCache[$ResultsRoot] = $rowsByClass
     }
 
+    $rowsByClass = $script:SharpProofTrxTimingRowsCache[$ResultsRoot]
+    $rows = $null
+    if (-not $rowsByClass.TryGetValue($ClassName, [ref]$rows)) {
+        return @()
+    }
     $milliseconds = @{}
-    foreach ($row in @($script:SharpProofTrxTimingRowsCache[$ResultsRoot])) {
-        if ($row.ClassName -cne $ClassName) {
-            continue
-        }
+    foreach ($row in $rows) {
         $match = [regex]::Match(
             $row.MethodName,
             '^(?<name>[A-Za-z_][A-Za-z0-9_]*)')
