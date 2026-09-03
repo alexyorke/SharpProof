@@ -14833,3 +14833,11 @@ focused RequiresAndControl analyzer suite passes (92 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1232 | **`ReifiesWorkerVerificationCancellation` repeats argument and condition projection for three fields.** Its three `IsCancellationProjection` calls each search the same invocation arguments and unwrap/check the same conditional-local shape before applying different expected types and field names. A shared projection snapshot or one-pass validator can retain the distinct enum policies while removing the repeated structural work. | `SharpProof.Meta.Analyzers/CancellationBoundaryAnalyzer.cs:777-799,802-832` |
+
+## Second survey, part five hundred fifty-five: R1233 - CFG region extraction is performed twice per analysis
+
+`EffectMethodNodeBuilder.AnalyzeControlFlowGraph` creates both `exceptionalRegionOperations` and `finallyEntries` from the same control-flow graph. `CreateExceptionalRegionOperations` and `CreateFinallyEntries` each begin by walking every graph block, expanding its enclosing-region chain, deduplicating the result, and materializing a region array. Their later filters and maps are intentionally different, but the region snapshot is identical for one analysis invocation. Passing one shared region snapshot into the two builders preserves each catch/finally ordering policy while removing the repeated block-and-region traversal.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1233 | **`AnalyzeControlFlowGraph` rebuilds the same CFG region set for two maps.** The exceptional-region and finally-entry helpers independently execute `graph.Blocks.SelectMany(EnclosingRegions).Distinct().ToArray()` before applying their distinct projections. Compute that immutable region snapshot once at the caller and reuse it in both helpers to remove one full CFG region walk. | `SharpProof.Effects/EffectMethodNodeBuilder.cs:720-733,955-963,1012-1018` |
