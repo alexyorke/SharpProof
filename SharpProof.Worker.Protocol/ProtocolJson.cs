@@ -387,8 +387,8 @@ public static partial class WorkerProtocolJson
         if (expectedRequest != null)
         {
             errors.Check(response.Summary?.Budgets != null &&
-                JsonSerializer.Serialize(response.Summary.Budgets, s_options) ==
-                JsonSerializer.Serialize(expectedRequest.Budgets, s_options), "response.budgets_mismatch");
+                BudgetsEqual(response.Summary.Budgets, expectedRequest.Budgets),
+                "response.budgets_mismatch");
             ValidateCacheForRequest(response, expectedRequest, errors);
         }
 
@@ -476,6 +476,17 @@ public static partial class WorkerProtocolJson
             actual.ApiSpecVersion == expected.ApiSpecVersion &&
             actual.WorkerBinarySha256 == expected.WorkerBinarySha256 &&
             actual.ApiSpecContentSha256 == expected.ApiSpecContentSha256;
+    }
+    private static bool BudgetsEqual(
+        WorkerBudgets actual,
+        WorkerBudgets expected)
+    {
+        return actual.QueryRlimit == expected.QueryRlimit &&
+            actual.MethodRlimit == expected.MethodRlimit &&
+            actual.MethodWallTimeMilliseconds == expected.MethodWallTimeMilliseconds &&
+            actual.ProjectWallTimeMilliseconds == expected.ProjectWallTimeMilliseconds &&
+            actual.MaxParallelism == expected.MaxParallelism &&
+            actual.MaximumExpressionDepth == expected.MaximumExpressionDepth;
     }
     private static void ValidateExpectedManifest(
         WorkerClaimManifest? actual,
