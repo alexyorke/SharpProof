@@ -16808,6 +16808,10 @@ BinaryMappingsAndArithmeticCategoriesAreExhaustive and UnaryMappingsAndCheckedPo
 |---|---|---|
 | R1381 | The binary and unary catalog tests repeat the same supported-kind projection solely for two assertions; cache that projection within each test or centralize the key assertion. | SharpProof.Frontend.Test/CSharpScalarOperatorSemanticsTests.cs:45-55,229-239 |
 
+R1380 is applied: unary and binary operator metadata tests now share one generic exhaustive-harness helper while retaining their distinct metadata tables and invalid values. `IrOperatorCatalogTests` pass (5/5).
+
+R1381 is applied: binary and unary scalar semantics tests materialize supported operator kinds once per test and reuse the projection for uniqueness and coverage checks. `CSharpScalarOperatorSemanticsTests` pass (4/4).
+
 ## Second survey, continued: R1382 - ExceptionHandlerReachabilityTests duplicates the catch-reachability local helper
 
 ClosedVirtualDispatchUsesTheExactExceptionSet and OnlyAuthenticatedRuntimeRefLikeAccessorsAreNonthrowing each define the same local IsCatchReachable function: resolve a sample method, create handler reachability with the compilation/session, and query the method's catch clause with inFilter false. The fixtures intentionally exercise different dispatch and ref-like policies, but this helper is byte-equivalent and can move to a class-level test helper that accepts the compilation, session, and method name.

@@ -78,26 +78,13 @@ public sealed class IrOperatorCatalogTests
                 (1, IrTypeKind.Integer, "-")
         };
 
-        Assert.That(
+        AssertOperatorMetadata(
+            expected,
             Enum.GetValues<IrUnaryOperator>(),
-            Is.EquivalentTo(expected.Keys));
-        Assert.That(
-            expected.Keys.Select(static @operator => (int)@operator),
-            Is.Unique);
-        foreach (var row in expected)
-        {
-            Assert.That(
-                (int)row.Key,
-                Is.EqualTo(row.Value.Key),
-                $"numeric {row.Key}");
-            Assert.That(
-                IrOperatorCatalog.Get(row.Key),
-                Is.EqualTo(row.Value),
-                row.Key.ToString());
-        }
-        Assert.Throws<ArgumentOutOfRangeException>(
-            new Action(() => IrOperatorCatalog.Get(
-                (IrUnaryOperator)int.MaxValue)));
+            static @operator => (int)@operator,
+            static metadata => metadata.Key,
+            static @operator => IrOperatorCatalog.Get(@operator),
+            (IrUnaryOperator)int.MaxValue);
     }
 
     [Test]
@@ -141,25 +128,39 @@ public sealed class IrOperatorCatalogTests
                 (13, IrTypeKind.String, IrTypeKind.String, "++")
         };
 
-        Assert.That(
+        AssertOperatorMetadata(
+            expected,
             Enum.GetValues<IrBinaryOperator>(),
-            Is.EquivalentTo(expected.Keys));
-        Assert.That(
-            expected.Keys.Select(static @operator => (int)@operator),
-            Is.Unique);
+            static @operator => (int)@operator,
+            static metadata => metadata.Key,
+            static @operator => IrOperatorCatalog.Get(@operator),
+            (IrBinaryOperator)int.MaxValue);
+    }
+
+    private static void AssertOperatorMetadata<TEnum, TMetadata>(
+        IReadOnlyDictionary<TEnum, TMetadata> expected,
+        TEnum[] values,
+        Func<TEnum, int> numericValue,
+        Func<TMetadata, int> expectedNumericValue,
+        Func<TEnum, TMetadata> getMetadata,
+        TEnum invalidValue)
+        where TEnum : struct, Enum
+    {
+        Assert.That(values, Is.EquivalentTo(expected.Keys));
+        Assert.That(expected.Keys.Select(numericValue), Is.Unique);
         foreach (var row in expected)
         {
             Assert.That(
-                (int)row.Key,
-                Is.EqualTo(row.Value.Key),
+                numericValue(row.Key),
+                Is.EqualTo(expectedNumericValue(row.Value)),
                 $"numeric {row.Key}");
             Assert.That(
-                IrOperatorCatalog.Get(row.Key),
+                getMetadata(row.Key),
                 Is.EqualTo(row.Value),
                 row.Key.ToString());
         }
+
         Assert.Throws<ArgumentOutOfRangeException>(
-            new Action(() => IrOperatorCatalog.Get(
-                (IrBinaryOperator)int.MaxValue)));
+            (Action)(() => getMetadata(invalidValue)));
     }
 }

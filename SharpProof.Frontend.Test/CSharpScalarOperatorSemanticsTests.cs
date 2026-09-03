@@ -42,14 +42,11 @@ public sealed class CSharpScalarOperatorSemanticsTests
             BinaryOperatorKind.Multiply
         };
 
-        Assert.That(
-            CSharpScalarSemantics.SupportedBinaryOperators.Select(
-                static semantics => semantics.Kind),
-            Is.Unique);
-        Assert.That(
-            CSharpScalarSemantics.SupportedBinaryOperators.Select(
-                static semantics => semantics.Kind),
-            Is.EquivalentTo(mappings.Keys));
+        var supportedKinds = CSharpScalarSemantics.SupportedBinaryOperators
+            .Select(static semantics => semantics.Kind)
+            .ToArray();
+        Assert.That(supportedKinds, Is.Unique);
+        Assert.That(supportedKinds, Is.EquivalentTo(mappings.Keys));
         foreach (var kind in Enum.GetValues<BinaryOperatorKind>())
         {
             var expected = mappings.TryGetValue(kind, out var mapped)
@@ -226,14 +223,11 @@ public sealed class CSharpScalarOperatorSemanticsTests
                     (IrUnaryOperator.Negate, false, true, true)
         };
 
-        Assert.That(
-            CSharpScalarSemantics.SupportedUnaryOperators.Select(
-                static semantics => semantics.Kind),
-            Is.Unique);
-        Assert.That(
-            CSharpScalarSemantics.SupportedUnaryOperators.Select(
-                static semantics => semantics.Kind),
-            Is.EquivalentTo(expected.Keys));
+        var supportedKinds = CSharpScalarSemantics.SupportedUnaryOperators
+            .Select(static semantics => semantics.Kind)
+            .ToArray();
+        Assert.That(supportedKinds, Is.Unique);
+        Assert.That(supportedKinds, Is.EquivalentTo(expected.Keys));
         foreach (var kind in Enum.GetValues<UnaryOperatorKind>())
         {
             var present = CSharpScalarSemantics.TryGetUnary(
