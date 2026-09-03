@@ -22,6 +22,13 @@ internal static class FinalCompilationCollector
                 return;
             }
 
+            if (ContractRuntimePolicy.IsRuntimeEvaluationEnabled(
+                    context.Compilation,
+                    context.CancellationToken))
+            {
+                return;
+            }
+
             if (!SharpProofAnalyzerEngine.GetConfigurationDiagnostics(
                     context.Compilation,
                     context.Options,
@@ -56,9 +63,6 @@ internal static class FinalCompilationCollector
         AnalyzerConfigOptions options, AnalyzerConfiguration configuration)
     {
         var compilation = (CSharpCompilation)context.Compilation;
-        ContractRuntimePolicy.ThrowIfRuntimeEvaluationEnabled(
-            compilation,
-            context.CancellationToken);
         var targetFramework = Get(options, TargetFrameworkOption);
         var features = configuration.Features == SharpProofFeatures.Effects ? WorkerFeatureSet.Effects :
             configuration.Features == SharpProofFeatures.Contracts ? WorkerFeatureSet.Contracts : WorkerFeatureSet.All;

@@ -17714,3 +17714,79 @@ After the `casesByIdBuilder` loop has already visited every `CorpusCase`, `RunAs
 | ID | Finding | Evidence |
 |---|---|---|
 | R1512 | **The self-cycle and mutual-cycle fixtures duplicate the same implementation source.** The self-target test has the body once, while the mutual-cycle test copies it into both `LeftContracts.Map` and `RightContracts.Map`; all three copies exist only to force implementation analysis alongside cycle diagnostics. Sharing that raw body through a narrowly scoped fixture helper would keep the semantic trigger in one place and reduce drift between regression cases without merging their distinct cycle assertions. | `SharpProof.Analyzer.Test/ContractForCycleAnalyzerTests.cs:49-104` |
+## Second survey, part five hundred ninety-nine: R1509 - three namespaces are shared across referenced assembly pairs, and the assembly named `SharpProof.Analyzer.Core` never once declares its own name
+
+Every production `.cs` file was mapped to its owning `.csproj` and its file-scoped
+namespace, excluding the six shared sources that are `Compile Include`d into other
+projects and therefore carry a consumer's namespace on purpose (`ArgumentNullGuard.cs`,
+`HashEncoding.cs`, `Utf16WellFormedness.cs`, `IrIdentifierAliases.cs`, and the two
+`Polyfills`, which R355 and R953 already cover).
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1509 | **Sixty-eight production types sit in a namespace that a different assembly is named after, all three shared namespaces span a pair of assemblies where one references the other, and `SharpProof.Analyzer.Core` declares the namespace `SharpProof.Analyzer.Core` in zero of its thirty-three files.** The three shared namespaces: **`SharpProof.Analyzer`** is declared by `SharpProof.Analyzer` (1 file), `SharpProof.Analyzer.Core` (**27 files, 36 types**) and `SharpProof.CompilerCollector` (1 file) - the assembly the namespace is named after owns **1 of 29** files in it, because `SharpProof.Analyzer` is a single-file thin entry point, `SharpProofAnalyzer.cs`. **`SharpProof.CompilerArtifact`** is declared by `SharpProof.CompilerArtifact` (17), `SharpProof.CompilerCollector` (**13 files, 21 types**) and `SharpProof.Analyzer.Core` (1). **`SharpProof.Specs`** is declared by `SharpProof.Specs` (8) and `SharpProof.Effects` (**2 files, 9 types**). **The hazard is live rather than theoretical because each pair is a reference edge.** `SharpProof.Analyzer.csproj` references `SharpProof.Analyzer.Core`, `SharpProof.CompilerCollector.csproj` references `SharpProof.CompilerArtifact`, and `SharpProof.Effects.csproj` references `SharpProof.Specs`. Two types with the same name in the same namespace in two *unreferenced* assemblies are harmless; in a referenced pair they are `CS0433`. Today there are **zero** fully-qualified collisions across all production assemblies, so this is a missing constraint and not a defect - but the next type added to `SharpProof.Analyzer` under a name `SharpProof.Analyzer.Core` already uses fails the build with an ambiguity error whose message names two assemblies the author did not think were related. **The reader cost is immediate and does not need a collision.** Every architecture gate in this repository is scoped by *assembly*: `BannedApiProjects` selects the projects that get `BannedSymbols.txt` and `RS0030`, `InternalsVisibleToMatchesApprovedAssemblyBoundary` and `NewLayerProjectReferencesFollowTheDependencyDag` reason over project references, and `internal` means assembly. A file that opens `namespace SharpProof.Analyzer;` gives a reader no signal about which of those applies to it, and for 27 files the answer is the assembly whose name never appears. **Two further namespaces belong to no assembly at all**: `SharpProof.ContractForValidation` (3 files, 4 types) is a top-level `SharpProof.*` namespace with no project of that name, and `SharpProof.Analyzer.Configuration` (2 files, 6 types) is a sub-namespace of an assembly that does not contain it - both inside `SharpProof.Analyzer.Core`. **Nothing checks any of this**: the two places the architecture suite touches `type.Namespace` compare against `typeof(IrTerm).Namespace` and the literal `"SharpProof.ArchitectureTest"`, neither of which constrains namespace ownership. | `SharpProof.Analyzer/SharpProofAnalyzer.cs` (the assembly's only file); `SharpProof.Analyzer.Core/` (27 files in `SharpProof.Analyzer`, 3 in `SharpProof.ContractForValidation`, 2 in `SharpProof.Analyzer.Configuration`, 1 in `SharpProof.CompilerArtifact`, **0** in `SharpProof.Analyzer.Core`); `SharpProof.CompilerCollector/` (13 in `SharpProof.CompilerArtifact`, 1 in `SharpProof.Analyzer`, 1 in `SharpProof.CompilerCollector`); `SharpProof.Effects/ApiSpecResolution.cs`, `ApiSpecResolutionModels.generated.cs`; `SharpProof.Analyzer/SharpProof.Analyzer.csproj`, `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj`, `SharpProof.Effects/SharpProof.Effects.csproj` for the reference edges; `SharpProof.ArchitectureTest/ArchitectureTests.cs:363`, `BuildSchedulingTests.cs:861` for the only two namespace assertions; related R355, R953 |
+
+### Checked and not proposed (part five hundred ninety-nine)
+
+- **The linked shared sources were excluded deliberately and are not part of
+  R1509.** `SharpProof.Ir/ArgumentNullGuard.cs` declares `SharpProof`,
+  `SharpProof.Dataflow` and `SharpProof.Worker.Protocol` depending on
+  `DefineConstants`; `HashEncoding.cs` declares `SharpProof.Worker.Protocol`;
+  `Utf16WellFormedness.cs` and the two `Polyfills` follow the same pattern. Those
+  files are `Compile Include`d into their consumers, so carrying the consumer's
+  namespace is the mechanism working, and R355 and R953 already record the
+  conditional-compilation cost. Counting them would have inflated R1509's figure
+  by six files and blamed the wrong thing.
+- **The test projects' apparent mismatches are almost all fixture text, not real
+  declarations.** `SharpProof.Meta.Analyzers.Test/SharpProofSoundnessAnalyzerTests.cs`
+  appears to declare seventeen namespaces including `SharpProof.Ir`,
+  `SharpProof.Worker` and `FriendAssembly.Consumer`; every one is inside a verbatim
+  C# source literal fed to the analyzer under test. The same is true of `Lookalike`,
+  `External`, `Collision`, `First`, `Second`, `A`, `B.C.D` and `Empty` across seven
+  test files. A namespace census that does not distinguish source text from source
+  code produces a list that is mostly noise, which is why R1509 is scoped to
+  production assemblies only.
+- **The samples and pilots are correct as they stand.** Twelve projects there are
+  named for their directory (`Library`, `PollyEffects`) and declare
+  `SharpProof.Samples.<Name>` or `SharpProof.Pilots.<Name>`. The namespace does not
+  start with the project name, but the project name is a fixture label rather than
+  an assembly identity anyone reasons about, and the namespaces are internally
+  consistent.
+- **The production interface surface is eight types and none is an unnecessary
+  abstraction.** `IIrIdentifierTag` has nine implementers and exists as a phantom
+  type constraint on `ScopedIrId<TTag>`; `IEffectCallPreconditionPolicy` has two;
+  `IAbstractDomain`, `IAnalyzerSessionFactory` and `ISmtBackend` are used across 7,
+  10 and 14 files; `IWorkerResponseEvidenceAuthority` has a single implementer in
+  `SharpProof.CompilerArtifact` but is consumed from `SharpProof.Worker.Protocol`
+  and `SharpProof.Worker.Launcher`, so it is a layering seam rather than
+  speculative generality. There is no single-implementer, single-consumer interface
+  to remove.
+- **`ICompilerAdditionalTextSnapshot` is a deliberate, documented test seam and is
+  not filed.** It is `internal` to `SharpProof.CompilerCollector`, has **no**
+  production implementer, and its only implementer is a test type at
+  `FinalCompilationCollectorTests.cs:1332` - so the `if (file is
+  ICompilerAdditionalTextSnapshot snapshot)` branch at
+  `CompilerCompilationCapture.cs:419` is unreachable in production. The comment
+  immediately above it says so and gives the reason: the supported command-line
+  compiler uses `AdditionalTextFile`, whose `Lazy<SourceText>` is shared with
+  generators, so re-reading after generation is unsound. The consequence worth
+  naming without proposing a change: tests that take the seam do not exercise the
+  strict provider-type check that production actually runs, so that check's failure
+  message - *"An additional file does not expose a stable compiler input
+  snapshot."* - is reached only by a path no test takes through this branch.
+
+### Status (part five hundred ninety-nine)
+
+R1509 is `pending` and splits into a cheap half and an expensive one. The cheap
+half is one architecture assertion: every production type's namespace must equal
+its assembly name or start with it plus a dot, with an explicit exemption list for
+the six linked shared sources - which would fail today on 68 types and so has to
+be filed rather than applied. The expensive half is the rename itself, which
+touches 44 files and every `using` that reaches them, and is an authority decision
+about whether `SharpProof.Analyzer` is the name of an assembly or the name of a
+layer.
+
+R1399 is applied: runtime-evaluation rejection is centralized in
+`FinalCompilationCollector.Collect`, so the analyzer no longer scans the same
+compilation before `Create` scans it again. Direct collector calls retain the
+fail-closed guard. `FinalCompilationProbeTests` pass (7/7).

@@ -21,10 +21,7 @@ public sealed class FinalCompilationCollectorAnalyzer : DiagnosticAnalyzer
         {
             var configuration =
                 AnalyzerConfiguration.FromOptions(compilationContext.Options);
-            if (configuration.Profile == SharpProofProfile.Off ||
-                ContractRuntimePolicy.IsRuntimeEvaluationEnabled(
-                    compilationContext.Compilation,
-                    compilationContext.CancellationToken))
+            if (configuration.Profile == SharpProofProfile.Off)
             {
                 return;
             }
