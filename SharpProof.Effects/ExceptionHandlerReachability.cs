@@ -1522,13 +1522,18 @@ internal sealed class ExceptionHandlerReachability(
         var selected = new Dictionary<
             ISwitchCaseOperation,
             SwitchCaseReachability>();
+        var selectedCases = new List<(
+            ISwitchCaseOperation Case,
+            int Index)>();
         var inputDefinitelyNonNull =
             DefiniteOperationFacts.IsDefinitelyNonNull(@switch.Value) ||
             abstractFlow?.ProvesNonNull(@switch, @switch.Value) == true;
         ISwitchCaseOperation? defaultCase = null;
+        var defaultCaseIndex = -1;
         var definiteMatch = false;
-        foreach (var @case in @switch.Cases)
+        for (var caseIndex = 0; caseIndex < @switch.Cases.Length; caseIndex++)
         {
+            var @case = @switch.Cases[caseIndex];
             var reachableClauses = new List<ICaseClauseOperation>();
             var bodyReachable = false;
             var stopsSelection = false;
@@ -1539,6 +1544,7 @@ internal sealed class ExceptionHandlerReachability(
                 if (clause is IDefaultCaseClauseOperation)
                 {
                     defaultCase = @case;
+                    defaultCaseIndex = caseIndex;
                     continue;
                 }
                 var patternSelection = clause is
@@ -1599,6 +1605,7 @@ internal sealed class ExceptionHandlerReachability(
                     @case,
                     reachableClauses,
                     bodyReachable);
+                selectedCases.Add((@case, caseIndex));
             }
             if (stopsSelection)
             {
@@ -1621,22 +1628,37 @@ internal sealed class ExceptionHandlerReachability(
                     defaultCase,
                     [],
                     BodyReachable: true);
+                var insertAt = selectedCases.FindIndex(
+                    item => item.Index > defaultCaseIndex);
+                if (insertAt < 0)
+                {
+                    selectedCases.Add((defaultCase, defaultCaseIndex));
+                }
+                else
+                {
+                    selectedCases.Insert(
+                        insertAt,
+                        (defaultCase, defaultCaseIndex));
+                }
             }
         }
 
-        foreach (var @case in @switch.Cases)
+        var reachableCases = new List<ISwitchCaseOperation>(selectedCases.Count);
+        foreach (var selectedCase in selectedCases)
         {
+            var @case = selectedCase.Case;
             if (!selected.TryGetValue(@case, out var reachability))
             {
                 continue;
             }
+            reachableCases.Add(@case);
             switchCaseReachability[@case] = reachability;
             if (reachability.BodyReachable)
             {
                 scheduledSwitchBodies.Add(@case);
             }
         }
-        return @switch.Cases.Where(selected.ContainsKey).ToArray();
+        return reachableCases.ToArray();
     }
 
     private static ISwitchCaseOperation? GetSwitchGotoTargetCase(
