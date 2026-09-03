@@ -15040,6 +15040,12 @@ soundness-owner decision rather than a mechanical reduction.
 |---|---|---|
 | R1242 | **`EffectSummary` repeats the unknown uncertainty marker numerically.** The constructor checks `(EffectUncertainty)(1 << 6)` after the generated enum already defines `Unknown` as `All` plus that marker. Deriving the marker from `Unknown & ~All` keeps validation tied to the catalog if the uncertainty layout changes. | `SharpProof.Effects/EffectSummary.cs:36-46`; `SharpProof.Effects/EffectContractMappings.generated.cs:93-105` |
 
+### Status (part five hundred sixty-four)
+
+R1242 is applied: the uncertainty sentinel is derived from the generated enum's
+`Unknown` and `All` values instead of a numeric bit literal. Effect-value
+validation tests pass (4 passed).
+
 ## Second survey, part five hundred sixty-five: R1243 - symbol sort keys are rebuilt per comparison
 
 `EffectSymbolComparer<TSymbol>.Compare` constructs a canonical compiler display for both non-null symbols on every comparison, then may ask Roslyn for source locations as a tie-breaker. The comparer is used by `List.Sort`/`OrderBy` at several Effects call-graph, analysis-session, and throw-set ordering sites, so a symbol participating in many comparisons is repeatedly converted to the same stable identity. Projecting each input to `(symbol, canonicalIdentity, locationKey)` before sorting, or using a compilation-scoped cache with the same symbol identity semantics, can retain the equality and source-order tie-breakers while avoiding repeated display construction.
