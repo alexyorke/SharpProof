@@ -13950,3 +13950,18 @@ is called without a prior completion check.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1181 | **`ExceptionHandlerReachability` rechecks receiver completion inside `GetPotentialNullReceiver`.** Its invocation, event, property, field, array, `with`, await, and method-group callers already call `canCompleteNormally` on the same instance before entering the helper, while the helper repeats that call before classifying nullness. A prevalidated-instance seam can remove the duplicate completion traversal without changing value-type, definitely-null, or exception-type handling. | `SharpProof.Effects/ExceptionHandlerReachability.cs:238-278,289-302,328-345,366-428,850-990,1040-1060,1134-1162`; helper `:1862-1905` |
+
+## Second survey, part five hundred four: R1182 - formatted-value resolution is repeated for completion
+
+`AddFormattedValuePotential` first calls `GetFormattedValueExceptions`, which
+resolves the formatted-value method and dispatch uncertainty before adding
+static-initialization and callable exceptions. It then immediately calls
+`TryResolveFormattedValueMethod` again with the same operand, origin,
+compilation, and flow to decide whether the target can complete normally. The
+exception projection and completion decision need different downstream facts,
+but they can share one resolver result, including the null/uncertain outcomes,
+without changing the string-formatting policy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1182 | **`ExceptionHandlerReachability.AddFormattedValuePotential` resolves the same formatted-value method twice.** `GetFormattedValueExceptions` and the method's completion check both call `StringConcatenationEffectResolver.TryResolveFormattedValueMethod` with identical inputs before the caller returns. A shared `(target, dispatchUncertain, resolved)` projection can remove the duplicate symbol/operation analysis while preserving unknown-potential and completion behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:2564-2627`; resolver `SharpProof.Effects/StringConcatenationEffectResolver.cs` |
