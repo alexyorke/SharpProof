@@ -14481,6 +14481,12 @@ error boundary.
 |---|---|---|
 | R1205 | **`CompilerLoweredArtifact.Decode` scans callable artifacts twice for one identity gate.** Its pre-loop condition materializes `artifacts.Select(item => item?.CallableId).Distinct(...).Count()` and then runs `artifacts.Any(item => item == null || !callables.ContainsKey(item.CallableId))` over the same rows. A single loop can combine null, duplicate-ID, and manifest-membership validation without changing the accepted artifact set or exception behavior. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:337-340` |
 
+### Status (part five hundred twenty-seven)
+
+R1205 is applied: callable artifact validation combines null, duplicate-ID, and
+manifest-membership checks in one pass after the length gate. Focused
+manifest-artifact tests pass (92/92).
+
 ## Second survey, part five hundred twenty-eight: R1206 - summary free-variable checks repeat the same list scans
 
 For each lowered summary call, `DecodeBody` builds `free` from the result and
