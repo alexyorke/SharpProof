@@ -10394,3 +10394,15 @@ a new production dependency solely for a three-line helper.
 R995 is deferred: the setting is redundant, but a shared helper should not
 add dependency or source-link complexity disproportionate to the tiny
 duplication.
+
+## Second survey, part two hundred twenty-seven: R996 - repeated IR depth-test chain construction
+
+The IR kernel tests independently construct the same left-associated integer-addition chain in three places. `MemoizedSubtermsCannotBypassTheEvaluationDepthLimit` builds nested additions through its local `Nest` function, while `DeeplyNestedTermsAbstainInsteadOfExhaustingTheStack` and `TermsWithinTheDepthBudgetStillEvaluate` each repeat the same `term = factory.Binary(Add, term, factory.Variable(value))` loop with only the depth and expected outcome changed. The tests intentionally cover different resource-limit behaviors and should remain separate, but a small test-only `BuildAdditionChain` helper could own the fixture shape and make future changes to the chain consistent across boundary cases. This is distinct from R968, which concerns multiple production depth notions and exception behavior, and from R963, which concerns duplicate production graph walks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R996 | **IR depth-boundary tests duplicate the same nested-addition fixture builder.** Three tests in `IrKernelTests` independently create a left-associated chain of additions around one variable to exercise memoized-depth rejection, deep-term abstention, and in-budget evaluation. A test-only helper parameterized by depth can preserve those distinct assertions while removing the repeated construction loop and reducing drift between the boundary fixtures. | `SharpProof.Ir.Test/IrKernelTests.cs:1101-1102,1125-1136`; `SharpProof.Ir.Test/IrKernelTests.cs:1147-1154`; `SharpProof.Ir.Test/IrKernelTests.cs:1177-1184` |
+
+### Status (part two hundred twenty-seven)
+
+R996 is deferred: the duplicated fixture is small and readable, so centralize it only if more depth-boundary tests are added or the chain shape changes.
