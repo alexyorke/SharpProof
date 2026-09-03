@@ -14617,3 +14617,11 @@ decision points.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1217 | **`AcyclicBlockPredicateExecutor.ApplySpec` repeats one optional-projection test across three branches.** The `projection ==/!= default` checks at conflict detection, map construction, and registration all inspect the same immutable result. Factoring that state into one boolean reduces local branching noise without merging the distinct projection behaviors. | `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:406-423,433-436` |
+
+## Second survey, part five hundred forty: R1218 - call-site dispatch repeats reduced-method normalization
+
+`RequiresCallSiteDiscovery` and `RequiresCallSiteAnalyzer` each normalize an extension-method target with `call.TargetMethod.ReducedFrom ?? call.TargetMethod` (or the corresponding candidate expression) immediately before invoking `RequiresCallSiteDispatch.ResolveExactTarget`. The dispatcher is the sole consumer of this target-normalization boundary, and both callers pass the same normalized form. Letting `ResolveExactTarget` own the reduced-method projection removes two repeated call-site fragments while preserving exact receiver dispatch and reduced-extension behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1218 | **`RequiresCallSiteDispatch.ResolveExactTarget` has two callers that duplicate reduced-method normalization.** Both discovery and analysis spell `TargetMethod.ReducedFrom ?? TargetMethod` before the same dispatcher call. Moving that normalization into the dispatcher centralizes one invariant without changing either caller's receiver or cancellation handling. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:61-67`; `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:303-309` |
