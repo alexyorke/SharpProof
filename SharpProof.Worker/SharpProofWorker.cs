@@ -250,9 +250,11 @@ public sealed class SharpProofWorker : IDisposable
                     .ConfigureAwait(false);
                 ownsInjectedBackendRunGate = true;
             }
+            var orderedTargets = targets.OrderBy(
+                static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
             var laneCreation = TryCreateLanes(
                 request.Budgets,
-                CountSolverTargets(targets),
+                CountSolverTargets(orderedTargets),
                 out solverLanes,
                 out var laneError);
             if (laneCreation != LaneCreationResult.Success)
@@ -275,8 +277,6 @@ public sealed class SharpProofWorker : IDisposable
                         ? WorkerClaimReason.BackendUnavailable
                         : WorkerClaimReason.InfrastructureFailure);
             }
-            var orderedTargets = targets.OrderBy(
-                static target => target.Entry.CallableId, StringComparer.Ordinal).ToArray();
             var results = new CallableVerificationResult[orderedTargets.Length];
             for (var index = 0; index < orderedTargets.Length; index++)
             {
