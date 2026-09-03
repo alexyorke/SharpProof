@@ -220,7 +220,7 @@ function Test-CompilerGeneratedMethod {
 }
 
 function Get-PortablePdbModule {
-    param([Parameter(Mandatory = $true)] [string]$ProjectName, [Parameter(Mandatory = $true)] [string]$AssemblyPath, [Parameter(Mandatory = $true)] [string]$PdbPath, [Parameter(Mandatory = $true)] [System.Collections.Generic.HashSet[string]]$CompilePaths)
+    param([Parameter(Mandatory = $true)] [string]$ProjectName, [Parameter(Mandatory = $true)] [string]$AssemblyPath, [Parameter(Mandatory = $true)] [string]$PdbPath, [Parameter(Mandatory = $true)] [System.Collections.Generic.HashSet[string]]$CompilePaths, [Parameter(Mandatory = $true)] [ref]$SequencePointCount)
     if (-not (Test-Path -LiteralPath $AssemblyPath -PathType Leaf)) { throw "Production inventory assembly is missing: '$AssemblyPath'." }
     if (-not (Test-Path -LiteralPath $PdbPath -PathType Leaf)) { throw "Production inventory PDB is missing: '$PdbPath'." }
     $assemblyStream = [IO.File]::OpenRead($AssemblyPath)
@@ -274,8 +274,9 @@ function Get-PortablePdbModule {
                     }
                     $documentStates.Add($relativePath, $documentState)
                 }
-                if (-not $isCompilerGenerated) {
-                    [void]$documentState.SequencePoints.Add($point.StartLine)
+                if (-not $isCompilerGenerated -and
+                    $documentState.SequencePoints.Add($point.StartLine)) {
+                    $SequencePointCount.Value++
                 }
                 $rangeKey = ([string]$point.StartLine) + ':' + ([string]$point.EndLine)
                 if (-not $documentState.SequencePointRanges.ContainsKey($rangeKey)) {
@@ -283,14 +284,7 @@ function Get-PortablePdbModule {
                 }
             }
         }
-        $hasProductionSequencePoints = $false
-        foreach ($documentState in $documentStates.Values) {
-            if ($documentState.SequencePoints.Count -gt 0) {
-                $hasProductionSequencePoints = $true
-                break
-            }
-        }
-        if (-not $hasProductionSequencePoints) { throw "Production inventory PDB has no production sequence points: '$PdbPath'." }
+        if ($SequencePointCount.Value -eq 0) { throw "Production inventory PDB has no production sequence points: '$PdbPath'." }
         $documents = foreach ($path in @($documentStates.Keys | Sort-Object)) {
             $documentState = $documentStates[$path]
             [pscustomobject][ordered]@{
@@ -430,6 +424,7 @@ $generatorInputs = [pscustomobject][ordered]@{
     additionalFiles = @($additionalFileRecords | Sort-Object project, path)
 }
 $modules = [Collections.Generic.List[object]]::new()
+$sequencePointCount = 0
 if ($RequirePdb) {
     foreach ($project in $sortedProjects) {
         $targetPath = [string]$project.targetPath
@@ -437,12 +432,10 @@ if ($RequirePdb) {
         if (-not [IO.Path]::IsPathRooted($targetPath)) { $targetPath = Join-Path $resolvedRepositoryRoot $targetPath }
         $compilePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
         foreach ($file in @($project.compile)) { [void]$compilePaths.Add([string]$file.path) }
-        [void]$modules.Add((Get-PortablePdbModule -ProjectName ([string]$project.name) -AssemblyPath $targetPath -PdbPath ([IO.Path]::ChangeExtension($targetPath, '.pdb')) -CompilePaths $compilePaths))
+        [void]$modules.Add((Get-PortablePdbModule -ProjectName ([string]$project.name) -AssemblyPath $targetPath -PdbPath ([IO.Path]::ChangeExtension($targetPath, '.pdb')) -CompilePaths $compilePaths -SequencePointCount ([ref]$sequencePointCount)))
     }
 }
 $sortedModules = @($modules | Sort-Object project)
-$sequencePointCount = 0
-foreach ($module in $sortedModules) { foreach ($document in @($module.documents)) { $sequencePointCount += @($document.sequencePoints).Count } }
 $authority = [pscustomobject][ordered]@{ schemaVersion = 1; commit = $commit; configuration = $Configuration; generatorInputs = $generatorInputs; projects = $sortedProjects; modules = $sortedModules; sequencePointCount = $sequencePointCount }
 $json = $authority | ConvertTo-Json -Depth 30
 if ([string]::IsNullOrWhiteSpace($OutputPath)) { Write-Output $json } else {

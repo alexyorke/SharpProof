@@ -16454,3 +16454,8 @@ R1361 is applied: trusted-mutation shard descriptors and timing records now use
 pre-sized generic lists based on validated parallelism, avoiding repeated array
 growth while preserving shard order and serialized output. PowerShell parsing and
 the project-scoped concurrency architecture test pass.
+
+R1362 is applied: the PDB point walk now carries the unique production sequence
+point count through module construction, eliminating the document-state presence
+scan and the later projected-document recount without changing inventory shape.
+PowerShell parsing and the inventory authority fixture test pass (1 passed).
