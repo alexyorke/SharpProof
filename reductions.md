@@ -342,6 +342,7 @@ the smallest relevant containerized test target passes.
 | R934 | Compute effect-violation facts only for the selected contract rule | `SharpProof.Worker.Test`: 695 passed |
 | R949 | Share the native `prctl` binding and control constants across Host and BuildTasks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
 | R948 | Share supervisor protocol-line normalization between record checks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
+| R818 | Remove the unreachable unsupported-host sample branch | PowerShell parse; `samples` command to run after clean commit |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -6873,9 +6874,9 @@ restore already owned by the container command.
 
 ### Status (part three hundred twenty-nine)
 
-R818 is `deferred`: the dead branch is a small clarity issue, but choosing
-between fail-fast enforcement and an actually exercised unsupported-host test
-changes the script's supported invocation contract.
+R818 is `applied`: the sample script already fails fast outside the canonical
+Linux amd64 container, so the later unsupported-host branch was unreachable and
+has been removed. The supported-host assertions remain unchanged.
 
 ## Second survey, part three hundred thirty: R819 - repeated pilot project uniqueness scan
 
@@ -8890,3 +8891,42 @@ answer is chosen, the work is to state it once and extend the existing
 direct-reference assertion beyond the single project it currently covers. The
 measurement is recorded here mainly so that a future pass does not repeat the
 naive version of it and report 68.
+
+## Second survey, part one hundred seventy-five: R952 - the undeclared exit-code vocabulary
+
+A cross-language numeric-literal census: distinctive numbers appearing in both
+production C# and a configuration or script file. Most of the 27 hits are
+coincidental powers of two and round bounds. Two are a shared contract.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R952 | **The verifier's process exit-code contract - 124 for timeout, 125 for environment failure - is written as bare integer literals at roughly forty sites across C#, bash, and PowerShell, is named nowhere, and is documented nowhere.** `124` appears in production at `SharpProof.BuildTasks/RunVerifier.cs:325`, `VerifierProcessSupervisor.cs:149`, `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:164,268`, and `SharpProof.Host/LinuxWorkerProcess.cs:165`, and is asserted at eight further sites in `SharpProof.Package.Test/BuildTaskTests.cs` and `LauncherArgumentTests.cs`. `125` appears at `RunVerifier.cs:306,1025,1046` and at **ten sites in `VerifierProcessSupervisor.cs`** (`:27,36,54,83,107,138,142,187,204`), plus **two `exit 125` in `eng/container/entrypoint.sh` and twelve in `eng/container/loop-command.sh`**. The meanings are used consistently - 124 wherever a wait times out, 125 wherever a precondition on the environment fails: not Linux, not x86_64, missing container contract, missing loop source, lock already held, snapshot outside the artifacts root. **They are the GNU `timeout` conventions**, which is presumably why they were chosen, but nothing in the repository says so; a search of all 47 markdown files finds no exit-code documentation, and the acceptance contract does not pin them. **The contrast inside one file makes the point.** `LinuxWorkerProcess.cs` *declares* `LinuxProcessControlConstants` at `:358-367` with eight named signal and syscall numbers, uses `LinuxProcessControlConstants.SignalKill` at `:118-123` - and returns a bare `124` at `:165`. The same file both owns the naming convention and does not apply it to the value that crosses the process boundary into MSBuild, the shell entrypoint, and the tests. This composes directly with R949: that item moves two prctl option constants into the shared class and deduplicates the `prctl` P/Invoke; the exit codes belong in the same place, and `SharpProof.BuildTasks` already consumes that class at twenty sites. The shell half cannot share a C# constant, so the two `.sh` files would keep their literals - but a named C# constant plus one line of comment in each script is the difference between a convention and a coincidence. | `SharpProof.Host/LinuxWorkerProcess.cs:118-123,165,358-367`; `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:27,36,54,83,107,138,142,149,187,204`; `SharpProof.BuildTasks/RunVerifier.cs:306,325,1025,1046`; `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:164,268`; `eng/container/entrypoint.sh` (2 sites); `eng/container/loop-command.sh` (12 sites); `SharpProof.Package.Test/BuildTaskTests.cs:451,914,1178,1291,1341,1516`; `SharpProof.Package.Test/LauncherArgumentTests.cs:67,97,271` |
+
+### Checked and not proposed (part one hundred seventy-five)
+
+- **The other 25 cross-language numeric coincidences are not shared concepts.**
+  The technique found 27 distinctive numbers of three digits or more present in
+  both production C# and a config or script file; all but the two exit codes are
+  independent bounds that happen to collide - `256`, `512`, `1024`, `4096` as
+  separate size and count limits in unrelated subsystems, and `100`, `1000`,
+  `10000` as unrelated round thresholds. Do not file these as duplication; the
+  values coincide, the concepts do not.
+- **The size and count limits that *are* one concept are already pinned.**
+  `CompilerReferenceLimits` (`MaximumModuleBytes`, `MaximumClosureBytes`,
+  `MaximumModuleCount`) is declared once in
+  `CompilerArtifactModel.schema.json`, generated into C#, and cross-checked
+  against `eng/acceptance/contract.json` by `ArchitectureTests:2138-2150`. That is
+  the shape R952 asks for, already applied to the neighbouring vocabulary.
+- The `exit 2` used by both container scripts for "clean exact-commit source
+  required" and "loop snapshot does not match host HEAD" is **not** included in
+  R952. It is shell-only, never crosses into C#, and 2 carries no
+  cross-tool convention worth naming.
+
+### Status (part one hundred seventy-five)
+
+R952 is `pending` and should be actioned with R949 - the same two
+assemblies, the same shared constants class, the same already-open seam. Of the
+two it is the more consequential: a duplicated P/Invoke declaration fails loudly
+if the copies drift, whereas an exit code that means "timed out" in one process
+and something else in the process reading it fails silently, and three of the four
+readers here are in a different language from the writer.

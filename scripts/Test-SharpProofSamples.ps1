@@ -366,66 +366,57 @@ try {
             '-p:ContinuousIntegrationBuild=true',
             "-p:SharpProofVerifyResultFile=$strictResultPath"
         )
-    if ($isSupportedWorkerHost) {
-        Assert-ExitCode $strict $true 'Strict library build'
-        $strictResult = Read-WorkerResult $strictResultPath
-        if ([string]$strictResult.runStatus -ne 'Complete' -or
-            [string]$strictResult.failureReason -ne 'None' -or
-            @($strictResult.claimResults).Count -ne 5 -or
-            @($strictResult.claimResults |
-                Where-Object { [string]$_.outcome -ne 'Proven' }).Count -ne 0) {
-            throw 'The strict library sample did not prove every selected claim.'
-        }
-
-        $outcomesResultPath = Get-ForwardSlashPath (
-            Join-Path $temporaryRoot 'results/outcomes.json')
-        $outcomes = Invoke-SampleBuild `
-            -ProjectName 'Outcomes' `
-            -RunName 'Outcomes-explicit' `
-            -Properties @(
-                '-p:SharpProofVerify=true',
-                '-p:SharpProofVerifyPolicy=advisory',
-                "-p:SharpProofVerifyResultFile=$outcomesResultPath"
-            )
-        Assert-ExitCode $outcomes $false 'Mixed-outcomes verification'
-        Assert-OutputContains `
-            $outcomes `
-            @('failed with exit code 5') `
-            'Mixed-outcomes verification'
-        $outcomeResult = Read-WorkerResult $outcomesResultPath
-        if ([string]$outcomeResult.runStatus -ne 'Complete' -or
-            [string]$outcomeResult.failureReason -ne 'None') {
-            throw 'Mixed-outcomes verification did not complete normally.'
-        }
-        $actualOutcomes = @(
-            $outcomeResult.claimResults |
-                ForEach-Object { [string]$_.outcome } |
-                Sort-Object
-        )
-        $expectedOutcomes = @('Proven', 'Refuted', 'Unknown') | Sort-Object
-        if (($actualOutcomes -join '|') -ne ($expectedOutcomes -join '|')) {
-            throw (
-                "Mixed-outcomes verification returned '$($actualOutcomes -join ', ')' " +
-                "instead of '$($expectedOutcomes -join ', ')'.")
-        }
-        $unknownClaims = @(
-            $outcomeResult.claimResults |
-                Where-Object { [string]$_.outcome -eq 'Unknown' }
-        )
-        if ($unknownClaims.Count -ne 1) {
-            throw 'Mixed-outcomes verification must return exactly one Unknown.'
-        }
-        $unknownReason = [string]$unknownClaims[0].reason
-        if ($unknownReason -in @('', 'None', 'Unspecified')) {
-            throw 'The Unknown sample claim must have a typed non-None reason.'
-        }
+    Assert-ExitCode $strict $true 'Strict library build'
+    $strictResult = Read-WorkerResult $strictResultPath
+    if ([string]$strictResult.runStatus -ne 'Complete' -or
+        [string]$strictResult.failureReason -ne 'None' -or
+        @($strictResult.claimResults).Count -ne 5 -or
+        @($strictResult.claimResults |
+            Where-Object { [string]$_.outcome -ne 'Proven' }).Count -ne 0) {
+        throw 'The strict library sample did not prove every selected claim.'
     }
-    else {
-        Assert-ExitCode $strict $false 'Unsupported-host strict library build'
-        Assert-OutputContains `
-            $strict `
-            @('supported only by Core MSBuild inside the canonical Linux amd64 container') `
-            'Unsupported-host strict library build'
+
+    $outcomesResultPath = Get-ForwardSlashPath (
+        Join-Path $temporaryRoot 'results/outcomes.json')
+    $outcomes = Invoke-SampleBuild `
+        -ProjectName 'Outcomes' `
+        -RunName 'Outcomes-explicit' `
+        -Properties @(
+            '-p:SharpProofVerify=true',
+            '-p:SharpProofVerifyPolicy=advisory',
+            "-p:SharpProofVerifyResultFile=$outcomesResultPath"
+        )
+    Assert-ExitCode $outcomes $false 'Mixed-outcomes verification'
+    Assert-OutputContains `
+        $outcomes `
+        @('failed with exit code 5') `
+        'Mixed-outcomes verification'
+    $outcomeResult = Read-WorkerResult $outcomesResultPath
+    if ([string]$outcomeResult.runStatus -ne 'Complete' -or
+        [string]$outcomeResult.failureReason -ne 'None') {
+        throw 'Mixed-outcomes verification did not complete normally.'
+    }
+    $actualOutcomes = @(
+        $outcomeResult.claimResults |
+            ForEach-Object { [string]$_.outcome } |
+            Sort-Object
+    )
+    $expectedOutcomes = @('Proven', 'Refuted', 'Unknown') | Sort-Object
+    if (($actualOutcomes -join '|') -ne ($expectedOutcomes -join '|')) {
+        throw (
+            "Mixed-outcomes verification returned '$($actualOutcomes -join ', ')' " +
+            "instead of '$($expectedOutcomes -join ', ')'.")
+    }
+    $unknownClaims = @(
+        $outcomeResult.claimResults |
+            Where-Object { [string]$_.outcome -eq 'Unknown' }
+    )
+    if ($unknownClaims.Count -ne 1) {
+        throw 'Mixed-outcomes verification must return exactly one Unknown.'
+    }
+    $unknownReason = [string]$unknownClaims[0].reason
+    if ($unknownReason -in @('', 'None', 'Unspecified')) {
+        throw 'The Unknown sample claim must have a typed non-None reason.'
     }
 
     Write-Host 'SharpProof package-backed samples passed.'
