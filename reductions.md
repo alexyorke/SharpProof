@@ -15349,6 +15349,13 @@ passed).
 |---|---|---|
 | R1263 | **`CancelableBuildTask.Present` pays a `params`-array allocation at every path-group call.** The helper only filters its input and is invoked repeatedly by both publication tasks with fixed literal groups. Replace the `params` boundary or reuse caller-owned collections if profiling justifies it, without moving the shared whitespace policy into each task. | `SharpProof.BuildTasks/CancelableBuildTask.cs:59-62`; `SharpProof.BuildTasks/ResetPublishedVerification.cs:25-30`; `SharpProof.BuildTasks/InvalidatePublishedResult.cs:53-62,96-103` |
 
+### Status (part five hundred eighty-five)
+
+R1263 is applied: fixed two-to-five-path call sites now use a lazy fixed-arity
+overload, avoiding temporary `params` arrays while retaining the original
+overload for array and zero/one-argument callers. Build-task tests pass (63
+passed).
+
 ## Second survey, part five hundred eighty-six: R1264 - publication conflict candidates are rebuilt for each policy flag
 
 `InvalidatePublishedResult.ExecuteCore` constructs the same concatenated candidate sequence of publication paths, publication marker paths, and input paths independently for `aliasesWorkerTree` and `aliasesCache`; `aliasesCompilerOutput` then reconstructs the same three groups in a different order even though `PathsConflict` is symmetric for these checks. The path arrays are already stable locals for the execution, and these predicates only return booleans, so a single materialized conflict-candidate array can feed all three policy checks while leaving the distinct protected-tool paths and compiler-output comparison intact.
@@ -15604,3 +15611,44 @@ R1158, R1159, R1300, R1301, R1302 and R1303, plus R1304 assigned here to close t
 collision. Both collisions this session came from allocating `max + 1` against a
 file another pass is appending to; both were caught by re-reading immediately after
 writing, which remains the cheap mitigation.
+
+## Second survey, part five hundred ninety-one: R1305 - the third-party notice is checked for what it contains, never for what it claims
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1305 | **The shipped legal notice is validated as a superset of the declared components and never as an exact set, so a dependency that is dropped keeps attributing itself to users indefinitely - and the same function, twenty lines earlier, already does the exact-set check for payload files.** `New-SharpProofReleaseEvidence.ps1:198-215` opens the built `.nupkg`, reads `THIRD-PARTY-NOTICES.txt`, and for each component in `eng/release/third-party-components.json` requires the literal `"Package: <id> <version>"` to appear, throwing *"Third-party notice for '...' is missing ..."* otherwise. `"Package: "` occurs in exactly **one** place across every script and test in the repository - that `$needle` at `:210` - so nothing anywhere parses the notice's own `Package:` lines back out. Remove a component from the manifest and the notice keeps its line: the loop no longer looks for it, no other check reads it, and the stale attribution ships inside both `SharpProof` and `SharpProof.Verifier`. **The correct shape is already in the same function.** At `:180-193` the *entries* check enumerates every non-`SharpProof` `.dll` and `.so` actually present in the archive and requires the set to **equal** the declared entries, reporting both sides on failure - `"Actual: ... Declared: ..."`. Payload files get set equality; the legal notice, twenty lines later, gets `String.Contains` per declared component. The two lists are the same 13 components and they agree exactly today - `Microsoft.Bcl.AsyncInterfaces 10.0.10`, `Microsoft.Z3 4.12.2`, `System.Buffers 4.6.1`, `System.Collections.Immutable 9.0.18`, `System.IO.Pipelines 10.0.10`, `System.Memory 4.6.3`, `System.Numerics.Vectors 4.6.1`, `System.Reflection.Metadata 9.0.0`, `System.Runtime.CompilerServices.Unsafe 6.1.2`, `System.Text.Encoding.CodePages 7.0.0`, `System.Text.Encodings.Web 10.0.10`, `System.Text.Json 10.0.10`, `System.Threading.Tasks.Extensions 4.6.3` - so this is a missing check rather than an observed defect, exactly as R491 is for the version field. The fix is a regex over the notice's `Package:` lines and a set comparison, in the function that already contains the pattern to copy. | `scripts/New-SharpProofReleaseEvidence.ps1:178-193,198-215`; `THIRD-PARTY-NOTICES.txt:10-21,28`; `eng/release/third-party-components.json`; `SharpProof.Package/SharpProof.nuspec`; `SharpProof.Verifier/SharpProof.Verifier.nuspec`; related R491 |
+
+### Checked and not proposed (part five hundred ninety-one)
+
+- **`THIRD-PARTY-NOTICES.txt` is not an unvalidated second copy of the component
+  list, and it first appeared to be.** Its lines 10-21 and 28 restate all 13
+  components and versions that `eng/release/third-party-components.json` declares,
+  and its own line 5 names that JSON as authoritative - the classic shape of a
+  hand-maintained duplicate. It is not one: every declared component's
+  `id`/`version` pair is required to appear in the notice at release-evidence time.
+  R1305 is the narrow residual - the check has no reverse direction - and the
+  duplication itself is enforced and fine. This was checked before filing
+  precisely because the "second hand-maintained list" reading was the obvious one.
+- **R491 remains accurate and is not superseded.** It records that the `version`
+  field in the manifest is read by no *correctness* check and that
+  `Test-SharpProofThirdPartyComponentProjection` compares the manifest to itself.
+  That is about the manifest against reality. R1305 is about the notice against
+  the manifest - a different pair of documents and a different missing direction.
+  The two together mean the version string is copied from the manifest into the
+  notice and into `SharpProof.spdx.json` with the manifest itself checked against
+  nothing, which is worth stating explicitly since neither finding says it alone.
+- **`PackageLayoutSmokeTests` checks the notice's presence, not its content.**
+  `:1955` and `:1974` list `THIRD-PARTY-NOTICES.txt` among the expected archive
+  entries for both packages, inside `AssertArchiveLayout` calls that do assert
+  exact entry sets. That is a real check and it is why the file cannot silently
+  stop shipping; it says nothing about what the file contains.
+- **All 13 notice versions match the manifest today**, verified by parsing both
+  and comparing, so nothing in this part is an observed defect.
+
+### Status (part five hundred ninety-one)
+
+R1305 is `pending` and is a few lines inside a function that already demonstrates
+the technique. It is worth more than its size because the artifact is a legal
+notice in a published package: the failure mode is not a broken build but a
+correct-looking attribution for software the product no longer redistributes, and
+nothing in the release pipeline would report it.
