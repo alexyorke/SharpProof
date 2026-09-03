@@ -15867,3 +15867,25 @@ DevCheckCommandPlanTests keeps DebugCommandIds and ReleaseCommandIds as separate
 | ID | Finding | Evidence |
 |---|---|---|
 | R1324 | **DevCheckCommandPlanTests duplicates the seven command IDs shared by DebugCommandIds and ReleaseCommandIds. Define one shared ordered command sequence and model the Debug-only package-product-build row explicitly, preserving the configuration-specific count and order assertions.** | SharpProof.ArchitectureTest/DevCheckCommandPlanTests.cs:11-46 |
+
+## Second survey, continued: R1325 - marker attributes repeat empty constructors
+
+DoesNotThrowAttribute, EnforcePureAttribute, and ZeroAllocationsAttribute each declare the same public parameterless constructor whose body is empty. NotNullAttribute and PositiveAttribute do the same in ClosedContractAttributes. With no instance fields or initialization, C# supplies an equivalent public parameterless constructor when no other constructor exists. If constructor-specific XML documentation is not required, removing the five bodies reduces repeated API boilerplate while preserving the public attribute activation syntax; InRange and argument-taking attributes remain explicit.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1325 | **Five marker attributes repeat explicit empty public parameterless constructors. If constructor-specific documentation is not an API requirement, rely on the compiler-supplied public constructor and remove the empty bodies while preserving the public attribute signature.** | SharpProof.Attributes/DoesNotThrowAttribute.cs:5-10; EnforcePureAttribute.cs:5-10; ZeroAllocationsAttribute.cs:5-10; ClosedContractAttributes.cs:7-24 |
+## Second survey, continued: R1326 - contained-path fixture helper masks unexpected exceptions
+
+Test-SharpProofContainedPathFixtures.Require-Rejection catches every exception from Resolve-SharpProofContainedPath and treats it as the intended rejection; only the helper's own 'fixture was accepted' exception is rethrown. A fixture typo, missing directory, platform API failure, or unrelated argument error can therefore make a rejection case pass. Assert the expected exception type and containment-failure shape so these tests distinguish a real boundary rejection from an unexpected test failure.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1326 | **Test-SharpProofContainedPathFixtures.Require-Rejection masks unexpected failures by accepting any exception as a valid rejection. Assert the expected exception type and message/parameter contract so broken fixtures cannot pass as containment coverage.** | scripts/Test-SharpProofContainedPathFixtures.ps1:12-20,34-50,52-67 |
+## Second survey, continued: R1327 - mutation-baseline fixture helper accepts any exception
+
+Test-SharpProofMutationBaselines.Assert-Throws catches any exception and returns without checking its type or message. The surrounding cases intend to distinguish a rejected exit code, timeout, missing TRX evidence, and order-contamination result, but an unrelated parser, path, or null-reference failure would satisfy the same helper. Return the caught exception or use a typed assertion and retain the caller-specific expected-failure messages.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1327 | **Test-SharpProofMutationBaselines.Assert-Throws accepts every exception as the expected failure. Check the exception type and relevant message/condition, preserving the four distinct negative-fixture contracts instead of allowing unrelated errors to pass.** | scripts/Test-SharpProofMutationBaselines.ps1:9-14,52-65,77-81 |
