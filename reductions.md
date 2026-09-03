@@ -17934,3 +17934,19 @@ R1402 is applied: corpus transaction destination canonicalization now fills
 the ordered destination array, checks containment, and records duplicate
 targets in one pass, preserving containment-first error precedence and the
 original uniqueness diagnostic. `CorpusGateTests` pass (23/23).
+
+## Second survey, continued: R1526 - the analyzer-session cancellation cases compile the same fixture once per lazy-path case
+
+`AnalyzerSessionCancellationTests.CancellationStopsLazyContractInitialization` is parameterized over the two lazy initialization methods, but both invocations create the same one-method compilation, session, and already-canceled token. Only the selected session call differs. A fixture-scoped compilation/session setup (with a fresh cancellation token per case) or a small shared harness can retain both cancellation paths while removing the duplicate parse/bind setup.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1526 | **Two `[TestCase]` rows rebuild an identical analyzer session before selecting the operation under test.** `resolveContractSource` changes only whether `IsContractCompanion` or `GetContractClauses` is called; lines 16-32 construct the same source, method symbol, canceled token, and `AnalyzerSession` for both rows. Reusing the immutable compilation and method while keeping cancellation state case-local removes one redundant compilation without merging the two lazy paths. | `SharpProof.Analyzer.Test/AnalyzerSessionCancellationTests.cs:11-49` |
+
+## Second survey, continued: R1527 - the analyzer-diagnostic generator repeats the same uniqueness-validation loop for two catalog sections
+
+`Generate-AnalyzerDiagnosticCatalog.ps1` creates `seenIntrinsic` and `seenPlacement`, iterates each JSON section, and performs the same add-and-throw-on-duplicate shape before emitting C# lines. The key construction and diagnostic wording differ, so the catalog projections should remain separate, but a narrow uniqueness helper can own the shared `HashSet` admission/duplicate failure pattern and make future sections use one validation idiom.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1527 | **The analyzer-diagnostic generator has two copies of the same set-admission guard.** The intrinsic loop at lines 40-46 and placement loop at lines 62-67 each allocate an ordinal `HashSet`, call `.Add`, and throw when the key is repeated; only the key expression and message differ. A small helper accepting the key and failure text would remove the repeated validation skeleton without merging the distinct generated switch arms. | `scripts/Generate-AnalyzerDiagnosticCatalog.ps1:40-46,62-67` |
