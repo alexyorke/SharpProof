@@ -1808,7 +1808,7 @@ public sealed class WorkerTests
 
         Assert.That(backend.CallCount, Is.EqualTo(requests.Count));
         Assert.That(
-            Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+            CacheFiles(project),
             Has.Length.EqualTo(requests.Count));
 
         void Add(
@@ -4545,9 +4545,7 @@ public sealed class WorkerTests
             Is.EqualTo(WorkerClaimOutcome.Unknown));
         AssertSemanticallyEquivalent(first, second);
         Assert.That(
-            Directory.Exists(project.CacheDirectory)
-                ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
-                : [],
+            CacheFiles(project),
             Is.Empty);
     }
 
@@ -4875,7 +4873,7 @@ public sealed class WorkerTests
             Assert.That(first.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
             Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
             Assert.That(
-                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                CacheFiles(project),
                 Is.Empty);
         }
     }
@@ -4901,7 +4899,7 @@ public sealed class WorkerTests
             Assert.That(second.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Unavailable));
             Assert.That(backend.CallCount, Is.EqualTo(2));
             Assert.That(
-                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                CacheFiles(project),
                 Is.Empty);
         }
     }
@@ -4970,7 +4968,7 @@ public sealed class WorkerTests
             Assert.That(hit.Summary.CacheStatus, Is.EqualTo(WorkerCacheStatus.Hit));
             Assert.That(backend.CallCount, Is.EqualTo(2));
             Assert.That(
-                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                CacheFiles(project),
                 Is.EqualTo(new[] { newest }));
         }
     }
@@ -4999,7 +4997,7 @@ public sealed class WorkerTests
             var canceled = await worker.VerifyAsync(request, cancellation.Token);
             Assert.That(canceled.RunStatus, Is.EqualTo(WorkerRunStatus.Canceled));
             Assert.That(
-                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                CacheFiles(project),
                 Is.Empty);
         }
         finally
@@ -5277,7 +5275,7 @@ public sealed class WorkerTests
                 cached.Summary.CacheStatus,
                 Is.EqualTo(WorkerCacheStatus.Hit));
             Assert.That(
-                Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+                CacheFiles(project),
                 Has.Length.EqualTo(1));
         }
     }
@@ -5960,7 +5958,7 @@ public sealed class WorkerTests
         Assert.That(backend.CallCount, Is.EqualTo(2));
         Assert.That(second.InputHash, Is.Not.EqualTo(first.InputHash));
         Assert.That(
-            Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json"),
+            CacheFiles(project),
             Has.Length.EqualTo(2));
     }
 
@@ -5997,9 +5995,7 @@ public sealed class WorkerTests
             Assert.That(WorkerProtocolJson.Validate(response).IsValid, Is.True);
         }
         Assert.That(
-            Directory.Exists(project.CacheDirectory)
-                ? Directory.GetFiles(project.CacheDirectory, "*.sharp-proof-cache.json")
-                : [],
+            CacheFiles(project),
             Is.Empty);
     }
 

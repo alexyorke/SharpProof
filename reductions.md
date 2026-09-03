@@ -187,6 +187,7 @@ the smallest relevant containerized test target passes.
 | R620 | Share Meta-analyzer local-write candidate enumeration | `SharpProof.Meta.Analyzers.Test`: SharpProofSoundnessAnalyzerTests, 162 passed |
 | R621 | Share Worker artifact-authority verification baseline | `SharpProof.Worker.Test`: WorkerTests, 148 passed |
 | R060 | Share the safe single-run Worker fixture setup through a response-only helper; retain explicit project/request ownership for mutation, cache, multi-run, and custom-factory cases | `SharpProof.Worker.Test`: WorkerTests, 148 passed |
+| R094 | Reuse `CacheFiles(project)` for all remaining Worker cache-file assertions | `SharpProof.Worker.Test`: WorkerTests, 148 passed |
 | R625 | Hash already-normalized corpus text without a second line-ending scan | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R623 | Share corpus observation collection between gate execution and snapshot rendering | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R869 | Validate IR sequence elements while taking the immutable snapshot | `SharpProof.Ir.Test`: 114 passed |
@@ -425,7 +426,7 @@ status document.
 | R038-R039, R041 | These alter soundness-sensitive traversal, pattern, or replay-candidate ordering; defer to a dedicated semantic refactor. |
 | R007-R009 | Compiler-probe JSON bytes, artifact authority, and IL opcode admission are compatibility/soundness boundaries; defer to focused format work. |
 | R027-R031 | Generalizing process, temporary-directory, and package-test setup changes cleanup/lifetime semantics across many fixtures; defer after the shared root/default work already removed the exact duplication. |
-| R057, R087-R096, R104-R105 | These parameterize or abstract large test fixtures; keep named failure isolation and local arrange/assert evidence in this reduction pass. |
+| R057, R087-R093, R095-R096, R104-R105 | These parameterize or abstract large test fixtures; keep named failure isolation and local arrange/assert evidence in this reduction pass. |
 | R066-R070 | These change sample/pilot inheritance, scheduled validation, packaged imports, workflow setup, or automatic production-project classification. |
 | R072, R074, R076 | Shared shard/coverage/timing orchestration would centralize timeout, process, and atomic-publication semantics; treat as dedicated infrastructure work. |
 | R078-R080, R082-R085 | Soundness-critical recursive traversal, dispatch, alias, and abstract-value changes are deferred as requested. |
@@ -469,7 +470,7 @@ Merged IDs are not separate work items and must not be counted twice.
 
 ## Pending queue
 
-The active follow-up queue is R087-R094, R096, R104-R105,
+The active follow-up queue is R087-R093, R096, R104-R105,
 R107, R149, R165, R169, R171-R185, R194, R211, R217-R218, and R221.
 Each still requires current-tree validation before implementation. The other
 items in the Deferred table are intentional behavior, public API, release
