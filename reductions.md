@@ -10837,7 +10837,9 @@ as `NAME=VALUE` on the Compose command line without mutating the host process;
 
 ### Status (part two hundred sixty)
 
-R1029 is pending: remove the dead file cleanup from `loop-command.sh`.
+R1029 is applied: loop synchronization now relies on the `/tmp` manifest's
+EXIT cleanup and no longer removes the never-created `.git` path; shell and
+container-source checks pass.
 
 ## Second survey, part two hundred sixty-one: R1030 - redundant hard reset following detached checkout in loop sync
 
@@ -10849,7 +10851,8 @@ In `eng/container/loop-command.sh`, after cleaning untracked files from the targ
 
 ### Status (part two hundred sixty-one)
 
-R1030 is pending: remove the redundant `git reset --hard` following `git checkout --detach`.
+R1030 is applied: detached checkout is the sole target synchronization step;
+the redundant hard reset is gone and the loop script remains valid.
 
 ## Second survey, part two hundred sixty-two: R1031 - uncleaned archive extraction in native payload preparation
 
@@ -10861,7 +10864,8 @@ R1030 is pending: remove the redundant `git reset --hard` following `git checkou
 
 ### Status (part two hundred sixty-two)
 
-R1031 is pending: clean up the temporary Z3 download and extraction trees in `Prepare-NativePayload.ps1`.
+R1031 is applied: native-payload preparation removes the archive and extraction
+tree in `finally`, including failure paths; the container image build passes.
 
 ## Second survey, part two hundred sixty-three: R1032 - unused container directories in Dockerfile
 
@@ -10873,7 +10877,8 @@ In `eng/container/Dockerfile`, lines 69-70 create directories `/workspace/artifa
 
 ### Status (part two hundred sixty-three)
 
-R1032 is pending: remove `/src` and `/workspace/artifacts` from the Dockerfile directory initialization.
+R1032 is applied: the Dockerfile creates only the workspace and required tool
+cache directories; container-source cleanliness checks pass.
 
 ## Second survey, part two hundred sixty-four: R1033 - dropped package source parameter for samples profile
 
@@ -10885,7 +10890,8 @@ In `build.ps1`, the profile switch branch that validates and forwards `-PackageS
 
 ### Status (part two hundred sixty-four)
 
-R1033 is pending: forward `-PackageSource` in `build.ps1` for the samples profile.
+R1033 is applied: the samples profile forwards a nonblank `-PackageSource`,
+preserving the child command's default otherwise; build-profile tests pass.
 
 ## Second survey, part two hundred sixty-five: R1034 - inconsistent workflow run attempt suffix on portable consumer artifacts
 
@@ -10897,7 +10903,8 @@ In `.github/workflows/package-consumers.yml`, the portable consumer receipts upl
 
 ### Status (part two hundred sixty-five)
 
-R1034 is pending: append `-${{ github.run_attempt }}` to portable consumer artifact uploads.
+R1034 is applied: portable consumer receipt and report artifact names include
+`${{ github.run_attempt }}` and no longer collide on reruns.
 
 ## Second survey, part two hundred sixty-six: R1035 - redundant packages permission on reusable security workflow calls
 
@@ -10909,7 +10916,8 @@ Both `.github/workflows/security.yml` and `.github/workflows/package-consumers.y
 
 ### Status (part two hundred sixty-six)
 
-R1035 is pending: remove `packages: read` from the reusable security workflow call sites.
+R1035 is applied: reusable security workflow callers request only the
+permissions they use; dependency-automation checks pass.
 
 ## Second survey, part two hundred sixty-seven: R1036 - dynamic script slicing for acceptance timing validation
 
@@ -10921,7 +10929,9 @@ R1035 is pending: remove `packages: read` from the reusable security workflow ca
 
 ### Status (part two hundred sixty-seven)
 
-R1036 is pending: factor `Test-AcceptanceTimingTimeline` into an acceptance module and load phase names from `contract.json`.
+R1036 is deferred: the timing function is part of the acceptance contract's
+trusted Verify authority, and moving it to a new module would expand the
+trusted-computing-base surface without a net source reduction.
 
 ## Second survey, part two hundred sixty-eight: R1037 - tautological publication action test in release publishing
 
@@ -10933,7 +10943,8 @@ In `scripts/Publish-SharpProofRelease.ps1`, for each package being published, th
 
 ### Status (part two hundred sixty-eight)
 
-R1037 is pending: remove the redundant `Test-SharpProofPublicationActionAuthority` call from the release publication loop.
+R1037 is applied: publication no longer reconstructs and self-validates the
+newly created action; release publication tests pass.
 
 ## Second survey, part two hundred sixty-nine: R1038 - unreachable `NoBuild` removal branch in developer check
 
@@ -10945,7 +10956,8 @@ In `scripts/Invoke-SharpProofDevCheck.ps1`, lines 60-69 strictly validate that a
 
 ### Status (part two hundred sixty-nine)
 
-R1038 is pending: remove the dead `NoBuild` removal condition in `Invoke-SharpProofDevCheck.ps1`.
+R1038 is applied: developer-check packaging commands pass their validated
+`NoBuild` value directly; the unreachable removal branch is gone.
 
 ## Second survey, part two hundred seventy: R1039 - redundant empty collection guards around `Require-ExactSet`
 
@@ -10957,7 +10969,8 @@ R1038 is pending: remove the dead `NoBuild` removal condition in `Invoke-SharpPr
 
 ### Status (part two hundred seventy)
 
-R1039 is pending: remove the manual empty-collection checks wrapping `Require-ExactSet`.
+R1039 is applied: release configuration validation calls `Require-ExactSet`
+directly, retaining its empty-set and duplicate handling.
 
 ## Second survey, part two hundred seventy-one: R1040 - empty package source parameter forwarding in container release commands
 
@@ -10969,7 +10982,8 @@ R1039 is pending: remove the manual empty-collection checks wrapping `Require-Ex
 
 ### Status (part two hundred seventy-one)
 
-R1040 is pending: guard `-PackageSource` forwarding in container release commands to preserve child script defaults.
+R1040 is applied: release qualification and publication forward `-PackageSource`
+only when supplied, preserving the child script default.
 
 ## Second survey, part two hundred seventy-two: R1041 - duplicate process-not-found errno constants and literals
 
@@ -11053,7 +11067,8 @@ In `SharpProof.Worker.Launcher/Program.cs`, `ValidateDotNetHostPath` joins five 
 
 ### Status (part two hundred seventy-eight)
 
-R1047 is pending: replace bitwise operators with short-circuiting boolean operators in launcher path and option validation.
+R1047 is applied: launcher validation uses short-circuiting logical operators;
+launcher/package tests pass (90 passed).
 
 ## Second survey, part two hundred seventy-nine: R1048 - artificial loop splitting in launcher publication commit
 
@@ -11065,7 +11080,8 @@ In `SharpProof.Worker.Launcher/Program.cs`, `PublishOutputs` iterates over `memb
 
 ### Status (part two hundred seventy-nine)
 
-R1048 is pending: iterate all publication members in one loop and set `commitStarted` once before publication begins.
+R1048 is applied: publication iterates all members uniformly and sets the
+rollback boundary once before the loop; launcher/package tests pass (90).
 
 ## Second survey, part two hundred eighty: R1049 - duplicate exception catch blocks in publication backup capture
 
@@ -11077,7 +11093,8 @@ In `SharpProof.Worker.Launcher/Program.cs`, `CapturePreviousPublication` defines
 
 ### Status (part two hundred eighty)
 
-R1049 is pending: consolidate the two catch blocks into a single filtered exception handler.
+R1049 is applied: backup capture uses one filtered filesystem-exception handler;
+launcher/package tests pass (90).
 
 ## Second survey, part two hundred eighty-one: R1050 - duplicated publication staging cleanup across commit and rollback
 
@@ -11089,7 +11106,8 @@ In `SharpProof.Worker.Launcher/Program.cs`, `PublishOutputs` and `RestorePreviou
 
 ### Status (part two hundred eighty-one)
 
-R1050 is pending: extract a shared staging cleanup helper for publication commit and rollback.
+R1050 is applied: commit and rollback share `CleanupPublicationStaging`; the
+launcher/package test suite passes (90).
 
 ## Second survey, part two hundred eighty-two: R1051 - repeated path validation on stable cache paths
 
@@ -11101,7 +11119,9 @@ In `SharpProof.Worker/VerificationCache.cs`, `ValidatePath` calls `LinuxPathIden
 
 ### Status (part two hundred eighty-two)
 
-R1051 is pending: validate cache paths once upon operation entry rather than repeating validation before each filesystem call.
+R1051 is deferred: repeated containment checks are deliberate defense-in-depth
+around cache filesystem operations; removing them would weaken a security
+boundary for a small line-count saving.
 
 ## Second survey, part two hundred eighty-three: R1052 - transient allocations in cache transaction recovery and capacity staging
 
@@ -11125,7 +11145,8 @@ In `SharpProof.Worker/VerificationCache.cs`, `RestoreStaged` and `RestorePreviou
 
 ### Status (part two hundred eighty-four)
 
-R1053 is pending: extract a shared `TryRestoreFile` helper in `VerificationCache`.
+R1053 is applied: rollback and eviction recovery share `TryRestoreFile`, while
+their distinct path ownership checks remain explicit; Worker tests pass.
 
 ## Second survey, part two hundred eighty-five: R1054 - redundant term rewriting of invariant execution conditions in CallableVerifier
 
@@ -11137,7 +11158,8 @@ In `SharpProof.Worker/CallableVerifier.cs`, within the outer loop over all `ensu
 
 ### Status (part two hundred eighty-five)
 
-R1054 is pending: pre-project path execution conditions outside the postcondition loop in `CallableVerifier`.
+R1054 is applied: return-path execution conditions are rewritten once before
+postcondition projection; Worker tests pass.
 
 ## Second survey, part two hundred eighty-six: R1055 - redundant secondary proof-label sorting in CallableEntryFeasibility
 
@@ -11149,7 +11171,8 @@ In `SharpProof.Worker/CallableEntryFeasibility.cs`, `CallableEntryFeasibility.Co
 
 ### Status (part two hundred eighty-six)
 
-R1055 is pending: remove secondary proof core label sorting in `CallableEntryFeasibility`.
+R1055 is applied: normalized proof-core labels are reused without a second
+distinct/sort pass; Worker tests pass.
 
 ## Second survey, part two hundred eighty-seven: R1056 - transient heap allocation in WorkerInputSnapshot UTF-8 BOM check
 
@@ -11161,7 +11184,8 @@ In `SharpProof.Worker/WorkerInputSnapshot.cs`, line 58 tests for a UTF-8 BOM by 
 
 ### Status (part two hundred eighty-seven)
 
-R1056 is pending: replace the byte array allocation in `DecodeUtf8` with a static span literal.
+R1056 is applied: UTF-8 BOM detection uses a static span and allocates no
+temporary byte array; Worker tests pass.
 
 ## Second survey, part two hundred eighty-eight: R1057 - redundant double cancellation check in SharpProofWorker.Assemble
 
@@ -11173,7 +11197,8 @@ In `SharpProof.Worker/SharpProofWorker.cs`, `Assemble` calls `projectBoundary.To
 
 ### Status (part two hundred eighty-eight)
 
-R1057 is pending: remove the duplicate cancellation throw inside `SharpProofWorker.Assemble`.
+R1057 is applied: synchronous assembly has one cancellation boundary; Worker
+tests pass.
 
 ## Second survey, part two hundred eighty-nine: R1058 - JSON serialization for WorkerBudgets equality comparison in ValidateResponse
 
@@ -11317,7 +11342,8 @@ In `SharpProof.Worker.Test/CompilerManifestArtifactTests.cs`, `AssertMalformedAd
 
 ### Status (part three hundred)
 
-R1069 is pending: delegate `AssertMalformedAdditionalFiles` to `AssertMalformedCapture`.
+R1069 is applied: additional-file corruption cases reuse the common malformed
+capture harness; CompilerManifestArtifactTests pass (91).
 
 ## Second survey, part three hundred one: R1070 - redundant nested artifact clone before canonical round-tripping
 
@@ -11329,7 +11355,8 @@ In `SharpProof.Worker.Test/CompilerManifestArtifactTests.cs` line 1503, the test
 
 ### Status (part three hundred one)
 
-R1070 is pending: remove the redundant `CloneArtifact` call before `CanonicalRoundTrip`.
+R1070 is applied: canonical round-tripping no longer performs a redundant
+pre-clone; CompilerManifestArtifactTests pass (91).
 
 ## Second survey, part three hundred two: R1071 - duplicated interval assertion envelope in wave-six lowerer tests
 
@@ -11401,7 +11428,8 @@ R1075 is deferred: adopt the linked `TempDirectory` helper across `ContainerCont
 
 ### Status (part three hundred seven)
 
-R1076 is pending: change `SharpProofAnalyzerEngine.SupportedDiagnostics` from an expression-bodied property to a static get-only property.
+R1076 is applied: supported diagnostics are initialized once in a static
+get-only property; analyzer tests pass.
 
 ## Second survey, part three hundred eight: R1077 - redundant syntax traversal and symbol lookup in member initializer analysis
 
@@ -11413,7 +11441,8 @@ In `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs`, `AnalyzeMemberInitiali
 
 ### Status (part three hundred eight)
 
-R1077 is pending: pass the resolved type symbol directly into `CanReachMemberInitializer`.
+R1077 is applied: member-initializer analysis reuses its caller-resolved type
+symbol instead of a second syntax walk; analyzer tests pass.
 
 ## Second survey, part three hundred nine: R1078 - LINQ allocation in implicit base constructor resolution
 
@@ -11425,7 +11454,8 @@ In `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs`, `TryGetImplicitBaseCo
 
 ### Status (part three hundred nine)
 
-R1078 is pending: replace LINQ filtering with a non-allocating loop in `TryGetImplicitBaseConstructor`.
+R1078 is applied: implicit base-constructor selection uses a direct unique-match
+loop; analyzer tests pass.
 
 ## Second survey, part three hundred ten: R1079 - redundant nested SpecReuseSessionFactory in analyzer tests
 
@@ -11437,7 +11467,8 @@ In `SharpProof.Analyzer.Test/AnalyzerModeAndEffectTests.cs`, lines 3718-3736 def
 
 ### Status (part three hundred ten)
 
-R1079 is pending: replace `SpecReuseSessionFactory` with `RecordingSessionFactory` and delete the nested class.
+R1079 is applied: analyzer tests use the shared `RecordingSessionFactory`; the
+redundant nested factory is gone.
 
 ## Second survey, part three hundred eleven: R1080 - redundant Cast<MetadataReference> in analyzer test host reference setup
 
@@ -11449,7 +11480,8 @@ In `SharpProof.Analyzer.Test/AnalyzerTestHost.cs`, lines 270-276 call `MetadataR
 
 ### Status (part three hundred eleven)
 
-R1080 is pending: remove `.Cast<MetadataReference>()` from `AnalyzerTestHost.CreateReferences`.
+R1080 is applied: metadata references are passed through without an identity
+cast; analyzer tests pass.
 
 ## Second survey, part three hundred twelve: R1081 - redundant Distinct call on deduplicated type symbols in ContractFor validation
 
@@ -11461,7 +11493,8 @@ In `SharpProof.Analyzer.Core/ContractForValidation/ContractForValidationEngine.c
 
 ### Status (part three hundred twelve)
 
-R1081 is pending: remove the redundant `Distinct` call in `ResolveCompanions`.
+R1081 is applied: companion resolution iterates the already-deduplicated
+candidates directly; analyzer tests pass.
 
 ## Second survey, part three hundred thirteen: R1082 - private PotentialExceptions shadow record struct duplicating EffectThrowSet
 
@@ -11605,7 +11638,8 @@ R1092 is deferred: replace `GroupBy` duplicate detection with an adjacent-elemen
 
 ### Status (part three hundred twenty-four)
 
-R1093 is pending: call `TestRepository.FindRoot()` in `PublicApiDocumentationTests`.
+R1093 is refuted/stale: the current documentation test resolves its generated
+XML beside the test assembly and contains no hand-rolled repository-root walk.
 
 ## Second survey, part three hundred twenty-five: R1094 - hand-rolled process runner in API-spec catalog generation tests
 
@@ -11653,7 +11687,8 @@ R1096 is deferred: maintain a hash set for pre-state values and cache `VariableB
 
 ### Status (part three hundred twenty-eight)
 
-R1097 is pending: replace `Capture<TException>` with `Assert.Throws<TException>` in `ContractApiTests`.
+R1097 is applied: contract API tests use NUnit's typed `Assert.Throws` directly;
+the custom capture helper is gone.
 
 ## Second survey, part three hundred twenty-nine: R1098 - duplicate direct contract fallback resolution construction
 
@@ -11665,7 +11700,8 @@ In `SharpProof.Contracts/EffectiveContractSourceResolver.cs`, lines 88-99 constr
 
 ### Status (part three hundred twenty-nine)
 
-R1098 is pending: construct the direct fallback resolution record once in `EffectiveContractSourceResolver`.
+R1098 is applied: `EffectiveContractSourceResolver` constructs one direct
+fallback record and reuses it across companion-resolution exits.
 
 ## Second survey, part three hundred thirty: R1099 - redundant boolean flag in ContractBinder private constructor
 
@@ -11797,7 +11833,8 @@ R1108 is applied: extract an assertion helper for finite-domain differential ora
 
 ### Status (part three hundred forty)
 
-R1109 is pending: forward `GITHUB_ACTIONS` through the container environment to ensure CI builds enforce locked package restore as designed.
+R1109 is applied: Compose forwards `GITHUB_ACTIONS` into tooling containers, so
+CI activates the existing locked-restore property without changing local runs.
 
 ## Second survey, part three hundred forty-one: R1110 - repeated release-version fixture values
 
