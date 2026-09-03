@@ -15083,6 +15083,13 @@ single-projection API. Contract wire-parity tests pass (19 passed).
 |---|---|---|
 | R1245 | **`RequiresCallSite` resolves exact virtual/interface dispatch twice for accepted calls.** Discovery computes `ResolveExactTarget` for precondition admission, then `CreateCandidate` retains the unresolved `call.TargetMethod`; analysis recomputes the same target from the unchanged instance before binding. Carry the resolved target across the candidate boundary to avoid the duplicate dispatch walk. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:59-78,314-331`; `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:302-327`; `SharpProof.Analyzer.Core/RequiresCallSiteDispatch.cs:5-47` |
 
+### Status (part five hundred sixty-seven)
+
+R1245 is applied: accepted call-site candidates retain discovery's resolved
+dispatch target, while candidates constructed elsewhere still use the existing
+resolver fallback. Requires-call-site discovery and requires/control tests pass
+(44 and 92 passed, respectively).
+
 ## Second survey, part five hundred sixty-eight: R1246 - formatted interpolation facts are resolved twice in one scan
 
 `OperationEffectScanner.ScanInterpolatedString` first calls `ResolveFormattedValue` for an interpolation expression and immediately calls `CanFormattedValueCompleteNormally` with the same expression, origin, compilation, and abstract-flow instance. Both resolver paths independently unwrap implicit conversions, test string/null/abstract-null cases, derive the receiver type, and resolve the formatting target and dispatch policy. A shared formatted-value projection can feed the effect summary and the completion check while leaving the call resolver and completion evaluator as separate consumers.
