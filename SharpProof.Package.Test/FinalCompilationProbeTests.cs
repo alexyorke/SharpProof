@@ -320,16 +320,11 @@ public sealed class FinalCompilationProbeTests
             .ToArray();
         foreach (var expectedSuffix in new[] { "Subject.cs", CompilerProbeContract.ContractHintName })
         {
-            var probeTree = probe.SyntaxTrees
-                .Select(static text => JsonDocument.Parse(text))
-                .Single(tree => (tree.RootElement.GetProperty("path").GetString() ?? string.Empty)
-                    .EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase));
-            var probeHash = probeTree.RootElement.GetProperty("textSha256").GetString();
+            var probeHash = probe.GetTreeChecksum(expectedSuffix);
             var manifestHash = trees.Single(tree => tree.Path.EndsWith(
                 expectedSuffix, StringComparison.OrdinalIgnoreCase)).Sha256;
             Assert.That(manifestHash, Is.EqualTo(probeHash),
                 "compiler manifest syntax-tree provenance: " + expectedSuffix);
-            probeTree.Dispose();
         }
 
         var additionalPath = compilation.GetProperty("additionalFiles")

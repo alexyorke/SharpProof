@@ -11013,6 +11013,10 @@ In `SharpProof.Package.Test/FinalCompilationProbeTests.cs`, `AssertManifestBinds
 
 R1042 is deferred: call `probe.GetTreeChecksum` in `AssertManifestBindsProbeInputs` and remove the redundant parsing.
 
+R1042 is applied: manifest/probe binding now uses the existing `ProbeArtifact.GetTreeChecksum` helper, removing repeated JSON parsing and the leaked unmatched documents. `FinalCompilationProbeTests` pass (7/7).
+
+R1042 is applied: manifest/probe binding now uses the existing `ProbeArtifact.GetTreeChecksum` helper, removing repeated JSON parsing and the leaked unmatched documents. `FinalCompilationProbeTests` pass.
+
 ## Second survey, part two hundred seventy-four: R1043 - inert package metadata property groups shadowed by custom nuspec files
 
 `SharpProof.Package.csproj` and `SharpProof.Verifier.csproj` both define `<PropertyGroup>` blocks specifying package metadata properties such as `<PackageId>`, `<Title>`, `<Description>`, and `<PackageTags>`. However, both projects configure `<NuspecFile>` (`SharpProof.nuspec` and `SharpProof.Verifier.nuspec`), which causes NuGet to ignore project-level package metadata and read strictly from the `.nuspec` file. The csproj property groups are completely inert, and in the case of `Description`, drift from the actual text in the nuspec file. Removing the dead property groups cleans up project files and removes misleading configuration.
