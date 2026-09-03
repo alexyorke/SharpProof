@@ -14103,3 +14103,18 @@ classification.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1189 | **`ExceptionHandlerReachability.GetReachableSwitchCases` computes each pattern selection twice.** A pattern clause is passed to `GetPatternSelection` for `patternSelection`, then the same call is repeated inside `clauseSelection` before `ApplySwitchGuard`; all five inputs are unchanged. Applying the guard to the cached first result preserves clause reachability and stop-selection behavior while eliminating the duplicate pattern analysis. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1448-1491` |
+
+## Second survey, part five hundred twelve: R1190 - switch clause completion facts are recomputed
+
+After a clause is admitted, `CanCaseClauseReachBody` checks whether its pattern
+completes and, for a non-constant guard, whether that guard completes. The
+same loop then evaluates `canCompleteNormally` for the pattern again when an
+unavoidable pattern is a barrier, and for the guard again when the unguarded
+pattern selection is `Always`. Those calls are conditional and therefore do
+not fire for every clause, but when they do they query unchanged operation
+facts. Carry the pattern/guard completion facts into the stop-selection
+decision, preserving the separate selection and barrier predicates.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1190 | **`ExceptionHandlerReachability.GetReachableSwitchCases` can recheck a clause's pattern and guard completion.** `CanCaseClauseReachBody` calls `canCompleteNormally` for the pattern and non-constant guard, while the following `stopsSelection` expression can call the same predicate again for the barrier pattern and for an `Always` pattern's guard. A clause-completion projection can share those results without changing the ordered switch stop rules. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1492-1520,1668-1697` |
