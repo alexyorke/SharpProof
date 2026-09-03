@@ -232,18 +232,13 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             var canceled = _cancellationSignal.IsSet;
             if (timedOut)
             {
-                var processWasAlive = !process.HasExited;
-                var contained = TryTerminate(
+                TerminateAfterTimeout(
                     process,
                     processGroupId,
-                    RemainingMilliseconds(
-                        processStopwatch,
-                        processTimeout));
-                retainCleanupAnchor |= processWasAlive;
-                if (!contained)
-                {
-                    containmentFailed = true;
-                }
+                    processStopwatch,
+                    processTimeout,
+                    ref retainCleanupAnchor,
+                    ref containmentFailed);
                 canceled = _cancellationSignal.IsSet;
                 if (!canceled && !_outputLimitSignal.IsSet)
                 {
@@ -266,15 +261,13 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
             if (!outputCompleted)
             {
                 timedOut = true;
-                var processWasAlive = !process.HasExited;
-                var contained = TryTerminate(
+                TerminateAfterTimeout(
                     process,
                     processGroupId,
-                    RemainingMilliseconds(
-                        processStopwatch,
-                        processTimeout));
-                retainCleanupAnchor |= processWasAlive;
-                containmentFailed |= !contained;
+                    processStopwatch,
+                    processTimeout,
+                    ref retainCleanupAnchor,
+                    ref containmentFailed);
             }
             var outputResult = standardOutput.IsCompletedSuccessfully
                 ? standardOutput.Result
@@ -844,6 +837,23 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
         return remaining <= 0
             ? 0
             : (int)Math.Min(remaining, int.MaxValue);
+    }
+
+    private void TerminateAfterTimeout(
+        Process process,
+        int processGroupId,
+        Stopwatch processStopwatch,
+        int processTimeout,
+        ref bool retainCleanupAnchor,
+        ref bool containmentFailed)
+    {
+        var processWasAlive = !process.HasExited;
+        var contained = TryTerminate(
+            process,
+            processGroupId,
+            RemainingMilliseconds(processStopwatch, processTimeout));
+        retainCleanupAnchor |= processWasAlive;
+        containmentFailed |= !contained;
     }
 
     private bool WaitForExitOrCancellation(
