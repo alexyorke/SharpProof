@@ -8758,3 +8758,47 @@ build-file changes were made during this audit.
 R944 is `applied`: `ContractApiSymbols.TryCreate` now returns immediately when
 the contract API is absent, avoiding an unused compilation-wide selection
 inventory while preserving successful binding and its cached selections.
+
+## Second survey, part four hundred fifty-five: R945 - linear operation-support membership
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R945 | **`OperationSupportCatalog.IsSupported` linearly scans the generated support array for every query.** The catalog projection stores the contract-expression and effect-discovery operation kinds as static arrays, and `IsSupported` calls `Contains(kind)` on the selected array. `OperationSubsetClassifier` can call this for public classification/snapshot work, while the effect gate may inspect every operation in a body; the larger effect array therefore turns a fixed catalog lookup into a repeated linear search. Generating a `FrozenSet`, a compact enum-indexed bitmap, or a direct switch can preserve the declarative catalog and unknown-stage failure while making membership independent of catalog length. | `SharpProof.Frontend/OperationSupportCatalog.cs:13-20`; generated arrays `SharpProof.Frontend/OperationSupportCatalog.generated.cs:10-93`; callers `SharpProof.Frontend/OperationSubsetClassifier.cs:17-33` and `SharpProof.Analyzer.Core/LanguageSubsetGate.cs:36-80` |
+
+### Status (part four hundred fifty-five)
+
+R945 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred fifty-six: R946 - per-line legacy-marker table allocation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R946 | **`RunVerifier.TryParseLegacyDiagnostic` rebuilds the same four marker records for every legacy stderr line.** The severity, diagnostic code, and marker text are all derived from stable `VerifierDiagnosticCodes` constants, yet the method allocates a new tuple array and interpolated marker strings on each call before searching the line. A private static readonly marker table can reuse those values while retaining the current reverse-location search, marker precedence, and independent warning/error handling. | `SharpProof.BuildTasks/RunVerifier.cs:1119-1125,1166-1215`; stable codes `SharpProof.Host/VerifierDiagnosticCodes.cs:3-8` |
+
+### Status (part four hundred fifty-six)
+
+R946 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred fifty-seven: R947 - fixed-schema diagnostic field-set allocation
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R947 | **`VerifierDiagnosticTransport.TryDeserialize` allocates a `HashSet<string>` to validate seven fixed JSON property names.** The accepted schema is closed and each property is later fetched by its known name, so a seven-bit field mask (or equivalent fixed-name switch) can detect duplicates, unknown names, and missing fields without allocating a general-purpose set per diagnostic line. The parse, strict field count, canonical property vocabulary, and final record validation remain unchanged. | `SharpProof.Host/VerifierDiagnosticTransport.cs:43-79` |
+
+### Status (part four hundred fifty-seven)
+
+R947 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
+
+## Second survey, part four hundred fifty-eight: R948 - duplicated supervisor-record line normalization
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R948 | **`RunVerifier.HasSupervisorProtocolRecord` and `FindSupervisorProtocolRecords` duplicate the split-and-trim protocol-line walk.** Both split captured output on `\\n`, remove one trailing `\\r`, and compare with ordinal equality; one searches for an arbitrary expected message and the other tracks the two authenticated supervisor records. A shared line enumerator or normalization helper can retain the single-record test's arbitrary message and the two-record test's early completion while removing the duplicated framing logic. | `SharpProof.BuildTasks/RunVerifier.cs:481-517`; test calls `SharpProof.Package.Test/BuildTaskTests.cs:74-88` |
+
+### Status (part four hundred fifty-eight)
+
+R948 is `deferred`: this is a ledger-only observation, and no implementation or
+build-file changes were made during this audit.
