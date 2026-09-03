@@ -19207,3 +19207,11 @@ assignment” checks now share one short-circuiting assignment search, with
 separate leaf predicates and polarity. Boolean/integer ordering, cancellation,
 unsupported-type fallback, and environment cleanup remain unchanged. The
 focused finite-domain tests pass (2/2).
+
+## Second survey, continued: R1681 - fuzz oracle repeats indexed generated-method name formatting
+
+The fuzz oracle has two private method-name helpers with the same formatting mechanics. `MethodName(int)` returns a fixed `Target` prefix plus `index.ToString(CultureInfo.InvariantCulture)`, while `SemanticEdgeMethodName(int)` returns `SemanticEdgeMethodPrefix` plus that same invariant index conversion. The prefixes and their call sites should remain distinct, but a small `FormatGeneratedMethodName(string prefix, int index)` helper (or a parameterized method-name helper) can own the shared conversion and prevent a future change to generated-name formatting from updating only one path. This is separate from the already recorded collectible-load lifetime and token-replacement findings.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1681 | The fuzz oracle duplicates invariant indexed-name formatting in `MethodName` and `SemanticEdgeMethodName`; parameterize the prefix while retaining the separate ordinary and semantic-edge names. | `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1553,1586,1597-1606`; related R633 and R696 |
