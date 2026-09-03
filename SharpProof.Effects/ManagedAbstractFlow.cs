@@ -376,8 +376,18 @@ internal sealed class ManagedAbstractFlow
 
     internal ManagedFlowState Assume(ManagedFlowState state, IOperation condition, bool expected)
     {
+        return Assume(state, condition, expected, conditionValue: null);
+    }
+
+    private ManagedFlowState Assume(
+        ManagedFlowState state,
+        IOperation condition,
+        bool expected,
+        ManagedAbstractValue? conditionValue)
+    {
         condition = Unwrap(condition);
-        if (EvaluateCore(condition, state).TryGetBoolean(out var constant))
+        if ((conditionValue ?? EvaluateCore(condition, state))
+            .TryGetBoolean(out var constant))
         {
             return constant == expected ? state : ManagedFlowState.Bottom;
         }
@@ -756,7 +766,8 @@ internal sealed class ManagedAbstractFlow
 
     private ManagedAbstractValue EvaluateConditional(IConditionalOperation operation, ManagedFlowState state)
     {
-        if (EvaluateCore(operation.Condition, state).TryGetBoolean(out var condition))
+        var conditionValue = EvaluateCore(operation.Condition, state);
+        if (conditionValue.TryGetBoolean(out var condition))
         {
             return EvaluateCore(condition ? operation.WhenTrue : operation.WhenFalse!, state);
         }
@@ -764,8 +775,12 @@ internal sealed class ManagedAbstractFlow
         return operation.WhenFalse == null
             ? Unknown
             : ManagedAbstractValue.Join(
-                EvaluateCore(operation.WhenTrue, Assume(state, operation.Condition, true)),
-                EvaluateCore(operation.WhenFalse, Assume(state, operation.Condition, false)));
+                EvaluateCore(
+                    operation.WhenTrue,
+                    Assume(state, operation.Condition, true, conditionValue)),
+                EvaluateCore(
+                    operation.WhenFalse,
+                    Assume(state, operation.Condition, false, conditionValue)));
     }
 
     private ManagedAbstractValue EvaluateCoalesce(ICoalesceOperation operation, ManagedFlowState state)
