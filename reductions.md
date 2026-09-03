@@ -18370,3 +18370,27 @@ directly. `CorpusGateTests` pass (23/23).
 R1510 is applied: corpus support counts are accumulated alongside case-index
 construction in one pass, preserving duplicate-ID detection and all support
 classification values. `CorpusGateTests` pass (23/23).
+
+## Second survey, continued: R1601 - the same terminal-initializer compilation is rebuilt by two tests
+
+**`ModuleInitializerOrderingRegressionTests` rebuilds one immutable two-tree Roslyn compilation for two different analysis-shape assertions.** `TerminalInitializerSuppressesLaterInitializerAndEntryEffects` calls `CreateTerminalCompilation`, creates a session, and analyzes three methods, while `AnalyzeAllUsesTheSameOrderedTerminalInitializerPrefix` calls the same helper again before running `AnalyzeAll`. The helper parses the identical `ZFirst.cs` and `ASecond.cs` trees and passes them to `EffectTestHost.CreateCompilation`; only the session/query surface differs. A static lazy compilation fixture, or one shared setup helper that supplies the same compilation to both assertion paths while keeping separate sessions, can remove repeated parsing and compilation without merging the distinct single-method and `AnalyzeAll` coverage. This is distinct from the already-applied R1023 assertion-helper reduction.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1601 | `ModuleInitializerOrderingRegressionTests` reconstructs the identical terminal-initializer compilation in both tests; cache the immutable `CSharpCompilation` or share a fixture while retaining separate sessions and query paths. | `SharpProof.Effects.Test/ModuleInitializerOrderingRegressionTests.cs:11-22,87-105,107-149` |
+
+## Second survey, continued: R1602 - constructor-path regression tests duplicate their common source fixture
+
+**`MemberInitializerConstructorPathRegressionTests` embeds the same guard, contract call, type, and field initializer twice.** The first test's source and the second test's source both define `Guard.RequireNull`, `Subject`, and `_value = Guard.RequireNull(new object())`; only the root-constructor body changes from an unsuppressed `Contract.Requires(false)` to a suppressed constructor plus a delegating overload. A source-factory parameterized by the constructor declaration, or a shared fixture prefix combined with the two distinct constructor tails, can retain the opposite diagnostic expectations while removing duplicated fixture text and keeping the regression's path distinction explicit.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1602 | The two constructor-path tests repeat the `Guard`/`Subject`/field-initializer fixture and vary only root suppression/delegation; factor the common source or constructor-tail builder. | `SharpProof.Analyzer.Test/MemberInitializerConstructorPathRegressionTests.cs:11-34,42-65` |
+
+## Second survey, continued: R1603 - a two-case IR test rebuilds the same template and factory
+
+**`ApiSpecConditionalNullInstantiationTests.ReferenceNullBranchUsesExactSubstitutedPeerType` repeats its entire IR fixture for both boolean orientations.** Each `[TestCase]` invocation creates the same condition/reference declarations, builds the same API-spec target and postcondition, allocates an `IrFactory`, creates the same `Widget` and variable terms, instantiates the template, and reruns the full assertion envelope; only the two conditional operands and the final expected branch depend on `nullWhenTrue`. A shared immutable declaration/template fixture plus per-case branch selection, or a single table-driven assertion over both orientations, can preserve coverage of both branch positions without reconstructing the common evidence and term setup twice.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1603 | The `true` and `false` cases rebuild the same declarations, API-spec table, IR factory, and instantiation; share the invariant fixture while retaining both null-branch assertions. | `SharpProof.Specs.Test/ApiSpecConditionalNullInstantiationTests.cs:13-16,18-53,55-71,75-93` |
