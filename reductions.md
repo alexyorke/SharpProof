@@ -16659,6 +16659,11 @@ The release-configuration fixture test passes (1 passed).
 |---|---|---|
 | R1378 | `SharpProof.ContainerExecution.psm1` independently loads `contract.json` for solution timeout and CPU-budget decisions. Reuse one per-run contract projection across adjacent calls, especially package tests, without merging the distinct policy validations. | `scripts/SharpProof.ContainerExecution.psm1:264-309,393-435`; callers `scripts/Invoke-SharpProofPackageTests.ps1:35-43`, `scripts/Invoke-SharpProofDevCheck.ps1:20-29` |
 
+R1378 is applied: container execution now caches the parsed acceptance contract
+by repository-root path, so adjacent timeout and CPU-budget policies reuse one
+validated document while retaining their distinct fallback, override, divisor,
+and percentage checks. BuildSchedulingTests pass (25 passed).
+
 R1146 is applied: spec and summary assumptions rely on the final depth sweep,
 which still runs after source-domain and normal-completion assumptions are added;
 the duplicate per-assumption checks are gone. The focused worker claim/lowering

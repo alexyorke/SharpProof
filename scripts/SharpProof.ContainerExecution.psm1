@@ -1,6 +1,24 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $script:SharpProofSolutionTestTimeoutFallbackSeconds = 1800
+$script:SharpProofAcceptanceContractCache = @{}
+
+function Get-SharpProofAcceptanceContract {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot
+    )
+
+    $path = [IO.Path]::GetFullPath((Join-Path `
+            $RepositoryRoot 'eng/acceptance/contract.json'))
+    if (-not $script:SharpProofAcceptanceContractCache.ContainsKey($path)) {
+        $script:SharpProofAcceptanceContractCache[$path] = Get-Content `
+            -LiteralPath $path `
+            -Raw |
+            ConvertFrom-Json
+    }
+    return $script:SharpProofAcceptanceContractCache[$path]
+}
 
 function Assert-SharpProofContainer {
     param(
@@ -288,9 +306,8 @@ function Get-SharpProofCpuBudget {
         return $visibleProcessors
     }
 
-    $contract = Get-Content -LiteralPath (Join-Path `
-        $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
-        ConvertFrom-Json
+    $contract = Get-SharpProofAcceptanceContract `
+        -RepositoryRoot $RepositoryRoot
     if (-not [string]::IsNullOrWhiteSpace($DivisorProperty)) {
         $divisor = [int]$contract.automation.$DivisorProperty
         if ($divisor -lt 1) {
@@ -406,8 +423,8 @@ function Resolve-SharpProofSolutionTestTimeoutSeconds {
     if (-not $WasSpecified) {
         $contractPath = Join-Path $RepositoryRoot 'eng/acceptance/contract.json'
         if (Test-Path -LiteralPath $contractPath -PathType Leaf) {
-            $contract = Get-Content -LiteralPath $contractPath -Raw |
-                ConvertFrom-Json
+            $contract = Get-SharpProofAcceptanceContract `
+                -RepositoryRoot $RepositoryRoot
             $automation = $contract.PSObject.Properties['automation']
             $solutionTestWall = if ($null -eq $automation) {
                 $null
