@@ -14642,6 +14642,12 @@ allocation tests pass (1 passed).
 |---|---|---|
 | R1214 | **`VerificationCache.IsOwnedCacheEntry` uses a LINQ pipeline for a fixed-width filename scan.** The `Take(64).All(IsHexDigit)` expression is evaluated for each enumerated cache candidate even though the method has already established the exact required prefix length. Reusing a direct bounded loop/helper, distinct from the existing predicate-sharing reduction, removes iterator overhead without changing which cache names are accepted. | `SharpProof.Worker/VerificationCache.cs:368-383,526-531` |
 
+### Status (part five hundred thirty-six)
+
+R1214 is applied: cache filename validation now uses a shared bounded hexadecimal
+range loop instead of allocating a LINQ iterator per entry. Cache-related Worker
+tests pass (44 passed).
+
 ## Second survey, part five hundred thirty-seven: R1215 - verifier repeats one normal-completion pattern test
 
 `CallableVerifier.VerifyPostconditionsAsync` derives `normalCompletionProofCore` by testing whether `normalCompletion` is the false Boolean term, then immediately performs the identical pattern test again to initialize `noModeledNormalReturn`. The two locals remain useful for different later decisions, but one boolean can drive both initializations, preserving the vacuity proof-core marker and the later result policy without repeating the type/value pattern match.
