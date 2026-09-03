@@ -14195,6 +14195,12 @@ collection scans without changing default-case admission or ordering.
 |---|---|---|
 | R1191 | **`ExceptionHandlerReachability.GetReachableSwitchCases` scans the case collection up to three times.** The selection pass builds `selected`, a second `foreach (@switch.Cases)` copies its entries into the reachability/scheduling outputs, and `@switch.Cases.Where(selected.ContainsKey).ToArray()` scans all cases again for the return value. Retaining selected cases in source order while populating the side tables can eliminate the latter two collection walks and preserve the existing early-stop and default-case semantics. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1448-1559` |
 
+### Status (part five hundred thirteen)
+
+R1191 is applied: selected switch cases retain source order while the
+reachability and scheduling side tables and returned array are populated in one
+pass. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred fourteen: R1192 - goto continuation membership is quadratic
 
 `IncludeLabeledStatement` builds a mutable continuation list and uses
