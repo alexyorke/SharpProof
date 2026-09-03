@@ -14783,3 +14783,11 @@ Requires-call-site analyzer tests pass (82 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1228 | **`ResolveCompanion` performs two successive filters and allocations for method selection.** It builds `named` from `GetOrdinaryMethods`, then scans that immutable array again to build `matches`; only `named.IsDefaultOrEmpty`, `matches.Length`, and `matches[0]` are consumed. A single pass that tracks name presence, match count, and the unique match removes the redundant buffers and traversal without changing ambiguity or missing-companion classification. | `SharpProof.Contracts/ContractForSymbolMatcher.cs:139-143,297-313` |
+
+## Second survey, part five hundred fifty-one: R1229 - mutable-storage classification repeats the initial type policy
+
+`SharpProofSoundnessAnalyzer.IsMutableStorageType` applies `IsKnownImmutableStorageType(named)` and `IsCompilationScopedWeakCache(named)` in its admission guard, then initializes the base-type loop with that same `named` symbol and evaluates both predicates again before inspecting its members. Any symbol that reaches the loop has already failed both predicates, so the first iteration repeats two type-policy queries; the checks remain necessary for later base types. Carrying the admission result into the loop, or structuring the initial and base-type cases through one classification path, removes only that first duplicate while preserving the early exit and recursive `visiting` behavior.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1229 | **`IsMutableStorageType` rechecks both special-type policies for its first loop item.** The outer guard rejects the starting named type when it is a known immutable or compilation-scoped weak cache, but the loop starts at the same symbol and calls both predicates again. A cached/propagated classification can preserve the base-type checks while eliminating the guaranteed duplicate queries. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:757-783` |
