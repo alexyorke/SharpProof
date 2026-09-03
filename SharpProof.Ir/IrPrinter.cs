@@ -2,7 +2,7 @@ namespace SharpProof.Ir;
 
 public sealed partial class IrPrinter(IrFactory factory)
 {
-    private const int MaxFormatDepth = 1024;
+    private const int MaximumFormatDepth = 1024;
 
     private readonly IrFactory _factory =
         ArgumentNullGuard.NotNull(factory, nameof(factory));
@@ -18,7 +18,7 @@ public sealed partial class IrPrinter(IrFactory factory)
 
     private string FormatChild(IrTerm term)
     {
-        if (_formatDepth >= MaxFormatDepth)
+        if (_formatDepth >= MaximumFormatDepth)
         {
             throw new InvalidOperationException(
                 "IR term exceeds the printer formatting depth limit.");

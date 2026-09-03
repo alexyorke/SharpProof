@@ -2045,6 +2045,30 @@ public sealed class ArchitectureTests
     }
 
     [Test]
+    public void CollectorDepthBudgetsDoNotExceedLoweringBudget()
+    {
+        var root = TestRepository.FindRoot();
+        var loweringDepth = ReadIntegerConstant(
+            root,
+            "SharpProof.Frontend/RoslynOperationLowerer.cs",
+            "MaximumLoweringDepth");
+        var termDepth = ReadIntegerConstant(
+            root,
+            "SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs",
+            "MaximumTermDepth");
+        var dependencyDepth = ReadIntegerConstant(
+            root,
+            "SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs",
+            "MaximumDependencyDepth");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(termDepth, Is.LessThanOrEqualTo(loweringDepth));
+            Assert.That(dependencyDepth, Is.LessThanOrEqualTo(loweringDepth));
+        }
+    }
+
+    [Test]
     public void DeclarativeModelOutputsContainOnlyStorageDeclarations()
     {
         var root = TestRepository.FindRoot();
@@ -2105,6 +2129,24 @@ public sealed class ArchitectureTests
         Assert.That(
             complexity.GetProperty("ceilingRationale").GetString(),
             Does.Contain(binding));
+    }
+
+    private static int ReadIntegerConstant(
+        string root,
+        string relativePath,
+        string name)
+    {
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        var match = Regex.Match(
+            source,
+            $@"(?m)^\s*(?:private|internal|public)\s+const\s+int\s+{Regex.Escape(name)}\s*=\s*(?<value>\d+)\s*;",
+            RegexOptions.CultureInvariant);
+        Assert.That(match.Success, Is.True, relativePath + ":" + name);
+        return int.Parse(
+            match.Groups["value"].Value,
+            System.Globalization.CultureInfo.InvariantCulture);
     }
 
     [Test]
