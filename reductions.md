@@ -18993,3 +18993,7 @@ at a runtime conversion site. The focused parity test passes (1/1).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1668 | Three frontend abstention boundary tests repeat the same invalid-enum exception harness; share the negative-test helper while retaining independent constructor/factory coverage. | `SharpProof.Frontend.Test/FrontendAbstentionValueTests.cs:7-35` |
+R520 is applied: the native resolver now uses one cleanup catch for all loader
+failures, including cancellation exceptions, so partially published handles
+and assembly state are always reset before rethrowing. The native-library setup
+test passes (1/1).

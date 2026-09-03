@@ -35,10 +35,6 @@ public static class ContainerNativeLibrary
                     z3Assembly,
                     ResolveZ3Import);
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
             catch
             {
                 Volatile.Write(ref s_z3Handle, IntPtr.Zero);
