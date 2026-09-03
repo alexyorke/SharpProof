@@ -475,12 +475,14 @@ Merged IDs are not separate work items and must not be counted twice.
 
 ## Pending queue
 
-The active follow-up queue is R088, R091, R096, R104-R105,
-R107, R149, R165, R169, R171-R185, R194, R211, R217-R218, and R221.
-Each still requires current-tree validation before implementation. The other
-items in the Deferred table are intentional behavior, public API, release
-authority, security, or soundness decisions and remain deferred under the
-original instruction not to remove important features merely for line count.
+The active mechanical queue for this reduction pass is exhausted. The IDs
+formerly listed here (R088, R091, R096, R104-R105, R107, R149, R165, R169,
+R171-R185, R194, R211, R217-R218, and R221) are either covered by a later
+applied follow-up note or intentionally deferred in the table above; they are
+not unreviewed work items. Historical survey sections may retain their
+original `pending` wording, but the latest status or follow-up note is the
+authoritative disposition. Current safety-sensitive deferrals are recorded
+explicitly for R1880 and R1900 below.
 Merged IDs inherit the status of their canonical item.
 
 ## Final gate
