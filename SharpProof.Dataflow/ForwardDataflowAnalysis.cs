@@ -112,9 +112,11 @@ public static class ForwardDataflowAnalysis
         ArgumentNullGuard.NotNull(domain, nameof(domain));
         ArgumentNullGuard.NotNull(options, nameof(options));
 
-        var inputs = Enumerable.Repeat(domain.Bottom, graph.Blocks.Length).ToArray();
-        var outputs = Enumerable.Repeat(domain.Bottom, graph.Blocks.Length).ToArray();
-        var updateCounts = new int[graph.Blocks.Length];
+        var blockCount = graph.Blocks.Length;
+        var bottom = domain.Bottom;
+        var inputs = Enumerable.Repeat(bottom, blockCount).ToArray();
+        var outputs = Enumerable.Repeat(bottom, blockCount).ToArray();
+        var updateCounts = new int[blockCount];
         inputs[graph.EntryBlockId] = initialState;
 
         var pending = FindReachableBlocks(graph);
@@ -172,7 +174,7 @@ public static class ForwardDataflowAnalysis
 
             foreach (var blockId in affected)
             {
-                var incoming = blockId == graph.EntryBlockId ? initialState : domain.Bottom;
+                var incoming = blockId == graph.EntryBlockId ? initialState : bottom;
                 foreach (var predecessor in graph.GetPredecessors(blockId))
                 {
                     incoming = domain.Join(incoming, outputs[predecessor]);

@@ -21018,3 +21018,8 @@ immutable variable metadata once into result, pre-state, and all-variable
 views, preserving exact-one-result validation, pre-state type checks, order,
 and fail-closed interval validation. The focused replay suite passes 15/15
 with zero warnings or errors.
+
+R1992 is applied: `ForwardDataflowAnalysis.AnalyzeCore` now caches the block
+count and immutable bottom value before constructing its two independent state
+arrays, and reuses that bottom for incoming states. The focused
+`ForwardDataflowAnalysisTests` suite passes 10/10 with zero warnings or errors.
