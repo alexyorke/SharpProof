@@ -19220,3 +19220,7 @@ R639 is applied: specification-pack method resolution now caches normalized
 method identities, including misses, so admission and later summary building
 reuse one validated definition. Pack overlap, type/shape checks, and fail-closed
 build behavior remain unchanged. The focused provider tests pass (7/7).
+
+R1681 is applied: ordinary and semantic-edge generated method names now share
+one invariant index formatter while retaining their distinct prefixes. The
+focused frontend fuzz comparison tests pass (7/7).

@@ -1596,13 +1596,17 @@ public sealed class FrontendDifferentialOracle
 
     private static string MethodName(int index)
     {
-        return "Target" + index.ToString(CultureInfo.InvariantCulture);
+        return FormatGeneratedMethodName("Target", index);
     }
 
     private static string SemanticEdgeMethodName(int index)
     {
-        return SemanticEdgeMethodPrefix +
-        index.ToString(CultureInfo.InvariantCulture);
+        return FormatGeneratedMethodName(SemanticEdgeMethodPrefix, index);
+    }
+
+    private static string FormatGeneratedMethodName(string prefix, int index)
+    {
+        return prefix + index.ToString(CultureInfo.InvariantCulture);
     }
 
     private static int ParseMethodIndex(string name)
