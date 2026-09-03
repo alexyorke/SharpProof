@@ -13783,6 +13783,12 @@ checks.
 |---|---|---|
 | R1172 | **`OperationCompletionEvaluator` rechecks a deconstruction value already proven complete.** `CanCompleteDeconstruction` validates `deconstruction.Value`, then the root non-static deconstruction phase routes the same value through `CanCompleteInvocation`, whose instance guard calls `CanCompleteNormally(value)` again. A prevalidated-instance completion seam can retain static/reduced and nested phase distinctions while removing the duplicate check. | `SharpProof.Effects/OperationCompletionEvaluator.cs:631-649,918-969` |
 
+### Status (part four hundred ninety-four)
+
+R1172 is applied: the full deconstruction path carries its already-completed
+root value into the root instance invocation check, while standalone phase
+callers retain the original validation. The Effects test suite passes (323/323).
+
 ## Second survey, part four hundred ninety-five: R1173 - with-clone operand completion is rechecked
 
 `CanCompleteWithClone` first validates `withOperation.Operand` with
