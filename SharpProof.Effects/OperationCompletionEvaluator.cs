@@ -10,6 +10,10 @@ internal sealed class OperationCompletionEvaluator
     private readonly IMethodSymbol _caller;
     private readonly Compilation _compilation;
     private readonly DefiniteOperationFacts _completionFacts;
+    private readonly Func<IOperation?, IOperation, OperationNullnessEvaluator.NullState>
+        _getNullState;
+    private readonly Func<IOperation?, IOperation, OperationNullnessEvaluator.NullState>
+        _getNullStatePreferNull;
     private readonly Func<IOperation?, IOperation, bool> _isProvenNull;
     private readonly Func<IOperation?, IOperation, bool> _isProvenNonNull;
     private readonly Func<IInvocationOperation, bool> _isImplicitLockEnterWithNullValue;
@@ -19,6 +23,9 @@ internal sealed class OperationCompletionEvaluator
         IMethodSymbol caller,
         Func<IOperation?, IOperation, bool> isProvenNull,
         Func<IOperation?, IOperation, bool> isProvenNonNull,
+        Func<IOperation?, IOperation, OperationNullnessEvaluator.NullState> getNullState,
+        Func<IOperation?, IOperation, OperationNullnessEvaluator.NullState>
+            getNullStatePreferNull,
         Func<IInvocationOperation, bool> isImplicitLockEnterWithNullValue,
         ManagedFlowResult? abstractFlow = null,
         CancellationToken cancellationToken = default)
@@ -30,6 +37,8 @@ internal sealed class OperationCompletionEvaluator
         _completionFacts = new DefiniteOperationFacts(
             session.Compilation,
             cancellationToken);
+        _getNullState = getNullState;
+        _getNullStatePreferNull = getNullStatePreferNull;
         _isProvenNull = isProvenNull;
         _isProvenNonNull = isProvenNonNull;
         _isImplicitLockEnterWithNullValue = isImplicitLockEnterWithNullValue;
@@ -889,14 +898,14 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        if (_isProvenNonNull(assignment.Target, assignment))
+        return _getNullState(assignment.Target, assignment) switch
         {
-            return true;
-        }
-
-        return !_isProvenNull(assignment.Target, assignment) ||
-            CanCompleteNormally(assignment.Value) &&
-            CanCompleteWriteTarget(assignment.Target);
+            OperationNullnessEvaluator.NullState.NonNull => true,
+            OperationNullnessEvaluator.NullState.Null =>
+                CanCompleteNormally(assignment.Value) &&
+                CanCompleteWriteTarget(assignment.Target),
+            _ => true
+        };
     }
 
     private bool CanCompleteCoalesce(ICoalesceOperation coalesce)
@@ -906,13 +915,13 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        if (_isProvenNonNull(coalesce.Value, coalesce))
+        return _getNullState(coalesce.Value, coalesce) switch
         {
-            return true;
-        }
-
-        return !_isProvenNull(coalesce.Value, coalesce) ||
-            CanCompleteNormally(coalesce.WhenNull);
+            OperationNullnessEvaluator.NullState.NonNull => true,
+            OperationNullnessEvaluator.NullState.Null =>
+                CanCompleteNormally(coalesce.WhenNull),
+            _ => true
+        };
     }
 
     private bool CanCompleteDeconstruction(
@@ -1229,13 +1238,13 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        if (_isProvenNull(conditional.Operation, conditional))
+        return _getNullStatePreferNull(conditional.Operation, conditional) switch
         {
-            return true;
-        }
-
-        return !_isProvenNonNull(conditional.Operation, conditional) ||
-            CanCompleteNormally(conditional.WhenNotNull);
+            OperationNullnessEvaluator.NullState.Null => true,
+            OperationNullnessEvaluator.NullState.NonNull =>
+                CanCompleteNormally(conditional.WhenNotNull),
+            _ => true
+        };
     }
 
     private bool CanCompleteWith(IWithOperation withOperation)

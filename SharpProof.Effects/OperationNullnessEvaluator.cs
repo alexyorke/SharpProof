@@ -64,6 +64,44 @@ internal sealed class OperationNullnessEvaluator
             : NullState.Unknown;
     }
 
+    internal NullState GetNullStatePreferNull(
+        IOperation? value,
+        IOperation origin)
+    {
+        if (value != null &&
+            value.ConstantValue is { HasValue: true, Value: null })
+        {
+            return NullState.Null;
+        }
+
+        if (value != null &&
+            _abstractFlow?.TryEvaluate(origin, value, out var result) == true)
+        {
+            if (result.IsDefinitelyNull)
+            {
+                return NullState.Null;
+            }
+
+            if (result.IsDefinitelyNonNull)
+            {
+                return NullState.NonNull;
+            }
+        }
+
+        if (value != null && IsSourceDefinitelyNull(value, origin))
+        {
+            return NullState.Null;
+        }
+
+        return value == null ||
+            value is IInstanceReferenceOperation ||
+            (value.Type is { IsValueType: true } type &&
+             !ManagedAbstractValue.IsNullableType(type)) ||
+            DefiniteOperationFacts.IsDefinitelyNonNull(value)
+            ? NullState.NonNull
+            : NullState.Unknown;
+    }
+
     internal bool IsImplicitLockEnterWithNullValue(IInvocationOperation invocation)
     {
         return invocation.IsImplicit &&

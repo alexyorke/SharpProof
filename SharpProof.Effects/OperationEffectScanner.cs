@@ -77,6 +77,8 @@ internal sealed partial class OperationEffectScanner
             method,
             _nullnessEvaluator.IsProvenNull,
             _nullnessEvaluator.IsProvenNonNull,
+            _nullnessEvaluator.GetNullState,
+            _nullnessEvaluator.GetNullStatePreferNull,
             _nullnessEvaluator.IsImplicitLockEnterWithNullValue,
             abstractFlow,
             cancellationToken);
