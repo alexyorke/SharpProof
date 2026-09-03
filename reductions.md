@@ -10578,3 +10578,15 @@ R1008 is deferred: preserve first-match and malformed-target rejection semantics
 ### Status (part two hundred forty)
 
 R1009 is deferred: use the single loaded manifest only within a gate invocation; retain an explicit load for independent snapshot/render/update entrypoints.
+
+## Second survey, part two hundred forty-one: R1010 - redundant contiguous-ID set
+
+`OpenSourceCorpusCatalog.Validate` checks each method's ID against the positional value `OSS{index + 1:D4}` and throws before proceeding when the value differs. That invariant already makes duplicate method IDs impossible: two rows cannot both equal their different positional IDs. The following `HashSet<string> ids` and `ids.Add(method.Id)` rejection therefore cannot observe a duplicate in any input that reaches it. The separate `locations` set remains meaningful because distinct IDs can still point at the same source location, and the source-ID set remains a separate source-table contract. Removing only the method-ID set/check, or replacing the positional check with one explicit ordered-unique validator, reduces validation state without weakening the contiguous-ID requirement.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1010 | **OSS method validation enforces duplicate IDs twice.** The positional `expectedId` comparison already requires row `index` to own the unique ID `OSS{index + 1:D4}`; the immediately following `ids.Add(method.Id)` branch is unreachable after that check. Remove the redundant method-ID `HashSet` or combine the checks into one ordered-unique rule, while keeping source-location uniqueness and source-ID validation separate. | `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:190-208`; method-ID order/shape contract at `:193-201`; independent location set at `:190-192,224-230` | |
+
+### Status (part two hundred forty-one)
+
+R1010 is deferred: retain the positional contiguous-ID contract; eliminate only the duplicate check that it logically subsumes.
