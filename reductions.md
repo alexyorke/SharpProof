@@ -16581,3 +16581,7 @@ In `Write-SharpProofQualificationReceipt.ps1`, the package-backed gate set is id
 | ID | Finding | Evidence |
 |---|---|---|
 | R1372 | `Write-SharpProofQualificationReceipt.ps1` repeats a post-validation `$packageArtifacts.Count -eq 6` check in the portable, package-consumer, and pilot switch arms. The shared package-artifact precondition already rejects any non-six or duplicate set; carry that validated state into the branches and keep only gate-specific predicates. | `scripts/Write-SharpProofQualificationReceipt.ps1:32-52,62-67,85-95` |
+
+R1370 is covered by R1367: the multiplication extrema fold is already shared
+through the local candidate helper, with the same four products and overflow
+checks preserved.
