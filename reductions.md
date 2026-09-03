@@ -14152,6 +14152,12 @@ classification.
 |---|---|---|
 | R1189 | **`ExceptionHandlerReachability.GetReachableSwitchCases` computes each pattern selection twice.** A pattern clause is passed to `GetPatternSelection` for `patternSelection`, then the same call is repeated inside `clauseSelection` before `ApplySwitchGuard`; all five inputs are unchanged. Applying the guard to the cached first result preserves clause reachability and stop-selection behavior while eliminating the duplicate pattern analysis. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1448-1491` |
 
+### Status (part five hundred eleven)
+
+R1189 is applied: guarded switch clauses reuse the unguarded pattern selection
+already computed for barrier analysis, preserving guard and stop-selection
+behavior. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred twelve: R1190 - switch clause completion facts are recomputed
 
 After a clause is admitted, `CanCaseClauseReachBody` checks whether its pattern
