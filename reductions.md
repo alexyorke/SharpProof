@@ -12815,7 +12815,6 @@ pass a concrete precondition - **check the 35 reflection-gating files before
 claiming any correspondence is unchecked.** The three findings that survive it -
 R967, R1147, and R978 as re-framed above - are stronger for having been tested
 against it.
-
 ## Second survey, part four hundred seventy-three: R1153 - empty SMT project item group
 
 `SharpProof.Smt/SharpProof.Smt.csproj` contains an empty `<ItemGroup>` at lines

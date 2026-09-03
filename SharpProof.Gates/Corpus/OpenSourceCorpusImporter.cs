@@ -367,11 +367,9 @@ SOFTWARE.
             .Select(static group => group.ToImmutableArray())
             .ToImmutableArray();
         var selected = ImmutableArray.CreateBuilder<ImportCandidate>(count);
-        for (var offset = 0;
-             selected.Count < count &&
-             byFile.Any(group => group.Length > offset);
-             offset++)
+        for (var offset = 0; selected.Count < count; offset++)
         {
+            var addedThisRound = false;
             foreach (var group in byFile)
             {
                 if (group.Length <= offset)
@@ -380,10 +378,15 @@ SOFTWARE.
                 }
 
                 selected.Add(group[offset]);
+                addedThisRound = true;
                 if (selected.Count == count)
                 {
                     break;
                 }
+            }
+            if (!addedThisRound)
+            {
+                break;
             }
         }
         if (selected.Count != count)
