@@ -1247,11 +1247,10 @@ internal sealed class ExceptionHandlerReachability(
             case ISimpleAssignmentOperation assignment:
                 var inputs = GetSimpleAssignmentTargetInputs(
                     assignment.Target).ToArray();
-                if (inputs.All(canCompleteNormally))
-                {
-                    remaining.Push(assignment.Value);
-                }
-                PushSequentialCore(inputs, remaining);
+                PushSequentialCore(
+                    inputs,
+                    remaining,
+                    assignment.Value);
                 return;
             case IBinaryOperation
             {
@@ -1445,20 +1444,28 @@ internal sealed class ExceptionHandlerReachability(
         }
     }
 
-    private void PushSequentialCore(
+    private bool PushSequentialCore(
         IEnumerable<IOperation> children,
-        Stack<IOperation> remaining)
+        Stack<IOperation> remaining,
+        IOperation? continuation = null)
     {
         var reachable = new List<IOperation>();
+        var allComplete = true;
         foreach (var child in children)
         {
             reachable.Add(child);
             if (!canCompleteNormally(child))
             {
+                allComplete = false;
                 break;
             }
         }
+        if (allComplete && continuation != null)
+        {
+            remaining.Push(continuation);
+        }
         PushAllCore(reachable, remaining);
+        return allComplete;
     }
 
     private static void PushAllCore(
