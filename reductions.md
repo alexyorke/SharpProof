@@ -14681,3 +14681,11 @@ decision points.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1222 | **`GetCalls` creates a `params IOperation[]` for every implicit-operator candidate.** Five operation arms pass one or two known operands into `CreateImplicitOperatorCalls`, which packages them into a new array before the common lifted/null and call-target logic runs. Fixed-arity overloads can retain the shared policy without allocating a params array in the CFG operation walk. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:748-794,859-875` |
+
+## Second survey, part five hundred forty-five: R1223 - list-pattern argument projection allocates a params array
+
+`RequiresCallSiteDiscovery.GetListPatternCalls` invokes `CreateImplicitListPatternArguments` once for each callable indexer or slice member it emits. The helper accepts `params long?[] values`, although the indexed branch supplies one value and the slice branch supplies at most two. Each call therefore creates a short-lived nullable-value array before building the immutable argument map. Fixed-arity overloads can preserve the existing parameter-count truncation and nullable filtering while removing that repeated per-member allocation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1223 | **`GetListPatternCalls` allocates a `params long?[]` for every implicit list-pattern member.** Its index and slice paths pass one or two known values into the variadic helper, which allocates an array before the dictionary builder performs the actual mapping. One- and two-value overloads retain the same argument semantics without the temporary array. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1484-1521,1550-1566` |
