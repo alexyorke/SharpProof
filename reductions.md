@@ -9889,3 +9889,65 @@ same symbol-level predicate copied into several resolvers.
 R983 is `deferred`: share only the common method-symbol classification. Keep
 receiver-specific sealing, interpolation, and `IDisposable` reimplementation
 rules at their respective call sites.
+
+## Second survey, part two hundred fourteen: R984 - the same comparer twice in one assembly
+
+A census of every interface implemented in production and of every explicit
+interface implementation, across the 693 production types.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R984 | **`SharpProof.Frontend` declares the same reference-identity comparer twice, in one assembly, differing only in the type it closes over.** `CompilationModelProvider.cs:70-84` declares `private sealed class CompilationReferenceComparer : IEqualityComparer<Compilation>` and `CompilerIdentityBridge.cs:224-238` declares `internal sealed class OperationReferenceComparer : IEqualityComparer<IOperation>`. Both consist of exactly three members with identical bodies: a singleton `internal static ... Instance { get; } = new();`, an `Equals` returning `ReferenceEquals(a, b)`, and a `GetHashCode` returning `System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(x)` - written with the same fully-qualified name and the same line wrapping in both. The only differences are the closed type, the accessibility of the nested class, and the parameter names: `x, y` and `obj` in one, `left, right` and `operation` in the other. **A single `internal sealed class ReferenceComparer<T> : IEqualityComparer<T> where T : class` would replace both**, and hand-writing one is genuinely necessary here - `SharpProof.Frontend` targets `netstandard2.0`, where the framework's `ReferenceEqualityComparer` (introduced in .NET 5) is unavailable. So the need for the type is real; the need for two of them is not. | `SharpProof.Frontend/CompilationModelProvider.cs:70-84`; `SharpProof.Frontend/CompilerIdentityBridge.cs:224-238`; `SharpProof.Frontend/SharpProof.Frontend.csproj:3` |
+
+### Checked and not proposed (part two hundred fourteen)
+
+- **The production interface surface is small, framework-dominated, and shows no
+  over-abstraction.** Thirteen distinct interfaces are implemented across the 693
+  production types, and eight are framework contracts - `IDisposable` (10
+  implementers), `IEquatable` (9), `IEqualityComparer` (6), `IIncrementalGenerator`
+  (2), `ISignatureTypeProvider`, `IComparable`, `IComparer`. The five domain
+  interfaces are `IIrIdentifierTag` (9 generated tag structs),
+  `IAnalyzerSessionFactory` (4), `IEffectCallPreconditionPolicy` (2), `ISmtBackend`
+  (2), and `IAbstractDomain`. The two with a single implementer were already
+  examined and correctly not proposed in earlier parts. There is no interface here
+  that exists only to be mocked once.
+- **There are zero explicit interface implementations in production.** A scan for
+  the `IInterface.Member` declaration form across every production file returns
+  **nothing**: every interface member is implemented implicitly. That is a uniform
+  convention with no exceptions to reconcile.
+- **The other four `IEqualityComparer` implementations are genuinely distinct and
+  must not be folded into R984.** `ReplayEventComparer`
+  (`CompilerEffectAuthority.cs:281`) compares artifact records structurally;
+  `ManagedKeyComparer` (`ManagedAbstractFlow.cs:1621`) dispatches on runtime type,
+  using reference identity for `IOperation` and `SymbolEqualityComparer` for
+  `ISymbol`; `MethodOutcomeKeyComparer` (`AnalyzerGateHost.cs:293`) combines a
+  reference comparison on `SourceTree` with a symbol comparison; and
+  `EffectSymbolComparer` is an `IComparer`, not an equality comparer. Only the two
+  in R984 are the same class twice.
+- **The seven `RuntimeHelpers.GetHashCode` sites are not otherwise duplicated.**
+  Beyond the two in R984, the remaining five each combine reference identity
+  with something else - a type-dispatch, a symbol hash, or a `hash * 397 ^` pair in
+  `IrFactory.cs:898-899`. Reference-identity hashing is used deliberately in each.
+
+### Status (part two hundred fourteen)
+
+R984 is `pending` and is the most self-contained item filed in this session: one
+new generic class inside one assembly, two deletions, no cross-assembly seam, no
+convention to decide, and no behavioural question - `ReferenceEquals` and
+`RuntimeHelpers.GetHashCode` mean the same thing for both closed types.
+
+## Second survey, part two hundred fifteen: R985 - a second built-in throw table
+
+A comparison of the shared Roslyn CFG helper with the Effects exception
+reachability classifier found substantial overlap with intentionally different
+conservatism.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R985 | **`ExceptionHandlerReachability.CanThrowUnknown` maintains a second operation-kind throw table that overlaps fifteen built-in cases in `RoslynCfgThrowFacts.OperationMayThrow`.** Both classify invocation, dynamic invocation, function-pointer invocation, object/array creation, array-element access, property access, lock operations, checked conversions, checked compound/binary/unary operations, divide/remainder operations, and checked increments as potentially throwing. `CanThrowUnknown` is intentionally narrower: its caller separately filters lifted operators and uses the predicate only when the exception type cannot be resolved, while `RoslynCfgThrowFacts` also admits explicit reference conversions, instance fields/events/awaits, user-defined operators, and an explicit `throw`. Those policy differences should remain visible. The duplicated built-in subset is nevertheless a drift surface: adding or removing a built-in throwing operation requires updating two pattern lists that live in different layers, and a mismatch changes whether a catch is considered reachable. A shared low-level predicate for built-in unknown-throwing operations, with the broader CFG helper layering its additional cases and the Effects caller retaining its prerequisite/child-completion checks, would remove the repeated table without collapsing the two soundness policies. | `SharpProof.Effects/ExceptionHandlerReachability.cs:2966-3004`; shared predicate `eng/RoslynCfgThrowFacts.cs:12-62`; call-site policy `SharpProof.Effects/ExceptionHandlerReachability.cs:3007-3029`; CFG consumers `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:1157-1165` and `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1166-1173` |
+
+### Status (part two hundred fifteen)
+
+R985 is `deferred`: extract only the shared built-in operation classification.
+Retain `RoslynCfgThrowFacts`'s user-defined/explicit-throw cases and the Effects
+layer's unknown-exception and prerequisite filtering.
