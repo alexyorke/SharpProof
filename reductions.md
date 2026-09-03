@@ -20960,3 +20960,11 @@ R1780's nineteen `AnalyzerModeAndEffectTests` candidates are now using the
 default diagnostic catalog instead of suppressing every unasserted ID. The
 focused class passes 104/104 with zero warnings or errors; intentionally
 multi-ID suppression fixtures remain unchanged.
+
+## Second survey, continued: R1989 - ValidatePublishedVerificationResult repeats project-root normalization across path projections
+
+ValidatePublishedVerificationResult resolves RequestPath, ResultPath, ManifestPath, optional SarifPath, optional InvocationResultPath, and the request's compiler-manifest path through CancelableBuildTask.ResolveProjectRelativePath during one Execute call. That shared helper recomputes Path.GetFullPath of the same ProjectDirectory for every invocation before combining relative inputs and calling LinuxPathIdentity.RequireLocalPath. A per-execution resolver that caches the normalized project root can remove the repeated root calculation while retaining a separate locality/containment check for every resulting path, the rooted-path override behavior, and the final compiler-manifest equality check. This is narrower than the existing cross-task resolver consolidation and the InvalidatePublishedResult repeated-path finding.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1989 | ValidatePublishedVerificationResult repeatedly recomputes the same normalized project root for six path projections in one execution; cache the root per task invocation while retaining per-path Linux locality validation and rooted-path semantics. | SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs:29-38,57-58,93-103 |
