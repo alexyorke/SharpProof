@@ -629,9 +629,10 @@ public sealed class CompilerArtifactModelSchemaTests
                 continue;
             }
 
-            var replacement = ReplacementValue(
+            var replacement = SchemaModelTestHelpers.ReplacementValue(
                 property.PropertyType,
-                property.GetValue(instance));
+                property.GetValue(instance),
+                CreateObject);
             property.SetValue(instance, replacement);
             Assert.That(
                 property.GetValue(instance),
@@ -751,55 +752,6 @@ public sealed class CompilerArtifactModelSchemaTests
             _ => throw new AssertionException(
                 $"Unsupported constructor default '{value}'.")
         };
-    }
-
-    private static object? ReplacementValue(Type type, object? current)
-    {
-        if (type == typeof(string))
-        {
-            return "changed";
-        }
-
-        if (type == typeof(bool))
-        {
-            return !(bool)current!;
-        }
-
-        if (type == typeof(int))
-        {
-            return 17;
-        }
-
-        if (type == typeof(long))
-        {
-            return 17L;
-        }
-
-        if (Nullable.GetUnderlyingType(type) is { } nullable)
-        {
-            return nullable == typeof(long)
-                ? 17L
-                : Activator.CreateInstance(nullable);
-        }
-
-        if (type.IsEnum)
-        {
-            return Enum.GetValues(type).GetValue(Enum.GetValues(type).Length - 1);
-        }
-
-        if (type.IsArray)
-        {
-            var elementType = type.GetElementType()!;
-            var value = elementType == typeof(string)
-                ? "item"
-                : elementType.IsValueType
-                    ? Activator.CreateInstance(elementType)
-                    : CreateObject(elementType);
-            var result = Array.CreateInstance(elementType, 1);
-            result.SetValue(value, 0);
-            return result;
-        }
-        return CreateObject(type);
     }
 
     private static object CreateObject(Type type)

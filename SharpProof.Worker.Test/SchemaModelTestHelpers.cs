@@ -83,4 +83,65 @@ internal static class SchemaModelTestHelpers
             ? name + "?"
             : name;
     }
+
+    internal static object? ReplacementValue(
+        Type type,
+        object? current,
+        Func<Type, object> createObject,
+        bool includeUnsignedInteger = false)
+    {
+        if (type == typeof(string))
+        {
+            return "changed";
+        }
+
+        if (type == typeof(bool))
+        {
+            return !(bool)current!;
+        }
+
+        if (type == typeof(int))
+        {
+            return 17;
+        }
+
+        if (includeUnsignedInteger && type == typeof(uint))
+        {
+            return 17U;
+        }
+
+        if (type == typeof(long))
+        {
+            return 17L;
+        }
+
+        if (Nullable.GetUnderlyingType(type) is { } nullable)
+        {
+            return nullable == typeof(long)
+                ? 17L
+                : Activator.CreateInstance(nullable);
+        }
+
+        if (type.IsEnum)
+        {
+            return Enum.GetValues(type).GetValue(Enum.GetValues(type).Length - 1);
+        }
+
+        if (type.IsArray)
+        {
+            var elementType = type.GetElementType()!;
+            var value = elementType == typeof(string)
+                ? "item"
+                : elementType.IsEnum
+                    ? Enum.GetValues(elementType).GetValue(0)
+                    : elementType.IsValueType
+                        ? Activator.CreateInstance(elementType)
+                        : createObject(elementType);
+            var result = Array.CreateInstance(elementType, 1);
+            result.SetValue(value, 0);
+            return result;
+        }
+
+        return createObject(type);
+    }
 }

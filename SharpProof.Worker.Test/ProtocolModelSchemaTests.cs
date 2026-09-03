@@ -448,7 +448,11 @@ public sealed class ProtocolModelSchemaTests
                 continue;
             }
 
-            var replacement = ReplacementValue(property.PropertyType, initial);
+            var replacement = SchemaModelTestHelpers.ReplacementValue(
+                property.PropertyType,
+                initial,
+                CreateInstance,
+                includeUnsignedInteger: true);
             property.SetValue(instance, replacement);
             Assert.That(
                 property.GetValue(instance),
@@ -528,54 +532,6 @@ public sealed class ProtocolModelSchemaTests
                 BindingFlags.Instance | BindingFlags.NonPublic)
             .Single()
             .Invoke([Array.Empty<WorkerProtocolError>()]);
-    }
-
-    private static object? ReplacementValue(Type type, object? current)
-    {
-        if (type == typeof(string))
-        {
-            return "changed";
-        }
-
-        if (type == typeof(bool))
-        {
-            return !(bool)current!;
-        }
-
-        if (type == typeof(int))
-        {
-            return 17;
-        }
-
-        if (type == typeof(uint))
-        {
-            return 17U;
-        }
-
-        if (type == typeof(long))
-        {
-            return 17L;
-        }
-
-        if (type.IsEnum)
-        {
-            return Enum.GetValues(type).GetValue(Enum.GetValues(type).Length - 1);
-        }
-
-        if (type.IsArray)
-        {
-            var elementType = type.GetElementType()!;
-            var array = Array.CreateInstance(elementType, 1);
-            array.SetValue(
-                elementType == typeof(string)
-                    ? "item"
-                    : elementType.IsEnum
-                        ? Enum.GetValues(elementType).GetValue(0)
-                        : Activator.CreateInstance(elementType),
-                0);
-            return array;
-        }
-        return Activator.CreateInstance(type);
     }
 
     private static object? ResolveMemberValue(

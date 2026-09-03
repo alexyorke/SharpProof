@@ -18669,3 +18669,9 @@ failures (14 failures).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1650 | The test helper duplicates all seven generated classification arms and their output tuples as a second hand-maintained policy switch | `SharpProof.Analyzer.Test/EffectEvaluationProjectionsTests.cs:12-105`; generated policy at `SharpProof.Analyzer.Core/EffectEvaluationProjections.generated.cs:12-42` |
+
+R1621 is applied: the compiler-artifact and worker-protocol schema suites now
+share `SchemaModelTestHelpers.ReplacementValue`, with caller-provided object
+creation and the protocol-only `uint` replacement retained. The affected schema
+tests pass: `CompilerArtifactModelSchemaTests` 4/4 and
+`ProtocolModelSchemaTests` 5/5.
