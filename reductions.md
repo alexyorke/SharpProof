@@ -10052,3 +10052,40 @@ redundant invocation. The open items concerning the pipeline remain R980 - that 
 generated-staleness checks live only in the `acceptance` command, which pull
 requests do not reach - and R978 on test-parallelism configuration; neither is a
 composition problem, which is why this pass does not add to them.
+
+## Second survey, part two hundred eighteen: R987 - duplicated analyzer-session recording plumbing
+
+The two production gate paths each embed a recording implementation for the same
+`IAnalyzerSessionFactory` lifecycle. `AnalyzerGateHost.RecordingAnalyzerSessionFactory`
+and `OpenSourceCorpusRunner.RecordingSessionFactory` both expose the same
+`Create` method: they construct an `AnalyzerSession` from the supplied
+`Compilation`, `AnalyzerConfiguration`, `CancellationToken`, and their local
+`Record` callback. Both callbacks also feed a concurrent outcome map with
+`AddOrUpdate`, combining repeated observations through
+`AnalyzerSemanticOutcomes.Combine`. This is the concurrency-sensitive plumbing
+that keeps analyzer callbacks usable when Roslyn runs concurrently, and it is
+duplicated in two gate implementations rather than owned by a shared recorder.
+
+The key and presentation policies are intentionally different and should remain
+at the callers. `AnalyzerGateHost` keys by a composite containing the Roslyn
+method symbol, source tree, source position, file ordering, method name, and
+accessibility, then emits a deterministically sorted
+`ImmutableArray<AnalyzerMethodSemanticOutcome>`. The OSS runner first resolves a
+syntax-tree/start pair to a catalog `TargetInfo`, then keys by the catalog's
+stable method ID and returns an immutable dictionary. A generic internal recorder
+or a small callback-backed base can own only the session construction and
+concurrent combine operation while leaving those key selectors, duplicate-target
+rules, and output projections local. That would remove a second copy of the
+highest-risk callback plumbing without flattening the two evidence models. R753
+already records analogous duplication in test-only factories; this entry is the
+separate production gate pair.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R987 | **`AnalyzerGateHost` and `OpenSourceCorpusRunner` duplicate the concurrent `AnalyzerSession` recording lifecycle.** Both private factories implement `IAnalyzerSessionFactory`, construct the session with the same four inputs and a local callback, and use `ConcurrentDictionary.AddOrUpdate` plus `AnalyzerSemanticOutcomes.Combine` to merge callback results. Their key domains and output projections are deliberately different - the general analyzer gate preserves Roslyn identity and sorted metadata, while the OSS gate resolves annotated catalog methods and stores stable corpus IDs - so those policies should not be merged. The shared session-construction and outcome-combination seam can nevertheless be factored into a generic recorder/base helper, reducing two copies of concurrency-sensitive plumbing and making future callback-lifecycle changes consistent across both production gates. | `SharpProof.Gates/AnalyzerGateHost.cs:205-317`; `SharpProof.Gates/Corpus/OpenSourceCorpusRunner.cs:230-280`; test-only analogue `SharpProof.Analyzer.Test` and R753 |
+
+### Status (part two hundred eighteen)
+
+R987 is `deferred`: share the analyzer-session callback lifecycle and outcome
+combination only; keep the Roslyn identity/sorting policy and the OSS catalog-ID
+projection separate.
