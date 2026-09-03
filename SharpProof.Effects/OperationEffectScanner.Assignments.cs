@@ -108,8 +108,12 @@ internal sealed partial class OperationEffectScanner
     private EffectSummary ScanCompoundAssignment(
         ICompoundAssignmentOperation assignment)
     {
+        var evaluatedLocation = ScanWriteTargetEvaluation(assignment.Target);
         var result = new EffectStep(
-            Scan(assignment.Target, EffectAccess.Read),
+            Scan(
+                assignment.Target,
+                EffectAccess.Read,
+                evaluatedLocation),
             _completionEvaluator.CanCompleteNormally(assignment.Target));
         if (!result.CompletesNormally)
         {
@@ -177,7 +181,8 @@ internal sealed partial class OperationEffectScanner
                 ScanWriteTarget(
                     assignment.Target,
                     assignment.Value,
-                    valueIsStoredDirectly: false),
+                    valueIsStoredDirectly: false,
+                    evaluatedLocation: evaluatedLocation),
                 true)).Summary;
     }
 
@@ -213,8 +218,9 @@ internal sealed partial class OperationEffectScanner
         Func<bool> canCompleteOperation,
         IOperation storedValue)
     {
+        var evaluatedLocation = ScanWriteTargetEvaluation(target);
         var result = new EffectStep(
-            Scan(target, EffectAccess.Read),
+            Scan(target, EffectAccess.Read, evaluatedLocation),
             _completionEvaluator.CanCompleteNormally(target));
         if (!result.CompletesNormally)
         {
@@ -236,15 +242,20 @@ internal sealed partial class OperationEffectScanner
                 ScanWriteTarget(
                     target,
                     storedValue,
-                    valueIsStoredDirectly: false),
+                    valueIsStoredDirectly: false,
+                    evaluatedLocation: evaluatedLocation),
                 true)).Summary;
     }
 
     private EffectSummary ScanCoalesceAssignment(
         ICoalesceAssignmentOperation assignment)
     {
+        var evaluatedLocation = ScanWriteTargetEvaluation(assignment.Target);
         var result = new EffectStep(
-            Scan(assignment.Target, EffectAccess.Read),
+            Scan(
+                assignment.Target,
+                EffectAccess.Read,
+                evaluatedLocation),
             _completionEvaluator.CanCompleteNormally(assignment.Target));
         if (!result.CompletesNormally)
         {
@@ -262,7 +273,10 @@ internal sealed partial class OperationEffectScanner
         return !result.CompletesNormally
             ? result.Summary
             : result.Then(new EffectStep(
-                ScanWriteTarget(assignment.Target, assignment.Value),
+                ScanWriteTarget(
+                    assignment.Target,
+                    assignment.Value,
+                    evaluatedLocation: evaluatedLocation),
                 true)).Summary;
     }
 }

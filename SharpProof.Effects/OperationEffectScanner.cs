@@ -220,7 +220,10 @@ internal sealed partial class OperationEffectScanner
                 _handlerReachability.CanExitAbruptly);
     }
 
-    private EffectSummary Scan(IOperation operation, EffectAccess access)
+    private EffectSummary Scan(
+        IOperation operation,
+        EffectAccess access,
+        EffectStep? evaluatedLocation = null)
     {
         // Every recursive path through the scanner funnels here, so this is the
         // one place that has to keep deeply nested expressions from exhausting
@@ -234,7 +237,7 @@ internal sealed partial class OperationEffectScanner
         _nestingDepth++;
         try
         {
-            return ScanCore(operation, access);
+            return ScanCore(operation, access, evaluatedLocation);
         }
         finally
         {
@@ -242,7 +245,10 @@ internal sealed partial class OperationEffectScanner
         }
     }
 
-    private EffectSummary ScanCore(IOperation operation, EffectAccess access)
+    private EffectSummary ScanCore(
+        IOperation operation,
+        EffectAccess access,
+        EffectStep? evaluatedLocation = null)
     {
         if (ManagedFlowResult.HasSameIdentity(operation, _directOperation))
         {
@@ -250,14 +256,15 @@ internal sealed partial class OperationEffectScanner
         }
 
         return EffectExceptionFlow.KeepEscaping(
-            ScanCoreOperation(operation, access),
+            ScanCoreOperation(operation, access, evaluatedLocation),
             operation,
             _session.Compilation);
     }
 
     private EffectSummary ScanCoreOperation(
         IOperation operation,
-        EffectAccess access)
+        EffectAccess access,
+        EffectStep? evaluatedLocation = null)
     {
         return operation switch
         {
@@ -280,9 +287,18 @@ internal sealed partial class OperationEffectScanner
                     ? EffectSummaryOperations.Read(
                         _conversionOwnership.ClassifyParameter(parameter.Parameter))
                     : EffectSummary.Empty,
-            IFieldReferenceOperation field => ScanField(field, access),
-            IPropertyReferenceOperation property => ScanProperty(property, access),
-            IArrayElementReferenceOperation element => ScanArrayElement(element, access),
+            IFieldReferenceOperation field => ScanField(
+                field,
+                access,
+                evaluatedLocation),
+            IPropertyReferenceOperation property => ScanProperty(
+                property,
+                access,
+                evaluatedLocation: evaluatedLocation),
+            IArrayElementReferenceOperation element => ScanArrayElement(
+                element,
+                access,
+                evaluatedLocation: evaluatedLocation),
             ICoalesceAssignmentOperation assignment =>
                 ScanCoalesceAssignment(assignment),
             IDeconstructionAssignmentOperation deconstruction =>
@@ -373,15 +389,17 @@ internal sealed partial class OperationEffectScanner
             : property.Property.SetMethod;
         if (accessor == null)
         {
+            var location = evaluatedLocation?.Summary ??
+                ScanSequence(
+                    (property.Instance == null
+                        ? property.Arguments.Select(static argument => argument.Value)
+                        : new[] { property.Instance }.Concat(
+                            property.Arguments.Select(static argument => argument.Value))))
+                    .Summary;
             return access == EffectAccess.Write
                 ? EffectSummaryOperations.Unsupported()
                 : EffectSummaryDomain.Instance.Join(
-                    ScanSequence(
-                        (property.Instance == null
-                            ? property.Arguments.Select(static argument => argument.Value)
-                            : new[] { property.Instance }.Concat(
-                                property.Arguments.Select(static argument => argument.Value))))
-                        .Summary,
+                    location,
                     EffectSummaryOperations.Unsupported());
         }
 
