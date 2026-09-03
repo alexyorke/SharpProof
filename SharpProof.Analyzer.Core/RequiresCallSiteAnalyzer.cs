@@ -181,12 +181,36 @@ internal static partial class RequiresCallSiteAnalyzer
             return null;
         }
 
-        var candidates = constructor.ContainingType.BaseType?
-            .InstanceConstructors
-            .Where(static candidate => candidate.Parameters.All(
-                static parameter => parameter.IsOptional || parameter.IsParams))
-            .ToImmutableArray() ?? [];
-        return candidates.Length == 1 ? candidates[0] : null;
+        var baseType = constructor.ContainingType.BaseType;
+        if (baseType == null)
+        {
+            return null;
+        }
+
+        IMethodSymbol? candidateMatch = null;
+        foreach (var candidate in baseType.InstanceConstructors)
+        {
+            var isImplicit = true;
+            foreach (var parameter in candidate.Parameters)
+            {
+                if (!parameter.IsOptional && !parameter.IsParams)
+                {
+                    isImplicit = false;
+                    break;
+                }
+            }
+            if (!isImplicit)
+            {
+                continue;
+            }
+            if (candidateMatch != null)
+            {
+                return null;
+            }
+            candidateMatch = candidate;
+        }
+
+        return candidateMatch;
     }
 
     internal static AnalyzerSemanticOutcome AnalyzeInitializerCall(
