@@ -16642,3 +16642,11 @@ R1146 is applied: spec and summary assumptions rely on the final depth sweep,
 which still runs after source-domain and normal-completion assumptions are added;
 the duplicate per-assumption checks are gone. The focused worker claim/lowering
 coverage run passes (182 passed).
+
+## Second survey, continued: R1379 - Release evidence performs a redundant version-uniformity pass
+
+`New-SharpProofReleaseEvidence.ps1` projects the artifact versions, sorts them uniquely, and throws unless the resulting set has one member. It then passes the original per-artifact versions to `Test-SharpProofReleaseVersionSet`, whose empty-set guard and per-item `Test-SharpProofReleaseVersion` calls require every value to equal the same authoritative `$releaseVersion`. That later call therefore rejects empty, mixed, and wrong-version inputs on its own; remove the earlier `$versions.Count -ne 1` branch while retaining the helper result used for output and the separate repository-commit uniqueness check.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1379 | `New-SharpProofReleaseEvidence` checks `$versions.Count -ne 1` and then invokes `Test-SharpProofReleaseVersionSet` over the same values. The helper already makes every version equal the release authority, which implies one nonempty value; keep one validation boundary and retain the distinct commit-consistency check. | `scripts/New-SharpProofReleaseEvidence.ps1:351-362`; helper `scripts/Get-SharpProofReleaseVersion.ps1:63-77` |
