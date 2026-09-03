@@ -11212,6 +11212,9 @@ In `SharpProof.Worker.Protocol/ProtocolJson.cs`, `WorkerProtocolJson.ValidateRes
 
 R1058 is deferred: replace JSON string comparison with direct property comparison for `WorkerBudgets`.
 
+Current-tree reconciliation: R1058 is already applied. `BudgetsEqual` compares
+the six numeric fields directly, and ProtocolJsonTests pass (108 passed).
+
 ## Second survey, part two hundred ninety: R1059 - multi-pass LINQ and set allocation in error state projection
 
 In `SharpProof.Worker.Protocol/WorkerResultAssembler.cs`, `TryProjectRunState` projects error codes by materializing an intermediate array, calling `Any` to check for nulls, projecting again with `Select`, allocating a `HashSet` via `Distinct()`, and checking `Count() > 1`. All of this ceremony is performed solely to check that every error maps to a valid state and all mapped states agree. A single imperative loop can capture the first mapped state, exit immediately on any mismatch or null, and complete with zero intermediate array, iterator, or set allocations.
@@ -11224,6 +11227,10 @@ In `SharpProof.Worker.Protocol/WorkerResultAssembler.cs`, `TryProjectRunState` p
 
 R1059 is deferred: replace LINQ array and distinct operations with a single non-allocating loop in `TryProjectRunState`.
 
+Current-tree reconciliation: R1059 is already applied. `TryProjectRunState`
+projects error state in one loop with no intermediate array or set, and
+WorkerResultAssemblerTests pass (3 passed).
+
 ## Second survey, part two hundred ninety-one: R1060 - intermediate reason array allocation in WorkerResultAssembler.Classify
 
 In `SharpProof.Worker.Protocol/WorkerResultAssembler.cs`, `Classify` allocates two intermediate arrays by calling `.Select(static result => result.Reason).ToArray()` on callables and claims, solely to pass them to `SummarizeCallableReasons` and `SummarizeClaimReasons`. Both summary methods immediately iterate through the arrays with a `foreach` loop to compute boolean summary flags. Accepting `IEnumerable` directly or using non-allocating enumeration eliminates two array allocations on every response classification.
@@ -11235,6 +11242,10 @@ In `SharpProof.Worker.Protocol/WorkerResultAssembler.cs`, `Classify` allocates t
 ### Status (part two hundred ninety-one)
 
 R1060 is deferred: consume reasons directly in summary methods without allocating intermediate arrays.
+
+Current-tree reconciliation: R1060 is already applied. `Classify` passes the
+callable and claim collections directly to the summary folds; the focused
+WorkerResultAssemblerTests pass (3 passed).
 
 ## Second survey, part two hundred ninety-two: R1061 - redundant preliminary JsonDocument parse in manifest deserialization
 
