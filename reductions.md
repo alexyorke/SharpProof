@@ -9874,3 +9874,18 @@ path found a second traversal and memoization engine.
 R982 is `deferred`: preserve the projection-specific equality/nullness and
 length-proxy rules, but move child enumeration, DAG memoization, and deep-term
 traversal to the shared IR rewrite seam.
+
+## Second survey, part two hundred twelve: R983 - repeated dispatch-uncertainty core
+
+A comparison of effect-call and effect-property dispatch policies found the
+same symbol-level predicate copied into several resolvers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R983 | **Three effect paths independently encode the same open-dispatch test, with one policy extension and no named shared core.** `PropertyDispatchFacts.IsSymbolDispatchUncertain` and `StringConcatenationEffectResolver.IsDispatchUncertain` both require a non-static accessor/method, one of virtual/abstract/override/interface dispatch, a non-sealed containing type, and a non-sealed method. `UsingDisposalEffectResolver.IsDispatchUncertain` repeats those same checks but adds the deliberate rule that a class implementation can be re-mapped through `IDisposable`; `OperationEffectScanner` separately expresses the shorter invocation form as `invocation.IsVirtual && !method.ContainingType.IsSealed && !method.IsSealed`. The policy differences are real - receiver sealing, interpolation type parameters, and interface reimplementation affect each operation kind - so a single unconditional predicate would be unsafe. A shared internal helper for the common symbol-level core, with explicit options or a caller-owned precondition for those extensions, would remove repeated flag cascades and make future dispatch-policy changes reviewable in one place. | `SharpProof.Effects/PropertyDispatchFacts.cs:22-31`; `SharpProof.Effects/StringConcatenationEffectResolver.cs:414-437`; `SharpProof.Effects/UsingDisposalEffectResolver.cs:368-382`; invocation wrapper `SharpProof.Effects/OperationEffectScanner.cs:1571-1579` |
+
+### Status (part two hundred twelve)
+
+R983 is `deferred`: share only the common method-symbol classification. Keep
+receiver-specific sealing, interpolation, and `IDisposable` reimplementation
+rules at their respective call sites.
