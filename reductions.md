@@ -16327,3 +16327,7 @@ also include the writer's required release-json and package-identity scripts.
 R1348 is applied: compiler-option mapping and fail-closed assertions share local
 test helpers, preserving all enum and null coverage. The focused test passes (3
 passed).
+
+R1349 is applied: effect-evaluation wire mappings use shared closed-mapping and
+fail-closed assertion helpers while preserving each enum's expected sequence.
+The focused test passes (2 passed).
