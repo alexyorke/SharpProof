@@ -17950,3 +17950,19 @@ original uniqueness diagnostic. `CorpusGateTests` pass (23/23).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1527 | **The analyzer-diagnostic generator has two copies of the same set-admission guard.** The intrinsic loop at lines 40-46 and placement loop at lines 62-67 each allocate an ordinal `HashSet`, call `.Add`, and throw when the key is repeated; only the key expression and message differ. A small helper accepting the key and failure text would remove the repeated validation skeleton without merging the distinct generated switch arms. | `scripts/Generate-AnalyzerDiagnosticCatalog.ps1:40-46,62-67` |
+
+## Second survey, continued: R1528 - four effect regression matrices rebuild unchanged source once per selected method
+
+`ArrayAccessCompletionRegressionTests`, `AssignableRecursivePatternCompletionRegressionTests`, `BinaryPatternCompletionRegressionTests`, and `NullablePatternCompletionRegressionTests` each parameterize over two method names but call `CreateCompilation` or `EffectTestHost.CreateCompilation` inside the test body. Each source literal contains both cases and is otherwise immutable, so every NUnit row reparses and binds the same fixture before selecting one method. A cached fixture compilation or a shared test-case source that supplies prebuilt symbols can preserve the distinct completion cases while removing the duplicate setup.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1528 | **Four two-case effects fixtures repeat their complete Roslyn compilation per row.** The array-access, assignable-recursive-pattern, binary-pattern, and nullable-pattern tests vary only the selected method (and expected result where applicable), while each embedded source declares both methods and all helper types. The existing `EffectTestHost` helpers already separate analysis from compilation; retaining one fixture-scoped compilation per class would remove one redundant parse/bind cycle from each matrix without merging their behavioral assertions. This is separate from R1088's hand-written analysis/assertion boilerplate. | `SharpProof.Effects.Test/ArrayAccessCompletionRegressionTests.cs:6-39`; `SharpProof.Effects.Test/AssignableRecursivePatternCompletionRegressionTests.cs:9-83`; `SharpProof.Effects.Test/BinaryPatternCompletionRegressionTests.cs:6-45`; `SharpProof.Effects.Test/NullablePatternCompletionRegressionTests.cs:6-67` |
+
+## Second survey, continued: R1529 - the indirect-mutation nullness tests recompile each two-case source matrix
+
+`IndirectLocalMutationNullnessRegressionTests` has two parameterized tests, each with two cases, and each test constructs an identical source literal inside the case method. The first matrix varies only the method analyzed; the second varies the method plus expected assertion data. A fixture-scoped compilation (with case data carrying the selected symbols and expectations) can retain the two independent mutation scenarios while avoiding four repeated parse/bind operations.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1529 | **Both indirect-mutation matrices rebuild an unchanged two-method compilation for every case.** `WriteThroughAlias`/`ReadThroughAlias` share one source literal, and `ThroughRefAlias`/`ThroughLocalFunction` share another; each `[TestCase]` invocation calls `EffectTestHost.CreateCompilation` again before selecting its method. The per-case expected values are already explicit after R1027, so they can travel with a shared immutable compilation rather than forcing duplicate fixture setup. | `SharpProof.Effects.Test/IndirectLocalMutationNullnessRegressionTests.cs:6-44,46-110` |
