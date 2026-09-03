@@ -145,11 +145,13 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
         var normalCompletion = evidence.NormalCompletion;
         var replayVariables = evidence.ReplayVariables;
         var normalCompletionUnknown = WorkerClaimReason.None;
+        var normalCompletionIsFalse =
+            normalCompletion is IrBooleanTerm { Value: false };
         var normalCompletionProofCore =
-            normalCompletion is IrBooleanTerm { Value: false }
+            normalCompletionIsFalse
                 ? ImmutableArray.Create("body:normal-completion")
                 : [];
-        var noModeledNormalReturn = normalCompletion is IrBooleanTerm { Value: false };
+        var noModeledNormalReturn = normalCompletionIsFalse;
         if (normalCompletion is not IrBooleanTerm)
         {
             var bodyEvidence = assumptions.Where(
