@@ -10615,3 +10615,15 @@ R1011 is deferred: reuse validated syntax roots only within the same immutable d
 ### Status (part two hundred forty-three)
 
 R1012 is deferred: preserve warmup exception propagation, measured latency capture, diagnostic-failure collection, and the alternating edit state when consolidating the shared transition.
+
+## Second survey, part two hundred forty-four: R1013 - repeated publication ancestor identity probes
+
+`LinuxPathIdentity.AcquirePublicationSet` captures the ancestor identity map once before acquiring publication locks. `CaptureAncestorIdentity` walks from each canonical publication path's parent up to `/`, performs `lstat` at every level, and assigns the result into a dictionary keyed by the ancestor path. The dictionary prevents duplicate stored entries but not duplicate probes: publication members that share a directory cause the same ancestor paths to be inspected and overwritten once per member. The later `ConfirmAncestorIdentity` pass already rechecks every distinct dictionary key after locks are acquired, so the capture phase can record each existing ancestor path once per acquisition (and separately retain a missing-state marker if that state is relevant) without removing the TOCTOU confirmation boundary. This is distinct from R223, which preserves the post-lock confirmation, and from R1005, which concerns PowerShell physical-prefix walks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1013 | **Publication ancestor capture deduplicates the map but not the filesystem reads.** For every canonical publication path, `CaptureAncestorIdentity` walks all parent directories and calls `lstat`, even when a shared ancestor is already present in its result dictionary; the assignment merely overwrites the existing value. A per-acquisition inspected-path set or identity map can skip repeated probes while leaving `ConfirmAncestorIdentity` to verify every distinct ancestor after lock acquisition, preserving the live path-identity boundary. | `SharpProof.Host/LinuxPathIdentity.cs:266`; `:417-451`; post-lock confirmation at `:292-301,454-467`; related TOCTOU note R223 | |
+
+### Status (part two hundred forty-four)
+
+R1013 is deferred: deduplicate only the pre-lock ancestor probes within one acquisition, and retain the post-lock identity confirmation and failure handling.
