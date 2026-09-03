@@ -120,6 +120,46 @@ internal static class StringConcatenationEffectResolver
             origin,
             compilation,
             flow);
+        return ResolveFormattedValue(
+            formatted,
+            origin,
+            calls,
+            classifyRegion);
+    }
+
+    internal static (EffectSummary Summary, bool CompletesNormally)
+        ResolveFormattedValueEffects(
+        IOperation operand,
+        IOperation origin,
+        Compilation compilation,
+        EffectCallSiteResolver calls,
+        ManagedFlowResult? flow,
+        Func<IOperation?, bool, EffectRegionSet> classifyRegion,
+        OperationCompletionEvaluator completionEvaluator)
+    {
+        var formatted = ResolveFormattedValueCall(
+            operand,
+            origin,
+            compilation,
+            flow);
+        return (
+            ResolveFormattedValue(
+                formatted,
+                origin,
+                calls,
+                classifyRegion),
+            CanFormattedValueCompleteNormally(
+                formatted,
+                origin,
+                completionEvaluator));
+    }
+
+    private static EffectSummary ResolveFormattedValue(
+        FormattedValueCall formatted,
+        IOperation origin,
+        EffectCallSiteResolver calls,
+        Func<IOperation?, bool, EffectRegionSet> classifyRegion)
+    {
         if (!formatted.IsRequired)
         {
             return EffectSummary.Empty;
@@ -162,6 +202,17 @@ internal static class StringConcatenationEffectResolver
             origin,
             compilation,
             flow);
+        return CanFormattedValueCompleteNormally(
+            formatted,
+            origin,
+            completionEvaluator);
+    }
+
+    private static bool CanFormattedValueCompleteNormally(
+        FormattedValueCall formatted,
+        IOperation origin,
+        OperationCompletionEvaluator completionEvaluator)
+    {
         return !formatted.IsRequired ||
             formatted.Target == null ||
             IsDispatchUncertain(

@@ -724,22 +724,17 @@ internal sealed partial class OperationEffectScanner
             }
 
             var formattedValue =
-                StringConcatenationEffectResolver.ResolveFormattedValue(
+                StringConcatenationEffectResolver.ResolveFormattedValueEffects(
                     value.Expression,
                     value,
                     _session.Compilation,
                     _callResolver,
                     _abstractFlow,
-                    _conversionOwnership.ClassifyRegion);
+                    _conversionOwnership.ClassifyRegion,
+                    _completionEvaluator);
             result = result.Then(new EffectStep(
-                formattedValue,
-                StringConcatenationEffectResolver
-                    .CanFormattedValueCompleteNormally(
-                        value.Expression,
-                        value,
-                        _session.Compilation,
-                        _abstractFlow,
-                        _completionEvaluator)));
+                formattedValue.Summary,
+                formattedValue.CompletesNormally));
             if (!result.CompletesNormally)
             {
                 return result.Summary;
