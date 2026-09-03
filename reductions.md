@@ -16398,3 +16398,7 @@ combined schema tests pass (9 passed).
 R408 is applied: contradictory claim construction now has one shared assembler
 helper while retaining each caller's evidence-certainty and replay semantics.
 Worker tests pass (148 passed).
+
+R1359 is applied: the event-accessor subset remains deferred for its single
+consumer instead of being copied into a temporary array. The focused test passes
+(1 passed).

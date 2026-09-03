@@ -34,7 +34,7 @@ public sealed class AnalyzerSyntaxHelpersTests
         var accessors = root.DescendantNodes().OfType<AccessorDeclarationSyntax>().ToArray();
         var eventAccessors = accessors.Where(
             static accessor =>
-                accessor.Parent?.Parent is EventDeclarationSyntax).ToArray();
+                accessor.Parent?.Parent is EventDeclarationSyntax);
         var declaration = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
 
         using (Assert.EnterMultipleScope())
