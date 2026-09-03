@@ -15661,6 +15661,11 @@ New-SharpProofCoverageContext first tests whether either coverage argument is no
 |---|---|---|
 | R1306 | **New-SharpProofCoverageContext recomputes its two coverage-input presence checks. The initial OR and the later mismatch guard call IsNullOrWhiteSpace on the same arguments again. Cache the two booleans while retaining the paired-input failure rule.** | scripts/SharpProof.ContainerExecution.psm1:932-940 |
 
+### Status (continued)
+
+R1306 is applied: coverage enablement and the paired-input guard now reuse the
+same two presence booleans. Coverage script tests pass (33 passed).
+
 ## Second survey, continued: R1307 - fuzz summary filters the same failures twice
 
 Invoke-SharpProofFuzzCampaign derives status by filtering the completed run records for a nonzero exit code or failed validation, then applies the identical predicate again to compute passed. Both fields are projections of the same immutable $runs snapshot, so one failed-run collection or count can drive both without changing the summary schema or fail-closed result.
