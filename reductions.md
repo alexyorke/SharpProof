@@ -13971,3 +13971,18 @@ without changing the string-formatting policy.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1182 | **`ExceptionHandlerReachability.AddFormattedValuePotential` resolves the same formatted-value method twice.** `GetFormattedValueExceptions` and the method's completion check both call `StringConcatenationEffectResolver.TryResolveFormattedValueMethod` with identical inputs before the caller returns. A shared `(target, dispatchUncertain, resolved)` projection can remove the duplicate symbol/operation analysis while preserving unknown-potential and completion behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:2564-2627`; resolver `SharpProof.Effects/StringConcatenationEffectResolver.cs` |
+
+## Second survey, part five hundred five: R1183 - return nullability uses two aggregate passes
+
+`GetReturnNullability` has already collected the reachable returned values into a
+stable array. It then asks whether all values are definitely non-null and, when
+that fails, asks whether all values are definitely null. The nullability
+classification is tri-state, so a single pass can track whether a non-null and
+a null result have been observed and return the same `NonNull`, `Null`, or
+`MaybeNull` result. The empty-return and expression-bodied fallbacks should stay
+as they are; only the repeated per-value predicate calls need a shared
+accumulator.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1183 | **`ExceptionHandlerReachability.GetReturnNullability` can scan returned values twice.** After building `returnedValues`, it runs `returnedValues.All(DefiniteOperationFacts.IsDefinitelyNonNull)` and, if that is false, runs `returnedValues.All(DefiniteOperationFacts.IsDefinitelyNull)`. An all-null result therefore traverses the complete array twice, while mixed results can revisit values; one tri-state accumulation can preserve the current short-circuit classification without repeating the nullness predicates. | `SharpProof.Effects/ExceptionHandlerReachability.cs:2629-2676` |
