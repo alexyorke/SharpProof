@@ -19766,3 +19766,11 @@ No new ID. The measurement is recorded because its value is the zero: a later pa
 that wonders whether production carries duplicated logic can read this instead of
 re-deriving it, and the two residuals it names - R388 and R495 - are both small,
 both `pending`, and both now confirmed accurate at HEAD.
+
+## Second survey, continued: R1761 - Primary constructor argument tests duplicate the same source harness
+
+`PrimaryConstructorBaseArgumentsCheckNestedCalls` and `PrimaryConstructorSkipsUnreachableNestedCalls` repeat the same `Guard.Positive` definition, `Base(int value)` declaration, primary-constructor `Derived`, analyzer invocation, and result assertion envelope. The only semantic variation is the base argument: a direct `Guard.Positive(-1)` call must report `SP0027`, while `false ? Guard.Positive(-1) : 0` must remain unreachable and produce no diagnostic. A parameterized source builder or case table can keep that direct-versus-unreachable distinction while removing the repeated compilation fixture and making the zero-diagnostic expectation use the same assertion surface. This is a narrower residual than R1760's larger primary-constructor replay cluster.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1761 | Two adjacent primary-constructor argument tests repeat the Guard/Base/analyzer harness; parameterize only the base argument and expected diagnostic IDs. | `SharpProof.Analyzer.Test/RequiresAndControlTests.cs:581-623,605-624`; related R1760 |
