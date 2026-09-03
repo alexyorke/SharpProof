@@ -13152,3 +13152,23 @@ normalization boundary.
 ### Status (part four hundred seventy-eight)
 
 R1155 is pending: pass the target directly to `ContractClauseInventoryBuilder.Create` and keep normalization in that builder's existing entry path.
+
+## Second survey, part four hundred seventy-nine: R1156 - duplicated harmless-wrapper traversal
+
+`DefiniteOperationFacts.IsHarmlessValue` and
+`UnwrapHarmlessValue` each recursively walk parenthesized operations and
+conversions accepted by `HarmlessConversion`. The two methods intentionally
+end differently: the first recognizes a terminal allow-list and returns a
+boolean, while the second returns the terminal operation and passes through
+non-harmless operations for callers that need to inspect them. A shared
+`UnwrapHarmlessWrappers` loop can own only the common conversion/parenthesis
+traversal; the existing terminal allow-list and passthrough behavior can stay
+at their respective call sites.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1156 | **`DefiniteOperationFacts` duplicates harmless-wrapper recursion.** `IsHarmlessValue` and `UnwrapHarmlessValue` repeat the same recursive `IConversionOperation`/`IParenthesizedOperation` traversal and `HarmlessConversion` predicate. Sharing that wrapper-stripping core removes one maintenance copy without conflating boolean terminal classification with operation passthrough. | `SharpProof.Effects/ManagedAbstractFlow.cs:2828-2859,2916-2925` |
+
+### Status (part four hundred seventy-nine)
+
+R1156 is pending: centralize harmless conversion/parenthesis unwrapping while preserving the separate terminal allow-list and passthrough contract.
