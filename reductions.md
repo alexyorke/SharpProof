@@ -16044,6 +16044,11 @@ ContractClauseInventory.HasPlacementErrors evaluates !clause.IsValid and then se
 |---|---|---|
 | R1334 | **`ContractClauseInventory.HasPlacementErrors` re-expresses `IsValid` and then separately excludes `NestedCallable`. Use one direct placement pattern for the two allowed states, retaining the public `IsValid` property for callers.** | SharpProof.Contracts/ContractClauseInventory.cs:13-24 |
 
+### Status (continued)
+
+R1334 is applied: placement validation uses one direct pattern for the two
+allowed states. Contract clause inventory tests pass (14 passed).
+
 ## Second survey, continued: R1335 - protocol completeness and uniqueness checks traverse arrays twice
 
 WorkerProtocolJson.CompleteUnique first walks every object to check null/completeness and then walks the same array again through Select(key).Distinct().Count(). The three callers use side-effect-free predicates and only need a boolean, so a one-pass loop with an ordinal key set can preserve fail-closed validation while removing the second traversal, LINQ pipeline, and duplicate-key counting pass.
