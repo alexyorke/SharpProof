@@ -335,6 +335,7 @@ the smallest relevant containerized test target passes.
 | R803 | Partition sorted manifest claims in one pass for postconditions and effects | `SharpProof.Package.Test`: focused compiler-manifest tests with `-Fast` |
 | R944 | Defer selection-inventory construction until the contract API is present | `SharpProof.Contracts.Test`: 142 passed |
 | R942 | Build aligned effect-call arguments directly into an immutable array | `SharpProof.Effects.Test`: 323 passed |
+| R917 | Remove duplicate array-creation type hashing from semantic claim identity | `SharpProof.Worker.Test`: ClaimIdentity filter, 4 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -8457,8 +8458,9 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred twenty-seven)
 
-R917 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R917 is `applied`: semantic operation identity already writes the operation type
+before its kind-specific fields, so the duplicate array-creation type write was
+removed without changing child traversal or identity fields.
 
 ## Second survey, part four hundred twenty-eight: R918 - duplicate constant runtime-type lookup
 

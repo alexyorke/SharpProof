@@ -238,9 +238,6 @@ internal static partial class SemanticClaimIdentity
                 WriteType(writer, value.TypeOperand, context);
                 writer.Add(value.IsNegated);
                 break;
-            case IArrayCreationOperation value:
-                WriteType(writer, value.Type, context);
-                break;
         }
         var children = operation.ChildOperations;
         writer.Add(children.Count);
