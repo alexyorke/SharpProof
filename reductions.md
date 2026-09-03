@@ -13172,3 +13172,23 @@ at their respective call sites.
 ### Status (part four hundred seventy-nine)
 
 R1156 is pending: centralize harmless conversion/parenthesis unwrapping while preserving the separate terminal allow-list and passthrough contract.
+
+## Second survey, part four hundred eighty: R1157 - two independent substitutions of one instantiated summary
+
+`IrRelationalSummaryInstantiator.Instantiate` builds one replacement map and
+then calls `IrSubstitution.Substitute` separately for
+`summary.NormalCompletion` and `summary.NormalRelation`. Each public
+substitution call validates the factory, root, and replacement map, copies the
+map into a dictionary, rechecks replacement types, and allocates a fresh rewrite
+memo. A batched substitution entry point can validate and snapshot the map once
+and optionally share memoized rewrites for hash-consed subterms while returning
+the two distinct output roots; the completion and relation semantics should
+remain separate.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1157 | **`IrRelationalSummaryInstantiator` repeats the full substitution setup for both summary predicates.** The two `IrSubstitution.Substitute` calls use the same factory and replacement map, so map materialization, replacement-type validation, and rewrite-memo allocation are duplicated per instantiation. A multi-root substitution seam can amortize that work without merging `NormalCompletion` and `NormalRelation`. | `SharpProof.Summaries/IrRelationalSummaryInstantiator.cs:82-92`; `SharpProof.Ir/IrSubstitution.cs:21-55` |
+
+### Status (part four hundred eighty)
+
+R1157 is pending: expose a validated/batched substitution path for the two summary roots, retaining separate output terms and fail-closed replacement checks.
