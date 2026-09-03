@@ -1,4 +1,5 @@
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'Assert-SharpProofFuzzRunnerResult.ps1')
 
 function Get-SharpProofRotatingSeed {
     [CmdletBinding()]
@@ -116,12 +117,9 @@ function Read-SharpProofRetainedFuzzSeedManifest {
         if ($root.ValueKind -ne [Text.Json.JsonValueKind]::Object) {
             throw 'The retained fuzz seed manifest must be an object.'
         }
-        $expected = @('schemaVersion', 'casesPerSeed', 'seeds')
-        $names = @($root.EnumerateObject() | ForEach-Object { $_.Name })
-        if ($names.Count -ne $expected.Count -or
-            @($names | Where-Object { $expected -cnotcontains $_ }).Count -ne 0) {
-            throw 'The retained fuzz seed manifest has unexpected properties.'
-        }
+        Assert-ExactJsonObjectProperties -Object $root `
+            -Expected @('schemaVersion', 'casesPerSeed', 'seeds') `
+            -Description 'Retained fuzz seed manifest'
 
         [int]$schemaVersion = 0
         $schema = $root.GetProperty('schemaVersion')
