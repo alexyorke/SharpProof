@@ -349,8 +349,13 @@ internal sealed partial class AcyclicBlockPredicateExecutor
                 !ApiSpecTable.Default.TryGetByWitnessIdentifier(prepared.WitnessIdentifier, out var template) ||
                 template.Target.DocumentationCommentId != prepared.CallIdentity ||
                 !template.Result.HasValue ||
-                prepared.ConsumesMemoryHavoc != (template.Facets.Effects.Effects != SpecEffect.None) ||
-                !IsResultType(template.Target.ResultType, factory.GetVariableInfo(call.Target.Value).Type) ||
+                prepared.ConsumesMemoryHavoc != (template.Facets.Effects.Effects != SpecEffect.None))
+            {
+                return null;
+            }
+
+            var targetType = factory.GetVariableInfo(call.Target.Value).Type;
+            if (!IsResultType(template.Target.ResultType, targetType) ||
                 call.Arguments.Length != template.Parameters.Length ||
                 template.Receiver.HasValue != (call.Receiver != null))
             {
@@ -393,7 +398,7 @@ internal sealed partial class AcyclicBlockPredicateExecutor
             var resultVariable = factory.CreateVariable(
                 "spec-call-result:" +
                 call.Id.Value.ToString(CultureInfo.InvariantCulture),
-                factory.GetVariableInfo(call.Target.Value).Type);
+                targetType);
             var result = factory.Variable(resultVariable);
             substitutions.Add(template.Result.Value, result);
             if (!SpecResultDomainProjection.TryCreate(
