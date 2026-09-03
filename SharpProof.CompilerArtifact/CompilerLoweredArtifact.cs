@@ -334,11 +334,19 @@ internal static class CompilerLoweredArtifact
             .ToDictionary(static group => group.Key,
                 static group => group.OrderBy(static item => item.Ordinal).ToImmutableArray(),
                 StringComparer.Ordinal);
-        if (artifacts.Length != callables.Count ||
-            artifacts.Select(static item => item?.CallableId).Distinct(StringComparer.Ordinal).Count() != artifacts.Length ||
-            artifacts.Any(item => item == null || !callables.ContainsKey(item.CallableId)))
+        if (artifacts.Length != callables.Count)
         {
             throw new InvalidDataException("The lowered callable payload does not equal the manifest.");
+        }
+        var callableIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var artifact in artifacts)
+        {
+            if (artifact == null ||
+                !callableIds.Add(artifact.CallableId) ||
+                !callables.ContainsKey(artifact.CallableId))
+            {
+                throw new InvalidDataException("The lowered callable payload does not equal the manifest.");
+            }
         }
 
         var result = ImmutableArray.CreateBuilder<CompilerCallablePreparation>(artifacts.Length);
