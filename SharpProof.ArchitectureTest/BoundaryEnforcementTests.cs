@@ -317,10 +317,10 @@ public sealed class BoundaryEnforcementTests
             adapter,
             Does.Contain("The single audited boundary"));
         Assert.That(
-            Count(adapter, "#pragma warning disable RS0030"),
+            TestTextHelpers.CountOrdinal(adapter, "#pragma warning disable RS0030"),
             Is.EqualTo(1));
         Assert.That(
-            Count(adapter, "#pragma warning restore RS0030"),
+            TestTextHelpers.CountOrdinal(adapter, "#pragma warning restore RS0030"),
             Is.EqualTo(1));
     }
 
@@ -610,21 +610,6 @@ public sealed class BoundaryEnforcementTests
                 Does.Not.Contain(forbidden),
                 forbidden);
         }
-    }
-
-    private static int Count(string text, string value)
-    {
-        var count = 0;
-        var offset = 0;
-        while ((offset = text.IndexOf(
-                   value,
-                   offset,
-                   StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            offset += value.Length;
-        }
-        return count;
     }
 
 }

@@ -14,7 +14,7 @@ public sealed class NativeTestBootstrapTests
             var path = Path.Combine(root, project, "ContainerNativeLibrarySetup.cs");
             var source = await File.ReadAllTextAsync(path);
             Assert.That(
-                CountOrdinal(
+                TestTextHelpers.CountOrdinal(
                     source,
                     "ContainerNativeLibrary.InstallZ3ResolverRequired("),
                 Is.EqualTo(1),
@@ -35,21 +35,6 @@ public sealed class NativeTestBootstrapTests
                 Does.Contain("SharpProof.Host.csproj"),
                 project);
         }
-    }
-
-    private static int CountOrdinal(string value, string needle)
-    {
-        var count = 0;
-        var offset = 0;
-        while ((offset = value.IndexOf(
-                   needle,
-                   offset,
-                   StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            offset += needle.Length;
-        }
-        return count;
     }
 
 }
