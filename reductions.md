@@ -9394,3 +9394,44 @@ file it needs: `PerformanceGateTests.cs` is already read at
 `[Category("Coverage")]` beside it is a two-line addition. It is worth doing
 because the failure mode is a coverage gate that passes while measuring nothing,
 which is the one class of failure a coverage gate cannot self-detect.
+
+## Second survey, part one hundred ninety-four: R968 - one constant, three limits, three exception types
+
+A style and consistency census over all 538 exception messages of twelve
+characters or more in production C#.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R968 | **`MaximumTermDepth = 64` enforces three different notions of depth at three places in one file, raising three different exception types, and two of them share one message.** `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:13` declares the constant once and uses it three ways. At `:362-367` it is passed as `JsonDocumentOptions.MaxDepth`, so exceeding it raises **`JsonException`** from `JsonDocument.Parse` - a type this file never throws itself. At `:563-566`, `ParseTerm(JsonElement, int depth)` guards its own recursion and throws **`InvalidDataException("A specification-pack term is too deep.")`**. At `:266-268`, `Instantiate(Term, ImmutableArray<IrVarId>, int depth)` guards *the same recursion shape over the already-parsed tree* and throws **`ArgumentException`** with the **identical message string**. The two traversals are structurally parallel - `ParseTerm` recurses `depth + 1` through unary, binary and conditional operands at `:619-641`, and `Instantiate` does the same at `:281-289` - so they count the same nesting, and every `Term` reaching `Instantiate` in this file came from `ParseTerm`. **The ordering makes the later guards hard to reach**: JSON nesting depth for a term is strictly greater than term-tree depth, so the reader's `MaxDepth` fires first, then `ParseTerm`'s, leaving `Instantiate`'s as a defensive check on data already twice rejected. That is defensible as belt-and-braces; what is not is that the three tiers report differently. A user who exceeds the limit gets `JsonException` with a framework message, or `InvalidDataException`, or `ArgumentException` - the last two with the *same* sentence, so the message cannot distinguish which limit was hit, while the type distinguishes them in a way no caller acts on: this repository catches `ArgumentException` at 35 sites and `InvalidDataException` at 3. Across all 538 production exception messages this is **the only text used with more than one exception type**. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerSpecificationPackProvider.cs:13,266-268,281-289,362-367,563-566,619-641` |
+
+### Checked and not proposed (part one hundred ninety-four)
+
+- **Exception message style is 95 percent uniform and the exceptions are
+  deliberate.** Of 538 production messages, **509 (95%) end with a period** and
+  **519 (96%) start with a capital**. Nearly every deviation is a **sentence
+  fragment designed to complete a caller's prefix**, which is correct as written:
+  the six lowercase, period-less messages in
+  `SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs:65-140` are
+  surfaced by `:149-151` as
+  `"SharpProof verification did not publish a valid current result: {0}"`, and the
+  fragments in `CompilerSpecificationPackProvider.cs:693-756` (`"has an invalid
+  property set."`, `"is missing ''."`) are concatenated after a subject. The
+  remainder end with an interpolated value rather than a period, which is a
+  reasonable convention. Do not propose normalising these.
+- **No message text is duplicated across exception types except the one in
+  R968.** A grouping of all 538 messages by text found exactly one used with two
+  types. Message-text duplication is otherwise absent.
+- **The exception-type distribution is coherent** and was measured in part one
+  hundred eighty-one: 693 `throw new` sites over 17 types, `InvalidDataException`
+  dominant at 212 for malformed input. R968 is a local inconsistency inside that
+  convention, not evidence against it.
+
+### Status (part one hundred ninety-four)
+
+R968 is `pending`. The smallest correct fix is to give the two internal guards
+distinct messages naming which depth was exceeded, and to make
+`Instantiate`'s type match `ParseTerm`'s, since both reject the same malformed
+input rather than a caller's bad argument. Whether the third tier - the JSON
+reader's `MaxDepth` sharing the same constant - should have its own limit is a
+judgement for the owner: term depth and JSON nesting depth are different
+quantities that currently share one number.
