@@ -14811,3 +14811,11 @@ RequiresAndControl analyzer tests pass (92 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1230 | **`GetReturnExpressions` enumerates the same syntax subtree twice.** Its arrow-clause projection and return-statement projection each traverse `syntax.DescendantNodesAndSelf()` independently before `Concat`; a single categorized traversal can retain the current grouped ordering while eliminating the duplicate enumeration. | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1577-1588` |
+
+## Second survey, part five hundred fifty-three: R1231 - dispatch-target discovery repeats the full source-type walk
+
+`CacheSoundnessRules.IsNonCacheableReturnedValue` asks `GetPossibleDispatchTargets` to expand a virtual, abstract, or interface member before reading returned-value names. For every such symbol, `GetPossibleDispatchTargets` walks every source type in the compilation and then searches each relevant member/implementation chain. The `resolving` set prevents recursive cycles while a symbol is active, but completed dispatch results are discarded; repeated cache-value analysis can therefore rebuild the same source-type closure and dispatch target array. A compilation-scoped cache keyed by the symbol (including empty and single-target results, with no partial result retained across cancellation) can preserve interface/override semantics while removing repeated hierarchy walks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1231 | **`GetPossibleDispatchTargets` re-walks all source types for each completed dispatch query.** Virtual/interface return analysis starts a fresh target builder and invokes `GetSourceTypes(compilation.Assembly.GlobalNamespace)` for every symbol; the local recursion set is not a memo of completed results. A compilation-scoped immutable dispatch cache can retain the existing target ordering and cycle behavior while avoiding repeated whole-compilation enumeration. | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1403-1422,1425-1463,1511-1529` |
