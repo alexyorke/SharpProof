@@ -20923,3 +20923,9 @@ R1987 is applied: `RunVerifier` now routes structured warning/error records
 through one logging helper that owns the shared MSBuild location/message
 projection, while preserving severity and `HasStructuredError`. The focused
 verifier logging tests pass 14/14 with zero build warnings or errors.
+
+R1986 is applied: the three analyzer entry points now share
+`TryRecordRejectedContractAbstention` for the common semantic-outcome and
+early-return branch, while retaining their distinct rejection detection and
+ordering. The full `SharpProof.Analyzer.Test` project passes 476/476 tests with
+zero warnings or errors.

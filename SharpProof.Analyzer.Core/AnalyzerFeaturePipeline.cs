@@ -135,11 +135,11 @@ internal static partial class AnalyzerFeaturePipeline
             session.RecordSemanticOutcome(method, AnalyzerSemanticOutcome.Suppressed);
             return;
         }
-        if (rejectedContractApi)
-        {
-            session.RecordSemanticOutcome(
+        if (TryRecordRejectedContractAbstention(
                 method,
-                AnalyzerSemanticOutcome.Abstained);
+                rejectedContractApi,
+                session))
+        {
             return;
         }
         if (!selection.Contracts &&
@@ -242,11 +242,11 @@ internal static partial class AnalyzerFeaturePipeline
                 session,
                 context.ReportDiagnostic,
                 context.CancellationToken);
-        if (rejectedContractApi)
-        {
-            session.RecordSemanticOutcome(
+        if (TryRecordRejectedContractAbstention(
                 method,
-                AnalyzerSemanticOutcome.Abstained);
+                rejectedContractApi,
+                session))
+        {
             return;
         }
         if (selection.IsSuppressed)
@@ -379,11 +379,11 @@ internal static partial class AnalyzerFeaturePipeline
         {
             return;
         }
-        if (rejectedContractApi)
-        {
-            session.RecordSemanticOutcome(
+        if (TryRecordRejectedContractAbstention(
                 method,
-                AnalyzerSemanticOutcome.Abstained);
+                rejectedContractApi,
+                session))
+        {
             return;
         }
         if (selection.IsSuppressed)
@@ -732,6 +732,22 @@ internal static partial class AnalyzerFeaturePipeline
         return inventory.HasRejectedContractApiUsage ||
             inventory.HasPlacementErrors ||
             !intrinsicViolations.IsDefaultOrEmpty;
+    }
+
+    private static bool TryRecordRejectedContractAbstention(
+        IMethodSymbol method,
+        bool rejectedContractApi,
+        AnalyzerSession session)
+    {
+        if (!rejectedContractApi)
+        {
+            return false;
+        }
+
+        session.RecordSemanticOutcome(
+            method,
+            AnalyzerSemanticOutcome.Abstained);
+        return true;
     }
 
     private static void ReportRejectedContractApi(
