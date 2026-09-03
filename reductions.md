@@ -14011,3 +14011,19 @@ dropping either dimension.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1184 | **`ExceptionHandlerReachability` traverses the same body separately for exception potential and abrupt control-flow reachability.** `CanExitAbruptly` calls `GetPotentialExceptions(operation)` and then `CanExitAbruptlyWithoutExceptions(operation, scope)` when the exception result is inconclusive; `GetPotentialExceptions`' nested-try handling likewise computes a body's exception set and then asks the second walker whether an abrupt exit is reachable. The two results must remain semantically distinct, but a combined `(potentialExceptions, canReachAbruptExit)` projection or carefully scoped memo can avoid replaying the operation structure while retaining catch, finally, goto, and scope behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:92-225,1744-1804,2111-2125` |
+
+## Second survey, part five hundred seven: R1185 - catch reachability caches the wrong layer
+
+`GetReachability` caches the final answer by `CatchClauseSyntax`, but its first
+expensive input is the potential-exception set of the enclosing protected
+block. That set is independent of which sibling catch is the target: every
+target in one `try` uses the same operation, the same `keepEscaping: false`
+policy, and the same compilation-scoped callbacks. Consequently, a try with
+several catches can pay the complete explicit-stack exception walk once per
+catch before the target-specific type/filter scan begins. Cache the protected
+block projection by try/block identity, then retain the per-catch result cache
+for the distinct ordered-catch and filter policies.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1185 | **`ExceptionHandlerReachability.GetReachability` memoizes per catch but recomputes the shared protected-block exception set.** For every uncached `CatchClauseSyntax`, it resolves the enclosing try's block and calls `GetPotentialExceptions(protectedBlock)` even though that value does not depend on the target catch; sibling catches therefore repeat the same full operation walk. A per-try or per-protected-block potential cache can remove that repeated analysis while leaving each target's `CanKnownReach`, `CanUnknownReach`, and filter selection independent. | `SharpProof.Effects/ExceptionHandlerReachability.cs:22,45-79,82-90` |
