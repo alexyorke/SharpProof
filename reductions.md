@@ -10823,7 +10823,9 @@ R1027 is deferred: make the per-case write/completeness expectations explicit, a
 
 ### Status (part two hundred fifty-nine)
 
-R1028 is pending: pass container environment entries directly on the Docker command line and remove host process environment mutation.
+R1028 is applied: `build.ps1` passes each requested container environment entry
+as `NAME=VALUE` on the Compose command line without mutating the host process;
+`LocalProfilesMatchTheWorkflowCommands` passes.
 
 ## Second survey, part two hundred sixty: R1029 - dead manifest cleanup in container loop script
 
