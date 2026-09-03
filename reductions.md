@@ -13177,7 +13177,9 @@ at their respective call sites.
 
 ### Status (part four hundred seventy-nine)
 
-R1156 is pending: centralize harmless conversion/parenthesis unwrapping while preserving the separate terminal allow-list and passthrough contract.
+R1156 is applied: `IsHarmlessValue` and `UnwrapHarmlessValue` share one
+iterative harmless-wrapper traversal while retaining their separate terminal
+classification and passthrough behavior. The Effects test suite passes (323/323).
 
 ## Second survey, part four hundred eighty: R1157 - two independent substitutions of one instantiated summary
 

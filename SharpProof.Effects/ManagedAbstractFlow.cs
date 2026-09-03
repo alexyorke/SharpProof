@@ -2827,16 +2827,29 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
     internal static bool IsHarmlessValue(IOperation operation)
     {
-        return operation switch
-        {
+        operation = UnwrapHarmlessWrappers(operation);
+        return operation is
             ILiteralOperation or ILocalReferenceOperation or IParameterReferenceOperation or
-                IInstanceReferenceOperation or IDefaultValueOperation or ITypeOfOperation or
-                INameOfOperation or ISizeOfOperation => true,
-            IConversionOperation conversion when HarmlessConversion(conversion) =>
-                IsHarmlessValue(conversion.Operand),
-            IParenthesizedOperation parenthesized => IsHarmlessValue(parenthesized.Operand),
-            _ => false
-        };
+            IInstanceReferenceOperation or IDefaultValueOperation or ITypeOfOperation or
+            INameOfOperation or ISizeOfOperation;
+    }
+
+    private static IOperation UnwrapHarmlessWrappers(IOperation operation)
+    {
+        while (true)
+        {
+            switch (operation)
+            {
+                case IConversionOperation conversion when HarmlessConversion(conversion):
+                    operation = conversion.Operand;
+                    continue;
+                case IParenthesizedOperation parenthesized:
+                    operation = parenthesized.Operand;
+                    continue;
+                default:
+                    return operation;
+            }
+        }
     }
 
     internal static bool IsDirectArrayCreationComplete(
@@ -2850,13 +2863,7 @@ internal sealed class DefiniteOperationFacts(Compilation compilation, Cancellati
 
     internal static IOperation UnwrapHarmlessValue(IOperation operation)
     {
-        return operation switch
-        {
-            IConversionOperation conversion when HarmlessConversion(conversion) =>
-                UnwrapHarmlessValue(conversion.Operand),
-            IParenthesizedOperation parenthesized => UnwrapHarmlessValue(parenthesized.Operand),
-            _ => operation
-        };
+        return UnwrapHarmlessWrappers(operation);
     }
 
     /// <summary>
