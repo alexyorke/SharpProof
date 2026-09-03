@@ -5,6 +5,7 @@ using SharpProof.Attributes;
 using SharpProof.CompilerArtifact;
 using SharpProof.Contracts;
 using SharpProof.Ir;
+using SharpProof.Summaries;
 using SharpProof.Verify;
 using SharpProof.Worker.Protocol;
 
@@ -18,6 +19,19 @@ public sealed class CompilerCallableLowererTests
         CompilerContractKind.Assume,
         CompilerContractKind.Ensures
     ];
+
+    [Test]
+    public void SummaryOriginWireVocabularyMatches()
+    {
+        Assert.That(
+            Enum.GetNames<CompilerSummaryOrigin>(),
+            Is.EqualTo(Enum.GetNames<IrSummaryOrigin>()));
+        Assert.That(
+            Enum.GetValues<CompilerSummaryOrigin>()
+                .Select(static value => Convert.ToInt32(value)),
+            Is.EqualTo(Enum.GetValues<IrSummaryOrigin>()
+                .Select(static value => Convert.ToInt32(value))));
+    }
 
     [TestCase(ContractBindingFailure.UnsupportedExpression,
         WorkerClaimReason.UnsupportedExpression)]

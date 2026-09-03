@@ -18981,3 +18981,7 @@ selective package mutations remain in their individual tests. The complete
 | ID | Finding | Evidence |
 |---|---|---|
 | R1667 | The IR identifier formatting tests repeat a nine-kind default/nondefault matrix; centralize kind-to-prefix data while retaining allocation and hash-specific assertions. | `SharpProof.Ir.Test/IrIdentifierTests.cs:8-20,37-95` |
+R1147 is applied: `CompilerCallableLowererTests` now compares the member names
+and ordinal values of `IrSummaryOrigin` and `CompilerSummaryOrigin`, making the
+cross-assembly vocabulary drift fail in the Worker test lane instead of only
+at a runtime conversion site. The focused parity test passes (1/1).
