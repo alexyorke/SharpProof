@@ -16799,3 +16799,19 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 | ID | Finding | Evidence |
 |---|---|---|
 | R1387 | `Assert-ComposeAuthority` re-walks the Compose lines once to locate each service and again to locate its end; parse service ranges in one ordered pass instead of rescanning the same block per service. | `scripts/Test-SharpProofContainerContract.ps1:235-333` |
+
+## Second survey, continued: R1388 - Production-complexity inventory reserializes unchanged project parse options per file
+
+`Test-ProductionCSharpComplexity` computes `$project.parseOptions | ConvertTo-Json -Compress` inside the inner compile-file loop, even though a project’s evaluated parse-options object is unchanged for every file in that project. Precompute the signature once per project (or carry it from inventory construction) and reuse it for each file’s per-path deduplication set, preserving the distinct-options behavior for shared files while removing repeated PowerShell JSON serialization.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1388 | `Test-ProductionCSharpComplexity` serializes each project's immutable parse-options object once per compiled file; cache the project signature before the file loop while retaining per-file option deduplication. | `scripts/Test-ProductionCSharpComplexity.ps1:97-112` |
+
+## Second survey, continued: R1389 - Package dependency graph validation repeatedly partitions one materialized model set
+
+`Get-SharpProofPackageDependencyGraph` fully materializes `$models`, filters that same array independently for `.nupkg` and `.snupkg` validation, and then filters it again for `.nupkg` edge projection. The extension is already computed on every model, so one partition/map can supply both exact-graph checks and the later edge walk, retaining extension-specific license/metadata rules and package ordering while removing repeated scans and pipeline arrays.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1389 | `Get-SharpProofPackageDependencyGraph` applies three separate extension filters to the same package-model array; partition models once by extension and reuse the two collections for validation and edge construction. | `scripts/Test-SharpProofPackageDependencies.ps1:137-153,220-235` |
