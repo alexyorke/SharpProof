@@ -51,7 +51,7 @@ public sealed class NullablePatternCompletionRegressionTests
         var completion = new DefiniteOperationFacts(
             compilation,
             CancellationToken.None);
-        var result = new EffectAnalysisSession(compilation).Analyze(caller);
+        var result = EffectTestHost.AnalyzeSample(compilation, callerName);
 
         using (Assert.EnterMultipleScope())
         {

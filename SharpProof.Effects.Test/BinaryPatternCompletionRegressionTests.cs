@@ -34,9 +34,7 @@ public sealed class BinaryPatternCompletionRegressionTests
         var completion = new DefiniteOperationFacts(
             compilation,
             CancellationToken.None);
-        var summary = new EffectAnalysisSession(compilation)
-            .Analyze(method)
-            .Summary;
+        var summary = EffectTestHost.AnalyzeSample(compilation, methodName).Summary;
 
         using (Assert.EnterMultipleScope())
         {
