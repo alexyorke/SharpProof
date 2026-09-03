@@ -14659,3 +14659,11 @@ decision points.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1220 | **`AnalyzePrimaryConstructorInitializer` materializes the same arguments twice.** It first builds `ImmutableArray<IArgumentOperation?>`, validates `arguments.Any(argument => argument == null)`, then filters the proven non-null array through `OfType<IArgumentOperation>().ToImmutableArray()` for `baseCall`. Reusing a single typed projection after validation removes an iterator and array allocation without changing malformed-operation handling. | `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:59-101` |
+
+## Second survey, part five hundred forty-three: R1221 - abstract and concrete call checks duplicate the prerequisite gate
+
+`RequiresCallSiteAnalyzer.Analysis` has nearly identical prerequisite blocks in `AnalyzeAbstractCallSite` and `AnalyzeConcreteCall`: both validate the receiver's normal completion, reject a definitely-null instance for instance targets, and require every argument value to complete. The modes intentionally use different strength (`CompletesNormally` for abstract flow and `MayCompleteNormally` for replay) and different unknown return values, so their policy is not identical; however, a shared helper taking the completion predicate and returning the same boolean can own the repeated receiver/argument shape. That would keep the mode-specific predicate and caller response explicit while reducing a drift-prone validation copy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1221 | **`AnalyzeAbstractCallSite` and `AnalyzeConcreteCall` duplicate the receiver/nullness/argument prerequisite gate.** Each constructs `DefiniteOperationFacts`, checks an optional receiver, applies the non-static definitely-null rule, and scans `Arguments` for incomplete values; only the abstract/concrete completion predicate and failure sentinel differ. A policy-parameterized helper can centralize the shape without changing either analysis mode's soundness boundary. | `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:360-381,453-478` |
