@@ -21107,3 +21107,11 @@ owns the one-dimensional constant-array length projection used by both list
 pattern analyses, while their distinct unwrapping and property-length policies
 remain local. The full `SharpProof.Effects.Test` suite passes 323/323 with zero
 warnings or errors.
+
+## Second survey, continued: R1998 - RequiresCallSiteDiscovery and CacheSoundnessRules duplicate the reachable CFG block iterator prelude
+
+`RequiresCallSiteDiscovery` and `CacheSoundnessRules` each enumerate `graph.Blocks`, poll the same cancellation token, and skip blocks whose `IsReachable` flag is false before entering their distinct block logic. The discovery path then expands operation roots, while the meta-analyzer computes predecessor state and exceptional successors; those policies must remain separate. A small shared `EnumerateReachableBlocks` iterator (possibly alongside the already linked CFG facts source) can own only the cancellation/reachability prelude and prevent future CFG traversal paths from silently differing on unreachable-block admission.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1998 | **`RequiresCallSiteDiscovery` and `CacheSoundnessRules` repeat the cancellation-plus-`IsReachable` CFG block filter; centralize only that iterator while retaining their distinct block transfer and operation policies.** | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:141-147`; `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:993-999`; broader flow overlap R542 |
