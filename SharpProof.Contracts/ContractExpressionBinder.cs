@@ -11,6 +11,7 @@ internal sealed class ContractExpressionBinder
     private readonly HashSet<IrVarId> _receiverVariables = [];
     private readonly Dictionary<IrVarId, IrVarId> _preState = [];
     private readonly HashSet<IrVarId> _preStateValues = [];
+    private ImmutableArray<FrontendVariableBinding> _variableBindings;
     private IrVarId? _result;
 
     internal ContractExpressionBinder(
@@ -29,9 +30,19 @@ internal sealed class ContractExpressionBinder
         };
     }
 
-    internal ImmutableArray<FrontendVariableBinding> VariableBindings =>
-        [.. _variables.Select(static pair =>
-            new FrontendVariableBinding(pair.Key, pair.Value))];
+    internal ImmutableArray<FrontendVariableBinding> VariableBindings
+    {
+        get
+        {
+            if (_variableBindings.IsDefault)
+            {
+                _variableBindings = [.. _variables.Select(static pair =>
+                    new FrontendVariableBinding(pair.Key, pair.Value))];
+            }
+
+            return _variableBindings;
+        }
+    }
 
     internal ImmutableArray<IrVarId> ReceiverVariables =>
         [.. _receiverVariables];
@@ -109,6 +120,7 @@ internal sealed class ContractExpressionBinder
         {
             _variables[binding.Symbol] = binding.Variable;
         }
+        _variableBindings = default;
 
         var boundVariables = new HashSet<IrVarId>(
             result.Variables.Select(static binding => binding.Variable));

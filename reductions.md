@@ -11764,6 +11764,8 @@ In `SharpProof.Contracts/ContractExpressionBinder.cs`, `Bind` iterates variables
 
 R1096 is deferred: maintain a hash set for pre-state values and cache `VariableBindings` in `ContractExpressionBinder`.
 
+R1096 is applied: the existing pre-state value set is retained, and `VariableBindings` is now cached with invalidation on new bindings to avoid repeated immutable-array materialization. `SharpProof.Contracts.Test` passes (142/142).
+
 ## Second survey, part three hundred twenty-eight: R1097 - custom exception capture helper duplicating Assert.Throws in contract tests
 
 `SharpProof.Attributes.Test/ContractApiTests.cs` defines a 15-line custom helper `Capture<TException>(Action action)` that runs the action in a manual `try/catch` block and returns the exception or calls `Assert.Fail`. NUnit's built-in `Assert.Throws<TException>(TestDelegate code)` already captures and returns the typed exception with standard assertion formatting. Replacing `Capture` with `Assert.Throws` eliminates the custom helper and manual try/catch boilerplate.
