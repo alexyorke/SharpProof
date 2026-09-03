@@ -15027,3 +15027,27 @@ initializer effects tests pass (2 and 1 passed, respectively).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1247 | **`VerifierProcessSupervisor.Run` double-closes reserve descriptors on acquisition failure.** The descriptor-probe failure path closes the shared reserve array and returns, but `finally` closes the same non-invalidated entries again. Make one scope own that cleanup or clear the entries after the early close while retaining the failure result. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:39-56,152-155` |
+
+## Second survey, part five hundred seventy: R1248 - clause ownership is queried twice per recognized invocation
+
+`ContractClauseInventoryBuilder.CreateCore` first checks whether a recognized invocation belongs to the callable while deciding whether to record rejected API usage. For a known contract clause it then calls `Classify`, whose first operation is the same `IsOwnedByCallable` query with the same callable, invocation, semantic model, and cancellation token. The enclosing traversal has not changed those inputs, so passing the ownership fact into classification can remove one semantic-model lookup for every recognized clause while keeping nested-callable classification and rejected-API handling separate.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1248 | **`ContractClauseInventoryBuilder` repeats the same callable-ownership lookup.** `CreateCore` uses `IsOwnedByCallable` to process a recognized clause, then `Classify` recomputes it before choosing `NestedCallable` versus direct placement. Thread the first boolean into `Classify` to avoid the duplicate enclosing-symbol query. | `SharpProof.Contracts/ContractClauseInventoryBuilder.cs:123-145,205-241,243-254` |
+
+## Second survey, part five hundred seventy-one: R1249 - declaration target groups repeat their common member mask
+
+`SharpProofAttributeTargets` defines `Contract` as the union of constructor, method, and property targets, then repeats those same three flags inside the broader `Declaration` constant alongside assembly, class, struct, and interface. The two constants are intentionally different sets, but `Declaration` can be expressed as the additional declaration-only flags plus `Contract`. Keeping the shared member mask in one constant reduces the chance that a new callable target is added to one attribute family and silently omitted from the other.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1249 | **`SharpProofAttributeTargets.Declaration` repeats the callable flags already owned by `Contract`.** Constructor, method, and property appear in both target unions. Defining the broader set in terms of `Contract` preserves the distinct attribute scopes while removing a duplicated target vocabulary. | `SharpProof.Attributes/SharpProofAttributeTargets.cs:3-18` |
+
+## Second survey, part five hundred seventy-two: R1250 - closed-contract attributes repeat the parameter/return mask
+
+`ClosedContractAttributes.cs` applies the same `AttributeTargets.Parameter | AttributeTargets.ReturnValue` mask independently to `NotNullAttribute`, `PositiveAttribute`, and `InRangeAttribute`. These three attributes intentionally remain separate public contracts, but their placement policy is one shared invariant. A local `ParameterOrReturn` constant or a shared attribute-target declaration helper can own that mask while leaving each attribute's documentation and constructor semantics explicit.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1250 | **The three closed-contract attributes duplicate the same parameter/return target expression.** `NotNull`, `Positive`, and `InRange` each spell the identical `AttributeTargets` union. Centralizing the shared mask reduces repeated metadata policy without merging the public attribute types. | `SharpProof.Attributes/ClosedContractAttributes.cs:3-36` |
