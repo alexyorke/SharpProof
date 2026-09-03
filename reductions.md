@@ -16350,3 +16350,19 @@ passes, including canonical and malformed-schema cases.
 R1354 is applied: cancellation graph tests share one immutable method-symbol
 fixture while retaining independent cancellation sources and graph state. The
 focused test passes (2 passed).
+
+## Second survey, continued: R1355 - overlapping operation-support catalog arrays
+
+`SharpProof.Frontend/OperationSupport.catalog.json` stores 13 contract-expression names and 65 effect-discovery names as independent arrays, with 11 exact operation names repeated across both stages. The generator then emits and validates each list separately. A shared operation-entry list with stage membership (while retaining stage-specific spellings such as `UnaryOperator`/`Unary` and `BinaryOperator`/`Binary`) could remove the repeated declarative names and make cross-stage drift explicit; generated stage arrays or equivalent lookup projections should remain so runtime stage semantics do not change.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1355 | **`OperationSupport.catalog.json` repeats 11 operation names in both stage arrays.** Shared entries with stage membership could reduce the declarative duplication and make cross-stage drift visible, while preserving the generated per-stage projections and the intentional stage-specific names. | `SharpProof.Frontend/OperationSupport.catalog.json:3-84`; `scripts/Generate-OperationSupportCatalog.ps1:34-50` |
+
+## Second survey, continued: R1356 - repeated API-spec facet profiles
+
+`SharpProof.Specs/DefaultApiSpecCatalog.json` repeats complete facet objects and empty postconditions: one profile is copied across four BCL exception constructors, another across `contract.assume`, `contract.ensures`, and `contract.requires`, and a third across `contract.old` and `contract.result`. Named reusable profiles, or generator-side canonical profiles expanded during validation, could reduce the declarative payload while keeping target metadata and witness identifiers distinct. This is a schema/readability tradeoff, so profile expansion and strict validation must remain fail-closed.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1356 | **`DefaultApiSpecCatalog.json` repeats three complete facet/postcondition profiles across nine declarations.** Named profiles or generator-side canonical expansion could reduce the repeated JSON while retaining each declaration's distinct target metadata and witness identity. | `SharpProof.Specs/DefaultApiSpecCatalog.json:277-461,623-797`; `scripts/Generate-ApiSpecCatalog.ps1:932-998` |
