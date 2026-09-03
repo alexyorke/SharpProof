@@ -192,6 +192,7 @@ the smallest relevant containerized test target passes.
 | R870 | Remove the redundant IR location type-table lookup | `SharpProof.Ir.Test`: 114 passed |
 | R883 | Reuse the stateless IR interpreter across differential comparisons | `SharpProof.Testing.Test`: 13 passed |
 | R899 | Remove the repeated source declaration-count check after candidate admission | `SharpProof.Worker.Test`: CompilerRelationalSummaryProviderTests passed |
+| R918 | Cache the constant runtime type used by canonical identity writing | `SharpProof.Worker.Test`: ClaimManifestBuilderTests passed |
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
@@ -8485,8 +8486,9 @@ removed without changing child traversal or identity fields.
 
 ### Status (part four hundred twenty-eight)
 
-R918 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R918 is `applied`: canonical constant identity writing now reads each runtime
+type once while preserving the existing fully-qualified/fallback type label.
+ClaimManifestBuilderTests passed.
 
 ## Second survey, part four hundred twenty-nine: R919 - repeated parse-option aggregation scans
 

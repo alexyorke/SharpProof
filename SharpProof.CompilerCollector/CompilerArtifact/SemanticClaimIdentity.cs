@@ -494,7 +494,8 @@ internal static partial class SemanticClaimIdentity
             writer.Add("null");
             return;
         }
-        writer.Add(value.GetType().FullName ?? value.GetType().Name);
+        var runtimeType = value.GetType();
+        writer.Add(runtimeType.FullName ?? runtimeType.Name);
         switch (value)
         {
             case string text:
