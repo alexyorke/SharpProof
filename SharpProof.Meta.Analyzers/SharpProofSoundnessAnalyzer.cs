@@ -698,10 +698,13 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         {
             return;
         }
+        var isAutoProperty = IsAutoProperty(
+            property,
+            context.CancellationToken);
         if (property.Type.SpecialType == SpecialType.System_String &&
             property.ContainingType?.Name is not ("IrUnsupportedInfo" or "IrExceptionInfo") &&
             IsNamespaceOrNested(property.ContainingNamespace, "SharpProof", "Ir") &&
-            IsAutoProperty(property, context.CancellationToken))
+            isAutoProperty)
         {
             Report(context, MetaDiagnosticDescriptors.StringFieldInIr, property.Locations.FirstOrDefault(), property.Name);
         }
@@ -709,7 +712,7 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                 property.Type,
                 context.CancellationToken)) &&
             IsForbiddenMutableStaticStorage(property) &&
-            IsAutoProperty(property, context.CancellationToken))
+            isAutoProperty)
         {
             Report(
                 context,
