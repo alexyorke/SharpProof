@@ -12285,12 +12285,11 @@ Comparing the three lists that answer "what is not source": `.gitignore`,
 
 ### Status (part four hundred sixty)
 
-R1144 is `pending`. It composes with R747, which records that the source-snapshot
-policy is implemented twice across `entrypoint.sh` and `loop-command.sh`; this is
-the same duplication *inside one script*, with a measured consequence in both
-directions. The `.claude/` half is a single `.gitignore` line and should be done
-regardless of what happens to the rest, because it is the case where the
-deliberate fix landed in the unused branch.
+R1144 is applied in its safe half: `.gitignore` now excludes `.claude/`, so the
+Git-backed snapshot path no longer copies the same local state that the archive
+fallback already excludes. The focused `ContainerSourceCleanlinessTests` run
+passes (39/39). The broader `entrypoint.sh`/`loop-command.sh` duplication recorded
+by R747 remains separate.
 
 ## Second survey, part four hundred sixty-one: R1145-R1146 - repeated merge and evidence-depth passes
 
