@@ -24,6 +24,8 @@ internal sealed class ExceptionHandlerReachability(
         _potentialExceptionsCache = new();
     private readonly Dictionary<(IOperation Operation, IOperation Scope), bool>
         _abruptExitCache = new();
+    private readonly Dictionary<IObjectCreationOperation, bool>
+        _objectCreationArgumentsCache = new();
     private readonly INamedTypeSymbol? _exceptionType =
         compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
     private readonly INamedTypeSymbol? _nullReferenceExceptionType =
@@ -600,8 +602,8 @@ internal sealed class ExceptionHandlerReachability(
             }
             if (operation is IObjectCreationOperation creation)
             {
-                var argumentsComplete = creation.Arguments.All(argument =>
-                    canCompleteNormally(argument.Value));
+                var argumentsComplete =
+                    AreObjectCreationArgumentsComplete(creation);
                 if (argumentsComplete)
                 {
                     var constructor = creation.Constructor;
@@ -1371,15 +1373,19 @@ internal sealed class ExceptionHandlerReachability(
                 remaining.Push(withOperation.Operand);
                 return;
             case IObjectCreationOperation creation:
+                var argumentsComplete =
+                    AreObjectCreationArgumentsComplete(creation);
                 if (creation.Initializer != null &&
-                    creation.Arguments.All(argument =>
-                        canCompleteNormally(argument.Value)) &&
+                    argumentsComplete &&
                     creation.Constructor is { } constructor &&
                     canMethodCompleteNormally(constructor))
                 {
                     remaining.Push(creation.Initializer);
                 }
-                PushSequentialCore(creation.Arguments, remaining);
+                PushSequentialCore(
+                    creation.Arguments,
+                    remaining,
+                    childrenAlreadyComplete: argumentsComplete);
                 return;
             case ILockOperation @lock:
                 if (canCompleteNormally(@lock.LockedValue) &&
@@ -1447,8 +1453,19 @@ internal sealed class ExceptionHandlerReachability(
     private bool PushSequentialCore(
         IEnumerable<IOperation> children,
         Stack<IOperation> remaining,
-        IOperation? continuation = null)
+        IOperation? continuation = null,
+        bool childrenAlreadyComplete = false)
     {
+        if (childrenAlreadyComplete)
+        {
+            if (continuation != null)
+            {
+                remaining.Push(continuation);
+            }
+            PushAllCore(children, remaining);
+            return true;
+        }
+
         var reachable = new List<IOperation>();
         var allComplete = true;
         foreach (var child in children)
@@ -1466,6 +1483,22 @@ internal sealed class ExceptionHandlerReachability(
         }
         PushAllCore(reachable, remaining);
         return allComplete;
+    }
+
+    private bool AreObjectCreationArgumentsComplete(
+        IObjectCreationOperation creation)
+    {
+        if (_objectCreationArgumentsCache.TryGetValue(
+                creation,
+                out var cached))
+        {
+            return cached;
+        }
+
+        var complete = creation.Arguments.All(argument =>
+            canCompleteNormally(argument.Value));
+        _objectCreationArgumentsCache.Add(creation, complete);
+        return complete;
     }
 
     private static void PushAllCore(
