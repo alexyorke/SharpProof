@@ -805,7 +805,7 @@ public sealed class PerformanceGateTests
         verifier.SetAttributeValue(
             "Condition",
             ((string?)verifier.Attribute("Condition"))?.Replace(
-                "'$(SharpProofVerify)' == 'true' AND ",
+                "'$(_SharpProofVerifyActive)' == 'true' AND ",
                 string.Empty,
                 StringComparison.Ordinal));
 

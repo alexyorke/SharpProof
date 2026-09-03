@@ -9654,11 +9654,13 @@ duplication.
 
 ### Status (part two hundred three)
 
-R974 is `pending` and is one property definition plus five substitutions. It is
-worth doing ahead of most items in this ledger for a reason unrelated to line
-count: this is the guard that decides whether verification runs at all, it is
-written five times in a form where the negated copy is visually identical to the
-positive ones, and it sits in a file that ships to consumers.
+R974 is `applied`. The verifier now computes `_SharpProofVerifyActive` in a
+pre-compile target, after NuGet's transitive target imports, and uses that flag
+for the four supported-host guards plus the readable inverse on
+`SharpProofRejectUnsupportedWorkerHost`. The package-layout matrix (21 tests),
+worker/MSBuild integration matrix (75 passed, 1 expected platform skip), and
+advisory policy checks cover supported, disabled, design-time, and
+unsupported-host paths.
 
 ## Second survey, part two hundred five: R949 is applied, and R975 - four definitions of "the canonical container"
 

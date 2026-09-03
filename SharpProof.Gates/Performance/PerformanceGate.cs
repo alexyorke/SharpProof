@@ -1637,9 +1637,8 @@ internal static class PerformanceGate
             "'$(_SharpProofVerifierHostArchitecture)'=='X64'AND" +
             "'$(_SharpProofVerifierProcessArchitecture)'=='X64'";
         const string expectedVerifierCondition =
-            "'$(SharpProofVerify)'=='true'AND'$(_SharpProofProfileNormalized)'!='off'AND" +
-            "'$(_SharpProofVerifierHostSupported)'=='true'AND" +
-            "'$(DesignTimeBuild)'!='true'AND'$(BuildingProject)'!='false'";
+            "'$(_SharpProofVerifyActive)'=='true'AND" +
+            "'$(_SharpProofVerifierHostSupported)'=='true'";
         var unexpectedCoreDependency = verifierTargets.Descendants("Target")
             .Where(target => !ReferenceEquals(target, verifierTarget))
             .Any(target => SplitMsBuildList(

@@ -1,4 +1,4 @@
-<Project TreatAsLocalProperty="_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCompilerManifestStagingPath;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained;_SharpProofCleanVerifyDirectory;_SharpProofCleanCompilerManifestStagingPath">
+<Project TreatAsLocalProperty="_SharpProofVerifyActive;_SharpProofVerifyDirectory;_SharpProofInvocationRunsDirectory;_SharpProofInvocationIdIsSafe;_SharpProofExpectedInvocationDirectory;_SharpProofInvocationDirectoryFullPath;_SharpProofInvocationDirectoryIsCanonical;_SharpProofInvocationDirectoryMatchesExpected;_SharpProofInvocationDirectoryParent;_SharpProofInvocationDirectoryIsContained;_SharpProofCompilerManifestStagingPath;_SharpProofCleanupVerifyDirectory;_SharpProofCleanupRunsDirectory;_SharpProofCleanupInvocationIdIsSafe;_SharpProofCleanupExpectedInvocationDirectory;_SharpProofCleanupInvocationDirectoryFullPath;_SharpProofCleanupInvocationDirectoryIsCanonical;_SharpProofCleanupInvocationDirectoryMatchesExpected;_SharpProofCleanupInvocationDirectoryParent;_SharpProofCleanupInvocationDirectoryIsContained;_SharpProofCleanVerifyDirectory;_SharpProofCleanCompilerManifestStagingPath">
   <PropertyGroup>
     <_SharpProofToolsDirectory>$([System.IO.Path]::GetFullPath('$(SharpProofToolsDirectory)'))</_SharpProofToolsDirectory>
     <_SharpProofWorkerPathConfigured>$([System.String]::Copy('$(SharpProofWorkerPath)').Trim())</_SharpProofWorkerPathConfigured>
@@ -12,6 +12,13 @@
     <_SharpProofBuildTasksPath Condition="'$(_SharpProofTestBuildTasksPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestBuildTasksPath)'))</_SharpProofBuildTasksPath>
     <_SharpProofPackageBuildTasksPath Condition="'$(_SharpProofTestBuildTasksPath)' != ''">$([System.IO.Path]::GetFullPath('$(_SharpProofTestBuildTasksPath)'))</_SharpProofPackageBuildTasksPath>
   </PropertyGroup>
+  <Target Name="_SharpProofSetVerifyActive"
+          BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;GenerateMSBuildEditorConfigFile;CoreCompile">
+    <PropertyGroup>
+      <_SharpProofVerifyActive>false</_SharpProofVerifyActive>
+      <_SharpProofVerifyActive Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">true</_SharpProofVerifyActive>
+    </PropertyGroup>
+  </Target>
   <UsingTask TaskName="SharpProof.BuildTasks.InvalidatePublishedResult"
              AssemblyFile="$(_SharpProofBuildTasksPath)" />
   <UsingTask TaskName="SharpProof.BuildTasks.RunVerifier"
@@ -29,9 +36,8 @@
     <_SharpProofVerifyPolicyNormalized>$([System.String]::Copy('$(SharpProofVerifyPolicy)').Trim().ToLowerInvariant())</_SharpProofVerifyPolicyNormalized>
     <_SharpProofAssumptionPolicyNormalized>$([System.String]::Copy('$(SharpProofAssumptionPolicy)').Trim().ToLowerInvariant())</_SharpProofAssumptionPolicyNormalized>
   </PropertyGroup>
-
   <Target Name="_SharpProofValidateRuntimeClosure"
-          Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+          Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' == 'true'">
     <Error Condition="'$(_SharpProofToolsDirectory)' != '$(_SharpProofPackageToolsDirectory)' OR '$(_SharpProofWorkerPath)' != '$(_SharpProofPackageWorkerPath)' OR '$(_SharpProofLauncherPath)' != '$(_SharpProofPackageLauncherPath)' OR '$(_SharpProofWorkerProtocolPath)' != '$(_SharpProofPackageWorkerProtocolPath)' OR '$(_SharpProofBuildTasksPath)' != '$(_SharpProofPackageBuildTasksPath)'"
            Text="SharpProof verifier runtime paths must resolve to the exact package-owned runtime closure." />
     <Error Condition="!Exists('$(_SharpProofPackageNativeZ3Path)')"
@@ -88,13 +94,13 @@
            Text="SharpProof invocation ID must be an exact safe identifier of 32 lowercase hexadecimal characters." />
     <Error Condition="'$(_SharpProofInvocationDirectoryIsCanonical)' != 'True' OR '$(_SharpProofInvocationDirectoryMatchesExpected)' != 'True' OR '$(_SharpProofInvocationDirectoryIsContained)' != 'True'"
            Text="SharpProof invocation directory must resolve canonically to a direct child of the package-owned runs directory." />
-    <PropertyGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <PropertyGroup Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' == 'true'">
       <_SharpProofCompilationTargetFramework>$(TargetFramework)</_SharpProofCompilationTargetFramework>
       <_SharpProofCompilerManifestStagingPath>$([System.IO.Path]::Combine('$(_SharpProofVerifyDirectory)', 'compiler-manifest.staging.json'))</_SharpProofCompilerManifestStagingPath>
       <_SharpProofCompilerManifestPath Condition="'$(_SharpProofCompilerManifestPath)' == ''">$(_SharpProofCompilerManifestStagingPath)</_SharpProofCompilerManifestPath>
       <_SharpProofProjectDirectory>$(MSBuildProjectDirectory)</_SharpProofProjectDirectory>
     </PropertyGroup>
-    <ItemGroup Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+    <ItemGroup Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' == 'true'">
       <_SharpProofCompilerOwnedOutput Remove="@(_SharpProofCompilerOwnedOutput)" />
       <_SharpProofCompilerOwnedOutput Include="$(TargetPath)" Condition="'$(TargetPath)' != ''" />
       <_SharpProofCompilerOwnedOutput Include="@(IntermediateAssembly)" />
@@ -249,7 +255,7 @@
   <Target Name="SharpProofVerify"
           AfterTargets="CoreCompile"
           DependsOnTargets="_SharpProofVerifyCore"
-          Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' == 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+          Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' == 'true'">
     <OnError ExecuteTargets="_SharpProofCleanupInvocation" />
   </Target>
 
@@ -276,7 +282,7 @@
 
   <Target Name="SharpProofRejectUnsupportedWorkerHost"
           AfterTargets="CoreCompile"
-          Condition="'$(SharpProofVerify)' == 'true' AND '$(_SharpProofProfileNormalized)' != 'off' AND '$(_SharpProofVerifierHostSupported)' != 'true' AND '$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' != 'false'">
+          Condition="'$(_SharpProofVerifyActive)' == 'true' AND '$(_SharpProofVerifierHostSupported)' != 'true'">
     <Error Text="SharpProof verification is supported only by Core MSBuild inside the canonical Linux amd64 container. Portable analyzer profiles remain available on this host." />
   </Target>
 </Project>
