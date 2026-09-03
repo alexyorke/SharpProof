@@ -3,8 +3,11 @@ namespace SharpProof.CompilerCollector;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class FinalCompilationCollectorAnalyzer : DiagnosticAnalyzer
 {
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+    private static readonly ImmutableArray<DiagnosticDescriptor> s_supportedDiagnostics =
         [GeneratedDiagnosticDescriptors.CompilerManifestFailureRule];
+
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        s_supportedDiagnostics;
 
     public override void Initialize(AnalysisContext context)
     {

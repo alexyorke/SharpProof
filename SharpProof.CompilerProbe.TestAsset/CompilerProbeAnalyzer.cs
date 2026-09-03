@@ -11,9 +11,11 @@ public sealed class CompilerProbeAnalyzer : DiagnosticAnalyzer
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
+    private static readonly ImmutableArray<DiagnosticDescriptor> s_supportedDiagnostics =
+        [s_failureRule];
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        [s_failureRule];
+        s_supportedDiagnostics;
 
     public override void Initialize(AnalysisContext context)
     {
