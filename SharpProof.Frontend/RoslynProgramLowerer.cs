@@ -81,10 +81,7 @@ public sealed class RoslynProgramLowerer(
         {
             var selection = SelectBlocks();
             var selected = selection.Selected;
-            var omittedHandler = _graph.Blocks.FirstOrDefault(block =>
-                block.IsReachable &&
-                !selection.Reachable.Contains(block) &&
-                IsInsideCatchHandler(block));
+            var omittedHandler = selection.OmittedHandler;
             if (omittedHandler != null)
             {
                 Abstain(
@@ -767,7 +764,9 @@ public sealed class RoslynProgramLowerer(
             return false;
         }
 
-        private (BasicBlock[] Selected, HashSet<BasicBlock> Reachable)
+        private (
+            BasicBlock[] Selected,
+            BasicBlock? OmittedHandler)
             SelectBlocks()
         {
             var reachable = new HashSet<BasicBlock>();
@@ -792,14 +791,28 @@ public sealed class RoslynProgramLowerer(
                     pending.Push(conditional);
                 }
             }
-            return (
-                [
-                    _entry,
-                    .. _graph.Blocks.Where(
-                            block => block != _entry && reachable.Contains(block))
-                        .OrderBy(static block => block.Ordinal)
-                ],
-                reachable);
+            var selected = new List<BasicBlock>();
+            BasicBlock? omittedHandler = null;
+            foreach (var block in _graph.Blocks)
+            {
+                if (block != _entry && reachable.Contains(block))
+                {
+                    selected.Add(block);
+                }
+
+                if (omittedHandler == null &&
+                    block.IsReachable &&
+                    !reachable.Contains(block) &&
+                    IsInsideCatchHandler(block))
+                {
+                    omittedHandler = block;
+                }
+            }
+
+            selected.Sort(static (left, right) =>
+                left.Ordinal.CompareTo(right.Ordinal));
+            selected.Insert(0, _entry);
+            return ([.. selected], omittedHandler);
         }
 
         private sealed class LocationLowering(
