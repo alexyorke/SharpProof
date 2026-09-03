@@ -16083,3 +16083,11 @@ UnflowedCallDiscoverySkipsNonexecutedOperations launches five separate analyzer 
 | ID | Finding | Evidence |
 |---|---|---|
 | R1339 | **`UnflowedCallDiscoverySkipsNonexecutedOperations` repeats the Guard/Base/Derived source scaffold in five switch-arm compilations. Factor that stable fixture into a source factory or case table, keeping each distinct switch expression and expected diagnostic assertion.** | `SharpProof.Analyzer.Test/RequiresAndControlTests.cs:951-1034` |
+
+## Second survey, continued: R1340 - partial-event accessor tests repeat the same inventory assertions
+
+ReferencedPartialEventAccessorsUseImplementationBodies creates inventories for the definition accessor and implementation accessor, then repeats the same three checks for each: implementation body is present, clause count equals the expected count, and every clause is valid. A local AssertValidInventory helper can own that invariant while the surrounding symbol-identity assertions continue to distinguish the two partial-accessor paths.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1340 | **`ReferencedPartialEventAccessorsUseImplementationBodies` duplicates the same three inventory assertions for definition and implementation accessors. Extract one assertion helper parameterized by the inventory and expected count, preserving the distinct symbol-identity checks.** | `SharpProof.Contracts.Test/PartialMethodContractTests.cs:317-348` |
