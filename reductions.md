@@ -15584,12 +15584,10 @@ names, and two are a quarter of it.
 
 ### Status (part five hundred eighty-nine)
 
-R1303 is `pending` and deliberately asks for less than it could. The eight `256`s
-should **not** be merged into one constant; what is missing is a statement of the
-ordering between the collector-side `64`s and everything downstream of them, which
-is one assertion in an existing architecture test. Renaming `MaxFormatDepth` to
-`MaximumFormatDepth` is independent, mechanical, and makes the fourteenth budget
-findable by the same grep as the other thirteen.
+R1303 is applied: the architecture suite now asserts that the collector-side term
+and dependency limits do not exceed the frontend lowering limit, while retaining
+their independent budgets. `MaxFormatDepth` is renamed to `MaximumFormatDepth`.
+The new depth-ordering test passes (1 passed).
 
 ## Second survey, part five hundred ninety: R1156 collision closed
 
