@@ -16830,6 +16830,8 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 |---|---|---|
 | R1383 | The TCB helper builds a filtered segment collection solely for a nonempty check; use an early-exit loop/predicate to avoid one temporary array per path while preserving dot-segment rejection. | scripts/Get-SharpProofTcbPaths.ps1:28-45,54-63; callers eng/acceptance/Verify.ps1:594-601 and scripts/Test-SharpProofCoverage.ps1:590-601 |
 
+R1383 is applied: dot-segment validation now exits directly from a segment loop, avoiding the transient filtered collection. A direct smoke test validates 351 contract paths and rejects a dot segment; the broader container `check` remains blocked by 219 pre-existing analyzer/style errors in unrelated files.
+
 ## Second survey, continued: R1384 - Worker protocol object-shape validation materializes every property
 
 `WorkerProtocolJson.EnsureObjectShape` converts every `JsonElement` object's properties to an array before checking the fixed count, exact order, and recursively validating each value. The generated object-shape metadata already supplies the expected property sequence, so a single indexed enumeration can reject extra/missing properties while comparing names and descending immediately; this removes one transient property array per nested object on every strict protocol validation without weakening duplicate/order rejection.

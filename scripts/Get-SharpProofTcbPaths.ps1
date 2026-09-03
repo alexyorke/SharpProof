@@ -37,8 +37,10 @@ function Get-SharpProofTcbPaths {
             throw "Trusted-computing-base path is not canonical: '$path'."
         }
         $segments = $path.Split('/')
-        if ($segments.Where({ $_ -eq '.' -or $_ -eq '..' }).Count -ne 0) {
-            throw "Trusted-computing-base path contains a dot segment: '$path'."
+        foreach ($segment in $segments) {
+            if ($segment -eq '.' -or $segment -eq '..') {
+                throw "Trusted-computing-base path contains a dot segment: '$path'."
+            }
         }
         if (-not $seen.Add($path)) {
             throw "Trusted-computing-base path is duplicated: '$path'."
