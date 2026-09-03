@@ -14216,6 +14216,12 @@ continuation.
 |---|---|---|
 | R1192 | **`ExceptionHandlerReachability.GetGotoTargetContinuation` linearly rescans its continuation for every candidate.** `IncludeLabeledStatement` calls `result.Any(operation => ReferenceEquals(operation, candidate))` once for the label and once per reversed invocation before inserting at index one, so a long labeled continuation performs repeated identity scans over the same growing list. A `HashSet<IOperation>` using reference identity can preserve deduplication and insertion order while removing the avoidable quadratic membership work. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1629-1647` |
 
+### Status (part five hundred fourteen)
+
+R1192 is applied: goto continuation candidates use a reference-identity set for
+deduplication while retaining the existing insertion order. The Effects test
+suite passes (323/323).
+
 ## Second survey, part five hundred fifteen: R1193 - goto fallback rewalks the label subtree
 
 The goto continuation resolver first enumerates invocation syntax beneath the
