@@ -10493,3 +10493,15 @@ foreign-declaration case remains explicit because it intentionally mixes trees.
 ### Status (part two hundred thirty-three)
 
 R1002 is deferred: resolve the intended native-payload coverage before consolidating or removing the branch, since either choice changes the test suite's stated coverage.
+
+## Second survey, part two hundred thirty-four: R1003 - repository-relative receipt fixture cleanup
+
+`ReleaseCoverageBaselineTests.RunReceiptFixturesAsync` creates a unique directory below `artifacts/qualification-fixtures`, runs several receipt fixtures, and manually deletes that directory in a `finally` block. The repository already links `eng/testing/TempDirectory.cs` into `SharpProof.ArchitectureTest`, but its current API creates under the process temp root; replacing this helper blindly would violate `Write-SharpProofQualificationReceipt.ps1`'s requirement that relative evidence and receipt paths remain inside the repository. A repository-rooted disposable fixture (or an overload that accepts an approved parent) could retain that containment requirement while owning creation and cleanup for both callers. This is distinct from the broad Package/Gates temporary-directory cleanup items: this helper intentionally needs a repository-relative root because the script validates evidence containment.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1003 | **Receipt-fixture lifetime is hand-coded despite an available disposable-directory abstraction.** `RunReceiptFixturesAsync` independently combines a GUID path, `Directory.CreateDirectory`, `try/finally`, existence checking, and recursive deletion. The shared `TempDirectory` type is already compiled into the architecture-test project, but it needs a repository-parent variant rather than direct substitution because the receipt script rejects evidence outside the checkout. A scoped repository fixture can remove the lifecycle boilerplate without weakening path containment. | `SharpProof.ArchitectureTest/ReleaseCoverageBaselineTests.cs:255-313`; `eng/testing/TempDirectory.cs:1-20`; `Directory.Build.props:80-85`; `scripts/Write-SharpProofQualificationReceipt.ps1:21-29,100-110` | |
+
+### Status (part two hundred thirty-four)
+
+R1003 is deferred: first define the approved repository-rooted temporary-directory API; do not replace the fixture with the current system-temp-only helper until the receipt script's containment contract is preserved.
