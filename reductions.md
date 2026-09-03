@@ -10763,6 +10763,8 @@ R1021 is applied: the five semantic-edge isolation tests now share one valid-pee
 
 R1022 is deferred: share only the common definite type-initialization-failure assertions, and preserve each source fixture and its scenario-specific effects.
 
+R1022 is applied: the two static-initialization regression tests now share one definite type-initialization-failure assertion helper while retaining their distinct fixtures and write assertion. `StaticFieldTypeInitializationTests` pass (5/5).
+
 ## Second survey, part two hundred fifty-four: R1023 - repeated later-initializer assertions
 
 `ConditionallyThrowingInitializerStillPermitsLaterEffects` analyzes both the later module initializer and the ordinary entry point, then repeats the same four assertions for `second` and `entry`: the summary contains a static write, contains synchronization, reports `FirstException`, and has no direct witnesses. The first initializer has intentionally different empty-effect expectations, so it should not use that helper, but a focused `AssertLaterInitializerEffects` helper can own the duplicated later-path envelope.
