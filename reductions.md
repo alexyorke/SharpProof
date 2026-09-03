@@ -13953,6 +13953,12 @@ the wrapper traversal.
 |---|---|---|
 | R1180 | **`ExceptionHandlerReachability` unwraps a thrown exception expression twice in one type decision.** The `INamedTypeSymbol` check and the fallback `ITypeParameterSymbol` check each call `DefiniteOperationFacts.UnwrapHarmlessValue(exception)` with identical input. A local unwrapped operation/type projection can remove the duplicate traversal while preserving nullness, implicit-conversion, and unknown-potential behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:201-225` |
 
+### Status (part five hundred two)
+
+R1180 is applied: thrown exception type classification now reuses one
+unwrapped operation while preserving the named-type, type-parameter, and
+unknown-potential branches. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred three: R1181 - null-receiver checks repeat completed operands
 
 Several operation branches first establish that a receiver or target operand
