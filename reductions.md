@@ -14241,3 +14241,18 @@ operator-initialization and property-setter policies.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1197 | **`ExceptionHandlerReachability` recomputes increment/decrement target completion across three phases.** The `IIncrementOrDecrementOperation` case stores `priorPhasesComplete`, `CanThrowUnknownAfterPrerequisites` calls `canCompleteNormally(increment.Target)` again, and the subsequent generic `PushChildren` path reaches `PushSequentialCore`, which checks the target a third time. A shared target-completion fact can remove the repeated traversal without changing throw or child-order behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:534-577,3008-3034,1413-1427` |
+
+## Second survey, part five hundred twenty: R1198 - an accessor branch repeats the fallback
+
+`GetAccessors` has one meaningful exception: a property used as the target of
+a simple assignment has no getter access. Every other property reference
+returns `property.Property.GetMethod`. The following conditional for
+coalesce-assignment, compound-assignment, and increment targets therefore
+returns exactly the same getter as the unconditional fallback, with no
+additional accessor or policy distinction. Removing that no-op branch leaves
+the simple-assignment suppression explicit and reduces one set of parent-kind
+checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1198 | **`ExceptionHandlerReachability.GetAccessors` has a redundant coalesce/compound/increment branch.** After the simple-assignment target guard, the conditional branch yields `property.Property.GetMethod` and exits, while its fallback yields the identical value; only the simple-assignment `yield break` changes the result. The middle parent-kind test can be removed without changing accessor enumeration. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1977-1996` |
