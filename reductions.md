@@ -8240,8 +8240,9 @@ CompilerSpecificationPackProviderTests passed.
 
 ### Status (part four hundred six)
 
-R896 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R896 is `deferred`: the immutable dictionary builder in the target framework
+does not provide a single-probe insertion API, and replacing it would either
+change the overlap exception behavior or add more scaffolding than it removes.
 
 ## Second survey, part four hundred seven: R897 - repeated Boolean term property lookup
 
@@ -9165,3 +9166,49 @@ repository actively does elsewhere: sharing one source file across several
 projects. The substantive result of this part is the three clean sweeps, and in
 particular the 153-for-153 `ConfigureAwait` match, which is worth knowing before
 anyone proposes an async-hygiene pass.
+
+## Second survey, part one hundred eighty-five: R962 - the only virtual member
+
+Inheritance, polymorphism, and LINQ-versus-loop balance across production C#. The
+sealing and inheritance discipline is total; one member is the exception to it.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R962 | **`ClosedAbstractDomain<T>.AreEquivalent` is the only `virtual` member in the production tree, and none of its five subclasses overrides it.** A census of 286k lines of production C# finds **exactly one** `virtual` member - `SharpProof.Dataflow/ClosedAbstractDomain.cs:21` - against 16 `abstract` members, 102 `override`s (Roslyn visitor dispatch and `Equals`/`GetHashCode`/`ToString`), and **two** `base.` calls in the whole repository. The five types deriving from it are `IntervalDomain`, `NullnessDomain`, `SequenceCardinalityDomain` (all `SharpProof.Dataflow`), `EffectSummaryDomain` (`SharpProof.Effects`), and the private `FlowDomain` inside `ManagedAbstractFlow.cs:1201` - **all five `sealed`, and a search for `override.*AreEquivalent` across every tracked file returns nothing**. Every one inherits the default `LessThanOrEqual(left, right) && LessThanOrEqual(right, left)`. Nor can an external type override it: `SharpProof.Dataflow` is not one of the three projects in `scripts/package-projects.json`, so it never leaves the repository. The `virtual` is flexibility that nobody uses and nobody outside can use, in a codebase that otherwise expresses extension exclusively through `abstract` members and interfaces. Removing the keyword is a one-word change that makes the method's finality match the five sealed implementations that rely on it. | `SharpProof.Dataflow/ClosedAbstractDomain.cs:6-25`; `SharpProof.Dataflow/{IntervalDomain,NullnessDomain,SequenceCardinalityDomain}.cs:6`; `SharpProof.Effects/EffectSummary.cs:155`; `SharpProof.Effects/ManagedAbstractFlow.cs:1201`; `SharpProof.Dataflow/IAbstractDomain.cs:18`; `scripts/package-projects.json` |
+
+### Checked and not proposed (part one hundred eighty-five)
+
+- **Sealing discipline is total: 333 sealed classes and zero non-sealed ones.** A
+  scan for `public`/`internal class` declarations that are not `sealed`,
+  `abstract`, `static`, or a `record` returns **zero** across all production
+  assemblies. There is no candidate anywhere for a "seal this type" pass; the
+  question is already answered everywhere.
+- **The single `new`-shadowed member is correct and must not be changed.**
+  `SharpProof.Effects/ManagedAbstractFlow.cs:1624`,
+  `public new bool Equals(object? left, object? right)` inside
+  `internal sealed class ManagedKeyComparer : IEqualityComparer<object>`, looks
+  like the classic `new`-instead-of-`override` hazard and is not one:
+  `System.Object` exposes a **static** `Equals(object, object)`, so an instance
+  method of that signature raises **CS0108**, and `new` is the standard suppression.
+  The method still satisfies `IEqualityComparer<object>.Equals` by signature, so
+  interface dispatch reaches it. Recorded because the shape invites exactly the
+  wrong fix.
+- **The LINQ-versus-loop balance shows no inconsistency worth acting on.** 693
+  `foreach` and 183 `for` statements against roughly 1,250 LINQ operator calls
+  (`Select` 348, `Any` 261, `Where` 201, `All` 139, `ToArray` 149,
+  `ToImmutableArray` 82, `FirstOrDefault` 79). Both idioms are used broadly and
+  neither is confined to particular assemblies, which is ordinary for a codebase of
+  this size. Per-site allocation and traversal questions are the concurrent
+  performance lane's subject and are covered there; nothing systematic is filed
+  here.
+- **Inheritance depth is minimal by design.** Ten abstract classes, only one of
+  which extends another (`ProofJustification : Justification` in
+  `SharpProof.Verify/Evidence.cs:29-36`), 14 `protected` members, and two `base.`
+  calls repository-wide. There is no deep hierarchy to flatten.
+
+### Status (part one hundred eighty-five)
+
+R962 is `pending` and is one word. Its value is that it is the last exception to
+an otherwise complete convention: this codebase expresses polymorphism through
+`abstract` members and interfaces, seals every concrete class, and calls `base.`
+twice. One unused `virtual` is what remains.
