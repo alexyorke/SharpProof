@@ -616,15 +616,21 @@ switch ($Command) {
     }
     'release-qualification' {
         & (Join-Path $repositoryRoot 'scripts/Test-SharpProofReadme.ps1')
+        $releaseArguments = @{ Mode = 'WriteQualificationEvidence' }
+        if (-not [string]::IsNullOrWhiteSpace($PackageSource)) {
+            $releaseArguments.PackageSource = $PackageSource
+        }
         & (Join-Path $repositoryRoot `
             'scripts/Invoke-SharpProofReleaseContainer.ps1') `
-            -Mode WriteQualificationEvidence `
-            -PackageSource $PackageSource
+            @releaseArguments
     }
     'release-publish' {
+        $releaseArguments = @{ Mode = 'Publish' }
+        if (-not [string]::IsNullOrWhiteSpace($PackageSource)) {
+            $releaseArguments.PackageSource = $PackageSource
+        }
         & (Join-Path $repositoryRoot `
             'scripts/Invoke-SharpProofReleaseContainer.ps1') `
-            -Mode Publish `
-            -PackageSource $PackageSource
+            @releaseArguments
     }
 }
