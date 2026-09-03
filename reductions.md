@@ -16138,6 +16138,12 @@ MarkerMentionsDoNotSuppressHandwrittenCallSites and ExactGeneratedHeadersSuppres
 |---|---|---|
 | R1341 | **`GeneratedCodeAnalyzerTests` duplicates the same `Subject.Positive` analyzer fixture across handwritten-marker and exact-header cases. Share the header-driven source/invocation helper while retaining the opposite diagnostic expectations.** | `SharpProof.Analyzer.Test/GeneratedCodeAnalyzerTests.cs:249-304` |
 
+### Status (continued)
+
+R1341 is applied: the two generated-header cases share one analyzer fixture
+helper while retaining opposite diagnostic assertions. The five focused cases
+pass.
+
 ## Second survey, continued: R1342 - publication snapshots re-sort the same entries for uniqueness checks
 
 New-SharpProofPublicationInputSnapshot materializes the sorted publication entries, then independently pipes the same entries through Sort-Object -Unique once for paths and once for fileIdentity only to compare distinct counts. The path and device-inode sets can be populated while each file identity is projected, preserving the sorted output and both duplicate and alias rejection policies without two extra sorts and temporary arrays.
