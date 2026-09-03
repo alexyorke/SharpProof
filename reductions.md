@@ -15828,3 +15828,18 @@ Test-SharpProofReadme calls Get-EnumMembers for ten protocol enum names while va
 | ID | Finding | Evidence |
 |---|---|---|
 | R1322 | **Test-SharpProofReadme.Get-EnumMembers rescans and reparses the full generated protocol source once per enum. Build the enum-member map in one source pass or cache each content/name result, preserving exact member-order comparison and unknown-reason coverage.** | scripts/Test-SharpProofReadme.ps1:300-321,693-716 |
+
+## Second survey, continued: R1323 - corpus snapshot validation performs two full passes
+
+ValidateCanonicalData first calls Any(!IsCanonicalData) over every data line; once all lines pass it calls IsCanonicalOrder, which sorts a second full copy and compares it with the original. The input is immutable for this validation and canonical order is ordinal non-decreasing, so a single loop can parse/check each line once while comparing each line to its predecessor, preserving the current invalid-data exception and order semantics without the second enumeration/sort allocation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1323 | **CorpusSnapshotFormat.ValidateCanonicalData scans the entire data array twice and materializes a sorted copy to check order. Combine canonical-data validation with adjacent ordinal-order checking in one pass, retaining the current failure behavior.** | SharpProof.Gates/Corpus/CorpusSnapshotFormat.cs:74-90,138-142 |
+## Second survey, continued: R1324 - dev-check architecture tests duplicate configuration command lists
+
+DevCheckCommandPlanTests keeps DebugCommandIds and ReleaseCommandIds as separate arrays even though Release is the same ordered sequence minus only package-product-build. Both arrays are consumed only by one conditional expected-value assertion. A shared base sequence plus a configuration-specific insertion or derived expected array can retain exact order and count while eliminating duplicated literals and drift surface.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1324 | **DevCheckCommandPlanTests duplicates the seven command IDs shared by DebugCommandIds and ReleaseCommandIds. Define one shared ordered command sequence and model the Debug-only package-product-build row explicitly, preserving the configuration-specific count and order assertions.** | SharpProof.ArchitectureTest/DevCheckCommandPlanTests.cs:11-46 |
