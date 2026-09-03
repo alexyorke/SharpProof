@@ -12838,7 +12838,8 @@ and analyzer/reference edges.
 
 ### Status (part four hundred seventy-three)
 
-R1153 is pending: remove the empty `<ItemGroup>` from `SharpProof.Smt.csproj`.
+R1153 is applied: the inert `<ItemGroup>` is gone from `SharpProof.Smt.csproj`.
+The SMT project and test gate pass (30/30).
 
 ## Second survey, part four hundred seventy-four: correcting R980 - generated-output coverage is much wider than I reported
 
