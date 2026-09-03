@@ -125,9 +125,17 @@ function Emit-Class([Collections.Generic.List[string]]$Lines,
         $Lines.Add("$Indent    }")
     }
     $parameterSources = [Collections.Generic.List[string]]::new()
+    $parameterNameCounts = [Collections.Generic.Dictionary[string, int]]::new(
+        [StringComparer]::Ordinal)
     foreach ($parameter in $parameters) {
         $parameterName = Identifier ([string](Required $parameter 'name' "$Context parameter")) "$Context parameter name"
         $parameterType = TypeName ([string](Required $parameter 'type' "$Context parameter")) "$Context parameter type"
+        if ($parameterNameCounts.ContainsKey($parameterName)) {
+            $parameterNameCounts[$parameterName]++
+        }
+        else {
+            $parameterNameCounts.Add($parameterName, 1)
+        }
         $parameterSources.Add("$parameterType $parameterName")
     }
     if ($storageTag) {
@@ -152,7 +160,10 @@ function Emit-Class([Collections.Generic.List[string]]$Lines,
         if (-not $propertyNames.Contains($propertyName)) {
             throw "$Context assignment references unknown property '$propertyName'."
         }
-        if (@($parameters | Where-Object { [string]$_.name -eq $parameterName }).Count -ne 1) {
+        $parameterCount = 0
+        if (-not $parameterNameCounts.TryGetValue(
+                $parameterName,
+                [ref]$parameterCount) -or $parameterCount -ne 1) {
             throw "$Context assignment references unknown parameter '$parameterName'."
         }
         $Lines.Add("$Indent        $propertyName = $parameterName;")
