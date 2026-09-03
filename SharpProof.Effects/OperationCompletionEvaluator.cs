@@ -866,21 +866,30 @@ internal sealed class OperationCompletionEvaluator
              minimumIndex < maximumLength);
     }
 
-    internal bool CanCompleteWriteTarget(IOperation target)
+    internal bool CanCompleteWriteTarget(
+        IOperation target,
+        bool targetAlreadyComplete = false)
     {
         return target switch
         {
+            IFieldReferenceOperation when targetAlreadyComplete => true,
+            IArrayElementReferenceOperation when targetAlreadyComplete => true,
             IFieldReferenceOperation field =>
                 CanCompleteField(field),
             IArrayElementReferenceOperation element =>
                 CanCompleteArrayElement(element),
             IPropertyReferenceOperation property
                 when property.Property.SetMethod is { } setter =>
-                CanCompleteInvocation(
-                    setter,
-                    property.Instance,
-                    property,
-                    property.Arguments),
+                targetAlreadyComplete
+                    ? CanCompleteMethodTail(
+                        setter,
+                        hasUncertainVirtualDispatch: false)
+                    : CanCompleteInvocation(
+                        setter,
+                        property.Instance,
+                        property,
+                        property.Arguments),
+            IInvocationOperation when targetAlreadyComplete => true,
             ILocalReferenceOperation or
                 IParameterReferenceOperation or
                 IDiscardOperation => true,
@@ -905,7 +914,9 @@ internal sealed class OperationCompletionEvaluator
             OperationNullnessEvaluator.NullState.NonNull => true,
             OperationNullnessEvaluator.NullState.Null =>
                 CanCompleteNormally(assignment.Value) &&
-                CanCompleteWriteTarget(assignment.Target),
+                CanCompleteWriteTarget(
+                    assignment.Target,
+                    targetAlreadyComplete: true),
             _ => true
         };
     }
