@@ -14698,6 +14698,12 @@ tests pass (14 passed).
 |---|---|---|
 | R1218 | **`RequiresCallSiteDispatch.ResolveExactTarget` has two callers that duplicate reduced-method normalization.** Both discovery and analysis spell `TargetMethod.ReducedFrom ?? TargetMethod` before the same dispatcher call. Moving that normalization into the dispatcher centralizes one invariant without changing either caller's receiver or cancellation handling. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:61-67`; `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:303-309` |
 
+### Status (part five hundred forty)
+
+R1218 is applied: exact-target dispatch now normalizes reduced extension methods
+at its single boundary, and both callers pass their original target symbols.
+Requires-call-site analyzer tests pass (82 passed).
+
 ## Second survey, part five hundred forty-one: R1219 - replayability dispatch repeats one result branch
 
 `RequiresCallSiteDiscovery.HasReplayableCallEvaluation` sends five separate operation-shape branches to the same `HasReplayableAccessorEvaluation(call, operationFacts)` result: accessor/list-pattern, foreach, recursive pattern, indirect delegate invocation, and implicit operation. The `using` branch and the final ordinary-operation fallback have different policies, but the repeated accessor-style branches can be expressed as one predicate before those distinct cases. This removes conditional scaffolding while preserving the exact special handling and short-circuit order.
