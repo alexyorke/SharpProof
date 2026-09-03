@@ -275,6 +275,11 @@ internal static class CorpusCatalog
             {
                 continue;
             }
+            if (variant == CorpusVariant.AlphaRenameContractFormals &&
+                !string.Equals(seed.Mode, "contracts", StringComparison.Ordinal))
+            {
+                continue;
+            }
 
             var item = CreateCase(seed, variant);
             if (variant == CorpusVariant.AlphaRenameContractFormals &&
