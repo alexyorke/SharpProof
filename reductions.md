@@ -15759,6 +15759,12 @@ Generate-ProtocolModel creates declarationNames to detect duplicate protocol dec
 |---|---|---|
 | R1313 | **Generate-ProtocolModel maintains declarationNames alongside declarationByName even though only the dictionary survives and its Add operation has the same duplicate-key fact. Use one name-to-declaration index with an explicit duplicate check that preserves the current error text.** | scripts/Generate-ProtocolModel.ps1:424-452 |
 
+### Status (continued)
+
+R1313 is applied: protocol declaration uniqueness and lookup now share one
+ordinal dictionary via `TryAdd`, preserving the duplicate-declaration error.
+Protocol model schema tests pass (5 passed).
+
 ## Second survey, continued: R1314 - validation plan indexes are split across three keyed structures
 
 Generate-ProtocolModel stores validation plan names in one HashSet and stores each plan's type and mode in two separate dictionaries keyed by that same name. The set only detects duplicates; later generation and condition conversion read the type and mode dictionaries for the same plan. One ordinal dictionary whose value contains type and mode can perform the uniqueness check during insertion and remove the parallel-key coordination.
