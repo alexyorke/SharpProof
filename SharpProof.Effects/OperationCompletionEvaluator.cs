@@ -1384,10 +1384,8 @@ internal sealed class OperationCompletionEvaluator
                 binary.LeftOperand.ConstantValue is
                 { HasValue: true, Value: bool left })
             {
-                var shortCircuits = binary.OperatorKind ==
-                    BinaryOperatorKind.ConditionalAnd
-                        ? !left
-                        : left;
+                var shortCircuits = ConditionalTruthOperatorFacts
+                    .SkipsRightOperand(binary.OperatorKind, left);
                 return shortCircuits ||
                     CanCompleteNormally(binary.RightOperand);
             }
@@ -1442,10 +1440,8 @@ internal sealed class OperationCompletionEvaluator
 
                 if (hasLeftValue)
                 {
-                    var shortCircuits = binary.OperatorKind ==
-                        BinaryOperatorKind.ConditionalAnd
-                            ? !leftValue
-                            : leftValue;
+                    var shortCircuits = ConditionalTruthOperatorFacts
+                        .SkipsRightOperand(binary.OperatorKind, leftValue);
                     if (shortCircuits)
                     {
                         return true;

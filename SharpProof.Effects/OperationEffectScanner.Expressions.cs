@@ -560,10 +560,8 @@ internal sealed partial class OperationEffectScanner
         if (isConditional &&
             TryGetBoolean(binary, binary.LeftOperand, out var leftValue))
         {
-            var shortCircuits = binary.OperatorKind ==
-                BinaryOperatorKind.ConditionalAnd
-                    ? !leftValue
-                    : leftValue;
+            var shortCircuits = ConditionalTruthOperatorFacts
+                .SkipsRightOperand(binary.OperatorKind, leftValue);
             if (shortCircuits)
             {
                 return left.Summary;

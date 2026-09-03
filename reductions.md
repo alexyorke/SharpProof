@@ -21073,6 +21073,12 @@ their traversal policies. The full `SharpProof.Contracts.Test` suite passes
 |---|---|---|
 | R1996 | **`IrCSharpDifferentialOracle.CompareException` and `FrontendFuzzing` duplicate the five-case runtime exception-to-`IrExceptionKind` projection; share only the classifier while retaining their distinct result policies.** | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:577-585`; `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1663-1671` |
 
+R1995 is applied: `ConditionalTruthOperatorFacts.SkipsRightOperand` now owns
+the shared conditional-AND/OR left-value projection used by completion and
+effect scanning, while user-defined truth-operator and consumer-specific
+policies remain local. The full `SharpProof.Effects.Test` suite passes 323/323
+with zero warnings or errors.
+
 R1820 is applied: the repeated Meta.Analyzers project reference now lives in
 `Directory.Build.targets` behind the explicit `SharpProofUsesMetaAnalyzer` opt-in;
 the 17 consuming projects keep one-line opt-ins and the architecture gate derives

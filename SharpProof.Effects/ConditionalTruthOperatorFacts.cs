@@ -36,6 +36,15 @@ internal static class ConditionalTruthOperatorFacts
         return candidates.Length == 1 ? candidates[0] : null;
     }
 
+    internal static bool SkipsRightOperand(
+        BinaryOperatorKind operatorKind,
+        bool leftValue) => operatorKind switch
+        {
+            BinaryOperatorKind.ConditionalAnd => !leftValue,
+            BinaryOperatorKind.ConditionalOr => leftValue,
+            _ => false
+        };
+
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
         "CA1508:Avoid dead conditional code",
