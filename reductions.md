@@ -14082,3 +14082,18 @@ and all arguments complete.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1188 | **`ExceptionHandlerReachability` revalidates object-creation arguments across exception analysis and child scheduling.** The `IObjectCreationOperation` case computes `creation.Arguments.All(argument => canCompleteNormally(argument.Value))` before resolving constructor effects; `PushChildrenCore` repeats the same `All` check for initializer reachability and then `PushSequentialCore(creation.Arguments, remaining)` invokes the completion predicate over the arguments again. One cached argument-prefix projection can remove these repeated scans without changing constructor, initializer, or argument order semantics. | `SharpProof.Effects/ExceptionHandlerReachability.cs:580-626,1339-1348,1413-1427` |
+
+## Second survey, part five hundred eleven: R1189 - switch pattern selection is recomputed
+
+For each pattern case clause, `GetReachableSwitchCases` first computes a
+pattern-only selection and stores it in `patternSelection`. It then enters the
+clause-selection switch and calls `GetPatternSelection` again with the same
+pattern, governing type, constant-value inputs, and nullness fact, using that
+second result only as the input to `ApplySwitchGuard`. The first result is
+already the exact unguarded selection required there. Reusing it keeps the
+guard policy separate while removing a repeated pattern traversal and type
+classification.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1189 | **`ExceptionHandlerReachability.GetReachableSwitchCases` computes each pattern selection twice.** A pattern clause is passed to `GetPatternSelection` for `patternSelection`, then the same call is repeated inside `clauseSelection` before `ApplySwitchGuard`; all five inputs are unchanged. Applying the guard to the cached first result preserves clause reachability and stop-selection behavior while eliminating the duplicate pattern analysis. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1448-1491` |
