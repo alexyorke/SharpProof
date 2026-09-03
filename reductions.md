@@ -16228,3 +16228,27 @@ In `ReleaseQualificationMatrixTests`, both receipt tests build the same six-elem
 R1347 is applied: both qualification receipt scenarios use one shared package
 artifact factory, and the full matrix passes (3 passed). Isolated fixtures now
 also include the writer's required release-json and package-identity scripts.
+
+## Second survey, continued: R1348 - Collapse repeated compiler-option wire-mapping test cases
+
+**`CompilerOptionWireMappingsTests` spells the same mapping and fail-closed assertion envelopes once per Roslyn enum.** `EveryCurrentRoslynCompilerOptionHasAClosedWireMapping` repeats the `Enum.GetValues<T>() -> Map(value).ToString()` equality projection six times, differing only in the enum type; `FutureCompilerOptionValuesFailClosed` repeats the same `Assert.Throws<InvalidOperationException>` wrapper for six invalid enum values and `null`. A small case table or local assertion helper can preserve per-enum coverage and the distinct invalid-value inputs while removing the repeated test plumbing; the two comparer cases and reflected-property test remain separate.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1348 | **`CompilerOptionWireMappingsTests` repeats six enum mapping projections and seven equivalent fail-closed assertion envelopes; a table/helper can retain the individual cases while removing test-only scaffolding.** | `SharpProof.Analyzer.Test/CompilerOptionWireMappingsTests.cs:12-57,60-78` |
+
+## Second survey, continued: R1349 - Table-drive effect-evaluation wire-mapping tests
+
+**`CompilerEffectEvaluationWireMappingsTests` repeats the same closed-enum mapping assertion shape four times and the same invalid-enum exception shape four times.** Each mapping block only changes the source enum and expected worker sequence, while each failure block only changes the enum cast. A case table carrying the projection, expected sequence, and invalid-value action can keep the wire contract explicit and fail-closed without maintaining eight parallel assertion blocks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1349 | **`CompilerEffectEvaluationWireMappingsTests` repeats four mapping projections and four invalid-value exception assertions with only their enum-specific data changed; table-driven cases can remove the duplicated test envelope.** | `SharpProof.Analyzer.Test/CompilerEffectEvaluationWireMappingsTests.cs:18-75` |
+
+## Second survey, continued: R1350 - Deduplicate queued runtime dependency assemblies at enqueue time
+
+**`RuntimeDependencyTests` deduplicates assemblies only after dequeueing them.** Every SharpProof reference is loaded and enqueued immediately, while `visited` is checked only at lines 24-28, so converging dependency edges can put the same assembly in `pending` multiple times and pay queue/dequeue/name work repeatedly before the duplicate is discarded. Marking a name as queued when it is enqueued, or maintaining separate queued and processed sets, can remove that churn while preserving the current breadth-first closure and forbidden-reference assertions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1350 | **`RuntimeDependencyTests` checks `visited` at dequeue but enqueues every SharpProof reference without a pending-set guard, so shared dependencies can be queued repeatedly before one copy is processed.** | `SharpProof.Worker.Test/RuntimeDependencyTests.cs:16-39` |
