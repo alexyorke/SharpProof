@@ -79,7 +79,9 @@ public sealed partial class ReleaseQualificationMatrixTests
         foreach (var name in new[]
                  {
                          "Write-SharpProofQualificationReceipt.ps1",
-                         "Test-SharpProofPilotReport.ps1"
+                         "Test-SharpProofPilotReport.ps1",
+                         "SharpProof.ReleaseJson.ps1",
+                         "SharpProof.PackageIdentity.psm1"
                      })
         {
             File.Copy(
@@ -97,11 +99,7 @@ public sealed partial class ReleaseQualificationMatrixTests
         var head = (await RunAsync(
             fixture.FullName, "git", "rev-parse", "HEAD")).Trim();
         var evidence = Path.Combine(fixture.FullName, "portable-linux.json");
-        var packages = Enumerable.Range(0, 6).Select(index => new
-        {
-            fileName = $"package-{index}.nupkg",
-            bytes = 1
-        }).ToArray();
+        var packages = CreatePackageArtifacts();
 
         async Task<int> WriteAsync(string commit, string osFamily, int count)
         {
@@ -148,6 +146,12 @@ public sealed partial class ReleaseQualificationMatrixTests
             Path.Combine(
                 scripts.FullName,
                 "Write-SharpProofQualificationReceipt.ps1"));
+        File.Copy(
+            Path.Combine(sourceRoot, "scripts", "SharpProof.ReleaseJson.ps1"),
+            Path.Combine(scripts.FullName, "SharpProof.ReleaseJson.ps1"));
+        File.Copy(
+            Path.Combine(sourceRoot, "scripts", "SharpProof.PackageIdentity.psm1"),
+            Path.Combine(scripts.FullName, "SharpProof.PackageIdentity.psm1"));
         await File.WriteAllTextAsync(
             Path.Combine(scripts.FullName, "Test-SharpProofPilotReport.ps1"),
             "function Test-SharpProofPilotReport { return $true }\n");
@@ -176,11 +180,7 @@ public sealed partial class ReleaseQualificationMatrixTests
             "-m",
             "fixture");
         var evidence = Path.Combine(fixture.FullName, "pilots.json");
-        var packages = Enumerable.Range(0, 6).Select(index => new
-        {
-            fileName = $"package-{index}.nupkg",
-            bytes = 1
-        }).ToArray();
+        var packages = CreatePackageArtifacts();
 
         async Task<int> WriteAsync(string reviewStatus)
         {
@@ -213,6 +213,15 @@ public sealed partial class ReleaseQualificationMatrixTests
         Assert.That(start, Is.GreaterThanOrEqualTo(0), name);
         Assert.That(end, Is.GreaterThan(start), next);
         return workflow[start..end];
+    }
+
+    private sealed record PackageArtifact(string fileName, int bytes);
+
+    private static PackageArtifact[] CreatePackageArtifacts()
+    {
+        return Enumerable.Range(0, 6)
+            .Select(index => new PackageArtifact($"package-{index}.nupkg", 1))
+            .ToArray();
     }
 
     private static async Task<string> RunAsync(
