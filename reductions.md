@@ -14797,3 +14797,11 @@ policies. Requires-call-site analyzer tests pass (82 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1229 | **`IsMutableStorageType` rechecks both special-type policies for its first loop item.** The outer guard rejects the starting named type when it is a known immutable or compilation-scoped weak cache, but the loop starts at the same symbol and calls both predicates again. A cached/propagated classification can preserve the base-type checks while eliminating the guaranteed duplicate queries. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:757-783` |
+
+## Second survey, part five hundred fifty-two: R1230 - return-expression discovery traverses each syntax tree twice
+
+`CacheSoundnessRules.GetReturnExpressions` calls `syntax.DescendantNodesAndSelf()` once to collect arrow-expression bodies and a second time to collect return statements, then concatenates the two sequences and filters nested callables. The two result categories are deliberately kept in separate groups, but that ordering can be preserved by one traversal that appends each node to its corresponding bucket before concatenating the buckets. This removes one full syntax-tree walk without changing the existing arrow-then-return ordering or the unreachable-return and nested-callable filters.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1230 | **`GetReturnExpressions` enumerates the same syntax subtree twice.** Its arrow-clause projection and return-statement projection each traverse `syntax.DescendantNodesAndSelf()` independently before `Concat`; a single categorized traversal can retain the current grouped ordering while eliminating the duplicate enumeration. | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1577-1588` |
