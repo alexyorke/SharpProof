@@ -15364,6 +15364,14 @@ passed).
 |---|---|---|
 | R1264 | **`InvalidatePublishedResult.ExecuteCore` rebuilds the publication/input conflict sequence for multiple alias flags.** The worker-tree, cache, and compiler-output checks independently chain the same path arrays before testing conflicts. Materialize one shared candidate set (or use one pairwise evaluator) while preserving each separately reported error category and the protected-tool paths. | `SharpProof.BuildTasks/InvalidatePublishedResult.cs:126-156` |
 
+### Status (part five hundred eighty-six)
+
+R1264 is applied: publication, marker, and input paths now share one materialized
+conflict-candidate array for worker-tree, cache, and compiler-output checks,
+preserving each error category and symmetric predicate behavior. Build-task tests
+pass (63 passed).
+
+
 ## Second survey, part five hundred eighty-seven: R1301 - two projects with no C# source spend four lines configuring C#; and two ID collisions resolved
 
 ### R1301
