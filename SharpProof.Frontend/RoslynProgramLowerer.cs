@@ -387,12 +387,16 @@ public sealed class RoslynProgramLowerer(
             bool wantsResult)
         {
             var receiver = LowerOptionalValue(block, operation, invocation.Instance);
-            var arguments = LowerInvocationArguments(block, operation, invocation);
+            var loweredArguments = LowerInvocationArguments(
+                block,
+                operation,
+                invocation);
+            var arguments = loweredArguments.Arguments;
             var resultType = _expressions.GetTypeId(invocation.Type);
             var hasSupportedResult = invocation.TargetMethod.ReturnsVoid ||
                 CompilerIdentityBridge.IsSupportedValueDomain(invocation.Type);
             var member = _expressions.GetMember(invocation.TargetMethod, ref receiver, "call:", resultType, arguments);
-            var isDirect = IsDirectInvocation(invocation);
+            var isDirect = loweredArguments.IsDirect;
             if (!isDirect)
             {
                 Abstain(operation, FrontendAbstention.UnsupportedInvocationShape);
@@ -446,17 +450,41 @@ public sealed class RoslynProgramLowerer(
             return null;
         }
 
-        private IrTerm[] LowerInvocationArguments(
+        private (IrTerm[] Arguments, bool IsDirect) LowerInvocationArguments(
             IrBlockId block,
             OperationId operation,
             IInvocationOperation invocation)
         {
-            return [.. invocation.Arguments
-                .Select(argument => (
-                    Ordinal: argument.Parameter?.Ordinal ?? int.MaxValue,
-                    Value: LowerValue(block, operation, argument.Value)))
+            var isDirect = invocation.TargetMethod.ReducedFrom == null &&
+                invocation.Arguments.Length ==
+                invocation.TargetMethod.Parameters.Length;
+            var ordinals = isDirect ? new HashSet<int>() : null;
+            var lowered = new List<(
+                int Ordinal, IrTerm Value)>(invocation.Arguments.Length);
+            foreach (var argument in invocation.Arguments)
+            {
+                var ordinal = argument.Parameter?.Ordinal ?? -1;
+                var value = LowerValue(block, operation, argument.Value);
+                lowered.Add((argument.Parameter?.Ordinal ?? int.MaxValue, value));
+                if (isDirect &&
+                    (argument.ArgumentKind != ArgumentKind.Explicit ||
+                     ordinal < 0 ||
+                     ordinal >= invocation.TargetMethod.Parameters.Length ||
+                     !ordinals!.Add(ordinal)))
+                {
+                    isDirect = false;
+                }
+            }
+
+            if (isDirect &&
+                ordinals!.Count != invocation.TargetMethod.Parameters.Length)
+            {
+                isDirect = false;
+            }
+
+            return ([.. lowered
                 .OrderBy(static argument => argument.Ordinal)
-                .Select(static argument => argument.Value)];
+                .Select(static argument => argument.Value)], isDirect);
         }
 
         private LocationLowering LowerLocation(
