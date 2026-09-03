@@ -13897,3 +13897,19 @@ subtree evaluation.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1178 | **`SwitchExpressionFacts.IsPatternEvaluationUnavoidable` traverses a binary pattern's left subtree twice.** It separately calls itself and `GetPatternSelectionForUnknownValue` for `binary.LeftPattern`, so nested pattern structure and type checks are repeated before the right-side short-circuit decision. A combined fact projection can remove that duplicate traversal without changing pattern-selection or inevitability semantics. | `SharpProof.Effects/SwitchExpressionFacts.cs:371-418` |
+
+## Second survey, part five hundred one: R1179 - recursive pattern completion and totality walk the same subtree
+
+For every recursive deconstruction subpattern,
+`CanCompletePatternEvaluation` first traverses the subpattern to determine
+whether its runtime operations can complete, then `SwitchExpressionFacts.IsTotalPattern`
+traverses it again to decide whether a failed evaluation is fatal or can be
+skipped. The property-subpattern loop performs the same pair of walks after
+checking the property member. The two facts have intentionally different
+policies, so neither should replace the other; a combined pattern-facts
+projection, or a traversal that carries totality alongside completion, can
+preserve those policies without revisiting nested pattern structure.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1179 | **`OperationCompletionEvaluator.CanCompletePatternEvaluation` walks each recursive subpattern twice for separate facts.** It calls `CanCompletePatternEvaluation` and then `SwitchExpressionFacts.IsTotalPattern` on the same deconstruction and property subpatterns, repeating nested pattern traversal before deciding whether to stop. A combined fact seam can remove the structural duplicate while retaining distinct completion and total-pattern semantics; this is separate from R613's repeated totality call within each loop. | `SharpProof.Effects/OperationCompletionEvaluator.cs:243-276`; `SharpProof.Effects/SwitchExpressionFacts.cs:338-368` |
