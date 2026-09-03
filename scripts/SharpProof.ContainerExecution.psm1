@@ -929,12 +929,12 @@ function New-SharpProofCoverageContext {
         [switch]$CreateResultsDirectory
     )
 
-    $enabled =
-        -not [string]::IsNullOrWhiteSpace($CoverageSettings) -or
+    $hasCoverageSettings =
+        -not [string]::IsNullOrWhiteSpace($CoverageSettings)
+    $hasCoverageResults =
         -not [string]::IsNullOrWhiteSpace($CoverageResultsDirectory)
-    if ($enabled -and
-        ([string]::IsNullOrWhiteSpace($CoverageSettings) -or
-         [string]::IsNullOrWhiteSpace($CoverageResultsDirectory))) {
+    $enabled = $hasCoverageSettings -or $hasCoverageResults
+    if ($hasCoverageSettings -xor $hasCoverageResults) {
         throw (
             'CoverageSettings and CoverageResultsDirectory must be supplied ' +
             'together.')
