@@ -53,8 +53,7 @@ function Invoke-Container(
             'compose', 'run', '--rm', '--no-TTY', '--quiet-pull')
         foreach ($name in @($Environment.Keys | Sort-Object)) {
             $value = [string]$Environment[$name]
-            [Environment]::SetEnvironmentVariable($name, $value, 'Process')
-            $arguments += @('-e', $name)
+            $arguments += @('-e', "$name=$value")
         }
         Build-ToolingImage
         $arguments += @(
