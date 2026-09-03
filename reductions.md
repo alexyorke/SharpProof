@@ -14134,3 +14134,18 @@ collection scans without changing default-case admission or ordering.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1191 | **`ExceptionHandlerReachability.GetReachableSwitchCases` scans the case collection up to three times.** The selection pass builds `selected`, a second `foreach (@switch.Cases)` copies its entries into the reachability/scheduling outputs, and `@switch.Cases.Where(selected.ContainsKey).ToArray()` scans all cases again for the return value. Retaining selected cases in source order while populating the side tables can eliminate the latter two collection walks and preserve the existing early-stop and default-case semantics. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1448-1559` |
+
+## Second survey, part five hundred fourteen: R1192 - goto continuation membership is quadratic
+
+`IncludeLabeledStatement` builds a mutable continuation list and uses
+`result.Any` with `ReferenceEquals` before adding the labeled statement and
+each discovered invocation. Because invocations are processed one at a time
+while the list grows, every membership check scans the accumulated prefix;
+the identity comparison itself is repeated for all prior entries. Keep the
+list for ordering and insertion, but maintain a reference-identity set beside
+it so duplicate suppression remains exact without repeatedly walking the
+continuation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1192 | **`ExceptionHandlerReachability.GetGotoTargetContinuation` linearly rescans its continuation for every candidate.** `IncludeLabeledStatement` calls `result.Any(operation => ReferenceEquals(operation, candidate))` once for the label and once per reversed invocation before inserting at index one, so a long labeled continuation performs repeated identity scans over the same growing list. A `HashSet<IOperation>` using reference identity can preserve deduplication and insertion order while removing the avoidable quadratic membership work. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1629-1647` |
