@@ -109,7 +109,7 @@ public sealed class RequiresCallSiteDiscoveryTests
                 public static void Call() { Trace(-1); }
             }
             """,
-            ["SP0027"]);
+            []);
         if (defineFirstSymbol)
         {
             var tree = compilation.SyntaxTrees.Single();
@@ -190,7 +190,7 @@ public sealed class RequiresCallSiteDiscoveryTests
                 public static void Call() { Target(-1); }
             }
             """,
-            ["SP0027", "SP0047"]);
+            []);
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
@@ -723,7 +723,7 @@ public sealed class RequiresCallSiteDiscoveryTests
                     new SliceContractList() is [.. var rest];
             }
             """,
-            ["SP0027"]);
+            []);
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,
@@ -763,7 +763,7 @@ public sealed class RequiresCallSiteDiscoveryTests
                     new SliceArgumentContractList() is [_, .. var rest, _];
             }
             """,
-            ["SP0027"]);
+            []);
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             compilation,

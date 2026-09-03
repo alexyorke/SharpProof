@@ -19,7 +19,7 @@ public sealed class MemberInitializerConstructorPathRegressionTests
                 }
                 """),
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }

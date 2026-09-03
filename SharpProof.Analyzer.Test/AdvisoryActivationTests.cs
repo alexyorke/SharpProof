@@ -35,7 +35,7 @@ public sealed class AdvisoryActivationTests
                 StringComparison.Ordinal);
         var compilation = AnalyzerTestHost.CreateCompilation(
             source,
-            ["SP0027"]);
+            []);
         var factory = new RecordingSessionFactory();
 
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(

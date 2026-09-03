@@ -20968,3 +20968,11 @@ ValidatePublishedVerificationResult resolves RequestPath, ResultPath, ManifestPa
 | ID | Finding | Evidence |
 |---|---|---|
 | R1989 | ValidatePublishedVerificationResult repeatedly recomputes the same normalized project root for six path projections in one execution; cache the root per task invocation while retaining per-path Linux locality validation and rooted-path semantics. | SharpProof.BuildTasks/ValidatePublishedVerificationResult.cs:29-38,57-58,93-103 |
+
+The remaining seven R1780 fixture cases now also use the default diagnostic
+catalog: conditional-emission and list-pattern discovery tests, contract
+identifier activation, reachable initializer, and virtual-hierarchy cases.
+The full `SharpProof.Analyzer.Test` project passes 475/475 unaffected cases
+plus the one intentionally filtered `SP0024` fixture (476 total) with zero
+warnings or errors; that fixture remains narrowed because its source emits a
+placement diagnostic outside the call-site assertion.

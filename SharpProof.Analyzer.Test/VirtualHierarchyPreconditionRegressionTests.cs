@@ -61,7 +61,7 @@ public sealed class VirtualHierarchyPreconditionRegressionTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 4);
     }
