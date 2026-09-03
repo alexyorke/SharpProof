@@ -9435,3 +9435,11 @@ input rather than a caller's bad argument. Whether the third tier - the JSON
 reader's `MaxDepth` sharing the same constant - should have its own limit is a
 judgement for the owner: term depth and JSON nesting depth are different
 quantities that currently share one number.
+
+## Second survey, part one hundred ninety-six: R969 - repeated protocol enum type discovery
+
+| R969 | **`WorkerProtocolJson.EnsureCanonicalEnum` rediscovers the same enum `Type` for every enum-valued JSON node.** The shape metadata supplies a stable declared type name such as `WorkerClaimReason` or `WorkerRunStatus`; nevertheless each field and each element of an enum array calls `Assembly.GetType`, checks `IsEnum`, and only then parses the text. The generated protocol model has a closed set of enum types, and the object-shape dictionary is immutable after initialization, so the assembly lookup and enum-kind check are invariant by `declaredType`, while the spelling parse and canonical-value comparison must remain per value. A small cached declared-type-to-enum-type map, including a fail-closed entry for an unknown type, can remove repeated reflection metadata discovery from request/response deserialization without weakening unknown-type, invalid-value, or canonical-spelling errors. | `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:83-141,155-183`; generated shape vocabulary `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:463-650`; deserialization entrypoints `SharpProof.Worker.Protocol/ProtocolJson.cs:64-71,1066-1069` |
+
+### Status (part one hundred ninety-six)
+
+R969 is `deferred`: the cache is local to the protocol validator, but its invalid-type representation and initialization strategy should be tested against the generated shape table before applying it.
