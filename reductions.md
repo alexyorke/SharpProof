@@ -16017,6 +16017,11 @@ CompilerProbeContract.AssemblyPath exposes typeof(CompilerProbeContract).Assembl
 |---|---|---|
 | R1332 | **`CompilerProbeContract.AssemblyPath` is an unreferenced public property. Remove it if no external fixture consumer calls it dynamically; the generated probe and package tests use the other contract members and do not need this assembly-location accessor.** | SharpProof.CompilerProbe.TestAsset/CompilerProbeContract.cs:55-56; repository-wide search finds no `CompilerProbeContract.AssemblyPath` reference |
 
+### Status (continued)
+
+R1332 is applied: the unused compiler-probe `AssemblyPath` property is removed.
+The probe test asset builds with zero warnings/errors.
+
 ## Second survey, continued: R1333 - protocol options are cloned at every access
 
 WorkerProtocolJson keeps one configured options instance but returns new(s_options) on every Options access. The property is consumed by the worker, compiler-artifact, launcher, package, and test serialization paths, many of which request it repeatedly in one operation and never mutate the returned options. A read-only shared instance, an internal accessor for trusted callers, or an explicit serialization helper can remove the repeated options/converter clone while retaining a separate mutable copy only for public callers if that isolation is part of the API contract.
