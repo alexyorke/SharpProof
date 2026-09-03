@@ -14333,3 +14333,19 @@ IR factory's interning behavior.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1201 | **`CompilerImplementationIlSummaryLowerer.Translator.WrapInt32` re-interns the same modulus three times.** The remainder, negative-remainder adjustment, and final signed adjustment each call `_factory.Integer(modulus)` with unchanged input; `IrFactory.Integer` synchronizes and interns by the same structural key on every call. Caching one `IrIntegerTerm` per wrap removes the duplicate factory work without changing the generated term graph. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:1523-1549`; `SharpProof.Ir/IrFactory.cs:372-380` |
+
+## Second survey, part five hundred twenty-four: R1202 - opaque lowering repeats child traversal
+
+`Opaque` first lowers its receiver and child arguments through `LowerCore`, then
+calls `IsDemonstrablyPure(operation)`, whose recursive operation-kind walk
+revisits the receiver and argument suboperations for the pure shapes it
+recognizes. `LowerCore` memoizes each lowered operation, but purity has no
+corresponding per-operation cache or shared child result. A combined
+lowered-child/purity projection, or a scoped purity memo keyed by operation
+identity, can retain the current depth and known-pure policy while eliminating
+repeated tree work; any cache must remain scoped to this lowerer's
+`_isKnownPure` callback.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1202 | **`RoslynOperationLowerer.Opaque` walks the same operation tree once for lowering and again for purity.** Receiver/argument children are enumerated and lowered through `LowerCore`, then `IsDemonstrablyPure` recursively traverses the operation and its children again to decide whether to create a pure opaque term. The existing lowering cache prevents duplicate lowering results but does not avoid the second purity walk. Combining the projections or memoizing purity per operation within a lowering run can preserve the distinct abstention, depth, and `_isKnownPure` semantics while removing redundant traversal.** | `SharpProof.Frontend/RoslynOperationLowerer.cs:290-338,345-391` |
