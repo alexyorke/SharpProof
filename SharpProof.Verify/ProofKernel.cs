@@ -55,15 +55,22 @@ public sealed class ProofKernel(ISmtBackend backend)
             return Unknown(AbstentionReason.MalformedBackendResult);
         }
 
-        if (result.UnsatCore.Any(index => index < 0 || index >= query.Assumptions.Length))
-        {
-            return Unknown(AbstentionReason.MalformedBackendResult);
-        }
-
-        var justifications = ImmutableArray.CreateBuilder<ProofJustification>();
-        foreach (var index in result.UnsatCore.Distinct())
+        var justifications = ImmutableArray.CreateBuilder<ProofJustification>(
+            result.UnsatCore.Length);
+        var seen = new HashSet<int>();
+        foreach (var index in result.UnsatCore)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (index < 0 || index >= query.Assumptions.Length)
+            {
+                return Unknown(AbstentionReason.MalformedBackendResult);
+            }
+
+            if (!seen.Add(index))
+            {
+                continue;
+            }
+
             justifications.Add(query.Assumptions[index].Justification);
         }
         return new ProvenOutcome(justifications.ToImmutable());

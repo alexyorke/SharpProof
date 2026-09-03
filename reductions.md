@@ -16477,3 +16477,13 @@ R412 is applied: launcher projection generation now emits `Level` as internal,
 so the handwritten partial-class forwarding wrapper is removed. Generated-output
 verification passes for all 14 generators, and LauncherArgumentTests passes
 (75 passed).
+
+R1363 is kept deferred: the protocol assembly targets `netstandard2.0`, where the
+proposed ref-based dictionary API is unavailable; replacing values with mutable
+counter objects would add allocations and structural complexity instead of
+reducing code while preserving the same summary semantics.
+
+R417 is applied: unsat-core bounds validation, duplicate suppression, and
+justification projection now share one cancellation-aware pass with a pre-sized
+builder, retaining malformed-result handling and deterministic first occurrence
+ordering. ProofKernelTests passes (14 passed).
