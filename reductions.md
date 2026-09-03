@@ -14131,6 +14131,12 @@ and all arguments complete.
 |---|---|---|
 | R1188 | **`ExceptionHandlerReachability` revalidates object-creation arguments across exception analysis and child scheduling.** The `IObjectCreationOperation` case computes `creation.Arguments.All(argument => canCompleteNormally(argument.Value))` before resolving constructor effects; `PushChildrenCore` repeats the same `All` check for initializer reachability and then `PushSequentialCore(creation.Arguments, remaining)` invokes the completion predicate over the arguments again. One cached argument-prefix projection can remove these repeated scans without changing constructor, initializer, or argument order semantics. | `SharpProof.Effects/ExceptionHandlerReachability.cs:580-626,1339-1348,1413-1427` |
 
+### Status (part five hundred ten)
+
+R1188 is applied: object-creation argument completion is cached and reused for
+initializer scheduling and prevalidated prefix pushing, preserving constructor
+and argument order. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred eleven: R1189 - switch pattern selection is recomputed
 
 For each pattern case clause, `GetReachableSwitchCases` first computes a
