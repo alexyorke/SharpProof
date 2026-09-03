@@ -289,8 +289,7 @@ public sealed class WorkerTests
         var claim = response.Manifest.Claims.Single();
         var result = AssertClaimVerdict(
             response,
-            WorkerClaimOutcome.Proven,
-            assertNoErrors: false);
+            WorkerClaimOutcome.Proven);
 
         using (Assert.EnterMultipleScope())
         {
@@ -335,8 +334,7 @@ public sealed class WorkerTests
         var result = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Proven,
-            expectedVacuity: WorkerVacuityKind.ContradictoryPreconditions,
-            assertNoErrors: false);
+            expectedVacuity: WorkerVacuityKind.ContradictoryPreconditions);
         var usedPreconditions = result.Assumptions.Where(
             static assumption =>
                 assumption.Kind ==
@@ -434,8 +432,7 @@ public sealed class WorkerTests
             response,
             WorkerClaimOutcome.Unknown,
             WorkerClaimReason.ResourceLimit,
-            WorkerVacuityKind.None,
-            assertNoErrors: false);
+            WorkerVacuityKind.None);
 
         using (Assert.EnterMultipleScope())
         {
@@ -725,8 +722,7 @@ public sealed class WorkerTests
         var result = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Refuted,
-            WorkerClaimReason.None,
-            assertNoErrors: false);
+            WorkerClaimReason.None);
 
         using (Assert.EnterMultipleScope())
         {
@@ -777,8 +773,7 @@ public sealed class WorkerTests
         var result = AssertClaimVerdict(
             response,
             WorkerClaimOutcome.Unknown,
-            WorkerClaimReason.EffectContractNotEstablished,
-            assertNoErrors: false);
+            WorkerClaimReason.EffectContractNotEstablished);
 
         using (Assert.EnterMultipleScope())
         {
@@ -939,12 +934,11 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
         var result = AssertClaimVerdict(
             response,
-            WorkerClaimOutcome.Proven,
-            expectedRunStatus: WorkerRunStatus.Complete,
-            assertNoErrors: false);
+            WorkerClaimOutcome.Proven);
 
         using (Assert.EnterMultipleScope())
         {
+            Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(result.EffectCertainty,
                 Is.EqualTo(
                     WorkerEffectEvidenceCertainty.TrustedCompleteBoundary));
@@ -2280,12 +2274,13 @@ public sealed class WorkerTests
 
         var first = await worker.VerifyAsync(request);
         var response = await worker.VerifyAsync(request);
-        var result = response.ClaimResults.Single();
+        var result = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Proven,
+            expectedVacuity: WorkerVacuityKind.ContradictoryPreconditions);
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(result.Vacuity,
-                Is.EqualTo(WorkerVacuityKind.ContradictoryPreconditions));
             Assert.That(first.Summary.CacheStatus,
                 Is.EqualTo(WorkerCacheStatus.Miss));
             Assert.That(response.Summary.CacheStatus,
@@ -2400,18 +2395,12 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-            Assert.That(record.ProofCore, Is.Empty);
-            Assert.That(record.Model, Is.Empty);
-        }
+        var record = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.UnsupportedBody);
+        Assert.That(record.ProofCore, Is.Empty);
+        Assert.That(record.Model, Is.Empty);
     }
 
     [Test]
@@ -2436,18 +2425,15 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
+        var record = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Proven,
+            WorkerClaimReason.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
                 response.RunStatus,
                 Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
             Assert.That(record.Model, Is.Empty);
         }
     }
@@ -2549,17 +2535,11 @@ public sealed class WorkerTests
                 Environment.NewLine,
                 response.Errors.Select(error =>
                     error.Code + ": " + error.Message)));
-        var record = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-            Assert.That(record.ProofCore, Is.Empty);
-        }
+        var record = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.UnsupportedBody);
+        Assert.That(record.ProofCore, Is.Empty);
     }
 
     [Test]
@@ -2585,15 +2565,11 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedExpression));
-            Assert.That(record.ProofCore, Is.Empty);
-        }
+        var record = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.UnsupportedExpression);
+        Assert.That(record.ProofCore, Is.Empty);
     }
 
     [Test]
@@ -2622,17 +2598,11 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-            Assert.That(record.ProofCore, Is.Empty);
-        }
+        var record = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.UnsupportedBody);
+        Assert.That(record.ProofCore, Is.Empty);
     }
 
     [Test]
@@ -2701,16 +2671,10 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(WorkerClaimReason.None));
-        }
+        _ = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Proven,
+            WorkerClaimReason.None);
     }
 
     [Test]
@@ -3947,7 +3911,10 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
+        var record = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.CounterexampleNotReplayable);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -3956,13 +3923,6 @@ public sealed class WorkerTests
             Assert.That(
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.None));
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.CounterexampleNotReplayable));
             Assert.That(record.ProofCore, Is.Empty);
             Assert.That(record.Model, Is.Empty);
         }
@@ -4051,13 +4011,11 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
 
-        var result = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(response.Errors, Is.Empty);
-            Assert.That(result.Outcome, Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(result.Reason, Is.EqualTo(WorkerClaimReason.UnsupportedBody));
-        }
+        Assert.That(response.Errors, Is.Empty);
+        _ = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.UnsupportedBody);
     }
 
     [Test]
@@ -4117,18 +4075,14 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
-            Assert.That(
-                record.Model.Single(value =>
-                    value.Variable == "parameter:0").Value,
-                Is.EqualTo(byte.MaxValue.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture)));
-        }
+        var record = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Refuted);
+        Assert.That(
+            record.Model.Single(value =>
+                value.Variable == "parameter:0").Value,
+            Is.EqualTo(byte.MaxValue.ToString(
+                System.Globalization.CultureInfo.InvariantCulture)));
     }
 
     [Test]
@@ -4252,14 +4206,15 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
+        var record = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Proven,
+            WorkerClaimReason.None,
+            WorkerVacuityKind.None);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.FailureReason, Is.EqualTo(WorkerRunFailureReason.None));
-            Assert.That(record.Outcome, Is.EqualTo(WorkerClaimOutcome.Proven));
-            Assert.That(record.Reason, Is.EqualTo(WorkerClaimReason.None));
-            Assert.That(record.Vacuity, Is.EqualTo(WorkerVacuityKind.None));
             Assert.That(record.ProofCore, Does.Contain("body:normal-completion"));
             Assert.That(record.Model, Is.Empty);
         }
@@ -4285,7 +4240,10 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
 
         Assert.That(response.Errors, Is.Empty);
-        var record = response.ClaimResults.Single();
+        _ = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.PostconditionMayBeUndefined);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(
@@ -4294,13 +4252,6 @@ public sealed class WorkerTests
             Assert.That(
                 response.FailureReason,
                 Is.EqualTo(WorkerRunFailureReason.None));
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.PostconditionMayBeUndefined));
         }
     }
 
@@ -4327,16 +4278,10 @@ public sealed class WorkerTests
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
                 error.Code)));
-        var record = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedContract));
-        }
+        _ = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.UnsupportedContract);
     }
 
     [Test]
@@ -4433,16 +4378,10 @@ public sealed class WorkerTests
         Assert.That(response.Errors, Is.Empty,
             string.Join(", ", response.Errors.Select(static error =>
                 error.Code)));
-        var record = response.ClaimResults.Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                record.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                record.Reason,
-                Is.EqualTo(WorkerClaimReason.UnsupportedContract));
-        }
+        _ = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.UnsupportedContract);
     }
 
     [Test]
@@ -4461,13 +4400,12 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
 
+        Assert.That(response.Errors, Is.Empty);
+        _ = AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(response.Errors, Is.Empty);
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
             Assert.That(response.ClaimResults, Has.Length.EqualTo(1));
-            Assert.That(response.ClaimResults[0].Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(response.Manifest.Claims[0].Kind,
                 Is.EqualTo(WorkerClaimKind.Effect));
             Assert.That(response.CallableResults, Has.Length.EqualTo(1));
@@ -5237,11 +5175,9 @@ public sealed class WorkerTests
         var response = await worker.VerifyAsync(request);
         var cached = await worker.VerifyAsync(request);
 
+        _ = AssertClaimVerdict(response, WorkerClaimOutcome.Refuted);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                response.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
             Assert.That(
                 response.Summary.CacheStatus,
                 Is.EqualTo(WorkerCacheStatus.Written));
@@ -5303,12 +5239,10 @@ public sealed class WorkerTests
         using var worker = SharpProofWorker.Create(request.Budgets);
         var response = await worker.VerifyAsync(request);
 
-        Assert.That(
-            response.ClaimResults.Single().Outcome,
-            Is.EqualTo(WorkerClaimOutcome.Unknown));
-        Assert.That(
-            response.ClaimResults.Single().Reason,
-            Is.EqualTo(WorkerClaimReason.ResourceLimit));
+        _ = AssertClaimVerdict(
+            response,
+            WorkerClaimOutcome.Unknown,
+            WorkerClaimReason.ResourceLimit);
     }
 
     [Test]
@@ -5382,12 +5316,10 @@ public sealed class WorkerTests
 
         var response = await worker.VerifyAsync(request);
 
+        _ = AssertClaimVerdict(response, WorkerClaimOutcome.Proven);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(response.RunStatus, Is.EqualTo(WorkerRunStatus.Complete));
-            Assert.That(
-                response.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Proven));
             Assert.That(backend!.DisposeCalls, Is.EqualTo(1));
         }
     }
@@ -6113,21 +6045,8 @@ public sealed class WorkerTests
         WorkerVerifyResponse response,
         WorkerClaimOutcome expectedOutcome,
         WorkerClaimReason? expectedReason = null,
-        WorkerVacuityKind? expectedVacuity = null,
-        WorkerRunStatus? expectedRunStatus = null,
-        WorkerRunFailureReason? expectedFailureReason = null,
-        string? expectedProofCoreEntry = null,
-        string? errorsMessage = null,
-        bool assertNoErrors = true)
+        WorkerVacuityKind? expectedVacuity = null)
     {
-        if (assertNoErrors && errorsMessage is null)
-        {
-            Assert.That(response.Errors, Is.Empty);
-        }
-        else if (assertNoErrors)
-        {
-            Assert.That(response.Errors, Is.Empty, errorsMessage!);
-        }
         var result = response.ClaimResults.Single();
         using (Assert.EnterMultipleScope())
         {
@@ -6139,18 +6058,6 @@ public sealed class WorkerTests
             if (expectedVacuity is { } vacuity)
             {
                 Assert.That(result.Vacuity, Is.EqualTo(vacuity));
-            }
-            if (expectedRunStatus is { } runStatus)
-            {
-                Assert.That(response.RunStatus, Is.EqualTo(runStatus));
-            }
-            if (expectedFailureReason is { } failureReason)
-            {
-                Assert.That(response.FailureReason, Is.EqualTo(failureReason));
-            }
-            if (expectedProofCoreEntry is { } proofCoreEntry)
-            {
-                Assert.That(result.ProofCore, Does.Contain(proofCoreEntry));
             }
         }
         return result;
