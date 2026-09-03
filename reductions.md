@@ -11573,6 +11573,8 @@ In `SharpProof.Effects/SwitchExpressionFacts.cs`, `IsRuntimeSpanMember` verifies
 
 R1083 is deferred: return `true` immediately after containing type match in `IsRuntimeSpanMember` and remove member iteration.
 
+Current-tree reconciliation: R1083 is already applied; `IsRuntimeSpanMember` returns immediately after the containing-type identity check, with the member enumeration removed.
+
 ## Second survey, part three hundred fifteen: R1084 - executable declaration body extraction duplicated across Effects analyzers
 
 `ManagedAbstractFlow.GetBody`, `ExceptionHandlerReachability.GetBodyOperation`, and `OperationEffectScanner.GetDirectSyntax` in `SharpProof.Effects` each independently implement switch expressions over `BaseMethodDeclarationSyntax`, `AccessorDeclarationSyntax`, and `LocalFunctionStatementSyntax` to extract method bodies or expression bodies. Centralizing this 3-arm declaration syntax extraction in an internal shared helper in `SharpProof.Effects` consolidates AST traversal utility logic while leaving operation conversion and statement unwrapping at the respective callers.
@@ -11685,6 +11687,8 @@ In `SharpProof.Specs/ApiSpecTable.cs`, `ApiSpecTable.Create` sorts incoming decl
 
 R1092 is deferred: replace `GroupBy` duplicate detection with an adjacent-element check in `ApiSpecTable.Create`.
 
+Current-tree reconciliation: R1092 is already applied; `ApiSpecTable.Create` checks adjacent sorted witness identifiers in one pass and no longer builds grouping tables.
+
 ## Second survey, part three hundred twenty-four: R1093 - hand-rolled repository root discovery in public API documentation tests
 
 `SharpProof.Attributes.Test/PublicApiDocumentationTests.cs` defines a private `GetDocumentationPath()` method that walks directory ancestors searching for `"SharpProof.Attributes/SharpProof.Attributes.xml"`. `Directory.Build.props` already compiles `eng/testing/TestRepository.cs` into all test projects. Replacing the 18-line custom directory search with `Path.Combine(TestRepository.FindRoot(), "SharpProof.Attributes", "SharpProof.Attributes.xml")` adopts the shared repository root helper and eliminates duplicate traversal code.
@@ -11784,6 +11788,8 @@ In `SharpProof.Summaries/IrRelationalSummaryBuilder.cs`, signature variable uniq
 
 R1100 is deferred: replace multi-stage LINQ variable chaining with a single set or loop in `IrRelationalSummaryBuilder`.
 
+Current-tree reconciliation: R1100 is already applied; signature uniqueness uses one `HashSet<IrVarId>` pass over receiver, parameters, and result.
+
 ## Second survey, part three hundred thirty-two: R1101 - unadopted AssertSingle helper in ContractFor validator generator tests
 
 `SharpProof.ContractForGenerator.Test/ContractForValidatorGeneratorTests.cs` defines a helper `AssertSingle(GeneratorRun run, string diagnosticId)`. While called in 15 tests, 12 other tests write out the long-form LINQ projection `Assert.That(run.Diagnostics.Select(static diagnostic => diagnostic.Id), Is.EqualTo(["SPCF0005"]));` or check length and index 0 manually. Standardizing on `AssertSingle` eliminates redundant projection boilerplate across the test suite and provides consistent failure diagnostics.
@@ -11810,6 +11816,8 @@ In `SharpProof.Frontend/RoslynOperationLowerer.cs`, `GetSyntheticInstance` is a 
 
 R1102 is deferred: remove unreachable lines 292-297 from `RoslynOperationLowerer.GetSyntheticInstance`.
 
+Current-tree reconciliation: R1102 is already applied; `GetSyntheticInstance` contains only the symbol lookup and shared missing-instance fallback after the unreachable path was removed.
+
 ## Second survey, part three hundred thirty-four: R1103 - redundant metamorphic variant generation and string equality comparison for effect seeds
 
 In `SharpProof.Gates/Corpus/CorpusCatalog.cs`, `CreateCases` generates all metamorphic variants for each seed, including `AlphaRenameContractFormals`. It then checks `if (variant == CorpusVariant.AlphaRenameContractFormals && string.Equals(item.Source, baseline.Source, StringComparison.Ordinal)) continue;`. For all 18 effect seeds (E01 to E18), alpha-renaming contract formals produces identical code because effect seeds have no contract formals. Instead of guarding upfront with `seed.Mode == "contracts"`, the catalog generates full class source, executes six string replacements, allocates `CorpusCase`, and performs a multi-line string comparison against baseline only to discard it every time. Checking the seed mode upfront avoids 18 useless string allocations and comparisons per catalog load.
@@ -11821,6 +11829,8 @@ In `SharpProof.Gates/Corpus/CorpusCatalog.cs`, `CreateCases` generates all metam
 ### Status (part three hundred thirty-four)
 
 R1103 is deferred: guard alpha-renaming variant generation on `seed.Mode == "contracts"` in `CorpusCatalog`.
+
+Current-tree reconciliation: R1103 is already applied for the proposed generation guard; `CreateCases` skips `AlphaRenameContractFormals` before creating variants for non-contract seeds.
 
 ## Second survey, part three hundred thirty-five: R1104 - ad-hoc try-catch-Assert.Pass anti-pattern in FuzzRunnerTests
 
