@@ -9284,3 +9284,11 @@ its accompanying measurements, and with the 153-for-153 `ConfigureAwait` result 
 part one hundred eighty-four, the object-lifetime, concurrency, and dead-code
 dimensions of this codebase are now measured and clean. What remains open in this
 ledger is duplication and shadowed authority, not hygiene.
+
+## Second survey, part one hundred eighty-eight: R964 - generic enum validation in every outcome merge
+
+| R964 | **`AnalyzerSemanticOutcomes.Combine` pays for two generic `Enum.IsDefined` validations on every merge of a private closed enum.** `Combine` calls `Rank` for both operands; `Rank` casts the result of `ArgumentNullGuard.RequireDefined`, which invokes the reflection-style generic enum check, even though `AnalyzerSemanticOutcome` is an internal six-value enum and its declaration order is deliberately the severity rank used by the comparison. A specialized rank table or exhaustive switch can validate the same six legal values and return their integer ranks directly, retaining the existing fail-closed behavior for an invalid cast value while removing two generic type/enum checks from every aggregation callback. This is not a proposal to remove validation: `AnalyzerConfigurationUnitTests.InvalidSemanticOutcomeIsRejected` explicitly asserts that an invalid enum value throws, so the specialized path must keep that contract. | `SharpProof.Analyzer.Core/AnalyzerSemanticOutcome.cs:1-28`; generic guard `SharpProof.Ir/ArgumentNullGuard.cs:74-84`; production merges `SharpProof.Analyzer.Core/AnalyzerSession.cs:259`, `AnalyzerFeaturePipeline.cs:285-311`, `RequiresCallSiteAnalyzer.cs:156-163,260,539`; invalid-value test `SharpProof.Analyzer.Test/AnalyzerConfigurationUnitTests.cs:103-112` |
+
+### Status (part one hundred eighty-eight)
+
+R964 is `deferred`: the reduction is small but sits on analyzer aggregation paths and can be implemented without weakening the existing invalid-value boundary, provided the specialized rank code retains an explicit default failure.
