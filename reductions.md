@@ -13855,3 +13855,18 @@ retaining their distinct arm and unmatched-path results.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1176 | **`OperationEffectScanner.ScanSwitchExpression` revalidates the switch value three times through `SwitchExpressionFacts`.** The pattern-only arm query, reachable-arm query, and unmatched-path query each re-invoke `_completionEvaluator.CanCompleteNormally` for the same `switchExpression.Value`; this is separate from R448's duplicated per-arm selection logic and R1175's evaluator-to-helper boundary. A shared reachability result can remove the repeated value traversals without merging the consumers' semantics. | `SharpProof.Effects/OperationEffectScanner.cs:1037-1062`; `SharpProof.Effects/SwitchExpressionFacts.cs:92-122,174-190` |
+
+## Second survey, part four hundred ninety-nine: R1177 - null-state APIs duplicate their flow mapping
+
+`GetNullState` and `GetNullStatePreferNull` deliberately use different
+precedence: the latter gives a constant-null value priority over abstract-flow
+facts, while the former first admits statically non-null shapes. After those
+entry-order differences, however, both methods contain the same
+`TryEvaluate`/`IsDefinitelyNonNull`/`IsDefinitelyNull` mapping and repeat the
+same value-shape non-null predicate in their fallback. A private flow-state
+helper and a shared static-shape predicate can centralize the mechanics while
+leaving each public method's precedence and source-null fallback unchanged.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1177 | **`OperationNullnessEvaluator` duplicates the null-state decision mechanics in `GetNullState` and `GetNullStatePreferNull`.** Both APIs map the same abstract-flow result to `NonNull`/`Null` and repeat the `null`/instance-reference/non-nullable-value/definitely-non-null fallback predicate; only the ordering of constant-null, flow, and source-null checks differs. Shared internal helpers can remove the duplicated branches without changing the two APIs' intentional precedence. | `SharpProof.Effects/OperationNullnessEvaluator.cs:37-104` |
