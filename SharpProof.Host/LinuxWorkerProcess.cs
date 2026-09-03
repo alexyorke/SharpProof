@@ -182,7 +182,8 @@ public sealed partial class LinuxWorkerProcess : IDisposable
                 process.Id,
                 LinuxProcessControlConstants.SignalTerminate) != 0)
         {
-            if (Marshal.GetLastPInvokeError() == 3 &&
+            if (Marshal.GetLastPInvokeError() ==
+                    LinuxProcessControlConstants.ProcessNotFound &&
                 process.WaitForExit(0))
             {
                 KillCapturedDescendants(descendants);
@@ -265,7 +266,8 @@ public sealed partial class LinuxWorkerProcess : IDisposable
             if (NativeMethods.Kill(
                     processId,
                     LinuxProcessControlConstants.SignalKill) != 0 &&
-                Marshal.GetLastPInvokeError() != 3)
+                Marshal.GetLastPInvokeError() !=
+                    LinuxProcessControlConstants.ProcessNotFound)
             {
                 throw NativeFailure(
                     "SharpProof could not terminate a worker descendant.");
@@ -360,6 +362,7 @@ internal static partial class LinuxPrctl
 
 internal static class LinuxProcessControlConstants
 {
+    internal const int ProcessNotFound = 3;
     internal const int ParentDeathSignal = 1;
     internal const int ChildSubreaper = 36;
     internal const int SetDumpable = 4;

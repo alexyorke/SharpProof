@@ -7,7 +7,6 @@ namespace SharpProof.BuildTasks;
 
 internal static partial class VerifierProcessSupervisor
 {
-    private const int ProcessNotFound = 3;
     private const int CleanupMilliseconds = 750;
     private const int RetryCleanupMilliseconds = 100;
     private const int MaximumCleanupRetries = 8;
@@ -261,7 +260,8 @@ internal static partial class VerifierProcessSupervisor
                     OpenPidFd(processId);
                 if (descriptor < 0)
                 {
-                    if (Marshal.GetLastPInvokeError() != ProcessNotFound)
+                    if (Marshal.GetLastPInvokeError() !=
+                            LinuxProcessControlConstants.ProcessNotFound)
                     {
                         Thread.Sleep(1);
                     }
@@ -276,7 +276,8 @@ internal static partial class VerifierProcessSupervisor
                              descriptor,
                              LinuxProcessControlConstants.SignalStop)) != 0)
                     {
-                        if (Marshal.GetLastPInvokeError() != ProcessNotFound)
+                        if (Marshal.GetLastPInvokeError() !=
+                                LinuxProcessControlConstants.ProcessNotFound)
                         {
                             Thread.Sleep(1);
                         }
@@ -288,7 +289,8 @@ internal static partial class VerifierProcessSupervisor
                          SendPidFdSignal(
                              descriptor,
                              LinuxProcessControlConstants.SignalKill)) != 0 &&
-                        Marshal.GetLastPInvokeError() != ProcessNotFound)
+                        Marshal.GetLastPInvokeError() !=
+                            LinuxProcessControlConstants.ProcessNotFound)
                     {
                         Thread.Sleep(1);
                     }

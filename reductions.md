@@ -10997,6 +10997,8 @@ When inspecting `Marshal.GetLastPInvokeError()` to detect whether a target proce
 
 R1041 is deferred: centralize `ProcessNotFound` on `LinuxProcessControlConstants` and replace magic literals across Host and BuildTasks.
 
+R1041 is applied: the shared host constant now owns errno 3 and all Linux worker and BuildTasks checks use it instead of private or magic literals. `BuildTaskTests` (63/63) and `WorkerProgramTests` (8/8) pass.
+
 ## Second survey, part two hundred seventy-three: R1042 - redundant JSON parsing and document leak in probe test assertions
 
 In `SharpProof.Package.Test/FinalCompilationProbeTests.cs`, `AssertManifestBindsProbeInputs` parses every syntax tree JSON text in `probe.SyntaxTrees` into a new `JsonDocument` on every iteration of a loop. However, `.Single(...)` and the trailing `Dispose()` only dispose the single matched document, leaking unmanaged resources for all other parsed trees. Furthermore, `ProbeArtifact` already provides a dedicated helper `GetTreeChecksum(string pathSuffix)` that performs this lookup safely. Replacing the inline LINQ parsing with `probe.GetTreeChecksum` eliminates the duplication and the resource leak.

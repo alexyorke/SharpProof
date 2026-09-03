@@ -1084,7 +1084,8 @@ public sealed partial class RunVerifier : Microsoft.Build.Utilities.Task,
                     _processGroupPidFd,
                     LinuxProcessControlConstants.SignalKill);
             }
-            else if (Marshal.GetLastPInvokeError() != 3)
+            else if (Marshal.GetLastPInvokeError() !=
+                         LinuxProcessControlConstants.ProcessNotFound)
             {
                 _ = SendPidFdSignal(
                     _processGroupPidFd,
