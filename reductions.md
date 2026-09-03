@@ -19008,3 +19008,8 @@ test passes (1/1).
 R1668 is applied: frontend abstention tests now share one invalid-enum exception
 assertion helper, while constructor/factory coverage and the two parameter-name
 checks remain explicit. `FrontendAbstentionValueTests` passes (3/3).
+
+R1669 is applied: the two module-initializer tests now share the static-write,
+synchronization, and completeness assertion envelope, while exception,
+recursion, and analyzed-method-count checks remain scenario-specific.
+`ModuleInitializerEffectTests` passes (5/5).

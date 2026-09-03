@@ -65,28 +65,12 @@ public sealed class ModuleInitializerEffectTests
             var result = session.Analyze(
                 EffectTestHost.SampleMethod(compilation, methodName));
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(
-                    result.Summary.Writes.Contains(
-                        EffectRegionId.Static()),
-                    Is.True,
-                    methodName);
-                Assert.That(
-                    result.Summary.Capabilities.Contains(
-                        EffectCapabilityKind.Synchronization),
-                    Is.True,
-                    methodName);
-                Assert.That(
-                    result.Summary.Throws.Types.Select(
-                        static type => type.ToDisplayString()),
-                    Does.Contain("System.InvalidOperationException"),
-                    methodName);
-                Assert.That(
-                    result.Summary.Completeness,
-                    Is.EqualTo(EffectCompleteness.Complete),
-                    methodName);
-            }
+            AssertModuleInitializerEffects(result, methodName);
+            Assert.That(
+                result.Summary.Throws.Types.Select(
+                    static type => type.ToDisplayString()),
+                Does.Contain("System.InvalidOperationException"),
+                methodName);
         }
     }
 
@@ -192,24 +176,36 @@ public sealed class ModuleInitializerEffectTests
                 "Startup",
                 "Initialize"));
 
+        AssertModuleInitializerEffects(result);
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(
-                result.Summary.Writes.Contains(
-                    EffectRegionId.Static()),
-                Is.True);
-            Assert.That(
-                result.Summary.Capabilities.Contains(
-                    EffectCapabilityKind.Synchronization),
-                Is.True);
-            Assert.That(
-                result.Summary.Completeness,
-                Is.EqualTo(EffectCompleteness.Complete));
             Assert.That(
                 result.Summary.Uncertainty &
                     EffectUncertainty.Recursion,
                 Is.EqualTo(EffectUncertainty.None));
             Assert.That(session.AnalyzedSourceMethodCount, Is.EqualTo(2));
+        }
+    }
+
+    private static void AssertModuleInitializerEffects(
+        EffectMethodResult result,
+        string context = "")
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                context);
+            Assert.That(
+                result.Summary.Capabilities.Contains(
+                    EffectCapabilityKind.Synchronization),
+                Is.True,
+                context);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete),
+                context);
         }
     }
 }
