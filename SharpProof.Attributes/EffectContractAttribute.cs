@@ -5,11 +5,16 @@ namespace SharpProof.Attributes;
     SharpProofAttributeTargets.Contract,
     AllowMultiple = true,
     Inherited = false)]
-public sealed class EffectContractAttribute(SharpProofEffect effects) : Attribute
+public sealed class EffectContractAttribute : Attribute
 {
     /// <summary>Creates an effect summary.</summary>
     /// <param name="effects">The declared effect flags.</param>
-    public SharpProofEffect Effects { get; } = effects;
+    public EffectContractAttribute(SharpProofEffect effects)
+    {
+        Effects = effects;
+    }
+
+    public SharpProofEffect Effects { get; }
 
     /// <summary>Gets or sets the ambient capabilities used by the member.</summary>
     /// <value>The used capabilities; the default is <c>None</c>.</value>
