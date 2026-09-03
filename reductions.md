@@ -190,6 +190,7 @@ the smallest relevant containerized test target passes.
 | R623 | Share corpus observation collection between gate execution and snapshot rendering | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R869 | Validate IR sequence elements while taking the immutable snapshot | `SharpProof.Ir.Test`: 114 passed |
 | R870 | Remove the redundant IR location type-table lookup | `SharpProof.Ir.Test`: 114 passed |
+| R883 | Reuse the stateless IR interpreter across differential comparisons | `SharpProof.Testing.Test`: 13 passed |
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
@@ -8090,8 +8091,8 @@ build-file changes were made during this audit.
 
 ### Status (part three hundred ninety-three)
 
-R883 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R883 is `applied`: `IrCSharpDifferentialOracle` now reuses one interpreter whose
+evaluation state remains per call. `SharpProof.Testing.Test` passed (13 tests).
 
 ## Second survey, part three hundred ninety-four: R884 - repeated path conflict canonicalization
 
@@ -9033,15 +9034,82 @@ three-line guard in the generator, matching what the other fourteen already do.
 It is worth doing because the catalog it protects drives effect-contract mappings,
 where a silently skipped key means a missing mapping rather than a build failure.
 
-## Second survey, part one hundred seventy-eight: R957 - duplicated compiler model decoders
+## Second survey, part one hundred eighty-two: R957 - duplicated compiler model decoders
 
 | ID | Finding | Evidence |
 |---|---|---|
 | R957 | **The compiler artifact authority and the worker cache maintain two nearly identical `WorkerModelValue[]` decoders.** Both build an ordinal-string dictionary from `target.Variables`, allocate an immutable IR-value builder, walk every row, reject null/unknown/non-input variables, call the shared scalar `CompilerModelValues.TryCreateValue`, reject duplicate variable IDs, then require every Boolean/integer receiver and parameter to be present before freezing the model. The implementations differ at the edges - the authority precomputes a required array and uses `ContainsKey` plus `Add`, while the worker scans eligible variables afterward and uses `TryAdd` - but those are equivalent rejection policies, not different model semantics. A shared decoder can own label lookup, role filtering, scalar-required admission, and duplicate handling with an explicit policy for nullable rows and error surface; the authority and worker can retain their distinct replay/reason paths without carrying two copies of the model contract. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:806-861`; `SharpProof.Worker/VerificationCache.cs:655-701`; shared scalar conversion `SharpProof.CompilerArtifact/CompilerModelValues.cs:5-35` |
 
-### Status (part one hundred seventy-eight)
+### Status (part one hundred eighty-two)
 
 R957 is `deferred`: the model decoder is a cross-assembly validation seam,
 so the shared core must preserve fail-closed null handling, ordinal duplicate
 rejection, scalar-input requirements, and each caller's surrounding replay
 failure behavior.
+
+## Second survey, part one hundred eighty-one: R958, and R724 is partly applied
+
+An exception-handling census across production C#: every `throw new`, every `catch`
+clause, and the cleanup paths they guard.
+
+### Status update: R724 has been applied for the files it named
+
+`eng/testing/ProcessRunner.cs` now exists - 84 lines, linked into every
+`SharpProofTestProject` by `Directory.Build.props:76-77` - with
+`CreateStartInfo` (including the `CreateNoWindow = true` that three of the six
+original copies omitted), `RunCapturedAsync`, a described
+`InvalidOperationException` naming the executable when `Process.Start` returns
+null, and `ProcessRunnerResult(int ExitCode, string Output, string Error)`, the
+three-field shape R724 recommended over the concatenating variant. **All six files
+R724 named have adopted it** - `AcceptanceScriptTests`, `CoverageScriptTests`,
+`ProductionInventoryAuthorityTests`, `DependencyAuditScriptTests`,
+`PackageLayoutSmokeTests`, `ReleasePublicationScriptTests` - plus
+`ArchitectureGitRepository.cs`, seven callers in total. The measured tail:
+`new ProcessStartInfo` sites are down from **55 in 43 files to 48 in 38**, and
+private `ProcessResult` declarations from **16 to 14**. R724's six named copies are
+resolved; the long tail is not, so the item should move to partially-applied rather
+than applied.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R958 | **Four implementations of "kill this process tree" disagree about which exceptions to swallow, and every one of them runs inside a `catch` block where an escaping exception replaces the original failure.** The four: `SharpProof.Gates/GateProcess.cs:33-46`, `eng/testing/ProcessRunner.cs:64-77` (byte-identical to it), `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:510-522` (`TryKill`), and `SharpProof.BuildTasks/RunVerifier.cs:971-980` (`TerminateBootstrapProcess`). All four call `process.Kill(entireProcessTree: true)`. **Three catch only `InvalidOperationException`; `TerminateBootstrapProcess` also catches `Win32Exception`** - the exception the framework documents for "the associated process could not be terminated" - and it is the only one that also waits after killing (`WaitForExit(1000)`). **None of the four catches `AggregateException`**, which is the exception the `entireProcessTree: true` overload specifically documents for "not all processes in the process tree could be killed"; this is from the documented contract of that overload and is not observed here at runtime. Why the asymmetry matters: all four are invoked from a bare `catch { ... throw; }` cleanup path - `WorkerPerformanceProbe.cs:282,370`, `RunVerifier.cs:200`, `GateProcess.cs:19`, `ProcessRunner.cs:52`, `PerformanceGate.cs:680`, `OpenSourceCorpusImporter.cs:473` - so an exception escaping the kill **replaces the exception being handled**, and the real failure is lost rather than reported. `TryKill` is additionally redundant outright: it lives in `SharpProof.Gates`, the same assembly that declares `GateProcess.KillTree`, does the same thing, and three other files in that assembly already call the shared one. | `SharpProof.Gates/GateProcess.cs:19-46`; `eng/testing/ProcessRunner.cs:44-77`; `SharpProof.Gates/Performance/WorkerPerformanceProbe.cs:282,370,510-522`; `SharpProof.BuildTasks/RunVerifier.cs:200,971-980`; `SharpProof.Gates/Performance/PerformanceGate.cs:680,700-714,1354`; `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:473-477` |
+
+### Checked and not proposed (part one hundred eighty-one)
+
+- **Every bare `catch` in production is a cleanup-and-rethrow, and none swallows.**
+  There are exactly **eight** `catch {` blocks across seven production files, and
+  all eight either `throw;` or restore state and rethrow. An earlier regex over
+  this same data reported 104, which was an artefact of matching typed catches; the
+  verified figure is 8. Recorded so the larger number is not repeated.
+- **The exception vocabulary is consistent and deliberate.** 693 `throw new` sites
+  in production use 17 exception types, dominated by `InvalidDataException` (212)
+  for malformed input, `ArgumentException` (151) and `ArgumentOutOfRangeException`
+  (73) for caller error, and `InvalidOperationException` (126) for state. Three
+  domain types exist - `UnsupportedIrEncodingException`,
+  `QueryResourceLimitException`, `DataflowConvergenceException`. There is no
+  scattering of ad-hoc types and no obvious misuse; nothing to reduce.
+- **The 31 method name-and-arity collisions across three or more assemblies are all
+  framework or factory conventions** - `Dispose`, `Equals`, `GetHashCode`,
+  `ToString`, `Main`, and the `Create`/`Initialize`/`Validate` family. None is two
+  implementations of one algorithm. The method-signature axis is exhausted.
+
+### Status (part one hundred eighty-one)
+
+R958 is `pending`. The `TryKill` half is a deletion - one private helper
+replaced by the shared `GateProcess.KillTree` already used three times in the same
+assembly. The exception-list half is a decision that should be made once and
+applied to all four copies, because they are the last cleanup step before a real
+failure is reported, and three of the four currently let a secondary failure hide
+the primary one.
+
+## Second survey, part one hundred eighty-three: R959 - per-claim target-variable rescans
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R959 | **`CompilerResponseEvidenceAuthority.TryReplayPostcondition` repeatedly projects the same target-variable array for one claim replay.** After model creation, the method filters `target.Variables` to find result variables, later filters it again for pre-state variables, and then walks the complete array to enforce source-integer domains; the result and pre-state loops also perform fresh `GetVariableInfo` lookups. The outer response validator can replay several claims against one immutable target, so these role and type projections repeat across claims even though the target shape cannot change. A target-scoped variable catalog containing result/pre-state/input partitions and validated type facts can remove the repeated filtering and table lookups while preserving the exact-one result rule, pre-state binding checks, and independent all-variable domain validation. | `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs:670-818`; target-variable projections at `:704-758,766-781`; target-scoped claim loop `:57-79` | 
+
+### Status (part one hundred eighty-three)
+
+R959 is `deferred`: result, pre-state, and domain checks enforce different
+invariants and must remain separate at the validation boundary; the proposed
+reduction is only to cache their immutable target-local projections and type facts.

@@ -27,6 +27,7 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         new(CreateReferences, LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly IrFactory _factory =
         factory ?? throw new ArgumentNullException(nameof(factory));
+    private readonly IrInterpreter _interpreter = new(factory);
 
     public DifferentialResult Compare(
         IrTerm term,
@@ -35,7 +36,7 @@ public sealed class IrCSharpDifferentialOracle(IrFactory factory)
         ArgumentNullException.ThrowIfNull(term);
         ArgumentNullException.ThrowIfNull(variables);
 
-        var interpreted = new IrInterpreter(_factory).Evaluate(term, variables);
+        var interpreted = _interpreter.Evaluate(term, variables);
         if (!TryCreateProgram(term, variables, out var program, out var orderedVariables, out var reason))
         {
             return new DifferentialResult(DifferentialStatus.Abstained, interpreted, reason);
