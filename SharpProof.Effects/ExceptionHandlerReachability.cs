@@ -28,6 +28,10 @@ internal sealed class ExceptionHandlerReachability(
         _objectCreationArgumentsCache = new();
     private readonly Dictionary<ILockOperation, bool>
         _lockValueCompletionCache = new();
+    private readonly Dictionary<ICompoundAssignmentOperation, bool>
+        _compoundAssignmentTargetCompletionCache = new();
+    private readonly Dictionary<IMethodSymbol, bool> _methodCompletionCache =
+        new(SymbolEqualityComparer.Default);
     private readonly Dictionary<
         ICoalesceAssignmentOperation,
         (bool Completes, bool IsNonNull)> _coalesceAssignmentTargetFactsCache = new();
@@ -482,7 +486,8 @@ internal sealed class ExceptionHandlerReachability(
             }
             if (operation is ICompoundAssignmentOperation compound)
             {
-                var targetCompletes = canCompleteNormally(compound.Target);
+                var targetCompletes =
+                    GetCompoundAssignmentTargetCompletion(compound);
                 var skipsOperator =
                     ConversionEffectClassifier.SkipsLiftedOperator(
                         compound,
@@ -1333,9 +1338,9 @@ internal sealed class ExceptionHandlerReachability(
                 remaining.Push(coalesce.Target);
                 return;
             case ICompoundAssignmentOperation compound:
-                if (canCompleteNormally(compound.Target) &&
+                if (GetCompoundAssignmentTargetCompletion(compound) &&
                     (compound.InConversion.MethodSymbol == null ||
-                     canMethodCompleteNormally(
+                     CanMethodCompleteCached(
                          compound.InConversion.MethodSymbol)))
                 {
                     remaining.Push(compound.Value);
@@ -1503,6 +1508,33 @@ internal sealed class ExceptionHandlerReachability(
 
         var complete = canCompleteNormally(@lock.LockedValue);
         _lockValueCompletionCache.Add(@lock, complete);
+        return complete;
+    }
+
+    private bool GetCompoundAssignmentTargetCompletion(
+        ICompoundAssignmentOperation compound)
+    {
+        if (_compoundAssignmentTargetCompletionCache.TryGetValue(
+                compound,
+                out var cached))
+        {
+            return cached;
+        }
+
+        var complete = canCompleteNormally(compound.Target);
+        _compoundAssignmentTargetCompletionCache.Add(compound, complete);
+        return complete;
+    }
+
+    private bool CanMethodCompleteCached(IMethodSymbol method)
+    {
+        if (_methodCompletionCache.TryGetValue(method, out var cached))
+        {
+            return cached;
+        }
+
+        var complete = canMethodCompleteNormally(method);
+        _methodCompletionCache.Add(method, complete);
         return complete;
     }
 
@@ -3031,7 +3063,7 @@ internal sealed class ExceptionHandlerReachability(
         }
 
         add(ResolveDispatch(method, activeMethods, depth), origin);
-        return canMethodCompleteNormally(method);
+        return CanMethodCompleteCached(method);
     }
 
     private PotentialExceptions ResolveDispatch(
