@@ -138,37 +138,11 @@ internal sealed class UsingDisposalEffectResolver
                 canMethodThrow);
         }
 
-        var acquired = new List<(
-            ITypeSymbol Type,
-            IOperation Resource,
-            IOperation Origin)>();
-        var allInitializersComplete = true;
-        var reachableDisposalCount = 0;
-        foreach (var declarator in group.Declarations
-                     .SelectMany(static declaration => declaration.Declarators))
-        {
-            var resource = declarator.Initializer?.Value;
-            if (resource != null && canExitAbruptly(resource, resource))
-            {
-                reachableDisposalCount = acquired.Count;
-            }
-            if (!canCompleteNormally(resource))
-            {
-                allInitializersComplete = false;
-                break;
-            }
-            if (resource != null)
-            {
-                acquired.Add((
-                    declarator.Symbol.Type,
-                    resource,
-                    declarator));
-            }
-        }
-        if (scopeExitReachable && allInitializersComplete)
-        {
-            reachableDisposalCount = acquired.Count;
-        }
+        var (acquired, reachableDisposalCount) = UsingDisposalGraph.AcquireResources(
+            group,
+            canCompleteNormally,
+            canExitAbruptly,
+            scopeExitReachable);
         if (reachableDisposalCount == 0)
         {
             return EffectSummary.Empty;

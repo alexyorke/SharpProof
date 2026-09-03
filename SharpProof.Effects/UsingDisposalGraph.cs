@@ -4,6 +4,49 @@ namespace SharpProof.Effects;
 
 internal static class UsingDisposalGraph
 {
+    internal static (
+        List<(ITypeSymbol Type, IOperation Resource, IOperation Origin)> Acquired,
+        int ReachableDisposalCount) AcquireResources(
+        IVariableDeclarationGroupOperation group,
+        Func<IOperation?, bool> canCompleteNormally,
+        Func<IOperation, IOperation, bool> canExitAbruptly,
+        bool scopeExitReachable)
+    {
+        var acquired = new List<(
+            ITypeSymbol Type,
+            IOperation Resource,
+            IOperation Origin)>();
+        var allInitializersComplete = true;
+        var reachableDisposalCount = 0;
+        foreach (var declarator in group.Declarations
+                     .SelectMany(static declaration => declaration.Declarators))
+        {
+            var resource = declarator.Initializer?.Value;
+            if (resource != null && canExitAbruptly(resource, resource))
+            {
+                reachableDisposalCount = acquired.Count;
+            }
+            if (!canCompleteNormally(resource))
+            {
+                allInitializersComplete = false;
+                break;
+            }
+            if (resource != null)
+            {
+                acquired.Add((
+                    declarator.Symbol.Type,
+                    resource,
+                    declarator));
+            }
+        }
+        if (scopeExitReachable && allInitializersComplete)
+        {
+            reachableDisposalCount = acquired.Count;
+        }
+
+        return (acquired, reachableDisposalCount);
+    }
+
     internal static bool CanReachDeclarationDisposal(
         IUsingDeclarationOperation declaration,
         Func<IOperation?, bool> canCompleteNormally,

@@ -2063,38 +2063,11 @@ internal sealed class ExceptionHandlerReachability(
         var result = EmptyPotential;
         if (resources is IVariableDeclarationGroupOperation group)
         {
-            var acquired = new List<(
-                ITypeSymbol Type,
-                IOperation Resource,
-                IOperation Origin)>();
-            var allInitializersComplete = true;
-            var reachableDisposalCount = 0;
-            foreach (var declarator in group.Declarations
-                         .SelectMany(static declaration =>
-                             declaration.Declarators))
-            {
-                var resource = declarator.Initializer?.Value;
-                if (resource != null && CanExitAbruptly(resource, resource))
-                {
-                    reachableDisposalCount = acquired.Count;
-                }
-                if (!canCompleteNormally(resource))
-                {
-                    allInitializersComplete = false;
-                    break;
-                }
-                if (resource != null)
-                {
-                    acquired.Add((
-                        declarator.Symbol.Type,
-                        resource,
-                        declarator));
-                }
-            }
-            if (scopeExitReachable && allInitializersComplete)
-            {
-                reachableDisposalCount = acquired.Count;
-            }
+            var (acquired, reachableDisposalCount) = UsingDisposalGraph.AcquireResources(
+                group,
+                canCompleteNormally,
+                CanExitAbruptly,
+                scopeExitReachable);
             if (reachableDisposalCount == 0)
             {
                 return EmptyPotential;

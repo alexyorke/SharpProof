@@ -1088,9 +1088,10 @@ into R306.
 
 R306 is partially applied: the Effects-internal copies now call the existing
 `ConversionOwnershipClassifier.IsInsideNestedCallable` helper, while the
-cross-assembly and syntax-tree variants remain separate. R307 is small but
-should be done deliberately, because the computation is soundness-bearing even
-though the copies currently agree.
+cross-assembly and syntax-tree variants remain separate. R307 is applied: the
+shared `UsingDisposalGraph.AcquireResources` helper now owns the identical
+declaration acquisition and reachable-disposal count calculation, while each
+caller retains its own disposal analysis and unwind policy.
 
 ## Second survey, part twelve: R308-R309
 
