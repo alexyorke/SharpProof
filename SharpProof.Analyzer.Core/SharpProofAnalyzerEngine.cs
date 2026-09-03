@@ -210,16 +210,10 @@ internal sealed partial class SharpProofAnalyzerEngine
         CancellationToken cancellationToken)
     {
         var hasContractApiCandidate = false;
-        foreach (var tree in compilation.SyntaxTrees)
+        foreach (var tree in PotentiallyActivatedTrees(
+                     compilation,
+                     cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!MayContainAdvisoryActivationSyntax(
-                    tree.GetText(cancellationToken),
-                    cancellationToken))
-            {
-                continue;
-            }
-
             foreach (var node in tree.GetRoot(cancellationToken)
                          .DescendantNodes())
             {
@@ -258,6 +252,22 @@ internal sealed partial class SharpProofAnalyzerEngine
                     cancellationToken)
                 ? AdvisoryActivation.Lightweight
                 : AdvisoryActivation.None;
+    }
+
+    private static IEnumerable<SyntaxTree> PotentiallyActivatedTrees(
+        Compilation compilation,
+        CancellationToken cancellationToken)
+    {
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (MayContainAdvisoryActivationSyntax(
+                    tree.GetText(cancellationToken),
+                    cancellationToken))
+            {
+                yield return tree;
+            }
+        }
     }
 
     private static bool MayContainAdvisoryActivationSyntax(
@@ -417,16 +427,10 @@ internal sealed partial class SharpProofAnalyzerEngine
             return false;
         }
 
-        foreach (var tree in compilation.SyntaxTrees)
+        foreach (var tree in PotentiallyActivatedTrees(
+                     compilation,
+                     cancellationToken))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!MayContainAdvisoryActivationSyntax(
-                    tree.GetText(cancellationToken),
-                    cancellationToken))
-            {
-                continue;
-            }
-
             var model = SharpProof.Frontend.Host.CompilationModelProvider
                 .GetSemanticModel(compilation, tree);
             foreach (var invocation in tree.GetRoot(cancellationToken)

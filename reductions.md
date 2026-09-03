@@ -20912,3 +20912,9 @@ selector between clause and generic identity validation while retaining their
 distinct method-shape predicates. The focused ContractApiIdentity suite passes
 13/13 and the full `SharpProof.Frontend.Test` project passes 121/121, with zero
 warnings or errors.
+
+R1985 is applied: `SharpProofAnalyzerEngine` now shares a lazy
+`PotentiallyActivatedTrees` iterator for the cancellation and syntax prefilter
+used by both advisory scans. Their distinct tree analyses remain unchanged;
+the full `SharpProof.Analyzer.Test` project passes 476/476 tests with zero
+warnings or errors.
