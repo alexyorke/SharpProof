@@ -10777,3 +10777,15 @@ R1024 is deferred: centralize only the test-side constructor access, and keep th
 ### Status (part two hundred fifty-six)
 
 R1025 is deferred: remove only the redundant `ToImmutableArray()` call, and preserve the reverse namespace ordering, nested-type traversal, and per-container cancellation checks.
+
+## Second survey, part two hundred fifty-seven: R1026 - repeated virtual-dispatch divergence fixture
+
+`ReturningOverrideMakesVirtualCallMayComplete` and `BaseQualifiedCallStillUsesTheBaseBody` exercise different dispatch semantics, but each embeds the same `DivergingBase.Invoke` method whose `while (true)` body establishes a noncompleting base implementation. Both tests also construct `DefiniteOperationFacts` from the same compilation and cancellation token. A shared source fragment or focused test fixture helper can own that base declaration and analyzer setup while leaving the returning override, base-qualified call, and their different completion expectations independent.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1026 | **Virtual-dispatch completion tests duplicate their noncompletion base fixture and facts setup.** The two tests repeat the same `DivergingBase.Invoke` infinite-loop declaration and the same `new DefiniteOperationFacts(compilation, CancellationToken.None)` construction; only the derived/caller scenario changes. Centralizing the common fixture/setup would reduce test scaffolding without merging the distinct virtual and base-qualified dispatch authorities. | `SharpProof.Effects.Test/VirtualDispatchCompletionRegressionTests.cs:11-32,43-45`; `SharpProof.Effects.Test/VirtualDispatchCompletionRegressionTests.cs:71-87,93-95` |
+
+### Status (part two hundred fifty-seven)
+
+R1026 is deferred: share only the divergent base declaration and completion-facts construction, and retain the separate runtime-override and base-qualified-call cases.
