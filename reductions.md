@@ -19094,3 +19094,11 @@ R1068 is applied: protocol validation tests now route repeated single- and
 multi-code containment checks through the shared `AssertErrorCode` helper;
 exact-set and empty-result assertions remain explicit. `ProtocolJsonTests`
 passes (108/108).
+
+## Second survey, continued: R1676 - Compiler-probe test adds an unlisted platform-reference factory copy
+
+`CompilerProbeInputConsistencyTests.CreateCompilation` independently reads `TRUSTED_PLATFORM_ASSEMBLIES` with an `as string ??` guard, splits it, projects each path to `MetadataReference`, and appends the SharpProof.Attributes assembly. It also uses the third error-message spelling, `The runtime did not expose trusted platform assemblies.` The `SharpProof.Package.Test` project does not currently link `eng/testing/TestMetadataReferences.cs`, so this is not the same-project bypass counted by R730; it is a new consumer omitted from R729's 23-site inventory and reinforces R341's distribution gap. Extending the shared metadata-reference source to this project, or adding an equivalent package-test factory, would remove this local construction and align the probe with the existing `WithSharpProof` vocabulary while preserving its parse options and deterministic compilation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1676 | A new package-test compiler-probe helper duplicates platform-reference construction and adds another null-handling/error-message variant; extend or deliberately scope the shared metadata-reference helper. | `SharpProof.Package.Test/CompilerProbeInputConsistencyTests.cs:70-91`; `Directory.Build.props:104-110`; related R341, R729, R730 |
