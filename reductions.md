@@ -19163,3 +19163,10 @@ R540 is applied: `MatchesCallableProjection` now aggregates unknown claim
 reasons in one pass, preserving unsupported, infrastructure, timeout,
 cancellation, and semantic-unknown precedence while removing the repeated
 materialized scans. `ProtocolJsonTests` passes (108/108).
+
+R551 is applied: fixture archive identity extraction now reuses
+`Get-SharpProofPackageIdentity` with an explicit single-identity check, while
+fixture-specific package-name, release-version, role, and duplicate checks
+remain local. The parameterized publication-destination fixture suite passes
+(37/37); the broader filter still has one pre-existing static publisher-text
+failure unrelated to this reduction.

@@ -57,7 +57,10 @@ function Get-SharpProofPackageIdentity {
         [string]$Path,
 
         [Parameter()]
-        [switch]$RequireRepository
+        [switch]$RequireRepository,
+
+        [Parameter()]
+        [switch]$RequireSingleIdentity
     )
 
     $metadata = Get-SharpProofNuspecMetadata -Path $Path
@@ -65,8 +68,14 @@ function Get-SharpProofPackageIdentity {
         $metadata.OwnerDocument.NameTable)
     $namespaces.AddNamespace(
         'n', [string]$metadata.OwnerDocument.DocumentElement.NamespaceURI)
-    $id = $metadata.SelectSingleNode('n:id', $namespaces)
-    $version = $metadata.SelectSingleNode('n:version', $namespaces)
+    $ids = @($metadata.SelectNodes('n:id', $namespaces))
+    $versions = @($metadata.SelectNodes('n:version', $namespaces))
+    if ($RequireSingleIdentity -and
+        ($ids.Count -ne 1 -or $versions.Count -ne 1)) {
+        throw "Package '$Path' has incomplete identity metadata."
+    }
+    $id = if ($ids.Count -eq 0) { $null } else { $ids[0] }
+    $version = if ($versions.Count -eq 0) { $null } else { $versions[0] }
     $repository = $metadata.SelectSingleNode('n:repository', $namespaces)
     if ($null -eq $id -or $null -eq $version -or
         ($RequireRepository -and $null -eq $repository)) {

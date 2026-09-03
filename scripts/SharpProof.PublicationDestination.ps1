@@ -70,11 +70,10 @@ function Get-SharpProofPublicationFixtureArchiveCatalog {
             } |
             Sort-Object FullName)
     foreach ($file in $archives) {
-        $metadata = Get-SharpProofNuspecMetadata -Path $file.FullName
-        $namespaces = [Xml.XmlNamespaceManager]::new(
-            $metadata.OwnerDocument.NameTable)
-        $namespaces.AddNamespace(
-            'n', [string]$metadata.OwnerDocument.DocumentElement.NamespaceURI)
+        $identity = Get-SharpProofPackageIdentity `
+            -Path $file.FullName -RequireSingleIdentity
+        $id = [string]$identity.Id
+        $version = [string]$identity.Version
         try {
             $archive = [IO.Compression.ZipFile]::OpenRead($file.FullName)
         }
@@ -82,13 +81,6 @@ function Get-SharpProofPublicationFixtureArchiveCatalog {
             throw "Fixture archive is malformed: '$($file.FullName)'."
         }
         try {
-            $ids = @($metadata.SelectNodes('n:id', $namespaces))
-            $versions = @($metadata.SelectNodes('n:version', $namespaces))
-            if ($ids.Count -ne 1 -or $versions.Count -ne 1) {
-                throw "Fixture archive nuspec identity is incomplete: '$($file.FullName)'."
-            }
-            $id = [string]$ids[0].InnerText
-            $version = [string]$versions[0].InnerText
             if ($id -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$' -or
                 -not (Test-SharpProofReleaseVersionSyntax `
                     -Version $version)) {
