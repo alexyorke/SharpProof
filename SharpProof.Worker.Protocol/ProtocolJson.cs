@@ -593,7 +593,7 @@ public static partial class WorkerProtocolJson
             }
         }
 
-        return errors.Check(
+        errors.Check(
                 denseOrdinals,
                 prefix + ".dense_ordinals")
             .Check(claimMembership, prefix + ".claim_membership")
