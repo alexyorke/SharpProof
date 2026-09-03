@@ -110,7 +110,7 @@ internal static class WorkerBinaryIdentity
             var snapshot = new WorkerRuntimeClosureSnapshot(
                 path,
                 Combine(stagingDirectory, GetFileName(path)),
-                components.Values.ToArray(),
+                components.Values,
                 hash.Finish(),
                 stagedHandles);
             ownershipTransferred = true;
@@ -303,7 +303,7 @@ internal static class WorkerBinaryIdentity
 internal sealed class WorkerRuntimeClosureSnapshot(
     string workerPath,
     string executionWorkerPath,
-    IReadOnlyList<string> componentPaths,
+    IEnumerable<string> componentPaths,
     string sha256,
     IReadOnlyList<FileStream> stagedHandles) : IDisposable
 {

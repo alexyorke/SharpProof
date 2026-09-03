@@ -338,6 +338,7 @@ the smallest relevant containerized test target passes.
 | R917 | Remove duplicate array-creation type hashing from semantic claim identity | `SharpProof.Worker.Test`: ClaimIdentity filter, 4 passed |
 | R920 | Reuse normalized syntax-tree paths in compiler-probe rows | `SharpProof.Package.Test`: CompilerProbe filter, 6 passed |
 | R919 | Aggregate compiler-probe parse-option sets in one pass | `SharpProof.Package.Test`: CompilerProbe filter, 6 passed |
+| R936 | Avoid the intermediate runtime-component path array | `SharpProof.Worker.Test`: WorkerBinaryIdentityTests, 8 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -8672,8 +8673,8 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred forty-six)
 
-R936 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R936 is `applied`: the runtime closure snapshot now accepts the sorted
+component-value sequence directly and creates its immutable view once.
 
 ## Second survey, part four hundred forty-seven: R937 - separate diagnostic shape, order, and binding passes
 
