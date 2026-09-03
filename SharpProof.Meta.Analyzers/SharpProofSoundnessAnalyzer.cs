@@ -293,12 +293,11 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var literal = GetSemanticLiteral(
-                binary.LeftOperand,
-                context.CancellationToken) ??
-            GetSemanticLiteral(
-                binary.RightOperand,
-                context.CancellationToken);
+        var literalResolver = new SemanticLiteralResolver(
+            binary,
+            context.CancellationToken);
+        var literal = literalResolver.Resolve(binary.LeftOperand) ??
+            literalResolver.Resolve(binary.RightOperand);
         if (literal != null)
         {
             Report(context, MetaDiagnosticDescriptors.SemanticStringControlFlow, binary.Syntax.GetLocation(), literal);
@@ -323,15 +322,14 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        var literalResolver = new SemanticLiteralResolver(
+            invocation,
+            context.CancellationToken);
         var literal = invocation.Instance == null
             ? null
-            : GetSemanticLiteral(
-                invocation.Instance,
-                context.CancellationToken);
+            : literalResolver.Resolve(invocation.Instance);
         literal ??= invocation.Arguments
-            .Select(argument => GetSemanticLiteral(
-                argument.Value,
-                context.CancellationToken))
+            .Select(argument => literalResolver.Resolve(argument.Value))
             .FirstOrDefault(static value => value != null);
         if (literal != null)
         {
@@ -544,96 +542,113 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         IOperation operation,
         CancellationToken cancellationToken)
     {
-        var root = operation;
-        while (root.Parent != null)
-        {
-            root = root.Parent;
-        }
-
-        return GetSemanticLiteral(
+        return new SemanticLiteralResolver(
             operation,
-            root,
-            new HashSet<ILocalSymbol>(
-                SymbolEqualityComparer.Default),
-            cancellationToken);
+            cancellationToken).Resolve(operation);
     }
 
-    private static string? GetSemanticLiteral(
-        IOperation operation,
-        IOperation root,
-        HashSet<ILocalSymbol> visitedLocals,
-        CancellationToken cancellationToken)
+    private sealed class SemanticLiteralResolver
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (operation.ConstantValue.HasValue)
+        private readonly CancellationToken _cancellationToken;
+        private readonly Dictionary<ILocalSymbol, List<IOperation>> _assignments =
+            new(SymbolEqualityComparer.Default);
+        private readonly Dictionary<ILocalSymbol, string> _literalCache =
+            new(SymbolEqualityComparer.Default);
+
+        internal SemanticLiteralResolver(
+            IOperation operation,
+            CancellationToken cancellationToken)
         {
-            return GetSemanticLiteral(operation.ConstantValue.Value);
+            _cancellationToken = cancellationToken;
+            var root = operation;
+            while (root.Parent != null)
+            {
+                root = root.Parent;
+            }
+
+            foreach (var candidate in root.DescendantsAndSelf())
+            {
+                _cancellationToken.ThrowIfCancellationRequested();
+                switch (candidate)
+                {
+                    case IVariableDeclaratorOperation declaration
+                        when declaration.Initializer?.Value is { } value:
+                        AddAssignment(declaration.Symbol, value);
+                        break;
+                    case ISimpleAssignmentOperation
+                    {
+                        Target: ILocalReferenceOperation target,
+                        Value: { } value
+                    }:
+                        AddAssignment(target.Local, value);
+                        break;
+                }
+            }
         }
 
-        switch (operation)
+        internal string? Resolve(IOperation operation)
         {
-            case IArgumentOperation argument:
-                return GetSemanticLiteral(
-                    argument.Value,
-                    root,
-                    visitedLocals,
-                    cancellationToken);
-            case IConversionOperation conversion:
-                return GetSemanticLiteral(
-                    conversion.Operand,
-                    root,
-                    visitedLocals,
-                    cancellationToken);
-            case IParenthesizedOperation parenthesized:
-                return GetSemanticLiteral(
-                    parenthesized.Operand,
-                    root,
-                    visitedLocals,
-                    cancellationToken);
+            return Resolve(
+                operation,
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
         }
-        if (operation is not ILocalReferenceOperation localReference ||
-            !visitedLocals.Add(localReference.Local))
+
+        private string? Resolve(
+            IOperation operation,
+            HashSet<ILocalSymbol> visitedLocals)
         {
+            _cancellationToken.ThrowIfCancellationRequested();
+            if (operation.ConstantValue.HasValue)
+            {
+                return GetSemanticLiteral(operation.ConstantValue.Value);
+            }
+
+            switch (operation)
+            {
+                case IArgumentOperation argument:
+                    return Resolve(argument.Value, visitedLocals);
+                case IConversionOperation conversion:
+                    return Resolve(conversion.Operand, visitedLocals);
+                case IParenthesizedOperation parenthesized:
+                    return Resolve(parenthesized.Operand, visitedLocals);
+            }
+            if (operation is not ILocalReferenceOperation localReference ||
+                !visitedLocals.Add(localReference.Local))
+            {
+                return null;
+            }
+            if (_literalCache.TryGetValue(localReference.Local, out var cached))
+            {
+                return cached;
+            }
+
+            if (!_assignments.TryGetValue(localReference.Local, out var values))
+            {
+                return null;
+            }
+            foreach (var value in values)
+            {
+                var literal = Resolve(value, visitedLocals);
+                if (literal != null)
+                {
+                    _literalCache[localReference.Local] = literal;
+                    return literal;
+                }
+            }
+
             return null;
         }
 
-        foreach (var candidate in root.DescendantsAndSelf())
+        private void AddAssignment(ILocalSymbol local, IOperation value)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            IOperation? value = candidate switch
+            if (!_assignments.TryGetValue(local, out var values))
             {
-                IVariableDeclaratorOperation declaration
-                    when SymbolEqualityComparer.Default.Equals(
-                        declaration.Symbol,
-                        localReference.Local) =>
-                    declaration.Initializer?.Value,
-                ISimpleAssignmentOperation
-                {
-                    Target: ILocalReferenceOperation target
-                } assignment
-                    when SymbolEqualityComparer.Default.Equals(
-                        target.Local,
-                        localReference.Local) =>
-                    assignment.Value,
-                _ => null
-            };
-            if (value == null)
-            {
-                continue;
+                values = [];
+                _assignments.Add(local, values);
             }
 
-            var literal = GetSemanticLiteral(
-                value,
-                root,
-                visitedLocals,
-                cancellationToken);
-            if (literal != null)
-            {
-                return literal;
-            }
+            values.Add(value);
         }
-
-        return null;
     }
 
     private static string? GetSemanticLiteral(object? value)
