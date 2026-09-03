@@ -15773,6 +15773,12 @@ Generate-ProtocolModel stores validation plan names in one HashSet and stores ea
 |---|---|---|
 | R1314 | **Generate-ProtocolModel represents each validation plan with validationPlanNames, validationPlanTypes, and validationPlanModes. Consolidate those keyed values into one plan metadata record while preserving duplicate-name rejection and the later type/mode lookups.** | scripts/Generate-ProtocolModel.ps1:401-422,872-891; validation lookups at :292-297 |
 
+### Status (continued)
+
+R1314 is applied: validation plans now use one ordinal metadata dictionary for
+name uniqueness, type compatibility, and mode lookup. Protocol schema tests pass
+(5 passed).
+
 ## Second survey, continued: R1315 - validation table rows are kept in parallel pattern lists
 
 For each validation table, Generate-ProtocolModel adds the formatted pattern string to patternSources and adds a separate object containing the same row's Parts to partRows. The parts list is used for two-argument grouping, while the pattern list is used for the fallback expression; both are created in the same loop and remain positionally paired. A single row record carrying both Pattern and Parts can preserve the two output strategies without maintaining synchronized collections.
