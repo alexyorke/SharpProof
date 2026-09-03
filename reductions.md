@@ -18866,3 +18866,11 @@ R1508 is applied: the coverage identity test now reuses
 `ArchitectureRepository.BannedApiProjects` instead of rebuilding the same
 sorted production-plus-Gates project list. The targeted coverage identity test
 passes (1/1).
+
+## Second survey, continued: R1660 - Two schema contract test suites duplicate the same reflection-validation framework
+
+`CompilerArtifactModelSchemaTests` and `ProtocolModelSchemaTests` each implement their own declaration-kind dispatch plus near-identical `AssertConstants`, `AssertEnum`, property/default verification, instance construction, and schema-reading helpers. `SchemaModelTestHelpers` already factors only low-level JSON ordering/type/replacement operations, leaving the higher-level validator duplicated. Any generated model change must be reflected in two validators, and the near-duplicate branches can drift; a parameterized shared validator with schema-specific callbacks for differing metadata would reduce test-only complexity.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1660 | The compiler-artifact and protocol schema suites duplicate declaration dispatch and reflection/default/property validation; consolidate shared validator machinery to prevent drift. | `SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs:39-79,465-834`; `SharpProof.Worker.Test/ProtocolModelSchemaTests.cs:47-78,318-556`; shared low-level helper at `SharpProof.Worker.Test/SchemaModelTestHelpers.cs:11-132` |
