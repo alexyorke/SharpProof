@@ -270,16 +270,7 @@ public sealed class CompilerManifestArtifactTests
 
         foreach (var corrupt in corruptions)
         {
-            var artifact = CreateArtifact();
-            corrupt(artifact.Compilation);
-            artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-                artifact.Compilation, []);
-
-            Assert.Throws<JsonException>((Action)(() =>
-                CompilerManifestArtifactJson.Deserialize(
-                    JsonSerializer.Serialize(
-                        artifact,
-                        WorkerProtocolJson.Options) + "\n")));
+            AssertMalformedCapture(corrupt);
         }
     }
 
@@ -295,9 +286,7 @@ public sealed class CompilerManifestArtifactTests
             artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
                 artifact.Compilation, []);
 
-            Assert.DoesNotThrow((Action)(() =>
-                CompilerManifestArtifactJson.Deserialize(
-                    CompilerManifestArtifactJson.Serialize(artifact))));
+            AssertWellFormedCapture(artifact);
         }
 
         foreach (var version in new[]
@@ -325,9 +314,7 @@ public sealed class CompilerManifestArtifactTests
         }
         validArtifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             validArtifact.Compilation, []);
-        Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(validArtifact))));
+        AssertWellFormedCapture(validArtifact);
 
         var invalid = new[]
         {
@@ -365,10 +352,7 @@ public sealed class CompilerManifestArtifactTests
             artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
                 artifact.Compilation, []);
 
-            Assert.DoesNotThrow((Action)(() =>
-                CompilerManifestArtifactJson.Deserialize(
-                    CompilerManifestArtifactJson.Serialize(artifact))),
-                languageVersion);
+            AssertWellFormedCapture(artifact, languageVersion);
         }
 
         foreach (var languageVersion in new[]
@@ -383,9 +367,7 @@ public sealed class CompilerManifestArtifactTests
     public void Sp034AssemblyIdentitiesRoundTripAndBindTheAssemblyName()
     {
         var valid = CreateArtifact();
-        Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(valid))));
+        AssertWellFormedCapture(valid);
 
         var identity = valid.Compilation.AssemblyIdentity;
         foreach (var malformed in new[]
@@ -411,9 +393,7 @@ public sealed class CompilerManifestArtifactTests
         moduleIdentity.Compilation.References[0].Modules = [module];
         moduleIdentity.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             moduleIdentity.Compilation, []);
-        Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(moduleIdentity))));
+        AssertWellFormedCapture(moduleIdentity);
 
         AssertMalformedCapture(snapshot =>
         {
@@ -444,44 +424,28 @@ public sealed class CompilerManifestArtifactTests
 
         foreach (var corrupt in corruptions)
         {
-            var artifact = CreateArtifact();
-            corrupt(artifact.Compilation.References[0]);
-            artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-                artifact.Compilation, []);
-
-            Assert.Throws<JsonException>((Action)(() =>
-                CompilerManifestArtifactJson.Deserialize(
-                    CompilerManifestArtifactJson.Serialize(artifact))));
+            AssertMalformedCapture(snapshot => corrupt(snapshot.References[0]));
         }
     }
 
     [Test]
     public void Sp034SyntaxTreePathsMustBeCaptureCanonical()
     {
-        var artifact = CreateArtifact();
-        artifact.Compilation.SyntaxTrees[0].Path += "/.";
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation, []);
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact))));
+        AssertMalformedCapture(snapshot => snapshot.SyntaxTrees[0].Path += "/.");
     }
 
     [Test]
     public void Sp034EmptySyntaxTreesRetainDerivedCaptureValues()
     {
-        var artifact = CreateArtifact(source: string.Empty);
-        var tree = artifact.Compilation.SyntaxTrees[0];
-        tree.TextLength = 0;
-        tree.Sha256 = new string('a', 64);
-        tree.EffectivePreprocessorSymbols = ["fabricated"];
-        artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
-            artifact.Compilation, []);
-
-        Assert.Throws<JsonException>((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact))));
+        AssertMalformedCapture(
+            snapshot =>
+            {
+                var tree = snapshot.SyntaxTrees[0];
+                tree.TextLength = 0;
+                tree.Sha256 = new string('a', 64);
+                tree.EffectivePreprocessorSymbols = ["fabricated"];
+            },
+            source: string.Empty);
     }
 
     [Test]
@@ -493,9 +457,7 @@ public sealed class CompilerManifestArtifactTests
                 preprocessorSymbols: ["DUPLICATE", "DUPLICATE"]),
             source: string.Empty);
 
-        Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact))));
+        AssertWellFormedCapture(artifact);
     }
 
     [Test]
@@ -676,9 +638,7 @@ public sealed class CompilerManifestArtifactTests
         var artifact = CreateArtifact();
         AddCaseVariantModule(artifact);
 
-        Assert.DoesNotThrow((Action)(() =>
-            CompilerManifestArtifactJson.Deserialize(
-                CompilerManifestArtifactJson.Serialize(artifact))));
+        AssertWellFormedCapture(artifact);
     }
 
     [Test]
@@ -2741,9 +2701,12 @@ public sealed class CompilerManifestArtifactTests
     }
 
     private static void AssertMalformedCapture(
-        Action<CompilerCompilationSnapshot> corrupt)
+        Action<CompilerCompilationSnapshot> corrupt,
+        string? source = null)
     {
-        var artifact = CreateArtifact();
+        var artifact = source is null
+            ? CreateArtifact()
+            : CreateArtifact(source: source);
         corrupt(artifact.Compilation);
         artifact.CompilationSha256 = CompilationFingerprint.ComputeSha256(
             artifact.Compilation, []);
@@ -2754,6 +2717,16 @@ public sealed class CompilerManifestArtifactTests
 
         Assert.Throws<JsonException>((Action)(() =>
             CompilerManifestArtifactJson.Deserialize(json)));
+    }
+
+    private static void AssertWellFormedCapture(
+        CompilerManifestArtifact artifact,
+        string? message = null)
+    {
+        Assert.DoesNotThrow((Action)(() =>
+            CompilerManifestArtifactJson.Deserialize(
+                CompilerManifestArtifactJson.Serialize(artifact))),
+            message ?? string.Empty);
     }
 
     private static CSharpCompilation CreateCompilation(
