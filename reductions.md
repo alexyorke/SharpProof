@@ -19579,3 +19579,190 @@ tests pass (32/32).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1721 | `RequiresCallSiteDiscovery` and `OperationCompletionEvaluator` repeat the exact slice/nested-pattern versus indexer member selector; centralize only that projection. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1487-1498`; `SharpProof.Effects/OperationCompletionEvaluator.cs:463-471`; related R1161 |
+
+## Second survey, part six hundred twelve: R1740 - eight interval-refinement tests share a seven-assertion envelope, and the Effects regression family closes under a fifth measurement
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1740 | **Eight of the thirty-two tests in `ManagedAbstractFlowTests` end in the same seven-assertion interval-refinement envelope, and two of them differ from each other in exactly two tokens.** The envelope is `Assert.That(analysis.Status, Is.EqualTo(ManagedFlowStatus.Complete))`, then `analysis.Result!.TryEvaluate(call, call.Arguments[0].Value, out var left)` and the same for `Arguments[1]`, then `left.TryGetInteger(out var leftInterval)` and `right.TryGetInteger(out var rightInterval)`, then two `Is.EqualTo(IntervalValue.Range(a, b))` comparisons. The eight are `IncrementAndDecrementUpdateSubsequentIntervals`, `EqualityBranchesIntersectBothVariableIntervals`, `OrderedBranchesRefineBothVariableIntervals`, `ContractRequiresRefinesSubsequentFacts`, `ContractRequiresRefinesConditionalAndFacts`, `ContractRequiresRefinesNegatedConditionalOrFacts`, `SourceShadowedContractClauseDoesNotRefineScalarFacts` and `SourceShadowedClosedAttributesDoNotRefineEntryFacts`. **The clearest pair is measurable at 0.85 similarity and differs in two tokens.** `EqualityBranchesIntersectBothVariableIntervals:435` and `OrderedBranchesRefineBothVariableIntervals:472` embed the same 12-line fixture - a `Sink(int, int)` and a `Calls` method whose parameters carry `[InRange(0, 10)]` and `[InRange(3, 7)]` - and differ only in the branch condition, `left == right` against `left < right`, and in the expected left interval, `Range(3, 7)` against `Range(0, 6)`. Everything else, fixture and assertions alike, is character-identical. Two further pairs sit at 0.84 and 0.71 on the same axis: `ContractRequiresRefinesConditionalAndFacts` against `ContractRequiresRefinesNegatedConditionalOrFacts`, and `AssumeRefinesCompoundAndFacts` against `AssumeRefinesNegatedCompoundOrFacts` - each an And form beside its negated Or form. **A `[TestCase]` method taking the branch source and the two expected intervals replaces eight method envelopes with eight rows**, and it is the same remedy the ledger has already proposed three times on this axis - R1352 for the getter/setter pair in `LanguageSubsetGatePropertyTests`, R1111 for the two shard-shape projections, applied R1071 for the two signed-`Int64` interval tests. This file is cited in the ledger only for its *harness*: R617, R626 and R627 are all applied and all concern the Roslyn-to-CFG setup that `AnalyzeSingleCall` now owns. Nothing has looked at what the tests assert once that setup returns. | `SharpProof.Effects.Test/ManagedAbstractFlowTests.cs:435-470,472-506` (the two-token pair), `:595,627,655,683,720,757` and `IncrementAndDecrementUpdateSubsequentIntervals` (the other six of the eight), 32 `[Test]` methods in the file; related R1352, R1111, applied R1071, applied R617, R626, R627 |
+
+### Checked and not proposed (part six hundred twelve)
+
+- **The thirty-seven `SharpProof.Effects.Test` regression files survive a fifth
+  independent duplication measurement, and this one was aimed directly at them.**
+  Running the near-duplicate scan *within* the project and at a much looser
+  threshold - Jaccard 0.60 rather than the 0.85 used repository-wide - over its
+  **283** method bodies of eight or more normalized lines yields **19** pairs.
+  **Not one of the nineteen involves a `*RegressionTests.cs` file.** Every pair is
+  in `ManagedAbstractFlowTests.cs` or `EffectAnalysisTests.cs`, the project's two
+  large non-regression suites, and eight of the nineteen are R1740 above. The
+  remainder are deliberate variant pairs -
+  `SealedReferenceArrayStoreOmitsArrayTypeMismatchException` beside
+  `DefinitelyNullReferenceArrayStoreOmitsArrayTypeMismatchException`,
+  `FreshArrayContentsDoNotBecomeFreshOwnedAliases` beside
+  `FreshObjectContentsDoNotBecomeFreshOwnedAliases`,
+  `MetadataListPatternAccessorsRemainConservative` beside its `RefStruct` twin -
+  where the near-identity is the point of the test. **The regression family is now
+  closed under five measurements**: exact bodies (R296, zero), near-duplicate
+  bodies repository-wide at 0.85 (six pairs, none here), embedded fixture sources
+  (1.6 percent; the family's only pair is four lines), assertion envelopes (81
+  repeats, none here), and this project-local scan at 0.60.
+- **The project's assertion vocabulary is genuinely varied rather than
+  table-shaped.** `SharpProof.Effects.Test` makes **844** `Assert.That` calls over
+  **396** distinct first-argument expressions. The most frequent,
+  `result.Summary.Completeness` at 70 and `result.Projection.IsComplete` at 45, are
+  property reads whose *expected* values differ per test; nothing approaches the
+  shape of one assertion repeated with one varying literal, which is what R1740 and
+  R1720 identify elsewhere.
+- **`EffectAnalysisTests.cs`'s pairs at 0.62 to 0.81 were examined and left
+  alone.** `AwaitProtocolEffectsAreIncludedInTheSummary`,
+  `NullReferenceAwaiterThrowsBeforeProtocolMembersRun` and
+  `CriticalAwaitProtocolUsesUnsafeContinuationEffects` form a cluster around the
+  await-protocol fixture, but each asserts a different effect summary against a
+  materially different awaiter shape; collapsing them into rows would hide which
+  protocol member the fixture exercises, which is the distinction the three names
+  carry. They are recorded so a future pass does not read the similarity number
+  without reading the tests.
+
+### Status (part six hundred twelve)
+
+R1740 is `pending` and is the fourth instance of one remedy this ledger has now
+proposed on the same axis, which argues for doing them together: R1352, R1111,
+R1720 and R1740 are all "one assertion envelope, N fixtures, N method headers", and
+applied R1071 is the worked example of the fix.
+
+## Second survey, part six hundred thirteen: R1760 - the densest near-duplicate cluster in the test tree, and the project-by-project sweep that found it
+
+Every test project was scanned separately at a much looser similarity threshold
+than the repository-wide pass - Jaccard 0.60 over normalized method-body line sets,
+against 0.85 before - so that clusters invisible at the strict threshold surface.
+The whole table, 1,982 method bodies of eight or more lines across nineteen
+projects:
+
+| project | bodies | pairs at 0.60 | project | bodies | pairs at 0.60 |
+|---|---|---|---|---|---|
+| Analyzer.Test | 361 | **48** | Meta.Analyzers.Test | 66 | 6 |
+| Worker.Test | 416 | 7 | Contracts.Test | 83 | 6 |
+| Effects.Test | 283 | 19 | ContractForGenerator.Test | 53 | 5 |
+| Package.Test | 188 | 9 | ArchitectureTest | 134 | 4 |
+| Frontend.Test | 95 | 3 | Gates.Test | 40 | 1 |
+| Ir.Test | 74 | **0** | Dataflow.Test | 29 | 1 |
+| Specs.Test | 72 | **0** | Smt.Test | 27 | **0** |
+| Fuzz.Test | 19 | **0** | Summaries.Test | 15 | **0** |
+| Testing.Test | 11 | **0** | Attributes.Test | 10 | **0** |
+| Verify.Test | 9 | **0** | | | |
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1760 | **`SharpProof.Analyzer.Test` is the densest near-duplicate surface in the repository - 48 linked pairs over 361 bodies, more than the next three projects combined - and half of them are inside one 2,972-line file that this ledger has never examined for what it asserts.** Twenty-four of the 48 pairs are within `RequiresAndControlTests.cs`, twelve within `RequiresCallSiteDiscoveryTests.cs`, six within `AnalyzerModeAndEffectTests.cs`. Treating the pairs as a graph gives 18 connected clusters, and the largest is **ten methods** in `RequiresAndControlTests.cs`, every one about constructor and base-initializer precondition replay: `ConstructorInitializersReplayConcretePreconditions`, `GeneratedImplicitBaseInitializerRemainsQuiet`, `ImplicitBaseInitializerReplaysParameterlessPrecondition`, `ImplicitPrimaryConstructorBaseCallChecksRequires`, `PrimaryConstructorBaseInitializerAcceptsSatisfyingOptionalDefault`, `PrimaryConstructorBaseInitializerChecksViolatingOptionalDefault`, `PrimaryConstructorSameNamedOverloadIsAnalyzed`, `RecordConstructorReplaysImplicitBasePrecondition`, `SynthesizedConstructorReplaysParameterlessBasePrecondition` and `ZeroArgumentPrimaryConstructorBaseInitializerChecksRequires`. **The cleanest table-driven case is a four-method cluster whose members differ in one position.** `CoalesceAssignmentSkipsSetterAfterNonreturningGetter:337`, `...Receiver:368`, `...Index:397` and `...Value:428` each build a compilation, take `SyntaxTrees.Single()`, find the single `Call` method by identifier, construct the discovery adapter, call `Get(callerContracts: null)` and assert the candidate `MethodKind` sequence - about twenty lines identical four times. Only the fixture varies, and it varies in exactly the axis the names state: the non-returning expression sits in the getter, in the receiver (`Fail().Value ??= null`), in the index (`box[Fail()] ??= null`) or in the value (`Value ??= Fail()`). Four `[TestCase]` rows carrying a source string and the expected kinds preserve every distinction. **The file it mostly lives in has never been read for content.** `RequiresAndControlTests.cs` is **2,972 lines and 86 `[Test]` methods**, the largest analyzer test file, and its two citations in this ledger are both status lines from other findings. Its sibling `RequiresCallSiteDiscoveryTests.cs` (1,711 lines, 38 tests) has four - applied R1001 for the shared discovery adapter, plus R1339, R1344 and R1645 for three specific fixture repetitions - and none of the four names any member of the clusters above. | `SharpProof.Analyzer.Test/RequiresAndControlTests.cs` (2,972 lines, 86 tests; the ten-method cluster); `RequiresCallSiteDiscoveryTests.cs:337,368,397,428` (the four-method cluster); `AnalyzerModeAndEffectTests.cs` (a four-method cluster, the ten-line envelope of part six hundred eleven); related applied R1001, R1339, R1344, R1645, R1352, R1720, R1740 |
+
+### Checked and not proposed (part six hundred thirteen)
+
+- **Eight of the nineteen test projects have no near-duplicate pair at all, even
+  at 0.60.** `SharpProof.Ir.Test` (74 bodies), `Specs.Test` (72), `Smt.Test` (27),
+  `Fuzz.Test` (19), `Summaries.Test` (15), `Testing.Test` (11), `Attributes.Test`
+  (10) and `Verify.Test` (9) return zero pairs. `Ir.Test` and `Specs.Test` are
+  substantial projects, so this is a real result rather than a small-sample
+  artefact: those suites are written one distinct assertion at a time.
+- **`SharpProof.Worker.Test` is the largest test project and among the least
+  duplicated.** 416 method bodies, **7** pairs - a rate of 1.7 percent against
+  Analyzer.Test's 13 percent. Its four pairs above 0.69 are deliberate typed-failure
+  twins: `InvalidCompilerManifestDigestIsTypedAndStopsBeforeWork` beside
+  `UnavailableCompilerManifestIsTypedAndStopsBeforeWork`,
+  `UnsupportedSelectedEffectCallablesRemainTypedUnknown` beside its `Contract`
+  twin, and two `WorkerTcbEdgeCaseTests` fail-closed cases. The Worker suites'
+  harness duplication is R602, R608 and R1580; their assertions are not duplicated.
+- **The `ArchitectureTest` pairs are all already filed or deliberate.** Its top
+  pair, `ContainedPathAuthorityTests.LinuxEvidencePathsUseOrdinalCanonicalContainment`
+  beside `PilotAuthorityTests.PilotPackagesAndOutputsUseExactCandidateAuthority` at
+  0.88, is the cross-file pair the repository-wide 0.85 scan already surfaced; the
+  `CoverageScriptTests` pair at 0.85 and the `BuildSchedulingTests` pair at 0.63 are
+  positive/negative authority checks whose near-identity is the design.
+- **`Package.Test`'s pairs are worker-fixture factories, not tests.**
+  `CreateMalformedWorkerAsync`, `CreateMalformedThenHangWorkerAsync` and
+  `CreateResultlessWorkerAsync` in `WorkerMsBuildIntegrationTests.cs` are helper
+  builders that emit deliberately broken worker executables; they differ in the
+  failure they inject, which is their whole purpose.
+- **The three `ContractForGenerator.Test` pairs above 0.74 all involve
+  `SourceDefinedContractForAttributeIsRejected` and
+  `ProjectShadowedContractForAttributeIsRejected`**, the pair the repository-wide
+  scan already identified as a deliberate accept/reject design, plus
+  `RepeatedContractForAttributesOnOneCompanionFailClosed` which shares their
+  fail-closed envelope. Three tests, one envelope - smaller than R1760's clusters
+  and on the same axis; whoever applies R1760 should look at it.
+
+### Status (part six hundred thirteen)
+
+R1760 is `pending`. It is the fifth finding on the "one envelope, N fixtures"
+axis - after R1352, R1111, R1720 and R1740 - and the largest: ten methods in one
+cluster and four in another, against two and eleven and eight in the others.
+Applied R1071 remains the worked example. The project-by-project table above is
+recorded so that no later pass repeats the sweep: eight projects are provably
+clean at 0.60, and the density is concentrated in one file.
+
+R262 is applied: samples and pilots now import one shared
+`SharpProof.NonProductionDefaults.props` file for their identical .NET 8,
+warning, analyzer, audit, lock, and output defaults. Their package references,
+pilot verification settings, and sample-specific package inventory remain local.
+Container MSBuild evaluation reports the expected defaults for both project
+families, and the focused architecture checks pass (2/2).
+
+## Second survey, part six hundred fourteen: production method-body duplication closed at every threshold, with both residuals already filed
+
+No new ID. The near-duplicate sweep that produced R1740 and R1760 for the test tree
+was run over production code, which had only ever been measured at the exact-match
+threshold.
+
+### Checked and not proposed (part six hundred fourteen)
+
+- **Production C# has exactly two near-duplicate method bodies at Jaccard 0.60,
+  and this ledger already contains both.** Parsing every non-generated `.cs` file
+  under the 23 production projects gives **1,273** method bodies, **635** of them
+  five or more normalized lines. At Jaccard **0.70** the count of pairs is
+  **zero**. Lowering to **0.60** returns **two**:
+  - `SharpProof.Host/ContainerContract.cs:228 RequireInteger` against `:252
+    RequireInteger64`, 6 lines each at 0.71. They differ in exactly two tokens -
+    `int`/`long` and `TryGetInt32`/`TryGetInt64` - and their
+    `InvalidDataException` message is character-identical, as is the message of
+    their two `expected`-comparison siblings. **This is R495**, which names the
+    pair and the wrapper duplication precisely.
+  - `SharpProof.Effects/ConversionOwnershipClassifier.cs:154
+    ClassifyRefLocalStorage` against `:872 ClassifyLocal`, 7 lines each at 0.75.
+    They differ in **one token**: `_refLocalStorageRegions` against
+    `_localRegions`. The `SymbolEqualityComparer.Default.Equals(local.ContainingSymbol?.OriginalDefinition,
+    _method.OriginalDefinition)` guard, the `TryGetValue`-or-`Unknown` ternary and
+    the `return ClassifyCapturedLocal(local)` fallback are identical. **This is
+    R388**, which names the same file and the same local-versus-captured
+    classification family.
+  Both were re-read at HEAD and both descriptions are still accurate.
+- **Taken with R296 this closes the production duplication axis completely.** R296
+  measured exact whole-body duplicates and part five hundred ninety-seven
+  re-measured them at **2 groups, 2 copies, 27 lines** repository-wide, both filed
+  (R958's `KillTree` pair and R1507's `DeleteTemporaryRepository` pair, neither in
+  production). Adding this sweep: **no production method body resembles another at
+  0.70 or above, and the only two that resemble another at 0.60 are already
+  pending findings.** There is no unfiled duplicated production logic at any
+  similarity threshold this survey can measure.
+- **The contrast with the test tree is the useful part of the result.** The same
+  measurement over test code gives 1,982 bodies and 110 pairs at 0.60 - 48 in
+  `SharpProof.Analyzer.Test` alone (R1760), 19 in `SharpProof.Effects.Test`
+  (R1740), and eight projects at zero. Production is two orders of magnitude
+  cleaner on the same metric, which is what the repository's own instrumentation
+  predicts: `CA1811`, `IDE0051`, `IDE0052`, `IDE0060` and `CS8019` are build
+  **errors** for every production project and the aggregate complexity ratchet caps
+  total production expression nodes, while test projects have neither the ratchet
+  nor, until this survey, any duplication measurement at all.
+- **`ConversionOwnershipClassifier.cs` is worth applying R388 to for a second
+  reason.** Part six hundred one measured it at **166** whole-file branching
+  points, above the highest per-file ratchet cap of any governed file except
+  `OperationEffectScanner.cs`, and it is one of the eight files R973 identifies as
+  outside the per-file ratchet. It is also the subject of R306, which supersedes
+  R285 and names its `IsInsideNestedCallable` as one of six copies. Three pending
+  findings touch this one file on three different axes.
+
+### Status (part six hundred fourteen)
+
+No new ID. The measurement is recorded because its value is the zero: a later pass
+that wonders whether production carries duplicated logic can read this instead of
+re-deriving it, and the two residuals it names - R388 and R495 - are both small,
+both `pending`, and both now confirmed accurate at HEAD.

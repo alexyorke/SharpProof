@@ -1,19 +1,12 @@
 <Project>
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <Import Project="../../SharpProof.NonProductionDefaults.props" />
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <EnableNETAnalyzers>false</EnableNETAnalyzers>
-    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
-    <NuGetAudit>false</NuGetAudit>
-    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
-    <RestoreLockedMode>false</RestoreLockedMode>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
     <SharpProofPilotVersion Condition="'$(SharpProofPilotVersion)' == ''">$(SharpProofPackageVersion)</SharpProofPilotVersion>
     <SharpProofProfile Condition="'$(SharpProofProfile)' == ''">advisory</SharpProofProfile>
     <SharpProofFeatures>all</SharpProofFeatures>
     <SharpProofVerify>true</SharpProofVerify>
-    <OutputType>Library</OutputType>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="SharpProof"
