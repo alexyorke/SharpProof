@@ -12,6 +12,8 @@ public sealed class RequiresCallSiteDiscoveryTests
     private static readonly string[] RequiresNotProvenDiagnosticIds =
         ["SP0027"];
     private static readonly bool[] ReplayableCandidate = [true];
+    private static readonly CSharpCompilation AccessorCompilation =
+        CreateAccessorCompilation();
 
     [Test]
     public void ImplicitBaseConstructorProducesOneReplayCandidate()
@@ -200,16 +202,7 @@ public sealed class RequiresCallSiteDiscoveryTests
     [Test]
     public void PotentialCallScreeningIncludesPropertyAndEventAccessors()
     {
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            using System;
-            public sealed class Subject {
-                public int Value { get; set; }
-                public event Action Changed { add { } remove { } }
-                public void Call() { _ = Value; Value = 1; Changed += null!; Changed -= null!; }
-            }
-            """,
-            []);
+        var compilation = AccessorCompilation;
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>().Single();
@@ -266,16 +259,7 @@ public sealed class RequiresCallSiteDiscoveryTests
     [Test]
     public void AccessorOperationShapesProduceOneReplayCandidateEach()
     {
-        var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            using System;
-            public sealed class Subject {
-                public int Value { get; set; }
-                public event Action Changed { add { } remove { } }
-                public void Call() { _ = Value; Value = 1; Changed += null!; Changed -= null!; }
-            }
-            """,
-            []);
+        var compilation = AccessorCompilation;
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>().Single();
@@ -1698,6 +1682,20 @@ public sealed class RequiresCallSiteDiscoveryTests
             declaration,
             semanticModel,
             CancellationToken.None);
+    }
+
+    private static CSharpCompilation CreateAccessorCompilation()
+    {
+        return AnalyzerTestHost.CreateCompilation(
+            """
+            using System;
+            public sealed class Subject {
+                public int Value { get; set; }
+                public event Action Changed { add { } remove { } }
+                public void Call() { _ = Value; Value = 1; Changed += null!; Changed -= null!; }
+            }
+            """,
+            []);
     }
 
     private static IMethodSymbol GetMethod(

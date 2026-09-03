@@ -18675,3 +18675,7 @@ share `SchemaModelTestHelpers.ReplacementValue`, with caller-provided object
 creation and the protocol-only `uint` replacement retained. The affected schema
 tests pass: `CompilerArtifactModelSchemaTests` 4/4 and
 `ProtocolModelSchemaTests` 5/5.
+
+R1645 is applied: the property/event accessor discovery cases now share one
+immutable compilation while each test creates its own syntax declaration and
+discovery instance. `RequiresCallSiteDiscoveryTests` pass (44/44).
