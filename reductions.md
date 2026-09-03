@@ -191,6 +191,7 @@ the smallest relevant containerized test target passes.
 | R869 | Validate IR sequence elements while taking the immutable snapshot | `SharpProof.Ir.Test`: 114 passed |
 | R870 | Remove the redundant IR location type-table lookup | `SharpProof.Ir.Test`: 114 passed |
 | R883 | Reuse the stateless IR interpreter across differential comparisons | `SharpProof.Testing.Test`: 13 passed |
+| R899 | Remove the repeated source declaration-count check after candidate admission | `SharpProof.Worker.Test`: CompilerRelationalSummaryProviderTests passed |
 | R897 | Cache the Boolean specification-term value property during parsing | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R895 | Remove the catalog dictionary duplicate probe subsumed by sorted-ID validation | `SharpProof.Worker.Test`: CompilerSpecificationPackProviderTests passed |
 | R574 | Reuse the parsed, validated mutation baseline object | `scripts/Test-SharpProofMutationEvidence.ps1`: behavioral fixtures passed |
@@ -8273,8 +8274,9 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred nine)
 
-R899 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R899 is `applied`: `TryBuildSource` now relies on the source-candidate predicate's
+exactly-one declaration guarantee before reading the declaration. Focused
+`CompilerRelationalSummaryProviderTests` passed.
 
 ## Second survey, part four hundred ten: R900 - repeated captured-tree lookup scans
 
@@ -9113,3 +9115,51 @@ the primary one.
 R959 is `deferred`: result, pre-state, and domain checks enforce different
 invariants and must remain separate at the validation boundary; the proposed
 reduction is only to cache their immutable target-local projections and type facts.
+
+## Second survey, part one hundred eighty-four: R960-R961 - concurrency, usings, and three clean sweeps
+
+Four techniques applied to areas not previously measured: async/await conventions,
+synchronization primitives, sync-over-async hazards, and global using declarations.
+Three of the four come back clean; two modest inconsistencies remain.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R960 | **The lock-object name is split three-and-three along assembly lines with no rule.** Seven `readonly object` mutexes exist in production. Three are named `_gate` - `SharpProof.Effects/EffectAnalysisSession.cs:34`, `SharpProof.Ir/IrFactory.cs:6`, `SharpProof.Smt/IrSmtBackend.cs:7` - and three are named `_synchronization` or `Synchronization` - `SharpProof.BuildTasks/CancelableBuildTask.cs:14`, `SharpProof.BuildTasks/RunVerifier.cs:38`, `SharpProof.Host/ContainerNativeLibrary.cs:9`. The split falls exactly on the analysis assemblies versus the build-and-host assemblies, which is how it presumably arose, and nothing records it as intentional. This is the smallest finding in this ledger and is recorded only because it is decidable and because the same 3/3 assembly-line split appeared in R749 for two other conventions; a naming rule stated once would settle all of them. | `SharpProof.Effects/EffectAnalysisSession.cs:34`; `SharpProof.Ir/IrFactory.cs:6`; `SharpProof.Smt/IrSmtBackend.cs:7`; `SharpProof.BuildTasks/CancelableBuildTask.cs:14`; `SharpProof.BuildTasks/RunVerifier.cs:38`; `SharpProof.Host/ContainerNativeLibrary.cs:9` |
+| R961 | **One project of sixty imports namespaces globally through `<Using>` items; the other fifty-nine use per-file `using` directives, and the difference makes that project's source non-portable under a policy the repository enforces as an error.** `SharpProof.CompilerArtifact.csproj:20-23` declares four global imports - `System.Collections.Immutable`, `System.Globalization`, and crucially the two **project-specific** namespaces `SharpProof.Ir` and `SharpProof.Worker.Protocol`. No other build file in the repository contains a `<Using>` item. The consequence is not hypothetical bookkeeping: `Directory.Build.props:21` promotes **`CS8019`** - unnecessary using directive - to an **error**, so a file inside `SharpProof.CompilerArtifact` must *not* write `using SharpProof.Ir;` while the identical file in any of the other twenty-two projects that reference `SharpProof.Ir` must. The same source text cannot compile clean in both, which matters in a repository that shares source across projects by `Compile Include ... Link` in eleven places. It is clean today - no `CompilerArtifact` file carries a redundant using, and the one file linked in, `SharpProof.Specs/Polyfills/IsExternalInit.cs`, depends on none of the four namespaces - so this is a latent constraint rather than a present defect. | `SharpProof.CompilerArtifact/SharpProof.CompilerArtifact.csproj:9,20-23`; `Directory.Build.props:16,21`; `SharpProof.Specs/Polyfills/IsExternalInit.cs` linked into four projects |
+
+### Checked and not proposed (part one hundred eighty-four)
+
+- **The async conventions are perfect and need nothing.** Production C# contains
+  **153 `await` expressions and exactly 153 `.ConfigureAwait(false)` calls** -
+  a one-to-one match, zero `ConfigureAwait(true)`, and **zero files with an
+  unconfigured await**. There are **zero `async void`** methods. `CA2007` is
+  enforced repository-wide and relaxed only for test projects
+  (`Directory.Build.targets:22`), and the result is total compliance across 23
+  files. This is the cleanest single measurement taken in this survey.
+- **There is no sync-over-async in production.** An initial count of 87 `.Result`
+  accesses across 34 files looked alarming and is **wrong**: every sampled one is a
+  domain property - `call.Result`, `item.Result`, `SpecVariableRole.Result`,
+  `template.Result`, `errors.Result`, `flowAnalysis.Result` - not `Task.Result`.
+  Likewise `IrSmtBackend.cs:142` `_queryGate.Wait()` is a **`SemaphoreSlim`**
+  acquire, not `Task.Wait()`. The only genuine blocking-on-task sites are the two
+  `GetAwaiter().GetResult()` calls at `PerformanceGate.cs:1359-1360`, inside a gate
+  that already imposes a 30-second timeout. Recorded so the 87 is not repeated.
+- **`IrFactory`'s 35 locks are correct and must not be replaced with concurrent
+  collections.** Thirty-five of the repository's fifty-seven `lock` statements are
+  in `SharpProof.Ir/IrFactory.cs`, all on one `_gate`, guarding **eleven
+  interdependent collections** in which each `Dictionary` maps a structural key to
+  an index into a parallel `List`. Those pairs must be updated atomically together,
+  which a `ConcurrentDictionary` cannot provide. The nineteen `ConcurrentDictionary`
+  uses elsewhere in the repository are single-map caches where it is the right
+  choice. Two different problems, two correct answers; do not propose converging
+  them.
+
+### Status (part one hundred eighty-four)
+
+R960 and R961 are both `pending` and both minor - a naming rule and a
+mechanism choice, neither with a present defect behind it. They are filed because
+they are decidable and cheap, and because R961 constrains something the
+repository actively does elsewhere: sharing one source file across several
+projects. The substantive result of this part is the three clean sweeps, and in
+particular the 153-for-153 `ConfigureAwait` match, which is worth knowing before
+anyone proposes an async-hygiene pass.

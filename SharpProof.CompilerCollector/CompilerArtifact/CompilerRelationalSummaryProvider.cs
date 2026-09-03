@@ -189,7 +189,6 @@ internal sealed class CompilerRelationalSummaryProvider
     {
         summary = null;
         if (!IsSourceCandidate(method) ||
-            method.DeclaringSyntaxReferences.Length != 1 ||
             method.DeclaringSyntaxReferences[0].GetSyntax(cancellationToken)
                 is not BaseMethodDeclarationSyntax declaration)
         {
