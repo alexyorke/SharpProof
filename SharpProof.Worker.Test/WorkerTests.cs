@@ -767,7 +767,7 @@ public sealed class WorkerTests
     [Test]
     public async Task ConditionalEffectViolationRemainsTypedUnknown()
     {
-        using var project = TestProject.Create(
+        var response = await RunAsync(
             """
             using System;
             using SharpProof.Attributes;
@@ -778,12 +778,8 @@ public sealed class WorkerTests
                         throw new InvalidOperationException();
                 }
             }
-            """);
-        var request = project.CreateRequest(cacheEnabled: false);
-        using var worker = new SharpProofWorker(
-            new CountingBackend(BackendCheckResult.Unsatisfiable([])));
-
-        var response = await worker.VerifyAsync(request);
+            """,
+            cacheEnabled: false);
         var result = response.ClaimResults.Single();
 
         using (Assert.EnterMultipleScope())
@@ -808,7 +804,7 @@ public sealed class WorkerTests
     [Test]
     public async Task UnprovenInitializationAndExceptionConstructionDoNotRefute()
     {
-        using var project = TestProject.Create(
+        var response = await RunAsync(
             """
             using System;
             using SharpProof.Attributes;
@@ -832,12 +828,8 @@ public sealed class WorkerTests
                 public static void Throw() =>
                     throw new UserException();
             }
-            """);
-        var request = project.CreateRequest(cacheEnabled: false);
-        using var worker = new SharpProofWorker(
-            new CountingBackend(BackendCheckResult.Unsatisfiable([])));
-
-        var response = await worker.VerifyAsync(request);
+            """,
+            cacheEnabled: false);
 
         using (Assert.EnterMultipleScope())
         {
@@ -860,7 +852,7 @@ public sealed class WorkerTests
     [Test]
     public async Task DirectWriteAndCapabilityClaimsFailClosedWithoutReplayTraces()
     {
-        using var project = TestProject.Create(
+        var response = await RunAsync(
             """
             using SharpProof.Attributes;
             public sealed class Subject {
@@ -875,12 +867,8 @@ public sealed class WorkerTests
                     }
                 }
             }
-            """);
-        var request = project.CreateRequest(cacheEnabled: false);
-        using var worker = new SharpProofWorker(
-            new CountingBackend(BackendCheckResult.Unsatisfiable([])));
-
-        var response = await worker.VerifyAsync(request);
+            """,
+            cacheEnabled: false);
         var results = response.ClaimResults.OrderBy(result =>
             response.Manifest.Claims.Single(claim =>
                 claim.ClaimId == result.ClaimId).EffectContractKind).ToArray();
@@ -980,7 +968,9 @@ public sealed class WorkerTests
     [Test]
     public async Task MixedPostconditionAndEffectClaimsAreReturnedInManifestOrder()
     {
-        using var project = TestProject.Create(
+        var backend = new CountingBackend(
+            BackendCheckResult.Unsatisfiable([]));
+        var response = await RunAsync(
             """
             using SharpProof.Attributes;
             public static class Subject {
@@ -988,13 +978,9 @@ public sealed class WorkerTests
                 [return: Positive]
                 public static int One() => 1;
             }
-            """);
-        var request = project.CreateRequest(cacheEnabled: false);
-        var backend = new CountingBackend(
-            BackendCheckResult.Unsatisfiable([]));
-        using var worker = new SharpProofWorker(backend);
-
-        var response = await worker.VerifyAsync(request);
+            """,
+            cacheEnabled: false,
+            backend: backend);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1171,7 +1157,7 @@ public sealed class WorkerTests
     [Test]
     public async Task UnsupportedSelectedEffectCallablesRemainTypedUnknown()
     {
-        using var project = TestProject.Create(
+        var response = await RunAsync(
             """
             using System;
             using System.Threading.Tasks;
@@ -1193,13 +1179,8 @@ public sealed class WorkerTests
                     Func<object> factory) =>
                     new object();
             }
-            """);
-        var request = project.CreateRequest(cacheEnabled: false);
-        using var worker = new SharpProofWorker(
-            new CountingBackend(
-                BackendCheckResult.Unsatisfiable([])));
-
-        var response = await worker.VerifyAsync(request);
+            """,
+            cacheEnabled: false);
 
         using (Assert.EnterMultipleScope())
         {
@@ -1248,7 +1229,7 @@ public sealed class WorkerTests
     [Test]
     public async Task UnsupportedSelectedContractCallablesRemainTypedUnknown()
     {
-        using var project = TestProject.Create(
+        var response = await RunAsync(
             """
             using System.Threading.Tasks;
             using SharpProof.Attributes;
@@ -1266,13 +1247,8 @@ public sealed class WorkerTests
                     return 1;
                 }
             }
-            """);
-        var request = project.CreateRequest(cacheEnabled: false);
-        using var worker = new SharpProofWorker(
-            new CountingBackend(
-                BackendCheckResult.Unsatisfiable([])));
-
-        var response = await worker.VerifyAsync(request);
+            """,
+            cacheEnabled: false);
 
         using (Assert.EnterMultipleScope())
         {
@@ -4408,7 +4384,7 @@ public sealed class WorkerTests
     [Test]
     public async Task UnsupportedBodyAndDeepPostconditionAbstain()
     {
-        using var project = TestProject.Create(
+        var response = await RunAsync(
             """
             using SharpProof.Attributes;
             public static class Subject {
@@ -4425,13 +4401,9 @@ public sealed class WorkerTests
                     return value;
                 }
             }
-            """);
-        var request = project.CreateRequest(
+            """,
             cacheEnabled: false,
             maximumExpressionDepth: 3);
-        using var worker = new SharpProofWorker(new CountingBackend(
-            BackendCheckResult.Unsatisfiable([])));
-        var response = await worker.VerifyAsync(request);
 
         Assert.That(
             response.ClaimResults.Select(static record => record.Reason),
@@ -6198,6 +6170,23 @@ public sealed class WorkerTests
                 cache.GetProperty("enabledByDefault").GetBoolean(),
                 Is.True);
         }
+    }
+
+    private static async Task<WorkerVerifyResponse> RunAsync(
+        string source,
+        bool cacheEnabled,
+        ISmtBackend? backend = null,
+        int maximumExpressionDepth =
+            WorkerBudgets.DefaultMaximumExpressionDepth)
+    {
+        using var project = TestProject.Create(source);
+        var request = project.CreateRequest(
+            cacheEnabled,
+            maximumExpressionDepth: maximumExpressionDepth);
+        using var worker = new SharpProofWorker(
+            backend ?? new CountingBackend(
+                BackendCheckResult.Unsatisfiable([])));
+        return await worker.VerifyAsync(request);
     }
 
     private static WorkerClaimManifestEntry GetClaim(
