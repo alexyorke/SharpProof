@@ -1542,18 +1542,21 @@ internal sealed partial class RequiresCallSiteDiscovery(
     private static ImmutableDictionary<int, long>
         CreateImplicitListPatternArguments(
             IMethodSymbol method,
-            params long?[] values)
+            long? firstValue,
+            long? secondValue = null)
     {
         var arguments = ImmutableDictionary.CreateBuilder<int, long>();
-        var count = Math.Min(method.Parameters.Length, values.Length);
-        for (var ordinal = 0; ordinal < count; ordinal++)
+        if (method.Parameters.Length > 0 &&
+            firstValue.HasValue &&
+            method.Parameters[0].Type.SpecialType == SpecialType.System_Int32)
         {
-            if (values[ordinal].HasValue &&
-                method.Parameters[ordinal].Type.SpecialType ==
-                    SpecialType.System_Int32)
-            {
-                arguments.Add(ordinal, values[ordinal]!.Value);
-            }
+            arguments.Add(0, firstValue.Value);
+        }
+        if (method.Parameters.Length > 1 &&
+            secondValue.HasValue &&
+            method.Parameters[1].Type.SpecialType == SpecialType.System_Int32)
+        {
+            arguments.Add(1, secondValue.Value);
         }
         return arguments.ToImmutable();
     }
