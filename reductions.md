@@ -12036,3 +12036,15 @@ R1128 is deferred: publish receipts atomically within the existing repository co
 ### Status (part three hundred sixty)
 
 R1129 is deferred: execute the already-verified fuzz assembly directly, preserving its adjacent runtime files, timeout policy, and output/evidence contract.
+
+## Second survey, part three hundred sixty-one: R1130 - incomplete retained-seed property-set validation
+
+`Read-SharpProofRetainedFuzzSeedManifest` collects the JSON property names and rejects only a count different from three or a name outside the expected array. It does not require the names to be unique or prove that every expected name is present. Consequently, an object with a duplicate expected key and one omitted expected key can pass this shape check; subsequent `GetProperty` calls then depend on duplicate-property handling rather than a fail-closed schema decision. The sibling `Assert-ExactJsonObjectProperties` already checks both count and uniqueness, so the retained-seed reader can use the same exact-set predicate while retaining its typed numeric and seed validations.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1130 | **Retained fuzz-seed manifest validation permits duplicate/missing expected keys.** Its property check rejects unknown names but omits uniqueness and expected-set equality; the existing fuzz-result validator has the stronger count-plus-unique pattern. Share or reproduce that exact check before reading `schemaVersion`, `casesPerSeed`, and `seeds`. | `scripts/SharpProof.FuzzEvidenceLifecycle.ps1:115-125`; stronger peer `scripts/Assert-SharpProofFuzzRunnerResult.ps1:3-20` |
+
+### Status (part three hundred sixty-one)
+
+R1130 is deferred: make retained-seed property validation fail closed on duplicates and missing keys, preserving the existing strict types and budget limits.
