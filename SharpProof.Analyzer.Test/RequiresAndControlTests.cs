@@ -22,6 +22,17 @@ public sealed class RequiresAndControlTests
         }
         """;
 
+    private const string PositiveGuardSource =
+        """
+        using SharpProof.Attributes;
+        public static class Guard {
+            public static int Positive(int value) {
+                Contract.Requires(value > 0);
+                return value;
+            }
+        }
+        """;
+
     [Test]
     public async Task PrimaryConstructorSameNamedOverloadIsAnalyzed()
     {
@@ -737,13 +748,7 @@ public sealed class RequiresAndControlTests
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System.CodeDom.Compiler;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
+            """ + PositiveGuardSource + """
             [GeneratedCode("test", "1")]
             public sealed class GeneratedSubject {
                 private int _value = Guard.Positive(-1);
@@ -754,13 +759,7 @@ public sealed class RequiresAndControlTests
         var propertyDiagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System.CodeDom.Compiler;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
+            """ + PositiveGuardSource + """
             public sealed class Subject {
                 [GeneratedCode("test", "1")]
                 private int Value { get; } = Guard.Positive(-1);
@@ -836,13 +835,7 @@ public sealed class RequiresAndControlTests
         var diagnostics = await AnalyzerTestHost.AnalyzeAsync(
             """
             using System.CodeDom.Compiler;
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
+            """ + PositiveGuardSource + """
             public sealed class Subject {
                 private int _value = Guard.Positive(-1);
 
@@ -885,14 +878,7 @@ public sealed class RequiresAndControlTests
     public async Task GeneratedPartialConstructorSuppressesMemberInitializerCalls()
     {
         var compilation = AnalyzerTestHost.CreateCompilation(
-            """
-            using SharpProof.Attributes;
-            public static class Guard {
-                public static int Positive(int value) {
-                    Contract.Requires(value > 0);
-                    return value;
-                }
-            }
+            PositiveGuardSource + """
             public sealed partial class Subject {
                 private int _value = Guard.Positive(-1);
             }

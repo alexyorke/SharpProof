@@ -20071,3 +20071,98 @@ while the existing diagnostic-suppression policy remains explicit at the host.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1841 | The scalar-semantics and API-spec generators repeat the same object-to-Boolean validator; share the type check and parameterize only the diagnostic label. | `scripts/Generate-CSharpScalarSemantics.ps1:20,33-46`; `scripts/Generate-ApiSpecCatalog.ps1:23,212-225`; related R342 |
+## Second survey, part six hundred twenty: auditing the applied remedies - do consolidations create new problems? - and within-file build repetition
+
+No new ID. Two dimensions measured for the first time: whether the shared helpers
+this ledger's applied findings created are themselves adopted or bypassed, and
+whether MSBuild files repeat configuration *within* a single file rather than
+across files.
+
+### The remedy audit: twelve shared helpers, five clean, seven with a tail, and every tail already filed
+
+For each shared helper the repository owns, the files that call it were counted
+against the files that perform the same operation by hand without calling it.
+
+| helper | callers | files doing it by hand |
+|---|---|---|
+| `TestRepository.FindRoot` | **56** | **0** |
+| `DictionaryAnalyzerConfigOptionsProvider` | 4 | **0** |
+| `SchemaModelTestHelpers` | 2 | **0** |
+| `ArchitectureGitRepository.InitializeAsync` | 6 | 1 |
+| `AnalyzerTestHost.CreateCompilation` | 15 | 1 |
+| `TestRepository.DeleteOwnedTemporaryDirectory` | 13 | 18 |
+| `TestMetadataReferences` | 13 | 16 |
+| `TempDirectory` | 11 | 20 (within its four linked projects) |
+| `ProcessRunner` | 8 | 29 (within test projects) |
+| `ArgumentNullGuard` | 78 | 23 |
+| `GateProcess` | 4 | (production-boundary limited) |
+| `EffectTestHost.CreateCompilation` | 57 | 0 within its own project |
+
+- **The answer to "did any remedy create a new problem" is: two, both small, both
+  already filed.** The consolidations themselves are sound - no helper turned out
+  to be wrong, unused, or a worse abstraction than what it replaced. The two
+  second-order effects are **R1500**, where the helper is *over*-distributed
+  (`ProcessRunner` compiled into 19 test projects and referenced from 3, because
+  the link condition is a name pattern rather than a list), and **R1580**, where two
+  helpers exist that should be one (`ContractTestCompilation` and
+  `WorkerTestCompilation`, 23 of 41 lines shared, in the two projects that already
+  share a linked file). Neither is a regression in behaviour; both are the
+  distribution mechanism rather than the helper.
+- **Every bypass tail in the table is an existing finding**, which is the useful
+  result: the census reproduces the ledger rather than extending it.
+  `DeleteOwnedTemporaryDirectory` is R727, applied R1300 and R1507;
+  `TestMetadataReferences` is R729 and R730; `TempDirectory` is R428, R703, R726,
+  R1003 and R756; `ProcessRunner` is R724 and R725 with its measured tail;
+  `ArgumentNullGuard` is R364, R953, R954 and R1159. No helper has a bypass tail
+  that this ledger has not already named.
+- **The two single-file "bypasses" are correct and worth naming as such.**
+  `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:521` runs `git init --bare
+  --quiet` to clone a corpus repository - production work, not a test fixture, and
+  correctly outside `ArchitectureGitRepository`. `SharpProof.Gates/AnalyzerGateHost.cs`
+  calls `WithSpecificDiagnosticOptions` without `AnalyzerTestHost`, which is the
+  production gate and the deliberate counter-example R1800 leans on.
+- **Three helpers have a perfect record and are the pattern the others should
+  reach.** `TestRepository.FindRoot` is called from **56** files with **zero**
+  hand-rolled upward directory walks anywhere in the repository - the single most
+  successfully adopted helper in the tree. `DictionaryAnalyzerConfigOptionsProvider`
+  and `SchemaModelTestHelpers` are smaller but equally clean.
+
+### Checked and not proposed (part six hundred twenty)
+
+- **MSBuild files repeat almost nothing within themselves.** Across every tracked
+  `.props`, `.targets` and `.csproj`, counting repeated significant lines of twenty
+  characters or more *inside a single file* gives **75** redundant lines over 14
+  files, and inspecting them shows nearly all are inherent XML attribute repetition
+  on distinct elements - `ReferenceOutputAssembly="false"` and
+  `TreatAsPackageReference="false"` in the two packaging projects,
+  `OutputItemType="Analyzer"` in `SharpProof.AnalyzerConsumer.props`,
+  `AssemblyFile="$(_SharpProofBuildTasksPath)"` four times in the verifier targets
+  because four tasks are registered. MSBuild offers no shorter spelling for any of
+  them.
+- **The five files that define the same property element more than once all do so
+  deliberately.** `Directory.Build.props` declares `WarningsAsErrors` and
+  `TreatWarningsAsErrors` three times each - the base at `:22-23`, the test-project
+  override at `:28`, and the production override at `:134-135` - which is the
+  default-then-narrow pattern the file exists for and which R1504 examines from the
+  severity side. `SharpProof.Package/buildTransitive/SharpProof.targets` declares
+  `SharpProofAnalyzerRole` five times because it is item metadata on five `Analyzer`
+  entries, and `SharpProof.Attributes.csproj` declares `Pack` and `PackagePath`
+  twice for two packed files. None is a redundant restatement.
+- **The largest cross-file MSBuild block remains R1820** and the within-file
+  measurement does not change it: eighteen copies of a three-line analyzer
+  reference dwarf the 75 within-file lines spread over fourteen files.
+
+### Status (part six hundred twenty)
+
+No new ID. The remedy audit is the answer to a question this ledger had not asked
+of itself: the consolidations it has driven have not introduced new duplication,
+their helpers are sound, and where adoption is incomplete the gap is already a
+filed finding. The two second-order effects - an over-distributed helper and a pair
+that should be one - are R1500 and R1580.
+
+### Applied reduction follow-up
+
+R1821 is applied: the four generated/initializer fixtures in
+`RequiresAndControlTests` now reuse one `PositiveGuardSource` fragment while
+retaining their distinct generated-code boundaries. The focused class suite
+passes (92/92).
