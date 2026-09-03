@@ -12024,3 +12024,15 @@ R1127 is deferred: validate the report's six package rows through a keyed packag
 ### Status (part three hundred fifty-nine)
 
 R1128 is deferred: publish receipts atomically within the existing repository containment boundary, preserving the receipt schema and gate-specific validation.
+
+## Second survey, part three hundred sixty: R1129 - project re-evaluation around a verified fuzz assembly
+
+`Invoke-SharpProofFuzzCampaign.ps1` rebuilds the fuzz project, checks that the resulting `SharpProof.Fuzz.dll` exists at `$runnerAssembly`, and verifies the source commit around the build. `Invoke-FuzzRun` then constructs `dotnet run --project $fuzzProject -c Release --no-build ...` for every rotating or retained run. `--no-build` avoids compilation but still routes each run through project evaluation and leaves the checked `$runnerAssembly` as an existence assertion rather than the explicit execution target. Passing the verified DLL path to the existing timeout/output wrapper can remove repeated project-launch plumbing and make the post-build identity check bind directly to what runs; preserve the runner's runtime files and all CLI arguments.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1129 | **The fuzz campaign verifies a built DLL but reruns the project launcher for every case batch.** The checked `$runnerAssembly` is never passed to `Invoke-BoundedDotnetProcess`; each run uses `dotnet run --project ... --no-build`, incurring project evaluation and an extra indirection. Invoke the verified assembly directly through the same wrapper, retaining timeout, redirected output, and runner arguments. | `scripts/Invoke-SharpProofFuzzCampaign.ps1:129-148,165-186` |
+
+### Status (part three hundred sixty)
+
+R1129 is deferred: execute the already-verified fuzz assembly directly, preserving its adjacent runtime files, timeout policy, and output/evidence contract.
