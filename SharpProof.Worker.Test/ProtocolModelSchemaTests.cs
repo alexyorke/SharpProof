@@ -15,7 +15,6 @@ public sealed class ProtocolModelSchemaTests
     private static readonly Type s_protocolMetadata = s_protocolAssembly.GetType(
         "SharpProof.Worker.Protocol.WorkerProtocolMetadata",
         throwOnError: true)!;
-    private static readonly NullabilityInfoContext s_nullability = new();
     private static readonly string[] s_manifestIdentityCollections = [
         "Callables",
         "Claims"
@@ -420,11 +419,9 @@ public sealed class ProtocolModelSchemaTests
             instance,
             type,
             WorkerProtocolJson.Options));
-        Assert.That(
-            wire.RootElement.EnumerateObject().Select(static property =>
-                property.Name),
-            Is.EqualTo(specifications.Select(static specification =>
-                specification.GetProperty("jsonName").GetString())),
+        SchemaModelTestHelpers.AssertJsonPropertyOrder(
+            wire,
+            specifications,
             type.Name);
 
         for (var index = 0; index < properties.Length; index++)
@@ -436,7 +433,7 @@ public sealed class ProtocolModelSchemaTests
                 Is.EqualTo(index),
                 $"{type.Name}.{property.Name}");
             Assert.That(
-                SchemaType(property),
+                SchemaModelTestHelpers.SchemaType(property),
                 Is.EqualTo(specification.GetProperty("type").GetString()),
                 $"{type.Name}.{property.Name}");
             var expectsSetter = specification.GetProperty("set").GetBoolean();
@@ -598,48 +595,6 @@ public sealed class ProtocolModelSchemaTests
                 BindingFlags.Static |
                 BindingFlags.DeclaredOnly)!
             .GetRawConstantValue();
-    }
-
-    private static string SchemaType(PropertyInfo property)
-    {
-        return SchemaType(property.PropertyType, s_nullability.Create(property));
-    }
-
-    private static string SchemaType(Type type, NullabilityInfo? nullability)
-    {
-        if (type.IsArray)
-        {
-            return SchemaType(type.GetElementType()!, nullability?.ElementType) + "[]";
-        }
-
-        var name = type == typeof(string)
-            ? "string"
-            : type == typeof(bool)
-                ? "bool"
-                : type == typeof(int)
-                    ? "int"
-                    : type == typeof(uint)
-                        ? "uint"
-                        : type == typeof(long)
-                            ? "long"
-                            : type.IsGenericType
-                                ? type.Name[..type.Name.IndexOf(
-                                      '`',
-                                      StringComparison.Ordinal)] + "<" +
-                                  string.Join(
-                                      ", ",
-                                      type.GetGenericArguments()
-                                          .Select((argument, index) =>
-                                              SchemaType(
-                                                  argument,
-                                                  nullability?.GenericTypeArguments[
-                                                      index]))) +
-                                  ">"
-                                : type.Name;
-        return !type.IsValueType &&
-               nullability?.ReadState == NullabilityState.Nullable
-            ? name + "?"
-            : name;
     }
 
     private static JsonDocument ReadSchema()

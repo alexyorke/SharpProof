@@ -16366,3 +16366,7 @@ focused test passes (2 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1356 | **`DefaultApiSpecCatalog.json` repeats three complete facet/postcondition profiles across nine declarations.** Named profiles or generator-side canonical expansion could reduce the repeated JSON while retaining each declaration's distinct target metadata and witness identity. | `SharpProof.Specs/DefaultApiSpecCatalog.json:277-461,623-797`; `scripts/Generate-ApiSpecCatalog.ps1:932-998` |
+
+R308 is applied: the Worker schema suites share schema-type rendering and JSON
+wire-property-order assertions; declaration-specific checks remain local. The
+combined schema tests pass (9 passed).

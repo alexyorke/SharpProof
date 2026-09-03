@@ -26,7 +26,6 @@ public sealed class CompilerArtifactModelSchemaTests
 {
     private static readonly Assembly s_artifactAssembly =
         typeof(CompilerManifestArtifact).Assembly;
-    private static readonly NullabilityInfoContext s_nullability = new();
     private static readonly string[] s_assemblyComparerSources = [
         "AssemblyIdentityComparer.Default",
         "DesktopAssemblyIdentityComparer.Default"
@@ -547,7 +546,13 @@ public sealed class CompilerArtifactModelSchemaTests
         for (var index = 0; index < parameters.Length; index++)
         {
             Assert.That(
-                SchemaType(properties[index]),
+                SchemaModelTestHelpers.SchemaType(
+                    properties[index],
+                    static type => type.IsGenericType &&
+                                   type.GetGenericTypeDefinition() ==
+                                       typeof(ScopedIrId<>)
+                        ? IrIdentifierSchemaName(type.GetGenericArguments()[0])
+                        : null),
                 Is.EqualTo(parameters[index].GetProperty("type").GetString()),
                 $"{type.Name}.{properties[index].Name}");
         }
@@ -577,7 +582,13 @@ public sealed class CompilerArtifactModelSchemaTests
             var property = properties[index];
             var specification = specifications[index];
             Assert.That(
-                SchemaType(property),
+                SchemaModelTestHelpers.SchemaType(
+                    property,
+                    static type => type.IsGenericType &&
+                                   type.GetGenericTypeDefinition() ==
+                                       typeof(ScopedIrId<>)
+                        ? IrIdentifierSchemaName(type.GetGenericArguments()[0])
+                        : null),
                 Is.EqualTo(specification.GetProperty("type").GetString()),
                 $"{type.Name}.{property.Name}");
             Assert.That(
@@ -600,11 +611,9 @@ public sealed class CompilerArtifactModelSchemaTests
             instance,
             type,
             WorkerProtocolJson.Options));
-        Assert.That(
-            wire.RootElement.EnumerateObject().Select(static property =>
-                property.Name),
-            Is.EqualTo(specifications.Select(static specification =>
-                specification.GetProperty("jsonName").GetString())),
+        SchemaModelTestHelpers.AssertJsonPropertyOrder(
+            wire,
+            specifications,
             type.Name);
         for (var index = 0; index < properties.Length; index++)
         {
@@ -850,57 +859,6 @@ public sealed class CompilerArtifactModelSchemaTests
                 BindingFlags.Static |
                 BindingFlags.DeclaredOnly)!
             .GetRawConstantValue();
-    }
-
-    private static string SchemaType(PropertyInfo property)
-    {
-        return SchemaType(property.PropertyType, s_nullability.Create(property));
-    }
-
-    private static string SchemaType(Type type, NullabilityInfo? nullability)
-    {
-        if (Nullable.GetUnderlyingType(type) is { } underlying)
-        {
-            return SchemaType(underlying, null) + "?";
-        }
-
-        if (type.IsArray)
-        {
-            return SchemaType(type.GetElementType()!, nullability?.ElementType) + "[]";
-        }
-
-        if (type.IsGenericType &&
-            type.GetGenericTypeDefinition() == typeof(ScopedIrId<>))
-        {
-            return IrIdentifierSchemaName(type.GetGenericArguments()[0]);
-        }
-
-        var name = type == typeof(string)
-            ? "string"
-            : type == typeof(bool)
-                ? "bool"
-                : type == typeof(int)
-                    ? "int"
-                    : type == typeof(long)
-                        ? "long"
-                        : type.IsGenericType
-                            ? type.Name[..type.Name.IndexOf(
-                                  '`',
-                                  StringComparison.Ordinal)] + "<" +
-                              string.Join(
-                                  ", ",
-                                  type.GetGenericArguments()
-                                      .Select((argument, index) =>
-                                          SchemaType(
-                                              argument,
-                                              nullability?.GenericTypeArguments[
-                                                  index]))) +
-                              ">"
-                            : type.Name;
-        return !type.IsValueType &&
-               nullability?.ReadState == NullabilityState.Nullable
-            ? name + "?"
-            : name;
     }
 
     private static string IrIdentifierSchemaName(Type tag)
