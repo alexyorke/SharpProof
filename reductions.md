@@ -16561,3 +16561,6 @@ EffectAnalysisTests class passes (147 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1371 | **`ExecutableUnflowedDescendantsAndSelfCore` repeats child traversal and completion short-circuiting across four branches.** Share the iterator protocol without changing operation ordering or fail-closed stop rules. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1707-1732,1740-1751,1795-1818,1834-1857` |
+R1367 is applied: interval multiplication now folds all four arbitrary-precision
+candidate products through one extrema helper, preserving the existing range and
+overflow checks. The focused ManagedAbstractFlowTests suite passes (34 passed).

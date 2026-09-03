@@ -1902,35 +1902,9 @@ internal readonly record struct ManagedAbstractValue(
             case BinaryOperatorKind.Multiply:
                 {
                     minimum = maximum = a * c;
-                    var candidate = a * d;
-                    if (candidate < minimum)
-                    {
-                        minimum = candidate;
-                    }
-                    else if (candidate > maximum)
-                    {
-                        maximum = candidate;
-                    }
-
-                    candidate = b * c;
-                    if (candidate < minimum)
-                    {
-                        minimum = candidate;
-                    }
-                    else if (candidate > maximum)
-                    {
-                        maximum = candidate;
-                    }
-
-                    candidate = b * d;
-                    if (candidate < minimum)
-                    {
-                        minimum = candidate;
-                    }
-                    else if (candidate > maximum)
-                    {
-                        maximum = candidate;
-                    }
+                    Include(ref minimum, ref maximum, a * d);
+                    Include(ref minimum, ref maximum, b * c);
+                    Include(ref minimum, ref maximum, b * d);
 
                     break;
                 }
@@ -1945,6 +1919,21 @@ internal readonly record struct ManagedAbstractValue(
 
         result = IntervalValue.Range((long)minimum, (long)maximum);
         return true;
+
+        static void Include(
+            ref BigInteger minimum,
+            ref BigInteger maximum,
+            BigInteger candidate)
+        {
+            if (candidate < minimum)
+            {
+                minimum = candidate;
+            }
+            else if (candidate > maximum)
+            {
+                maximum = candidate;
+            }
+        }
     }
 
     /// <summary>
