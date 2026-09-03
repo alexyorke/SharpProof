@@ -14087,6 +14087,12 @@ fail-closed behavior.
 |---|---|---|
 | R1186 | **`ExceptionHandlerReachability` recomputes invocation prerequisites in its exception branch and child scheduler.** The `IInvocationOperation` case checks the instance and all argument values with `canCompleteNormally` before resolving nullness, initialization, and dispatch; after that, `PushChildren(invocation)` reaches the same receiver/argument completion checks before pushing the operation children. A shared prerequisite/scheduling projection can remove the duplicate completion walk without changing which invocation children are visited or which potential exceptions are added. | `SharpProof.Effects/ExceptionHandlerReachability.cs:238-278,1184-1210` |
 
+### Status (part five hundred eight)
+
+R1186 is applied: validated invocation prerequisites are carried into child
+scheduling, preventing a second receiver/argument completion walk while
+preserving child order and fail-closed behavior. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred nine: R1187 - assignment child prefixes are scanned twice
 
 The simple-assignment child scheduler materializes the target's receiver,
