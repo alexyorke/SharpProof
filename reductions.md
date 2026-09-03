@@ -13804,6 +13804,12 @@ traversal while retaining nullness, dispatch, and copy-constructor behavior.
 |---|---|---|
 | R1173 | **`OperationCompletionEvaluator.CanCompleteWithClone` rechecks the clone operand on the ordinary clone-method path.** After `CanCompleteWithClone` has completed `withOperation.Operand`, its call to `CanCompleteInvocation(clone, withOperation.Operand, ...)` invokes the same instance-completion check again. A prevalidated-instance seam can eliminate that repeat without changing the separate record copy-constructor path. | `SharpProof.Effects/OperationCompletionEvaluator.cs:631-649,717-741` |
 
+### Status (part four hundred ninety-five)
+
+R1173 is applied: ordinary clone-method completion reuses the already-validated
+`with` operand, while record copy constructors retain their instance-free path.
+The Effects test suite passes (323/323).
+
 ## Second survey, part four hundred ninety-six: R1174 - coalesce-assignment target completion is repeated
 
 `CanCompleteCoalesceAssignment` first calls `CanCompleteNormally` for the
