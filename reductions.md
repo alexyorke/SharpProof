@@ -12170,7 +12170,10 @@ The focused `VerifierProcessSupervisor` package tests pass (3/3).
 
 ### Status (part three hundred sixty-eight)
 
-R1137 is deferred: carry validated model-variable types from `QueryEncoder` into satisfiable-model decoding and preserve the current unsupported-type and malformed-value behavior.
+R1137 is applied: `QueryEncoder` now records each model variable together with
+its validated Boolean/integer type, and satisfiable-model projection passes that
+type directly to value decoding instead of calling `GetVariableInfo` again. The
+focused `IrSmtBackend` test suite passes (29/29).
 
 ## Second survey, part three hundred sixty-nine: R1138 - adjacent duplicate cancellation polling in SMT encoding
 
@@ -12910,7 +12913,6 @@ No new ID. R980 stays open in narrowed form; the byte-exact half is real and the
 pipeline evidence for it was independently verified. What changes is its size: the
 gap is five catalog-shaped generators and a formatting-drift class, not fourteen
 generators and everything about them.
-
 ## Second survey, part four hundred seventy-five: R1154 - one hex convention, three encodings, and a no-op
 
 A census of every SHA-256 computation and hex encoding in production, against the

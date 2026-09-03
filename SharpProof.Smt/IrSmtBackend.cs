@@ -333,11 +333,11 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
     {
         using var model = solver.Model;
         var assignments = ImmutableArray.CreateBuilder<KeyValuePair<IrVarId, IrValue>>();
-        foreach (var variable in encoder.Variables)
+        foreach (var (variable, type) in encoder.Variables)
         {
             meter.Consume();
             using var evaluated = model.Evaluate(encoder.GetVariable(variable), true);
-            if (!TryCreateValue(query.Factory, variable, evaluated, out var value))
+            if (!TryCreateValue(query.Factory, type, evaluated, out var value))
             {
                 return BackendCheckResult.Unknown(BackendFailureReason.MalformedResult);
             }
@@ -349,11 +349,10 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
 
     private static bool TryCreateValue(
         IrFactory factory,
-        IrVarId variable,
+        IrTypeId type,
         Expr expression,
         out IrValue? value)
     {
-        var type = factory.GetVariableInfo(variable).Type;
         if (type == factory.BooleanType)
         {
             bool? boolean = expression.IsTrue ? true : expression.IsFalse ? false : null;
@@ -402,12 +401,13 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 ValidateDepth(assumption.Predicate, maximumDepths, meter, cancellationToken);
             }
             ValidateDepth(query.Goal.Predicate, maximumDepths, meter, cancellationToken);
-            Variables = query.ModelVariables;
+            var variables = ImmutableArray.CreateBuilder<
+                (IrVarId Variable, IrTypeId Type)>(query.ModelVariables.Length);
             var integerVariables = ImmutableArray.CreateBuilder<IrVarId>();
-            for (var index = 0; index < Variables.Length; index++)
+            for (var index = 0; index < query.ModelVariables.Length; index++)
             {
                 meter.Consume();
-                var variable = Variables[index];
+                var variable = query.ModelVariables[index];
                 var type = _factory.GetVariableInfo(variable).Type;
                 if (type != _factory.BooleanType &&
                     type != _factory.IntegerType)
@@ -419,11 +419,13 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 {
                     integerVariables.Add(variable);
                 }
+                variables.Add((variable, type));
                 var name = "v" + index.ToString(CultureInfo.InvariantCulture);
                 _variables.Add(variable, type == _factory.BooleanType
                     ? _owner.Own(_context.MkBoolConst(name))
                     : _owner.Own(_context.MkIntConst(name)));
             }
+            Variables = variables.ToImmutable();
             IntegerVariables = integerVariables.ToImmutable();
         }
 
@@ -457,7 +459,7 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
             }
         }
 
-        internal ImmutableArray<IrVarId> Variables
+        internal ImmutableArray<(IrVarId Variable, IrTypeId Type)> Variables
         {
             get;
         }
