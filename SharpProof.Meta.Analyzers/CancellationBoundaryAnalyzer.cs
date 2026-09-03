@@ -840,10 +840,22 @@ internal static class CancellationBoundaryAnalyzer
                    timeoutName);
     }
 
-    private readonly record struct CancellationProjection(
-        bool ConditionMatches,
-        IOperation? WhenTrue,
-        IOperation? WhenFalse);
+    private readonly struct CancellationProjection
+    {
+        internal CancellationProjection(
+            bool conditionMatches,
+            IOperation? whenTrue,
+            IOperation? whenFalse)
+        {
+            ConditionMatches = conditionMatches;
+            WhenTrue = whenTrue;
+            WhenFalse = whenFalse;
+        }
+
+        internal bool ConditionMatches { get; }
+        internal IOperation? WhenTrue { get; }
+        internal IOperation? WhenFalse { get; }
+    }
 
     private static bool IsNamedStaticField(
         IOperation? operation,
