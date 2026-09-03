@@ -13934,3 +13934,19 @@ the wrapper traversal.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1180 | **`ExceptionHandlerReachability` unwraps a thrown exception expression twice in one type decision.** The `INamedTypeSymbol` check and the fallback `ITypeParameterSymbol` check each call `DefiniteOperationFacts.UnwrapHarmlessValue(exception)` with identical input. A local unwrapped operation/type projection can remove the duplicate traversal while preserving nullness, implicit-conversion, and unknown-potential behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:201-225` |
+
+## Second survey, part five hundred three: R1181 - null-receiver checks repeat completed operands
+
+Several operation branches first establish that a receiver or target operand
+can complete and then call `GetPotentialNullReceiver`. That helper immediately
+calls `canCompleteNormally(instance)` again before doing its nullness and type
+classification. The pattern occurs for ordinary and `with` invocations,
+events, property/field/array assignments, and later property, field, array,
+await, and method-group paths. Pass a validated-completion flag or use a
+validated-instance overload so the null-receiver helper owns only its
+nullness/exception projection; retain the current fail-closed behavior when it
+is called without a prior completion check.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1181 | **`ExceptionHandlerReachability` rechecks receiver completion inside `GetPotentialNullReceiver`.** Its invocation, event, property, field, array, `with`, await, and method-group callers already call `canCompleteNormally` on the same instance before entering the helper, while the helper repeats that call before classifying nullness. A prevalidated-instance seam can remove the duplicate completion traversal without changing value-type, definitely-null, or exception-type handling. | `SharpProof.Effects/ExceptionHandlerReachability.cs:238-278,289-302,328-345,366-428,850-990,1040-1060,1134-1162`; helper `:1862-1905` |
