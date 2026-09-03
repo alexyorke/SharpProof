@@ -16472,3 +16472,8 @@ R410 is applied: the worker's public backend constructor reuses `ReadResources`,
 and both postcondition resource-limit exits share one recovery helper while
 preserving the same suffix of unknown claims. The full WorkerTests class passes
 (148 passed).
+
+R412 is applied: launcher projection generation now emits `Level` as internal,
+so the handwritten partial-class forwarding wrapper is removed. Generated-output
+verification passes for all 14 generators, and LauncherArgumentTests passes
+(75 passed).

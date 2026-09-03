@@ -912,14 +912,6 @@ internal static class Program
     }
 }
 
-internal static partial class LauncherPresentation
-{
-    internal static string Level(Enum policy, string advisory)
-    {
-        return Level((object)policy, advisory);
-    }
-}
-
 internal sealed partial class LauncherArguments
 {
     internal const int MaximumCompilerManifestBytes =

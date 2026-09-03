@@ -384,7 +384,7 @@
           "fallback": "throw new ArgumentOutOfRangeException(nameof(kind))"
         },
         {
-          "accessibility": "private",
+          "accessibility": "internal",
           "static": true,
           "returnType": "string",
           "name": "Level",

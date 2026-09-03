@@ -61,7 +61,7 @@ internal static partial class LauncherPresentation
         };
     }
 
-    private static string Level(
+    internal static string Level(
         object policy,
         string advisory
     )
