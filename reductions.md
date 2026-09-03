@@ -21056,3 +21056,11 @@ R1994 is applied: the exact syntax-tree and span identity predicate now lives
 in the shared `SharpProof.Frontend.SyntaxSite` helper, while both callers retain
 their traversal policies. The full `SharpProof.Contracts.Test` suite passes
 142/142 with zero warnings or errors.
+
+## Second survey, continued: R1995 - OperationCompletionEvaluator and OperationEffectScanner duplicate conditional-binary short-circuit decision
+
+`OperationCompletionEvaluator.CanCompleteBinary` and `OperationEffectScanner.ScanBinary` both derive whether a conditional `&&` or `||` skips the right operand from the same known Boolean left value: `ConditionalAnd` skips on false and `ConditionalOr` skips on true. The evaluator obtains that value from a constant or abstract-flow result, while the scanner's `TryGetBoolean` owns the same two-source projection, and both then repeat the identical operator-kind ternary and early return. Their surrounding policies must remain separate - completion also accounts for user-defined truth operators, while scanning accumulates effects - but a small `ConditionalTruthOperatorFacts` predicate or shared short-circuit projection can own this invariant and prevent the two analyzers from disagreeing about right-operand reachability.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1995 | `OperationCompletionEvaluator` and `OperationEffectScanner` duplicate the `ConditionalAnd`/`ConditionalOr` left-value-to-right-skip rule; centralize only that short-circuit predicate while retaining each consumer's distinct completion and effect handling. | `SharpProof.Effects/OperationCompletionEvaluator.cs:1443-1453`; `SharpProof.Effects/OperationEffectScanner.Expressions.cs:560-571`; related R614 |
