@@ -15951,6 +15951,11 @@ Test-SharpProofMutationBaselines.Assert-Throws catches any exception and returns
 |---|---|---|
 | R1327 | **Test-SharpProofMutationBaselines.Assert-Throws accepts every exception as the expected failure. Check the exception type and relevant message/condition, preserving the four distinct negative-fixture contracts instead of allowing unrelated errors to pass.** | scripts/Test-SharpProofMutationBaselines.ps1:9-14,52-65,77-81 |
 
+### Status (continued)
+
+R1327 is applied: negative mutation-baseline fixtures now require the expected
+runtime exception type and message fragment. Mutation baseline fixtures pass.
+
 ## Second survey, continued: R1328 - mutation scheduler grows a fixed bucket container
 
 Get-SharpProofWeightedMutationShards validates ShardCount and then initializes $buckets as a PowerShell array, appending one List[object] per shard with $buckets +=. Each append reallocates and copies the array even though the final length is known before the loop and bounded to 16. A pre-sized object array or generic list can hold the same per-shard lists while leaving weighted ordering, load assignment, and output shape unchanged.
