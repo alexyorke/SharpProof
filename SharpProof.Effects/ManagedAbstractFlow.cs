@@ -1887,20 +1887,57 @@ internal readonly record struct ManagedAbstractValue(
         var b = new BigInteger(leftMaximum);
         var c = new BigInteger(rightMinimum);
         var d = new BigInteger(rightMaximum);
-        BigInteger[]? bounds = @operator switch
+        BigInteger minimum;
+        BigInteger maximum;
+        switch (@operator)
         {
-            BinaryOperatorKind.Add => [a + c, b + d],
-            BinaryOperatorKind.Subtract => [a - d, b - c],
-            BinaryOperatorKind.Multiply => [a * c, a * d, b * c, b * d],
-            _ => null
-        };
-        if (bounds == null)
-        {
-            return false;
+            case BinaryOperatorKind.Add:
+                minimum = a + c;
+                maximum = b + d;
+                break;
+            case BinaryOperatorKind.Subtract:
+                minimum = a - d;
+                maximum = b - c;
+                break;
+            case BinaryOperatorKind.Multiply:
+            {
+                minimum = maximum = a * c;
+                var candidate = a * d;
+                if (candidate < minimum)
+                {
+                    minimum = candidate;
+                }
+                else if (candidate > maximum)
+                {
+                    maximum = candidate;
+                }
+
+                candidate = b * c;
+                if (candidate < minimum)
+                {
+                    minimum = candidate;
+                }
+                else if (candidate > maximum)
+                {
+                    maximum = candidate;
+                }
+
+                candidate = b * d;
+                if (candidate < minimum)
+                {
+                    minimum = candidate;
+                }
+                else if (candidate > maximum)
+                {
+                    maximum = candidate;
+                }
+
+                break;
+            }
+            default:
+                return false;
         }
 
-        var minimum = bounds.Min();
-        var maximum = bounds.Max();
         if (minimum < long.MinValue || maximum > long.MaxValue)
         {
             return false;
