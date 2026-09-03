@@ -641,10 +641,11 @@ internal sealed class OperationCompletionEvaluator
         IMethodSymbol method,
         IOperation? instance,
         IOperation origin,
-        IEnumerable<IArgumentOperation>? arguments = null)
+        IEnumerable<IArgumentOperation>? arguments = null,
+        bool instanceAlreadyComplete = false)
     {
         if (instance != null &&
-            (!CanCompleteNormally(instance) ||
+            (!instanceAlreadyComplete && !CanCompleteNormally(instance) ||
              method.ReducedFrom == null && _isProvenNull(instance, origin)))
         {
             return false;
@@ -932,12 +933,15 @@ internal sealed class OperationCompletionEvaluator
             return false;
         }
 
-        return CanCompleteDeconstructionPhases(deconstruction) &&
+        return CanCompleteDeconstructionPhases(
+                   deconstruction,
+                   valueAlreadyComplete: true) &&
             CanCompleteDeconstructionTarget(deconstruction.Target);
     }
 
     internal bool CanCompleteDeconstructionPhases(
-        IDeconstructionAssignmentOperation deconstruction)
+        IDeconstructionAssignmentOperation deconstruction,
+        bool valueAlreadyComplete = false)
     {
         return !TryGetDeconstructionInfo(
                 _compilation,
@@ -947,7 +951,8 @@ internal sealed class OperationCompletionEvaluator
                 info,
                 deconstruction.Value,
                 isRoot: true,
-                origin: deconstruction);
+                origin: deconstruction,
+                valueAlreadyComplete: valueAlreadyComplete);
     }
 
     private bool CanCompleteDeconstructionTarget(IOperation target)
@@ -964,7 +969,8 @@ internal sealed class OperationCompletionEvaluator
         Microsoft.CodeAnalysis.CSharp.DeconstructionInfo info,
         IOperation value,
         bool isRoot,
-        IOperation origin)
+        IOperation origin,
+        bool valueAlreadyComplete)
     {
         if (info.Method is { } method)
         {
@@ -972,7 +978,11 @@ internal sealed class OperationCompletionEvaluator
             var completes = isRoot &&
                 !method.IsStatic &&
                 method.ReducedFrom == null
-                    ? CanCompleteInvocation(method, value, origin)
+                    ? CanCompleteInvocation(
+                        method,
+                        value,
+                        origin,
+                        instanceAlreadyComplete: valueAlreadyComplete)
                     : CanMethodCompleteNormally(callable);
             if (!completes)
             {
@@ -988,7 +998,8 @@ internal sealed class OperationCompletionEvaluator
                     nested,
                     value,
                     isRoot: false,
-                    origin: origin))
+                    origin: origin,
+                    valueAlreadyComplete: false))
             {
                 return false;
             }
