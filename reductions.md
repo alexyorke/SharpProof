@@ -13910,6 +13910,12 @@ subtree evaluation.
 |---|---|---|
 | R1178 | **`SwitchExpressionFacts.IsPatternEvaluationUnavoidable` traverses a binary pattern's left subtree twice.** It separately calls itself and `GetPatternSelectionForUnknownValue` for `binary.LeftPattern`, so nested pattern structure and type checks are repeated before the right-side short-circuit decision. A combined fact projection can remove that duplicate traversal without changing pattern-selection or inevitability semantics. | `SharpProof.Effects/SwitchExpressionFacts.cs:371-418` |
 
+### Status (part five hundred)
+
+R1178 is applied: binary-pattern analysis now projects the left selection and
+inevitability together, retaining the existing `and`/`or` short-circuit rules.
+The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred one: R1179 - recursive pattern completion and totality walk the same subtree
 
 For every recursive deconstruction subpattern,
