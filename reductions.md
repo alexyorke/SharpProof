@@ -14881,6 +14881,12 @@ nested-callable filtering. Meta analyzer tests pass (162 passed).
 |---|---|---|
 | R1231 | **`GetPossibleDispatchTargets` re-walks all source types for each completed dispatch query.** Virtual/interface return analysis starts a fresh target builder and invokes `GetSourceTypes(compilation.Assembly.GlobalNamespace)` for every symbol; the local recursion set is not a memo of completed results. A compilation-scoped immutable dispatch cache can retain the existing target ordering and cycle behavior while avoiding repeated whole-compilation enumeration. | `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1403-1422,1425-1463,1511-1529` |
 
+### Status (part five hundred fifty-three)
+
+R1231 is applied: dispatch target closures are cached per compilation and symbol
+after complete traversal, preserving target ordering and cancellation behavior
+while avoiding repeated source-type walks. Meta analyzer tests pass (162 passed).
+
 ## Second survey, part five hundred fifty-four: R1232 - cancellation projection checks rescan one invocation
 
 `ReifiesWorkerVerificationCancellation` validates `status`, `callableReason`, and `claimReason` projections from the same `CreateIncomplete` invocation. Each `IsCancellationProjection` call independently performs `invocation.Arguments.FirstOrDefault` by parameter name, unwraps the conditional, and verifies the condition references the same local. The expected enum type and the two static-field names differ, so the policy checks should remain distinct, but one argument lookup/conditional-shape projection can be shared before applying those three field policies. This removes repeated scans of the same small argument list while preserving parameter-name matching and the three separate type/name requirements.
