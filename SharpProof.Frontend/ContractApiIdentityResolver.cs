@@ -29,6 +29,8 @@ internal sealed class ContractApiIdentityResolver
         ImmutableHashSet.CreateRange(
             StringComparer.Ordinal,
             ContractApiMetadata.AttributeMetadataNames);
+    private static readonly ConcurrentDictionary<string, MetadataNameParts>
+        MetadataNames = new(StringComparer.Ordinal);
     private readonly Compilation _compilation;
     private readonly INamedTypeSymbol? _attribute;
     private readonly INamedTypeSymbol? _conditionalAttribute;
@@ -560,22 +562,23 @@ internal sealed class ContractApiIdentityResolver
             return false;
         }
 
-        var separator = metadataName.LastIndexOf('.');
-        return separator > 0 &&
+        var parts = MetadataNames.GetOrAdd(
+            metadataName,
+            static value => new MetadataNameParts(value));
+        return parts.IsValid &&
             string.Equals(
                 type.MetadataName,
-                metadataName.Substring(separator + 1),
+                parts.TypeName,
                 StringComparison.Ordinal) &&
             NamespaceMatches(
                 type.ContainingNamespace,
-                metadataName.Substring(0, separator));
+                parts.NamespaceSegments);
     }
 
     private static bool NamespaceMatches(
         INamespaceSymbol @namespace,
-        string expected)
+        string[] segments)
     {
-        var segments = expected.Split('.');
         for (var index = segments.Length - 1; index >= 0; index--)
         {
             if (@namespace.IsGlobalNamespace ||
@@ -591,6 +594,42 @@ internal sealed class ContractApiIdentityResolver
         }
 
         return @namespace.IsGlobalNamespace;
+    }
+
+    private sealed class MetadataNameParts
+    {
+        internal MetadataNameParts(string metadataName)
+        {
+            var separator = metadataName.LastIndexOf('.');
+            if (separator <= 0)
+            {
+                IsValid = false;
+                TypeName = string.Empty;
+                NamespaceSegments = [];
+                return;
+            }
+
+            IsValid = true;
+            TypeName = metadataName.Substring(separator + 1);
+            NamespaceSegments = metadataName
+                .Substring(0, separator)
+                .Split('.');
+        }
+
+        internal bool IsValid
+        {
+            get;
+        }
+
+        internal string TypeName
+        {
+            get;
+        }
+
+        internal string[] NamespaceSegments
+        {
+            get;
+        }
     }
 
     private sealed class AttributeResolution(INamedTypeSymbol? symbol)
