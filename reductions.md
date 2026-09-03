@@ -14684,6 +14684,12 @@ pass (14 passed).
 |---|---|---|
 | R1217 | **`AcyclicBlockPredicateExecutor.ApplySpec` repeats one optional-projection test across three branches.** The `projection ==/!= default` checks at conflict detection, map construction, and registration all inspect the same immutable result. Factoring that state into one boolean reduces local branching noise without merging the distinct projection behaviors. | `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:406-423,433-436` |
 
+### Status (part five hundred thirty-nine)
+
+R1217 is applied: specification projection presence is computed once and reused
+for conflict detection, rewriting, and registration. Acyclic block predicate
+tests pass (14 passed).
+
 ## Second survey, part five hundred forty: R1218 - call-site dispatch repeats reduced-method normalization
 
 `RequiresCallSiteDiscovery` and `RequiresCallSiteAnalyzer` each normalize an extension-method target with `call.TargetMethod.ReducedFrom ?? call.TargetMethod` (or the corresponding candidate expression) immediately before invoking `RequiresCallSiteDispatch.ResolveExactTarget`. The dispatcher is the sole consumer of this target-normalization boundary, and both callers pass the same normalized form. Letting `ResolveExactTarget` own the reduced-method projection removes two repeated call-site fragments while preserving exact receiver dispatch and reduced-extension behavior.
