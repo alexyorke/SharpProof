@@ -386,17 +386,19 @@ internal static class CompilerEffectReplayLowerer
         out string sourceLineMapSha256)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        treeOrdinal = -1;
+        treeSha256 = string.Empty;
+        treeSnapshotSha256 = string.Empty;
+        treeLineMapSha256 = string.Empty;
+        sourceTreeOrdinal = -1;
+        sourceTreePath = string.Empty;
+        sourceTreeSha256 = string.Empty;
+        sourceLineMapSha256 = string.Empty;
+
         var trees = compilation.SyntaxTrees;
         treeOrdinal = trees.IndexOf(operation.Syntax.SyntaxTree);
         if (treeOrdinal < 0)
         {
-            treeSha256 = string.Empty;
-            treeSnapshotSha256 = string.Empty;
-            treeLineMapSha256 = string.Empty;
-            sourceTreeOrdinal = -1;
-            sourceTreePath = string.Empty;
-            sourceTreeSha256 = string.Empty;
-            sourceLineMapSha256 = string.Empty;
             return false;
         }
 
@@ -405,13 +407,6 @@ internal static class CompilerEffectReplayLowerer
         if (operation.Syntax.SpanStart < 0 ||
             operation.Syntax.Span.End > text.Length)
         {
-            treeSha256 = string.Empty;
-            treeSnapshotSha256 = string.Empty;
-            treeLineMapSha256 = string.Empty;
-            sourceTreeOrdinal = -1;
-            sourceTreePath = string.Empty;
-            sourceTreeSha256 = string.Empty;
-            sourceLineMapSha256 = string.Empty;
             return false;
         }
 
@@ -423,10 +418,6 @@ internal static class CompilerEffectReplayLowerer
         treeSnapshotSha256 = CompilationFingerprint
             .ComputeSyntaxTreeSnapshotSha256(syntaxTree);
 
-        sourceTreeOrdinal = -1;
-        sourceTreePath = string.Empty;
-        sourceTreeSha256 = string.Empty;
-        sourceLineMapSha256 = string.Empty;
         sourceTreeOrdinal = CompilerSourceLocationAuthority.FindUniqueTree(
             location,
             capturedTrees,

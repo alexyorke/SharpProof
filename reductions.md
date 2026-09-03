@@ -20885,3 +20885,9 @@ R1982 is applied: tuple element name and corresponding-field lookup now lives in
 one `FindTupleElementIndex` helper shared by assignment deconstruction and
 recursive-pattern traversal. The full analyzer suite passes 476/476 tests with
 zero warnings or errors.
+
+R1983 is applied: `CompilerEffectReplayLowerer.TryResolveSource` initializes its
+eight unresolved output values once at entry, so the two early-failure branches
+and the source-lookup boundary no longer repeat the same defaults. The affected
+Worker test groups pass (50 `ClaimManifestBuilderTests` and 91
+`CompilerManifestArtifactTests`) with zero build warnings or errors.
