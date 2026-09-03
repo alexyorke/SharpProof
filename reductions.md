@@ -20826,3 +20826,10 @@ index, and value variants now share one scenario-driven test harness while
 retaining their distinct source fixtures and expected method-kind sequences.
 The full `SharpProof.Analyzer.Test` project passes 476/476 tests with zero
 warnings or errors.
+
+R1981 is applied: the unused parameterless `FuzzUsageException` constructor was
+removed; all in-repository construction sites already pass a message or inner
+exception. `Tools/SharpProof.Fuzz` has no test project. Its normal container
+build is currently blocked by four pre-existing diagnostics in unrelated
+`SharpProof.Testing` and `SharpProof.Host` sources, so no Fuzz-specific test
+failure is attributable to this change.
