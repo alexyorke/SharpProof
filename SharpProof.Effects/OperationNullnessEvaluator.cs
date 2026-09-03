@@ -36,26 +36,18 @@ internal sealed class OperationNullnessEvaluator
 
     internal NullState GetNullState(IOperation? value, IOperation origin)
     {
-        if (value == null ||
-            value is IInstanceReferenceOperation ||
-            (value.Type is { IsValueType: true } type &&
-             !ManagedAbstractValue.IsNullableType(type)) ||
-            DefiniteOperationFacts.IsDefinitelyNonNull(value))
+        if (IsStaticallyNonNull(value))
         {
             return NullState.NonNull;
         }
 
-        if (_abstractFlow?.TryEvaluate(origin, value, out var result) == true)
+        if (TryGetAbstractNullState(
+                value,
+                origin,
+                preferNull: false,
+                out var state))
         {
-            if (result.IsDefinitelyNonNull)
-            {
-                return NullState.NonNull;
-            }
-
-            if (result.IsDefinitelyNull)
-            {
-                return NullState.Null;
-            }
+            return state;
         }
 
         return value.ConstantValue is { HasValue: true, Value: null } ||
@@ -74,18 +66,13 @@ internal sealed class OperationNullnessEvaluator
             return NullState.Null;
         }
 
-        if (value != null &&
-            _abstractFlow?.TryEvaluate(origin, value, out var result) == true)
+        if (TryGetAbstractNullState(
+                value,
+                origin,
+                preferNull: true,
+                out var state))
         {
-            if (result.IsDefinitelyNull)
-            {
-                return NullState.Null;
-            }
-
-            if (result.IsDefinitelyNonNull)
-            {
-                return NullState.NonNull;
-            }
+            return state;
         }
 
         if (value != null && IsSourceDefinitelyNull(value, origin))
@@ -93,13 +80,46 @@ internal sealed class OperationNullnessEvaluator
             return NullState.Null;
         }
 
+        return IsStaticallyNonNull(value)
+            ? NullState.NonNull
+            : NullState.Unknown;
+    }
+
+    private bool TryGetAbstractNullState(
+        IOperation? value,
+        IOperation origin,
+        bool preferNull,
+        out NullState state)
+    {
+        if (value != null &&
+            _abstractFlow?.TryEvaluate(origin, value, out var result) == true)
+        {
+            var isNull = result.IsDefinitelyNull;
+            var isNonNull = result.IsDefinitelyNonNull;
+            if (preferNull ? isNull : isNonNull)
+            {
+                state = preferNull ? NullState.Null : NullState.NonNull;
+                return true;
+            }
+
+            if (preferNull ? isNonNull : isNull)
+            {
+                state = preferNull ? NullState.NonNull : NullState.Null;
+                return true;
+            }
+        }
+
+        state = NullState.Unknown;
+        return false;
+    }
+
+    private static bool IsStaticallyNonNull(IOperation? value)
+    {
         return value == null ||
             value is IInstanceReferenceOperation ||
             (value.Type is { IsValueType: true } type &&
              !ManagedAbstractValue.IsNullableType(type)) ||
-            DefiniteOperationFacts.IsDefinitelyNonNull(value)
-            ? NullState.NonNull
-            : NullState.Unknown;
+            DefiniteOperationFacts.IsDefinitelyNonNull(value);
     }
 
     internal bool IsImplicitLockEnterWithNullValue(IInvocationOperation invocation)
