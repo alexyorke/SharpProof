@@ -21,8 +21,7 @@ public sealed class ContractBinder
             compilation,
             factory,
             clauseInventory,
-            contractSources: null,
-            useProvidedContractSources: false)
+            contractSources: null)
     {
     }
 
@@ -37,8 +36,7 @@ public sealed class ContractBinder
             clauseInventory,
             ArgumentNullGuard.NotNull(
                 contractSources,
-                nameof(contractSources)),
-            useProvidedContractSources: true)
+                nameof(contractSources)))
     {
     }
 
@@ -46,8 +44,7 @@ public sealed class ContractBinder
         Compilation compilation,
         IrFactory factory,
         ContractClauseInventoryBuilder? clauseInventory,
-        EffectiveContractSourceResolver? contractSources,
-        bool useProvidedContractSources)
+        EffectiveContractSourceResolver? contractSources)
     {
         compilation = ArgumentNullGuard.NotNull(
             compilation,
@@ -60,13 +57,12 @@ public sealed class ContractBinder
             _factory);
         _clauseInventory = clauseInventory ??
             ContractClauseInventoryBuilder.ForCompilation(compilation);
-        _contractSources = useProvidedContractSources
-            ? contractSources!
-            : clauseInventory == null
+        _contractSources = contractSources ??
+            (clauseInventory == null
                 ? EffectiveContractSourceResolver.ForCompilation(compilation)
                 : new EffectiveContractSourceResolver(
                     compilation,
-                    clauseInventory);
+                    clauseInventory));
     }
 
     public ContractBindingResult Bind(
