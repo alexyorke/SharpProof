@@ -14,6 +14,8 @@ public sealed class RoslynOperationLowerer
     private readonly List<IrVarId> _captureOrder = [];
     private readonly LoweringVisitor _visitor;
     private Dictionary<IOperation, LoweredExpression>? _currentLoweringResults;
+    private Dictionary<IOperation, Dictionary<int, bool>>?
+        _currentPurityResults;
     private IrVarId? _missingInstance;
 
     public RoslynOperationLowerer(
@@ -56,7 +58,10 @@ public sealed class RoslynOperationLowerer
         operation = ArgumentNullGuard.NotNull(operation, nameof(operation));
 
         var previousResults = _currentLoweringResults;
+        var previousPurityResults = _currentPurityResults;
         _currentLoweringResults = new(
+            ReferenceComparer<IOperation>.Instance);
+        _currentPurityResults = new(
             ReferenceComparer<IOperation>.Instance);
         try
         {
@@ -67,6 +72,7 @@ public sealed class RoslynOperationLowerer
         finally
         {
             _currentLoweringResults = previousResults;
+            _currentPurityResults = previousPurityResults;
         }
     }
 
@@ -353,6 +359,29 @@ public sealed class RoslynOperationLowerer
         {
             return false;
         }
+
+        if (_currentPurityResults is { } purityResults)
+        {
+            if (!purityResults.TryGetValue(operation, out var depths))
+            {
+                depths = [];
+                purityResults.Add(operation, depths);
+            }
+            if (depths.TryGetValue(depth, out var cached))
+            {
+                return cached;
+            }
+
+            var result = IsDemonstrablyPureCore(operation, depth);
+            depths.Add(depth, result);
+            return result;
+        }
+
+        return IsDemonstrablyPureCore(operation, depth);
+    }
+
+    private bool IsDemonstrablyPureCore(IOperation operation, int depth)
+    {
 
         var childDepth = depth + 1;
         if (operation.ConstantValue.HasValue)
