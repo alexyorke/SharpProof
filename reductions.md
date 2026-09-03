@@ -11888,3 +11888,15 @@ R1116 is deferred: share the ordinal target probe, but keep the live-tree aggreg
 ### Status (part three hundred forty-eight)
 
 R1117 is deferred: extract only the common parallel-process start/capture/cleanup seam, preserving each scheduler's admission, deadline, output, failure, timing, and compiler-server behavior.
+
+## Second survey, part three hundred forty-nine: R1118 - duplicated scalar operator-catalog validation
+
+`Generate-CSharpScalarSemantics.ps1` validates `$irUnaryRows` and `$irBinaryRows` with the same post-projection sequence: `Operator` values must be unique, `Key` values must be unique, the projected operators must cover the corresponding declared operator list exactly once, and sorted keys must be contiguous from zero. The row projections themselves differ legitimately because binary rows carry result and optional operand metadata while unary rows do not. A parameterized `Assert-OperatorCatalogRows` helper can own the shared uniqueness/coverage/ordinal checks while leaving those schema-specific projections and their distinct diagnostics visible.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1118 | **The scalar-semantics generator repeats four IR operator-catalog invariants for unary and binary rows.** Both catalogs independently check duplicate operators, duplicate keys, declared-operator coverage, and contiguous zero-based keys; only the row-shape parsing differs. Sharing the invariant validator removes drift without merging unary and binary schema semantics. | `scripts/Generate-CSharpScalarSemantics.ps1:484-528,530-583` |
+
+### Status (part three hundred forty-nine)
+
+R1118 is deferred: extract the common operator/key uniqueness, coverage, and ordinal validator, retaining separate unary/binary row parsing and error context.
