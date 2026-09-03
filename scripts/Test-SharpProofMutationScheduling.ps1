@@ -19,6 +19,14 @@ $first = Get-SharpProofWeightedMutationShards `
 $second = Get-SharpProofWeightedMutationShards `
     -Mutations $mutations -ShardCount 4 -ProjectWeights $weights -DefaultWeight 1
 
+function Get-ShardShape {
+    param($schedule)
+
+    @($schedule.Shards | ForEach-Object {
+            (@($_ | ForEach-Object CatalogOrdinal) -join ',')
+        }) -join '|'
+}
+
 $ordinals = @($first.Shards | ForEach-Object { $_ } |
     ForEach-Object CatalogOrdinal)
 if (($ordinals | Sort-Object) -join ',' -cne ((0..11) -join ',')) {
@@ -31,12 +39,8 @@ foreach ($shard in $first.Shards) {
         throw 'Mutation order within a shard is not canonical.'
     }
 }
-$firstShape = @($first.Shards | ForEach-Object {
-        (@($_ | ForEach-Object CatalogOrdinal) -join ',')
-    }) -join '|'
-$secondShape = @($second.Shards | ForEach-Object {
-        (@($_ | ForEach-Object CatalogOrdinal) -join ',')
-    }) -join '|'
+$firstShape = Get-ShardShape $first
+$secondShape = Get-ShardShape $second
 if ($firstShape -cne $secondShape) {
     throw 'Weighted mutation scheduling is not deterministic.'
 }
