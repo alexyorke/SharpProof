@@ -19107,3 +19107,11 @@ R1676 is applied: the package compiler-probe test now reuses the shared
 `TestMetadataReferences.WithSharpProof` platform-reference factory, removing
 its local trusted-assembly parsing and error-message variant. The focused
 `CompilerProbeInputConsistencyTests` test passes (1/1).
+
+## Second survey, continued: R1677 - Compiler-probe test duplicates temporary-root ownership and cleanup
+
+`CompilerProbeInputConsistencyTests` builds a flat GUID-suffixed path under `Path.GetTempPath()`, creates it directly, and unconditionally calls `Directory.Delete(root, recursive: true)` in `finally`. `SharpProof.Package.Test` already links `eng/testing/TempDirectory.cs` and `TestRepository.cs`; the former supplies a disposable root using `Directory.CreateTempSubdirectory(prefix)` and existence-checked recursive disposal through `FullName`, while the latter supplies guarded cleanup for repository-owned paths. This new test therefore adds another unguarded temp-directory lifetime outside the shared seam covered by R726/R1300. Using `TempDirectory` (and passing its `FullName` to the output/input paths) would remove the local creation/deletion plumbing without changing the stateful additional-text scenario. This is separate from R1676's metadata-reference copy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1677 | The compiler-probe test hand-rolls a flat temp root and recursive delete despite linked disposable/guarded cleanup helpers; adopt the shared ownership abstraction. | `SharpProof.Package.Test/CompilerProbeInputConsistencyTests.cs:18-21,63-67`; `eng/testing/TempDirectory.cs:1-18`; `eng/testing/TestRepository.cs:59-82`; `Directory.Build.props:75-102` |
