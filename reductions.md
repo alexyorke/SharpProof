@@ -16993,3 +16993,27 @@ R1384 is applied: strict object-shape validation now enumerates properties direc
 | ID | Finding | Evidence |
 |---|---|---|
 | R1403 | The helper materializes one identity sequence and then performs separate whole-array blankness and distinct-count scans; a single loop can preserve the returned snapshot and both validation conditions. | `SharpProof.Worker.Protocol/ProtocolJson.cs:973-988` |
+
+## Second survey, continued: R1404 - `IntervalDomainTests` rebuilds its sample domain on every property access
+
+**`IntervalDomainTests.Samples` constructs the same interval corpus each time it is read.** The expression-bodied property allocates a new array and recreates all twelve `IntervalValue` instances for every law test; `RefinementTransfersAreMonotone` reads it twice in one test, while the order and havoc tests independently rebuild the identical immutable values. A cached static readonly sample array (or a lazy immutable fixture) removes the repeated setup without changing the domain cases or allowing tests to mutate the shared collection.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1404 | The static `Samples` property recreates the full immutable interval corpus for every access, including two accesses in one test; cache the fixture once. | `SharpProof.Dataflow.Test/IntervalDomainTests.cs:7-21,24-27,111-119,151-154` |
+
+## Second survey, continued: R1405 - `Analyzer.Test` and `Contracts.Test` duplicate intrinsic-validation fixtures
+
+**The analyzer and binder test projects embed the same intrinsic-validation source fixtures separately.** Both `ContractIntrinsicValidationTests` classes contain byte-equivalent direct `Result`-inside-`Old` and companion `ContractFor` sources, and both contain the same indirect `Result`/`Old` delegate source. Their assertions intentionally differ because one exercises diagnostics and the other checks binding failures, but a shared source-fixture file under the existing test infrastructure (or shared constants) would keep the syntax under test synchronized and remove three duplicated raw-string bodies.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1405 | Direct, companion, and indirect intrinsic-validation source strings are duplicated across the analyzer and binder test hosts; share the fixture while retaining host-specific assertions. | `SharpProof.Analyzer.Test/ContractIntrinsicValidationTests.cs:12-25,33-53,61-78`; `SharpProof.Contracts.Test/ContractIntrinsicValidationTests.cs:14-25,35-51,61-73` |
+
+## Second survey, continued: R1406 - `VerifierProcessSupervisorBug202Tests` repeats recycled-PID cleanup plumbing
+
+**The two recycled-supervisor-PID tests duplicate the `StopDescendants` fake callbacks and result assertions.** `RecycledSupervisorPidIsNotScannedAfterCleanupDeadline` and `RecycledSupervisorPidIsNotScanned` both set `opened = false`, make descriptor opening return `-1`, pass supervisor PID fd `777`, and assert that no descriptor was opened and cleanup completed; only the deadline, signal callback, and real child-process lifetime differ. A small helper parameterized by those differences can own the common setup and two assertions while keeping the two bug-reproduction scenarios explicit.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1406 | The two recycled-PID tests repeat fake descriptor callbacks and the same `opened == false`/`Complete == true` assertions; factor a parameterized test helper. | `SharpProof.Package.Test/VerifierProcessSupervisorBug202Tests.cs:10-24,61-89` |
