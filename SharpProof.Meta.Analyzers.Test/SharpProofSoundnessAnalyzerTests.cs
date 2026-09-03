@@ -3025,6 +3025,73 @@ public sealed class SharpProofSoundnessAnalyzerTests
     }
 
     [Test]
+    public void KnownTypeCatalogMatchesEnumAndResolvesEveryEntry()
+    {
+        var analyzer = typeof(SharpProofSoundnessAnalyzer);
+        var knownTypeNames = (ImmutableArray<string>)analyzer.GetField(
+                "KnownTypeNames",
+                System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Static)!
+            .GetValue(null)!;
+        var knownType = analyzer.GetNestedType(
+            "KnownType",
+            System.Reflection.BindingFlags.NonPublic)!;
+
+        Assert.That(knownTypeNames, Is.Unique);
+        Assert.That(
+            knownTypeNames.All(static name => !string.IsNullOrWhiteSpace(name)),
+            Is.True);
+        Assert.That(
+            knownTypeNames.Length,
+            Is.EqualTo(Enum.GetNames(knownType).Length));
+
+        var stubTrees = knownTypeNames
+            .Where(static name => !name.StartsWith(
+                "Microsoft.",
+                StringComparison.Ordinal) && !name.StartsWith(
+                "System.",
+                StringComparison.Ordinal))
+            .Select(static name =>
+            {
+                var parts = name.Split('.');
+                var namespaceName = string.Join('.', parts, 0, parts.Length - 1);
+                return CSharpSyntaxTree.ParseText(
+                    $"namespace {namespaceName} {{ public class {parts[^1]} {{ }} }}");
+            })
+            .ToArray();
+        var compilation = CSharpCompilation.Create(
+            "KnownTypeCatalog",
+            stubTrees,
+            PlatformReferences);
+        var knownSymbolsType = analyzer.GetNestedType(
+            "KnownSymbols",
+            System.Reflection.BindingFlags.NonPublic)!;
+        var knownSymbols = Activator.CreateInstance(
+            knownSymbolsType,
+            System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic,
+            binder: null,
+            args: [compilation],
+            culture: null)!;
+        var indexer = knownSymbolsType.GetProperty(
+            "Item",
+            System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic)!;
+        var unresolved = Enum.GetValues(knownType)
+            .Cast<object>()
+            .Where(value => indexer.GetValue(knownSymbols, [value]) is null)
+            .Select(value => value.ToString())
+            .ToArray();
+
+        Assert.That(
+            unresolved,
+            Is.Empty,
+            "KnownType entries must resolve in the analyzer compilation.");
+    }
+
+    [Test]
     public async Task AuditsCancellationCatchFilterSemantics()
     {
         const string source =

@@ -21241,3 +21241,9 @@ is documentation-only and passes the repository diff/format checks.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2006 | Root `.globalconfig` supplies the obsolete `sharpproof_enable_effect_summary_json` option with no reader or registry entry; delete the stale global setting or restore its complete option contract. | .globalconfig:1-2; SharpProof.Analyzer.Core/Configuration/AnalyzerConfigurationOptionRegistry.cs:3-20; exact `git grep` census; feature history `61da4979220d` and `cc70ff006e3` |
+
+R1960 is applied: `SharpProofSoundnessAnalyzerTests` now asserts that the
+`KnownTypeNames` catalog is unique, nonempty, and the same length as the
+`KnownType` enum, then constructs the private symbol table and verifies every
+enum entry resolves. The focused test passes (1/1), closing both positional
+drift and silent-null resolution gaps without changing analyzer behavior.
