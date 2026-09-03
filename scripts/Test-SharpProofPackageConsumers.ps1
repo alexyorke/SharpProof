@@ -263,39 +263,26 @@ function Assert-SharpProofAnalyzerItems {
                     '[/\\]SharpProof\.[^/\\]+\.dll$'
             }
     )
-    $entryPoints = @(
-        $sharpProofItems |
-            Where-Object {
-                $_.SharpProofAnalyzerRole -eq 'EntryPoint'
-            }
-    )
-    $entryPointNames = @(
-        $entryPoints |
-            ForEach-Object {
-                (([string]$_.Identity) -replace '\\', '/') -split '/' |
-                    Select-Object -Last 1
-            }
-    )
-    $generators = @(
-        $sharpProofItems |
-            Where-Object {
-                $_.SharpProofAnalyzerRole -eq 'Generator'
-            }
-    )
-    $generatorNames = @(
-        $generators |
-            ForEach-Object {
-                (([string]$_.Identity) -replace '\\', '/') -split '/' |
-                    Select-Object -Last 1
-            }
-    )
-    $legacyEntryPoints = @(
-        $sharpProofItems |
-            Where-Object {
-                (([string]$_.Identity) -replace '\\', '/') -match
-                    '/SharpProof\.PortableAnalyzer\.dll$'
-            }
-    )
+    $entryPoints = [Collections.Generic.List[object]]::new()
+    $entryPointNames = [Collections.Generic.List[string]]::new()
+    $generators = [Collections.Generic.List[object]]::new()
+    $generatorNames = [Collections.Generic.List[string]]::new()
+    $legacyEntryPoints = [Collections.Generic.List[object]]::new()
+    foreach ($item in $sharpProofItems) {
+        $identity = ([string]$item.Identity).Replace('\', '/')
+        $name = ($identity -split '/')[-1]
+        if ($item.SharpProofAnalyzerRole -eq 'EntryPoint') {
+            $entryPoints.Add($item)
+            $entryPointNames.Add($name)
+        }
+        if ($item.SharpProofAnalyzerRole -eq 'Generator') {
+            $generators.Add($item)
+            $generatorNames.Add($name)
+        }
+        if ($identity -match '/SharpProof\.PortableAnalyzer\.dll$') {
+            $legacyEntryPoints.Add($item)
+        }
+    }
 
     if ($entryPointNames.Count -ne 1 -or
         $entryPointNames[0] -ne 'SharpProof.Analyzer.dll' -or
