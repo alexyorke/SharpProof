@@ -14190,3 +14190,18 @@ exception branch or a shared lock-prefix projection.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1194 | **`ExceptionHandlerReachability` rechecks the locked value's completion.** The `ILockOperation` exception branch calls `canCompleteNormally(@lock.LockedValue)`, and `PushChildrenCore` calls the same predicate again while deciding whether to push `@lock.Body`; the operation and callback inputs are unchanged. Carrying the lock-value completion result into child scheduling removes the duplicate completion traversal without changing nullness or body-order semantics. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1000-1024,1350-1358` |
+
+## Second survey, part five hundred seventeen: R1195 - coalesce-assignment target facts are replayed
+
+The coalesce-assignment exception branch computes both target completion and
+target non-nullness before deciding whether a property setter can contribute
+exceptions. It then passes the same operation to `PushChildrenCore`, whose
+coalesce-assignment case recomputes the target completion and the same
+abstract-flow/static non-nullness predicate before scheduling the value. The
+child scheduler can consume a fact record from the exception branch, or a
+shared target-prefix helper can own the two facts, while retaining the
+distinct setter-effect policy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1195 | **`ExceptionHandlerReachability` recomputes coalesce-assignment target facts before scheduling children.** The main `ICoalesceAssignmentOperation` case calls `canCompleteNormally(coalesce.Target)` and derives target non-nullness, then `PushChildrenCore` repeats both computations to decide whether to push `coalesce.Value`. Sharing that target projection can remove the duplicate completion/nullness work without changing setter exception handling or target-first order. | `SharpProof.Effects/ExceptionHandlerReachability.cs:437-460,1292-1306` |
