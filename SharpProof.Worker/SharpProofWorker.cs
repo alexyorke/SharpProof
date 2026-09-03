@@ -189,7 +189,6 @@ public sealed class SharpProofWorker : IDisposable
                 var assembled = WorkerResultAssembler.Create(snapshot.InputHash, manifest, status, reason, callables, claims,
                     request.Budgets, resultCacheStatus, Elapsed(started), errors,
                     requestHash, Versions());
-                projectBoundary.Token.ThrowIfCancellationRequested();
                 return assembled;
             }
             WorkerVerifyResponse Canceled(WorkerCacheStatus status)
