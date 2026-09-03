@@ -969,13 +969,14 @@ public sealed class IrSmtBackendTests
         where TException : Exception
     {
         Z3Expr? expression = null;
-        Assert.Throws<TException>(() => ThrowAfterOwning(
+        Action throwAction = () => ThrowAfterOwning(
             context,
             owned =>
             {
                 expression = owned;
                 afterOwn(owned);
-            }));
+            });
+        Assert.Throws<TException>(throwAction);
         Assert.That(NativeObject(expression!), Is.EqualTo(IntPtr.Zero));
     }
 
