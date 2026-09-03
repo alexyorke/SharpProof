@@ -1060,10 +1060,16 @@ should be added, not compared.
 
 ### Status (part ten)
 
-R304 and R305 are `pending`. R304 is the largest single duplication in the
-repository by line count and has a ready home in a module both scripts already
-import, but it is process-lifetime and timeout code, so the deferral reasoning in
-R072, R074, and R076 governs how carefully it is done - not whether it is real.
+R304 is applied: the package and semantic runners now share
+`Invoke-SharpProofParallelDotnetTests` in `SharpProof.ContainerExecution.psm1`.
+The shared scheduler retains slot-aware/exclusive dispatch, bounded deadlines,
+process cleanup, captured output, quiet failure reporting, and per-test timing
+records; each script still owns its distinct shard selection and invocation
+arguments. The focused BuildSchedulingTests gate passed 25/25, the actual
+changed-test semantic path introduced no new failures (it retained the known
+seven unrelated architecture failures), and a selected package shard passed
+21/21. R305 remains `pending`; its smaller unrelated pairs can be handled
+independently.
 R270 and R303 are refuted because the package-integrity pipeline they described
 was removed.
 
@@ -11846,3 +11852,15 @@ R1113 is deferred: use one namespace-neutral linked UTF-16 helper, preserving th
 ### Status (part three hundred forty-five)
 
 R1114 is deferred: preserve the explicit mutation short circuits, but reuse their result when evaluating the same operand or index.
+
+## Second survey, part three hundred forty-six: R1115 - duplicated relational summary composition scaffolding
+
+`IrRelationalSummaryTests` builds a callee program, lowers its summary, constructs a caller with one call and a return, and builds the caller summary independently in both `CallCompositionUsesAReusableRelationAndFreshVariables` and `CallCompositionConjoinsDependencyNormalCompletion`. The arithmetic and assertions intentionally differ: one exercises reusable relations and fresh existential results, while the other checks conjunction of dependency normal completion. A test-only helper for the common one-call caller/callee harness, parameterized by the callee return term and caller signature/return policy, can remove the repeated IR variable, block, call, environment, and dependency-map setup without merging those behavioral cases.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1115 | **Relational summary composition tests duplicate the one-call IR harness.** The two composition cases independently create callee variables/builders and summaries, caller variables/builders/calls, parameter environments, and dependency maps; extracting only that test scaffolding would preserve their distinct relation, freshness, and normal-completion assertions. | `SharpProof.Summaries.Test/IrRelationalSummaryTests.cs:619-696,734-794` |
+
+### Status (part three hundred forty-six)
+
+R1115 is deferred: factor the repeated one-call summary fixture into a test-only helper, keeping the callee expression and each composition assertion at the individual test sites.
