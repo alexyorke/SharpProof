@@ -20063,3 +20063,11 @@ R1800 is applied: `ContractApiIdentityAnalyzerTests` now uses the shared
 `AnalyzerTestHost.WithEnabledDiagnostics` helper for its three custom-reference
 compilations. The focused ContractApiIdentity analyzer suite passes (13/13),
 while the existing diagnostic-suppression policy remains explicit at the host.
+
+## Second survey, continued: R1841 - Two generators duplicate the Boolean type validator
+
+`Generate-CSharpScalarSemantics.ps1::Assert-Boolean` and `Generate-ApiSpecCatalog.ps1::Assert-JsonBoolean` both accept an object and context, reject every non-`[bool]` value, throw a context-specific type error, and return `[bool]`. The API-spec version's `[AllowNull()]` annotation does not change behavior because null is immediately rejected, while the only intentional variation is the error wording (`Boolean` versus `JSON boolean`). Both generators already dot-source `GeneratedFileHelpers.ps1`, so a shared Boolean validator with an explicit wording/label parameter can remove the second type-check authority without changing either catalog's validation policy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1841 | The scalar-semantics and API-spec generators repeat the same object-to-Boolean validator; share the type check and parameterize only the diagnostic label. | `scripts/Generate-CSharpScalarSemantics.ps1:20,33-46`; `scripts/Generate-ApiSpecCatalog.ps1:23,212-225`; related R342 |
