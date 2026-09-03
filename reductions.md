@@ -15745,6 +15745,12 @@ Generate-CompilerArtifactModel materializes the actual slot-mapping keys and dec
 |---|---|---|
 | R1312 | **Generate-CompilerArtifactModel validates portable IR slot-domain membership with two repeated array searches. Build ordinal key sets once and keep the separate unsupported-domain and missing-domain diagnostics.** | scripts/Generate-CompilerArtifactModel.ps1:542-570 |
 
+### Status (continued)
+
+R1312 is applied: actual and declared portable-IR slot domains are indexed in
+ordinal sets once, while the separate unsupported and missing-domain checks are
+retained. Compiler artifact schema tests pass (4 passed).
+
 ## Second survey, continued: R1313 - protocol declaration uniqueness keeps a redundant name set
 
 Generate-ProtocolModel creates declarationNames to detect duplicate protocol declarations and immediately inserts the same name and declaration object into declarationByName. The name set is not read after the construction loop, while Dictionary.Add already rejects a duplicate key. A single ordinal dictionary insertion with the existing duplicate diagnostic can provide both uniqueness validation and the later name lookup.
