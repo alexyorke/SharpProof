@@ -14226,3 +14226,18 @@ the completion work.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1196 | **`ExceptionHandlerReachability` rechecks compound-assignment target and in-conversion completion.** The main `ICompoundAssignmentOperation` case computes `targetCompletes` and `inConversionCompletes` through `AddCompoundCallablePotential`, whose method path calls `canMethodCompleteNormally`; `PushChildrenCore` then calls `canCompleteNormally(compound.Target)` and `canMethodCompleteNormally(compound.InConversion.MethodSymbol)` again before pushing the value. A shared prerequisite projection can preserve operator/effect semantics while removing the duplicate checks. | `SharpProof.Effects/ExceptionHandlerReachability.cs:463-485,1306-1316,2810-2828` |
+
+## Second survey, part five hundred nineteen: R1197 - increment prerequisites are checked three times
+
+The increment/decrement branch begins by checking target completion. It then
+calls `CanThrowUnknownAfterPrerequisites`, whose increment arm checks the same
+target again, and finally sends the operation to the generic child scheduler,
+whose sequential prefix checks the target once more. All three checks use the
+same operation and completion callback; only the consumer of the boolean
+differs. Carry the target fact into unknown-throw classification and child
+scheduling, or expose one prerequisite projection, while retaining the
+operator-initialization and property-setter policies.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1197 | **`ExceptionHandlerReachability` recomputes increment/decrement target completion across three phases.** The `IIncrementOrDecrementOperation` case stores `priorPhasesComplete`, `CanThrowUnknownAfterPrerequisites` calls `canCompleteNormally(increment.Target)` again, and the subsequent generic `PushChildren` path reaches `PushSequentialCore`, which checks the target a third time. A shared target-completion fact can remove the repeated traversal without changing throw or child-order behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:534-577,3008-3034,1413-1427` |
