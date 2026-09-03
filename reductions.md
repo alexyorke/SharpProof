@@ -16532,3 +16532,8 @@ IrSmtBackendTests suite passes (29 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1368 | **`ExecutableUnflowedDescendantsAndSelfCore` repeats child-descend/normal-completion gating across four branches.** Share the iterator protocol while retaining each branch's exact operation ordering and stop rules. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1707-1732,1740-1751,1795-1818,1834-1857` |
+
+R1364-R1366 are applied: repeated fresh-container alias, external-precondition,
+and parameter-write remapping assertions now use shared test helpers while each
+distinct effect-analysis fixture and its additional checks remain local. The full
+EffectAnalysisTests class passes (147 passed).

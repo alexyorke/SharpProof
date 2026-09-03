@@ -3183,18 +3183,7 @@ public sealed class EffectAnalysisTests
             "Sample",
             "Mutate");
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
-            Assert.That(
-                result.Summary.Writes.IsUnknown ||
-                result.Summary.Writes.Regions.Any(
-                    static region => region.Kind != EffectRegionKind.Fresh),
-                Is.True);
-            Assert.That(
-                EffectContractMappings.IsObservablePure(result.Summary),
-                Is.False);
-        }
+        AssertFreshContainerAlias(result);
     }
 
     [Test]
@@ -3219,18 +3208,7 @@ public sealed class EffectAnalysisTests
             "Sample",
             "Mutate");
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
-            Assert.That(
-                result.Summary.Writes.IsUnknown ||
-                result.Summary.Writes.Regions.Any(
-                    static region => region.Kind != EffectRegionKind.Fresh),
-                Is.True);
-            Assert.That(
-                EffectContractMappings.IsObservablePure(result.Summary),
-                Is.False);
-        }
+        AssertFreshContainerAlias(result);
     }
 
     [Test]
@@ -3253,18 +3231,7 @@ public sealed class EffectAnalysisTests
             "Sample",
             "Mutate");
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
-            Assert.That(
-                result.Summary.Writes.IsUnknown ||
-                result.Summary.Writes.Regions.Any(
-                    static region => region.Kind != EffectRegionKind.Fresh),
-                Is.True);
-            Assert.That(
-                EffectContractMappings.IsObservablePure(result.Summary),
-                Is.False);
-        }
+        AssertFreshContainerAlias(result);
     }
 
     [Test]
@@ -3426,20 +3393,7 @@ public sealed class EffectAnalysisTests
             compilation).Analyze(
             Method(compilation, "Invoke"));
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                result.Summary.Completeness,
-                Is.EqualTo(EffectCompleteness.Incomplete));
-            Assert.That(
-                result.Summary.AnalysisIncompleteReason,
-                Is.EqualTo(
-                    EffectAnalysisIncompleteReason
-                        .CallPreconditionNotProven));
-            Assert.That(
-                result.Projection.IsComplete,
-                Is.False);
-        }
+        AssertExternalPreconditionFailure(result);
     }
 
     [Test]
@@ -3472,18 +3426,7 @@ public sealed class EffectAnalysisTests
                 "ExternalFixture",
                 "Restricted"));
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                result.Summary.Completeness,
-                Is.EqualTo(EffectCompleteness.Incomplete));
-            Assert.That(
-                result.Summary.AnalysisIncompleteReason,
-                Is.EqualTo(
-                    EffectAnalysisIncompleteReason
-                        .CallPreconditionNotProven));
-            Assert.That(result.Projection.IsComplete, Is.False);
-        }
+        AssertExternalPreconditionFailure(result);
     }
 
     [Test]
@@ -3611,20 +3554,7 @@ public sealed class EffectAnalysisTests
             compilation).Analyze(
             Method(compilation, "Invoke"));
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                result.Summary.Completeness,
-                Is.EqualTo(EffectCompleteness.Incomplete));
-            Assert.That(
-                result.Summary.AnalysisIncompleteReason,
-                Is.EqualTo(
-                    EffectAnalysisIncompleteReason
-                        .CallPreconditionNotProven));
-            Assert.That(
-                result.Projection.IsComplete,
-                Is.False);
-        }
+        AssertExternalPreconditionFailure(result);
     }
 
     [Test]
@@ -4498,11 +4428,7 @@ public sealed class EffectAnalysisTests
         var result = new EffectAnalysisSession(compilation).Analyze(
             Method(compilation, "Invoke"));
 
-        Assert.That(
-            result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
-            Is.True);
-        Assert.That(result.Summary.Writes.IsUnknown, Is.False);
-        Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+        AssertParameterWritesRemap(result);
         AssertThrows(result.Summary, "System.NullReferenceException");
         Assert.That(
             result.Projection.Effects,
@@ -4532,11 +4458,7 @@ public sealed class EffectAnalysisTests
         var result = new EffectAnalysisSession(compilation).Analyze(
             Method(compilation, "Invoke"));
 
-        Assert.That(
-            result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
-            Is.True);
-        Assert.That(result.Summary.Writes.IsUnknown, Is.False);
-        Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+        AssertParameterWritesRemap(result);
     }
 
     [Test]
@@ -4552,11 +4474,7 @@ public sealed class EffectAnalysisTests
         var result = new EffectAnalysisSession(compilation).Analyze(
             Method(compilation, "Invoke"));
 
-        Assert.That(
-            result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
-            Is.True);
-        Assert.That(result.Summary.Writes.IsUnknown, Is.False);
-        Assert.That(result.Summary.Completeness, Is.EqualTo(EffectCompleteness.Complete));
+        AssertParameterWritesRemap(result);
     }
 
     [Test]
@@ -8359,6 +8277,53 @@ public sealed class EffectAnalysisTests
                 compilation,
                 typeMetadataName,
                 methodName));
+    }
+
+    private static void AssertFreshContainerAlias(EffectMethodResult result)
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(result.Summary.Writes.IsEmpty, Is.False);
+            Assert.That(
+                result.Summary.Writes.IsUnknown ||
+                result.Summary.Writes.Regions.Any(
+                    static region => region.Kind != EffectRegionKind.Fresh),
+                Is.True);
+            Assert.That(
+                EffectContractMappings.IsObservablePure(result.Summary),
+                Is.False);
+        }
+    }
+
+    private static void AssertExternalPreconditionFailure(
+        EffectMethodResult result)
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Incomplete));
+            Assert.That(
+                result.Summary.AnalysisIncompleteReason,
+                Is.EqualTo(
+                    EffectAnalysisIncompleteReason
+                        .CallPreconditionNotProven));
+            Assert.That(result.Projection.IsComplete, Is.False);
+        }
+    }
+
+    private static void AssertParameterWritesRemap(EffectMethodResult result)
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Parameter(0)),
+                Is.True);
+            Assert.That(result.Summary.Writes.IsUnknown, Is.False);
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
     }
 
     private static IMethodSymbol Method(
