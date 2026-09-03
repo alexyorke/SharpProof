@@ -25,7 +25,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
             });
     private static readonly string[] TransactionSuffixes =
         [".rollback", ".eviction"];
-    private static readonly string CacheFilePattern = "*" + CacheFileSuffix;
+    private const string CacheFilePattern = "*" + CacheFileSuffix;
     internal static Action<string, string>? PathValidationOverride;
     internal static Action? TransactionRollbackOverride;
     // Set for the most recent read so the worker can distinguish an
