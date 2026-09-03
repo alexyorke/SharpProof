@@ -14299,6 +14299,12 @@ the completion work.
 |---|---|---|
 | R1196 | **`ExceptionHandlerReachability` rechecks compound-assignment target and in-conversion completion.** The main `ICompoundAssignmentOperation` case computes `targetCompletes` and `inConversionCompletes` through `AddCompoundCallablePotential`, whose method path calls `canMethodCompleteNormally`; `PushChildrenCore` then calls `canCompleteNormally(compound.Target)` and `canMethodCompleteNormally(compound.InConversion.MethodSymbol)` again before pushing the value. A shared prerequisite projection can preserve operator/effect semantics while removing the duplicate checks. | `SharpProof.Effects/ExceptionHandlerReachability.cs:463-485,1306-1316,2810-2828` |
 
+### Status (part five hundred eighteen)
+
+R1196 is applied: compound-assignment target completion and conversion-method
+completion are cached and reused by scheduling, while static-initialization
+handling remains unchanged. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred nineteen: R1197 - increment prerequisites are checked three times
 
 The increment/decrement branch begins by checking target completion. It then
