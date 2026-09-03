@@ -914,14 +914,25 @@ internal sealed partial class OperationEffectScanner
 
     private EffectSummary ScanArrayCreation(IArrayCreationOperation array)
     {
-        var dimensions = ScanSequence(array.DimensionSizes);
+        var dimensions = EffectStep.Empty;
+        var hasDimensionOverflow = false;
+        foreach (var size in array.DimensionSizes)
+        {
+            dimensions = dimensions.Then(ScanStep(size));
+            hasDimensionOverflow |=
+                !IsDefinitelyNonNegative(size) &&
+                _abstractFlow?.ProvesNonNegative(array, size) != true;
+            if (!dimensions.CompletesNormally)
+            {
+                return dimensions.Summary;
+            }
+        }
+
         var allocation = EffectSummaryOperations.Join(
             EffectSummaryOperations.Allocate(EffectAllocationKind.Managed),
-            ArrayCreationExceptions(array));
-        if (!dimensions.CompletesNormally)
-        {
-            return dimensions.Summary;
-        }
+            hasDimensionOverflow
+                ? Throw(FrameworkTypeMetadataNames.OverflowException)
+                : EffectSummary.Empty);
 
         var result = dimensions.Then(new EffectStep(allocation, true));
         if (array.Initializer != null && result.CompletesNormally)
@@ -1220,16 +1231,6 @@ internal sealed partial class OperationEffectScanner
     {
         return PotentialNullAccess(
             value, origin, FrameworkTypeMetadataNames.ArgumentNullException);
-    }
-
-    private EffectSummary ArrayCreationExceptions(
-        IArrayCreationOperation creation)
-    {
-        return creation.DimensionSizes.All(size =>
-            IsDefinitelyNonNegative(size) ||
-            _abstractFlow?.ProvesNonNegative(creation, size) == true)
-            ? EffectSummary.Empty
-            : Throw(FrameworkTypeMetadataNames.OverflowException);
     }
 
     private EffectThrowSet ResolveThrownException(IThrowOperation thrown)
