@@ -14283,3 +14283,16 @@ not allocate and populate two tables over the same decoded instruction list.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1199 | **`CompilerImplementationIlSummaryLowerer.Translator.Translate` materializes duplicate instruction-offset indexes.** It creates `offsets` as a `HashSet<int>` for `leaders.Contains` validation, then creates `instructionIndexes` as a dictionary from the same `instructions.Select(item => item.Offset)` projection before using it for block starts. Reusing one dictionary-backed index can preserve malformed-leader rejection and contiguous block lookup while removing the redundant offset set and enumeration. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:549-583` |
+
+## Second survey, part five hundred twenty-two: R1200 - IL leaders are enumerated twice
+
+The decoded instruction list is stable after leader discovery. `Translate`
+enumerates the sorted leader set once to create the `blocks` dictionary and
+then enumerates the same set again to create `leaderArray`, which drives the
+block loop. No leader is added between these projections. Materialize the
+ordered leader array first and build the block dictionary from it, retaining
+sorted order and the entry-block lookup while removing one collection pass.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1200 | **`CompilerImplementationIlSummaryLowerer.Translator.Translate` enumerates the leader set twice.** It calls `leaders.ToDictionary(...)` to create IR blocks and then calls `leaders.ToArray()` for the ordered block-emission loop, with no intervening mutation. Building both projections from one materialized leader array preserves block order and entry selection without repeating the `SortedSet<int>` walk. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:557-577` |
