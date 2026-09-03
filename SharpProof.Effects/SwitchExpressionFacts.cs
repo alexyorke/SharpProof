@@ -397,23 +397,19 @@ internal static class SwitchExpressionFacts
         }
         if (pattern is IBinaryPatternOperation binary)
         {
-            var leftIsUnavoidable = IsPatternEvaluationUnavoidable(
+            var left = GetPatternEvaluationFacts(
                 binary.LeftPattern,
                 inputType,
                 inputDefinitelyNonNull);
-            var leftSelection = GetPatternSelectionForUnknownValue(
-                binary.LeftPattern,
-                inputType,
-                inputDefinitelyNonNull);
-            return leftIsUnavoidable ||
+            return left.IsUnavoidable ||
                 binary.OperatorKind == BinaryOperatorKind.And &&
-                leftSelection == SwitchExpressionSelection.Always &&
+                left.Selection == SwitchExpressionSelection.Always &&
                 IsPatternEvaluationUnavoidable(
                     binary.RightPattern,
                     inputType,
                     inputDefinitelyNonNull) ||
                 binary.OperatorKind == BinaryOperatorKind.Or &&
-                leftSelection == SwitchExpressionSelection.Never &&
+                left.Selection == SwitchExpressionSelection.Never &&
                 IsPatternEvaluationUnavoidable(
                     binary.RightPattern,
                     inputType,
@@ -423,6 +419,104 @@ internal static class SwitchExpressionFacts
         return (inputType?.IsValueType == true || inputDefinitelyNonNull) &&
             SymbolEqualityComparer.Default.Equals(matchedType, inputType);
     }
+
+    private static PatternEvaluationFacts GetPatternEvaluationFacts(
+        IPatternOperation pattern,
+        ITypeSymbol? inputType,
+        bool inputDefinitelyNonNull)
+    {
+        if (pattern is IConstantPatternOperation
+            { Value.ConstantValue: { HasValue: true, Value: null } }
+            && inputDefinitelyNonNull)
+        {
+            return new(
+                SwitchExpressionSelection.Never,
+                false);
+        }
+
+        if (pattern is IDiscardPatternOperation or
+            IDeclarationPatternOperation { MatchesNull: true })
+        {
+            return new(
+                SwitchExpressionSelection.Always,
+                true);
+        }
+
+        if (pattern is IListPatternOperation)
+        {
+            return new(
+                IsTotalPattern(
+                    pattern,
+                    inputType,
+                    inputDefinitelyNonNull)
+                    ? SwitchExpressionSelection.Always
+                    : SwitchExpressionSelection.Maybe,
+                inputType?.IsValueType == true || inputDefinitelyNonNull);
+        }
+
+        if (pattern is INegatedPatternOperation negated)
+        {
+            var nested = GetPatternEvaluationFacts(
+                negated.Pattern,
+                inputType,
+                inputDefinitelyNonNull);
+            return new(
+                Negate(nested.Selection),
+                nested.IsUnavoidable);
+        }
+
+        if (pattern is IBinaryPatternOperation binary)
+        {
+            if (binary.OperatorKind is not
+                (BinaryOperatorKind.And or BinaryOperatorKind.Or))
+            {
+                return new(
+                    GetPatternSelectionForUnknownValue(
+                        pattern,
+                        inputType,
+                        inputDefinitelyNonNull),
+                    IsPatternEvaluationUnavoidable(
+                        binary.LeftPattern,
+                        inputType,
+                        inputDefinitelyNonNull));
+            }
+
+            var left = GetPatternEvaluationFacts(
+                binary.LeftPattern,
+                inputType,
+                inputDefinitelyNonNull);
+            var right = GetPatternEvaluationFacts(
+                binary.RightPattern,
+                inputType,
+                inputDefinitelyNonNull);
+            var selection = binary.OperatorKind == BinaryOperatorKind.And
+                ? And(left.Selection, right.Selection)
+                : Or(left.Selection, right.Selection);
+            var rightRequired = binary.OperatorKind == BinaryOperatorKind.And
+                ? left.Selection == SwitchExpressionSelection.Always
+                : left.Selection == SwitchExpressionSelection.Never;
+            return new(
+                selection,
+                left.IsUnavoidable ||
+                rightRequired && right.IsUnavoidable);
+        }
+
+        var selection = IsTotalPattern(
+            pattern,
+            inputType,
+            inputDefinitelyNonNull)
+                ? SwitchExpressionSelection.Always
+                : SwitchExpressionSelection.Maybe;
+        var matchedType = GetMatchedType(pattern);
+        return new(
+            selection,
+            (inputType?.IsValueType == true || inputDefinitelyNonNull) &&
+            SymbolEqualityComparer.Default.Equals(matchedType, inputType));
+    }
+
+    private readonly record struct PatternEvaluationFacts(
+        SwitchExpressionSelection Selection,
+        bool IsUnavoidable);
 
     private static ITypeSymbol? GetMatchedType(IPatternOperation pattern)
     {
