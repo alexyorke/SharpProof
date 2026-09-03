@@ -21,14 +21,6 @@ internal static class CompilerEffectViolationAuthority
             return false;
         }
 
-        var unexpectedEffects =
-            observed.Effects & ~evidence.Constraint.AllowedEffects;
-        var unexpectedCapabilities =
-            observed.Capabilities & ~evidence.Constraint.AllowedCapabilities;
-        var forbiddenException = HasForbiddenException(
-            evidence.Constraint,
-            observed);
-
         return evidence.ContractKind switch
         {
             WorkerEffectContractKind.EnforcePure =>
@@ -37,14 +29,18 @@ internal static class CompilerEffectViolationAuthority
             WorkerEffectContractKind.ZeroAllocations =>
                 (observed.Effects & WorkerEffectSet.Allocates) != 0,
             WorkerEffectContractKind.AllowedCapabilities =>
-                unexpectedCapabilities != WorkerEffectCapabilitySet.None,
+                (observed.Capabilities & ~evidence.Constraint.AllowedCapabilities) !=
+                WorkerEffectCapabilitySet.None,
             WorkerEffectContractKind.DoesNotThrow =>
                 (observed.Effects & WorkerEffectSet.Throws) != 0,
-            WorkerEffectContractKind.AllowedExceptions => forbiddenException,
+            WorkerEffectContractKind.AllowedExceptions =>
+                HasForbiddenException(evidence.Constraint, observed),
             WorkerEffectContractKind.EffectContract =>
-                unexpectedEffects != WorkerEffectSet.None ||
-                unexpectedCapabilities != WorkerEffectCapabilitySet.None ||
-                forbiddenException,
+                (observed.Effects & ~evidence.Constraint.AllowedEffects) !=
+                    WorkerEffectSet.None ||
+                (observed.Capabilities & ~evidence.Constraint.AllowedCapabilities) !=
+                    WorkerEffectCapabilitySet.None ||
+                HasForbiddenException(evidence.Constraint, observed),
             _ => false
         };
     }

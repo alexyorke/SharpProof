@@ -339,6 +339,7 @@ the smallest relevant containerized test target passes.
 | R920 | Reuse normalized syntax-tree paths in compiler-probe rows | `SharpProof.Package.Test`: CompilerProbe filter, 6 passed |
 | R919 | Aggregate compiler-probe parse-option sets in one pass | `SharpProof.Package.Test`: CompilerProbe filter, 6 passed |
 | R936 | Avoid the intermediate runtime-component path array | `SharpProof.Worker.Test`: WorkerBinaryIdentityTests, 8 passed |
+| R934 | Compute effect-violation facts only for the selected contract rule | `SharpProof.Worker.Test`: 695 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -8651,8 +8652,9 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred forty-four)
 
-R934 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R934 is `applied`: effect-violation dispatch now computes unexpected effects,
+capabilities, and exception hierarchy only in the contract arms that consume
+those facts; all contract-kind verdicts remain unchanged.
 
 ## Second survey, part four hundred forty-five: R935 - dependency-file parse/read duplication
 
