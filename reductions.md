@@ -15688,6 +15688,12 @@ Test-SharpProofCoverage already compares the sorted names from the baseline and 
 |---|---|---|
 | R1308 | **Test-SharpProofCoverage rescans all recomputed authority projects for each baseline project. Build a case-sensitive project-name index once and retain the exact-one validation, rather than executing a full pipeline filter inside every project iteration.** | scripts/Test-SharpProofCoverage.ps1:223-235,497-510 |
 
+### Status (continued)
+
+R1308 is applied: recomputed authority projects are indexed once by ordinal
+name while retaining exact-one validation for each baseline project. Coverage
+script tests pass (33 passed).
+
 ## Second survey, continued: R1309 - discovered test membership uses a linear array search
 
 Get-DiscoveredTestMethods parses, sorts, and de-duplicates the names reported by dotnet vstest, but keeps the result as an array. Reflection then checks every method in each requested class with -contains, which linearly scans that array before a second sort-and-unique projection. An ordinal HashSet[string] can provide the same membership semantics while leaving the returned method ordering and duplicate removal unchanged.
