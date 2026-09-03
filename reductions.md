@@ -14349,3 +14349,18 @@ repeated tree work; any cache must remain scoped to this lowerer's
 | ID | Finding | Evidence |
 |---|---|---|
 | R1202 | **`RoslynOperationLowerer.Opaque` walks the same operation tree once for lowering and again for purity.** Receiver/argument children are enumerated and lowered through `LowerCore`, then `IsDemonstrablyPure` recursively traverses the operation and its children again to decide whether to create a pure opaque term. The existing lowering cache prevents duplicate lowering results but does not avoid the second purity walk. Combining the projections or memoizing purity per operation within a lowering run can preserve the distinct abstention, depth, and `_isKnownPure` semantics while removing redundant traversal.** | `SharpProof.Frontend/RoslynOperationLowerer.cs:290-338,345-391` |
+
+## Second survey, part five hundred twenty-five: R1203 - invocation result type is projected twice
+
+`LowerInvocation` needs the IR result type to create a temporary for a
+supported non-void result. It then passes the unchanged Roslyn result type to
+`GetMember`, whose member construction calls `GetTypeId(resultType)` again for
+the member's result type. `GetTypeId` repeats specialization and the IR type
+classification, so one invocation pays for the same type projection twice.
+Passing the already computed `IrTypeId` through a narrow member-builder
+overload can retain the member-key and temporary-type checks while sharing the
+projection.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1203 | **`RoslynProgramLowerer.LowerInvocation` computes each invocation result type twice.** It calls `_expressions.GetTypeId(invocation.Type)` for the call temporary, then `_expressions.GetMember(..., invocation.Type, ...)`, whose implementation calls `GetTypeId(resultType)` again with the same `invocation.Type`. Reusing the first `IrTypeId` in member construction removes the repeated specialization/classification and preserves the existing member identity and result-type behavior. | `SharpProof.Frontend/RoslynProgramLowerer.cs:384-398`; `SharpProof.Frontend/RoslynOperationLowerer.cs:194-210` |
