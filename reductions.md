@@ -18661,3 +18661,11 @@ settings. The four affected suites pass: ContainerSourceCleanliness 39/39,
 ChangedTestSelection 6/6, ReleaseQualificationMatrix 3/3, and CoverageScript
 33/33. The broader Architecture project retains unrelated pre-existing gate
 failures (14 failures).
+
+## Second survey, continued: R1650 - `EffectEvaluationProjectionsTests.ExpectedClassification` mirrors the generated projection switch
+
+`ExpectedClassification` in the analyzer tests repeats the generated `EffectEvaluationProjections.Classify` decision tree: the same seven precedence arms for established, violated, valid, trusted, and complete, with the same outcome/reason/certainty tuples. The test needs an independent oracle, so calling `Classify` from the expected side would be wrong; the duplication still creates a second policy authority that must be edited whenever the projection catalog changes, and its hard-coded `ResourceLimit` assumption is easy to overlook. A data-driven table of input tuples and expected outputs, or a narrowly documented policy fixture generated from an independent specification, can retain the exhaustive precedence check while making the expected cases declarative and reducing a second hand-maintained switch.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1650 | The test helper duplicates all seven generated classification arms and their output tuples as a second hand-maintained policy switch | `SharpProof.Analyzer.Test/EffectEvaluationProjectionsTests.cs:12-105`; generated policy at `SharpProof.Analyzer.Core/EffectEvaluationProjections.generated.cs:12-42` |
