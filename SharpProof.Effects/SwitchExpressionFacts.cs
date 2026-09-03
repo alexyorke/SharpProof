@@ -179,9 +179,10 @@ internal static class SwitchExpressionFacts
     internal static bool HasReachableUnmatchedPath(
         ISwitchExpressionOperation operation,
         Func<IOperation?, bool> canCompleteNormally,
-        bool inputDefinitelyNonNull = false)
+        bool inputDefinitelyNonNull = false,
+        bool valueAlreadyComplete = false)
     {
-        if (!canCompleteNormally(operation.Value))
+        if (!valueAlreadyComplete && !canCompleteNormally(operation.Value))
         {
             return false;
         }
