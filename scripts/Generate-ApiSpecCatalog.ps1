@@ -145,11 +145,10 @@ function Get-RequiredArrayProperty {
         [string]$Context
     )
 
-    $property = $Object.PSObject.Properties[$Name]
-    if ($null -eq $property) {
-        throw "$Context is missing required property '$Name'."
-    }
-    $value = $property.Value
+    $value = Get-RequiredProperty `
+        -Object $Object `
+        -Name $Name `
+        -Context $Context
     if ($value -isnot [Array]) {
         throw "$Context.$Name must be a JSON array."
     }
