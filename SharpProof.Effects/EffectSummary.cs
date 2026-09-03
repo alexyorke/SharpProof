@@ -38,7 +38,8 @@ public sealed record EffectSummary
             throw new ArgumentOutOfRangeException(nameof(uncertainty));
         }
 
-        var uncertaintyMarker = (EffectUncertainty)(1 << 6);
+        var uncertaintyMarker = EffectUncertainty.Unknown &
+            ~EffectUncertainty.All;
         if ((uncertainty & uncertaintyMarker) != 0 &&
             uncertainty != EffectUncertainty.Unknown)
         {
