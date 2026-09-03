@@ -14042,6 +14042,12 @@ dropping either dimension.
 |---|---|---|
 | R1184 | **`ExceptionHandlerReachability` traverses the same body separately for exception potential and abrupt control-flow reachability.** `CanExitAbruptly` calls `GetPotentialExceptions(operation)` and then `CanExitAbruptlyWithoutExceptions(operation, scope)` when the exception result is inconclusive; `GetPotentialExceptions`' nested-try handling likewise computes a body's exception set and then asks the second walker whether an abrupt exit is reachable. The two results must remain semantically distinct, but a combined `(potentialExceptions, canReachAbruptExit)` projection or carefully scoped memo can avoid replaying the operation structure while retaining catch, finally, goto, and scope behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:92-225,1744-1804,2111-2125` |
 
+### Status (part five hundred six)
+
+R1184 is applied with scoped memoization: parameter-free exception walks and
+`(operation, scope)` abrupt-exit results are reused, while nested context and
+catch/finally policies remain uncached. The Effects test suite passes (323/323).
+
 ## Second survey, part five hundred seven: R1185 - catch reachability caches the wrong layer
 
 `GetReachability` caches the final answer by `CatchClauseSyntax`, but its first
