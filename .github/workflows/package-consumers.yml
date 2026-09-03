@@ -27,7 +27,6 @@ jobs:
     uses: ./.github/workflows/security-reusable.yml
     permissions:
       contents: read
-      packages: read
 
   package:
     name: Pack exact container artifacts
