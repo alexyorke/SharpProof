@@ -9495,3 +9495,57 @@ capable of holding once it is.
 ### Status (part one hundred ninety-eight)
 
 R971 is `deferred`: the cache is local to the protocol validator, but its invalid-type representation and initialization strategy should be tested against the generated shape table before applying it.
+
+## Second survey, part one hundred ninety-nine: R972 - IL integer bounds shadow the scalar catalog
+
+| R972 | **`CompilerImplementationIlSummaryLowerer.TryIntegerRange` duplicates the integer extrema already owned by `CSharpScalarSemantics`.** The IL path has a private two-arm switch that independently maps `SpecialType.System_Int32` to `int.MinValue`/`int.MaxValue` and `System_Int64` to `long.MinValue`/`long.MaxValue`; the generated scalar catalog contains those same bounds as structured `CSharpIntegerSemantics` rows and already exposes `TryGetInteger` to the surrounding frontend. The lowerer calls its copy for overflow-checked arithmetic, division, and remainder, so a future range or supported-type change can make IL summaries disagree with frontend scalar admission without a compiler error. Reusing the catalog's range data, with an explicit `int32`/`int64` admission guard or a narrower signed-arithmetic helper, preserves the IL translator's intentional type subset while removing the second numeric authority. | `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:1171-1190,1569-1587`; generated range authority `SharpProof.Frontend/CSharpScalarSemantics.generated.cs:8-20,74-107,144-154`; consumer reference `SharpProof.CompilerCollector/SharpProof.CompilerCollector.csproj:20` |
+
+### Status (part one hundred ninety-nine)
+
+R972 is `deferred`: sharing is safe only if the lowerer continues to reject the six scalar types that the general frontend catalog supports but this IL translator does not.
+
+## Second survey, part two hundred: R973 - the complexity ratchet does not cover the complexity
+
+A branch-density measurement across 2,985 hand-written production methods,
+compared against the sixteen files the per-file size ratchet governs.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R973 | **Eight of the ten most branch-dense production files are outside the per-file complexity ratchet, and several of the fourteen files it does govern are not dense at all.** `eng/acceptance/algorithm-size-ratchets.json` caps file and member expression-nodes and decision-points for **16 named files**, with the list duplicated as a literal `expectedPaths` array at `ArchitectureTests.cs:511-527` and asserted by set equality. Its own rationale says it exists to *"keep algorithm files and members reviewable."* Measuring branch density over every hand-written production method finds the ten densest files, of which **only `SharpProof.Ir/IrInterpreter.cs` and `SharpProof.Ir/IrProgramInterpreter.cs` are in the manifest**. Outside it: `CompilerImplementationIlSummaryLowerer.ExecuteInstruction` (`:666`, **66 branches - the densest method in the repository by a wide margin**), `ConversionOwnershipClassifier.BuildLocalRegions` (`:214`, 43), `ContractCanonicalization` (42), `SharpProofWorker.VerifyAsync` (`:52`, 39 across ~400 lines), `ExceptionHandlerReachability.PushChildrenCore` (`:1198`, 39), `RequiresCallSiteTreeAnalyzer.CanReachConsumption` (`:626`, 35), and `ConversionEffectClassifier` (34). **Two of those unlisted files are the two that R950 found had their structure deliberately reshaped to work around CA1508's cost** - `ContractCanonicalization` and `ExceptionHandlerReachability` - so the files whose shape is already distorted by an analyzer's limits are outside the gate meant to keep shape reviewable. Meanwhile the manifest governs `IntervalDomain.cs`, `NullnessDomain.cs`, `SequenceCardinalityDomain.cs`, `Evidence.cs` and `Outcomes.cs`, none of which appears near the top of the density measurement. The list is not wrong - it was presumably chosen when those files were the concern - it is **unmaintained relative to where complexity now lives**, and because adding a file means editing two places (the manifest and the literal array that pins it), the friction runs against ever widening it. | `eng/acceptance/algorithm-size-ratchets.json`; `SharpProof.ArchitectureTest/ArchitectureTests.cs:511-527,2072-2110`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs:666`; `SharpProof.Effects/ConversionOwnershipClassifier.cs:214`; `SharpProof.Worker/SharpProofWorker.cs:52`; `SharpProof.Effects/ExceptionHandlerReachability.cs:1198`; `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:626`; `SharpProof.Contracts/ContractCanonicalization.cs` |
+
+### Checked and not proposed (part two hundred)
+
+- **`ExecuteInstruction`'s 66 branches are not themselves a reduction candidate.**
+  It is an IL opcode dispatcher; a wide branch on opcode is the shape of that
+  problem, and collapsing it would trade a reviewable table for indirection.
+  R973 asks that it be *measured*, not that it be restructured.
+- **A caveat on the measurement.** The line-length half of this scan is unreliable:
+  the declaration regex also matched record and class declarations, so figures like
+  "a 591-line method" in `IrCSharpDifferentialOracle.cs` are 591-line **types**, not
+  methods. The **branch-density comparison at file level is sound**, and the seven
+  methods named above were each confirmed by reading their signatures. Recorded so
+  the line figures are not quoted later.
+- **JSON key naming across the catalogs is uniform and needs nothing.** Across the
+  32 product and engineering JSON files, **643 of 695 distinct keys are
+  `camelCase`**. Every exception is a *data value used as a key* rather than a
+  schema property: diagnostic ids (`SP0045`) in the corpus ratchet, package names
+  (`SharpProof.Attributes`) in `third-party-components.json`, and protocol type
+  names in `ProtocolModel.schema.json`. There is no naming drift.
+- **The corpus ratchet is gated in both directions on keys as well as counts**,
+  which strengthens R757 further. `CorpusGate.cs:704-712` fails when an observed
+  reason has **no** ceiling ("a new unreviewed Unknown reason"), and `:724-731`
+  fails when a ceiling has **no** observed reason ("remove its stale ratchet
+  ceiling"). Its three key shapes - single ids, `+`-joined compounds, and the
+  `silent-unclassified` sentinel - are all produced by one function,
+  `GetUnknownReason:645-665`, and matched exactly. This is the most thoroughly
+  gated artifact found in the survey, and remains the model R973 and R757 point
+  at.
+
+### Status (part two hundred)
+
+R973 is `pending` and is a scope question rather than a code change, which puts
+it beside R748 and R757: those record that both complexity ratchets are one-sided,
+this records that the per-file one also governs the wrong sixteen files. Any work
+on the ratchets should settle all three together - direction, headroom reporting,
+and coverage - because fixing one without the others leaves a gate that is precise
+about the wrong thing.
