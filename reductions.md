@@ -19061,3 +19061,11 @@ R1672 and R1673 are applied together: effect-replay tests now share one
 object/array event roster and reuse the linked `AllocationWitnessKinds.Managed`
 wire vocabulary for fixture mapping and concurrent result counts. The affected
 `EffectCounterexampleReplayTests` class passes (31/31).
+
+## Second survey, continued: R1674 - Compiler-manifest authority test repeats an identical mutation lambda
+
+`EffectEvidenceMustMatchIndependentCompilerAuthority` declares two entries in `transitions` that are identical: each changes effect evidence to `Proven`, clears the reason, assigns `CompleteMayEffectSummary`, and clears witness/replay. The loop pairs them with the distinct refuted and unknown source artifacts, so those two source cases should remain; the mutation action itself is one shared operation. Store one `Action<CompilerEffectClaimArtifact>` and apply it to both clones, or keep one action with the source-artifact array, to remove the repeated lambda without weakening the independent cases.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1674 | The authority-boundary test repeats the same evidence mutation lambda twice; share the action while retaining the two distinct source artifacts. | `SharpProof.Worker.Test/CompilerManifestArtifactTests.cs:1069-1087` |
