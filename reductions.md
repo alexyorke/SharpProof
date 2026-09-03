@@ -16516,3 +16516,19 @@ R415 is applied: query encoding creates the fixed integer constants once per
 query and reuses them for bounds, division, and overflow predicates, reducing
 native Z3 handle allocation while preserving expression ownership. The complete
 IrSmtBackendTests suite passes (29 passed).
+
+## Second survey, continued: R1367 - TryArithmetic repeats the candidate extrema update block
+
+`ManagedAbstractValue.TryArithmetic` initializes `minimum` and `maximum` from one product, then repeats the same `candidate < minimum` / `candidate > maximum` update logic for the other three multiplication products. A small local extrema helper or a structured candidate fold can centralize that invariant while preserving all four arbitrary-precision products and the existing overflow bounds check.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1367 | **`TryArithmetic` duplicates the same min/max update logic for three multiplication candidates.** Factor the extrema fold without changing product coverage or overflow behavior. | `SharpProof.Effects/ManagedAbstractFlow.cs:1902-1935` |
+
+## Second survey, continued: R1368 - ExecutableUnflowedDescendants repeats child traversal and completion gating
+
+`ExecutableUnflowedDescendantsAndSelfCore` repeats a two-stage child pattern in invocation arguments, object-creation arguments, simple-assignment property inputs, and property-reference inputs: recursively yield each child's executable descendants, then call `operationFacts.MayCompleteNormally(child)` and stop on failure. A local iterator helper over child operations can own this traversal/short-circuit protocol, while the operation-specific yield order and constructor/initializer/property semantics remain at their current branches.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1368 | **`ExecutableUnflowedDescendantsAndSelfCore` repeats child-descend/normal-completion gating across four branches.** Share the iterator protocol while retaining each branch's exact operation ordering and stop rules. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1707-1732,1740-1751,1795-1818,1834-1857` |
