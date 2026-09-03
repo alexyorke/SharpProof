@@ -12060,3 +12060,15 @@ R1130 is deferred: make retained-seed property validation fail closed on duplica
 ### Status (part three hundred sixty-two)
 
 R1131 is deferred: validate standalone gate JSON from a duplicate-aware parse boundary, preserving existing gate-specific result validation and diagnostics.
+
+## Second survey, part three hundred sixty-three: R1132 - unconditional coverage-report save branch
+
+`Invoke-SharpProofCoverage.ps1` initializes `$changed` to `$false` and sets it when an absolute class path is rewritten. It then always creates and appends the `sharpProofAuthority` node for the report, sets `$changed = $true` unconditionally, and immediately enters `if ($changed) { Save-CoverageXml ... }`. Because the authority append is mandatory after the preceding duplicate-node check, the condition cannot be false and the flag no longer represents a decision. Removing the dead flag/branch and saving at that point preserves both the path rewrites and the required authority metadata.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1132 | **Coverage report post-processing retains an impossible save condition.** Every report appends authority metadata and sets `$changed` true immediately before testing it, so the `if ($changed)` branch and initial flag are redundant. Save directly after the mandatory append while retaining the class-path rewrite logic. | `scripts/Invoke-SharpProofCoverage.ps1:268-301` |
+
+### Status (part three hundred sixty-three)
+
+R1132 is deferred: remove the now-unconditional change flag and preserve the required authority append plus XML save.
