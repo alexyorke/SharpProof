@@ -291,7 +291,7 @@ internal sealed class ExceptionHandlerReachability(
                             invocation);
                     }
                 }
-                PushChildren(invocation);
+                PushChildren(invocation, prerequisitesComplete);
                 continue;
             }
             if (operation is IDeconstructionAssignmentOperation deconstruction)
@@ -1205,13 +1205,16 @@ internal sealed class ExceptionHandlerReachability(
             unknown |= potential.Unknown;
         }
 
-        void PushChildren(IOperation operation)
+        void PushChildren(
+            IOperation operation,
+            bool prerequisitesAlreadyComplete = false)
         {
             PushChildrenCore(
                 operation,
                 remaining,
                 scheduledSwitchBodies,
-                switchCaseReachability);
+                switchCaseReachability,
+                prerequisitesAlreadyComplete);
         }
 
     }
@@ -1224,8 +1227,16 @@ internal sealed class ExceptionHandlerReachability(
         Stack<IOperation> remaining,
         HashSet<ISwitchCaseOperation> scheduledSwitchBodies,
         Dictionary<ISwitchCaseOperation, SwitchCaseReachability>
-            switchCaseReachability)
+            switchCaseReachability,
+        bool prerequisitesAlreadyComplete = false)
     {
+        if (operation is IInvocationOperation &&
+            prerequisitesAlreadyComplete)
+        {
+            PushAllCore(operation.ChildOperations, remaining);
+            return;
+        }
+
         switch (operation)
         {
             case INameOfOperation or ITypeOfOperation or ISizeOfOperation:
