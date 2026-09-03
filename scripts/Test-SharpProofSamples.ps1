@@ -36,10 +36,7 @@ $script:dotnetInvocationOrdinal = 0
 function Invoke-CapturedDotNet {
     param(
         [Parameter(Mandatory)]
-        [string[]]$Arguments,
-
-        [Parameter()]
-        [int]$TimeoutSeconds = 300
+        [string[]]$Arguments
     )
 
     $script:dotnetInvocationOrdinal++
@@ -241,7 +238,7 @@ function New-LocalPackageFeed {
     }
     foreach ($project in @($manifest.projects)) {
         $projectPath = Join-Path $repositoryRoot ([string]$project)
-        $pack = Invoke-CapturedDotNet -TimeoutSeconds 900 -Arguments @(
+        $pack = Invoke-CapturedDotNet -Arguments @(
             'pack',
             $projectPath,
             '--configuration',
