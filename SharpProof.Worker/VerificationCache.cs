@@ -23,6 +23,9 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                     ? timeComparison
                     : StringComparer.Ordinal.Compare(left.Name, right.Name);
             });
+    private static readonly string[] TransactionSuffixes =
+        [".rollback", ".eviction"];
+    private static readonly string CacheFilePattern = "*" + CacheFileSuffix;
     internal static Action<string, string>? PathValidationOverride;
     internal static Action? TransactionRollbackOverride;
     // Set for the most recent read so the worker can distinguish an
@@ -331,7 +334,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         out string originalName)
     {
         originalName = string.Empty;
-        foreach (var suffix in new[] { ".rollback", ".eviction" })
+        foreach (var suffix in TransactionSuffixes)
         {
             if (!fileName.EndsWith(suffix, StringComparison.Ordinal))
             {
@@ -392,7 +395,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
                 CapacityPriorityComparer);
         long total = 0;
         foreach (var file in new DirectoryInfo(_directory).EnumerateFiles(
-                     "*" + CacheFileSuffix,
+                     CacheFilePattern,
                      SearchOption.TopDirectoryOnly))
         {
             cancellationToken.ThrowIfCancellationRequested();
