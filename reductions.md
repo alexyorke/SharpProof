@@ -16125,6 +16125,11 @@ ReferencedPartialEventAccessorsUseImplementationBodies creates inventories for t
 |---|---|---|
 | R1340 | **`ReferencedPartialEventAccessorsUseImplementationBodies` duplicates the same three inventory assertions for definition and implementation accessors. Extract one assertion helper parameterized by the inventory and expected count, preserving the distinct symbol-identity checks.** | `SharpProof.Contracts.Test/PartialMethodContractTests.cs:317-348` |
 
+### Status (continued)
+
+R1340 is applied: both partial-event inventories use one shared assertion
+helper, and the focused test cases pass (2 passed).
+
 ## Second survey, continued: R1341 - generated-header tests duplicate the same analyzer fixture
 
 MarkerMentionsDoNotSuppressHandwrittenCallSites and ExactGeneratedHeadersSuppressUnselectedCallSites each parameterize header text but duplicate the same using directive, Subject.Positive contract, Call method, analyzer options, and file path. Their only behavioral difference is the expected diagnostic set. A shared parameterized case source or local AnalyzeHeader helper can keep the handwritten-marker and exact-header cases distinct while removing the repeated fixture and invocation envelope.
