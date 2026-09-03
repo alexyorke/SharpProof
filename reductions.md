@@ -16412,3 +16412,11 @@ R1358 is applied: the three compilation-reference activation tests now share one
 parameterized compilation and assertion helper while retaining their distinct
 external and caller source fixtures and the nested-parameter AD0001 assertion.
 The focused AdvisoryActivationTests suite passes (26 passed).
+
+## Second survey, continued: R1360 - constant-only literal negation fast path
+
+`RoslynOperationLowerer.VisitUnaryOperator` lowers the operand and checks its exact classification before testing `CompilerConstantAdmission.IsLiteralIntegerNegation`. When that predicate succeeds, the method immediately calls `LowerConstant(operation)`, which reads the unary operation's own constant/type data and does not use the already-lowered operand. Moving the constant-only admission after the operator/lifted/semantics guards but before `_owner.LowerCore(operation.Operand)` can avoid one child lowering and its IR interning for every supported literal integer negation; unsupported and non-literal cases can retain the current operand classification path.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1360 | **`RoslynOperationLowerer.VisitUnaryOperator` lowers a literal operand before a fast path that ignores it.** Check the constant-only integer-negation case before child lowering, while preserving operator, lifted, unsupported, and checked-arithmetic guards for other unary operations. | `SharpProof.Frontend/RoslynOperationLowerer.cs:681-714,449-495`; `SharpProof.Frontend/CompilerConstantAdmission.cs:28-35` |
