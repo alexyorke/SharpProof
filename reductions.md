@@ -13554,3 +13554,24 @@ tail also preserves the order of the existing checks.
 
 R1162 is `pending`: share the static-initialization/source-completion tail and
 retain the invocation-only uncertain-dispatch escape.
+
+## Second survey, part four hundred eighty-five: R1163 - repeated record-clone completion check
+
+The copy-constructor branch of `OperationEffectScanner.ScanWith` passes
+`_completionEvaluator.CanCompleteWithClone(withOperation)` into
+`ScanRecordCopyConstruction`. After that helper returns, `ScanWith` reconstructs
+the clone step and evaluates the same predicate again, with the same operation
+and unchanged analysis state. The clone-method branch has a different
+`ScanCallStep` path and should not be folded into this observation. Carrying the
+already-computed completion result through the branch preserves the later
+`clone.CompletesNormally` combination and initializer sequencing while removing
+one recursive completion evaluation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1163 | **`OperationEffectScanner.ScanWith` recomputes record-clone completion for the copy-constructor path.** When a `with` operation resolves to a record copy constructor, `ScanWith` evaluates `CanCompleteWithClone` to build `ScanRecordCopyConstruction` and immediately evaluates it again while replacing the returned step's completion flag. Reusing the first result removes a duplicate operation/completion traversal without changing the separate clone-method path or initializer ordering. | `SharpProof.Effects/OperationEffectScanner.Expressions.cs:372-406`; predicate `SharpProof.Effects/OperationCompletionEvaluator.cs:699-723` |
+
+### Status (part four hundred eighty-five)
+
+R1163 is `pending`: cache the copy-constructor branch's completion result and
+retain the final combination with the scanned clone summary.
