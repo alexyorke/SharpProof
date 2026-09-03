@@ -14954,6 +14954,13 @@ tests pass (34 passed).
 |---|---|---|
 | R1236 | **`TransferCore` performs a separate mutation walk before transferring and evaluating the same value.** The declarator, flow-capture, and simple-assignment cases compute `HasMutation`/`valueHasMutation`, traverse the value through `Transfer` or `TransferMany`, and then re-traverse it through `EvaluateCore`. A combined transfer result can retain the required ordering while eliminating the redundant structural mutation scan. | `SharpProof.Effects/ManagedAbstractFlow.cs:230-250,252-262,263-285` |
 
+### Status (part five hundred fifty-eight)
+
+R1236 is applied: managed mutation facts are memoized per flow analysis and
+shared by transfer, branch, and proof queries, eliminating repeated structural
+mutation walks without caching state-sensitive evaluation results. Managed
+abstract-flow tests pass (34 passed).
+
 ## Second survey, part five hundred fifty-nine: R1237 - acyclic analysis repeats included-block membership checks
 
 `ManagedAbstractFlow.IsAcyclic` uses an optional `included` block set both in the outer `graph.Blocks.Where(...)` filter and at the start of the recursive `Visit` function. When `included` is non-null, every root block that passes the filter performs the same membership lookup again; recursive destinations still need the visitor-side check. A single visitor entry path that owns reachability and inclusion filtering, or a root loop that calls a separate unchecked core while recursive calls use the checked wrapper, can preserve the included-subgraph semantics while removing the duplicate lookup for roots.
