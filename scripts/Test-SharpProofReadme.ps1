@@ -297,28 +297,47 @@ function Assert-ParseableMarkdownFences {
     }
 }
 
+function Get-EnumMemberMap {
+    param(
+        [Parameter(Mandatory)][string]$Content
+    )
+
+    $membersByName = [Collections.Generic.Dictionary[string, object]]::new(
+        [StringComparer]::Ordinal)
+    $pattern = '(?:public|internal)\s+enum\s+' +
+        '(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\{(?<body>.*?)\}'
+    foreach ($match in [regex]::Matches(
+            $Content,
+            $pattern,
+            [System.Text.RegularExpressions.RegexOptions]::Singleline)) {
+        $enumName = $match.Groups['name'].Value
+        $members = @(
+            $match.Groups['body'].Value.Split([char]',') |
+                ForEach-Object {
+                    $name = ($_ -split '=')[0].Trim()
+                    if ($name.Length -ne 0) {
+                        $name
+                    }
+                }
+        )
+        if (-not $membersByName.TryAdd($enumName, $members)) {
+            throw "Duplicate enum '$enumName' in a documentation source."
+        }
+    }
+    return $membersByName
+}
+
 function Get-EnumMembers {
     param(
-        [Parameter(Mandatory)][string]$Content,
+        [Parameter(Mandatory)][Collections.Generic.Dictionary[string, object]]$EnumMemberMap,
         [Parameter(Mandatory)][string]$EnumName
     )
 
-    $match = [regex]::Match(
-        $Content,
-        "(?:public|internal)\s+enum\s+$EnumName\s*\{(?<body>.*?)\}",
-        [System.Text.RegularExpressions.RegexOptions]::Singleline)
-    if (-not $match.Success) {
+    $members = $null
+    if (-not $EnumMemberMap.TryGetValue($EnumName, [ref]$members)) {
         throw "Could not find enum '$EnumName' in a documentation source."
     }
-    return @(
-        $match.Groups['body'].Value.Split([char]',') |
-            ForEach-Object {
-                $name = ($_ -split '=')[0].Trim()
-                if ($name.Length -ne 0) {
-                    $name
-                }
-            }
-    )
+    return @($members)
 }
 
 $releaseXml = [xml](Get-RequiredText 'SharpProof.Release.props')
@@ -693,6 +712,7 @@ foreach ($entry in $fixedBodyBounds) {
 $unknownReference = Get-RequiredText 'docs\unknown-reasons.md'
 $protocolSource = Get-RequiredText (
     'SharpProof.Worker.Protocol\ProtocolModel.generated.cs')
+$protocolEnumMemberMap = Get-EnumMemberMap $protocolSource
 foreach ($enumName in @(
         'WorkerFeatureSet',
         'WorkerVerifyPolicy',
@@ -704,7 +724,7 @@ foreach ($enumName in @(
         'WorkerClaimOutcome',
         'WorkerClaimReason',
         'WorkerCacheStatus')) {
-    foreach ($value in Get-EnumMembers $protocolSource $enumName) {
+    foreach ($value in Get-EnumMembers $protocolEnumMemberMap $enumName) {
         if (-not $unknownReference.Contains(
                 $value,
                 [StringComparison]::Ordinal)) {
