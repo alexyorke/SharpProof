@@ -5,9 +5,10 @@ sharpproof_enable_effect_summary_json = false
 # are still reported without changing package contents.
 dotnet_diagnostic.IDE0005.severity = none
 dotnet_diagnostic.CS8019.severity = warning
-# Build-visible dead-code inventory. This remains a warning because reflection,
-# MEF, analyzer registration, and serialization can be invisible to static
-# reachability analysis.
+# Build-visible dead-code inventory. The diagnostic remains warning-level here
+# because reflection, MEF, analyzer registration, and serialization can be
+# invisible to static reachability analysis; the build may still promote it to
+# an error through WarningsAsErrors.
 dotnet_diagnostic.CA1811.severity = warning
 dotnet_code_quality.CA1811.api_surface = private, internal
 dotnet_diagnostic.IDE0051.severity = warning

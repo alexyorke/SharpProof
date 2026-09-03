@@ -1,5 +1,9 @@
 # SharpProof historical agent fix queue
 
+> Historical archive: this file records prior agent work. It is not an active
+> queue; use the [current documentation map](../../../docs/README.md) for
+> current guidance.
+
 The open-ended fix loop is frozen for preview convergence. The authoritative
 finite release-debt list is now `preview-debt.md`. This file remains as
 historical mutation and coverage evidence; do not refill its backlog while the

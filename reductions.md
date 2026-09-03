@@ -18805,3 +18805,10 @@ R1640 is applied: the architecture scheduling gate now derives its parallel
 fixture roster from decorated test-fixture types and checks the current
 seven-fixture population, preserving the per-fixture scope and worker-limit
 assertions. `ExpensiveScriptFixturesUseBoundedCaseParallelism` passes (1/1).
+
+R1501 is applied: the archived agent queue now carries the repository's
+historical-record banner, making its frozen procedures clearly non-live.
+
+R1504 is applied: the dead-code severity comment now distinguishes warning-level
+diagnostics from the build's optional `WarningsAsErrors` promotion, removing
+the stale claim that the rules remain warnings during builds.
