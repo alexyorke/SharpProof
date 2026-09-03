@@ -699,19 +699,26 @@ internal sealed class ConversionOwnershipClassifier
                 return true;
             }
 
-            foreach (var assignment in root.DescendantsAndSelf()
-                         .OfType<ISimpleAssignmentOperation>()
-                         .Where(static assignment => assignment.IsRef))
+            var refLikeInvocations = new List<IInvocationOperation>();
+            foreach (var operation in root.DescendantsAndSelf())
             {
-                if (!IsCallMappedRefSource(assignment.Value, method))
+                if (operation is ISimpleAssignmentOperation
+                    {
+                        IsRef: true,
+                        Value: { } value
+                    } && !IsCallMappedRefSource(value, method))
                 {
                     return true;
                 }
+
+                if (operation is IInvocationOperation invocation &&
+                    CanRebindRefLikeStorage(invocation))
+                {
+                    refLikeInvocations.Add(invocation);
+                }
             }
 
-            foreach (var invocation in root.DescendantsAndSelf()
-                         .OfType<IInvocationOperation>()
-                         .Where(CanRebindRefLikeStorage))
+            foreach (var invocation in refLikeInvocations)
             {
                 if (MethodMayIntroduceUnknownRefAlias(
                         invocation.TargetMethod,
