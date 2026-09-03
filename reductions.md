@@ -15158,6 +15158,12 @@ overload ambiguities.
 |---|---|---|
 | R1250 | **The three closed-contract attributes duplicate the same parameter/return target expression.** `NotNull`, `Positive`, and `InRange` each spell the identical `AttributeTargets` union. Centralizing the shared mask reduces repeated metadata policy without merging the public attribute types. | `SharpProof.Attributes/ClosedContractAttributes.cs:3-36` |
 
+### Status (part five hundred seventy-two)
+
+R1250 is applied: `NotNull`, `Positive`, and `InRange` now share a named
+parameter-or-return target mask without merging their public attribute types.
+Frontend catalog-parity tests pass (6 passed).
+
 ## Second survey, part five hundred seventy-three: R1251 - launcher runtime paths rebuild on every query
 
 `LauncherArguments.LauncherRuntimePaths` is an immutable-in-practice projection of the launcher's assembly location, companion extensions, and generated runtime-companion inventory, but its getter constructs a new array and repeats `Assembly.Location`, `Path.GetDirectoryName`, `Path.ChangeExtension`, `Path.Combine`, and runtime-type assembly lookups on every access. `ValidateDistinctPaths` reads the property while deriving runtime directories, again while building the conflict candidates, and again inside the `runtimeSnapshot.ComponentPaths` filter, where the complete eleven-element array is rebuilt once per component path. The runtime closure paths do not change during a process, so a cached immutable projection or one local snapshot per validation pass can retain the same path set while removing repeated metadata and allocation work. This is narrower than R799, which covers canonicalization and filesystem identity calls after paths are obtained, and R798, which covers repeated validation phases.
