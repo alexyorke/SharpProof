@@ -21158,3 +21158,11 @@ version check and delegates the complete bundle validation to the publisher's
 existing `Get-ValidatedRelease` path, removing the duplicate preflight process.
 Both release scripts parse cleanly, and the focused release-version authority
 tests pass 7/7 with zero warnings or errors.
+
+## Second survey, continued: R2002 - Invoke-SharpProofMainPackagePreflight downloads and discards package bodies
+
+`Invoke-SharpProofMainPackagePreflight` creates a temporary file, calls the registry GET callback with that output path, checks only `StatusCode`, and deletes the temporary file in `finally`; it never reads or validates the downloaded package bytes. `Publish-SharpProofRelease` invokes this once per package when constructing remote state, so every main-package preflight downloads a complete `.nupkg` solely to distinguish 404 from 200. Prefer a HEAD or small metadata/range request if the supported registries guarantee the same status semantics, or explicitly document why a full GET is required and stream/discard it without a temporary file; retain the current status and cleanup behavior if the request contract cannot be narrowed.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2002 | Invoke-SharpProofMainPackagePreflight performs a full GET into a temporary file even though it uses only the HTTP status and immediately deletes the body. | scripts/SharpProof.PublicationDestination.ps1:333-369; scripts/Publish-SharpProofRelease.ps1:493-522 |
