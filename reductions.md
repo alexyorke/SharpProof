@@ -12048,3 +12048,15 @@ R1129 is deferred: execute the already-verified fuzz assembly directly, preservi
 ### Status (part three hundred sixty-one)
 
 R1130 is deferred: make retained-seed property validation fail closed on duplicates and missing keys, preserving the existing strict types and budget limits.
+
+## Second survey, part three hundred sixty-two: R1131 - duplicate-key loss in standalone gate evidence
+
+`Assert-SharpProofStandaloneGateResult.ps1` reads the evidence file with `ConvertFrom-Json` and then validates the resulting `PSObject` property names. PowerShell's conversion collapses repeated JSON keys before that shape check; a raw result with a duplicated known property is therefore presented to the validator as if it had appeared once, and the original key multiplicity or conflicting value is no longer observable. The neighboring fuzz-result validator reads a bounded UTF-8 byte snapshot into `JsonDocument` and rejects duplicate names before projecting typed values. Applying the same strict JSON boundary, or at least a duplicate-preserving property scan, to standalone gate evidence can close the asymmetry while retaining its corpus/performance-specific schema checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1131 | **Standalone gate evidence loses duplicate JSON keys before schema validation.** `ConvertFrom-Json` collapses repeated properties, so `Assert-ExactJsonProperties` cannot enforce a unique raw-key contract or detect conflicting duplicate values. Use a strict `JsonDocument`/byte reader like the fuzz-result path before the existing typed checks. | `scripts/Assert-SharpProofStandaloneGateResult.ps1:20-34`; strict peer `scripts/Assert-SharpProofFuzzRunnerResult.ps1:62-96` |
+
+### Status (part three hundred sixty-two)
+
+R1131 is deferred: validate standalone gate JSON from a duplicate-aware parse boundary, preserving existing gate-specific result validation and diagnostics.
