@@ -13491,3 +13491,27 @@ hand-written `if (x == null) throw` blocks, call `ArgumentNullGuard`. It should 
 applied together with R364, which is the same fix in `SharpProof.Worker`, and the
 `Gates` share of it should be sequenced after R951, because `Gates` reaches
 `SharpProof.Ir` only transitively.
+
+## Second survey, part four hundred eighty-two: R1160 - per-resource disposal facts recomputed
+
+`UsingDisposalEffectResolver.ResolveResources` processes each acquired resource
+by calling `ResolveResource`, then immediately calls `CanDisposalUnwind` for the
+same `(Type, Resource, Origin)` tuple. The first path calls `IsDefinitelyNull`
+and, for a non-null resource, resolves `UsingDisposalEffectResolver.ResolveDispose`;
+the second path repeats both checks against unchanged operation and compilation
+state before deciding whether to continue unwinding. `ResolveResource` also
+computes `IsDispatchUncertain(dispose)` once for its completion/throw filter and
+again when constructing the effect call. These are local facts for one resource,
+not independent validation boundaries. Returning a small per-resource
+resolution (or passing the already resolved disposal method and uncertainty into
+the unwind predicate) can remove the repeated nullness, symbol-resolution, and
+dispatch checks while preserving the separate summary and unwind decisions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1160 | **`UsingDisposalEffectResolver` recomputes each grouped resource's disposal facts immediately.** `ResolveResources` first sends an acquired resource through `ResolveResource`, which checks nullness and resolves its disposal method, then sends the same resource through `CanDisposalUnwind`, which checks nullness and performs the same disposal lookup again. Within `ResolveResource`, the same disposal symbol's dispatch uncertainty is also evaluated in both the admission condition and the final `_calls.Resolve` arguments. Carrying a per-resource resolution forward can remove these repeated checks without merging the distinct effect-summary and unwind policies. | `SharpProof.Effects/UsingDisposalEffectResolver.cs:141-170,207-277`; existing sibling-loop reduction R386 |
+
+### Status (part four hundred eighty-two)
+
+R1160 is `pending`: retain the separate summary and unwind outcomes, but share
+the immutable per-resource facts between them.
