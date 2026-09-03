@@ -13064,3 +13064,54 @@ names appears anywhere in the repository. Move R984 to applied.
 No new ID. With R984 applied, this session's applied or partly-applied set is
 R732, R733, R734, R735, R949, R953, R955, R958, R962, R970, R975, R980 and R984.
 The generic-type dimension is measured and clean, and its one finding is closed.
+
+## Second survey, part four hundred seventy-seven: the const-string census - three of four already filed
+
+Every `const string` declaration in production, grouped by value and by name. This
+is the first technique in this stretch of the survey to produce **no new finding
+worth filing**, which is itself the result. **No ID is allocated.**
+
+### Checked and not proposed (part four hundred seventy-seven)
+
+- **The const-string surface is small and nearly free of cross-assembly
+  duplication.** Production declares **120 `const string`s with 115 distinct
+  values**. Exactly **four** values appear in two or more assemblies, and **three of
+  the four are already in this ledger**:
+  - `"SHARPPROOF_CONTRACTS"` in three assemblies - `Contract.ConditionalSymbol`
+    (`SharpProof.Attributes/Contract.cs:9`, the public declaration),
+    `ContractApiMetadata.ConditionalSymbol`
+    (`SharpProof.Frontend/ContractApiMetadata.generated.cs:65`, generated from
+    `ContractApi.catalog.json`), and `CompilationFingerprint.RuntimeContractEvaluationSymbol`
+    (`SharpProof.CompilerArtifact/CompilationFingerprint.cs:10`, private, under a
+    third name). **This is R374**, which already records the symbol as
+    "independently authored at four boundaries".
+  - `"System.Diagnostics.ConditionalAttribute"` in `SharpProof.Frontend` and
+    `SharpProof.Specs` - covered by **R482**, which records
+    `FrameworkTypeMetadataNames` as the intended single home for BCL type-name
+    constants and its own doc comment as stating that policy.
+  - `"Microsoft.CodeAnalysis.AdditionalTextFile"`, declared under the **same name**
+    `CommandLineAdditionalTextTypeName` in `SharpProof.CompilerCollector` and
+    `SharpProof.CompilerProbe.TestAsset` - part of the probe-duplicates-collector
+    relationship already filed as **R281** and **R323**.
+- **The only unfiled one is trivial and not proposed.** The SHA-256 of the empty
+  string, `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, is
+  declared as `EmptyTextSha256` in `SharpProof.CompilerArtifact/CompilerCaptureAuthority.cs:8`
+  and as `EmptySha256` in `SharpProof.Worker.Protocol/ProtocolModel.generated.cs:14`.
+  One is hand-written and one is generated, in assemblies where the generated side
+  is the wire model; sharing it would mean the artifact assembly depending on the
+  protocol assembly's generated constant for a value that is a mathematical
+  identity, not a protocol decision. Two declarations of a well-known constant
+  under two names is not worth a cross-assembly coupling.
+- **Only one constant name is reused with different values across the tree.**
+  `Domain` is `"SharpProof.CompilerFeatureScope"` in
+  `CompilerFeatureScopeFingerprint.cs:9` and `"SharpProof.Worker.ManifestHash"` in
+  `ProtocolModel.generated.cs:965` - two different hash domains correctly named for
+  what they are, in different assemblies, with no shared meaning to confuse.
+
+### Status (part four hundred seventy-seven)
+
+No ID allocated. The result worth recording is the ratio: of four cross-assembly
+constant duplications, **three were already filed** and the fourth is not worth
+filing. Reading the ledger first - which this survey's own instruction requires -
+is what kept three duplicates out of it, and this is the clearest instance of that
+in the session.
