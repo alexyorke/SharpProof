@@ -11988,3 +11988,15 @@ R1124 is deferred: make release-artifact membership consume `$SharpProofPackageI
 ### Status (part three hundred fifty-six)
 
 R1125 is deferred: separate one-time workflow-document parsing from per-job lookup and retain the explicit contract-job existence and alias checks.
+
+## Second survey, part three hundred fifty-seven: R1126 - duplicated pilot evidence-path scaffolding
+
+`Test-SharpProofPilots.ps1` first derives the positive pilot artifact paths (`request.json`, `result.json`, `compiler-manifest.json`, and `result.sarif`) from `$artifactDirectory`, and later, only for `contract-heavy` pilots, derives the same four leaf names again from `$negativeArtifactDirectory`. The negative run also repeats the corresponding log-path construction with a `-negative` suffix. The roots and the positive-versus-negative build properties must remain distinct, but a helper that projects the four evidence paths and a log path from a root and run label can remove the repeated filename scaffold and make the two evidence sets less likely to drift.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1126 | **Pilot qualification duplicates its evidence-file path map for positive and negative runs.** Both branches spell the same request/result/compiler-manifest/SARIF filenames and log naming independently; only the root and run label differ. Share the path projection while retaining separate positive and negative directories, commands, and validation policies. | `scripts/Test-SharpProofPilots.ps1:193-216,255-269` |
+
+### Status (part three hundred fifty-seven)
+
+R1126 is deferred: centralize the pilot evidence-path projection, preserving the distinct roots and negative-probe behavior.
