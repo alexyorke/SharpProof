@@ -714,23 +714,22 @@ internal static class Program
         IReadOnlyList<PublicationMember> members,
         PreviousPublication previous)
     {
-        var restoreMembers = members.ToArray();
         try
         {
-            foreach (var member in restoreMembers)
+            foreach (var member in members)
             {
                 member.Temporary = AtomicFile.PrepareStaged(member.Path);
                 File.Copy(previous.BackupPaths[member.Path], member.Temporary);
                 LinuxPathIdentity.SyncDirectory(Path.GetDirectoryName(member.Path)!);
             }
-            foreach (var member in restoreMembers)
+            foreach (var member in members)
             {
                 PublishMember(member);
             }
         }
         finally
         {
-            CleanupPublicationStaging(restoreMembers);
+            CleanupPublicationStaging(members);
         }
     }
 
