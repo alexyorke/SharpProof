@@ -1086,11 +1086,11 @@ into R306.
 
 ### Status (part eleven)
 
-R306 and R307 are `pending`. The `SharpProof.Effects`-internal part of R306 is the
-cheapest real cleanup found in production C# during this whole survey: three
-copies in one assembly, one of them already `internal`, no cross-assembly
-question to settle. R307 is small but should be done deliberately, because the
-computation is soundness-bearing even though the copies currently agree.
+R306 is partially applied: the Effects-internal copies now call the existing
+`ConversionOwnershipClassifier.IsInsideNestedCallable` helper, while the
+cross-assembly and syntax-tree variants remain separate. R307 is small but
+should be done deliberately, because the computation is soundness-bearing even
+though the copies currently agree.
 
 ## Second survey, part twelve: R308-R309
 

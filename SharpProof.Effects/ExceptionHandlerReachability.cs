@@ -2163,7 +2163,7 @@ internal sealed class ExceptionHandlerReachability(
             return true;
         }
         if (!ReferenceEquals(operation, root) &&
-            HasNestedCallableParent(operation, root))
+            ConversionOwnershipClassifier.IsInsideNestedCallable(operation, root))
         {
             return false;
         }
@@ -2678,7 +2678,7 @@ internal sealed class ExceptionHandlerReachability(
                     !ManagedAbstractFlow.IsCompileTimeUnreachable(
                         compilation,
                         returned) &&
-                    !HasNestedCallableParent(returned, root))
+                    !ConversionOwnershipClassifier.IsInsideNestedCallable(returned, root))
                 .Select(static returned => returned.ReturnedValue!)
                 .ToArray();
             if (returnedValues.Length == 0 && directBody != null &&
@@ -2706,23 +2706,6 @@ internal sealed class ExceptionHandlerReachability(
         {
             return ReturnNullability.MaybeNull;
         }
-    }
-
-    private static bool HasNestedCallableParent(
-        IOperation operation,
-        IOperation root)
-    {
-        for (var parent = operation.Parent;
-             parent != null && !ReferenceEquals(parent, root);
-             parent = parent.Parent)
-        {
-            if (parent is IAnonymousFunctionOperation or
-                ILocalFunctionOperation)
-            {
-                return true;
-            }
-        }
-        return false;
     }
 
     internal enum ReturnNullability

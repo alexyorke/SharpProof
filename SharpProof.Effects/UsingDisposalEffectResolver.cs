@@ -43,7 +43,7 @@ internal sealed class UsingDisposalEffectResolver
                          operation is IUsingOperation or
                              IUsingDeclarationOperation))
         {
-            if (IsInsideNestedCallable(operation, root) ||
+            if (ConversionOwnershipClassifier.IsInsideNestedCallable(operation, root) ||
                 _flow != null && !_flow.IsReachable(operation))
             {
                 continue;
@@ -382,21 +382,4 @@ internal sealed class UsingDisposalEffectResolver
             (canReimplementInterface || !method.IsSealed);
     }
 
-    private static bool IsInsideNestedCallable(
-        IOperation operation,
-        IOperation root)
-    {
-        for (var parent = operation.Parent;
-             parent != null && !ReferenceEquals(parent, root);
-             parent = parent.Parent)
-        {
-            if (parent is IAnonymousFunctionOperation or
-                ILocalFunctionOperation)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }
