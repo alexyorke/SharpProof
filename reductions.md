@@ -14454,3 +14454,19 @@ removing repeated projection work.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1208 | **`WorkerProtocolJson.CountsMatch` recomputes each count row's kind and count.** Its `actual.All` predicate evaluates `count(value)` twice and `kind(value)` three times for a valid row: before positivity/enum checks, for `seen.Add`, and again for dictionary lookup. Local `itemKind` and `itemCount` values inside an equivalent loop can preserve the existing validation order and fail-fast behavior without repeated generic delegate calls. | `SharpProof.Worker.Protocol/ProtocolJson.cs:809-821` |
+
+## Second survey, part five hundred thirty-one: R1209 - verifier cleanup is wired at multiple target levels
+
+`_SharpProofCleanupInvocation` is already the single target that validates and
+removes the invocation directory. The verifier targets nevertheless attach it
+to initialization failure, verifier-core failure, and the public verifier
+target's failure path, while verifier-core also calls it explicitly after a
+successful run. When a dependency error propagates through the nested targets,
+more than one `OnError` hook can schedule the same cleanup and repeat its path
+validation/removal work. One owning failure boundary, plus the explicit
+success cleanup, can preserve cleanup on every exit while avoiding layered
+re-entry and making the target's ownership easier to reason about.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1209 | **`SharpProof.Verifier.targets` wires `_SharpProofCleanupInvocation` through redundant failure hooks.** The initialization target, `_SharpProofVerifyCore`, and public `SharpProofVerify` each declare an `OnError` for the same cleanup target, and `_SharpProofVerifyCore` also invokes it with `CallTarget` on success. Consolidating the failure hook at one boundary while retaining the success call preserves the cleanup contract without repeated target scheduling and directory checks. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:71-140,164-164,251-259` |
