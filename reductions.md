@@ -21252,3 +21252,17 @@ R2006 is applied: removed the obsolete
 `sharpproof_enable_effect_summary_json` assignment from the root global
 configuration. The live profile/features registry remains unchanged, and the
 focused analyzer-configuration tests pass (5/5).
+
+R1880 remains deferred: its 32 stale mutation pins target safety-boundary
+behavior, and refreshing each mutation against the refactored source requires
+reconstructing the intended mutant and rerunning its discriminating test.
+Deleting or auto-skipping those entries would silently reduce mutation
+coverage, so the fail-closed preflight is retained until that evidence can be
+refreshed deliberately.
+
+R1900 remains deferred: deduplicating the repeated compiler-artifact schema
+properties requires a new named-group construct in the schema language and
+generator, followed by regenerated output and compatibility validation. A
+data-only edit would either change the wire model or leave the generator's
+authority inconsistent, so this larger feature change is outside the safe
+mechanical reduction pass.
