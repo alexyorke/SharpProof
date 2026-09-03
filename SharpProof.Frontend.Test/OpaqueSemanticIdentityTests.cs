@@ -39,8 +39,12 @@ public sealed class OpaqueSemanticIdentityTests
         var tryCast = lowerer.Lower(operations[0]);
         var throwingCast = lowerer.Lower(operations[1]);
 
-        AssertPureConversionAbstention(tryCast);
-        AssertPureConversionAbstention(throwingCast);
+        AssertPureAbstention(
+            tryCast,
+            FrontendAbstention.ConversionMayChangeValue);
+        AssertPureAbstention(
+            throwingCast,
+            FrontendAbstention.ConversionMayChangeValue);
         Assert.That(throwingCast.Term, Is.Not.SameAs(tryCast.Term));
         Assert.That(throwingCast.Term.Id, Is.Not.EqualTo(tryCast.Term.Id));
     }
@@ -70,8 +74,12 @@ public sealed class OpaqueSemanticIdentityTests
         var first = lowerer.Lower(fields[0]);
         var second = lowerer.Lower(fields[1]);
 
-        AssertPureUnsupportedOperationAbstention(first);
-        AssertPureUnsupportedOperationAbstention(second);
+        AssertPureAbstention(
+            first,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertPureAbstention(
+            second,
+            FrontendAbstention.UnsupportedOperationKind);
         Assert.That(second.Term, Is.Not.SameAs(first.Term));
         Assert.That(second.Term.Id, Is.Not.EqualTo(first.Term.Id));
     }
@@ -97,8 +105,12 @@ public sealed class OpaqueSemanticIdentityTests
         var firstTypeOf = typeOfLowerer.Lower(typeOfOperations[0]);
         var secondTypeOf = typeOfLowerer.Lower(typeOfOperations[1]);
 
-        AssertPureUnsupportedOperationAbstention(firstTypeOf);
-        AssertPureUnsupportedOperationAbstention(secondTypeOf);
+        AssertPureAbstention(
+            firstTypeOf,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertPureAbstention(
+            secondTypeOf,
+            FrontendAbstention.UnsupportedOperationKind);
         Assert.That(secondTypeOf.Term, Is.Not.SameAs(firstTypeOf.Term));
         Assert.That(
             secondTypeOf.Term.Id,
@@ -128,16 +140,21 @@ public sealed class OpaqueSemanticIdentityTests
         var firstSizeOf = sizeOfLowerer.Lower(sizeOfOperations[0]);
         var secondSizeOf = sizeOfLowerer.Lower(sizeOfOperations[1]);
 
-        AssertPureUnsupportedOperationAbstention(firstSizeOf);
-        AssertPureUnsupportedOperationAbstention(secondSizeOf);
+        AssertPureAbstention(
+            firstSizeOf,
+            FrontendAbstention.UnsupportedOperationKind);
+        AssertPureAbstention(
+            secondSizeOf,
+            FrontendAbstention.UnsupportedOperationKind);
         Assert.That(secondSizeOf.Term, Is.Not.SameAs(firstSizeOf.Term));
         Assert.That(
             secondSizeOf.Term.Id,
             Is.Not.EqualTo(firstSizeOf.Term.Id));
     }
 
-    private static void AssertPureConversionAbstention(
-        FrontendLoweringResult result)
+    private static void AssertPureAbstention(
+        FrontendLoweringResult result,
+        FrontendAbstention expectedAbstention)
     {
         Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
         Assert.That(
@@ -148,22 +165,7 @@ public sealed class OpaqueSemanticIdentityTests
             Is.EqualTo(FrontendSubsetDecision.ClosedAbstention));
         Assert.That(
             result.Classification.Abstention,
-            Is.EqualTo(FrontendAbstention.ConversionMayChangeValue));
-    }
-
-    private static void AssertPureUnsupportedOperationAbstention(
-        FrontendLoweringResult result)
-    {
-        Assert.That(result.Term, Is.TypeOf<IrOpaqueTerm>());
-        Assert.That(
-            ((IrOpaqueTerm)result.Term).Purity,
-            Is.EqualTo(IrOpaquePurity.Pure));
-        Assert.That(
-            result.Classification.Decision,
-            Is.EqualTo(FrontendSubsetDecision.ClosedAbstention));
-        Assert.That(
-            result.Classification.Abstention,
-            Is.EqualTo(FrontendAbstention.UnsupportedOperationKind));
+            Is.EqualTo(expectedAbstention));
     }
 
     private static IOperation GetTargetExpression(string source)

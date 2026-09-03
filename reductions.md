@@ -19141,3 +19141,8 @@ The new `SharpProof.Package.Test` condition in `Directory.Build.props` is attach
 | ID | Finding | Evidence |
 |---|---|---|
 | R1679 | Package.Test is added to a shared-source group for metadata references but is also forced to compile an unused 116-line TestCompilation helper; split the MSBuild conditions. | `Directory.Build.props:105-111`; `SharpProof.Package.Test/CompilerProbeInputConsistencyTests.cs:69-79`; `eng/testing/TestCompilation.cs:1-116` |
+
+R1678 is applied: opaque-identity tests now share one pure-abstention assertion
+helper parameterized by the expected frontend abstention, while conversion and
+unsupported-operation expectations remain explicit at their call sites.
+`OpaqueSemanticIdentityTests` passes (3/3).
