@@ -21208,3 +21208,11 @@ R2004 is applied: the broad PR evidence upload now excludes
 `fast-pr-performance` artifact as the sole owner of those files. The
 performance-isolation architecture test passes 1/1; the workflow retains its
 artifact name and retention contract.
+
+## Second survey, continued: R2005 - SharpProof.Release.props retains two unconsumed product metadata properties
+
+`SharpProof.Release.props` defines `SharpProofProductName` and `SharpProofProductDescription`, and `Directory.Build.props` imports that file for every project, but an exact repository-wide search finds no read of either property outside its definition. The live packaging metadata uses `SharpProofPublisher` and `SharpProofProjectUrl`; the two package nuspecs carry their own description/name metadata, so these two custom properties currently add globally evaluated configuration without influencing a build or package. Remove the unused properties, or wire them deliberately into the nuspec metadata before retaining them; do not remove the live release properties that the version reader, package metadata, and README checks consume.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2005 | `SharpProof.Release.props` defines `SharpProofProductName` and `SharpProofProductDescription` with zero in-repository consumers; remove the dead properties or connect them to an explicit packaging authority. | SharpProof.Release.props:3,12-13; Directory.Build.props:2; exact `git grep` census found one definition and no read for each |
