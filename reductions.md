@@ -191,6 +191,7 @@ the smallest relevant containerized test target passes.
 | R093 | Merge the entry- and lock-reparse cache tests into one parameterized test while retaining both symlink safety cases | `SharpProof.Worker.Test`: focused reparse tests, 2 passed |
 | R092 | Parameterize the Worker TCB precondition, postcondition, and normal-completion edge-case families while retaining all verdict and vacuity assertions | `SharpProof.Worker.Test`: 7 focused cases passed |
 | R090 | Share malformed and well-formed compiler-manifest capture round-trip assertions while retaining fingerprint recomputation and source-specific fixtures | `SharpProof.Worker.Test`: CompilerManifestArtifactTests, 91 passed |
+| R089 | Merge the three rehashed-cache integrity tests into one parameterized mutation test while retaining each corruption mode and recomputation assertions | `SharpProof.Worker.Test`: 3 focused cases passed |
 | R625 | Hash already-normalized corpus text without a second line-ending scan | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R623 | Share corpus observation collection between gate execution and snapshot rendering | `SharpProof.Gates.Test`: CorpusGateTests, 23 passed |
 | R869 | Validate IR sequence elements while taking the immutable snapshot | `SharpProof.Ir.Test`: 114 passed |
@@ -429,7 +430,7 @@ status document.
 | R038-R039, R041 | These alter soundness-sensitive traversal, pattern, or replay-candidate ordering; defer to a dedicated semantic refactor. |
 | R007-R009 | Compiler-probe JSON bytes, artifact authority, and IL opcode admission are compatibility/soundness boundaries; defer to focused format work. |
 | R027-R031 | Generalizing process, temporary-directory, and package-test setup changes cleanup/lifetime semantics across many fixtures; defer after the shared root/default work already removed the exact duplication. |
-| R057, R087-R089, R091, R095-R096, R104-R105 | These parameterize or abstract large test fixtures; keep named failure isolation and local arrange/assert evidence in this reduction pass. |
+| R057, R087-R088, R091, R095-R096, R104-R105 | These parameterize or abstract large test fixtures; keep named failure isolation and local arrange/assert evidence in this reduction pass. |
 | R066-R070 | These change sample/pilot inheritance, scheduled validation, packaged imports, workflow setup, or automatic production-project classification. |
 | R072, R074, R076 | Shared shard/coverage/timing orchestration would centralize timeout, process, and atomic-publication semantics; treat as dedicated infrastructure work. |
 | R078-R080, R082-R085 | Soundness-critical recursive traversal, dispatch, alias, and abstract-value changes are deferred as requested. |
@@ -473,7 +474,7 @@ Merged IDs are not separate work items and must not be counted twice.
 
 ## Pending queue
 
-The active follow-up queue is R087-R089, R091, R096, R104-R105,
+The active follow-up queue is R087-R088, R091, R096, R104-R105,
 R107, R149, R165, R169, R171-R185, R194, R211, R217-R218, and R221.
 Each still requires current-tree validation before implementation. The other
 items in the Deferred table are intentional behavior, public API, release

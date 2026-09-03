@@ -5260,79 +5260,18 @@ public sealed class WorkerTests
         }
     }
 
-    [Test]
-    public async Task RehashedCacheCannotUpgradeARefutationToProven()
+    [TestCase("outcome")]
+    [TestCase("manifest")]
+    [TestCase("model")]
+    public async Task RehashedCacheMissesAndRecomputesAfterMutation(
+        string mutationKind)
     {
         using var project = TestProject.Create(RefutationSource);
         var request = project.CreateRequest(cacheEnabled: true);
         var backend = new SpuriousModelBackend();
         using var worker = new SharpProofWorker(backend);
         var first = await worker.VerifyAsync(request);
-        await RewriteCachedClaimAsync(
-            project,
-            claim =>
-            {
-                claim["outcome"] = nameof(WorkerClaimOutcome.Proven);
-                claim["model"] = new JsonArray();
-            });
-
-        var second = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                first.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(backend.CallCount, Is.EqualTo(2));
-            Assert.That(
-                second.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(
-                second.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
-        }
-    }
-
-    [Test]
-    public async Task RehashedCacheSealedForDifferentManifestMissesAndRecomputes()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        await RewriteCachedPayloadAsync(
-            project,
-            payload => payload["manifestHash"] = new string('c', 64));
-
-        var second = await worker.VerifyAsync(request);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                first.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(backend.CallCount, Is.EqualTo(2));
-            Assert.That(
-                second.Summary.CacheStatus,
-                Is.EqualTo(WorkerCacheStatus.Written));
-            Assert.That(
-                second.ClaimResults.Single().Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Refuted));
-        }
-    }
-
-    [Test]
-    public async Task RehashedCacheWithInvalidScalarModelMissesAndRecomputes()
-    {
-        using var project = TestProject.Create(RefutationSource);
-        var request = project.CreateRequest(cacheEnabled: true);
-        var backend = new SpuriousModelBackend();
-        using var worker = new SharpProofWorker(backend);
-        var first = await worker.VerifyAsync(request);
-        await RewriteCachedClaimAsync(
-            project,
-            claim => claim["model"]![0]!["value"] = "not-an-integer");
+        await RewriteRehashedCacheAsync(project, mutationKind);
 
         var second = await worker.VerifyAsync(request);
 
@@ -6197,6 +6136,29 @@ public sealed class WorkerTests
         await RewriteCachedPayloadAsync(
             project,
             payload => mutate(payload["claimResults"]![0]!.AsObject()));
+    }
+
+    private static Task RewriteRehashedCacheAsync(
+        TestProject project,
+        string mutationKind)
+    {
+        return mutationKind switch
+        {
+            "outcome" => RewriteCachedClaimAsync(
+                project,
+                claim =>
+                {
+                    claim["outcome"] = nameof(WorkerClaimOutcome.Proven);
+                    claim["model"] = new JsonArray();
+                }),
+            "manifest" => RewriteCachedPayloadAsync(
+                project,
+                payload => payload["manifestHash"] = new string('c', 64)),
+            "model" => RewriteCachedClaimAsync(
+                project,
+                claim => claim["model"]![0]!["value"] = "not-an-integer"),
+            _ => throw new ArgumentOutOfRangeException(nameof(mutationKind))
+        };
     }
 
     private static async Task RewriteCachedPayloadAsync(
