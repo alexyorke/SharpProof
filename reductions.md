@@ -15186,6 +15186,13 @@ generated companion inventory. Launcher argument tests pass (75 passed).
 |---|---|---|
 | R1252 | **`RoslynProgramLowerer.LowerInvocation` walks each invocation's arguments twice.** Argument lowering and direct-invocation validation independently enumerate the same argument list and inspect parameter ordinals. Carry the directness result with the lowered argument projection to remove the second scan and temporary ordinal set without changing argument order or admission rules. | `SharpProof.Frontend/RoslynProgramLowerer.cs:385-395,449-460`; `SharpProof.Frontend/RoslynProgramLowerer.cs:35-56` |
 
+### Status (part five hundred seventy-four)
+
+R1252 is applied: invocation lowering now validates directness while lowering
+arguments and carries that fact with the ordered terms, preserving Roslyn
+ordinal ordering and unsupported-shape abstentions. Program-lowering and general
+frontend-lowering tests pass (27 and 37 passed, respectively).
+
 ## Second survey, part five hundred seventy-five: R1253 - CFG block selection is followed by another full block scan
 
 `LoweringSession.SelectBlocks` performs a reachability walk and then enumerates the complete graph block collection to materialize the ordered selected array. Immediately afterward, `Lower` enumerates that same graph collection again to find the first reachable catch handler omitted by the selection, using the just-returned reachability set. The ordered selected blocks and the omitted-handler observation can be produced from one post-walk projection, or the omitted handler can be carried out of selection, retaining the explicit ordinal ordering and catch-handler policy while removing one full CFG-block scan.
