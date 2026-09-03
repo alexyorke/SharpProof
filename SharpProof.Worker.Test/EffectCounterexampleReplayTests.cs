@@ -172,23 +172,7 @@ public sealed class EffectCounterexampleReplayTests
             CompilerEffectReplayEventKind.ManagedObjectAllocation);
         fixture.Evidence.ContractKind =
             WorkerEffectContractKind.DoesNotThrow;
-        CompilerEffectClaimArtifactCodec.Seal(fixture.Evidence);
-
-        var result = EffectClaimResultAssembler.Assemble(
-            fixture.Target,
-            fixture.Evidence);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                result.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                result.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.CounterexampleReplayFailed));
-            Assert.That(result.EffectWitness, Is.Null);
-        }
+        AssertAllocationReplayUnknown(fixture);
     }
 
     [TestCase(
@@ -247,22 +231,7 @@ public sealed class EffectCounterexampleReplayTests
             CompilerEffectReplayEventKind.ManagedObjectAllocation);
         fixture.Evidence.ContractKind =
             WorkerEffectContractKind.EnforcePure;
-        CompilerEffectClaimArtifactCodec.Seal(fixture.Evidence);
-
-        var replayed = EffectClaimResultAssembler.Assemble(
-            fixture.Target,
-            fixture.Evidence);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                replayed.Outcome,
-                Is.EqualTo(WorkerClaimOutcome.Unknown));
-            Assert.That(
-                replayed.Reason,
-                Is.EqualTo(
-                    WorkerClaimReason.CounterexampleReplayFailed));
-            Assert.That(replayed.EffectWitness, Is.Null);
-        }
+        AssertAllocationReplayUnknown(fixture);
 
         var response = new WorkerVerifyResponse
         {
@@ -292,6 +261,28 @@ public sealed class EffectCounterexampleReplayTests
         Assert.That(
             errors,
             Does.Contain("response.effect_witness_authority"));
+    }
+
+    private static void AssertAllocationReplayUnknown(
+        ReplayFixture fixture)
+    {
+        CompilerEffectClaimArtifactCodec.Seal(fixture.Evidence);
+
+        var result = EffectClaimResultAssembler.Assemble(
+            fixture.Target,
+            fixture.Evidence);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Outcome,
+                Is.EqualTo(WorkerClaimOutcome.Unknown));
+            Assert.That(
+                result.Reason,
+                Is.EqualTo(
+                    WorkerClaimReason.CounterexampleReplayFailed));
+            Assert.That(result.EffectWitness, Is.Null);
+        }
     }
 
     [Test]

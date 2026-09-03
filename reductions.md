@@ -19077,3 +19077,7 @@ wire vocabulary for fixture mapping and concurrent result counts. The affected
 | ID | Finding | Evidence |
 |---|---|---|
 | R1675 | Three portable-IR tests repeat the same graph-serialization equality assertion; centralize canonical graph comparison and retain the distinct byte-level golden test. | `SharpProof.Worker.Test/PortableIrGraphCodecTests.cs:50-56,122-129,261-268` |
+
+R1671 is applied: the allocation-only replay tests now share one sealed
+unknown-result assertion helper, while the forged-response authority scenario
+remains explicit. `EffectCounterexampleReplayTests` passes (31/31).
