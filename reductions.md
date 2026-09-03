@@ -13595,3 +13595,20 @@ removing a repeated ownership/classification traversal.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1164 | **`OperationEffectScanner.ScanEventAssignment` classifies the same event receiver twice.** The call-site resolver receives `_conversionOwnership.ClassifyRegion(reference.Instance)` once as its receiver region and immediately again as its write-receiver region, with no intervening state change. Reusing the computed region set keeps the resolver's read/write distinction explicit while eliminating the duplicate classification. | `SharpProof.Effects/OperationEffectScanner.Expressions.cs:159-216`; resolver parameters `SharpProof.Effects/EffectCallSiteResolver.cs:39-58` |
+
+## Second survey, part four hundred eighty-seven: R1165 - array dimensions enumerated twice
+
+`OperationEffectScanner.ScanArrayCreation` enumerates
+`array.DimensionSizes` through `ScanSequence` to accumulate dimension effects,
+then immediately passes the same collection to `ArrayCreationExceptions`. That
+helper runs a second full `All` traversal to apply the constant/non-negative
+and abstract-flow proofs. The two products are independent, but the current
+method also computes the second product even when the first traversal has
+already found a non-completing dimension and its summary will be returned.
+A single bounded dimension pass can retain the early stop for effect scanning,
+accumulate the overflow fact for every dimension, and keep the existing
+non-completing-dimension precedence explicit.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1165 | **`OperationEffectScanner.ScanArrayCreation` traverses every dimension twice.** `ScanSequence(array.DimensionSizes)` scans each dimension operation, while `ArrayCreationExceptions` immediately enumerates `DimensionSizes` again for non-negative proofs; if a dimension does not complete, the latter result is computed but discarded when `dimensions.Summary` is returned. A shared per-dimension accumulator can preserve scan short-circuiting and overflow semantics while removing the duplicate collection traversal. | `SharpProof.Effects/OperationEffectScanner.cs:915-932,1225-1233` |
