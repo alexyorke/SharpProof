@@ -11798,3 +11798,15 @@ R1109 is pending: forward `GITHUB_ACTIONS` through the container environment to 
 ### Status (part three hundred forty-one)
 
 R1110 is deferred: initialize the six package-version entries with array multiplication, and retain the separate manifest, plan, and package mutation fields.
+
+## Second survey, part three hundred forty-two: R1111 - duplicated mutation-shape projection
+
+`Test-SharpProofMutationScheduling.ps1` invokes the weighted scheduler twice to test determinism, which is the intended independent execution. It then projects both results into canonical shard-shape strings with two byte-equivalent `ForEach-Object` pipelines; only the source variable (`$first` versus `$second`) changes. A small `Get-ShardShape` helper can preserve the two-run comparison while removing the duplicated shape-formatting pipeline.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1111 | **Mutation scheduling fixtures duplicate the same shard-shape projection.** The deterministic first and second scheduler outputs each enumerate shard ordinals, join each shard with commas, and join shards with `|` in separate pipelines. Extracting that projection makes the determinism assertion's two inputs explicit without merging the two scheduler invocations. | `scripts/Test-SharpProofMutationScheduling.ps1:34-41` |
+
+### Status (part three hundred forty-two)
+
+R1111 is deferred: share only the shard-shape formatter, and keep the two independent scheduler runs and their equality assertion.
