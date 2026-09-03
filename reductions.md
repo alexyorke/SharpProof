@@ -14064,6 +14064,12 @@ for the distinct ordered-catch and filter policies.
 |---|---|---|
 | R1185 | **`ExceptionHandlerReachability.GetReachability` memoizes per catch but recomputes the shared protected-block exception set.** For every uncached `CatchClauseSyntax`, it resolves the enclosing try's block and calls `GetPotentialExceptions(protectedBlock)` even though that value does not depend on the target catch; sibling catches therefore repeat the same full operation walk. A per-try or per-protected-block potential cache can remove that repeated analysis while leaving each target's `CanKnownReach`, `CanUnknownReach`, and filter selection independent. | `SharpProof.Effects/ExceptionHandlerReachability.cs:22,45-79,82-90` |
 
+### Status (part five hundred seven)
+
+R1185 is covered by the R1184 protected-block cache: parameter-free potential
+exception results are keyed by the resolved block operation, so sibling catches
+reuse that walk while retaining independent catch filtering and ordering.
+
 ## Second survey, part five hundred eight: R1186 - invocation prerequisites are checked twice
 
 In the main exception walk, invocation processing first validates the receiver
