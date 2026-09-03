@@ -18090,3 +18090,11 @@ R1403 is applied: `ProtocolJson.ValidateUniqueIds` now materializes the input
 once and checks blankness and ordinal uniqueness in one loop, preserving the
 returned snapshot and validator diagnostics. `ProtocolJsonTests` pass
 (108/108).
+
+## Second survey, continued: R1541 - the indirect-mutation nullness matrices recompile each unchanged source fixture
+
+`IndirectLocalMutationNullnessRegressionTests` has two parameterized tests with two cases each, and both construct their source literal inside the case method. The alias-read/write matrix varies only the selected method; the receiver-effects matrix varies the selected method plus expected values, which are already carried as explicit parameters. A fixture-scoped compilation for each source group can retain those expectations and remove repeated parse/bind work.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1541 | **Both indirect-mutation matrices rebuild an unchanged two-method compilation for every row.** `WriteThroughAlias`/`ReadThroughAlias` share one literal, and `ThroughRefAlias`/`ThroughLocalFunction` share another; every `[TestCase]` call invokes `EffectTestHost.CreateCompilation` before selecting its method. The parameterized expected values from R1027 do not require a new compilation, so the two source groups can be cached independently. | `SharpProof.Effects.Test/IndirectLocalMutationNullnessRegressionTests.cs:6-44,46-110` |
