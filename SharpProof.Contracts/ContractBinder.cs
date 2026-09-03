@@ -116,9 +116,7 @@ public sealed class ContractBinder
 
     public ContractClauseInventory GetClauseInventory(IMethodSymbol target)
     {
-        return _clauseInventory.Create(
-            ContractClauseInventoryBuilder.NormalizeCallable(
-                ArgumentNullGuard.NotNull(target, nameof(target))));
+        return _clauseInventory.Create(target);
     }
 
     private ContractBindingResult BindUncached(

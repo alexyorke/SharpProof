@@ -13155,7 +13155,9 @@ normalization boundary.
 
 ### Status (part four hundred seventy-eight)
 
-R1155 is pending: pass the target directly to `ContractClauseInventoryBuilder.Create` and keep normalization in that builder's existing entry path.
+R1155 is applied: `ContractBinder.GetClauseInventory` passes the target directly
+to `ContractClauseInventoryBuilder.Create`, leaving null checking and callable
+normalization in the builder. The Contracts test suite passes (142/142).
 
 ## Second survey, part four hundred seventy-nine: R1156 - duplicated harmless-wrapper traversal
 
@@ -13401,3 +13403,86 @@ can *reduce* strictness at a call site, so it needs the owner's answer rather th
 a mechanical edit. Either way the two-hop path from
 `GeneratedFileHelpers.ps1` to `CSharpSourceMetrics.ps1` should be made explicit,
 because it is currently the sole reason fifteen code generators run strict.
+
+## Second survey, part four hundred eighty-one: R1159 - the second instance of R364, and every InternalsVisibleTo grant is live
+
+`SharpProof.Ir/ArgumentNullGuard.cs` is the repository's argument-guard helper:
+`NotNull<T>`, `RequireNonnegative` (int and long), `RequirePositive` (int, long
+and uint), `RequireIndex`, `RequireDefined<TEnum>`. It is `internal`, and
+`SharpProof.Ir` grants `InternalsVisibleTo` to **eighteen** assemblies. Twelve
+production assemblies use it, heavily: `SharpProof.Effects` 48 references,
+`SharpProof.Contracts` 17, `SharpProof.Verify` 10.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1159 | **`SharpProof.Summaries` re-declares `ArgumentNullGuard.RequirePositive` character-for-character while holding the `InternalsVisibleTo` grant that makes the original callable - the second instance of R364, and the sharpest.** `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:33-38` declares `private static int RequirePositive(int value, string parameterName) => value > 0 ? value : throw new ArgumentOutOfRangeException(parameterName);`. `SharpProof.Ir/ArgumentNullGuard.cs:47-50` declares `internal static int RequirePositive(int value, string parameterName)` with the same body, the same parameter names, and the same exception. `SharpProof.Summaries` has a direct `ProjectReference` to `SharpProof.Ir` **and** appears on its `InternalsVisibleTo` list (`SharpProof.Ir.csproj:24`), so the call compiles today with no build change. **Four of the eighteen granted assemblies use `ArgumentNullGuard` zero times and hand-write twenty of its guards between them**: `SharpProof.Summaries` (11 - and it is a three-file, 1,195-line assembly, so every guard it has is hand-written), `SharpProof.Gates` (4), `SharpProof.Testing` (3), `SharpProof.Worker.Launcher` (2). All four can reach the helper - `Gates` transitively through `SharpProof.Worker`, the other three directly. The contrast inside the same repository is stark: `SharpProof.Contracts` has 17 helper uses against 1 hand-written guard and `SharpProof.Verify` 10 against 1, so where the helper is adopted it is adopted nearly completely; where it is not, it is not used at all. Adoption is per-assembly and all-or-nothing, which is the signature of a helper nobody knows is reachable rather than one deliberately declined. | `SharpProof.Summaries/IrRelationalSummaryBuilder.cs:33-38,52-64`; `SharpProof.Ir/ArgumentNullGuard.cs:19-83`; `SharpProof.Ir/SharpProof.Ir.csproj:16-33`; `SharpProof.Summaries/IrRelationalSummary.cs:38,61,87,93`; `SharpProof.Summaries/IrRelationalSummaryInstantiator.cs:11-24`; existing R364 at `SharpProof.Worker/MethodResourceBudget.cs:49-53` |
+
+### Checked and not proposed (part four hundred eighty-one)
+
+- **All 75 `InternalsVisibleTo` grants in the repository are live; none is inert.**
+  Sixty projects declare 75 grants. For every one, the grantee can see the granter
+  assembly through its compile-reference closure, so no grant widens an internal
+  surface for nothing. **Thirteen are transitive-only** - the grantee reaches the
+  granter without naming it directly: `CompilerArtifact` to `Analyzer.Test` and
+  `Package.Test`; `Contracts`, `Effects`, `Frontend` and `Ir` to `Analyzer`;
+  `Dataflow` to `Analyzer.Core`; `Effects` and `Ir` to `Analyzer.Test`; `Ir` to
+  `Effects` and `Gates`; `Verify` to `Smt.Test`; `Worker.Protocol` to `Gates`.
+  That is a legitimate configuration and is recorded only because it interacts
+  with R951: a grant that depends on a transitive path would break if one of
+  R951's 42 redundant direct references were removed in the wrong order.
+  **Correction to my own first pass:** testing only *direct* references reported
+  those same 13 as inert. They are not. The transitive closure is what governs
+  what the compiler can see, and the corrected count of inert grants is **zero**.
+- **R1148 is still live and its statement is exact, re-verified at HEAD.**
+  `SHARPPROOF_SMT_ARGUMENT_GUARD` occurs in exactly two tracked files:
+  `SharpProof.Ir/ArgumentNullGuard.cs`, where it is the second disjunct of the
+  `#if` at line 1 and again at line 88, and `reductions.md` itself. **No `.csproj`,
+  `.props` or `.targets` defines it**, so both disjuncts are permanently false and
+  the two `#if` branches reduce to their `SHARPPROOF_DATAFLOW_ARGUMENT_GUARD`
+  halves.
+- **The `SHARPPROOF_DATAFLOW_ARGUMENT_GUARD` half is principled and must not be
+  folded away with it.** A future pass will be tempted to propose "grant
+  `SharpProof.Dataflow` the `InternalsVisibleTo` and delete the `Compile Include`".
+  That does not work. `SharpProof.Dataflow.csproj` declares **zero** SharpProof
+  `ProjectReference`s - its only reference is `SharpProof.Meta.Analyzers` with
+  `ReferenceOutputAssembly="false"`, an analyzer - and it targets
+  **netstandard2.0**. An `InternalsVisibleTo` grant is useless to an assembly that
+  references nothing, and netstandard2.0 is also why lines 2-8 declare a local
+  `System.Diagnostics.CodeAnalysis.NotNullAttribute` shim. The linked copy plus the
+  namespace switch is the correct way to give a deliberately dependency-free
+  netstandard2.0 assembly the same guard, and R355/R953 should be read as being
+  about the *mechanism's second and third users*, not this one. Only the dead
+  `SMT` disjunct of R1148 is removable here.
+- **Central package management is clean; no finding.** `Directory.Packages.props`
+  declares 14 `PackageVersion` entries and **every one is referenced**. Twenty-three
+  distinct package ids are referenced across the 75 tracked project and build
+  files; the nine without a central version are the five pilot third-party
+  packages (`Ardalis.GuardClauses`, `FluentValidation`, `OneOf`, `Polly`,
+  `Serilog` - exempt per R750), the three SharpProof self-packages consumed by
+  `samples/` and `eng/pilots/`, and `NETStandard.Library` in
+  `SharpProof.Specs.Test.csproj:11-14`, which uses `VersionOverride="2.0.3"` with
+  `GeneratePathProperty="true"` because it is consumed for its
+  `build/netstandard2.0/ref/*.dll` reference assemblies rather than as a library.
+  **Correction to my own first pass:** an initial count reported 24 referenced ids
+  including `coverlet.collector`. That was a measurement error - `grep -rh`
+  suppresses filenames, so the `grep -v artifacts` filter downstream of it matched
+  nothing and the mutation workspace under `artifacts/` was included.
+  `coverlet.collector` appears nowhere in the tracked tree except a rationale
+  string in `eng/acceptance/contract.json:612`.
+- **`SharpProof.Summaries` was one of 247 tracked files never cited by name in
+  this ledger, which is how it was found.** Ranking all 953 tracked non-artifact
+  files by how often their basename appears in `reductions.md` puts 247 at zero,
+  almost all of them test files. Only two production `.cs` files of any size are
+  in that set: `SharpProof.Summaries/IrRelationalSummaryInstantiator.cs` and
+  `SharpProof.Gates/Corpus/CorpusModels.cs`. The technique is recorded because it
+  is cheap and self-updating: it names the survey's own blind spots rather than
+  re-searching the code.
+
+### Status (part four hundred eighty-one)
+
+R1159 is `pending` and is a mechanical substitution in the three assemblies that
+reference `SharpProof.Ir` directly - delete the private `RequirePositive` and the
+hand-written `if (x == null) throw` blocks, call `ArgumentNullGuard`. It should be
+applied together with R364, which is the same fix in `SharpProof.Worker`, and the
+`Gates` share of it should be sequenced after R951, because `Gates` reaches
+`SharpProof.Ir` only transitively.
