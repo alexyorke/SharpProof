@@ -17059,3 +17059,8 @@ R1392 is applied: fixture package-state projection now combines null and
 package/version identity predicates in one catalog pass, preserving the
 null-tolerant contract and main/symbol role states. `ReleasePublicationScriptTests`
 pass (24/24).
+
+R1393 is applied: fixture archive role detection now scans each ZIP entry list
+once, setting DLL and PDB flags and stopping when both are known. Ambiguous
+role rejection and main/symbol requirements are unchanged.
+`ReleasePublicationScriptTests` pass (24/24).

@@ -94,14 +94,21 @@ function Get-SharpProofPublicationFixtureArchiveCatalog {
                     -Version $version)) {
                 throw "Fixture archive nuspec identity is invalid: '$($file.FullName)'."
             }
-            $hasDll = @($archive.Entries | Where-Object {
-                $_.FullName.EndsWith(
-                    '.dll', [StringComparison]::OrdinalIgnoreCase)
-            }).Count -gt 0
-            $hasPdb = @($archive.Entries | Where-Object {
-                $_.FullName.EndsWith(
-                    '.pdb', [StringComparison]::OrdinalIgnoreCase)
-            }).Count -gt 0
+            $hasDll = $false
+            $hasPdb = $false
+            foreach ($entry in $archive.Entries) {
+                if (-not $hasDll -and $entry.FullName.EndsWith(
+                        '.dll', [StringComparison]::OrdinalIgnoreCase)) {
+                    $hasDll = $true
+                }
+                if (-not $hasPdb -and $entry.FullName.EndsWith(
+                        '.pdb', [StringComparison]::OrdinalIgnoreCase)) {
+                    $hasPdb = $true
+                }
+                if ($hasDll -and $hasPdb) {
+                    break
+                }
+            }
             if ($hasDll -eq $hasPdb) {
                 throw "Fixture archive role is ambiguous: '$($file.FullName)'."
             }
