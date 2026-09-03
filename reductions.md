@@ -11864,3 +11864,15 @@ R1114 is deferred: preserve the explicit mutation short circuits, but reuse thei
 ### Status (part three hundred forty-six)
 
 R1115 is deferred: factor the repeated one-call summary fixture into a test-only helper, keeping the callee expression and each composition assertion at the individual test sites.
+
+## Second survey, part three hundred forty-seven: R1116 - duplicated mutation-target uniqueness scans
+
+`Test-SharpProofTrustedMutations.ps1` validates every catalog entry's `Original` text against the live repository around lines 2196-2220, checking file existence, the first ordinal occurrence, and a second occurrence. After archiving the pinned source commit, the script reads each archived target and `Assert-UniqueMutationTarget` repeats the same two `IndexOf` checks around lines 2472-2479 and 2413-2423. The two passes intentionally protect different materializations, and the live-tree pass aggregates all errors while the archive pass fails fast, so neither validation boundary should disappear. A shared probe that returns a not-found/non-unique result, with caller-specific aggregation or throwing, can own the repeated ordinal-search algorithm.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1116 | **The trusted-mutation campaign duplicates its target-text uniqueness algorithm across live and archived sources.** Both passes search for the same catalog needle with two ordinal `IndexOf` calls; only source materialization and error-reporting policy differ. Centralizing the probe while retaining both live-tree and pinned-archive checks removes algorithm drift without weakening preflight coverage. | `scripts/Test-SharpProofTrustedMutations.ps1:2196-2220,2401-2424,2472-2479` |
+
+### Status (part three hundred forty-seven)
+
+R1116 is deferred: share the ordinal target probe, but keep the live-tree aggregate diagnostics and the archived-source fail-fast validation as separate callers.
