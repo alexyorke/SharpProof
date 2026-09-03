@@ -16321,3 +16321,9 @@ also include the writer's required release-json and package-identity scripts.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1354 | **`EffectCallGraphCancellationTests` calls `Methods()` twice even though it creates the same immutable compilation and method-symbol array; share that fixture while retaining per-test cancellation state.** | `SharpProof.Effects.Test/EffectCallGraphCancellationTests.cs:7-15,23-45,53-67` |
+
+### Status (continued)
+
+R1348 is applied: compiler-option mapping and fail-closed assertions share local
+test helpers, preserving all enum and null coverage. The focused test passes (3
+passed).
