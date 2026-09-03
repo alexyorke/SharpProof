@@ -242,8 +242,11 @@ internal sealed class ExternalEffectResolver
             return false;
         }
 
-        var reads = EffectContractMappings.ToAnalysisRegions(effects, isWrite: false, method.Parameters.Length);
-        var writes = EffectContractMappings.ToAnalysisRegions(effects, isWrite: true, method.Parameters.Length);
+        var regionProjections = EffectContractMappings.ToAnalysisRegions(
+            effects,
+            method.Parameters.Length);
+        var reads = regionProjections.Reads;
+        var writes = regionProjections.Writes;
         var allocation = (effects & EffectContractKind.Allocates) != 0
             ? EffectAllocationKind.Managed
             : EffectAllocationKind.None;

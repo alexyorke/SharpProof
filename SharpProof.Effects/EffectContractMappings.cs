@@ -81,11 +81,20 @@ internal static class EffectContractMappings
     internal static EffectRegionSet ToAnalysisRegions(
         EffectContractKind effects, bool isWrite, int parameterCount)
     {
-        var result = EffectRegionSet.Empty;
+        var projections = ToAnalysisRegions(effects, parameterCount);
+        return isWrite ? projections.Writes : projections.Reads;
+    }
+
+    internal static (EffectRegionSet Reads, EffectRegionSet Writes)
+        ToAnalysisRegions(EffectContractKind effects, int parameterCount)
+    {
+        var reads = EffectRegionSet.Empty;
+        var writes = EffectRegionSet.Empty;
         foreach (var mapping in RegionContracts)
         {
-            var contract = isWrite ? mapping.Write : mapping.Read;
-            if ((effects & contract) == 0)
+            var matchedRead = (effects & mapping.Read) != 0;
+            var matchedWrite = (effects & mapping.Write) != 0;
+            if (!matchedRead && !matchedWrite)
             {
                 continue;
             }
@@ -95,10 +104,18 @@ internal static class EffectContractMappings
                 : mapping.AnalysisRegion is { } region
                     ? EffectRegionSet.Create(region)
                     : EffectRegionSet.Empty;
-            result = result.Union(regions);
+            if (matchedRead)
+            {
+                reads = reads.Union(regions);
+            }
+
+            if (matchedWrite)
+            {
+                writes = writes.Union(regions);
+            }
         }
 
-        return result;
+        return (reads, writes);
     }
 
     internal static EffectRegionSet ParameterRegions(int count)
