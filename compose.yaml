@@ -49,7 +49,6 @@ services:
       DOTNET_CLI_USE_MSBUILD_SERVER: "1"
       SHARPPROOF_ORIGIN_URL: ${SHARPPROOF_ORIGIN_URL:-https://github.com/alexyorke/SharpProof.git}
       SHARPPROOF_DEV_REF: ${SHARPPROOF_DEV_REF:-}
-      SHARPPROOF_DEV_CONTAINER: "1"
     volumes:
       - sharpproof-workspace:/workspace/SharpProof
       - *sharpproof-nuget-volume

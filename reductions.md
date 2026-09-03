@@ -18851,3 +18851,8 @@ is removed; probe path assertions continue using `SyntaxTrees` and
 | ID | Finding | Evidence |
 |---|---|---|
 | R1659 | `RequiresCallSiteAnalyzer.Analyze` is a pure forwarder into `RequiresCallSiteTreeAnalyzer`, which calls back into the companion; collapse the internal entrypoint cycle. | `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:5-22`; `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs:5-40`; pipeline callers at `SharpProof.Analyzer.Core/AnalyzerFeaturePipeline.cs:60-69,300-310` |
+
+R1506 is applied: the unused `SHARPPROOF_DEV_CONTAINER` environment assignment
+is removed from the development Compose service; all remaining Compose
+environment names retain active consumers. `ContainerAuthorityScriptTests` pass
+(15/15).
