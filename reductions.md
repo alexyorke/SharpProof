@@ -11807,7 +11807,7 @@ R1109 is pending: forward `GITHUB_ACTIONS` through the container environment to 
 
 ### Status (part three hundred forty-one)
 
-R1110 is deferred: initialize the six package-version entries with array multiplication, and retain the separate manifest, plan, and package mutation fields.
+R1110 is applied: initialize the six package-version entries with array multiplication, and retain the separate manifest, plan, and package mutation fields; all six authority fixture cases pass.
 
 ## Second survey, part three hundred forty-two: R1111 - duplicated mutation-shape projection
 
@@ -11819,7 +11819,7 @@ R1110 is deferred: initialize the six package-version entries with array multipl
 
 ### Status (part three hundred forty-two)
 
-R1111 is deferred: share only the shard-shape formatter, and keep the two independent scheduler runs and their equality assertion.
+R1111 is applied: share only the shard-shape formatter, and keep the two independent scheduler runs and their equality assertion; the scheduling fixture passes.
 
 ## Second survey, part three hundred forty-three: R1112 - duplicated closure queue deduplication
 
@@ -11831,7 +11831,7 @@ R1111 is deferred: share only the shard-shape formatter, and keep the two indepe
 
 ### Status (part three hundred forty-three)
 
-R1112 is deferred: retain one authoritative closure-path deduplication mechanism and avoid a partial second guard that does not cover pending entries.
+R1112 is applied: retain dequeue-time closure-path deduplication and remove the partial enqueue guard; the mutation-discriminating closure fixture passes. The canonical closure test still reports the pre-existing missing `scripts/Test-SharpProofGeneratedOutputs.ps1` contract entry.
 
 ## Second survey, part three hundred forty-four: R1113 - conditional namespace on a linked UTF-16 helper
 
@@ -12120,3 +12120,27 @@ R1135 is deferred: fold candidate-round termination into the existing group walk
 ### Status (part three hundred sixty-seven)
 
 R1136 is deferred: use the existing descendant-set proof once per parent snapshot and retain all pidfd and signal safety checks.
+
+## Second survey, part three hundred sixty-eight: R1137 - repeated SMT model-variable type lookup
+
+`QueryEncoder` validates every model variable's type while constructing its Z3 symbol and rejects anything other than Boolean or integer. When a satisfiable result is later projected, `CreateSatisfiable` calls `TryCreateValue`, which retrieves `factory.GetVariableInfo(variable).Type` again for every same model variable before decoding the evaluated expression. The query factory and variable sequence are unchanged between those two phases, so a type snapshot carried by `QueryEncoder`, or a decoder that accepts the already-validated type, can remove the repeated metadata lookup while preserving the Boolean/integer decoding and malformed-result checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1137 | **SMT model projection repeats variable-type metadata lookup after query encoding already validated it.** `QueryEncoder` obtains and validates each model variable type while building `_variables`; `CreateSatisfiable` then obtains the same type again in `TryCreateValue` for the same variable sequence. Carry the validated type through model projection while retaining the existing scalar decoding and fail-closed result handling. | `SharpProof.Smt/IrSmtBackend.cs:334-352,354-376,410-427` |
+
+### Status (part three hundred sixty-eight)
+
+R1137 is deferred: carry validated model-variable types from `QueryEncoder` into satisfiable-model decoding and preserve the current unsupported-type and malformed-value behavior.
+
+## Second survey, part three hundred sixty-nine: R1138 - adjacent duplicate cancellation polling in SMT encoding
+
+`QueryEncoder.Encode` calls `_cancellationToken.ThrowIfCancellationRequested()` and, before doing any cache lookup or encoding work, immediately calls `_meter.PollCancellation()`. `QueryResourceMeter.PollCancellation` only calls the same cancellation token method and does not update resource state, so the second poll cannot observe a different condition. Removing one call, or making the meter the single cancellation boundary for this method, removes one redundant token check on every uncached term without changing cancellation timing relative to the first encoding operation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1138 | **SMT term encoding performs two identical cancellation checks before any work.** The direct token poll in `Encode` is followed immediately by `QueryResourceMeter.PollCancellation`, whose body is the same token poll and has no additional state or accounting effect. Keep one boundary while preserving cancellation checks in the resource-meter and solver paths. | `SharpProof.Smt/IrSmtBackend.cs:485-495,731-746` |
+
+### Status (part three hundred sixty-nine)
+
+R1138 is deferred: collapse the adjacent `Encode` cancellation polls into one check while retaining the meter's resource-limit and downstream cancellation boundaries.
