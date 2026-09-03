@@ -16564,3 +16564,8 @@ EffectAnalysisTests class passes (147 passed).
 R1367 is applied: interval multiplication now folds all four arbitrary-precision
 candidate products through one extrema helper, preserving the existing range and
 overflow checks. The focused ManagedAbstractFlowTests suite passes (34 passed).
+
+R1368/R1371 are applied together because they are duplicate findings: invocation,
+object-creation, property-assignment, and property-reference input traversal now
+share one completion-gated iterator while preserving each branch's yield order and
+stop behavior. The focused RequiresCallSiteDiscoveryTests suite passes (44 passed).

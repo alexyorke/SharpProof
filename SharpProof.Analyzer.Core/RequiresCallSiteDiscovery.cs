@@ -1704,31 +1704,42 @@ internal sealed partial class RequiresCallSiteDiscovery(
                 operationFacts);
         }
 
-        if (operationFacts != null && operation is IInvocationOperation invocation)
+        IEnumerable<IOperation> DescendInputs(
+            IOperation? instance,
+            IEnumerable<IArgumentOperation> arguments)
         {
-            if (invocation.Instance is { } instance)
+            if (instance is { } value)
             {
-                foreach (var descendant in
-                         Descend(instance))
+                foreach (var descendant in Descend(value))
                 {
                     yield return descendant;
                 }
-                if (!operationFacts.MayCompleteNormally(instance))
+                if (!operationFacts!.MayCompleteNormally(value))
                 {
                     yield break;
                 }
             }
-            foreach (var argument in invocation.Arguments)
+
+            foreach (var argument in arguments)
             {
-                foreach (var descendant in
-                         Descend(argument.Value))
+                foreach (var descendant in Descend(argument.Value))
                 {
                     yield return descendant;
                 }
-                if (!operationFacts.MayCompleteNormally(argument.Value))
+                if (!operationFacts!.MayCompleteNormally(argument.Value))
                 {
                     yield break;
                 }
+            }
+        }
+
+        if (operationFacts != null && operation is IInvocationOperation invocation)
+        {
+            foreach (var descendant in DescendInputs(
+                         invocation.Instance,
+                         invocation.Arguments))
+            {
+                yield return descendant;
             }
             yield return invocation;
             yield break;
@@ -1737,17 +1748,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
         if (operationFacts != null &&
             operation is IObjectCreationOperation creation)
         {
-            foreach (var argument in creation.Arguments)
+            foreach (var descendant in DescendInputs(
+                         instance: null,
+                         arguments: creation.Arguments))
             {
-                foreach (var descendant in
-                         Descend(argument.Value))
-                {
-                    yield return descendant;
-                }
-                if (!operationFacts.MayCompleteNormally(argument.Value))
-                {
-                    yield break;
-                }
+                yield return descendant;
             }
             yield return creation;
             if (creation.Constructor is { } constructor &&
@@ -1792,29 +1797,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
             } assignment)
         {
             yield return assignment;
-            if (property.Instance is { } propertyInstance)
+            foreach (var descendant in DescendInputs(
+                         property.Instance,
+                         property.Arguments))
             {
-                foreach (var descendant in
-                         Descend(propertyInstance))
-                {
-                    yield return descendant;
-                }
-                if (!operationFacts.MayCompleteNormally(propertyInstance))
-                {
-                    yield break;
-                }
-            }
-            foreach (var argument in property.Arguments)
-            {
-                foreach (var descendant in
-                         Descend(argument.Value))
-                {
-                    yield return descendant;
-                }
-                if (!operationFacts.MayCompleteNormally(argument.Value))
-                {
-                    yield break;
-                }
+                yield return descendant;
             }
             foreach (var descendant in
                      Descend(assignment.Value))
@@ -1831,29 +1818,11 @@ internal sealed partial class RequiresCallSiteDiscovery(
         if (operationFacts != null &&
             operation is IPropertyReferenceOperation propertyReference)
         {
-            if (propertyReference.Instance is { } propertyInstance)
+            foreach (var descendant in DescendInputs(
+                         propertyReference.Instance,
+                         propertyReference.Arguments))
             {
-                foreach (var descendant in
-                         Descend(propertyInstance))
-                {
-                    yield return descendant;
-                }
-                if (!operationFacts.MayCompleteNormally(propertyInstance))
-                {
-                    yield break;
-                }
-            }
-            foreach (var argument in propertyReference.Arguments)
-            {
-                foreach (var descendant in
-                         Descend(argument.Value))
-                {
-                    yield return descendant;
-                }
-                if (!operationFacts.MayCompleteNormally(argument.Value))
-                {
-                    yield break;
-                }
+                yield return descendant;
             }
             yield return propertyReference;
             yield break;
