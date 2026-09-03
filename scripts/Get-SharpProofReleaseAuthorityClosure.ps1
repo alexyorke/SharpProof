@@ -92,8 +92,7 @@ function Get-SharpProofReleaseAuthorityClosure {
             $isSourceCandidate = $canonical -notmatch '(?:^|/)(?:bin|obj|artifacts)/' -and
                 (Test-Path -LiteralPath (Join-Path $root $canonical) -PathType Leaf)
             if ($canonical -cne 'eng/acceptance/contract.json' -and
-                ($tracked.Contains($canonical) -or $isSourceCandidate) -and
-                -not $seen.Contains($canonical)) {
+                ($tracked.Contains($canonical) -or $isSourceCandidate)) {
                 $pending.Enqueue($canonical)
             }
         }
