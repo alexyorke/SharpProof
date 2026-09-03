@@ -168,7 +168,8 @@ internal sealed class OperationCompletionEvaluator
                 CanCompleteNormally,
                 _isProvenNonNull(
                     switchExpression.Value,
-                    switchExpression))
+                    switchExpression),
+                valueAlreadyComplete: true)
             .Any(CanCompleteNormally);
     }
 

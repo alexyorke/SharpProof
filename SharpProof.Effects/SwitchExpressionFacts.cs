@@ -92,35 +92,40 @@ internal static class SwitchExpressionFacts
     internal static IReadOnlyList<ISwitchExpressionArmOperation> GetReachableArms(
         ISwitchExpressionOperation operation,
         Func<IOperation?, bool> canCompleteNormally,
-        bool inputDefinitelyNonNull = false)
+        bool inputDefinitelyNonNull = false,
+        bool valueAlreadyComplete = false)
     {
         return GetArms(
             operation,
             canCompleteNormally,
             inputDefinitelyNonNull,
-            patternOnly: false);
+            patternOnly: false,
+            valueAlreadyComplete: valueAlreadyComplete);
     }
 
     internal static IReadOnlyList<ISwitchExpressionArmOperation>
         GetEvaluatedPatternOnlyArms(
             ISwitchExpressionOperation operation,
             Func<IOperation?, bool> canCompleteNormally,
-            bool inputDefinitelyNonNull = false)
+            bool inputDefinitelyNonNull = false,
+            bool valueAlreadyComplete = false)
     {
         return GetArms(
             operation,
             canCompleteNormally,
             inputDefinitelyNonNull,
-            patternOnly: true);
+            patternOnly: true,
+            valueAlreadyComplete: valueAlreadyComplete);
     }
 
     private static List<ISwitchExpressionArmOperation> GetArms(
         ISwitchExpressionOperation operation,
         Func<IOperation?, bool> canCompleteNormally,
         bool inputDefinitelyNonNull,
-        bool patternOnly)
+        bool patternOnly,
+        bool valueAlreadyComplete)
     {
-        if (!canCompleteNormally(operation.Value))
+        if (!valueAlreadyComplete && !canCompleteNormally(operation.Value))
         {
             return [];
         }
