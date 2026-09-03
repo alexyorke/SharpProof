@@ -14997,6 +14997,11 @@ tests pass (34 passed).
 |---|---|---|
 | R1239 | **`ManagedFlowState.LessThanOrEqual` calls `right.Get(key)` twice per unioned key.** The first result is passed to `ManagedAbstractValue.Join`, then the identical key is looked up again for equality. A local right-hand value removes the redundant lookup without changing abstract-state ordering. | `SharpProof.Effects/ManagedAbstractFlow.cs:1615-1639` |
 
+### Status (part five hundred sixty-one)
+
+R1239 is applied: flow-state ordering captures the right-hand value once per
+key before joining and comparing. Managed abstract-flow tests pass (34 passed).
+
 ## Second survey, part five hundred sixty-two: R1240 - interval arithmetic allocates a bounds array for two reductions
 
 `ManagedAbstractValue.TryArithmetic` creates a temporary `BigInteger[]` containing the two or four possible arithmetic products/sums, then traverses that array once for `Min()` and again for `Max()`. The array is not retained or otherwise inspected; only its extrema are needed for the overflow and interval result checks. Updating running minimum and maximum values while computing the operator-specific candidates can preserve arbitrary-precision overflow detection and all candidate combinations while removing the per-arithmetic array allocation and two enumerations.
