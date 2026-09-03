@@ -3392,10 +3392,11 @@ while preserving the distinct label-failure and response-state policies.
 
 ### Status (part seventy-five)
 
-R527 remains `pending`; R526 shares only duplicate order-insensitive comparison
-plumbing across the protocol and compiler-artifact layers. Canonical
-serialization remains distinct. R527 targets enumeration mechanics, not the
-deliberate failure and status precedence.
+R527 is applied: callable and claim reason arrays are each aggregated once into
+failure, cancellation, and timeout flags, preserving the existing failure
+precedence and run-state ordering. R526 shares only duplicate order-insensitive
+comparison plumbing across the protocol and compiler-artifact layers.
+Canonical serialization remains distinct.
 
 ## Second survey, part seventy-six: R528 - allocation sentinel reuse
 
@@ -10201,3 +10202,38 @@ execution modes rather than duplicate policy.
 R990 is `deferred`: decide whether full performance-run cardinalities are
 contract data or fixed protocol constants, then remove the unused source of
 authority without collapsing structural coverage or smoke-mode policy.
+
+## Second survey, part two hundred twenty-two: R991 - duplicated test-timeout defaults
+
+The repository has an automation contract for the solution-test wall clock,
+but the direct test and developer entry points each carry their own default for
+the same timeout. `eng/acceptance/contract.json` sets
+`automation.solutionTestWallSeconds` to `1800`, and `eng/acceptance/Verify.ps1`
+passes that value to both `Invoke-SharpProofSemanticTests.ps1` and
+`Invoke-SharpProofPackageTests.ps1`. When those entry points are run directly,
+however, each declares `[int]$TimeoutSeconds = 1800`; the changed-test driver
+declares the same default and propagates it to its restore, build, semantic, and
+package-test children, while the developer-check driver declares it and forwards
+it to every planned phase. Thus the acceptance path and the four direct
+orchestration paths agree today by repeated literal value, not by a shared
+default or a validation that the direct default matches the contract.
+
+The timeout is a real caller override, so the parameter and range validation
+should remain. The reduction is to centralize only the fallback: expose the
+automation value through the shared container module, or have each direct
+entrypoint read the same contract field before binding its default. Keep the
+different defaults for coverage, gate evidence, package samples, and release
+publication separate; they are intentionally narrower operations with different
+wall-clock scopes. Without a shared fallback, changing the acceptance test
+budget updates the gated path while a developer's direct `test`, `check`, or
+changed-test invocation silently keeps the old deadline.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R991 | **The solution-test timeout default is duplicated in four direct PowerShell entry points and independently repeated in the acceptance contract.** `eng/acceptance/contract.json` owns `automation.solutionTestWallSeconds = 1800`, and acceptance passes it into semantic and package tests; `Invoke-SharpProofSemanticTests.ps1`, `Invoke-SharpProofPackageTests.ps1`, `Invoke-SharpProofChangedTests.ps1`, and `Invoke-SharpProofDevCheck.ps1` each independently default `TimeoutSeconds` to the same literal. The changed-test and developer-check drivers also propagate that local value through their child invocations, so direct runs can diverge from the acceptance budget after one side changes. Centralize only the fallback/default while retaining each script's explicit override and the distinct timeout policies of coverage, gate-evidence, sample, and release commands. | `eng/acceptance/contract.json:20-28`; `eng/acceptance/Verify.ps1:649-667`; `scripts/Invoke-SharpProofSemanticTests.ps1:14-15,84-97`; `scripts/Invoke-SharpProofPackageTests.ps1:14-15,80-84`; `scripts/Invoke-SharpProofChangedTests.ps1:14-15,249-332`; `scripts/Invoke-SharpProofDevCheck.ps1:6-7,78-131` |
+
+### Status (part two hundred twenty-two)
+
+R991 is `deferred`: centralize the direct-run fallback or explicitly declare
+that it is intentionally independent of `automation.solutionTestWallSeconds`;
+preserve the caller override and the narrower command-specific deadlines.
