@@ -569,29 +569,35 @@ public static partial class WorkerProtocolJson
         var expected = claims
             .OrderBy(static value => value.Ordinal)
             .ThenBy(static value => value.ClaimId, s_ordinal).ToArray();
-        errors.Check(expected.Select(static value => value.Ordinal)
-                .SequenceEqual(Enumerable.Range(0, expected.Length)), prefix + ".dense_ordinals")
-            .Check(callable.ClaimIds != null && callable.ClaimIds.SequenceEqual(
-                expected.Select(static value => value.ClaimId), s_ordinal),
-                prefix + ".claim_membership")
-            .Check(HasVerifierCompatibleClaimOrder(expected), prefix + ".claim_order");
-    }
-    private static bool HasVerifierCompatibleClaimOrder(WorkerClaimManifestEntry[] claims)
-    {
+        var denseOrdinals = true;
+        var claimMembership = callable.ClaimIds is
+            { Length: var claimIdCount } && claimIdCount == expected.Length;
+        var claimOrder = true;
         var effectSeen = false;
-        foreach (var claim in claims)
+        for (var index = 0; index < expected.Length; index++)
         {
+            var claim = expected[index];
+            denseOrdinals &= claim.Ordinal == index;
+            if (claimMembership &&
+                !s_ordinal.Equals(callable.ClaimIds![index], claim.ClaimId))
+            {
+                claimMembership = false;
+            }
             if (claim.Kind == WorkerClaimKind.Effect)
             {
                 effectSeen = true;
             }
             else if (effectSeen && claim.Kind == WorkerClaimKind.Postcondition)
             {
-                return false;
+                claimOrder = false;
             }
         }
 
-        return true;
+        return errors.Check(
+                denseOrdinals,
+                prefix + ".dense_ordinals")
+            .Check(claimMembership, prefix + ".claim_membership")
+            .Check(claimOrder, prefix + ".claim_order");
     }
     private static WorkerCallableResult[] ValidateCallableResults(
         WorkerCallableResult[]? values,
