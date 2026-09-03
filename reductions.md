@@ -21115,3 +21115,11 @@ warnings or errors.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1998 | **`RequiresCallSiteDiscovery` and `CacheSoundnessRules` repeat the cancellation-plus-`IsReachable` CFG block filter; centralize only that iterator while retaining their distinct block transfer and operation policies.** | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:141-147`; `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:993-999`; broader flow overlap R542 |
+
+## Second survey, continued: R1999 - Get-ValidatedRelease repeats release-bundle cardinality checks
+
+`Get-ValidatedRelease` rejects `$artifacts.Count -ne 6` and later rejects `$packageArtifacts.Count -ne 6` before iterating package IDs. `Test-SharpProofReleaseBundleTopology`, called immediately between them, already requires a directory containing exactly six artifact rows with exactly three `package` and three `symbols` kinds, then validates the exact file set. Keep the filtered `$packageArtifacts` projection for subsequent lookup, but remove these two cardinality guards or make the helper return the validated projection; this leaves the helper as the single release-bundle cardinality authority without weakening the per-package identity and payload checks that follow.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1999 | Get-ValidatedRelease duplicates the six-artifact/package-symbol cardinality checks already enforced by Test-SharpProofReleaseBundleTopology. | scripts/Publish-SharpProofRelease.ps1:241-294; scripts/SharpProof.ReleaseBundle.ps1:52-73 |
