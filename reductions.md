@@ -13512,3 +13512,25 @@ R1160 is applied: grouped disposal resolution now computes immutable per-resourc
 facts once and shares the disposal method and dispatch uncertainty between the
 summary and unwind decisions, while keeping those outcomes separate. The Effects
 test suite passes (323/323).
+
+## Second survey, part four hundred eighty-three: R1161 - list-pattern shape facts repeated
+
+`OperationCompletionEvaluator.CanCompleteListPattern` and
+`GetReachableImplicitListPatternMembers` independently derive the same shape
+facts from one `IListPatternOperation`: the number of non-slice patterns, the
+presence of a slice, the governing value's known length, and the length-mismatch
+predicate. The callers then make the same early decision for a known-length
+pattern that cannot satisfy its required elements. A small immutable shape
+projection can own those facts and the shared mismatch test. The completion
+path must retain its separate unknown-length, single-total-slice recursion, and
+the member-reachability path must retain its own collected-member prefix and
+early-stop behavior; only the repeated structural query should be shared.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1161 | **`OperationCompletionEvaluator` recomputes list-pattern shape facts in two consumers.** `CanCompleteListPattern` and `GetReachableImplicitListPatternMembers` each count non-slice patterns, test for a slice, call `TryGetGoverningListLength`, and apply the same known-length mismatch rule before walking pattern elements. Returning one shared shape record would remove the duplicated LINQ passes and keep the two consumers' distinct unknown-length completion and member-collection semantics explicit. | `SharpProof.Effects/OperationCompletionEvaluator.cs:290-320,380-429` |
+
+### Status (part four hundred eighty-three)
+
+R1161 is `pending`: share only the list-pattern structural facts and mismatch
+predicate; retain the separate completion and reachable-member traversals.
