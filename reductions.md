@@ -342,7 +342,7 @@ the smallest relevant containerized test target passes.
 | R934 | Compute effect-violation facts only for the selected contract rule | `SharpProof.Worker.Test`: 695 passed |
 | R949 | Share the native `prctl` binding and control constants across Host and BuildTasks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
 | R948 | Share supervisor protocol-line normalization between record checks | `SharpProof.Package.Test`: BuildTaskTests, 63 passed |
-| R818 | Remove the unreachable unsupported-host sample branch | PowerShell parse; `samples` command to run after clean commit |
+| R818 | Remove the unreachable unsupported-host sample branch | `samples` command passed (expected diagnostics included) |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -8892,6 +8892,19 @@ direct-reference assertion beyond the single project it currently covers. The
 measurement is recorded here mainly so that a future pass does not repeat the
 naive version of it and report 68.
 
+## Second survey, part one hundred seventy-three: R952 - duplicated precondition policy shells
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R952 | **`AnalyzerSession` constructs two compilation-scoped conservative precondition policies with the same symbol-resolution core.** Its screening path creates a `ConservativeEffectCallPreconditionPolicy` with source companions enabled, while the `EffectAnalysisSession` path receives a second instance with source companions disabled as its fallback. The mode difference is intentional, but both instances resolve the same cached `ContractApiIdentityResolver`, retain the same contract/attribute symbol fields, and reference the same compilation-level companion-type cache; only their mode-specific method caches and source-companion decision differ. A shared immutable policy core (identity symbols and companion inventory) with thin mode-specific query state, or one policy with an explicit mode at the query boundary, can remove duplicate wiring and make the reason for the two semantics visible without merging their results or weakening the source-companion distinction. | `SharpProof.Analyzer.Core/AnalyzerSession.cs:93-109`; `SharpProof.Effects/EffectCallPreconditionPolicy.cs:14-77,101-132`; shared resolver cache `SharpProof.Frontend/ContractApiIdentityResolver.cs:26-82` | 
+
+### Status (part one hundred seventy-three)
+
+R952 is `deferred`: the two source-companion modes must remain behaviorally
+distinct; this is a design-level reduction of duplicated policy state and
+construction, not a request to reuse one mode's per-method answers for the
+other.
+
 ## Second survey, part one hundred seventy-five: R952 - the undeclared exit-code vocabulary
 
 A cross-language numeric-literal census: distinctive numbers appearing in both
@@ -8930,3 +8943,43 @@ two it is the more consequential: a duplicated P/Invoke declaration fails loudly
 if the copies drift, whereas an exit code that means "timed out" in one process
 and something else in the process reading it fails silently, and three of the four
 readers here are in a different language from the writer.
+
+## Second survey, part one hundred seventy-six: R953-R954 - one file, three namespaces, two nullability contracts
+
+A type-name census across the 693 production type declarations, which surfaced a
+mechanism rather than a name collision.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R953 | **`ArgumentNullGuard.cs` is compiled into three assemblies under three different namespaces, selected by two per-project `DefineConstants`, and for one of the three the mechanism is unnecessary because the ordinary seam is already open.** `SharpProof.Ir/ArgumentNullGuard.cs:11-17` switches its own namespace with `#if SHARPPROOF_DATAFLOW_ARGUMENT_GUARD` / `#elif SHARPPROOF_SMT_ARGUMENT_GUARD` / `#else`, producing `SharpProof.Dataflow`, `SharpProof.Smt`, or `SharpProof` depending on which symbol the consuming project defines (`SharpProof.Dataflow.csproj:4`, `SharpProof.Smt.csproj:4`), with the file linked in by `Compile Include ... Link` at `SharpProof.Dataflow.csproj:10-11` and `SharpProof.Smt.csproj:11-12`. **For `SharpProof.Smt` none of this is needed**: it already has a `ProjectReference` to `SharpProof.Ir` (`:18`) *and* `SharpProof.Ir.csproj:30` already grants it `InternalsVisibleTo`, so the `internal static class ArgumentNullGuard` in `SharpProof.Ir` is directly callable. The source-link plus namespace-switch buys nothing there. `SharpProof.Dataflow` is the genuine case - it references only `SharpProof.Meta.Analyzers`, as an analyzer, so it has no path to `SharpProof.Ir` and source-linking is the only option without adding a reference. One mechanism, built for two consumers, load-bearing for one. This also accounts for **six of the repository's nine `#if` regions**, which recasts an earlier anti-finding: nine conditional-compilation sites across 286k lines is genuinely low, but two thirds of them are this single file. | `SharpProof.Ir/ArgumentNullGuard.cs:1-9,11-17,88-92`; `SharpProof.Dataflow/SharpProof.Dataflow.csproj:4,10-11,14`; `SharpProof.Smt/SharpProof.Smt.csproj:4,11-12,18`; `SharpProof.Ir/SharpProof.Ir.csproj:30` |
+| R954 | **The same helper method has a different nullability contract in three assemblies, and the difference is invisible at the call site.** `ArgumentNullGuard.NotNull<T>` at `SharpProof.Ir/ArgumentNullGuard.cs:87-93` declares its parameter as `[System.Diagnostics.CodeAnalysis.NotNull] T? value` **when either guard symbol is defined**, and as a bare `T? value` otherwise. So in `SharpProof.Dataflow` and `SharpProof.Smt` the compiler's nullable flow analysis learns that the argument is non-null after the call; in `SharpProof.Ir` itself, compiling the identical body, it does not. Callers in `SharpProof.Ir` therefore need redundant null checks - or silently carry weaker analysis - for a method whose runtime behaviour is the same in all three. The `[NotNull]` attribute is not available in `netstandard2.0`, which is why the polyfill exists, but the polyfill is **in the same file** at `:1-9` under the same two symbols, so `SharpProof.Ir` could define it for itself with one line and does not; the exclusion appears to be an accident of how the symbols were named rather than a decision. Separately, this polyfill is the second home for `System.Diagnostics.CodeAnalysis` attributes in the repository: `SharpProof.Specs/Polyfills/NullableAttributes.cs` declares `NotNullWhenAttribute` and is linked into four other projects, so two sibling attributes from one BCL namespace live in two files, distributed by the same mechanism under different conditions. | `SharpProof.Ir/ArgumentNullGuard.cs:1-9,87-93`; `SharpProof.Specs/Polyfills/NullableAttributes.cs`; `SharpProof.Analyzer.Core`, `SharpProof.CompilerArtifact`, `SharpProof.CompilerCollector`, `SharpProof.Effects` csproj `Polyfills` links |
+
+### Checked and not proposed (part one hundred seventy-six)
+
+- **Only three type names are declared in more than one assembly, and two are
+  correct.** Across 693 production type declarations: `Program` in four assemblies
+  (four executables - correct); `StorageTag` in `SharpProof.Frontend` and
+  `SharpProof.Verify`, which is a **nested** marker struct emitted once per model
+  by `Generate-DeclarativeModels.ps1`, so the full names differ and it is generator
+  output, not duplication; and `NotNullAttribute`, which is R954.
+- **`SharpProof.Attributes.NotNullAttribute` is not part of R954.** It is a
+  *public product* contract attribute in the `SharpProof.Attributes` namespace,
+  applied to parameters and return values as part of the closed-contract
+  vocabulary, and shares only a simple name with the BCL nullability polyfill. Two
+  different concepts, two different namespaces, both correctly named for what they
+  are. Do not propose renaming either.
+- **The eight near-duplicate type-name pairs are all legitimate.** `ISmtBackend`
+  (`SharpProof.Verify`) versus `IrSmtBackend` (`SharpProof.Smt`) is an interface
+  and its implementation; `CompilerAdditionalFileSnapshot` versus
+  `ICompilerAdditionalTextSnapshot` likewise; `AnalyzerMethodSemanticOutcome` in
+  `SharpProof.Gates` is the gate's per-method aggregate over
+  `AnalyzerSemanticOutcome`. No pair is two names for one concept.
+
+### Status (part one hundred seventy-six)
+
+R953 is `pending` and its `SharpProof.Smt` half is the cheap, safe part: delete
+the link and the `DefineConstants`, and call the class through the reference and
+IVT grant that already exist. R954 is `pending` and is the one with observable
+consequence - a nullability contract that differs by assembly for one method body
+is the kind of divergence that produces a redundant null check in one place and a
+missing one in another, with nothing at the call site to show why.
