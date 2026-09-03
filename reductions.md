@@ -18640,3 +18640,11 @@ R1602 is applied: the two constructor-path tests now share one source-fixture
 builder for the guard, subject, and field initializer, while their root and
 delegating constructor declarations remain distinct. `MemberInitializerConstructorPathRegressionTests`
 pass (2/2).
+
+## Second survey, continued: R1649 - `AcyclicBlockPredicateExecutor.Execute` duplicates the full run-state parameter list
+
+`Execute` accepts `variables`, `factory`, `program`, both call maps, `initialEnvironment`, `parameterBindings`, and `cancellationToken`, then immediately forwards every one of them to the nested `Run` primary constructor, alongside the executor limits. The nested declaration repeats the same eight-input signature, so any state parameter addition or removal must be synchronized in both declarations and the forwarding call. A private execution-context record or a single context object passed into `Run` can keep the mutable `Run` isolation while eliminating this parameter-plumbing seam; the executor limits and cancellation behavior can remain explicit state.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1649 | The outer `Execute` repeats all eight run-state inputs in its `new Run` forwarding call, while the nested primary constructor redeclares them | `SharpProof.Worker/AcyclicBlockPredicateExecutor.cs:20-45` |
