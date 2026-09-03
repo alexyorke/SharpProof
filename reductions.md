@@ -21228,3 +21228,8 @@ declaration, and requires exactly one generated-code configuration containing
 both `Analyze` and `ReportDiagnostics`. The focused architecture test passes
 (1/1), while the deliberate test fixture that opts out is outside the
 production analyzer inventory.
+
+R1980 is applied: each file-scoped analyzer relaxation in `.editorconfig` now
+has a nearby rationale describing its host, domain, wire-format, or resource
+ownership contract. The severity settings and their scopes are unchanged; this
+is documentation-only and passes the repository diff/format checks.

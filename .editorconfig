@@ -39,31 +39,40 @@ dotnet_style_collection_initializer = true:suggestion
 dotnet_style_object_initializer = true:suggestion
 dotnet_style_prefer_collection_expression = true:suggestion
 
+# MSBuild discovers these task entry types by public name.
 [SharpProof.BuildTasks/{InvalidatePublishedResult,ResetPublishedVerification,RunVerifier,ValidatePublishedVerificationResult}.cs]
 dotnet_diagnostic.CA1515.severity = none
 
+# Domain operations are instance members to satisfy their shared abstraction.
 [SharpProof.Dataflow/IntervalDomain.cs]
 dotnet_diagnostic.CA1822.severity = none
 
+# This value type's operators are the public domain comparison surface.
 [SharpProof.Effects/EffectRegions.cs]
 dotnet_diagnostic.CA1036.severity = none
 
+# The flags enum intentionally defines a named composite value.
 [SharpProof.Effects/EffectValues.cs]
 dotnet_diagnostic.CA2217.severity = none
 
+# The struct is an immutable Roslyn-facing value without custom equality.
 [SharpProof.Frontend/FrontendSubset.cs]
 dotnet_diagnostic.CA1815.severity = none
 
+# Z3 exceptions and native handles cross the solver boundary deliberately.
 [SharpProof.Smt/IrSmtBackend.cs]
 dotnet_diagnostic.CA1032.severity = none
 dotnet_diagnostic.CA1064.severity = none
 dotnet_diagnostic.CA2000.severity = none
 
+# Console entry points must remain synchronous for the host contract.
 [SharpProof.Worker{,.Launcher}/Program.cs]
 dotnet_diagnostic.CA1849.severity = none
 
+# The worker host is instantiated by its external launcher.
 [SharpProof.Worker/SharpProofWorker.cs]
 dotnet_diagnostic.CA1515.severity = none
 
+# Lowercase hexadecimal is the package's stable wire-format encoding.
 [SharpProof.Worker/{CallableVerifier,VerificationCache,WorkerInputSnapshot}.cs]
 dotnet_diagnostic.CA1308.severity = none
