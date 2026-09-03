@@ -64,21 +64,52 @@ internal sealed partial class OperationEffectScanner
     private EffectStep ScanDeconstructionTargetEvaluations(
         IOperation target)
     {
+        return ScanDeconstructionTarget(
+            target,
+            value: null,
+            ScanDeconstructionTargetEvaluation);
+    }
+
+    private EffectStep ScanDeconstructionTargetWrites(
+        IOperation target,
+        IOperation value)
+    {
+        return ScanDeconstructionTarget(
+            target,
+            value,
+            ScanDeconstructionTargetWrite);
+    }
+
+    private EffectStep ScanDeconstructionTarget(
+        IOperation target,
+        IOperation? value,
+        Func<IOperation, IOperation?, EffectStep> leaf)
+    {
         if (target is IDeclarationExpressionOperation declaration)
         {
-            return ScanDeconstructionTargetEvaluations(
-                declaration.Expression);
+            return ScanDeconstructionTarget(
+                declaration.Expression,
+                value,
+                leaf);
         }
-        if (target is not ITupleOperation tuple)
+        if (target is not ITupleOperation targetTuple)
         {
-            return ScanWriteTargetEvaluation(target);
+            return leaf(target, value);
         }
 
+        var valueTuple = value as ITupleOperation;
+        var hasMatchingValueTuple = valueTuple is not null &&
+            valueTuple.Elements.Length == targetTuple.Elements.Length;
         var result = EffectStep.Empty;
-        foreach (var element in tuple.Elements)
+        for (var index = 0; index < targetTuple.Elements.Length; index++)
         {
-            result = result.Then(
-                ScanDeconstructionTargetEvaluations(element));
+            var elementValue = hasMatchingValueTuple
+                ? valueTuple!.Elements[index]
+                : value;
+            result = result.Then(ScanDeconstructionTarget(
+                targetTuple.Elements[index],
+                elementValue,
+                leaf));
             if (!result.CompletesNormally)
             {
                 break;
@@ -87,46 +118,28 @@ internal sealed partial class OperationEffectScanner
         return result;
     }
 
-    private EffectStep ScanDeconstructionTargetWrites(
+    private EffectStep ScanDeconstructionTargetEvaluation(
         IOperation target,
-        IOperation value)
+        IOperation? value)
     {
-        if (target is IDeclarationExpressionOperation declaration)
-        {
-            return ScanDeconstructionTargetWrites(
-                declaration.Expression,
-                value);
-        }
-        if (target is not ITupleOperation targetTuple)
-        {
-            return new EffectStep(
-                ScanWriteTarget(
-                    target,
-                    value,
-                    valueIsStoredDirectly:
-                        SymbolEqualityComparer.Default.Equals(
-                            target.Type,
-                            value.Type)),
-                _completionEvaluator.CanCompleteWriteTarget(target));
-        }
+        _ = value;
+        return ScanWriteTargetEvaluation(target);
+    }
 
-        var valueTuple = value as ITupleOperation;
-        var result = EffectStep.Empty;
-        for (var index = 0; index < targetTuple.Elements.Length; index++)
-        {
-            var elementValue = valueTuple != null &&
-                valueTuple.Elements.Length == targetTuple.Elements.Length
-                    ? valueTuple.Elements[index]
-                    : value;
-            result = result.Then(ScanDeconstructionTargetWrites(
-                targetTuple.Elements[index],
-                elementValue));
-            if (!result.CompletesNormally)
-            {
-                break;
-            }
-        }
-        return result;
+    private EffectStep ScanDeconstructionTargetWrite(
+        IOperation target,
+        IOperation? value)
+    {
+        var assignedValue = value!;
+        return new EffectStep(
+            ScanWriteTarget(
+                target,
+                assignedValue,
+                valueIsStoredDirectly:
+                    SymbolEqualityComparer.Default.Equals(
+                        target.Type,
+                        assignedValue.Type)),
+            _completionEvaluator.CanCompleteWriteTarget(target));
     }
 
     private static bool IsDirectTupleDeconstruction(

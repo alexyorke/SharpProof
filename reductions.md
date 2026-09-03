@@ -18928,3 +18928,9 @@ R1663 is applied: the two runtime-closure rejection tests now consume one
 `s_runtimeClosureProperties` test-case source for the three override names,
 while retaining their distinct build-path assertions. The affected cases pass
 (6/6 and 3/3).
+
+R519 is applied: deconstruction target evaluation and write phases now share
+one declaration/tuple traversal while retaining their distinct leaf effects,
+value mapping, and short-circuit ordering. `SharpProof.Effects.Test` passes
+(323/323). R520 remains pending because its native-loader exception cleanup
+needs a focused failure-path test before changing behavior.
