@@ -16702,3 +16702,19 @@ BinaryMappingsAndArithmeticCategoriesAreExhaustive and UnaryMappingsAndCheckedPo
 | ID | Finding | Evidence |
 |---|---|---|
 | R1381 | The binary and unary catalog tests repeat the same supported-kind projection solely for two assertions; cache that projection within each test or centralize the key assertion. | SharpProof.Frontend.Test/CSharpScalarOperatorSemanticsTests.cs:45-55,229-239 |
+
+## Second survey, continued: R1382 - ExceptionHandlerReachabilityTests duplicates the catch-reachability local helper
+
+ClosedVirtualDispatchUsesTheExactExceptionSet and OnlyAuthenticatedRuntimeRefLikeAccessorsAreNonthrowing each define the same local IsCatchReachable function: resolve a sample method, create handler reachability with the compilation/session, and query the method's catch clause with inFilter false. The fixtures intentionally exercise different dispatch and ref-like policies, but this helper is byte-equivalent and can move to a class-level test helper that accepts the compilation, session, and method name.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1382 | Two reachability tests repeat the same method lookup, handler construction, and catch-clause query; share that test-only helper while retaining the distinct fixtures and expected outcomes. | SharpProof.Effects.Test/ExceptionHandlerReachabilityTests.cs:60-70,120-130 |
+
+## Second survey, continued: R1383 - TCB path validation materializes dot-segment matches only to test existence
+
+Get-SharpProofTcbPaths splits every candidate path into segments, invokes the PowerShell collection Where method to build the matching dot-segment collection, and then reads only its Count. For the hundreds of trusted-kernel/TCB paths processed during acceptance and coverage, this creates a transient result array for a Boolean existence check and hides the early-exit intent. A direct segment loop, or a Boolean predicate that stops after the first '.'/'..' segment, can preserve the canonical-path rejection while removing the per-path materialization and making the validation rule explicit.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1383 | The TCB helper builds a filtered segment collection solely for a nonempty check; use an early-exit loop/predicate to avoid one temporary array per path while preserving dot-segment rejection. | scripts/Get-SharpProofTcbPaths.ps1:28-45,54-63; callers eng/acceptance/Verify.ps1:594-601 and scripts/Test-SharpProofCoverage.ps1:590-601 |
