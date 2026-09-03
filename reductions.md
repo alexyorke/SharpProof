@@ -14717,3 +14717,11 @@ passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1225 | **`IsMutableStorageType` calls `GetMembers()` three times for the same type.** It performs independent field, property, and event scans after the same type/base checks; a shared member snapshot or carefully ordered combined walk can remove the repeated Roslyn enumeration without weakening recursive nested-storage detection. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:775-835` |
+
+## Second survey, part five hundred forty-eight: R1226 - semantic-literal lookup repeats the same root search
+
+`SharpProofSoundnessAnalyzer.GetSemanticLiteral(IOperation, CancellationToken)` climbs to the operation root and starts a fresh local-symbol set for every query. `AnalyzeSemanticString` queries the left operand and, when it finds nothing, the right operand; `AnalyzeSemanticStringInvocation` similarly queries the instance and then each argument through a projection. Each unresolved query can rescan the same root's descendants and follow the same local assignments. A root-scoped resolver with memoized local results, while preserving operand/argument order and cycle handling, can remove repeated syntax-tree walks without changing which literal is reported.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1226 | **`GetSemanticLiteral` rebuilds and rescans the containing operation root for each operand query.** Binary operands and invocation instance/arguments independently allocate `visitedLocals` and search `root.DescendantsAndSelf()` when earlier candidates do not yield a literal. A per-root projection/cache preserves first-match precedence while avoiding repeated local-assignment traversal. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:296-301,326-335,543-637` |
