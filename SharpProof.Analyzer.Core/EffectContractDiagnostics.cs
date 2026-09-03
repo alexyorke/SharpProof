@@ -92,7 +92,13 @@ internal static class EffectContractDiagnostics
         var exceptions = DecodeAllowedExceptions(
             allowedExceptions, session.Compilation, location, session, reportDiagnostic);
         cancellationToken.ThrowIfCancellationRequested();
-        var contract = session.ResolveEffectContract(method);
+        var contract = new EffectContractResolution(
+            EffectContractResolutionKind.Missing,
+            EffectSummary.Bottom);
+        if (!summaryContracts.IsDefaultOrEmpty)
+        {
+            contract = session.ResolveEffectContract(method);
+        }
         var bodyless = method is { IsAbstract: true } or { IsExtern: true };
         var bodylessTrusted = bodyless && contract.Kind == EffectContractResolutionKind.Valid;
         var result = session.AnalyzeEffects(method, cancellationToken);
@@ -135,7 +141,9 @@ internal static class EffectContractDiagnostics
         var disallowedExceptions = exceptions.IsValid
             ? summary.Throws.Types.Where(type => !IsAllowed(type, exceptions.Types)).ToImmutableArray()
             : [];
-        var declaredProjection = EffectSummaryProjector.Project(contract.Summary);
+        var declaredProjection = summaryContracts.IsDefaultOrEmpty
+            ? default
+            : EffectSummaryProjector.Project(contract.Summary);
         var declaredValid = contract.Kind != EffectContractResolutionKind.Invalid;
         var declaredComplete = entrySummaryReachable && projection.IsComplete &&
             contract.Kind is not (EffectContractResolutionKind.Incomplete or EffectContractResolutionKind.Missing);

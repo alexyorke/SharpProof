@@ -17836,3 +17836,96 @@ pass (147/147).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1525 | **Both initializer matrices compile more source than their selected case needs.** The two terminal-arm cases share one unchanged two-type source literal, and the three short-circuit/coalesce cases share one unchanged three-type literal; NUnit reruns each literal once per `[TestCase]` value. The analysis intentionally varies only the selected type name, so caching each group compilation would remove three redundant compilations across the two tests without changing coverage. | `SharpProof.Effects.Test/BranchingExpressionEffectRegressionTests.cs:6-12,15-52,54-99` |
+## Second survey, part six hundred: R1521 - the analyzer loads five of its fifteen dependency assemblies at older versions in the dogfooding lane than consumers get, and an ID collision resolved
+
+### ID collision: R1509
+
+R1509 has been issued twice. The earlier row (line ~17692) is *"`CorpusGate.RunAsync`
+names the same immutable observation array twice"* and **keeps R1509**. The later
+row is mine - *"Sixty-eight production types sit in a namespace that a different
+assembly is named after"* - and is **hereby renumbered R1520**: same text, same
+evidence, same `pending` status. **Cite the namespace-ownership finding as R1520.**
+This is the fifth collision this survey produced by two passes allocating from a
+maximum they each read before the other wrote; R1521 below is taken from above the
+current maximum rather than at `max + 1`, and the next pass should do the same.
+
+### R1521
+
+R343 records that the fifteen portable analyzer dependency DLLs are listed at
+three MSBuild entry points. What nobody measured is that the three lists point at
+**three different directories**, and the assemblies in those directories are not
+the same versions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1521 | **Five of the fifteen analyzer dependency assemblies are older in the two source-tree lanes than in the shipped package, so the self-application lane - whose whole purpose is to prove the product analyzes itself the way a consumer runs it - runs the analyzer on a dependency graph consumers never get.** The three lists R343 names resolve to three directories. `SharpProof.Package/buildTransitive/SharpProof.targets:30-37` points at `$(_SharpProofSharedDirectory)`, which `SharpProof.nuspec:47-56` fills **entirely from `SharpProof.CompilerCollector/bin/$configuration$/netstandard2.0/`**. `eng/self-application/SharpProof.SelfApplication.props:49-56` points at `SharpProof.Analyzer/bin/...`, and `SharpProof.AnalyzerConsumer.props:33-40` at `SharpProof.Analyzer.Core/bin/...`. All three projects target `netstandard2.0` and sit in one solution under central package management, and their lock files disagree: `SharpProof.CompilerCollector` resolves **System.Buffers 4.6.1, System.Memory 4.6.3, System.Numerics.Vectors 4.6.1, System.Runtime.CompilerServices.Unsafe 6.1.2, System.Threading.Tasks.Extensions 4.6.3**, while `SharpProof.Analyzer` and `SharpProof.Analyzer.Core` both resolve **4.5.1, 4.5.5, 4.5.0, 6.0.0, 4.5.4**. The other three System assemblies in the list - `System.Collections.Immutable 9.0.18`, `System.Reflection.Metadata 9.0.0`, `System.Text.Encoding.CodePages 7.0.0` - agree everywhere. **The cause is a transitive floor that reaches one project and not the other.** `SharpProof.CompilerCollector` project-references `SharpProof.Worker.Protocol`, whose direct `System.Text.Json 10.0.10` requires `System.Buffers 4.6.1` and pulls `System.Memory 4.6.3`, `System.IO.Pipelines 10.0.10` and `System.Text.Encodings.Web 10.0.10` with it; `SharpProof.Analyzer` has no such edge and falls back to the `netstandard2.0` defaults. **The mechanism that would fix it is already switched on and inert.** `Directory.Packages.props:6` sets `CentralPackageTransitivePinningEnabled` to `true`, which pins a transitive package only when a `PackageVersion` for it exists - and the file's fourteen entries include none of the five. The three assemblies that agree are the ones either centrally pinned or resolved identically by every path; the five that diverge are exactly the five with no pin. Adding five `PackageVersion` lines makes all 47 lock files agree and makes the divergence impossible to reintroduce. **The shipped notice is correct and this is not a licensing defect** - `THIRD-PARTY-NOTICES.txt` declares the newer set, and the newer set is what `tools/shared/netstandard2.0/` receives, because every third-party file in the nuspec is sourced from the collector's `bin`. The defect is that the dogfooding and source-tree-consumer lanes silently exercise a different graph, which is precisely the drift R752 predicted - *"if it drifts from the shipping partition, the dogfooding silently stops covering whatever was added"* - measured in versions rather than in property names. | `Directory.Packages.props:5-6,9-23`; `SharpProof.Package/SharpProof.nuspec:33-56`; `SharpProof.Package/buildTransitive/SharpProof.targets:30-37`; `eng/self-application/SharpProof.SelfApplication.props:49-56`; `SharpProof.AnalyzerConsumer.props:33-40`; lock files `SharpProof.Analyzer/`, `SharpProof.Analyzer.Core/`, `SharpProof.CompilerCollector/`, `SharpProof.CompilerArtifact/`, `SharpProof.Worker.Protocol/packages.lock.json`; `eng/release/third-party-components.json`; related R343, R752, R491, R1305 |
+
+### Checked and not proposed (part six hundred)
+
+- **The third-party notice is not wrong, and the natural reading of this evidence
+  says it is.** `SharpProof.Analyzer` and `SharpProof.Analyzer.Core` both set
+  `CopyLocalLockFileAssemblies=true` (`Directory.Build.props:38`) and both resolve
+  the older five, so a reasonable inference is that an older `System.Buffers.dll`
+  ships while the notice claims 4.6.1. It does not: `SharpProof.nuspec:47-56`
+  sources **every** third-party file in `tools/shared/netstandard2.0/` from
+  `SharpProof.CompilerCollector/bin`, and the collector resolves the declared
+  versions. All thirteen declared components are resolved at their declared version
+  by at least one lock file, and for the shipping project by the right one. This was
+  checked before filing because the opposite conclusion would have been a
+  redistribution-compliance claim, and it is false.
+- **The enum surface has no cross-assembly duplication left to file.** 132
+  production enums; **seven** groups share an identical member set across
+  assemblies, and every one is either gated or conceptual.
+  `SharpProofCapability`/`EffectContractCapabilityKind` (14 members) and
+  `SharpProofEffect`/`EffectContractKind` (17) are held together by
+  `SharpProof.Effects.Test/EffectContractWireParityTests.cs`;
+  `CompilerContractKind`/`BoundContractKind`,
+  `CompilerContractEvidence`/`BoundContractEvidence` and
+  `CompilerVariableRole`/`BoundContractVariableRole` are all generated pairs with
+  schema tests in `CompilerArtifactModelSchemaTests` and `BoundContractModelTests`;
+  `CompilerSummaryOrigin`/`IrSummaryOrigin` is **R314**, whose three hand-written
+  mappings are in the three `CompilerCollector` files that name both. **No enum
+  name is declared by two production assemblies.**
+- **`GeneratedExpressionType` matching `IrTypeKind` member-for-member is a
+  coincidence of vocabulary, not a parallel declaration.** `Boolean, Integer,
+  String, Sequence, Reference` names the fuzzer's *C# source* expression types -
+  `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:643-652` maps them to `bool`, `long`
+  and `string?` - while `IrTypeKind` names IR term types. The five coincide because
+  the frontend's supported domain is five wide. It is the only one of the seven
+  groups with no ledger citation, and it should not gain one.
+- **`GeneratedCSharpCase.ReturnType` covering three of five enum members is
+  correct, and the `default` throw is the right shape.** `Sequence` and `Reference`
+  reach it only if a top-level generated expression has one of those types, and
+  `SmallCSharpCaseGenerator.Next`'s ten arms produce only `String`, `Integer` or
+  `Boolean` at the root - `CastToString(Reference())` is `String`,
+  `Length(Values())` and `ArrayIndex(Values(), Left())` are `Integer`. A total
+  switch with an explicit `ArgumentOutOfRangeException` over a domain the caller
+  restricts is a correct partial function, not a latent bug.
+- **The cross-assembly constant census is exhausted and was already done.** 214
+  production `const` declarations of string, integer, long, double or char; five
+  literal values are declared as a named constant in more than one assembly, and
+  the three string cases are all recorded - `"SHARPPROOF_CONTRACTS"` is **R374**,
+  `"System.Diagnostics.ConditionalAttribute"` is **R482**, and the empty-string
+  SHA-256 pair `EmptyTextSha256`/`EmptySha256` is already noted in this ledger. The
+  two integer cases are coincidences of value across unrelated quantities: `1000`
+  as a launcher reserve, a termination grace and a fuzz case count, and `4096` as a
+  maximum instruction count, a maximum module count and a maximum analyzed
+  operation count. Neither should be merged.
+- **The production interface surface offers nothing to remove**, as recorded in
+  part five hundred ninety-nine: eight interfaces, none with a single implementer
+  and a single consumer.
+
+### Status (part six hundred)
+
+R1521 is `pending` and its remedy is five `PackageVersion` lines in
+`Directory.Packages.props`, which the file's own
+`CentralPackageTransitivePinningEnabled` setting then enforces across all 47 lock
+files. It is worth more than its size because the divergence is invisible from
+every file that reads as authoritative: the nuspec, the three DLL lists, and the
+component manifest all name assemblies without versions, and the only place the
+disagreement is written down is the lock files nobody diffs against each other.
+
+R1401 is applied: effect contract resolution and projection are now performed
+only when an `EffectContract` claim is selected; facet-only claims retain the
+same argument validation and effect-summary evaluation path. `AnalyzerModeAndEffectTests`
+pass (104/104).
