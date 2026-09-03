@@ -161,9 +161,10 @@ internal static class CompilerProbeSnapshot
         CancellationToken cancellationToken)
     {
         var indexedTrees = compilation.SyntaxTrees
-            .Select(static (tree, ordinal) => (Tree: tree, Ordinal: ordinal))
+            .Select(static (tree, ordinal) =>
+                (Tree: tree, Ordinal: ordinal, Path: NormalizePath(tree.FilePath)))
             .OrderBy(
-                static item => NormalizePath(item.Tree.FilePath),
+                static item => item.Path,
                 StringComparer.Ordinal)
             .ThenBy(static item => item.Ordinal);
         return indexedTrees.Select(item =>
@@ -171,6 +172,7 @@ internal static class CompilerProbeSnapshot
                 compilation,
                 item.Tree,
                 item.Ordinal,
+                item.Path,
                 cancellationToken));
     }
 
@@ -178,6 +180,7 @@ internal static class CompilerProbeSnapshot
         CSharpCompilation compilation,
         SyntaxTree tree,
         int ordinal,
+        string path,
         CancellationToken cancellationToken)
     {
         var text = tree.GetText(cancellationToken).ToString();
@@ -200,7 +203,7 @@ internal static class CompilerProbeSnapshot
         AppendParseOptions(builder, (CSharpParseOptions)tree.Options);
         json.String(
 "path",
-            NormalizePath(tree.FilePath));
+            path);
         json.String(
 "textSha256",
             ProbeHash.Text(text));

@@ -336,6 +336,7 @@ the smallest relevant containerized test target passes.
 | R944 | Defer selection-inventory construction until the contract API is present | `SharpProof.Contracts.Test`: 142 passed |
 | R942 | Build aligned effect-call arguments directly into an immutable array | `SharpProof.Effects.Test`: 323 passed |
 | R917 | Remove duplicate array-creation type hashing from semantic claim identity | `SharpProof.Worker.Test`: ClaimIdentity filter, 4 passed |
+| R920 | Reuse normalized syntax-tree paths in compiler-probe rows | `SharpProof.Package.Test`: CompilerProbe filter, 6 passed |
 
 The final worktree removes 3,965 net lines: 2,136 net lines outside this ledger and
 1,829 net lines from replacing the duplicated 288 KB survey with this canonical
@@ -8492,8 +8493,9 @@ build-file changes were made during this audit.
 
 ### Status (part four hundred thirty)
 
-R920 is `deferred`: this is a ledger-only observation, and no implementation or
-build-file changes were made during this audit.
+R920 is `applied`: compiler-probe syntax-tree sorting now carries the normalized
+path into row construction, avoiding a second normalization while preserving
+ordering and emitted paths.
 
 ## Second survey, part four hundred thirty-one: R921 - eager unused probe-input capture
 
