@@ -880,12 +880,16 @@ sizing. Treat R254 as merged into R294; do not count them separately.
 
 ### Status (part six)
 
-R294 and R295 are `pending`. R294 is the root cause behind R254, R255, and R256,
-and it is the item to reason about first: the identity mapping tables those
-entries propose removing exist *because* of R294, so removing them without
-addressing the duplication would delete the only check that keeps two
-declarations aligned. R295 is a self-contained prerequisite that removes two of
-the eight declarations on its own.
+R294 remains `pending`: the identity mapping tables those entries propose
+removing exist because of the cross-format vocabulary duplication, so they must
+stay until an authoritative source replaces every dependent declaration. R295
+is applied: the hand-maintained `SharpProof.Attributes.xml` (268 lines) is gone;
+all public declarations carry their source XML comments and
+`GenerateDocumentationFile` emits the same package path. The documentation test
+now reads the generated artifact from test output, and package payload
+authority resolves the Release build output. `PublicApiDocumentationTests`
+passed 1/1 and the selected package-layout shard passed 21/21, so the
+IntelliSense package surface remains intact.
 
 ## Second survey, part seven: R296-R298
 
