@@ -6,12 +6,49 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class AssignableRecursivePatternCompletionRegressionTests
 {
+    private static readonly Compilation SharedCompilation = CreateCompilation();
+
     [TestCase("BasePattern")]
     [TestCase("InterfacePattern")]
     public void GuaranteedAssignablePatternsHonorNonreturningAccessors(
         string methodName)
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = SharedCompilation;
+        var method = EffectTestHost.SampleMethod(compilation, methodName);
+        var pattern = EffectTestHost.RootOperation(compilation, method)
+            .DescendantsAndSelf()
+            .OfType<ISwitchExpressionOperation>()
+            .Single()
+            .Arms[0]
+            .Pattern;
+        var recursive = (IRecursivePatternOperation)pattern;
+        var conversion = compilation.ClassifyCommonConversion(
+            pattern.InputType!,
+            recursive.MatchedType!);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                SymbolEqualityComparer.Default.Equals(
+                    pattern.InputType,
+                    recursive.MatchedType),
+                Is.False,
+                methodName);
+            Assert.That(
+                conversion.IsImplicit && conversion.IsReference,
+                Is.True,
+                methodName);
+            Assert.That(
+                EffectTestHost.CreateCompletionEvaluator(compilation, method)
+                    .CanCompleteNormally(pattern),
+                Is.False,
+                methodName);
+        }
+    }
+
+    private static Compilation CreateCompilation()
+    {
+        return EffectTestHost.CreateCompilation(
             """
             public sealed class Box {
                 public int Value;
@@ -51,36 +88,6 @@ public sealed class AssignableRecursivePatternCompletionRegressionTests
                 }
             }
             """);
-        var method = EffectTestHost.SampleMethod(compilation, methodName);
-        var pattern = EffectTestHost.RootOperation(compilation, method)
-            .DescendantsAndSelf()
-            .OfType<ISwitchExpressionOperation>()
-            .Single()
-            .Arms[0]
-            .Pattern;
-        var recursive = (IRecursivePatternOperation)pattern;
-        var conversion = compilation.ClassifyCommonConversion(
-            pattern.InputType!,
-            recursive.MatchedType!);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                SymbolEqualityComparer.Default.Equals(
-                    pattern.InputType,
-                    recursive.MatchedType),
-                Is.False,
-                methodName);
-            Assert.That(
-                conversion.IsImplicit && conversion.IsReference,
-                Is.True,
-                methodName);
-            Assert.That(
-                EffectTestHost.CreateCompletionEvaluator(compilation, method)
-                    .CanCompleteNormally(pattern),
-                Is.False,
-                methodName);
-        }
     }
 
 }

@@ -3,13 +3,39 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class NullablePatternCompletionRegressionTests
 {
+    private static readonly Compilation SharedCompilation = CreateCompilation();
+
     [TestCase("RecursivePatternMayReturn", "AfterRecursivePattern")]
     [TestCase("ListPatternMayReturn", "AfterListPattern")]
     public void NullMismatchRetainsTheCallersSuffixEffect(
         string helperName,
         string callerName)
     {
-        var compilation = EffectTestHost.CreateCompilation(
+        var compilation = SharedCompilation;
+        var helper = EffectTestHost.SampleMethod(compilation, helperName);
+        var caller = EffectTestHost.SampleMethod(compilation, callerName);
+        var completion = EffectTestHost.CreateCompletionFacts(compilation);
+        var result = EffectTestHost.AnalyzeSample(compilation, callerName);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                completion.MethodCanCompleteNormally(helper),
+                Is.True,
+                "the nullable null-mismatch path returns normally");
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                "the caller reaches its suffix write when the helper returns");
+            Assert.That(
+                result.Summary.Completeness,
+                Is.EqualTo(EffectCompleteness.Complete));
+        }
+    }
+
+    private static Compilation CreateCompilation()
+    {
+        return EffectTestHost.CreateCompilation(
             """
             #nullable enable
 
@@ -46,24 +72,5 @@ public sealed class NullablePatternCompletionRegressionTests
                 }
             }
             """);
-        var helper = EffectTestHost.SampleMethod(compilation, helperName);
-        var caller = EffectTestHost.SampleMethod(compilation, callerName);
-        var completion = EffectTestHost.CreateCompletionFacts(compilation);
-        var result = EffectTestHost.AnalyzeSample(compilation, callerName);
-
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                completion.MethodCanCompleteNormally(helper),
-                Is.True,
-                "the nullable null-mismatch path returns normally");
-            Assert.That(
-                result.Summary.Writes.Contains(EffectRegionId.Static()),
-                Is.True,
-                "the caller reaches its suffix write when the helper returns");
-            Assert.That(
-                result.Summary.Completeness,
-                Is.EqualTo(EffectCompleteness.Complete));
-        }
     }
 }

@@ -18570,3 +18570,8 @@ keys and duplicate messages. `Test-SharpProofGeneratedOutputs.ps1` verifies all
 | ID | Finding | Evidence |
 |---|---|---|
 | R1644 | The two constructor tests invoke a helper that emits the same metadata assembly and recompiles the same two-holder source; cache the immutable compilation/reference fixture while retaining per-test sessions and constructor selection. | `SharpProof.Effects.Test/TerminalObjectInitializerEffectTests.cs:7-31,33-88` |
+
+R1528 is applied: the array-access, assignable-recursive-pattern, binary-pattern,
+and nullable-pattern matrices now each reuse one immutable fixture compilation
+while retaining per-case method selection and analysis facts. The complete
+`SharpProof.Effects.Test` project passes (323/323).

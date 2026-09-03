@@ -3,13 +3,16 @@ namespace SharpProof.Effects.Test;
 [TestFixture]
 public sealed class ArrayAccessCompletionRegressionTests
 {
+    private static readonly CSharpCompilation SharedCompilation =
+        CreateCompilation();
+
     [TestCase("DefinitelyOutOfRange", false)]
     [TestCase("UnknownIndex", true)]
     public void ArrayAccessControlsSuffixWrite(
         string methodName,
         bool expected)
     {
-        var compilation = CreateCompilation();
+        var compilation = SharedCompilation;
         var method = EffectTestHost.SampleMethod(compilation, methodName);
 
         Assert.That(
