@@ -11333,6 +11333,10 @@ In `SharpProof.CompilerArtifact/CompilerFeatureScopeFingerprint.cs`, `ComputeSha
 
 R1067 is deferred: enumerate callables directly during fingerprint computation without re-sorting.
 
+R1067 is applied: feature-scope fingerprinting now enumerates the already
+canonical callable sequence directly, avoiding a second ordering allocation.
+CompilerManifestArtifactTests pass (91 passed).
+
 ## Second survey, part two hundred ninety-nine: R1068 - unadopted `AssertErrorCode` helper across Protocol JSON tests
 
 `ProtocolJsonTests.cs` defines a dedicated helper `AssertErrorCode(WorkerProtocolValidationResult validation, string expected)` that asserts `validation.Errors.Select(static error => error.Code)` contains the expected code. However, over 34 assertions across the test file still hand-roll the full 4-line LINQ assertion `Assert.That(WorkerProtocolJson.Validate(...).Errors.Select(...), Does.Contain(...))`. Adding overloads for response, manifest, and request validation and adopting them across the suite removes over 100 lines of repetitive assertion boilerplate.

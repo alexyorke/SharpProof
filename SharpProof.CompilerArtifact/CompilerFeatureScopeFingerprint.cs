@@ -20,8 +20,7 @@ internal static class CompilerFeatureScopeFingerprint
 
         var callables = artifact.Callables;
         hash.Add(callables?.Length ?? -1);
-        foreach (var callable in (callables ?? [])
-                     .OrderBy(static item => item?.CallableId, StringComparer.Ordinal))
+        foreach (var callable in callables ?? [])
         {
             AddCallable(hash, callable);
         }
