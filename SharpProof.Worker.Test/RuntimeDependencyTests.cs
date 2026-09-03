@@ -13,20 +13,22 @@ public sealed class RuntimeDependencyTests
             "SharpProof.Analyzer", "SharpProof.Attributes", "SharpProof.Contracts",
             "SharpProof.Effects", "SharpProof.Frontend"
         ], StringComparer.Ordinal);
-        var pending = new Queue<Assembly>([
-            typeof(SharpProofWorker).Assembly,
-            Assembly.LoadFrom(Path.Combine(
-                AppContext.BaseDirectory, "SharpProof.Worker.Launcher.dll"))
-        ]);
-        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Queue<Assembly>();
+        var queued = new HashSet<string>(StringComparer.Ordinal);
+        void Enqueue(Assembly assembly)
+        {
+            if (queued.Add(assembly.GetName().Name!))
+            {
+                pending.Enqueue(assembly);
+            }
+        }
+
+        Enqueue(typeof(SharpProofWorker).Assembly);
+        Enqueue(Assembly.LoadFrom(Path.Combine(
+            AppContext.BaseDirectory, "SharpProof.Worker.Launcher.dll")));
         while (pending.Count != 0)
         {
             var assembly = pending.Dequeue();
-            if (!visited.Add(assembly.GetName().Name!))
-            {
-                continue;
-            }
-
             foreach (var reference in assembly.GetReferencedAssemblies())
             {
                 var name = reference.Name!;
@@ -34,7 +36,7 @@ public sealed class RuntimeDependencyTests
                 Assert.That(forbidden, Does.Not.Contain(name), assembly.FullName);
                 if (name.StartsWith("SharpProof.", StringComparison.Ordinal))
                 {
-                    pending.Enqueue(Assembly.Load(reference));
+                    Enqueue(Assembly.Load(reference));
                 }
             }
         }

@@ -16331,3 +16331,7 @@ passed).
 R1349 is applied: effect-evaluation wire mappings use shared closed-mapping and
 fail-closed assertion helpers while preserving each enum's expected sequence.
 The focused test passes (2 passed).
+
+R1350 is applied: runtime dependency assemblies are marked when enqueued, so
+converging references never add duplicate queue entries. The focused test passes
+(1 passed).
