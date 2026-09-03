@@ -10,7 +10,13 @@ internal sealed class ConversionOwnershipClassifier
         new(SymbolEqualityComparer.Default);
     private readonly Dictionary<ISymbol, EffectRegionSet> _refLocalStorageRegions =
         new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<IMethodSymbol, RefAliasAnalysis> _refAliasAnalyses =
+        new(SymbolEqualityComparer.Default);
     private readonly IMethodSymbol _method;
+
+    private readonly record struct RefAliasAnalysis(
+        bool MayIntroduceUnknownAlias,
+        bool IsContextIndependent);
 
     internal ConversionOwnershipClassifier(
         IMethodSymbol method,
@@ -665,27 +671,42 @@ internal sealed class ConversionOwnershipClassifier
 
     private bool MethodMayIntroduceUnknownRefAlias(IMethodSymbol method)
     {
-        return MethodMayIntroduceUnknownRefAlias(
+        method = (method.ReducedFrom ?? method).OriginalDefinition;
+        if (_refAliasAnalyses.TryGetValue(method, out var cached))
+        {
+            return cached.MayIntroduceUnknownAlias;
+        }
+
+        var analysis = AnalyzeMethodMayIntroduceUnknownRefAlias(
             method,
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default));
+        if (analysis.IsContextIndependent)
+        {
+            _refAliasAnalyses[method] = analysis;
+        }
+        return analysis.MayIntroduceUnknownAlias;
     }
 
-    private bool MethodMayIntroduceUnknownRefAlias(
+    private RefAliasAnalysis AnalyzeMethodMayIntroduceUnknownRefAlias(
         IMethodSymbol method,
         HashSet<IMethodSymbol> activeMethods)
     {
         method = (method.ReducedFrom ?? method).OriginalDefinition;
         if (method.DeclaringSyntaxReferences.Length != 1)
         {
-            return true;
+            return new(true, true);
         }
         if (activeMethods.Count >= EffectCallGraph.MaximumCallGraphDepth)
         {
-            return true;
+            return new(true, false);
+        }
+        if (_refAliasAnalyses.TryGetValue(method, out var cached))
+        {
+            return cached;
         }
         if (!activeMethods.Add(method))
         {
-            return false;
+            return new(false, false);
         }
 
         try
@@ -696,7 +717,7 @@ internal sealed class ConversionOwnershipClassifier
             var root = model.GetOperation(declaration);
             if (root == null)
             {
-                return true;
+                return new(true, true);
             }
 
             var refLikeInvocations = new List<IInvocationOperation>();
@@ -708,7 +729,7 @@ internal sealed class ConversionOwnershipClassifier
                         Value: { } value
                     } && !IsCallMappedRefSource(value, method))
                 {
-                    return true;
+                    return new(true, true);
                 }
 
                 if (operation is IInvocationOperation invocation &&
@@ -718,17 +739,20 @@ internal sealed class ConversionOwnershipClassifier
                 }
             }
 
+            var isContextIndependent = true;
             foreach (var invocation in refLikeInvocations)
             {
-                if (MethodMayIntroduceUnknownRefAlias(
+                var nested = AnalyzeMethodMayIntroduceUnknownRefAlias(
                         invocation.TargetMethod,
-                        activeMethods))
+                        activeMethods);
+                isContextIndependent &= nested.IsContextIndependent;
+                if (nested.MayIntroduceUnknownAlias)
                 {
-                    return true;
+                    return new(true, isContextIndependent);
                 }
             }
 
-            return false;
+            return new(false, isContextIndependent);
         }
         finally
         {
