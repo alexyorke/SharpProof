@@ -11407,6 +11407,10 @@ In `SharpProof.Worker.Test/CompilerCallableLowererWaveSixRegressionTests.cs`, `S
 
 R1071 is deferred: extract a private assertion helper for 64-bit interval verification in wave-six lowerer tests.
 
+R1071 is applied: both signed-int64 lowerer tests now share one interval assertion helper while retaining separate direct and artifact round-trip setup. `CompilerCallableLowererWaveSixRegressionTests` pass (3/3).
+
+R1071 is applied: both signed-int64 lowerer tests now share one interval assertion helper while retaining separate direct and artifact round-trip setup. `CompilerCallableLowererWaveSixRegressionTests` pass.
+
 ## Second survey, part three hundred three: R1072 - single-claim verdict assertions bypass existing helper in WorkerTests
 
 `WorkerTests.cs` defines `AssertClaimVerdict(response, outcome, reason, vacuity, runStatus, failureReason, proofCoreEntry)` to validate single-claim responses. While several tests adopt it, numerous neighboring single-claim tests still hand-roll the multi-step assertion: checking `response.Errors.IsEmpty`, extracting `response.ClaimResults.Single()`, and checking `Outcome` and `Reason` inside `Assert.EnterMultipleScope()`. Adopting `AssertClaimVerdict` across these tests consolidates boilerplate and ensures consistent diagnostic output on failure.

@@ -30,22 +30,7 @@ public sealed class CompilerCallableLowererWaveSixRegressionTests
             preparation.IsSuccess,
             Is.True,
             preparation.FailureReason.ToString());
-        var expected = new CompilerIntegerInterval(
-            long.MinValue,
-            long.MaxValue);
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(
-                preparation.Variables.Single(static variable =>
-                    variable.Role == CompilerVariableRole.Parameter)
-                    .SourceIntegerInterval,
-                Is.EqualTo(expected));
-            Assert.That(
-                preparation.Variables.Single(static variable =>
-                    variable.Role == CompilerVariableRole.Result)
-                    .SourceIntegerInterval,
-                Is.EqualTo(expected));
-        }
+        AssertSignedInt64SourceIntervals(preparation);
     }
 
     [Test]
@@ -76,6 +61,12 @@ public sealed class CompilerCallableLowererWaveSixRegressionTests
             CompilerManifestArtifactJson.Serialize(artifact));
         var preparation = CompilerManifestArtifactJson.DecodeCallables(
             roundTrip).Single();
+        AssertSignedInt64SourceIntervals(preparation);
+    }
+
+    private static void AssertSignedInt64SourceIntervals(
+        CompilerCallablePreparation preparation)
+    {
         var expected = new CompilerIntegerInterval(
             long.MinValue,
             long.MaxValue);
