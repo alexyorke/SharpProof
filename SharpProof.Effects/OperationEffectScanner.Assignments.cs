@@ -71,12 +71,11 @@ internal sealed partial class OperationEffectScanner
                 Target: ILocalReferenceOperation
             }
             ? result.Summary
-            : result.Then(new EffectStep(
-                ScanWriteTarget(
-                    assignment.Target,
-                    assignment.Value,
-                    evaluatedLocation: evaluatedLocation),
-                true)).Summary;
+            : CommitWrite(
+                result,
+                assignment.Target,
+                assignment.Value,
+                evaluatedLocation);
     }
 
     private EffectStep ScanWriteTargetEvaluation(IOperation target)
@@ -177,13 +176,12 @@ internal sealed partial class OperationEffectScanner
                 assignment)));
         return !result.CompletesNormally
             ? result.Summary
-            : result.Then(new EffectStep(
-                ScanWriteTarget(
-                    assignment.Target,
-                    assignment.Value,
-                    valueIsStoredDirectly: false,
-                    evaluatedLocation: evaluatedLocation),
-                true)).Summary;
+            : CommitWrite(
+                result,
+                assignment.Target,
+                assignment.Value,
+                evaluatedLocation,
+                valueIsStoredDirectly: false);
     }
 
     private EffectSummary ResolveCompoundOperatorEffects(
@@ -236,15 +234,12 @@ internal sealed partial class OperationEffectScanner
         result = result.Then(new EffectStep(
             scanOperation(),
             canCompleteOperation()));
-        return !result.CompletesNormally
-            ? result.Summary
-            : result.Then(new EffectStep(
-                ScanWriteTarget(
-                    target,
-                    storedValue,
-                    valueIsStoredDirectly: false,
-                    evaluatedLocation: evaluatedLocation),
-                true)).Summary;
+        return CommitWrite(
+            result,
+            target,
+            storedValue,
+            evaluatedLocation,
+            valueIsStoredDirectly: false);
     }
 
     private EffectSummary ScanCoalesceAssignment(
@@ -270,13 +265,28 @@ internal sealed partial class OperationEffectScanner
         }
 
         result = result.Then(ScanStep(assignment.Value));
+        return CommitWrite(
+            result,
+            assignment.Target,
+            assignment.Value,
+            evaluatedLocation);
+    }
+
+    private EffectSummary CommitWrite(
+        EffectStep result,
+        IOperation target,
+        IOperation value,
+        EffectStep evaluatedLocation,
+        bool valueIsStoredDirectly = true)
+    {
         return !result.CompletesNormally
             ? result.Summary
             : result.Then(new EffectStep(
                 ScanWriteTarget(
-                    assignment.Target,
-                    assignment.Value,
-                    evaluatedLocation: evaluatedLocation),
+                    target,
+                    value,
+                    valueIsStoredDirectly,
+                    evaluatedLocation),
                 true)).Summary;
     }
 }

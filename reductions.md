@@ -19025,3 +19025,7 @@ and string-hash assertions remain covered. `IrIdentifierTests` passes (2/2).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1670 | The portable-IR term and type depth tests repeat the same build-to-limit/encode/reject harness; parameterize the differing nested-value builder. | `SharpProof.Worker.Test/PortableIrGraphCodecTests.cs:742-773` |
+R510 is applied: simple, compound, read-modify-write, and coalesce assignment
+paths now share one completion-and-write commit helper, while ref-assignment,
+operator, conversion, and nullness-specific behavior remains in each caller.
+`SharpProof.Effects.Test` passes (323/323).
