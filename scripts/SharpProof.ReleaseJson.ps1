@@ -59,10 +59,7 @@ function Assert-SharpProofCanonicalMatch {
         [Parameter(Mandatory = $true)][string]$Message
     )
 
-    $actualNames = @($Actual.PSObject.Properties.Name | Sort-Object)
-    $expectedNames = @($Expected.PSObject.Properties.Name | Sort-Object)
-    if (($actualNames -join "`0") -cne ($expectedNames -join "`0") -or
-        ($Actual | ConvertTo-Json -Compress -Depth $Depth) -cne
+    if (($Actual | ConvertTo-Json -Compress -Depth $Depth) -cne
             ($Expected | ConvertTo-Json -Compress -Depth $Depth)) {
         throw $Message
     }

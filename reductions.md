@@ -17043,3 +17043,8 @@ models by extension once and reuses those collections for exact graph checks
 and edge construction. Extension-specific metadata, dependency, ordering,
 and pairing rules remain unchanged. `PackageDependencyAuthorityTests` pass
 (45/45).
+
+R1390 is applied: canonical release JSON matching now performs only the
+complete compact serialization comparison; the sorted property-name precheck
+was redundant and had the same rejection message. `ReleasePublicationScriptTests`
+pass (24/24).
