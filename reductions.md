@@ -15751,3 +15751,18 @@ Emit-Class already traverses all constructor parameters to validate their names 
 | ID | Finding | Evidence |
 |---|---|---|
 | R1317 | **Generate-DeclarativeModels.Emit-Class re-scans constructor parameters for every assignment after the parameter list has been parsed. Reuse an ordinal parameter-name index while retaining assignment order and the unknown-parameter failure.** | scripts/Generate-DeclarativeModels.ps1:120-150 |
+## Second survey, continued: R1318 - trusted-mutation target validation rereads shared files per registration
+
+Test-SharpProofTrustedMutations registers 248 mutations across 108 distinct target files. The live-tree preflight reads each target file with Get-Content once per mutation before checking its Original needle, and the archived-source preflight later reads each archived target with ReadAllText once per mutation before running the same per-entry guard. Different mutations in one file therefore pay repeated file I/O in each materialization even though the file content is immutable during that pass. A per-pass content cache keyed by normalized target path can retain per-mutation diagnostics and the separate live/archive trust boundaries while reading each distinct file once.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1318 | **Test-SharpProofTrustedMutations rereads the same mutation target file for every registration in both preflight passes. Cache live and archived content independently by target path, then apply each mutation's unique-needle check to the cached text rather than duplicating file reads.** | scripts/Test-SharpProofTrustedMutations.ps1:2218-2235,2479-2486; 248 registrations across 108 distinct File values |
+
+## Second survey, continued: R1319 - trusted-mutation evidence grows a PowerShell array with plus-equals
+
+The campaign starts its result accumulator as a regular array containing completed results, then appends each newly killed mutation with $results += $result. PowerShell arrays are fixed-size, so each append constructs and copies a larger array; the checkpoint writer serializes the accumulated prefix after every mutation, making the repeated accumulator copy an avoidable second cost on top of the intentionally durable write. A generic List[object] can be seeded with completed results and use Add while still being enumerated by Write-MutationEvidence and emitted as the same mutations array.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1319 | **Test-SharpProofTrustedMutations rebuilds its accumulated result array on every mutation through $results += $result. Use a growable list for the in-memory accumulator and preserve the per-mutation atomic checkpoint writes and result ordering.** | scripts/Test-SharpProofTrustedMutations.ps1:2688-2689,2778-2781; checkpoint serialization at :2433-2466 |
