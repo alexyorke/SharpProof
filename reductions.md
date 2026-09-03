@@ -14870,3 +14870,11 @@ discovery tests pass (44 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1235 | **`EvaluateConditional` reevaluates an unknown condition during both branch assumptions.** After `EvaluateCore(operation.Condition, state)` fails to produce a Boolean, each `Assume(state, operation.Condition, ...)` invokes `EvaluateCore` on that same condition again before refining. A cached condition value/refinement entry point can preserve branch-sensitive state while avoiding up to two duplicate condition traversals. | `SharpProof.Effects/ManagedAbstractFlow.cs:377-410,757-768` |
+
+## Second survey, part five hundred fifty-eight: R1236 - managed transfer rewalks mutation-bearing values
+
+`ManagedAbstractFlow.TransferCore` separately calls `ManagedMutationFacts.HasMutation` for a variable initializer, flow capture, or assignment value, then recursively transfers that same value subtree and finally calls `EvaluateCore` on it to derive the stored abstract value. The post-transfer evaluation is state-sensitive and must remain distinct, but the mutation fact is a structural property already encountered during transfer. Returning or threading that fact from the transfer walk, or using a scoped operation fact cache, can remove the standalone mutation traversal while preserving the conservative top-value choice and post-transfer state semantics.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1236 | **`TransferCore` performs a separate mutation walk before transferring and evaluating the same value.** The declarator, flow-capture, and simple-assignment cases compute `HasMutation`/`valueHasMutation`, traverse the value through `Transfer` or `TransferMany`, and then re-traverse it through `EvaluateCore`. A combined transfer result can retain the required ordering while eliminating the redundant structural mutation scan. | `SharpProof.Effects/ManagedAbstractFlow.cs:230-250,252-262,263-285` |
