@@ -13868,6 +13868,12 @@ retaining their distinct arm and unmatched-path results.
 |---|---|---|
 | R1176 | **`OperationEffectScanner.ScanSwitchExpression` revalidates the switch value three times through `SwitchExpressionFacts`.** The pattern-only arm query, reachable-arm query, and unmatched-path query each re-invoke `_completionEvaluator.CanCompleteNormally` for the same `switchExpression.Value`; this is separate from R448's duplicated per-arm selection logic and R1175's evaluator-to-helper boundary. A shared reachability result can remove the repeated value traversals without merging the consumers' semantics. | `SharpProof.Effects/OperationEffectScanner.cs:1037-1062`; `SharpProof.Effects/SwitchExpressionFacts.cs:92-122,174-190` |
 
+### Status (part four hundred ninety-eight)
+
+R1176 is applied: switch scanning carries the already-completed value into all
+three reachability queries, preserving their separate arm and unmatched-path
+semantics. The Effects test suite passes (323/323).
+
 ## Second survey, part four hundred ninety-nine: R1177 - null-state APIs duplicate their flow mapping
 
 `GetNullState` and `GetNullStatePreferNull` deliberately use different
