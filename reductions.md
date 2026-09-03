@@ -12012,3 +12012,15 @@ R1126 is deferred: centralize the pilot evidence-path projection, preserving the
 ### Status (part three hundred fifty-eight)
 
 R1127 is deferred: validate the report's six package rows through a keyed package-ID and extension projection, preserving the independent producer-side source checks.
+
+## Second survey, part three hundred fifty-nine: R1128 - non-atomic qualification receipt publication
+
+`Write-SharpProofQualificationReceipt.ps1` serializes the validated receipt and writes it directly to `(Join-Path $receiptDirectory "$Gate.json")`. These receipts are the files later qualification stages discover and consume, so an interrupted `WriteAllText` can leave a truncated or partially replaced receipt at the canonical path. The repository already has temp-file publication helpers in `New-SharpProofReleaseEvidence.ps1` and `SharpProof.PublicationPlanIdentity.psm1`; a shared UTF-8 atomic writer can preserve the current containment and schema checks while preventing a failed write from masquerading as a newly published receipt.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1128 | **Qualification receipts are published with a direct overwrite despite being consumed as gate evidence.** The writer sends JSON straight to the final `$Gate.json` path, unlike the repository's existing atomic text/plan publication paths. Reuse or centralize the temp-write-and-move primitive so an interrupted receipt update cannot leave a partial canonical artifact. | `scripts/Write-SharpProofQualificationReceipt.ps1:101-110`; atomic peers `scripts/New-SharpProofReleaseEvidence.ps1:20-43`, `scripts/SharpProof.PublicationPlanIdentity.psm1` |
+
+### Status (part three hundred fifty-nine)
+
+R1128 is deferred: publish receipts atomically within the existing repository containment boundary, preserving the receipt schema and gate-specific validation.
