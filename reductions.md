@@ -18861,3 +18861,8 @@ R1659 is applied: the analyzer feature pipeline now calls
 `RequiresCallSiteTreeAnalyzer.Analyze` directly, while the tree analyzer's
 intentional fallback retains `RequiresCallSiteAnalyzer.AnalyzeCallable`; the
 pure forwarding facade is removed. `AnalyzerModeAndEffectTests` pass (104/104).
+
+R1508 is applied: the coverage identity test now reuses
+`ArchitectureRepository.BannedApiProjects` instead of rebuilding the same
+sorted production-plus-Gates project list. The targeted coverage identity test
+passes (1/1).

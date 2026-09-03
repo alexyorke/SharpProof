@@ -1928,10 +1928,7 @@ public sealed class ArchitectureTests
             .Select(static property => property.Name)
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
-        var expectedCoverageProjects = ProductionProjects
-            .Append("SharpProof.Gates")
-            .OrderBy(static name => name, StringComparer.Ordinal)
-            .ToArray();
+        var expectedCoverageProjects = BannedApiProjects;
         Assert.That(
             actualCoverageProjects,
             Is.EqualTo(expectedCoverageProjects),
