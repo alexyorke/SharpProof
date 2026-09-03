@@ -21093,3 +21093,11 @@ the shared internal `IrExceptionKindFacts` helper, used by both differential
 oracles while their agreement and mismatch policies remain separate.
 `SharpProof.Testing.Test` passes 13/13 and `SharpProof.Fuzz.Test` passes 39/39,
 with zero warnings or errors.
+
+## Second survey, continued: R1997 - ManagedAbstractFlow and OperationCompletionEvaluator duplicate constant array list-pattern length extraction
+
+`ManagedAbstractFlow.TryGetListPatternLength` and `OperationCompletionEvaluator.TryGetGoverningListLength` independently test for a one-dimensional `IArrayCreationOperation` and an integer `ConstantValue`, then return that length before trying a property-based `Length` member. The two methods intentionally have different surrounding policies: the completion evaluator unwraps harmless operations and has a stronger non-virtual/property-return fallback, while managed flow requires only a single declaration and a nonnegative integer. A small shared constant-array-length projection can remove the duplicated Roslyn shape test while leaving each caller's unwrapping, property getter rules, and failure behavior intact.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1997 | **`ManagedAbstractFlow.TryGetListPatternLength` and `OperationCompletionEvaluator.TryGetGoverningListLength` duplicate the one-dimensional constant-array length projection; share only that fact and retain their distinct property-length policies.** | `SharpProof.Effects/ManagedAbstractFlow.cs:2622-2634`; `SharpProof.Effects/OperationCompletionEvaluator.cs:554-570` |
