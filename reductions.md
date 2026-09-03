@@ -13791,3 +13791,18 @@ traversal while retaining nullness, dispatch, and copy-constructor behavior.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1173 | **`OperationCompletionEvaluator.CanCompleteWithClone` rechecks the clone operand on the ordinary clone-method path.** After `CanCompleteWithClone` has completed `withOperation.Operand`, its call to `CanCompleteInvocation(clone, withOperation.Operand, ...)` invokes the same instance-completion check again. A prevalidated-instance seam can eliminate that repeat without changing the separate record copy-constructor path. | `SharpProof.Effects/OperationCompletionEvaluator.cs:631-649,717-741` |
+
+## Second survey, part four hundred ninety-six: R1174 - coalesce-assignment target completion is repeated
+
+`CanCompleteCoalesceAssignment` first calls `CanCompleteNormally` for the
+assignment target. On the definitely-null path, after completing the right-hand
+side, it calls `CanCompleteWriteTarget` for that same target. Field and array
+targets therefore revisit receiver/index completion, ref-return invocation
+targets revisit invocation completion, and property targets revisit receiver
+and argument completion while applying setter-specific checks. Preserve the
+target's first completion result and route only the write-specific predicate
+through a prevalidated target state; retain the nullness and value branch rules.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1174 | **`OperationCompletionEvaluator.CanCompleteCoalesceAssignment` can complete the assignment target twice.** It first validates `assignment.Target`, then the definitely-null branch calls `CanCompleteWriteTarget(assignment.Target)`, which repeats target completion for field, array, ref-return invocation, or property targets. A write-target seam that consumes the already-computed target completion can remove the duplicate while preserving nullness, RHS, and write-specific checks. | `SharpProof.Effects/OperationCompletionEvaluator.cs:801-818,862-901` |
