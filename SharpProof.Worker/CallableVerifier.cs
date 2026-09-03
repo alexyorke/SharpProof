@@ -194,14 +194,24 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                         unknown.Reason);
             }
         }
+        var executionConditions = new IrTerm[body.Returns.Length];
+        for (var returnIndex = 0; returnIndex < body.Returns.Length; returnIndex++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            executionConditions[returnIndex] = SpecResultDomainProjection.Rewrite(
+                factory,
+                body.Returns[returnIndex].Predicate,
+                body.SpecResultProjections);
+        }
         var records = ImmutableArray.CreateBuilder<WorkerClaimResult>(ensures.Length);
         for (var index = 0; index < ensures.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var pathObligations = ImmutableArray.CreateBuilder<IrTerm>(body.Returns.Length);
             var missingReturnValue = false;
-            foreach (var path in body.Returns)
+            for (var returnIndex = 0; returnIndex < body.Returns.Length; returnIndex++)
             {
+                var path = body.Returns[returnIndex];
                 var pathCondition = ApplyBodySubstitutions(factory, ensures[index].Condition,
                     target.Variables, path.ReturnTerm, path.CurrentStates);
                 if (pathCondition == null)
@@ -210,9 +220,10 @@ internal sealed class CallableVerifier(ISmtBackend backend, int maximumExpressio
                     break;
                 }
                 pathCondition = SpecResultDomainProjection.Rewrite(factory, pathCondition, body.SpecResultProjections);
-                var executionCondition = SpecResultDomainProjection.Rewrite(
-                    factory, path.Predicate, body.SpecResultProjections);
-                pathObligations.Add(Guard(factory, executionCondition, pathCondition));
+                pathObligations.Add(Guard(
+                    factory,
+                    executionConditions[returnIndex],
+                    pathCondition));
             }
             if (missingReturnValue)
             {
