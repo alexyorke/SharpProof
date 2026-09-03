@@ -18963,3 +18963,8 @@ assumption path that was not already checked by `NormalizeDirectClause`, so
 the final guard preserves coverage for projected, domain, and completion
 assumptions without rescanning direct clauses. `SharpProof.Worker.Test` passes
 (695/695).
+
+R1665 is applied: the release-authority checks now share one lazy four-script
+snapshot and reuse the same script-name roster, while the package-consumer
+script remains included only in the strict-symbol check. The focused release
+authority checks pass (3/3).

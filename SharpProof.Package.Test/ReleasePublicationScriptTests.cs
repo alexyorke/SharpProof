@@ -16,6 +16,14 @@ public sealed class ReleasePublicationScriptTests
         PackagedProductFeed.PortablePackageId,
         PackagedProductFeed.VerifierPackageId
     ];
+    private static readonly string[] s_releaseAuthorityScriptNames = [
+        "New-SharpProofReleaseEvidence.ps1",
+        "Test-SharpProofReleaseArtifacts.ps1",
+        "Publish-SharpProofRelease.ps1",
+        "Test-SharpProofPackageConsumers.ps1"
+    ];
+    private static readonly Lazy<Task<Dictionary<string, string>>>
+        s_releaseAuthorityScripts = new(LoadReleaseAuthorityScriptsAsync);
 
     [Test]
     public async Task PublisherNeverSkipsExistingRemoteArtifacts()
@@ -295,17 +303,10 @@ public sealed class ReleasePublicationScriptTests
     [Test]
     public async Task EveryReleaseAuthorityUsesStrictSymbolValidation()
     {
-        var root = TestRepository.FindRoot();
-        foreach (var scriptName in new[]
-                 {
-                     "New-SharpProofReleaseEvidence.ps1",
-                     "Test-SharpProofReleaseArtifacts.ps1",
-                     "Publish-SharpProofRelease.ps1",
-                     "Test-SharpProofPackageConsumers.ps1"
-                 })
+        var scripts = await GetReleaseAuthorityScriptsAsync();
+        foreach (var scriptName in s_releaseAuthorityScriptNames)
         {
-            var script = await File.ReadAllTextAsync(
-                Path.Combine(root, "scripts", scriptName));
+            var script = scripts[scriptName];
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(
@@ -567,16 +568,10 @@ public sealed class ReleasePublicationScriptTests
     [Test]
     public async Task EveryReleaseAuthorityBindsExactPackageRoles()
     {
-        var root = TestRepository.FindRoot();
-        foreach (var scriptName in new[]
-                 {
-                     "New-SharpProofReleaseEvidence.ps1",
-                     "Test-SharpProofReleaseArtifacts.ps1",
-                     "Publish-SharpProofRelease.ps1"
-                 })
+        var scripts = await GetReleaseAuthorityScriptsAsync();
+        foreach (var scriptName in s_releaseAuthorityScriptNames[..3])
         {
-            var script = await File.ReadAllTextAsync(
-                Path.Combine(root, "scripts", scriptName));
+            var script = scripts[scriptName];
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(
@@ -594,16 +589,10 @@ public sealed class ReleasePublicationScriptTests
     [Test]
     public async Task EveryReleaseAuthorityUsesExactPackagePayloadValidation()
     {
-        var root = TestRepository.FindRoot();
-        foreach (var scriptName in new[]
-                 {
-                     "New-SharpProofReleaseEvidence.ps1",
-                     "Test-SharpProofReleaseArtifacts.ps1",
-                     "Publish-SharpProofRelease.ps1"
-                 })
+        var scripts = await GetReleaseAuthorityScriptsAsync();
+        foreach (var scriptName in s_releaseAuthorityScriptNames[..3])
         {
-            var script = await File.ReadAllTextAsync(
-                Path.Combine(root, "scripts", scriptName));
+            var script = scripts[scriptName];
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(
@@ -966,6 +955,27 @@ public sealed class ReleasePublicationScriptTests
             entry,
             entryName,
             stream => stream.Write(contents));
+    }
+
+    private static Task<Dictionary<string, string>>
+        GetReleaseAuthorityScriptsAsync()
+    {
+        return s_releaseAuthorityScripts.Value;
+    }
+
+    private static async Task<Dictionary<string, string>>
+        LoadReleaseAuthorityScriptsAsync()
+    {
+        var root = TestRepository.FindRoot();
+        var scripts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var scriptName in s_releaseAuthorityScriptNames)
+        {
+            scripts.Add(
+                scriptName,
+                await File.ReadAllTextAsync(
+                    Path.Combine(root, "scripts", scriptName)));
+        }
+        return scripts;
     }
 
     private sealed class PublicationWorkspace : IDisposable
