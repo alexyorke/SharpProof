@@ -15069,6 +15069,12 @@ symbol-equality, and deterministic tie-break behavior. Effect lattice tests pass
 |---|---|---|
 | R1244 | **`ExternalEffectResolver` projects the same contract-region catalog separately for reads and writes.** The two adjacent `ToAnalysisRegions` calls repeat the catalog traversal and parameter expansion for one contract. A paired read/write projection can accumulate both outputs in one pass without changing the individual mapping API or region semantics. | `SharpProof.Effects/ExternalEffectResolver.cs:245-246`; `SharpProof.Effects/EffectContractMappings.cs:81-107` |
 
+### Status (part five hundred sixty-six)
+
+R1244 is applied: read and write contract regions are projected together in one
+catalog pass, sharing parameter-region expansion while retaining the existing
+single-projection API. Contract wire-parity tests pass (19 passed).
+
 ## Second survey, part five hundred sixty-seven: R1245 - exact dispatch is recomputed between discovery and analysis
 
 `RequiresCallSiteDiscovery` resolves an exact target from the call's receiver before deciding whether the call has a potential precondition, but `CreateCandidate` stores the original target and receiver. When that candidate reaches `RequiresCallSiteAnalyzer.AnalyzeCallSite`, the analyzer invokes `ResolveExactTarget` again with the same target and instance before binding contracts. For candidates that survive discovery, carrying the resolved target in the candidate or in a discovery-side projection can remove the second receiver/type hierarchy walk while preserving the filter's dispatch semantics and the analyzer's later target checks.
