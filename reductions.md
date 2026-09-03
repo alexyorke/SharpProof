@@ -9859,8 +9859,9 @@ R980 is `pending` and is the most consequential gate-coverage gap found in this
 survey, alongside R967. The fix needs no new mechanism: fourteen tests shaped like
 `CheckedInGeneratedOutputsAreCurrent`, or one data-driven test over the generator
 list, would move staleness detection from the nightly lane into the pull-request
-lane where the edit is made. R981 is `pending`, is one indentation change, and
-is worth doing at the same time because it is in the same fifteen lines.
+lane where the edit is made. R981 is `applied`: the fifteen top-level generator
+verification calls now have consistent indentation. AcceptanceScriptTests passed
+all 15 tests.
 
 ## Second survey, part two hundred eleven: R982 - a parallel recursive IR rewriter
 
@@ -10167,3 +10168,38 @@ closed-attribute recognition itself.
 R989 is `deferred`: share only the parameter/return value-site projection and
 validator invocation boundary; retain analyzer diagnostics/deduplication and
 binder IR construction/failure semantics locally.
+
+## Second survey, part two hundred twenty-one: R990 - configurable-looking fixed performance protocol
+
+The acceptance performance contract publishes three protocol cardinalities as
+data, then rejects any values that differ from literals in the gate. The JSON
+contains `performance.warmups: 5`, `performance.samples: 30`, and
+`performance.ideEdits: 200`; `AcceptancePerformanceContract.Load` parses all
+three into a typed record and `PerformanceGate.RunValidatedAsync` passes them
+through to the package-build and IDE-edit measurement loops. Before either path
+runs, however, `PerformanceGate.ValidateContract` requires
+`Warmups == 5`, `Samples == 30`, and `IdeEdits == 200`, throwing if a contract
+editor changes any of them. The structural-coverage path then adds a second
+override layer with `Warmups = 1`, `Samples = 2`, and `IdeEdits = 2`, while
+smoke cardinalities remain genuinely configurable under separate positivity and
+evenness checks.
+
+The fixed protocol may be intentional, but its current representation creates a
+false configuration seam and a drift point: the JSON fields look authoritative,
+the record carries them as input, and the measurement code consumes them, yet a
+different authority silently owns their values. A fixed protocol should be
+expressed once as named constants (or removed from the JSON and derived in the
+gate); a configurable protocol should replace the equality guard with explicit
+range/shape validation. Keep the structural-coverage reductions and the
+smoke-specific constraints separate, because those are deliberate alternate
+execution modes rather than duplicate policy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R990 | **`AcceptancePerformanceContract` exposes three fixed protocol counts as configuration, then `PerformanceGate.ValidateContract` hard-codes the same values.** `contract.json` supplies `warmups = 5`, `samples = 30`, and `ideEdits = 200`; the loader and measurement methods treat them as record data, but the gate rejects every other value. `RunStructuralCoverageAsync` separately overrides those same record fields to `1`, `2`, and `2`, proving the record is being used as a mode parameter as well as a contract projection. Remove the dead configurability by deriving the fixed full-run counts from one named protocol definition, or make the JSON authoritative with bounded validation; retain the distinct structural-coverage overrides and smoke cardinality rules. | `eng/acceptance/contract.json:91-104`; `SharpProof.Gates/Performance/AcceptancePerformanceContract.cs:3-78`; `SharpProof.Gates/Performance/PerformanceGate.cs:80-94,130-170,891-953,1163-1181` |
+
+### Status (part two hundred twenty-one)
+
+R990 is `deferred`: decide whether full performance-run cardinalities are
+contract data or fixed protocol constants, then remove the unused source of
+authority without collapsing structural coverage or smoke-mode policy.
