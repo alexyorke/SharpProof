@@ -80,7 +80,7 @@ internal sealed partial class OperationEffectScanner
             ScanDeconstructionTargetWrite);
     }
 
-    private EffectStep ScanDeconstructionTarget(
+    private static EffectStep ScanDeconstructionTarget(
         IOperation target,
         IOperation? value,
         Func<IOperation, IOperation?, EffectStep> leaf)

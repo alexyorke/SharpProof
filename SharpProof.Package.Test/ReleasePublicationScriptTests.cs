@@ -127,14 +127,7 @@ public sealed class ReleasePublicationScriptTests
 
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PublicationWorkspace.Create();
-        foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
-        {
-            File.Copy(
-                package.Path,
-                Path.Combine(
-                    workspace.PackageSource,
-                    Path.GetFileName(package.Path)));
-        }
+        workspace.CopyAllPackages(feed);
 
         var evidence = await RunProcessAsync(
             repositoryRoot,
@@ -245,13 +238,7 @@ public sealed class ReleasePublicationScriptTests
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PublicationWorkspace.Create();
-        foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
-        {
-            var destination = Path.Combine(
-                workspace.PackageSource,
-                Path.GetFileName(package.Path));
-            File.Copy(package.Path, destination);
-        }
+        workspace.CopyAllPackages(feed);
 
         var previousRevision = await RunProcessAsync(
             TestRepository.FindRoot(),
@@ -331,14 +318,7 @@ public sealed class ReleasePublicationScriptTests
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PublicationWorkspace.Create();
-        foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
-        {
-            File.Copy(
-                package.Path,
-                Path.Combine(
-                    workspace.PackageSource,
-                    Path.GetFileName(package.Path)));
-        }
+        workspace.CopyAllPackages(feed);
 
         var symbolsPath = Path.Combine(
             workspace.PackageSource,
@@ -617,14 +597,7 @@ public sealed class ReleasePublicationScriptTests
     {
         var feed = await PackagedProductFeed.GetAsync();
         using var workspace = PublicationWorkspace.Create();
-        foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
-        {
-            File.Copy(
-                package.Path,
-                Path.Combine(
-                    workspace.PackageSource,
-                    Path.GetFileName(package.Path)));
-        }
+        workspace.CopyAllPackages(feed);
 
         if (mutation != "valid")
         {
@@ -1014,6 +987,18 @@ public sealed class ReleasePublicationScriptTests
             var root = Path.Combine(parent, Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
             return new PublicationWorkspace(root, parent);
+        }
+
+        internal void CopyAllPackages(PackagedProductFeed feed)
+        {
+            foreach (var package in feed.Packages.Concat(feed.SymbolPackages))
+            {
+                File.Copy(
+                    package.Path,
+                    Path.Combine(
+                        PackageSource,
+                        Path.GetFileName(package.Path)));
+            }
         }
 
         public void Dispose()

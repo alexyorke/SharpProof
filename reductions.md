@@ -18968,3 +18968,8 @@ R1665 is applied: the release-authority checks now share one lazy four-script
 snapshot and reuse the same script-name roster, while the package-consumer
 script remains included only in the strict-symbol check. The focused release
 authority checks pass (3/3).
+
+R1666 is applied: `PublicationWorkspace.CopyAllPackages` now owns the shared
+package-feed archive population used by the four release scenarios, while
+selective package mutations remain in their individual tests. The complete
+`ReleasePublicationScriptTests` class passes (24/24).
