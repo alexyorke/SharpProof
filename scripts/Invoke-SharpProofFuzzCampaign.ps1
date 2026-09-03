@@ -161,13 +161,7 @@ function Invoke-FuzzRun {
     $standardOutput = Join-Path $resolvedOutput "$Name.stdout.json"
     $standardError = Join-Path $resolvedOutput "$Name.stderr.txt"
     $dotnetArguments = @(
-        'run',
-        '--project',
-        $fuzzProject,
-        '-c',
-        'Release',
-        '--no-build',
-        '--',
+        $runnerAssembly,
         '--cases',
         [string]$Cases,
         '--seed',
