@@ -19017,3 +19017,11 @@ recursion, and analyzed-method-count checks remain scenario-specific.
 R1667 is applied: IR identifier tests now use one ordered prefix table for
 default and factory-created formatting checks, while allocation, default-state,
 and string-hash assertions remain covered. `IrIdentifierTests` passes (2/2).
+
+## Second survey, continued: R1670 - Portable-IR depth tests duplicate the encoder rejection harness
+
+`EncoderRejectsTermsDeeperThanTheDecoderLimit` and `EncoderRejectsTypesDeeperThanTheDecoderLimit` both create a value at `PortableIrGraphCodec.MaximumGraphDepth`, invoke `PortableIrGraphCodec.Encode(factory, null, [term])`, and assert `InvalidDataException`; only the nested object being built differs (unary terms versus sequence types). A small parameterized builder/assertion helper can own the shared depth loop and failure envelope while keeping the term and type constructors explicit.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1670 | The portable-IR term and type depth tests repeat the same build-to-limit/encode/reject harness; parameterize the differing nested-value builder. | `SharpProof.Worker.Test/PortableIrGraphCodecTests.cs:742-773` |
