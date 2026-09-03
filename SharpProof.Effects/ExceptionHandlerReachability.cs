@@ -1559,12 +1559,7 @@ internal sealed class ExceptionHandlerReachability(
                             : SwitchSelection.Never,
                     IPatternCaseClauseOperation pattern =>
                         ApplySwitchGuard(
-                            GetPatternSelection(
-                                pattern.Pattern,
-                                @switch.Value.Type,
-                                hasConstant,
-                                value,
-                                inputDefinitelyNonNull),
+                            patternSelection,
                             pattern.Guard),
                     _ => SwitchSelection.Maybe
                 };
