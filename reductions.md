@@ -19184,3 +19184,8 @@ path and canonical version, so the consumer script no longer rescans package
 archives solely to recover `SharpProof`'s version. Exact package/symbol sets,
 version agreement, repository identity, and pair validation remain unchanged;
 the affected architecture command-plan checks pass (2/2).
+
+R1680 is applied: the async and iterator deferred-call fixtures now use one
+shared source builder for their `Sample`/state/Run shell, with only the
+deferred method declaration supplied per case. `DeferredCallCompletionTests`
+passes (3/3).

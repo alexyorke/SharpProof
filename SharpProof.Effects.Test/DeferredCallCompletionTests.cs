@@ -8,48 +8,26 @@ public sealed class DeferredCallCompletionTests
     [Test]
     public void AsyncCallReturnsBeforeItsDeferredBodyTerminates()
     {
-        AssertCallReturnsBeforeSuffix(
+        AssertCallReturnsBeforeSuffix(BuildDeferredSource(
+            "using System.Threading.Tasks;",
             """
-            using System;
-            using System.Threading.Tasks;
-
-            public static class Sample {
-                private static int state;
-
-                private static async Task Deferred() {
-                    throw new InvalidOperationException();
-                }
-
-                public static void Run() {
-                    _ = Deferred();
-                    state++;
-                }
+            private static async Task Deferred() {
+                throw new InvalidOperationException();
             }
-            """);
+            """));
     }
 
     [Test]
     public void IteratorCallReturnsBeforeItsDeferredBodyTerminates()
     {
-        AssertCallReturnsBeforeSuffix(
+        AssertCallReturnsBeforeSuffix(BuildDeferredSource(
+            "using System.Collections.Generic;",
             """
-            using System;
-            using System.Collections.Generic;
-
-            public static class Sample {
-                private static int state;
-
-                private static IEnumerable<int> Deferred() {
-                    throw new InvalidOperationException();
-                    yield break;
-                }
-
-                public static void Run() {
-                    _ = Deferred();
-                    state++;
-                }
+            private static IEnumerable<int> Deferred() {
+                throw new InvalidOperationException();
+                yield break;
             }
-            """);
+            """));
     }
 
     [Test]
@@ -91,6 +69,27 @@ public sealed class DeferredCallCompletionTests
                 result.Summary.Writes.Contains(EffectRegionId.Static()),
                 Is.False);
         }
+    }
+
+    private static string BuildDeferredSource(
+        string additionalUsing,
+        string deferredMethod)
+    {
+        return $$"""
+            using System;
+            {{additionalUsing}}
+
+            public static class Sample {
+                private static int state;
+
+                {{deferredMethod}}
+
+                public static void Run() {
+                    _ = Deferred();
+                    state++;
+                }
+            }
+            """;
     }
 
     private static void AssertCallReturnsBeforeSuffix(string source)
