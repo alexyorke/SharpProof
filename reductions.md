@@ -12124,7 +12124,11 @@ maps are unchanged. The focused `SharpProof.Gates.Test` corpus suite passes
 
 ### Status (part three hundred sixty-five)
 
-R1134 is deferred: use one case-ID index/uniqueness boundary so duplicates remain a controlled corpus-gate failure instead of a later dictionary exception.
+R1134 is applied: `CorpusGate.RunAsync` builds one immutable case-ID index with
+`TryAdd`, records a controlled duplicate-ID failure, and reuses that index for
+downstream observation projection instead of performing a separate `Distinct`
+scan followed by a throwing `ToImmutableDictionary`. The focused corpus suite
+passes (23/23).
 
 ## Second survey, part three hundred sixty-six: R1135 - duplicate termination scan in OSS candidate selection
 
@@ -12657,3 +12661,83 @@ process-wide environment state both opt out of parallelism. This composes with
 R978, which records that only four of nineteen test projects declare a parallelism
 level at all - the suite's isolation is currently guaranteed less by discipline
 than by the fact that most of it never runs concurrently.
+
+## Second survey, part four hundred seventy-one: R1143 is refuted, and the wire-mapping gate it missed
+
+An outcome-and-reason enum census across the product turned up a fourth candidate
+cross-assembly vocabulary pair - and in checking whether *it* was gated, found the
+gate that refutes R1143.
+
+### Correction: R1143 is wrong and should be moved to the refuted table
+
+R1143 stated that `BoundContractKind`/`CompilerContractKind`,
+`BoundContractEvidence`/`CompilerContractEvidence` and
+`BoundContractVariableRole`/`CompilerVariableRole` are declared in two schemas with
+**nothing comparing them**. **That is false.**
+`SharpProof.Worker.Test/CompilerArtifactModelSchemaTests.cs:271`
+`CollectorWireCatalogIsUniqueAndSourceComplete` holds an 18-entry table at `:279`
+mapping each `collectorWireMappings` entry to its `(Source, Target)` CLR types,
+and **all three pairs are in it** at `:312-317`. For every entry the test asserts
+at `:452-455`:
+
+```
+Assert.That(sources, Is.EquivalentTo(Enum.GetNames(types.Source)),
+            name + " source completeness");
+```
+
+- exact set equivalence between the schema's mapping rows and the **real member
+names of the source enum**, plus a check at `:456-462` that every target name is a
+real member of the target enum. Adding a fourth `BoundContractKind` member without
+a mapping row **fails this test**. The scenario R1143 described as undetected is
+detected.
+
+**Why the finding was wrong:** the search behind R1143 looked for the *schema
+filename* `BoundContractModel.schema.json` and for cross-references between the two
+generator scripts. This test names neither - it reflects the **compiled types** via
+`typeof` and `Enum.GetNames`. A filename-based search cannot see a type-based gate.
+That is the second time this session the same blind spot produced a wrong
+conclusion; the first was caught before filing, when the 17-member
+`SharpProofEffect`/`EffectContractKind` pair turned out to be covered by
+`EffectContractWireParityTests`.
+
+### Checked and not proposed (part four hundred seventy-one)
+
+- **A fourth candidate pair exists and is also gated.**
+  `EffectEvaluationCertainty` (`SharpProof.Analyzer.Core/EffectEvaluationTypes.cs`,
+  internal, 5 members at ordinals 0-4) and `WorkerEffectEvidenceCertainty`
+  (`SharpProof.Worker.Protocol/ProtocolModel.generated.cs`, public, 7 members at
+  0-6) share five member names **in the same order but offset by one ordinal**,
+  because the wire enum reserves `Unspecified = 0` and appends `VacuousEntry = 6`.
+  That shape is dangerous - a cast between them would silently map
+  `IncompleteMayEffectSummary` to `Unspecified` and shift every value - but no cast
+  exists: `CompilerWireMappings.generated.cs:153-158` converts member-by-member
+  through a generated named switch, and the pair is entry `EffectEvaluationCertainty`
+  in the same source-completeness table. Safe, and worth recording because the
+  ordinal offset makes it look otherwise.
+- **The gate covers far more than the three pairs R1143 named.** Its 18 entries
+  include `EffectEvaluationOutcome`/`WorkerClaimOutcome`,
+  `EffectEvaluationReason`/`WorkerClaimReason`,
+  `EffectContractKind`/`WorkerEffectSet`,
+  `EffectContractCapabilityKind`/`WorkerEffectCapabilitySet`,
+  `ContractBindingFailure`/`WorkerClaimReason`, and the six Roslyn option enums.
+  Source-completeness is asserted for every one.
+- **R1147 stands.** `IrSummaryOrigin`/`CompilerSummaryOrigin` appears **nowhere** in
+  that table - a search for `IrSummaryOrigin` in the test file returns zero - which
+  is consistent with R1147's evidence that its only alignment mechanism is the
+  runtime `throw` in `CompilerCallableLowerer.cs:374-384`. The correct reading is
+  now sharper than when filed: this is not one of several ungated vocabulary pairs,
+  it is **the only one**.
+- **The 28 outcome/reason/status enums show no other cross-assembly duplication.**
+  Sentinel conventions do vary - seven enums lead with `None`, eight `Worker*`
+  protocol enums lead with `Unspecified`, three carry **both**, and the rest carry
+  neither - but the `Unspecified` plus `None` pairing in the protocol enums is the
+  wire convention (ordinal 0 reserved for forward compatibility, plus a domain
+  "no reason"), and the enums that carry neither have no absent state to name. Not
+  proposed.
+
+### Status (part four hundred seventy-one)
+
+No new ID. R1143 should move to the refuted table with this part as its evidence,
+and R1147's status improves from "one of several" to "the single ungated
+cross-assembly vocabulary pair in the product" - which makes it the more worthwhile
+of the two and the one that should carry the fix.
