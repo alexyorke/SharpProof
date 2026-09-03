@@ -571,7 +571,8 @@ public static partial class WorkerProtocolJson
             .ThenBy(static value => value.ClaimId, s_ordinal).ToArray();
         var denseOrdinals = true;
         var claimMembership = callable.ClaimIds is
-            { Length: var claimIdCount } && claimIdCount == expected.Length;
+        { Length: var claimIdCount } &&
+                claimIdCount == expected.Length;
         var claimOrder = true;
         var effectSeen = false;
         for (var index = 0; index < expected.Length; index++)

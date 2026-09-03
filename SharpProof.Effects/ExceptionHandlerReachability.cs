@@ -1881,7 +1881,7 @@ internal sealed class ExceptionHandlerReachability(
                 CanReachBody: patternCompletes);
         }
         else if (pattern.Guard.ConstantValue is
-                 { HasValue: true, Value: bool guard })
+        { HasValue: true, Value: bool guard })
         {
             var patternCompletes = canCompleteNormally(pattern.Pattern);
             result = new(
@@ -2782,7 +2782,6 @@ internal sealed class ExceptionHandlerReachability(
         int depth)
     {
         return GetFormattedValueExceptions(
-            operand,
             origin,
             activeMethods,
             depth,
@@ -2790,7 +2789,6 @@ internal sealed class ExceptionHandlerReachability(
     }
 
     private PotentialExceptions GetFormattedValueExceptions(
-        IOperation operand,
         IOperation origin,
         HashSet<IMethodSymbol> activeMethods,
         int depth,
@@ -2832,7 +2830,6 @@ internal sealed class ExceptionHandlerReachability(
         var resolution = ResolveFormattedValueMethod(operand, origin);
         add(
             GetFormattedValueExceptions(
-                operand,
                 origin,
                 activeMethods,
                 depth,

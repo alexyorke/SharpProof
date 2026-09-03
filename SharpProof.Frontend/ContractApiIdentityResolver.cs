@@ -29,8 +29,6 @@ internal sealed class ContractApiIdentityResolver
         ImmutableHashSet.CreateRange(
             StringComparer.Ordinal,
             ContractApiMetadata.AttributeMetadataNames);
-    private static readonly ConcurrentDictionary<string, MetadataNameParts>
-        MetadataNames = new(StringComparer.Ordinal);
     private readonly Compilation _compilation;
     private readonly INamedTypeSymbol? _attribute;
     private readonly INamedTypeSymbol? _conditionalAttribute;
@@ -39,6 +37,8 @@ internal sealed class ContractApiIdentityResolver
             new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<string, AttributeResolution> _attributes =
         new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, MetadataNameParts>
+        _metadataNames = new(StringComparer.Ordinal);
 
     private ContractApiIdentityResolver(Compilation compilation)
     {
@@ -419,7 +419,10 @@ internal sealed class ContractApiIdentityResolver
             }
 
             count++;
-            member ??= candidateMethod;
+            if (count == 1)
+            {
+                member = candidateMethod;
+            }
         }
 
         return count == 1 &&
@@ -506,7 +509,10 @@ internal sealed class ContractApiIdentityResolver
             }
 
             count++;
-            member ??= candidateMethod;
+            if (count == 1)
+            {
+                member = candidateMethod;
+            }
         }
 
         return count == 1 &&
@@ -566,7 +572,7 @@ internal sealed class ContractApiIdentityResolver
         return false;
     }
 
-    private static bool TryGetKnownAttributeMetadataName(
+    private bool TryGetKnownAttributeMetadataName(
         INamedTypeSymbol type,
         out string metadataName)
     {
@@ -583,7 +589,7 @@ internal sealed class ContractApiIdentityResolver
         return false;
     }
 
-    private static bool HasMetadataName(
+    private bool HasMetadataName(
         INamedTypeSymbol? type,
         string metadataName)
     {
@@ -592,7 +598,7 @@ internal sealed class ContractApiIdentityResolver
             return false;
         }
 
-        var parts = MetadataNames.GetOrAdd(
+        var parts = _metadataNames.GetOrAdd(
             metadataName,
             static value => new MetadataNameParts(value));
         return parts.IsValid &&

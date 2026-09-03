@@ -1900,40 +1900,40 @@ internal readonly record struct ManagedAbstractValue(
                 maximum = b - c;
                 break;
             case BinaryOperatorKind.Multiply:
-            {
-                minimum = maximum = a * c;
-                var candidate = a * d;
-                if (candidate < minimum)
                 {
-                    minimum = candidate;
-                }
-                else if (candidate > maximum)
-                {
-                    maximum = candidate;
-                }
+                    minimum = maximum = a * c;
+                    var candidate = a * d;
+                    if (candidate < minimum)
+                    {
+                        minimum = candidate;
+                    }
+                    else if (candidate > maximum)
+                    {
+                        maximum = candidate;
+                    }
 
-                candidate = b * c;
-                if (candidate < minimum)
-                {
-                    minimum = candidate;
-                }
-                else if (candidate > maximum)
-                {
-                    maximum = candidate;
-                }
+                    candidate = b * c;
+                    if (candidate < minimum)
+                    {
+                        minimum = candidate;
+                    }
+                    else if (candidate > maximum)
+                    {
+                        maximum = candidate;
+                    }
 
-                candidate = b * d;
-                if (candidate < minimum)
-                {
-                    minimum = candidate;
-                }
-                else if (candidate > maximum)
-                {
-                    maximum = candidate;
-                }
+                    candidate = b * d;
+                    if (candidate < minimum)
+                    {
+                        minimum = candidate;
+                    }
+                    else if (candidate > maximum)
+                    {
+                        maximum = candidate;
+                    }
 
-                break;
-            }
+                    break;
+                }
             default:
                 return false;
         }
