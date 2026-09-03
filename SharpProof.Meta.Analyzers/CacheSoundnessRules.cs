@@ -1577,14 +1577,25 @@ internal static class CacheSoundnessRules
     private static IEnumerable<ExpressionSyntax> GetReturnExpressions(
         SyntaxNode syntax)
     {
-        return syntax.DescendantNodesAndSelf()
-            .OfType<ArrowExpressionClauseSyntax>()
-            .Select(static arrow => arrow.Expression)
-            .Concat(syntax.DescendantNodesAndSelf()
-                .OfType<ReturnStatementSyntax>()
-                .Where(static statement => statement.Expression != null &&
-                    !IsSyntacticallyUnreachableReturn(statement))
-                .Select(static statement => statement.Expression!))
+        var arrows = new List<ExpressionSyntax>();
+        var returns = new List<ExpressionSyntax>();
+        foreach (var node in syntax.DescendantNodesAndSelf())
+        {
+            switch (node)
+            {
+                case ArrowExpressionClauseSyntax arrow:
+                    arrows.Add(arrow.Expression);
+                    break;
+                case ReturnStatementSyntax
+                {
+                    Expression: { } expression
+                } statement when !IsSyntacticallyUnreachableReturn(statement):
+                    returns.Add(expression);
+                    break;
+            }
+        }
+
+        return arrows.Concat(returns)
             .Where(expression => !IsInsideNestedCallable(expression, syntax));
     }
 
