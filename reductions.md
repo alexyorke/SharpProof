@@ -13577,5 +13577,7 @@ one recursive completion evaluation.
 
 ### Status (part four hundred eighty-five)
 
-R1163 is `pending`: cache the copy-constructor branch's completion result and
-retain the final combination with the scanned clone summary.
+R1163 is applied: the record copy-constructor branch carries its computed clone
+completion result into the final step instead of evaluating it twice; other
+`with` paths retain their existing completion checks. The Effects test suite
+passes (323/323).

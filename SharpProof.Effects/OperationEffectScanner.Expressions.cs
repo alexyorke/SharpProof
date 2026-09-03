@@ -372,25 +372,32 @@ internal sealed partial class OperationEffectScanner
     private EffectSummary ScanWith(IWithOperation withOperation)
     {
         EffectStep clone;
+        bool? copyConstructionCompletesNormally = null;
         if (withOperation.CloneMethod is { } cloneMethod)
         {
             var copyConstructor = OperationCompletionEvaluator
                 .GetRecordCopyConstructor(cloneMethod);
-            clone = copyConstructor == null
-                ? ScanCallStep(
+            if (copyConstructor == null)
+            {
+                clone = ScanCallStep(
                     cloneMethod,
                     withOperation.Operand,
                     [],
                     [],
                     [],
                     dispatchUncertain: false,
-                    withOperation)
-                : ScanRecordCopyConstruction(
+                    withOperation);
+            }
+            else
+            {
+                copyConstructionCompletesNormally =
+                    _completionEvaluator.CanCompleteWithClone(withOperation);
+                clone = ScanRecordCopyConstruction(
                     withOperation.Operand,
                     copyConstructor,
                     withOperation,
-                    _completionEvaluator.CanCompleteWithClone(
-                        withOperation));
+                    copyConstructionCompletesNormally.Value);
+            }
         }
         else
         {
@@ -400,7 +407,8 @@ internal sealed partial class OperationEffectScanner
         clone = new EffectStep(
             clone.Summary,
             clone.CompletesNormally &&
-                _completionEvaluator.CanCompleteWithClone(withOperation));
+                (copyConstructionCompletesNormally ??
+                 _completionEvaluator.CanCompleteWithClone(withOperation)));
         return withOperation.Initializer != null && clone.CompletesNormally
             ? clone.Then(ScanStep(withOperation.Initializer)).Summary
             : clone.Summary;
