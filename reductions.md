@@ -13615,3 +13615,19 @@ non-completing-dimension precedence explicit.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1165 | **`OperationEffectScanner.ScanArrayCreation` traverses every dimension twice.** `ScanSequence(array.DimensionSizes)` scans each dimension operation, while `ArrayCreationExceptions` immediately enumerates `DimensionSizes` again for non-negative proofs; if a dimension does not complete, the latter result is computed but discarded when `dimensions.Summary` is returned. A shared per-dimension accumulator can preserve scan short-circuiting and overflow semantics while removing the duplicate collection traversal. | `SharpProof.Effects/OperationEffectScanner.cs:915-932,1225-1233` |
+
+## Second survey, part four hundred eighty-eight: R1166 - delegate nullness queried twice
+
+`OperationEffectScanner.ScanDelegateCreation` asks whether the delegate
+constructor's instance is proven non-null and, when that answer is false, asks
+whether the same instance is proven null. Both calls use the same operation and
+origin. For a null or unknown instance this repeats the evaluator's constant,
+abstract-flow, and source/nullness checks; the result still needs three states,
+because unknown means the delegate construction may throw while proven null
+means it cannot complete. A single tri-state nullness query can preserve that
+distinction and the current allocation/exception behavior without evaluating
+the same fact twice.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1166 | **`OperationEffectScanner.ScanDelegateCreation` queries one instance's nullness twice.** The method first calls `IsProvenNonNull(instance, methodReference)` and, on the false branch, immediately calls `IsProvenNull(instance, methodReference)` for the same inputs. A tri-state result can retain the separate known-null, known-non-null, and unknown outcomes while removing the repeated nullness analysis. | `SharpProof.Effects/OperationEffectScanner.cs:813-843`; `SharpProof.Effects/OperationNullnessEvaluator.cs:17-27,110-125` |
