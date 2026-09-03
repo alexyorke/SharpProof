@@ -328,6 +328,7 @@ the smallest relevant containerized test target passes.
 | R996 | Share the left-associated addition-chain fixture in IR depth tests | `SharpProof.Ir.Test`: 114 passed |
 | R999 | Read analyzer option aliases once during validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R1000 | Reuse the existing effect-manifest test factory | `SharpProof.Worker.Test`: ProtocolJsonTests, 108 passed |
+| R1001 | Share declaration-to-discovery setup in analyzer tests | `SharpProof.Analyzer.Test`: RequiresCallSiteDiscoveryTests, 44 passed |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -10477,7 +10478,9 @@ capture the manifest identity before the effect mutation.
 
 ### Status (part two hundred thirty-two)
 
-R1001 is deferred: the adapter is test-only and the source cases are intentionally independent; add the helper if discovery APIs or the number of direct cases grows enough to make constructor/setup drift costly.
+R1001 is applied: the repeated declaration, semantic-model, method-symbol,
+and discovery construction now uses one test-only adapter. The custom
+foreign-declaration case remains explicit because it intentionally mixes trees.
 
 ## Second survey, part two hundred thirty-three: R1002 - unreachable release payload mutation branch
 

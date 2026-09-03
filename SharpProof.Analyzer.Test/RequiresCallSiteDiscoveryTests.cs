@@ -29,14 +29,8 @@ public sealed class RequiresCallSiteDiscoveryTests
             .OfType<ConstructorDeclarationSyntax>()
             .Single(static constructor =>
                 constructor.Identifier.ValueText == "Derived");
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -74,14 +68,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<ConstructorDeclarationSyntax>()
             .Single();
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -172,13 +160,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var declaration = (await tree.GetRootAsync()).DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single(static method => method.Identifier.ValueText == "Call");
-        var model = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)model.GetDeclaredSymbol(declaration)!;
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                model,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(
@@ -230,10 +213,7 @@ public sealed class RequiresCallSiteDiscoveryTests
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>().Single();
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-        var discovery = new RequiresCallSiteDiscovery(
-            caller, declaration, semanticModel, CancellationToken.None);
+        var discovery = CreateDiscovery(compilation, declaration);
         var kinds = new HashSet<MethodKind>();
 
         var hasPotential = discovery.HasPotentialCallSite(target =>
@@ -299,10 +279,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var tree = compilation.SyntaxTrees.Single();
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>().Single();
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-        var candidates = new RequiresCallSiteDiscovery(
-                caller, declaration, semanticModel, CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -350,13 +328,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single();
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -396,13 +369,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single(static method => method.Identifier.ValueText == "Call");
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -430,13 +398,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single(static method => method.Identifier.ValueText == "Call");
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -466,13 +429,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single(static method => method.Identifier.ValueText == "Call");
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -501,13 +459,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single(static method => method.Identifier.ValueText == "Call");
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -537,13 +490,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single();
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -572,13 +520,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single(static method => method.Identifier.ValueText == "Call");
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -645,10 +588,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var declaration = tree.GetRoot().DescendantNodes()
             .OfType<MethodDeclarationSyntax>()
             .Single(static method => method.Identifier.ValueText == "Call");
-        var semanticModel = compilation.GetSemanticModel(tree);
-        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
-        var candidates = new RequiresCallSiteDiscovery(
-                caller, declaration, semanticModel, CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
 
         Assert.That(candidates, Is.Not.Null);
@@ -684,7 +625,6 @@ public sealed class RequiresCallSiteDiscoveryTests
             []);
         var tree = compilation.SyntaxTrees.Single();
         var root = tree.GetRoot();
-        var semanticModel = compilation.GetSemanticModel(tree);
 
         using (Assert.EnterMultipleScope())
         {
@@ -700,13 +640,7 @@ public sealed class RequiresCallSiteDiscoveryTests
                 .OfType<MethodDeclarationSyntax>()
                 .Single(method =>
                     method.Identifier.ValueText == methodName);
-            var caller = (IMethodSymbol)semanticModel
-                .GetDeclaredSymbol(declaration)!;
-            var discovery = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None);
+            var discovery = CreateDiscovery(compilation, declaration);
             return discovery.HasPotentialCallSite(
                 static target =>
                     target.Name == "Contracted" ||
@@ -991,13 +925,7 @@ public sealed class RequiresCallSiteDiscoveryTests
                 callerName);
             var declaration = await caller.DeclaringSyntaxReferences.Single()
                 .GetSyntaxAsync();
-            var semanticModel = compilation.GetSemanticModel(
-                declaration.SyntaxTree);
-            var discovery = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None);
+            var discovery = CreateDiscovery(compilation, declaration);
             var owners = discovery.GetPotentialCallOwners(
                 session.HasPotentialCallPreconditions);
             var candidates = discovery.Get(callerContracts: null);
@@ -1586,13 +1514,8 @@ public sealed class RequiresCallSiteDiscoveryTests
         var caller = GetMethod(compilation, "Subject", "Call");
         var declaration = await caller.DeclaringSyntaxReferences.Single()
             .GetSyntaxAsync();
-        var semanticModel = compilation.GetSemanticModel(
-            declaration.SyntaxTree);
-        var candidates = new RequiresCallSiteDiscovery(
-                caller,
-                declaration,
-                semanticModel,
-                CancellationToken.None)
+        var discovery = CreateDiscovery(compilation, declaration);
+        var candidates = discovery
             .Get(callerContracts: null);
         Assert.That(
             candidates?.Where(static candidate =>
@@ -1761,6 +1684,20 @@ public sealed class RequiresCallSiteDiscoveryTests
         Assert.That(
             discovery.HasPotentialCallSite(static _ => false),
             Is.True);
+    }
+
+    private static RequiresCallSiteDiscovery CreateDiscovery(
+        Compilation compilation,
+        SyntaxNode declaration)
+    {
+        var semanticModel = compilation.GetSemanticModel(
+            declaration.SyntaxTree);
+        var caller = (IMethodSymbol)semanticModel.GetDeclaredSymbol(declaration)!;
+        return new RequiresCallSiteDiscovery(
+            caller,
+            declaration,
+            semanticModel,
+            CancellationToken.None);
     }
 
     private static IMethodSymbol GetMethod(
