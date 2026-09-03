@@ -14502,6 +14502,12 @@ separate.
 |---|---|---|
 | R1206 | **`CompilerLoweredArtifact.DecodeBody` rescans each summary call's free-variable list four times.** The `free` result-plus-existentials array is passed through `Distinct().Count()` and then through separate `Any` predicates for `canonical`, `programVariables`, and `summaryVariables`. One set-building pass can preserve all four rejection rules and the later `summaryVariables.UnionWith(free)` behavior without repeating the same bounded sequence traversal. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:888-907` |
 
+### Status (part five hundred twenty-eight)
+
+R1206 is applied: summary free-variable validation collects duplicate and
+membership flags in one pass while retaining the free-variable array. Focused
+manifest-artifact tests pass (92/92).
+
 ## Second survey, part five hundred twenty-nine: R1207 - claim membership validation reprojects sorted claims
 
 `ValidateClaimMembership` sorts one callable's claims once, but then projects
