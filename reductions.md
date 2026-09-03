@@ -15916,3 +15916,11 @@ IrBlockOrder derives its result only from program blocks, yet it creates active 
 | ID | Finding | Evidence |
 |---|---|---|
 | R1329 | **IrBlockOrder creates four growable traversal collections without using the known program block count as capacity. Pre-size the active/complete sets, pending stack, and result list from `program.Blocks.Length` (or use an equivalent indexed state) while preserving traversal semantics.** | SharpProof.Ir/IrBlockOrder.cs:18-22,23-74; SharpProof.Ir/IrProgram.cs:18-23 |
+
+## Second survey, continued: R1330 - architecture tests duplicate ordinal-occurrence helpers
+
+The exact C# duplication census notes this helper pair but leaves it without an actionable row. NativeTestBootstrapTests.CountOrdinal and BoundaryEnforcementTests.Count both initialize count and offset, repeatedly call IndexOf with StringComparison.Ordinal, advance by the matched value length, and return the count. They live in the same architecture-test assembly, so a shared ordinal-occurrence helper can replace both private copies without changing either assertion.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1330 | **`NativeTestBootstrapTests.CountOrdinal` and `BoundaryEnforcementTests.Count` are exact copies of the same ordinal-occurrence loop. Move the loop to shared architecture-test infrastructure and keep the two callers' distinct assertion contexts.** | SharpProof.ArchitectureTest/NativeTestBootstrapTests.cs:40-53; SharpProof.ArchitectureTest/BoundaryEnforcementTests.cs:615-628 |
