@@ -17836,7 +17836,7 @@ pass (147/147).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1525 | **Both initializer matrices compile more source than their selected case needs.** The two terminal-arm cases share one unchanged two-type source literal, and the three short-circuit/coalesce cases share one unchanged three-type literal; NUnit reruns each literal once per `[TestCase]` value. The analysis intentionally varies only the selected type name, so caching each group compilation would remove three redundant compilations across the two tests without changing coverage. | `SharpProof.Effects.Test/BranchingExpressionEffectRegressionTests.cs:6-12,15-52,54-99` |
-## Second survey, part six hundred: R1521 - the analyzer loads five of its fifteen dependency assemblies at older versions in the dogfooding lane than consumers get, and an ID collision resolved
+## Second survey, part six hundred: R1540 - the analyzer loads five of its fifteen dependency assemblies at older versions in the dogfooding lane than consumers get, and an ID collision resolved
 
 ### ID collision: R1509
 
@@ -17846,10 +17846,10 @@ row is mine - *"Sixty-eight production types sit in a namespace that a different
 assembly is named after"* - and is **hereby renumbered R1520**: same text, same
 evidence, same `pending` status. **Cite the namespace-ownership finding as R1520.**
 This is the fifth collision this survey produced by two passes allocating from a
-maximum they each read before the other wrote; R1521 below is taken from above the
+maximum they each read before the other wrote; R1540 below is taken from above the
 current maximum rather than at `max + 1`, and the next pass should do the same.
 
-### R1521
+### R1540
 
 R343 records that the fifteen portable analyzer dependency DLLs are listed at
 three MSBuild entry points. What nobody measured is that the three lists point at
@@ -17858,7 +17858,7 @@ the same versions.
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R1521 | **Five of the fifteen analyzer dependency assemblies are older in the two source-tree lanes than in the shipped package, so the self-application lane - whose whole purpose is to prove the product analyzes itself the way a consumer runs it - runs the analyzer on a dependency graph consumers never get.** The three lists R343 names resolve to three directories. `SharpProof.Package/buildTransitive/SharpProof.targets:30-37` points at `$(_SharpProofSharedDirectory)`, which `SharpProof.nuspec:47-56` fills **entirely from `SharpProof.CompilerCollector/bin/$configuration$/netstandard2.0/`**. `eng/self-application/SharpProof.SelfApplication.props:49-56` points at `SharpProof.Analyzer/bin/...`, and `SharpProof.AnalyzerConsumer.props:33-40` at `SharpProof.Analyzer.Core/bin/...`. All three projects target `netstandard2.0` and sit in one solution under central package management, and their lock files disagree: `SharpProof.CompilerCollector` resolves **System.Buffers 4.6.1, System.Memory 4.6.3, System.Numerics.Vectors 4.6.1, System.Runtime.CompilerServices.Unsafe 6.1.2, System.Threading.Tasks.Extensions 4.6.3**, while `SharpProof.Analyzer` and `SharpProof.Analyzer.Core` both resolve **4.5.1, 4.5.5, 4.5.0, 6.0.0, 4.5.4**. The other three System assemblies in the list - `System.Collections.Immutable 9.0.18`, `System.Reflection.Metadata 9.0.0`, `System.Text.Encoding.CodePages 7.0.0` - agree everywhere. **The cause is a transitive floor that reaches one project and not the other.** `SharpProof.CompilerCollector` project-references `SharpProof.Worker.Protocol`, whose direct `System.Text.Json 10.0.10` requires `System.Buffers 4.6.1` and pulls `System.Memory 4.6.3`, `System.IO.Pipelines 10.0.10` and `System.Text.Encodings.Web 10.0.10` with it; `SharpProof.Analyzer` has no such edge and falls back to the `netstandard2.0` defaults. **The mechanism that would fix it is already switched on and inert.** `Directory.Packages.props:6` sets `CentralPackageTransitivePinningEnabled` to `true`, which pins a transitive package only when a `PackageVersion` for it exists - and the file's fourteen entries include none of the five. The three assemblies that agree are the ones either centrally pinned or resolved identically by every path; the five that diverge are exactly the five with no pin. Adding five `PackageVersion` lines makes all 47 lock files agree and makes the divergence impossible to reintroduce. **The shipped notice is correct and this is not a licensing defect** - `THIRD-PARTY-NOTICES.txt` declares the newer set, and the newer set is what `tools/shared/netstandard2.0/` receives, because every third-party file in the nuspec is sourced from the collector's `bin`. The defect is that the dogfooding and source-tree-consumer lanes silently exercise a different graph, which is precisely the drift R752 predicted - *"if it drifts from the shipping partition, the dogfooding silently stops covering whatever was added"* - measured in versions rather than in property names. | `Directory.Packages.props:5-6,9-23`; `SharpProof.Package/SharpProof.nuspec:33-56`; `SharpProof.Package/buildTransitive/SharpProof.targets:30-37`; `eng/self-application/SharpProof.SelfApplication.props:49-56`; `SharpProof.AnalyzerConsumer.props:33-40`; lock files `SharpProof.Analyzer/`, `SharpProof.Analyzer.Core/`, `SharpProof.CompilerCollector/`, `SharpProof.CompilerArtifact/`, `SharpProof.Worker.Protocol/packages.lock.json`; `eng/release/third-party-components.json`; related R343, R752, R491, R1305 |
+| R1540 | **Five of the fifteen analyzer dependency assemblies are older in the two source-tree lanes than in the shipped package, so the self-application lane - whose whole purpose is to prove the product analyzes itself the way a consumer runs it - runs the analyzer on a dependency graph consumers never get.** The three lists R343 names resolve to three directories. `SharpProof.Package/buildTransitive/SharpProof.targets:30-37` points at `$(_SharpProofSharedDirectory)`, which `SharpProof.nuspec:47-56` fills **entirely from `SharpProof.CompilerCollector/bin/$configuration$/netstandard2.0/`**. `eng/self-application/SharpProof.SelfApplication.props:49-56` points at `SharpProof.Analyzer/bin/...`, and `SharpProof.AnalyzerConsumer.props:33-40` at `SharpProof.Analyzer.Core/bin/...`. All three projects target `netstandard2.0` and sit in one solution under central package management, and their lock files disagree: `SharpProof.CompilerCollector` resolves **System.Buffers 4.6.1, System.Memory 4.6.3, System.Numerics.Vectors 4.6.1, System.Runtime.CompilerServices.Unsafe 6.1.2, System.Threading.Tasks.Extensions 4.6.3**, while `SharpProof.Analyzer` and `SharpProof.Analyzer.Core` both resolve **4.5.1, 4.5.5, 4.5.0, 6.0.0, 4.5.4**. The other three System assemblies in the list - `System.Collections.Immutable 9.0.18`, `System.Reflection.Metadata 9.0.0`, `System.Text.Encoding.CodePages 7.0.0` - agree everywhere. **The cause is a transitive floor that reaches one project and not the other.** `SharpProof.CompilerCollector` project-references `SharpProof.Worker.Protocol`, whose direct `System.Text.Json 10.0.10` requires `System.Buffers 4.6.1` and pulls `System.Memory 4.6.3`, `System.IO.Pipelines 10.0.10` and `System.Text.Encodings.Web 10.0.10` with it; `SharpProof.Analyzer` has no such edge and falls back to the `netstandard2.0` defaults. **The mechanism that would fix it is already switched on and inert.** `Directory.Packages.props:6` sets `CentralPackageTransitivePinningEnabled` to `true`, which pins a transitive package only when a `PackageVersion` for it exists - and the file's fourteen entries include none of the five. The three assemblies that agree are the ones either centrally pinned or resolved identically by every path; the five that diverge are exactly the five with no pin. Adding five `PackageVersion` lines makes all 47 lock files agree and makes the divergence impossible to reintroduce. **The shipped notice is correct and this is not a licensing defect** - `THIRD-PARTY-NOTICES.txt` declares the newer set, and the newer set is what `tools/shared/netstandard2.0/` receives, because every third-party file in the nuspec is sourced from the collector's `bin`. The defect is that the dogfooding and source-tree-consumer lanes silently exercise a different graph, which is precisely the drift R752 predicted - *"if it drifts from the shipping partition, the dogfooding silently stops covering whatever was added"* - measured in versions rather than in property names. | `Directory.Packages.props:5-6,9-23`; `SharpProof.Package/SharpProof.nuspec:33-56`; `SharpProof.Package/buildTransitive/SharpProof.targets:30-37`; `eng/self-application/SharpProof.SelfApplication.props:49-56`; `SharpProof.AnalyzerConsumer.props:33-40`; lock files `SharpProof.Analyzer/`, `SharpProof.Analyzer.Core/`, `SharpProof.CompilerCollector/`, `SharpProof.CompilerArtifact/`, `SharpProof.Worker.Protocol/packages.lock.json`; `eng/release/third-party-components.json`; related R343, R752, R491, R1305 |
 
 ### Checked and not proposed (part six hundred)
 
@@ -17917,7 +17917,7 @@ the same versions.
 
 ### Status (part six hundred)
 
-R1521 is `pending` and its remedy is five `PackageVersion` lines in
+R1540 is `pending` and its remedy is five `PackageVersion` lines in
 `Directory.Packages.props`, which the file's own
 `CentralPackageTransitivePinningEnabled` setting then enforces across all 47 lock
 files. It is worth more than its size because the divergence is invisible from
@@ -17950,7 +17950,6 @@ original uniqueness diagnostic. `CorpusGateTests` pass (23/23).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1527 | **The analyzer-diagnostic generator has two copies of the same set-admission guard.** The intrinsic loop at lines 40-46 and placement loop at lines 62-67 each allocate an ordinal `HashSet`, call `.Add`, and throw when the key is repeated; only the key expression and message differ. A small helper accepting the key and failure text would remove the repeated validation skeleton without merging the distinct generated switch arms. | `scripts/Generate-AnalyzerDiagnosticCatalog.ps1:40-46,62-67` |
-
 ## Second survey, continued: R1528 - four effect regression matrices rebuild unchanged source once per selected method
 
 `ArrayAccessCompletionRegressionTests`, `AssignableRecursivePatternCompletionRegressionTests`, `BinaryPatternCompletionRegressionTests`, and `NullablePatternCompletionRegressionTests` each parameterize over two method names but call `CreateCompilation` or `EffectTestHost.CreateCompilation` inside the test body. Each source literal contains both cases and is otherwise immutable, so every NUnit row reparses and binds the same fixture before selecting one method. A cached fixture compilation or a shared test-case source that supplies prebuilt symbols can preserve the distinct completion cases while removing the duplicate setup.
@@ -17966,3 +17965,128 @@ original uniqueness diagnostic. `CorpusGateTests` pass (23/23).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1529 | **Both indirect-mutation matrices rebuild an unchanged two-method compilation for every case.** `WriteThroughAlias`/`ReadThroughAlias` share one source literal, and `ThroughRefAlias`/`ThroughLocalFunction` share another; each `[TestCase]` invocation calls `EffectTestHost.CreateCompilation` again before selecting its method. The per-case expected values are already explicit after R1027, so they can travel with a shared immutable compilation rather than forcing duplicate fixture setup. | `SharpProof.Effects.Test/IndirectLocalMutationNullnessRegressionTests.cs:6-44,46-110` |
+## Second survey, part six hundred one: R973 re-measured on the axis it did not use, and four lenses closed with no finding
+
+No new ID. This part is an evidence update to a pending finding plus four
+exhaustion notes, recorded so later passes do not spend the same effort.
+
+### Evidence update: R973's target set is wider than it says, and five of the eight files are new
+
+R973 measures **per-method** branch density and names eight of the ten densest
+methods as living outside `eng/acceptance/algorithm-size-ratchets.json`. The
+manifest, however, caps two independent things per entry -
+`maximumMemberDecisionPoints` **and** `maximumFileDecisionPoints` - and nobody has
+measured the second. Doing so over every hand-written production `.cs`, excluding
+generated files, counting branching constructs after stripping string literals and
+line comments:
+
+- **Eight unratcheted production files score above the highest-scoring file the
+  manifest governs.** The manifest's densest entry is
+  `SharpProof.Effects/OperationEffectScanner.cs`, capped at **285** file decision
+  points and measuring **257** on this proxy. Above it, ungoverned:
+  `SharpProof.Effects/ManagedAbstractFlow.cs` (**649**),
+  `SharpProof.Effects/ExceptionHandlerReachability.cs` (**626**),
+  `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs` (412),
+  `SharpProof.Effects/OperationCompletionEvaluator.cs` (356),
+  `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs` (337),
+  `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs` (328),
+  `SharpProof.CompilerCollector/CompilerArtifact/CompilerImplementationIlSummaryLowerer.cs`
+  (287), and `SharpProof.Analyzer.Core/RequiresCallSiteTreeAnalyzer.cs` (265).
+- **Five of those eight are absent from R973's list**, because they distribute
+  their branching across many modest methods and so never appear in a
+  per-method ranking: `ManagedAbstractFlow.cs`, `RequiresCallSiteDiscovery.cs`,
+  `OperationCompletionEvaluator.cs`, `CacheSoundnessRules.cs` and
+  `CompilerLoweredArtifact.cs`. The top file on the whole-file axis,
+  `ManagedAbstractFlow.cs`, is **2.5 times** the highest ratcheted file and is
+  named nowhere in R973.
+- **The contrast inside one assembly is the sharpest form of the finding.**
+  `SharpProof.Effects` has six of the sixteen manifest entries -
+  `OperationEffectScanner.cs`, `OperationEffectScanner.Assignments.cs`,
+  `EffectAnalysisSession.cs`, `ExternalEffectResolver.cs` - while its two largest
+  files by this measure, `ManagedAbstractFlow.cs` and
+  `ExceptionHandlerReachability.cs`, are ungoverned. All four governed and both
+  ungoverned files are declared in the trusted computing base.
+- **The cap range makes the gap concrete.** The sixteen governed caps run from
+  `SharpProof.Verify/Outcomes.cs` at **3** file decision points and `Evidence.cs`
+  at **10**, up to 285. The manifest spends an entry pinning a file to a budget of
+  three, and none on the file measuring six hundred and forty-nine.
+- **The proxy is calibrated, not assumed.** Against the manifest's own caps it
+  tracks within roughly fifteen percent on the governed files - 257 against a cap
+  of 285, 172 against 166, 143 against 123 - so a factor-of-2.5 gap is far outside
+  its error. This is a coarse regex count and not the Roslyn measurement
+  `CSharpSourceMetrics.ps1` performs; the ranking is what matters, and it is
+  unambiguous.
+
+R973 stays `pending` and its remedy is unchanged. What this adds is that its
+target set should be chosen on both of the manifest's own axes, and that widening
+it costs two edits per file - the JSON entry and the literal `expectedPaths` array
+at `ArchitectureTests.cs:511-527` that pins it - which is the friction R973 already
+identifies as the reason the list stopped growing.
+
+### Checked and not proposed (part six hundred one)
+
+- **The per-file ratchet manifest is otherwise well formed.** Sixteen entries, all
+  paths exist, all use the same five keys, no duplicates, every cap positive, and
+  `AlgorithmLayerSizeRatchetManifestIsWellFormed` checks each of those plus
+  containment under the repository root. The only thing it cannot check is
+  membership, which is R973.
+- **The repository-wide complexity ceiling is real and limits total growth, so
+  R973 is about distribution rather than absolute size.**
+  `scripts/Test-ProductionCSharpComplexity.ps1:22-48` reads
+  `productionComplexity.maximumExpressionNodes`, `maximumDecisionPoints` and
+  `maximumMembers` from the acceptance contract, requires a non-empty
+  `ceilingRationale`, and requires that rationale to contain the literal
+  `ceilings:<a>/<b>/<c>` matching the three numbers - currently
+  `ceilings:218647/12875/5808`. A new large file must therefore be paid for by
+  shrinking something else and writing down why. What the aggregate cannot say is
+  *which* file absorbed the budget, which is exactly the job the per-file manifest
+  exists to do.
+- **The release ownership list is hand-written but fails safe, so it is not
+  filed.** `eng/release/first-party-assemblies.json` names **20** assemblies and is
+  read only by `scripts/Test-SharpProofPackagePayloads.ps1:143-157`, purely as a
+  classifier: a packaged `.dll` whose assembly name is absent is added to
+  `$actualThirdParty`, which is then compared as an exact set against the declared
+  third-party components. So a *missing* first-party name fails loudly. The unsafe
+  direction - a genuinely third-party assembly listed as first-party, which would
+  escape the notice requirement - requires someone adding a non-`SharpProof.` name
+  to the file, and all twenty entries are real product assemblies today. The 20 is
+  exactly the union of the two nuspecs' first-party payloads plus
+  `SharpProof.Attributes`, which ships from its own SDK-packed project.
+- **The declared diagnostic surface has no dead entries.**
+  `eng/diagnostics/diagnostic-descriptors.v1.json` declares **13** `SP` ids -
+  SP0002, SP0013, SP0015, SP0016, SP0024, SP0025, SP0027, SP0030, SP0045, SP0046,
+  SP0047, SP0049, SP0050 - and every one appears in production C#. The id space is
+  full of gaps, which is retirement rather than error; analyzer release tracking is
+  R506's subject and is not re-filed here.
+- **The `#pragma warning disable` surface is 14 sites and mostly explained.** Ten
+  of the fourteen carry an inline rationale on the same line - three `RS1035` for
+  build-only file and PE access, one `RS0030` for the audited compiler-host
+  boundary, two `CA2000` for deliberate non-disposal, two `CA1849` for intentional
+  kernel waits. The four without a comment are two `CA1031`, two
+  `RSEXPERIMENTAL001` and one `CS0168`. Fourteen suppressions across a 286k-line
+  tree with `AnalysisLevel=latest-all` is low, and nothing here is worth a
+  reduction.
+- **Three project-local `TreatWarningsAsErrors` declarations remain, one more
+  than applied R327 recorded, and the extra one is correct.** R327 kept "the two
+  excluded-project declarations" - `SharpProof.Testing` and
+  `SharpProof.CompilerProbe.TestAsset`, both outside the production classification
+  and so not reached by the central `true`. The third is
+  `samples/Diagnostics/Diagnostics.csproj`, which sets it to **`false`**,
+  overriding `samples/Directory.Build.props:5`. That is the one sample whose
+  purpose is to emit diagnostics, and it pairs with
+  `samples/Diagnostics/.globalconfig` downgrading SP0045 and SP0047 to `warning`.
+  Both mechanisms are needed - one sets severity, the other decides whether
+  warnings fail - and R327's count should read three.
+
+### Status (part six hundred one)
+
+No new ID. The ratchet, release-ownership, diagnostic-catalog and suppression
+lenses are all closed: the first is R973 with a wider target set, and the other
+three produced nothing. Four exhausted lenses are worth recording precisely
+because each of them looked, from the outside, like it should have contained a
+finding.
+
+R1403 is applied: `ProtocolJson.ValidateUniqueIds` now materializes the input
+once and checks blankness and ordinal uniqueness in one loop, preserving the
+returned snapshot and validator diagnostics. `ProtocolJsonTests` pass
+(108/108).

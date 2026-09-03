@@ -983,8 +983,16 @@ public static partial class WorkerProtocolJson
         IEnumerable<string?> values, string code, Validator errors)
     {
         var items = values.ToArray();
-        errors.Check(items.All(static value => !string.IsNullOrWhiteSpace(value)) &&
-            items.Distinct(s_ordinal).Count() == items.Length, code);
+        var seen = new HashSet<string?>(s_ordinal);
+        var valid = true;
+        foreach (var value in items)
+        {
+            if (string.IsNullOrWhiteSpace(value) || !seen.Add(value))
+            {
+                valid = false;
+            }
+        }
+        errors.Check(valid, code);
         return items;
     }
     private static void ValidateExactIds(IEnumerable<string?> actual, IEnumerable<string?> expected, string code, Validator errors)
