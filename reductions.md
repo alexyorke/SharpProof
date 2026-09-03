@@ -13738,6 +13738,12 @@ overwrites, and construction-specific implicit-layer handling.
 |---|---|---|
 | R1170 | **`OperationEffectScanner` projects one call's arguments through three or four independent enumerations.** Invocation and property calls scan values, classify regions, and align actual arguments in separate passes; object creation and external-exception construction also enumerate the same creation arguments for expanded-param-array evidence inside `EffectCallSiteResolver`. A shared argument-facts projection can retain those distinct outputs and fail-closed rules while removing repeated argument-list traversal; this is broader than R942's mutable-to-immutable alignment allocation and separate from R391's summary-join arrays. | `SharpProof.Effects/OperationEffectScanner.cs:406-409,638-724,778-815,880-898,1584-1601`; `SharpProof.Effects/EffectCallSiteResolver.cs:39-66,89-145,189-196` |
 
+### Status (part four hundred ninety-two)
+
+R1170 is applied: calls now share one argument projection for ownership
+regions, aligned actuals, and param-array evidence, including object and
+exception construction paths. The Effects test suite passes (323/323).
+
 ## Second survey, part four hundred ninety-three: R1171 - completion nullness ladders repeat one fact
 
 Three completion paths use the same two-step nullness decision for one operand
