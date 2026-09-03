@@ -20865,3 +20865,11 @@ the new check rejects the old path. The documentation gate and all 24 focused
 release-qualification ordering assertion to recognize its current
 `@releaseArguments` splat and fixed the required README diagnostic-code list
 to flatten both launcher IDs.
+
+## Second survey, continued: R1984 - ContractApiIdentityResolver duplicates the single-method counting loop
+
+ContractApiIdentityResolver.HasSingleClause and HasSingleGenericIdentityMethod independently enumerate contract.GetMembers(name), discard non-method members, count the remaining IMethodSymbol candidates, and retain the first only when the count is one. Their shape predicates are intentionally different - one validates a void clause method and the other validates a generic identity method with a parameter-count-dependent argument rule - but the candidate-selection and exact-one policy are byte-for-byte the same. A private GetSingleMethod helper can own that bounded scan and return the retained method only when exactly one method is present, leaving both callers' distinct shape checks in place. This also preserves the current behavior of ignoring non-method members in both paths. Today a change to overload-counting or the exact-one policy requires synchronized edits in both contract validators.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1984 | ContractApiIdentityResolver repeats the same GetMembers(name)-to-single-method counting loop in clause and generic identity validation; share candidate selection while retaining the distinct method-shape predicates. | SharpProof.Frontend/ContractApiIdentityResolver.cs:408-446,497-542 |
