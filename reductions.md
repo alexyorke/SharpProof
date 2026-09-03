@@ -21072,3 +21072,12 @@ their traversal policies. The full `SharpProof.Contracts.Test` suite passes
 | ID | Finding | Evidence |
 |---|---|---|
 | R1996 | **`IrCSharpDifferentialOracle.CompareException` and `FrontendFuzzing` duplicate the five-case runtime exception-to-`IrExceptionKind` projection; share only the classifier while retaining their distinct result policies.** | `SharpProof.Testing/IrCSharpDifferentialOracle.cs:577-585`; `Tools/SharpProof.Fuzz/FrontendFuzzing.cs:1663-1671` |
+
+R1820 is applied: the repeated Meta.Analyzers project reference now lives in
+`Directory.Build.targets` behind the explicit `SharpProofUsesMetaAnalyzer` opt-in;
+the 17 consuming projects keep one-line opt-ins and the architecture gate derives
+its roster from those markers, including `SharpProof.Worker.Launcher`. The focused
+`EverySoundnessCriticalProjectRunsTheMetaAnalyzer` test passes 1/1 with zero
+warnings or errors. A direct Worker.Launcher build still reaches the existing
+`ContainerNativeLibrary` SPMETA003 cancellation-handler violation; the central
+reference change preserves that pre-existing diagnostic.

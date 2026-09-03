@@ -3,6 +3,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <IsRoslynComponent>true</IsRoslynComponent>
     <IsRoslynAnalyzer>true</IsRoslynAnalyzer>
+    <SharpProofUsesMetaAnalyzer>true</SharpProofUsesMetaAnalyzer>
     <NoWarn>$(NoWarn);RS2008</NoWarn>
   </PropertyGroup>
   <ItemGroup>
@@ -12,9 +13,5 @@
   <ItemGroup>
     <ProjectReference Include="..\SharpProof.Analyzer.Core\SharpProof.Analyzer.Core.csproj" />
     <ProjectReference Include="..\SharpProof.Contracts\SharpProof.Contracts.csproj" />
-    <ProjectReference
-      Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
-      OutputItemType="Analyzer"
-      ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

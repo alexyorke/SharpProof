@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <SharpProofUsesMetaAnalyzer>true</SharpProofUsesMetaAnalyzer>
     <!-- Integer and String are intentional names in the typed IR vocabulary. -->
     <NoWarn>$(NoWarn);CA1720</NoWarn>
   </PropertyGroup>
@@ -8,9 +9,6 @@
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.CompilerArtifact" />

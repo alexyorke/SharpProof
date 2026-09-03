@@ -2,13 +2,11 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <SharpProofUsesMetaAnalyzer>true</SharpProofUsesMetaAnalyzer>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\eng\container\toolchain.json"
                       LogicalName="SharpProof.Host.toolchain.json" />
-    <ProjectReference Include="..\SharpProof.Meta.Analyzers\SharpProof.Meta.Analyzers.csproj"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SharpProof.Package.Test" />

@@ -10,24 +10,12 @@ namespace SharpProof.ArchitectureTest;
 [Parallelizable(ParallelScope.Children)]
 public sealed class BoundaryEnforcementTests
 {
-    private static readonly string[] SoundnessCriticalProjects = [
-        "SharpProof.Analyzer",
-        "SharpProof.Analyzer.Core",
-        "SharpProof.CompilerArtifact",
-        "SharpProof.CompilerCollector",
-        "SharpProof.ContractForGenerator",
-        "SharpProof.Contracts",
-        "SharpProof.Dataflow",
-        "SharpProof.Effects",
-        "SharpProof.Frontend",
-        "SharpProof.Host",
-        "SharpProof.Ir",
-        "SharpProof.Smt",
-        "SharpProof.Specs",
-        "SharpProof.Summaries",
-        "SharpProof.Verify",
-        "SharpProof.Worker"
-    ];
+    private static readonly string[] SoundnessCriticalProjects = [..
+        ProductionProjects.Where(static project =>
+            XDocument.Load(ProjectFile(project))
+                .Descendants("SharpProofUsesMetaAnalyzer")
+                .Any(static element =>
+                    string.Equals(element.Value, "true", StringComparison.OrdinalIgnoreCase)))];
 
     private static readonly (string Project, string[] Grantees)[] ExpectedInternalsVisibleTo = [
         ("SharpProof.Analyzer.Core", [
@@ -363,23 +351,49 @@ public sealed class BoundaryEnforcementTests
     [Test]
     public void EverySoundnessCriticalProjectRunsTheMetaAnalyzer()
     {
-        foreach (var project in SoundnessCriticalProjects)
-        {
-            var reference = XDocument.Load(ProjectFile(project))
+        var buildTargets = XDocument.Load(Path.Combine(
+            TestRepository.FindRoot(),
+            "Directory.Build.targets"));
+        var centralReference = buildTargets
+            .Descendants("ProjectReference")
+            .SingleOrDefault(element =>
+                Path.GetFileNameWithoutExtension(
+                    ((string?)element.Attribute("Include") ?? string.Empty)
+                        .Replace('\\', '/')) ==
+                "SharpProof.Meta.Analyzers");
+        Assert.That(centralReference, Is.Not.Null);
+        Assert.That(
+            (string?)centralReference!.Attribute("OutputItemType"),
+            Is.EqualTo("Analyzer"));
+        Assert.That(
+            (string?)centralReference.Attribute("ReferenceOutputAssembly"),
+            Is.EqualTo("false"));
+        Assert.That(
+            centralReference.Parent?.Attribute("Condition")?.Value,
+            Does.Contain("$(SharpProofUsesMetaAnalyzer)"));
+
+        var inlineReferences = ProductionProjects
+            .Where(static project => XDocument.Load(ProjectFile(project))
                 .Descendants("ProjectReference")
-                .SingleOrDefault(element =>
+                .Any(static element =>
                     Path.GetFileNameWithoutExtension(
                         ((string?)element.Attribute("Include") ?? string.Empty)
                             .Replace('\\', '/')) ==
-                    "SharpProof.Meta.Analyzers");
-            Assert.That(reference, Is.Not.Null, project);
+                    "SharpProof.Meta.Analyzers"))
+            .ToArray();
+        Assert.That(inlineReferences, Is.Empty);
+
+        foreach (var project in SoundnessCriticalProjects)
+        {
             Assert.That(
-                (string?)reference!.Attribute("OutputItemType"),
-                Is.EqualTo("Analyzer"),
-                project);
-            Assert.That(
-                (string?)reference.Attribute("ReferenceOutputAssembly"),
-                Is.EqualTo("false"),
+                XDocument.Load(ProjectFile(project))
+                    .Descendants("SharpProofUsesMetaAnalyzer")
+                    .Any(static element =>
+                        string.Equals(
+                            element.Value,
+                            "true",
+                            StringComparison.OrdinalIgnoreCase)),
+                Is.True,
                 project);
         }
     }
