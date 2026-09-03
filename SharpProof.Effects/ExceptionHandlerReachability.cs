@@ -20,6 +20,10 @@ internal sealed class ExceptionHandlerReachability(
     Func<IMethodSymbol, bool> isKnownNonThrowing)
 {
     private readonly Dictionary<CatchClauseSyntax, CatchReachability> _cache = new();
+    private readonly Dictionary<IOperation, PotentialExceptions>
+        _potentialExceptionsCache = new();
+    private readonly Dictionary<(IOperation Operation, IOperation Scope), bool>
+        _abruptExitCache = new();
     private readonly INamedTypeSymbol? _exceptionType =
         compilation.GetTypeByMetadataName(FrameworkTypeMetadataNames.Exception);
     private readonly INamedTypeSymbol? _nullReferenceExceptionType =
@@ -82,11 +86,20 @@ internal sealed class ExceptionHandlerReachability(
     private PotentialExceptions GetPotentialExceptions(
         IOperation protectedBlock)
     {
-        return GetPotentialExceptions(
+        if (_potentialExceptionsCache.TryGetValue(
+                protectedBlock,
+                out var cached))
+        {
+            return cached;
+        }
+
+        var potential = GetPotentialExceptions(
             protectedBlock,
             new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default),
             depth: 0,
             keepEscaping: false);
+        _potentialExceptionsCache.Add(protectedBlock, potential);
+        return potential;
     }
 
     private PotentialExceptions GetPotentialExceptions(
@@ -2126,9 +2139,17 @@ internal sealed class ExceptionHandlerReachability(
         IOperation operation,
         IOperation scope)
     {
+        if (_abruptExitCache.TryGetValue(
+                (operation, scope),
+                out var cached))
+        {
+            return cached;
+        }
+
         var potential = GetPotentialExceptions(operation);
         var abrupt = potential.Unknown || !potential.Known.IsEmpty ||
             CanExitAbruptlyWithoutExceptions(operation, scope);
+        _abruptExitCache.Add((operation, scope), abrupt);
         return abrupt;
     }
 
