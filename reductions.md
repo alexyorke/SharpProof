@@ -10590,3 +10590,15 @@ R1009 is deferred: use the single loaded manifest only within a gate invocation;
 ### Status (part two hundred forty-one)
 
 R1010 is deferred: retain the positional contiguous-ID contract; eliminate only the duplicate check that it logically subsumes.
+
+## Second survey, part two hundred forty-two: R1011 - duplicate OSS source parsing
+
+`OpenSourceCorpusCatalog.Validate` parses every embedded corpus file into a Roslyn `CompilationUnitSyntax` so it can resolve method declarations and verify declaration hashes and names, but the parsed roots are discarded when `Load` returns the data record. `OpenSourceCorpusRunner.ObserveAsync` then parses every `document.Files` entry again from the same normalized content before applying instrumentation and building the analysis compilation. The two consumers need different follow-up operations, not different source text or parse options. A load/run validation snapshot that carries the already-validated roots (or a scoped parsed-file cache keyed by source ID and path) can let instrumentation operate on those roots directly while retaining declaration validation, source hashes, cancellation checks, and the final compilation construction. This is distinct from R1009's duplicate manifest deserialization and R860's per-method identity scans.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1011 | **The OSS corpus parses each embedded source file twice in one analysis run.** Manifest validation creates a syntax tree for every file and uses it to verify selected declarations, then drops the tree; the runner reparses the same normalized contents before instrumentation. Thread a validated parse snapshot into the runner, or cache it only for the run, to remove duplicate Roslyn parsing without skipping declaration/hash validation or instrumentation. | `SharpProof.Gates/Corpus/OpenSourceCorpusCatalog.cs:151-187`; `SharpProof.Gates/Corpus/OpenSourceCorpusRunner.cs:49-76`; same parse options `AnalyzerGateHost.ParseOptions` | |
+
+### Status (part two hundred forty-two)
+
+R1011 is deferred: reuse validated syntax roots only within the same immutable document/run, and keep the independent hash, declaration, and compilation-boundary checks explicit.
