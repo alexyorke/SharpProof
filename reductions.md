@@ -18760,3 +18760,8 @@ R1643 is applied: analyzer and collector default dependency items now share one
 remove/reinclude projection, while their configuration fallbacks and role
 specific roots remain separate. `SourceConsumerAnalyzerDependenciesUseMappedConfiguration`
 passes (1/1).
+
+R1652 is applied: soundness string-shape traversal now reuses the shared
+cancellation-aware `OperationUnwrapping` helper for parenthesized and built-in
+conversion wrappers, while string-specific cases remain local.
+`ReportsCSharpExpressionTextConstruction` passes (9/9).

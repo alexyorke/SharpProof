@@ -485,11 +485,9 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
                         pending.Push(arguments[index].Value);
                     }
                     break;
-                case IParenthesizedOperation parenthesized:
-                    pending.Push(parenthesized.Operand);
-                    break;
-                case IConversionOperation { OperatorMethod: null } conversion:
-                    pending.Push(conversion.Operand);
+                case IParenthesizedOperation or
+                    IConversionOperation { OperatorMethod: null }:
+                    pending.Push(OperationUnwrapping.Unwrap(current, cancellationToken)!);
                     break;
                 default:
                     shape.Append('\0');
