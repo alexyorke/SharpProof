@@ -15141,6 +15141,15 @@ nested-callable, and reachability decisions. Contract clause inventory tests pas
 |---|---|---|
 | R1249 | **`SharpProofAttributeTargets.Declaration` repeats the callable flags already owned by `Contract`.** Constructor, method, and property appear in both target unions. Defining the broader set in terms of `Contract` preserves the distinct attribute scopes while removing a duplicated target vocabulary. | `SharpProof.Attributes/SharpProofAttributeTargets.cs:3-18` |
 
+### Status (part five hundred seventy-one)
+
+R1249 is applied: the declaration target mask now composes the shared contract
+mask, preserving attribute scopes while removing duplicated constructor/method/
+property flags. The Attributes production build succeeds with 0 warnings/errors,
+and frontend catalog-parity tests pass (6 passed). The existing Attributes test
+project remains unbuildable here because of unrelated NUnit `Assert.Throws`
+overload ambiguities.
+
 ## Second survey, part five hundred seventy-two: R1250 - closed-contract attributes repeat the parameter/return mask
 
 `ClosedContractAttributes.cs` applies the same `AttributeTargets.Parameter | AttributeTargets.ReturnValue` mask independently to `NotNullAttribute`, `PositiveAttribute`, and `InRangeAttribute`. These three attributes intentionally remain separate public contracts, but their placement policy is one shared invariant. A local `ParameterOrReturn` constant or a shared attribute-target declaration helper can own that mask while leaving each attribute's documentation and constructor semantics explicit.
