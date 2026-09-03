@@ -492,7 +492,6 @@ public sealed class IrSmtBackend : ISmtBackend, IDisposable
                 return existing;
             }
 
-            _meter.PollCancellation();
             var encoded = term switch
             {
                 IrBooleanTerm boolean => Defined(

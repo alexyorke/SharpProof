@@ -12185,7 +12185,10 @@ focused `IrSmtBackend` test suite passes (29/29).
 
 ### Status (part three hundred sixty-nine)
 
-R1138 is deferred: collapse the adjacent `Encode` cancellation polls into one check while retaining the meter's resource-limit and downstream cancellation boundaries.
+R1138 is applied: `QueryEncoder.Encode` retains its cancellation boundary
+before cache lookup and no longer immediately repeats the same token poll via
+`QueryResourceMeter.PollCancellation`; resource-meter consumption and solver
+polls remain unchanged. The focused `IrSmtBackend` suite passes (29/29).
 
 ## Second survey, part three hundred seventy: R1139-R1141 - repeated API-resolution projections
 
