@@ -19399,3 +19399,11 @@ suite remained blocked by existing package-feed/layout failures (the ordinary
 run fails earlier on SPMETA003 in `SharpProof.Host/ContainerNativeLibrary.cs`; a
 fast-built feed reached 13/16 cases, with three pre-existing generated-package
 layout mutations failing).
+
+## Second survey, continued: R1701 - managed-flow transfer bottom guard may be behaviorally redundant
+
+`ManagedAbstractFlow.Transfer` returns immediately when `state.IsBottom`, while `TransferCore` is reached only after the same state has passed through `TransferMany` and the surrounding flow lattice preserves bottom through `Set`, `Forget`, and the transfer cases. A direct mutation probe of the guard produced the same analyzer result, so the branch currently looks like a short-circuit optimization rather than a semantic distinction. Confirm that every future `TransferCore` arm is bottom-preserving; if that invariant is intentional, either remove the guard or document/test it as an optimization so it does not appear to be an independently required transfer state.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1701 | `ManagedAbstractFlow.Transfer`'s `IsBottom` early return survived a behavior-preserving mutation probe; prove/document the bottom-preservation invariant or remove the redundant guard. | `SharpProof.Effects/ManagedAbstractFlow.cs:197-215,338-349,1582-1648`; historical mutation probe recorded in `eng/agent-notes/archive/unverified.md:67-99,129-141` |
