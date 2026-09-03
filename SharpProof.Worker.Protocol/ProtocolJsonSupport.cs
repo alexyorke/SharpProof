@@ -206,7 +206,7 @@ public static partial class WorkerProtocolJson
 
     private static void EnsureNoLoneSurrogates(string? value)
     {
-        if (value != null && !ProtocolUtf16WellFormedness.IsWellFormed(value))
+        if (value != null && !Utf16WellFormedness.IsWellFormed(value))
         {
             throw new JsonException(
                 "JSON strings must not contain lone UTF-16 surrogates.");
