@@ -13133,3 +13133,22 @@ fail-closed while avoiding the second pair of generic enum validations.
 ### Status (part four hundred seventy-seven)
 
 R1154 is pending: preserve `Widen`'s entry validation while reusing the validated comparison path instead of invoking `LessThanOrEqual`'s validation twice.
+
+## Second survey, part four hundred seventy-eight: R1155 - duplicate callable normalization in GetClauseInventory
+
+`ContractBinder.GetClauseInventory` first passes its target through
+`ContractClauseInventoryBuilder.NormalizeCallable`, then sends the result to
+`_clauseInventory.Create`. The internal `Create` overload always calls
+`NormalizeCallable` again after its own null check, regardless of whether the
+builder came from the compilation cache or was supplied to the binder. The
+normalization is therefore repeated on every public clause-inventory request;
+the binder can pass the original target and leave the builder as the single
+normalization boundary.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1155 | **`ContractBinder.GetClauseInventory` normalizes the target twice before inventory creation.** Its explicit `NormalizeCallable` call is immediately followed by `ContractClauseInventoryBuilder.Create`, whose internal overload unconditionally repeats the same normalization. Removing the binder-side normalization preserves the builder's null check and normalization boundary while eliminating one partial-method/accessor resolution per request. | `SharpProof.Contracts/ContractBinder.cs:117-122`; `SharpProof.Contracts/ContractClauseInventoryBuilder.cs:34-43,452-464` |
+
+### Status (part four hundred seventy-eight)
+
+R1155 is pending: pass the target directly to `ContractClauseInventoryBuilder.Create` and keep normalization in that builder's existing entry path.
