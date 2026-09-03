@@ -20936,3 +20936,11 @@ diagnostics at the catalog defaults instead of suppressing every ID except
 diagnostics as well. The focused `RequiresAndControlTests` suite passes 92/92
 tests with zero warnings or errors. Cases that assert emptiness or intentionally
 need unrelated diagnostics filtered remain unchanged for the next batch.
+
+## Second survey, continued: R1988 - RequiresCallSiteDiscovery repeats conditional-branch expansion scaffolding
+
+The Descend iterator in RequiresCallSiteDiscovery repeats the same nullable-child expansion in three conditional-operation paths: after selecting a constant fact-aware branch, inside the fact-aware two-branch loop, and after selecting a constant branch in the ordinary traversal. Each checks branch != null, enumerates Descend(branch), and yields every descendant; the surrounding completion and constant-selection policies are intentionally different. A tiny iterator or helper for expanding one optional branch can own only that repeated null-check and recursive-yield protocol while leaving those policies at their callers. This is a low-priority cleanup because the repeated block is short, but it is a third maintenance site in a soundness-sensitive traversal.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1988 | RequiresCallSiteDiscovery repeats the same nullable conditional-branch expansion in three Descend paths; share only the optional-child recursive-yield helper while retaining fact-aware completion and ordinary traversal semantics. | SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1847-1854,1863-1871,1968-1975 |
