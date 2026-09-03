@@ -635,8 +635,16 @@ internal sealed class CompilerResponseEvidenceAuthority :
             return false;
         }
 
-        return values.SequenceEqual(
-            values.OrderBy(static value => value, StringComparer.Ordinal));
+        for (var index = 1; index < values.Length; index++)
+        {
+            if (StringComparer.Ordinal.Compare(
+                    values[index - 1],
+                    values[index]) > 0)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool IsCanonicalModel(WorkerModelValue[]? values)
@@ -646,16 +654,31 @@ internal sealed class CompilerResponseEvidenceAuthority :
             return false;
         }
 
-        var actual = values.Select(static value =>
-                (value?.Variable ?? string.Empty,
-                 value?.Kind ?? string.Empty,
-                 value?.Value ?? string.Empty))
-            .ToArray();
-        var canonical = actual.OrderBy(static value => value.Item1, StringComparer.Ordinal)
-            .ThenBy(static value => value.Item2, StringComparer.Ordinal)
-            .ThenBy(static value => value.Item3, StringComparer.Ordinal)
-            .ToArray();
-        return actual.SequenceEqual(canonical);
+        for (var index = 1; index < values.Length; index++)
+        {
+            var previous = values[index - 1];
+            var current = values[index];
+            var comparison = StringComparer.Ordinal.Compare(
+                previous?.Variable ?? string.Empty,
+                current?.Variable ?? string.Empty);
+            if (comparison == 0)
+            {
+                comparison = StringComparer.Ordinal.Compare(
+                    previous?.Kind ?? string.Empty,
+                    current?.Kind ?? string.Empty);
+            }
+            if (comparison == 0)
+            {
+                comparison = StringComparer.Ordinal.Compare(
+                    previous?.Value ?? string.Empty,
+                    current?.Value ?? string.Empty);
+            }
+            if (comparison > 0)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static bool TryReplayPostcondition(

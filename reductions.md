@@ -11295,6 +11295,8 @@ In `SharpProof.CompilerArtifact/CompilerResponseEvidenceAuthority.cs`, `IsCanoni
 
 R1064 is deferred: replace full-array sorting with adjacent-element comparison when verifying canonical order.
 
+R1064 is applied: canonical proof-core and model validation now compare adjacent normalized values directly, avoiding sorted temporary arrays while preserving the existing ordinal sort keys and fail-closed ordering. `CompilerManifestArtifactTests` (91/91), `CallableCounterexampleReplayerTests` (15/15), and `EffectCounterexampleReplayTests` (31/31) pass.
+
 ## Second survey, part two hundred ninety-six: R1065 - intermediate substring allocation in documentation comment ID parsing
 
 In `SharpProof.CompilerArtifact/PortableIrGraphCodec.cs`, `CallDocumentationCommentId` locates the delimiter `"::"` after the `"call:"` prefix by evaluating `name.Substring(prefix.Length).IndexOf(delimiter, StringComparison.Ordinal)`. Substring allocation is unnecessary because `IndexOf` accepts a `startIndex` parameter: `name.IndexOf(delimiter, prefix.Length, StringComparison.Ordinal)` returns the exact index without allocating a temporary substring or requiring index offset adjustment.
