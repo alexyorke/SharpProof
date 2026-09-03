@@ -14257,6 +14257,12 @@ exception branch or a shared lock-prefix projection.
 |---|---|---|
 | R1194 | **`ExceptionHandlerReachability` rechecks the locked value's completion.** The `ILockOperation` exception branch calls `canCompleteNormally(@lock.LockedValue)`, and `PushChildrenCore` calls the same predicate again while deciding whether to push `@lock.Body`; the operation and callback inputs are unchanged. Carrying the lock-value completion result into child scheduling removes the duplicate completion traversal without changing nullness or body-order semantics. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1000-1024,1350-1358` |
 
+### Status (part five hundred sixteen)
+
+R1194 is applied: lock-value completion is cached per operation and reused by
+the child scheduler for body reachability. The Effects test suite passes
+(323/323).
+
 ## Second survey, part five hundred seventeen: R1195 - coalesce-assignment target facts are replayed
 
 The coalesce-assignment exception branch computes both target completion and
