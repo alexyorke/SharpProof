@@ -19224,3 +19224,11 @@ build behavior remain unchanged. The focused provider tests pass (7/7).
 R1681 is applied: ordinary and semantic-edge generated method names now share
 one invariant index formatter while retaining their distinct prefixes. The
 focused frontend fuzz comparison tests pass (7/7).
+
+## Second survey, continued: R1682 - bound-contract generator redefines shared required-property accessor
+
+The bound-contract generator dot-sources `GeneratedFileHelpers.ps1`, whose `Required` function already performs the exact `PSObject.Properties[$Name]` lookup, null/missing check, context-formatted exception, and value return. It then redeclares the same body as `Get-RequiredProperty` and uses that local name throughout the generator. Reuse the sourced helper or give the shared helper the generator-facing name while preserving its current failure contract; this removes one shadowing authority without changing schema-specific validation. This is a precise extension of R298's required-property family and R342's generator-local helper bypass finding.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1682 | `Generate-BoundContractModel.ps1` shadows the sourced `GeneratedFileHelpers.ps1::Required` helper with an exact `Get-RequiredProperty` clone; consolidate the accessor. | `scripts/Generate-BoundContractModel.ps1:10,19-25,27-128`; `scripts/GeneratedFileHelpers.ps1:157-165`; related R298, R342 |
