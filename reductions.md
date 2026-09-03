@@ -15054,6 +15054,13 @@ validation tests pass (4 passed).
 |---|---|---|
 | R1243 | **`EffectSymbolComparer<TSymbol>` recomputes stable symbol sort keys for each comparison.** `Compare` calls `CanonicalIdentity` for both operands and searches their source locations after every identity tie; the same immutable Roslyn symbols can therefore be formatted repeatedly by one sort. A key projection or appropriately scoped cache can own the canonical display/location data while preserving null, equality, and deterministic tie-break behavior. | `SharpProof.Effects/EffectValues.cs:222-276`; call sites `SharpProof.Effects/EffectCallGraph.cs:39-45,70-75,105` and `SharpProof.Effects/EffectAnalysisSession.cs:413,537,575,667` |
 
+### Status (part five hundred sixty-five)
+
+R1243 is applied: canonical symbol displays and first source-location keys are
+cached per symbol with weak compilation-independent keys, preserving null,
+symbol-equality, and deterministic tie-break behavior. Effect lattice tests pass
+(3 passed).
+
 ## Second survey, part five hundred sixty-six: R1244 - read/write region projection walks one catalog twice
 
 `ExternalEffectResolver` needs both analysis read and write regions for one validated contract. It calls `EffectContractMappings.ToAnalysisRegions` twice with the same effect flags and parameter count; each call independently walks the complete `RegionContracts` catalog and may construct the parameter-region set. A combined projection returning both region sets can perform one catalog walk and share the parameter expansion while keeping the read/write mapping and out-of-range parameter behavior unchanged.
