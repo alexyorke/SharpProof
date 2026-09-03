@@ -19133,3 +19133,11 @@ R1677 is applied: the compiler-probe test now owns its temporary root with the
 shared `TempDirectory` helper, removing manual GUID path construction and
 recursive cleanup. The focused `CompilerProbeInputConsistencyTests` test passes
 (1/1).
+
+## Second survey, continued: R1679 - Package tests inherit an unused compiler factory through shared-source wiring
+
+The new `SharpProof.Package.Test` condition in `Directory.Build.props` is attached to an `ItemGroup` that links both `TestMetadataReferences.cs` and `TestCompilation.cs`. `CompilerProbeInputConsistencyTests` needs only `TestMetadataReferences.WithSharpProof`; there are no `TestCompilation` references under `SharpProof.Package.Test`, so the 116-line compiler factory (including its Roslyn diagnostic assertion and multiple overloads) is compiled there solely because two unrelated shared files were coupled in one condition. Splitting the item groups, or adding the package project only to the metadata-reference group, removes that stale compile surface without changing the probe test. This is distinct from R1676's metadata-reference adoption and from R1500's earlier aggregate stale-shared-source census.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1679 | Package.Test is added to a shared-source group for metadata references but is also forced to compile an unused 116-line TestCompilation helper; split the MSBuild conditions. | `Directory.Build.props:105-111`; `SharpProof.Package.Test/CompilerProbeInputConsistencyTests.cs:69-79`; `eng/testing/TestCompilation.cs:1-116` |
