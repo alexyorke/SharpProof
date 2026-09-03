@@ -17024,3 +17024,9 @@ R1386 is applied: Dockerfile authority validation now collects all known ARG
 declarations in one line pass while preserving exact image text, uniqueness,
 pre-`FROM` placement, and diagnostics. `ContainerAuthorityScriptTests` pass
 (15/15).
+
+R1387 is applied: Compose service validation now parses service boundaries in
+one ordered pass and validates each closed range without rescanning the full
+document. Service ordering, tooling presence, shared-anchor checks, and
+override rejection remain unchanged. `ContainerAuthorityScriptTests` pass
+(15/15).

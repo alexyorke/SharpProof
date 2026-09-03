@@ -302,49 +302,50 @@ function Assert-ComposeAuthority {
         'Compose Dockerfile'
     Assert-SingleMatchingLine $buildLines '^    target:' '    target: toolchain' 'Compose build target'
 
-    $serviceNames = @()
-    for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
-        if ($lines[$index] -cmatch '^\S') {
-            break
-        }
-        if ($lines[$index] -cmatch '^  ([a-z0-9-]+):\s*$') {
-            $serviceNames += $Matches[1]
-        }
-    }
-    if ($serviceNames -cnotcontains 'tooling') {
-        throw 'Compose must define the canonical tooling service.'
-    }
-    foreach ($serviceName in $serviceNames) {
-        $header = "  ${serviceName}:"
-        $serviceStart = -1
-        for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
-            if ($lines[$index] -ceq $header) {
-                $serviceStart = $index
-                break
-            }
-        }
-        if ($serviceStart -lt 0) {
-            throw "Compose service '$serviceName' could not be resolved."
-        }
-        $serviceEnd = $lines.Count
-        for ($index = $serviceStart + 1; $index -lt $lines.Count; $index++) {
-            if ($lines[$index] -cmatch '^\S' -or
-                $lines[$index] -cmatch '^  [a-z0-9-]+:\s*$') {
-                $serviceEnd = $index
-                break
-            }
-        }
-        $serviceLines = @($lines[($serviceStart + 1)..($serviceEnd - 1)])
+    $assertService = {
+        param(
+            [Parameter(Mandatory = $true)][string]$ServiceName,
+            [Parameter(Mandatory = $true)][int]$ServiceStart,
+            [Parameter(Mandatory = $true)][int]$ServiceEnd)
+
+        $serviceLines = @($lines[($ServiceStart + 1)..($ServiceEnd - 1)])
         Assert-SingleMatchingLine `
             $serviceLines `
             '^    <<:' `
             '    <<: *sharpproof-common' `
-            "Compose service '$serviceName' authority"
+            "Compose service '$ServiceName' authority"
         if (@($serviceLines | Where-Object {
                     $_ -cmatch '^    (?:image|build|platform):'
                 }).Count -ne 0) {
-            throw "Compose service '$serviceName' overrides canonical image authority."
+            throw "Compose service '$ServiceName' overrides canonical image authority."
         }
+    }
+
+    $serviceNames = @()
+    $currentServiceName = $null
+    $currentServiceStart = -1
+    for ($index = $servicesStart + 1; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -cmatch '^\S') {
+            if ($currentServiceStart -ge 0) {
+                & $assertService $currentServiceName $currentServiceStart $index
+            }
+            $currentServiceStart = -1
+            break
+        }
+        if ($lines[$index] -cmatch '^  ([a-z0-9-]+):\s*$') {
+            if ($currentServiceStart -ge 0) {
+                & $assertService $currentServiceName $currentServiceStart $index
+            }
+            $currentServiceName = $Matches[1]
+            $serviceNames += $currentServiceName
+            $currentServiceStart = $index
+        }
+    }
+    if ($currentServiceStart -ge 0) {
+        & $assertService $currentServiceName $currentServiceStart $lines.Count
+    }
+    if ($serviceNames -cnotcontains 'tooling') {
+        throw 'Compose must define the canonical tooling service.'
     }
 }
 
