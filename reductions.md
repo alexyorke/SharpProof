@@ -18820,3 +18820,11 @@ the stale claim that the rules remain warnings during builds.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1657 | The unused `ContractForMetadataName` constant duplicates `ContractApiMetadata.ContractFor`; remove the dead alias or establish a real consumer. | `SharpProof.Contracts/ContractSelectionInventory.cs:16-17,25,56` |
+
+## Second survey, continued: R1658 - `ProbeArtifact.SyntaxTreeCount` is an unused convenience property
+
+`FinalCompilationProbeTests.ProbeArtifact` exposes `SyntaxTreeCount => SyntaxTrees.Length`, but the property has no repository caller. The same artifact type exposes the actual `SyntaxTrees` collection and the purpose-built `SyntaxTreePaths` projection, so retaining this extra member adds surface area without helping any assertion or parser path. Remove the property unless a test is intentionally meant to assert the count through this abstraction.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1658 | The private probe-artifact model exposes `SyntaxTreeCount`, but it is referenced only at its declaration; remove the unused convenience property. | `SharpProof.Package.Test/FinalCompilationProbeTests.cs:352-394` |
