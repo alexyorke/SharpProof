@@ -14476,3 +14476,18 @@ re-entry and making the target's ownership easier to reason about.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1209 | **`SharpProof.Verifier.targets` wires `_SharpProofCleanupInvocation` through redundant failure hooks.** The initialization target, `_SharpProofVerifyCore`, and public `SharpProofVerify` each declare an `OnError` for the same cleanup target, and `_SharpProofVerifyCore` also invokes it with `CallTarget` on success. Consolidating the failure hook at one boundary while retaining the success call preserves the cleanup contract without repeated target scheduling and directory checks. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:71-140,164-164,251-259` |
+
+## Second survey, part five hundred thirty-two: R1210 - timeout termination bookkeeping is duplicated
+
+`RunVerifier.Execute` can time out while waiting for the verifier process or
+while draining its bounded output. Both branches capture whether the process
+was alive, call `TryTerminate`, OR that state into `retainCleanupAnchor`, and
+record containment failure. The process-wait branch then has distinct
+post-termination cancellation and wait behavior, while the output-drain branch
+has no such tail. A small common termination-bookkeeping helper can own the
+shared state update and leave those branch-specific tails at their current
+decision points.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1210 | **`RunVerifier.Execute` repeats timeout termination state updates in two branches.** The `timedOut` process-wait path and the `!outputCompleted` path each compute `processWasAlive`, invoke `TryTerminate` with the remaining deadline, update `retainCleanupAnchor`, and mark `containmentFailed`; only the first path additionally handles cancellation and a final wait. Sharing the common update preserves the distinct timeout/output semantics while removing duplicated process-boundary bookkeeping. | `SharpProof.BuildTasks/RunVerifier.cs:233-278` |
