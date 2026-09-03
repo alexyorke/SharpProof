@@ -179,8 +179,7 @@ internal static class ContractForValidationEngine
         CancellationToken cancellationToken)
     {
         var result = ImmutableArray.CreateBuilder<ResolvedCompanion>();
-        foreach (var companion in candidates.Distinct(
-                     (IEqualityComparer<INamedTypeSymbol>)SymbolEqualityComparer.Default))
+        foreach (var companion in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var attributes = ContractForSymbolMatcher.GetAttributes(
