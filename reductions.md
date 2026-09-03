@@ -20992,3 +20992,9 @@ CallableCounterexampleReplayer.Replay catches ArgumentException and InvalidOpera
 | ID | Finding | Evidence |
 |---|---|---|
 | R1991 | CallableCounterexampleReplayer.Replay has adjacent ArgumentException and InvalidOperationException catches with identical returns; combine the exception pattern without broadening the fail-closed boundary. | SharpProof.Worker/CallableCounterexampleReplayer.cs:122-124 |
+
+R1989 is applied: `ValidatePublishedVerificationResult` now normalizes the
+project root once per execution and reuses a local resolver for every
+request/result/manifest/SARIF/invocation path, retaining per-path locality
+checks and rooted-path handling. The focused published-result build-task
+tests pass 9/9 with zero warnings or errors.
