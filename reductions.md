@@ -12425,9 +12425,11 @@ dispatching the actual proof outcome.
 
 ### Status (part four hundred sixty-four)
 
-R1149 is `pending`: avoid projecting `target.Entry.Assumptions` while creating
-the temporary default record, then retain the single final projection for the
-actual outcome's usage policy.
+R1149 is applied: `FromOutcome` now creates its temporary infrastructure-failure
+record without projecting assumptions, then performs only the final projection
+for the actual outcome's usage policy. Standalone `Unknown` and batch helpers
+retain their assumption projection. The focused Worker outcome/replay tests pass
+(51/51).
 
 ## Second survey, part four hundred sixty-five: the determinism audit - no finding
 

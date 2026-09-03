@@ -9,7 +9,11 @@ internal static class CallableClaimResultAssembler
         WorkerClaimReason replayFailure,
         WorkerVacuityKind vacuity)
     {
-        var record = Unknown(target, contractOrdinal, WorkerClaimReason.InfrastructureFailure);
+        var record = Unknown(
+            target,
+            contractOrdinal,
+            WorkerClaimReason.InfrastructureFailure,
+            projectAssumptions: false);
         var usedUserAssumptions = new HashSet<string>(StringComparer.Ordinal);
         switch (outcome)
         {
@@ -81,14 +85,18 @@ internal static class CallableClaimResultAssembler
     }
 
     internal static WorkerClaimResult Unknown(
-        CompilerCallablePreparation target, int contractOrdinal, WorkerClaimReason reason)
+        CompilerCallablePreparation target,
+        int contractOrdinal,
+        WorkerClaimReason reason,
+        bool projectAssumptions = true)
     {
         var claimId = target.Entry.ClaimIds[contractOrdinal];
         return CreateUnknown(
             target,
             claimId,
             reason,
-            target.EffectClaims.Any(evidence => evidence.ClaimId == claimId));
+            target.EffectClaims.Any(evidence => evidence.ClaimId == claimId),
+            projectAssumptions);
     }
 
     internal static ImmutableArray<WorkerClaimResult> Unknowns(
@@ -132,7 +140,8 @@ internal static class CallableClaimResultAssembler
         CompilerCallablePreparation target,
         string claimId,
         WorkerClaimReason reason,
-        bool hasEffectEvidence)
+        bool hasEffectEvidence,
+        bool projectAssumptions = true)
     {
         return Create(
             target,
@@ -141,24 +150,30 @@ internal static class CallableClaimResultAssembler
             reason,
             hasEffectEvidence
                 ? WorkerEffectEvidenceCertainty.Unavailable
-                : WorkerEffectEvidenceCertainty.Unspecified);
+                : WorkerEffectEvidenceCertainty.Unspecified,
+            projectAssumptions);
     }
 
     internal static WorkerClaimResult Create(
         CompilerCallablePreparation target, string claimId,
         WorkerClaimOutcome outcome, WorkerClaimReason reason,
-        WorkerEffectEvidenceCertainty certainty)
+        WorkerEffectEvidenceCertainty certainty,
+        bool projectAssumptions = true)
     {
-        return new()
+        var record = new WorkerClaimResult
         {
             ClaimId = claimId,
             Outcome = outcome,
             Reason = reason,
-            EffectCertainty = certainty,
-            Assumptions = ProjectAssumptions(
-                target,
-                static evidence => evidence.Used)
+            EffectCertainty = certainty
         };
+        if (projectAssumptions)
+        {
+            record.Assumptions = ProjectAssumptions(
+                target,
+                static evidence => evidence.Used);
+        }
+        return record;
     }
 
     internal static WorkerAssumptionEvidence[] MarkAssumptionsUsed(
