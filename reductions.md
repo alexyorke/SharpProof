@@ -19069,3 +19069,11 @@ wire vocabulary for fixture mapping and concurrent result counts. The affected
 | ID | Finding | Evidence |
 |---|---|---|
 | R1674 | The authority-boundary test repeats the same evidence mutation lambda twice; share the action while retaining the two distinct source artifacts. | `SharpProof.Worker.Test/CompilerManifestArtifactTests.cs:1069-1087` |
+
+## Second survey, continued: R1675 - Portable-IR tests repeat canonical graph JSON equality
+
+`RoundTripPreservesEveryTermInstructionAndLocationShape`, `RoundTripPreservesExplicitExtraVariables`, and `EverySupportedOperatorAndHavocKindRoundTrips` each compare two encoded graphs with `JsonSerializer.Serialize(...Graph)` followed by `Is.EqualTo(...)`. These are the same semantic assertion over canonical graph models; a small `AssertGraphJsonEqual(expected, actual)` helper can centralize the serialization and comparison. Keep `CanonicalGoldenWireRoundTripsWithoutChangingBytes` on its explicit UTF-8 byte assertion because it validates the wire-level golden contract rather than only graph equality.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1675 | Three portable-IR tests repeat the same graph-serialization equality assertion; centralize canonical graph comparison and retain the distinct byte-level golden test. | `SharpProof.Worker.Test/PortableIrGraphCodecTests.cs:50-56,122-129,261-268` |
