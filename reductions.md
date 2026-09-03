@@ -16537,3 +16537,27 @@ R1364-R1366 are applied: repeated fresh-container alias, external-precondition,
 and parameter-write remapping assertions now use shared test helpers while each
 distinct effect-analysis fixture and its additional checks remain local. The full
 EffectAnalysisTests class passes (147 passed).
+
+## Second survey, continued: R1369 - ApiSpecTests repeats the package-rejection cleanup and assertion envelope
+
+`SharpProofPackageSpecsRejectContractWithoutConditionalElision`, `SharpProofPackageSpecsRejectVersionMismatch`, `SharpProofPackageSpecsRejectPublicKeyMismatch`, and `SharpProofPackageSpecsRejectMatchingIdentityAndContractShapeFromAnotherPayload` construct different malformed package identities, but each enters `try/finally`, asserts an empty spec result and `UnapprovedReferenceFamily`, and deletes the package root. A helper accepting the package payload or resolved result can own the invariant cleanup/assertion envelope while retaining each distinct rejection setup and the public-key prechecks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1369 | **Four API-spec rejection tests repeat the same cleanup and failure assertions.** Share the `Specs`-empty/`UnapprovedReferenceFamily` envelope and owned package cleanup without merging the distinct malformed identity cases. | `SharpProof.Specs.Test/ApiSpecTests.cs:373-493` |
+
+## Second survey, continued: R1370 - TryArithmetic repeats the multiplication extrema fold
+
+`ManagedAbstractValue.TryArithmetic` initializes `minimum` and `maximum` from `a * c`, then repeats the same comparison/update block for `a * d`, `b * c`, and `b * d`. A local candidate-fold helper can own the extrema invariant while leaving all four arbitrary-precision products and the existing Int64 overflow check explicit.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1370 | **`TryArithmetic` duplicates the same min/max update block for three multiplication candidates.** Factor the extrema fold while preserving product coverage and overflow behavior. | `SharpProof.Effects/ManagedAbstractFlow.cs:1902-1935` |
+
+## Second survey, continued: R1371 - ExecutableUnflowedDescendants repeats child descend-and-gate logic
+
+`ExecutableUnflowedDescendantsAndSelfCore` repeats a child protocol in invocation arguments, object-creation arguments, simple-assignment property inputs, and property-reference inputs: recursively yield each child's executable descendants, then call `operationFacts.MayCompleteNormally(child)` and stop on failure. A local iterator helper over child operations can own that protocol while each operation branch retains its exact yield order and constructor/initializer/property semantics.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1371 | **`ExecutableUnflowedDescendantsAndSelfCore` repeats child traversal and completion short-circuiting across four branches.** Share the iterator protocol without changing operation ordering or fail-closed stop rules. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1707-1732,1740-1751,1795-1818,1834-1857` |
