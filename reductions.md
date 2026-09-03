@@ -18562,3 +18562,11 @@ R1527 is applied: analyzer-diagnostic catalog intrinsic and placement sections
 now use one shared uniqueness-validation helper while retaining their distinct
 keys and duplicate messages. `Test-SharpProofGeneratedOutputs.ps1` verifies all
 14 generators successfully.
+
+## Second survey, continued: R1644 - TerminalObjectInitializerEffectTests rebuilds one immutable fixture for each constructor assertion
+
+**`TerminalObjectInitializerEffectTests.AnalyzeConstructor` recreates the same metadata reference and full two-holder compilation for both tests.** `NonCompletingArgumentRetainsInitializerWrite` and `ExternalExceptionRetainsInitializerArgumentThrow` call the helper with different type names, but the helper emits the identical `MetadataException` assembly, compiles the identical `TerminalHolder` and `ExternalExceptionHolder` source, and then selects one constructor. The expensive immutable fixture can be cached in setup or a lazy holder and each test can continue creating its own `EffectAnalysisSession` and selecting its own constructor, removing repeated emission, parsing, binding, and reference setup without coupling the assertions.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1644 | The two constructor tests invoke a helper that emits the same metadata assembly and recompiles the same two-holder source; cache the immutable compilation/reference fixture while retaining per-test sessions and constructor selection. | `SharpProof.Effects.Test/TerminalObjectInitializerEffectTests.cs:7-31,33-88` |
