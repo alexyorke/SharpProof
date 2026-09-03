@@ -79,10 +79,11 @@ public sealed class RoslynProgramLowerer(
 
         internal SelectedProgramLoweringResult Lower()
         {
-            var selected = SelectBlocks();
+            var selection = SelectBlocks();
+            var selected = selection.Selected;
             var omittedHandler = _graph.Blocks.FirstOrDefault(block =>
                 block.IsReachable &&
-                !selected.Contains(block) &&
+                !selection.Reachable.Contains(block) &&
                 IsInsideCatchHandler(block));
             if (omittedHandler != null)
             {
@@ -738,7 +739,8 @@ public sealed class RoslynProgramLowerer(
             return false;
         }
 
-        private BasicBlock[] SelectBlocks()
+        private (BasicBlock[] Selected, HashSet<BasicBlock> Reachable)
+            SelectBlocks()
         {
             var reachable = new HashSet<BasicBlock>();
             var pending = new Stack<BasicBlock>();
@@ -762,11 +764,14 @@ public sealed class RoslynProgramLowerer(
                     pending.Push(conditional);
                 }
             }
-            return [
-                _entry,
-                .. _graph.Blocks.Where(block => block != _entry && reachable.Contains(block))
-                    .OrderBy(static block => block.Ordinal)
-            ];
+            return (
+                [
+                    _entry,
+                    .. _graph.Blocks.Where(
+                            block => block != _entry && reachable.Contains(block))
+                        .OrderBy(static block => block.Ordinal)
+                ],
+                reachable);
         }
 
         private sealed class LocationLowering(
