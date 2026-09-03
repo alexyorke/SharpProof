@@ -11071,6 +11071,10 @@ In `SharpProof.Package.Test/LauncherArgumentTests.cs`, seven consecutive test me
 
 R1046 is deferred: replace repeated imperative platform checks with declarative attributes or a shared fixture helper.
 
+R1046 is applied: the seven Linux worker boundary tests share one `RequireLinuxX64` guard, preserving the same OS/architecture skip behavior without repeated blocks. `LauncherArgumentTests` pass (75/75).
+
+R1046 is applied: the seven Linux worker boundary tests share one `RequireLinuxX64` guard, preserving the same OS/architecture skip behavior without repeated blocks. `LauncherArgumentTests` pass.
+
 ## Second survey, part two hundred seventy-eight: R1047 - un-short-circuited bitwise operators forcing redundant filesystem I/O in Launcher
 
 In `SharpProof.Worker.Launcher/Program.cs`, `ValidateDotNetHostPath` joins five validation checks using bitwise OR (`|`) rather than logical short-circuiting OR (`||`). As a result, `File.Exists(hostPath)` and `Directory.Exists(...)` perform synchronous filesystem I/O even when the path is not fully qualified or does not end in `"dotnet"`. Similarly, bitwise `|` is used in option parsing where `TryAdd` is evaluated even when the key is disallowed, mutating the dictionary before returning false. Replacing bitwise `|` and `&` with short-circuiting `||` and `&&` ensures filesystem checks and dictionary insertions never execute unnecessarily on invalid paths or keys.

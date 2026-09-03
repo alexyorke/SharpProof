@@ -17,15 +17,20 @@ public sealed class LauncherArgumentTests
     private const string SarifProjectDirectory = "/source";
     private const string ValidInputHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
-    [Test]
-    [NonParallelizable]
-    public void LinuxWorkerReceivesTheExactStartupRelease()
+    private static void RequireLinuxX64()
     {
         if (!OperatingSystem.IsLinux() ||
             RuntimeInformation.ProcessArchitecture != Architecture.X64)
         {
             Assert.Ignore("The verifier process boundary is supported on Linux x64.");
         }
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void LinuxWorkerReceivesTheExactStartupRelease()
+    {
+        RequireLinuxX64();
 
         using var process = LinuxWorkerProcess.Start(
             "/bin/sh",
@@ -45,11 +50,7 @@ public sealed class LauncherArgumentTests
     [Test]
     public void LinuxWorkerTimeoutTerminatesTheDirectChild()
     {
-        if (!OperatingSystem.IsLinux() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64)
-        {
-            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
-        }
+        RequireLinuxX64();
 
         using var process = LinuxWorkerProcess.Start(
             "/bin/sh",
@@ -75,11 +76,7 @@ public sealed class LauncherArgumentTests
     [Test]
     public void LinuxWorkerCooperatesWithTerminationInsideTheSameDeadline()
     {
-        if (!OperatingSystem.IsLinux() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64)
-        {
-            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
-        }
+        RequireLinuxX64();
 
         using var process = LinuxWorkerProcess.Start(
             "/bin/sh",
@@ -102,11 +99,7 @@ public sealed class LauncherArgumentTests
     [Test]
     public void LinuxWorkerCancellationDoesNotWaitForTheDeadline()
     {
-        if (!OperatingSystem.IsLinux() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64)
-        {
-            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
-        }
+        RequireLinuxX64();
 
         using var process = LinuxWorkerProcess.Start(
             "/bin/sh",
@@ -127,11 +120,7 @@ public sealed class LauncherArgumentTests
     [Test]
     public void LinuxWorkerDeadlineBoundariesAreExact()
     {
-        if (!OperatingSystem.IsLinux() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64)
-        {
-            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
-        }
+        RequireLinuxX64();
 
         using var process = LinuxWorkerProcess.Start(
             "/bin/sh",
@@ -163,11 +152,7 @@ public sealed class LauncherArgumentTests
     [NonParallelizable]
     public void LinuxWorkerMinimumGraceDoesNotRestartCleanupBudget()
     {
-        if (!OperatingSystem.IsLinux() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64)
-        {
-            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
-        }
+        RequireLinuxX64();
 
         var process = LinuxWorkerProcess.Start(
             "/bin/sh",
@@ -207,11 +192,7 @@ public sealed class LauncherArgumentTests
     [Test]
     public void LinuxWorkerDeadlinePreservesAnExitObservedBeforeTermination()
     {
-        if (!OperatingSystem.IsLinux() ||
-            RuntimeInformation.ProcessArchitecture != Architecture.X64)
-        {
-            Assert.Ignore("The verifier process boundary is supported on Linux x64.");
-        }
+        RequireLinuxX64();
 
         using var process = System.Diagnostics.Process.Start(
             new System.Diagnostics.ProcessStartInfo
