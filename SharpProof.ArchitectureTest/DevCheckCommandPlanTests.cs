@@ -8,24 +8,23 @@ namespace SharpProof.ArchitectureTest;
 [NonParallelizable]
 public sealed class DevCheckCommandPlanTests
 {
-    private static readonly string[] DebugCommandIds =
+    private static readonly string[] CommonCommandIds =
     [
         "restore", "solution-build", "semantic-tests",
-        "package-product-build",
         "package-pack:SharpProof.Attributes",
         "package-pack:SharpProof.Package",
         "package-pack:SharpProof.Verifier",
         "performance-smoke"
     ];
 
-    private static readonly string[] ReleaseCommandIds =
+    private static readonly string[] DebugCommandIds =
     [
-        "restore", "solution-build", "semantic-tests",
-        "package-pack:SharpProof.Attributes",
-        "package-pack:SharpProof.Package",
-        "package-pack:SharpProof.Verifier",
-        "performance-smoke"
+        ..CommonCommandIds[..3],
+        "package-product-build",
+        ..CommonCommandIds[3..]
     ];
+
+    private static readonly string[] ReleaseCommandIds = CommonCommandIds;
 
     [TestCase("Debug", 8, true)]
     [TestCase("Release", 7, true)]
