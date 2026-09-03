@@ -15965,3 +15965,11 @@ CompilerProbeContract.AssemblyPath exposes typeof(CompilerProbeContract).Assembl
 | ID | Finding | Evidence |
 |---|---|---|
 | R1332 | **`CompilerProbeContract.AssemblyPath` is an unreferenced public property. Remove it if no external fixture consumer calls it dynamically; the generated probe and package tests use the other contract members and do not need this assembly-location accessor.** | SharpProof.CompilerProbe.TestAsset/CompilerProbeContract.cs:55-56; repository-wide search finds no `CompilerProbeContract.AssemblyPath` reference |
+
+## Second survey, continued: R1333 - protocol options are cloned at every access
+
+WorkerProtocolJson keeps one configured options instance but returns new(s_options) on every Options access. The property is consumed by the worker, compiler-artifact, launcher, package, and test serialization paths, many of which request it repeatedly in one operation and never mutate the returned options. A read-only shared instance, an internal accessor for trusted callers, or an explicit serialization helper can remove the repeated options/converter clone while retaining a separate mutable copy only for public callers if that isolation is part of the API contract.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1333 | **`WorkerProtocolJson.Options` clones the configured `JsonSerializerOptions` on every access. Provide a read-only/shared or internal no-copy path for the many trusted serialization callers, preserving defensive-copy behavior for public consumers if required.** | SharpProof.Worker.Protocol/ProtocolJson.cs:12-16; option construction at ProtocolJsonSupport.cs:216-229; representative repeated callers in SharpProof.Worker/VerificationCache.cs:73,87,189,192 and SharpProof.CompilerArtifact/CompilationFingerprint.cs:30-65 |
