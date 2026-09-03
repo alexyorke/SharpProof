@@ -775,9 +775,13 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
         if (type.IsValueType ||
             type.SpecialType != SpecialType.None ||
             type is not INamedTypeSymbol named ||
-            named.TypeKind == TypeKind.Delegate ||
-            IsKnownImmutableStorageType(named) ||
-            IsCompilationScopedWeakCache(named))
+            named.TypeKind == TypeKind.Delegate)
+        {
+            return false;
+        }
+        var initialTypeIsImmutable = IsKnownImmutableStorageType(named);
+        var initialTypeIsWeakCache = IsCompilationScopedWeakCache(named);
+        if (initialTypeIsImmutable || initialTypeIsWeakCache)
         {
             return false;
         }
@@ -790,17 +794,20 @@ public sealed class SharpProofSoundnessAnalyzer : DiagnosticAnalyzer
 
         try
         {
+            var isInitialType = true;
             for (var current = named;
                  current != null &&
                  current.SpecialType == SpecialType.None;
                  current = current.BaseType)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (IsKnownImmutableStorageType(current) ||
-                    IsCompilationScopedWeakCache(current))
+                if (!isInitialType &&
+                    (IsKnownImmutableStorageType(current) ||
+                     IsCompilationScopedWeakCache(current)))
                 {
                     continue;
                 }
+                isInitialType = false;
 
                 // Metadata does not expose enough implementation detail to
                 // prove that an arbitrary reference type is immutable.
