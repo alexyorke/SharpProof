@@ -10765,3 +10765,15 @@ R1023 is deferred: share only the assertions for methods after a conditionally t
 ### Status (part two hundred fifty-five)
 
 R1024 is deferred: centralize only the test-side constructor access, and keep the two justification policies and their assertions independent.
+
+## Second survey, part two hundred fifty-six: R1025 - redundant namespace-member immutable conversion
+
+`INamespaceSymbol.GetNamespaceMembers()` already returns an `ImmutableArray<INamespaceSymbol>`. `ReferencedTypeSymbols.GetAll` immediately calls `ToImmutableArray()` on that result and then uses only the array's `Length` and indexer to push members in reverse order. The conversion therefore re-enumerates and copies an API-owned immutable array without changing the traversal contract; removing it preserves the current ordering and cancellation behavior while eliminating an unnecessary materialization.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1025 | **Referenced-type traversal redundantly rematerializes namespace members.** The namespace walk converts the `ImmutableArray<INamespaceSymbol>` returned by `GetNamespaceMembers()` into another immutable array before reverse indexing it. Dropping the identity conversion retains depth-first ordering and nested-type discovery while removing a needless enumeration/copy step. | `SharpProof.Frontend/ReferencedTypeSymbols.cs:44-51`; direct `GetNamespaceMembers()` iteration in `SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs:582` and `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1522` |
+
+### Status (part two hundred fifty-six)
+
+R1025 is deferred: remove only the redundant `ToImmutableArray()` call, and preserve the reverse namespace ordering, nested-type traversal, and per-container cancellation checks.
