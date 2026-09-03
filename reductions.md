@@ -15229,7 +15229,14 @@ The binary lowerer probes every equality or inequality through `GetNullCompariso
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R1255 | **`RoslynOperationLowerer.VisitBinaryOperator` may unwrap equality operands twice.** The preliminary null-comparison probe walks both operands before the later reference-comparison branch repeats conversion unwrapping, even when the probe finds no null constant. Thread one normalized comparison projection through both decisions while preserving the broader unwrapping needed to recognize converted null literals. | `SharpProof.Frontend/RoslynOperationLowerer.cs:742-785`; `SharpProof.Frontend/RoslynOperationLowerer.cs:236-268` |
+| R1255 | **`RoslynOperationLowerer.VisitBinaryOperator` may unwrap equality operands twice.** The preliminary null-comparison probe walks both operands before the later reference-comparison branch repeats conversion unwrapping, even when the probe finds no null constant. Thread one normalized comparison projection through both decisions while preserving the broader unwrapping needed to recognize converted null literals. | `SharpProof.Frontend/RoslynOperationLowerer.cs:742-785`; `RoslynOperationLowerer.cs:236-268` |
+
+### Status (part five hundred seventy-seven)
+
+R1255 is applied: equality lowering computes broad and reference-only operand
+projections in one conversion walk, reusing them for null recognition and
+reference comparison while retaining numeric-conversion semantics. Frontend
+lowering tests pass (37 passed).
 
 ## Second survey, part five hundred seventy-eight: R1256 - compilation-reference membership is rescanned per API symbol
 
