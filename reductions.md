@@ -13992,3 +13992,22 @@ accumulator.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1183 | **`ExceptionHandlerReachability.GetReturnNullability` can scan returned values twice.** After building `returnedValues`, it runs `returnedValues.All(DefiniteOperationFacts.IsDefinitelyNonNull)` and, if that is false, runs `returnedValues.All(DefiniteOperationFacts.IsDefinitelyNull)`. An all-null result therefore traverses the complete array twice, while mixed results can revisit values; one tri-state accumulation can preserve the current short-circuit classification without repeating the nullness predicates. | `SharpProof.Effects/ExceptionHandlerReachability.cs:2629-2676` |
+
+## Second survey, part five hundred six: R1184 - exception and abrupt-exit walks are separate
+
+The exception-reachability object answers two reachability questions over the
+same operation graph. `CanExitAbruptly` first runs the explicit-stack
+`GetPotentialExceptions` walk and, when that result does not already prove an
+abrupt exit, runs `CanExitAbruptlyWithoutExceptions`, whose recursive walker
+visits the operation graph again for returns, branches, try/finally handling,
+and short-circuit constructs. The nested-try exception path makes the same
+split after materializing a body's potential exceptions. These facts are not
+interchangeable: thrown-type collection and scope-sensitive control-flow exit
+have different policies. A shared per-operation reachability fact, or one
+combined traversal that carries both results and preserves the existing
+short-circuit/try/goto state, can remove the duplicate structural walk without
+dropping either dimension.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1184 | **`ExceptionHandlerReachability` traverses the same body separately for exception potential and abrupt control-flow reachability.** `CanExitAbruptly` calls `GetPotentialExceptions(operation)` and then `CanExitAbruptlyWithoutExceptions(operation, scope)` when the exception result is inconclusive; `GetPotentialExceptions`' nested-try handling likewise computes a body's exception set and then asks the second walker whether an abrupt exit is reachable. The two results must remain semantically distinct, but a combined `(potentialExceptions, canReachAbruptExit)` projection or carefully scoped memo can avoid replaying the operation structure while retaining catch, finally, goto, and scope behavior. | `SharpProof.Effects/ExceptionHandlerReachability.cs:92-225,1744-1804,2111-2125` |
