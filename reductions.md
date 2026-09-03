@@ -14341,6 +14341,12 @@ checks.
 |---|---|---|
 | R1198 | **`ExceptionHandlerReachability.GetAccessors` has a redundant coalesce/compound/increment branch.** After the simple-assignment target guard, the conditional branch yields `property.Property.GetMethod` and exits, while its fallback yields the identical value; only the simple-assignment `yield break` changes the result. The middle parent-kind test can be removed without changing accessor enumeration. | `SharpProof.Effects/ExceptionHandlerReachability.cs:1977-1996` |
 
+### Status (part five hundred twenty)
+
+R1198 is applied: the accessor helper retains the simple-assignment
+suppression and uses one getter path for all other property references. The
+Effects test suite passes (323/323).
+
 ## Second survey, part five hundred twenty-one: R1199 - IL leader validation builds a second index
 
 `Translator.Translate` collects every decoded instruction offset into a
