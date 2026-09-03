@@ -129,8 +129,8 @@ function Get-SharpProofPublicationFixturePackageState {
         [Parameter(Mandatory = $true)][string]$Version
     )
 
-    $entries = @($Catalog | Where-Object { $null -ne $_ })
-    $matching = @($entries | Where-Object {
+    $matching = @($Catalog | Where-Object {
+        $null -ne $_ -and
         [string]::Equals(
             [string]$_.packageId, $PackageId,
             [StringComparison]::OrdinalIgnoreCase) -and

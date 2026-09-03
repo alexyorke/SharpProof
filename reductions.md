@@ -17054,3 +17054,8 @@ single conversion pass for actual components, while expected catalog rows
 retain their existing projection path. Fail-closed schema checks and the
 canonical comparison are unchanged. `PackageDependencyAuthorityTests` pass
 (45/45).
+
+R1392 is applied: fixture package-state projection now combines null and
+package/version identity predicates in one catalog pass, preserving the
+null-tolerant contract and main/symbol role states. `ReleasePublicationScriptTests`
+pass (24/24).
