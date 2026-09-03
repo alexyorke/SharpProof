@@ -57,13 +57,22 @@ public sealed partial class ApiSpecTable
             throw new ArgumentException("At least one spec declaration is required.", nameof(declarations));
         }
 
-        var duplicate = ordered
-            .GroupBy(static declaration => declaration.Target?.WitnessIdentifier, StringComparer.Ordinal)
-            .FirstOrDefault(static group => group.Count() != 1);
+        ApiSpecDeclaration? duplicate = null;
+        for (var index = 1; index < ordered.Length; index++)
+        {
+            if (StringComparer.Ordinal.Equals(
+                    ordered[index - 1].Target?.WitnessIdentifier,
+                    ordered[index].Target?.WitnessIdentifier))
+            {
+                duplicate = ordered[index];
+                break;
+            }
+        }
         if (duplicate != null)
         {
             throw new ArgumentException(
-                "Spec witness identifiers must be unique: " + duplicate.Key + ".",
+                "Spec witness identifiers must be unique: " +
+                duplicate.Target?.WitnessIdentifier + ".",
                 nameof(declarations));
         }
 
