@@ -20873,3 +20873,11 @@ ContractApiIdentityResolver.HasSingleClause and HasSingleGenericIdentityMethod i
 | ID | Finding | Evidence |
 |---|---|---|
 | R1984 | ContractApiIdentityResolver repeats the same GetMembers(name)-to-single-method counting loop in clause and generic identity validation; share candidate selection while retaining the distinct method-shape predicates. | SharpProof.Frontend/ContractApiIdentityResolver.cs:408-446,497-542 |
+
+## Second survey, continued: R1985 - SharpProofAnalyzerEngine duplicates the advisory-activation syntax prefilter
+
+SharpProofAnalyzerEngine.GetAdvisoryActivation and CompilationContainsRequiresClause each iterate compilation.SyntaxTrees, perform a cancellation check, fetch the tree text, and skip the tree unless MayContainAdvisoryActivationSyntax returns true. The downstream work is intentionally different: the first scans all descendant nodes for attributes and contract-API expressions, while the second resolves a semantic model and scans only candidate invocations. A private PotentiallyActivatedTrees iterator can own the common cancellation and conservative text prefilter while leaving both node scans, early returns, and compilation-specific semantics unchanged. The current copy means a change to the activation prefilter's cancellation or eligibility policy must be synchronized in both callers.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1985 | SharpProofAnalyzerEngine repeats the same syntax-tree cancellation and MayContainAdvisoryActivationSyntax prefilter in two advisory scans; share the eligible-tree iterator while retaining distinct attribute and invocation analysis. | SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs:208-239,403-452 |
