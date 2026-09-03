@@ -18770,3 +18770,11 @@ R1653 is applied: runtime-oracle and static-analysis exception tests now share
 the common arithmetic, checked-increment, array, and lock source fragment while
 retaining their distinct fixtures and assertions. Both affected tests pass
 (1/1 each).
+
+## Second survey, continued: R1655 - `ContractRuntimePolicy.ThrowIfRuntimeEvaluationEnabled` is now an orphaned wrapper
+
+`ContractRuntimePolicy.ThrowIfRuntimeEvaluationEnabled` remains as an internal method that calls `IsRuntimeEvaluationEnabled` and formats a rejection exception, but a repository-wide search finds no call site beyond its own declaration. After R1399 was applied, `FinalCompilationCollector.Collect` uses the predicate directly and returns before `Create`, while `SharpProofAnalyzerEngine` has its own predicate use; the former method is no longer part of either path. Keeping it duplicates the predicate boundary and exception wording and suggests that direct collector callers still receive an exception when they do not. Remove the unused wrapper, or add a real caller and test if an exception-shaped API is still required; do not retain an unreferenced internal entry point.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1655 | The post-R1399 collector path leaves `ThrowIfRuntimeEvaluationEnabled` unreferenced; remove the dead wrapper or give it a tested caller instead of retaining duplicate runtime-policy plumbing. | `SharpProof.Analyzer.Core/ContractRuntimePolicy.cs:37-47`; active predicate callers at `SharpProof.CompilerCollector/FinalCompilationCollector.cs:25` and `SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs:75` |
