@@ -905,13 +905,25 @@ internal static class CompilerLoweredArtifact
                 summary.NormalRelationRoot,
                 "root");
             var free = existentials.Insert(0, result);
+            var freeIdentifiers = new HashSet<IrVarId>();
+            var hasDuplicateFreeVariable = false;
+            var hasCanonicalFreeVariable = false;
+            var hasProgramFreeVariable = false;
+            var hasSummaryFreeVariable = false;
+            foreach (var variable in free)
+            {
+                hasDuplicateFreeVariable |= !freeIdentifiers.Add(variable);
+                hasCanonicalFreeVariable |= canonical.Contains(variable);
+                hasProgramFreeVariable |= programVariables.Contains(variable);
+                hasSummaryFreeVariable |= summaryVariables.Contains(variable);
+            }
             if (!call.Target.HasValue ||
                 graph.Factory.GetVariableInfo(call.Target.Value).Type !=
-                graph.Factory.GetVariableInfo(result).Type ||
-                free.Distinct().Count() != free.Length ||
-                free.Any(canonical.Contains) ||
-                free.Any(programVariables.Contains) ||
-                free.Any(summaryVariables.Contains) ||
+                    graph.Factory.GetVariableInfo(result).Type ||
+                hasDuplicateFreeVariable ||
+                hasCanonicalFreeVariable ||
+                hasProgramFreeVariable ||
+                hasSummaryFreeVariable ||
                 relation.Type != graph.Factory.BooleanType ||
                 !HasValidSummaryFreeVariableRoles(
                     call,
