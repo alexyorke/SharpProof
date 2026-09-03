@@ -11111,7 +11111,7 @@ In `SharpProof.Worker/VerificationCache.cs`, `TryGetOwnedTransactionOriginal` it
 
 ### Status (part two hundred eighty-three)
 
-R1052 is pending: hoist cache transaction suffixes and file search patterns to static constants.
+R1052 is applied: hoist cache transaction suffixes and the file search pattern to static constants; the worker build now satisfies the analyzer's constant-field rule.
 
 ## Second survey, part two hundred eighty-four: R1053 - duplicated safe file restoration across cache rollback and eviction recovery
 
@@ -11951,7 +11951,7 @@ R1121 is applied: retain the 14-generator verification helper and eliminate its 
 
 ### Status (part three hundred fifty-three)
 
-R1122 is deferred: either remove the misleading timeout parameter and argument or implement it in the process wrapper while preserving captured output and exit-code handling.
+R1122 is applied: remove the misleading timeout parameter and argument while preserving captured output and exit-code handling. Sample validation reached package-consumer validation but remains blocked by its pre-existing null-source failure.
 
 ## Second survey, part three hundred fifty-four: R1123 - duplicate publication-plan validation at serialization boundary
 
@@ -12162,3 +12162,15 @@ R1138 is deferred: collapse the adjacent `Encode` cancellation polls into one ch
 ### Status (part three hundred seventy)
 
 R1139-R1141 are deferred: remove only the repeated constructor guard, cache the immutable ordered API-spec projection, and share the approved-assembly identity scan while preserving direct-constructor validation, deterministic ordering, and the existing two-stage reference admission semantics.
+
+## Second survey, part three hundred seventy-one: R1142 - repeated callable-reason passes
+
+`CallableVerificationPolicy.ProjectCallableReason` first filters the claims into `unknownReasons`, then tests that array for emptiness, scans it for all-unsupported-callable, scans it again for all-unsupported-contract, and scans it again for any infrastructure/backend/malformed reason. These predicates implement one ordered precedence decision over an immutable local array. A single pass that records the relevant flags (or a count/category accumulator) can preserve the current precedence and default semantic-unknown result while avoiding repeated enumeration and predicate delegates.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1142 | **`ProjectCallableReason` traverses the same unknown-reason array up to four times.** After materializing unknown reasons, it separately checks empty, all-unsupported-callable, all-unsupported-contract, and any-infrastructure conditions. Fold those flags into one classification pass while retaining the existing precedence and coverage categories. | `SharpProof.Worker/CallableVerificationPolicy.cs:113-136` |
+
+### Status (part three hundred seventy-one)
+
+R1142 is deferred: classify unknown claim reasons in one pass, preserving the current unsupported-callable, unsupported-contract, infrastructure, and semantic-unknown precedence.
