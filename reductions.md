@@ -21124,6 +21124,13 @@ warnings or errors.
 |---|---|---|
 | R1999 | Get-ValidatedRelease duplicates the six-artifact/package-symbol cardinality checks already enforced by Test-SharpProofReleaseBundleTopology. | scripts/Publish-SharpProofRelease.ps1:241-294; scripts/SharpProof.ReleaseBundle.ps1:52-73 |
 
+R1999 is applied: `Get-ValidatedRelease` now relies on the immediately
+preceding `Test-SharpProofReleaseBundleTopology` call for the six-artifact and
+package/symbol cardinality invariants, retaining all per-artifact and
+per-package validation. The release-authority closure fixtures pass and the
+edited script parses cleanly. The focused release-publication test run remains
+blocked by pre-existing Release diagnostics in `ContractApiIdentityResolver`.
+
 R1998 is applied: the shared linked `RoslynCfgThrowFacts.ReachableBlocks`
 iterator now owns cancellation polling and reachable-block filtering for both
 CFG consumers, while their block processing remains separate. The full

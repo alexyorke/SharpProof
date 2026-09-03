@@ -241,9 +241,6 @@ function Get-ValidatedRelease {
     $artifacts = @(
         Get-RequiredProperty $manifest 'artifacts' 'Release manifest'
     )
-    if ($artifacts.Count -ne 6) {
-        throw 'Release manifest must contain exactly six artifacts.'
-    }
     Test-SharpProofReleaseBundleTopology `
         -Directory $Directory `
         -Artifacts $artifacts `
@@ -289,9 +286,6 @@ function Get-ValidatedRelease {
                 [string]$_.kind -in @('package', 'symbols')
             }
     )
-    if ($packageArtifacts.Count -ne 6) {
-        throw 'Release manifest has an invalid package or symbol graph.'
-    }
 
     $packages = [Collections.Generic.List[object]]::new()
     $payloadSets = @(
