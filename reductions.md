@@ -11675,7 +11675,7 @@ R1098 is pending: construct the direct fallback resolution record once in `Effec
 
 ### Status (part three hundred thirty)
 
-R1099 is pending: remove `useProvidedContractSources` from the private constructor in `ContractBinder`.
+R1099 is applied: remove `useProvidedContractSources` from the private constructor in `ContractBinder` and route the pre-resolved source path through a named factory; the dependent compiler-collector build passes.
 
 ## Second survey, part three hundred thirty-one: R1100 - multi-stage LINQ allocations in relational summary signature variable check
 
@@ -11843,7 +11843,7 @@ R1112 is applied: retain dequeue-time closure-path deduplication and remove the 
 
 ### Status (part three hundred forty-four)
 
-R1113 is deferred: use one namespace-neutral linked UTF-16 helper, preserving the separate assembly dependency boundaries.
+R1113 is applied: use one namespace-neutral linked UTF-16 helper, preserving the separate assembly dependency boundaries; protocol and compiler-collector builds pass.
 
 ## Second survey, part three hundred forty-five: R1114 - repeated mutation scans in managed-flow proofs
 
@@ -11855,7 +11855,7 @@ R1113 is deferred: use one namespace-neutral linked UTF-16 helper, preserving th
 
 ### Status (part three hundred forty-five)
 
-R1114 is deferred: preserve the explicit mutation short circuits, but reuse their result when evaluating the same operand or index.
+R1114 is applied: preserve the explicit mutation short circuits while reusing their result when evaluating the same operand or index; all 323 effects tests pass.
 
 ## Second survey, part three hundred forty-six: R1115 - duplicated relational summary composition scaffolding
 
@@ -11867,7 +11867,7 @@ R1114 is deferred: preserve the explicit mutation short circuits, but reuse thei
 
 ### Status (part three hundred forty-six)
 
-R1115 is deferred: factor the repeated one-call summary fixture into a test-only helper, keeping the callee expression and each composition assertion at the individual test sites.
+R1115 is applied: factor the repeated one-call summary fixture into a test-only helper, keeping the callee expression and each composition assertion at the individual test sites; both composition tests pass.
 
 ## Second survey, part three hundred forty-seven: R1116 - duplicated mutation-target uniqueness scans
 
@@ -11879,7 +11879,7 @@ R1115 is deferred: factor the repeated one-call summary fixture into a test-only
 
 ### Status (part three hundred forty-seven)
 
-R1116 is deferred: share the ordinal target probe, but keep the live-tree aggregate diagnostics and the archived-source fail-fast validation as separate callers.
+R1116 is applied: share the ordinal target probe while keeping live-tree aggregate diagnostics and archived-source fail-fast validation as separate callers; the mutation preflight architecture test passes.
 
 ## Second survey, part three hundred forty-eight: R1117 - duplicated parallel-process lifecycle plumbing
 
@@ -11891,7 +11891,7 @@ R1116 is deferred: share the ordinal target probe, but keep the live-tree aggreg
 
 ### Status (part three hundred forty-eight)
 
-R1117 is deferred: extract only the common parallel-process start/capture/cleanup seam, preserving each scheduler's admission, deadline, output, failure, timing, and compiler-server behavior.
+R1117 is applied: extract the common parallel-process start/capture/cleanup seam while preserving each scheduler's admission, deadline, output, failure, timing, and compiler-server behavior; all 25 build-scheduling tests pass.
 
 ## Second survey, part three hundred forty-nine: R1118 - duplicated scalar operator-catalog validation
 
@@ -11903,7 +11903,7 @@ R1117 is deferred: extract only the common parallel-process start/capture/cleanu
 
 ### Status (part three hundred forty-nine)
 
-R1118 is deferred: extract the common operator/key uniqueness, coverage, and ordinal validator, retaining separate unary/binary row parsing and error context.
+R1118 is applied: extract the common operator/key uniqueness, coverage, and ordinal validator, retaining separate unary/binary row parsing and error context; generator verification passes.
 
 ## Second survey, part three hundred fifty: R1119 - repeated required-property lookup in API-spec generation
 
@@ -11915,7 +11915,7 @@ R1118 is deferred: extract the common operator/key uniqueness, coverage, and ord
 
 ### Status (part three hundred fifty)
 
-R1119 is deferred: have `Get-RequiredArrayProperty` reuse `Get-RequiredProperty`, retaining its array-kind validation and context-specific failure text.
+R1119 is applied: have `Get-RequiredArrayProperty` reuse `Get-RequiredProperty`, retaining its array-kind validation and context-specific failure text; API-spec generator verification passes.
 
 ## Second survey, part three hundred fifty-one: R1120 - duplicated analyzer tuple vocabulary in protocol generation
 
@@ -11927,7 +11927,7 @@ R1119 is deferred: have `Get-RequiredArrayProperty` reuse `Get-RequiredProperty`
 
 ### Status (part three hundred fifty-one)
 
-R1120 is deferred: give the analyzer-to-protocol tuple bridge one declarative, validated vocabulary while preserving the separate internal analyzer and worker-wire enum types.
+R1120 is applied: give the analyzer-to-protocol tuple bridge one declarative schema vocabulary while preserving the separate internal analyzer and worker-wire enum types; protocol generation verification passes.
 
 ## Second survey, part three hundred fifty-two: R1121 - duplicate declarative-model verification in acceptance
 
@@ -11939,7 +11939,7 @@ R1120 is deferred: give the analyzer-to-protocol tuple bridge one declarative, v
 
 ### Status (part three hundred fifty-two)
 
-R1121 is deferred: retain the 14-generator verification helper and eliminate its duplicate declarative-model call from the acceptance path.
+R1121 is applied: retain the 14-generator verification helper and eliminate its duplicate declarative-model call from the acceptance path; generated-output verification and 15 acceptance-script tests pass.
 
 ## Second survey, part three hundred fifty-three: R1122 - inert timeout parameter in sample builds
 
@@ -12103,7 +12103,7 @@ R1134 is deferred: use one case-ID index/uniqueness boundary so duplicates remai
 
 | ID | Finding | Evidence |
 |---|---|---|
-| R1135 | **OSS candidate selection scans every file group twice per round to detect termination.** The `byFile.Any` loop condition and the following `foreach` repeat the same "has an item at this offset" question. Track whether the body added a candidate and terminate on an empty round while preserving deterministic round-robin selection. | `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:359-378` |
+| R1135 | **OSS candidate selection scans every file group twice per round to detect termination.** The `byFile.Any` loop condition and the following `foreach` repeat the same “has an item at this offset” question. Track whether the body added a candidate and terminate on an empty round while preserving deterministic round-robin selection. | `SharpProof.Gates/Corpus/OpenSourceCorpusImporter.cs:359-378` |
 
 ### Status (part three hundred sixty-six)
 
@@ -12144,3 +12144,21 @@ R1137 is deferred: carry validated model-variable types from `QueryEncoder` into
 ### Status (part three hundred sixty-nine)
 
 R1138 is deferred: collapse the adjacent `Encode` cancellation polls into one check while retaining the meter's resource-limit and downstream cancellation boundaries.
+
+## Second survey, part three hundred seventy: R1139-R1141 - repeated API-resolution projections
+
+`ExternalEffectResolver(Compilation, ApiSpecTable)` delegates to the overload accepting a `ResolvedApiSpecTable`, but validates `compilation` before delegation and the receiving constructor validates the same object again. The receiving constructor still needs its guard for direct callers; the delegating overload does not need to repeat it.
+
+`ResolvedApiSpecTable.Specs` is an immutable-table projection whose source dictionary and values never change after construction, but its getter sorts all values by template ID and allocates a new immutable array on every access. This is observable in the public API and is queried repeatedly by tests and diagnostics; caching the ordered projection once would preserve deterministic ordering without recurring sorting and allocation.
+
+`ApiSpecResolver.MatchAssembly` first scans `target.ApprovedAssemblies` to establish identity approval and, after classifying the reference family, scans the same collection again to establish the family-qualified approval. The identity predicate is identical in both scans. Selecting the matching approved entries once and checking their family constraints afterward can preserve the two-stage result while removing the duplicate linear walk.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1139 | **`ExternalEffectResolver` double-validates the compilation in its delegating constructor.** The `(Compilation, ApiSpecTable)` overload calls `ArgumentNullGuard.NotNull(compilation, ...)` and then delegates to the `(Compilation, ResolvedApiSpecTable)` overload, whose first assignment calls the same guard again. Keep the receiving-constructor guard for direct callers and remove the delegating copy. | `SharpProof.Effects/ExternalEffectResolver.cs:11-21` |
+| R1140 | **`ResolvedApiSpecTable.Specs` re-sorts and reallocates its immutable projection on every access.** `_specs` is captured once and never mutated, but the expression-bodied getter orders all values and spreads them into a new array each time. Cache the deterministic ordered projection at construction while retaining the public immutable result and template-ID ordering. | `SharpProof.Effects/ApiSpecResolution.cs:27-32`; repeated consumers include `SharpProof.Specs.Test/ApiSpecTests.cs:256,335,362,388,417,481,515,540,565,591,624,666,755` |
+| R1141 | **`ApiSpecResolver.MatchAssembly` scans approved assembly identities twice for one target.** The first `Any(IdentityMatches)` establishes identity approval, and the return expression invokes another `Any` with the same identity predicate plus the reference-family test. Select or retain the identity-matching approvals once, then evaluate family approval from that set without changing the distinct identity/family result fields. | `SharpProof.Effects/ApiSpecResolution.cs:224-256` |
+
+### Status (part three hundred seventy)
+
+R1139-R1141 are deferred: remove only the repeated constructor guard, cache the immutable ordered API-spec projection, and share the approved-assembly identity scan while preserving direct-constructor validation, deterministic ordering, and the existing two-stage reference admission semantics.
