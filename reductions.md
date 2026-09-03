@@ -18513,3 +18513,19 @@ The earlier sequence-cardinality R1521 entry is applied: its fixed sample
 corpus is now a static read-only fixture, avoiding reconstruction across law
 tests. `SequenceCardinalityDomainTests` pass (6/6). (The later dependency
 finding was renumbered to R1540 by the ledger reconciliation.)
+
+## Second survey, continued: R1641 - a two-case relational-summary test recompiles an unchanged source
+
+**`CompilerRelationalSummaryProviderTests.ClosedFormsNestedInsideGenericOuterHaveIndependentCacheEntries` recompiles the same source for both method-order cases.** The two `[TestCase]` rows swap only `outerMethodName` and `innerMethodName`; each invocation then recreates the identical generic `Outer<T>.Inner.F`, `VerifyInt`, and `VerifyLong` source, a fresh `IrFactory`, provider, and API-spec resolver before exercising the order-specific lookup. The compilation is immutable and the provider/cache is the state under test, so a shared compiled fixture with a fresh provider per case can retain independent cache assertions while removing repeated parsing, reference loading, and diagnostic validation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1641 | The two method-order cases rebuild the identical generic closed-form compilation; reuse an immutable `CSharpCompilation` while keeping a fresh provider/cache for each case. | `SharpProof.Worker.Test/CompilerRelationalSummaryProviderTests.cs:66-100,187-193` |
+
+## Second survey, continued: R1642 - metadata-signature cases recreate one emitted target and consumer compilation
+
+**`ContractForMetadataSignatureTests.CompoundMetadataSignatureIdentityMustMatchExactly` rebuilds the same large metadata image and consumer compilation once for each method-name case.** Both `[TestCase]` invocations call `CreateMetadataTarget`, parse the identical `MetadataTargetContracts` source containing both methods, compile it with the same references/options, and run the same binding assertion; `methodName` only selects `ReadBounds` versus `ReadModified`. The emitted PE image and parsed consumer tree are immutable inputs, while the method selection is the semantic parameter. A cached fixture or one table-driven test over both target methods can preserve the two signature-mismatch checks without repeating metadata emission, Roslyn compilation, and no-error validation.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1642 | The `ReadBounds` and `ReadModified` cases reconstruct the same emitted metadata target and consumer compilation; share the immutable fixture or table-drive the two method selections. | `SharpProof.Contracts.Test/ContractForMetadataSignatureTests.cs:16-55,67-206` |
