@@ -14983,6 +14983,12 @@ Managed abstract-flow tests pass (34 passed).
 |---|---|---|
 | R1238 | **`TryStorage` allocates a throwaway object for every unsupported operation.** Its `_ => new object()` arm only satisfies `out object storage`; callers branch on the returned Boolean and do not read `storage` when false. A null/default failure value or a success-only storage result removes the per-probe allocation without changing tracked-storage identity. | `SharpProof.Effects/ManagedAbstractFlow.cs:980-991`; callers at `SharpProof.Effects/ManagedAbstractFlow.cs:406-419,448,947,955` |
 
+### Status (part five hundred sixty)
+
+R1238 is applied: unsupported storage probes now use a non-allocating null
+sentinel, which callers never consume on the false path. Managed abstract-flow
+tests pass (34 passed).
+
 ## Second survey, part five hundred sixty-one: R1239 - state-order comparison looks up the right value twice
 
 `ManagedFlowState.LessThanOrEqual` unions the keys from both states and, for each key, compares `ManagedAbstractValue.Join(left.Get(key), right.Get(key))` with `right.Get(key)`. The second `right.Get(key)` is the same immutable state lookup used as the join operand; no state changes between the two calls. Capturing the right-hand value once per key preserves the lattice comparison and missing-key defaults while removing a dictionary probe and repeated fallback value construction.
