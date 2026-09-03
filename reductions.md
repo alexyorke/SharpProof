@@ -13760,6 +13760,12 @@ semantics while removing repeated nullness analysis.
 |---|---|---|
 | R1171 | **`OperationCompletionEvaluator` repeats the proven-null/proven-non-null ladder in conditional access and coalescing.** `CanCompleteConditionalAccess`, `CanCompleteCoalesceAssignment`, and `CanCompleteCoalesce` query both predicates for the same operation/origin instead of sharing one tri-state result. The helper must retain each construct's branch order and unknown behavior, but can eliminate repeated abstract-flow/nullness work. | `SharpProof.Effects/OperationCompletionEvaluator.cs:884-916,1224-1238` |
 
+### Status (part four hundred ninety-three)
+
+R1171 is applied: completion now projects one tri-state nullness result per
+operand, with conditional access retaining null-first precedence and coalescing
+retaining non-null-first precedence. The Effects test suite passes (323/323).
+
 ## Second survey, part four hundred ninety-four: R1172 - deconstruction value completion is rechecked
 
 `CanCompleteDeconstruction` first calls `CanCompleteNormally` for the whole
