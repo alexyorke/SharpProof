@@ -461,19 +461,33 @@ internal static class Program
                 unknownClaims++;
             }
         }
-        var incomplete = response.CallableResults
-            .Where(static result => result.Coverage == WorkerCallableCoverage.Incomplete).ToArray();
-        if (incomplete.Length != 0)
+        var incompleteCount = 0;
+        string? firstIncompleteCallableId = null;
+        foreach (var result in response.CallableResults)
+        {
+            if (result.Coverage != WorkerCallableCoverage.Incomplete)
+            {
+                continue;
+            }
+
+            if (incompleteCount == 0)
+            {
+                firstIncompleteCallableId = result.CallableId;
+            }
+            incompleteCount++;
+        }
+        if (incompleteCount != 0)
         {
             ReportDiagnostic(
-                response.Manifest.Callables.First(callable => callable.CallableId == incomplete[0].CallableId).Location,
+                response.Manifest.Callables.First(callable =>
+                    callable.CallableId == firstIncompleteCallableId).Location,
                 LauncherPresentation.Level(request.VerifyPolicy, "info"),
                 VerifierDiagnosticCodes.IncompleteSelectedCallable,
                 FormattableString.Invariant(
-                    $"Selected analysis is incomplete: callables={incomplete.Length}, unknown-claims={unknownClaims}."));
+                    $"Selected analysis is incomplete: callables={incompleteCount}, unknown-claims={unknownClaims}."));
         }
 
-        var incompleteError = incomplete.Length != 0 &&
+        var incompleteError = incompleteCount != 0 &&
             request.VerifyPolicy == WorkerVerifyPolicy.RequireProven;
         var assumptionError = ReportAssumptions(request.AssumptionPolicy, response);
         Console.WriteLine("SharpProof summary " + JsonSerializer.Serialize(

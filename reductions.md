@@ -16850,6 +16850,8 @@ R1384 is applied: strict object-shape validation now enumerates properties direc
 |---|---|---|
 | R1385 | `SharpProof.Worker.Launcher.Program.ValidateAndReport` creates an `incomplete` array solely for count/first-item access; accumulate the count and first callable during one pass, retaining the same diagnostic and exit-code semantics. | `SharpProof.Worker.Launcher/Program.cs:449-477` |
 
+R1385 is applied: launcher response validation now counts incomplete callables and retains the first ID in one pass, preserving diagnostics and policy exit codes. `LauncherArgumentTests` pass (75/75).
+
 ## Second survey, continued: R1386 - Dockerfile authority validation rescans all lines for each image ARG
 
 `Assert-DockerfileAuthority` builds five image authorities, then runs a full `$lines` scan and grows a temporary `$declarations` array separately for each image ARG. The validation only needs one declaration per known argument and all five names are available before the scan; one pass can collect declarations by argument and retain the same before-first-`FROM`, exact-text, and duplicate checks, avoiding five repeated regex walks and intermediate arrays.
