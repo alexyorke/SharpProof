@@ -20813,3 +20813,11 @@ R1761 is applied: the nested primary-constructor base-argument and unreachable
 argument cases in `RequiresAndControlTests` are one parameterized test with
 preserved named cases. The full `SharpProof.Analyzer.Test` project passes
 476/476 tests with zero warnings or errors.
+
+## Second survey, continued: R1981 - FuzzUsageException exposes an unused empty constructor
+
+FuzzUsageException lives in Tools/SharpProof.Fuzz, whose project file sets OutputType to Exe and explicitly says that the executable has no public API contract. Its parameterless constructor at FuzzOptions.cs:95-97 has an empty body. A repository-wide constructor-use search finds every construction site passing a message or a message plus inner exception (FuzzOptions.cs:28,33,43-46,56,64-66,70,86); Program.cs:12-20 only catches the type and reads Message. No production or test file calls new FuzzUsageException() without arguments. Removing this overload would eliminate an unused public surface and five lines of scaffolding; retain it only if out-of-repository callers are intentionally supported despite the project's no-public-API declaration.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1981 | FuzzUsageException has an unused empty public constructor. The type is part of an executable explicitly declared to have no public API contract; all in-repository construction sites pass a message or inner exception, and the parameterless overload has no initialization. Remove the overload unless external callers are intentionally supported. | Tools/SharpProof.Fuzz/FuzzOptions.cs:93-107; Tools/SharpProof.Fuzz/Program.cs:7-20; Tools/SharpProof.Fuzz/SharpProof.Fuzz.csproj:6-11 |
