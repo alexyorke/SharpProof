@@ -727,9 +727,13 @@ internal sealed class EffectMethodNodeBuilder
         var constructorInitializersScanned = false;
         var bodyEntryReached = constructorPlan == null;
         var exceptionalEntriesAdded = false;
+        var regions = graph.Blocks
+            .SelectMany(static block => EnclosingRegions(block.EnclosingRegion))
+            .Distinct()
+            .ToArray();
         var exceptionalRegionOperations =
-            CreateExceptionalRegionOperations(graph);
-        var finallyEntries = CreateFinallyEntries(graph);
+            CreateExceptionalRegionOperations(graph, regions);
+        var finallyEntries = CreateFinallyEntries(graph, regions);
         if (constructorPlan == null)
         {
             AddExceptionalEntries();
@@ -953,12 +957,9 @@ internal sealed class EffectMethodNodeBuilder
         IOperation? Operation);
 
     private static Dictionary<ControlFlowRegion, FinallyEntry> CreateFinallyEntries(
-        ControlFlowGraph graph)
+        ControlFlowGraph graph,
+        ControlFlowRegion[] regions)
     {
-        var regions = graph.Blocks
-            .SelectMany(static block => EnclosingRegions(block.EnclosingRegion))
-            .Distinct()
-            .ToArray();
         var finallyRegions = regions
             .Where(static region =>
                 region.Kind == ControlFlowRegionKind.Finally)
@@ -1010,12 +1011,10 @@ internal sealed class EffectMethodNodeBuilder
     }
 
     private static Dictionary<ControlFlowRegion, IOperation>
-        CreateExceptionalRegionOperations(ControlFlowGraph graph)
+        CreateExceptionalRegionOperations(
+            ControlFlowGraph graph,
+            ControlFlowRegion[] regions)
     {
-        var regions = graph.Blocks
-            .SelectMany(static block => EnclosingRegions(block.EnclosingRegion))
-            .Distinct()
-            .ToArray();
         var catches = graph.OriginalOperation.DescendantsAndSelf()
             .OfType<ICatchClauseOperation>()
             .Where(@catch =>
