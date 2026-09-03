@@ -832,7 +832,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -1038,7 +1038,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         Assert.That(
@@ -1068,7 +1068,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"],
+            [],
             additionalReferences: [external]);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
@@ -1266,7 +1266,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             mode: null,
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -1438,7 +1438,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -1506,7 +1506,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
         Assert.That(
@@ -1537,7 +1537,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -1589,7 +1589,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -1732,7 +1732,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027", "SP0027");
     }
@@ -1770,7 +1770,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -1808,7 +1808,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -1873,7 +1873,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -1911,7 +1911,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027", "SP0027");
     }
@@ -1934,7 +1934,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
     }
@@ -1958,7 +1958,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -1977,7 +1977,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -1994,7 +1994,7 @@ public sealed class RequiresAndControlTests
             public sealed class Derived : Base { }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -2020,7 +2020,7 @@ public sealed class RequiresAndControlTests
             {{derivedDeclaration}}
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -2046,7 +2046,7 @@ public sealed class RequiresAndControlTests
             public sealed class SynthesizedDerived : SynthesizedBase { }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -2070,7 +2070,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027", 3);
     }
@@ -2089,7 +2089,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -2132,7 +2132,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027");
     }
@@ -2178,7 +2178,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
         Assert.That(
@@ -2251,7 +2251,7 @@ public sealed class RequiresAndControlTests
             }
             """,
             "contracts",
-            ["SP0027"]);
+            []);
 
         AnalyzerTestHost.AssertIds(diagnostics, "SP0027", "SP0027");
     }

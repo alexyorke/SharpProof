@@ -20944,3 +20944,8 @@ The Descend iterator in RequiresCallSiteDiscovery repeats the same nullable-chil
 | ID | Finding | Evidence |
 |---|---|---|
 | R1988 | RequiresCallSiteDiscovery repeats the same nullable conditional-branch expansion in three Descend paths; share only the optional-child recursive-yield helper while retaining fact-aware completion and ordinary traversal semantics. | SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:1847-1854,1863-1871,1968-1975 |
+
+The second R1780 batch removes another twelve redundant `SP0027` filters from
+precondition replay, flow, constructor, and extension-call cases. The same
+92-test class passes with zero warnings or errors; one flow fixture exposed an
+intentional `SP0047` companion diagnostic and remains filtered.
