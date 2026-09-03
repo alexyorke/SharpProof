@@ -20907,3 +20907,8 @@ RunVerifier.LogStandardError parses one VerifierDiagnostic and then repeats the 
 | ID | Finding | Evidence |
 |---|---|---|
 | R1987 | RunVerifier.LogStandardError duplicates the complete VerifierDiagnostic-to-MSBuild field projection in its error and warning branches; centralize the shared projection while retaining severity and HasStructuredError behavior. | SharpProof.BuildTasks/RunVerifier.cs:1153-1178 |
+R1984 is applied: `ContractApiIdentityResolver` now shares one exact-one method
+selector between clause and generic identity validation while retaining their
+distinct method-shape predicates. The focused ContractApiIdentity suite passes
+13/13 and the full `SharpProof.Frontend.Test` project passes 121/121, with zero
+warnings or errors.

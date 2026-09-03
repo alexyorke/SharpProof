@@ -409,24 +409,7 @@ internal sealed class ContractApiIdentityResolver
         INamedTypeSymbol contract,
         string name)
     {
-        IMethodSymbol? member = null;
-        var count = 0;
-        foreach (var candidate in contract.GetMembers(name))
-        {
-            if (candidate is not IMethodSymbol candidateMethod)
-            {
-                continue;
-            }
-
-            count++;
-            if (count == 1)
-            {
-                member = candidateMethod;
-            }
-        }
-
-        return count == 1 &&
-            member is
+        return GetSingleMethod(contract, name) is
             {
                 MethodKind: MethodKind.Ordinary,
                 DeclaredAccessibility: Accessibility.Public,
@@ -499,24 +482,7 @@ internal sealed class ContractApiIdentityResolver
         string name,
         int parameterCount)
     {
-        IMethodSymbol? member = null;
-        var count = 0;
-        foreach (var candidate in contract.GetMembers(name))
-        {
-            if (candidate is not IMethodSymbol candidateMethod)
-            {
-                continue;
-            }
-
-            count++;
-            if (count == 1)
-            {
-                member = candidateMethod;
-            }
-        }
-
-        return count == 1 &&
-            member is
+        return GetSingleMethod(contract, name) is
             {
                 MethodKind: MethodKind.Ordinary,
                 DeclaredAccessibility: Accessibility.Public,
@@ -540,6 +506,27 @@ internal sealed class ContractApiIdentityResolver
             SymbolEqualityComparer.Default.Equals(
                 parameter.Type,
                 method.TypeParameters[0]));
+    }
+
+    private static IMethodSymbol? GetSingleMethod(
+        INamedTypeSymbol contract,
+        string name)
+    {
+        IMethodSymbol? member = null;
+        foreach (var candidate in contract.GetMembers(name))
+        {
+            if (candidate is not IMethodSymbol candidateMethod)
+            {
+                continue;
+            }
+
+            if (member != null)
+            {
+                return null;
+            }
+            member = candidateMethod;
+        }
+        return member;
     }
 
     private static bool HasUnconstrainedTypeParameter(
