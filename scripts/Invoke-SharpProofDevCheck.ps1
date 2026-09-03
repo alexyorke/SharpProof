@@ -3,8 +3,7 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Debug',
 
-    [ValidateRange(1, 86400)]
-    [int]$TimeoutSeconds = 1800,
+    [int]$TimeoutSeconds,
 
     [switch]$PlanOnly
 )
@@ -19,6 +18,10 @@ if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
 $planScript = Join-Path $PSScriptRoot 'Get-SharpProofDevCheckPlan.ps1'
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+$TimeoutSeconds = Resolve-SharpProofSolutionTestTimeoutSeconds `
+    -RepositoryRoot $repositoryRoot `
+    -TimeoutSeconds $TimeoutSeconds `
+    -WasSpecified $PSBoundParameters.ContainsKey('TimeoutSeconds')
 $dotnetWrapper = Get-SharpProofDotnetWrapperPath
 $buildParallelism = Get-SharpProofBuildParallelism `
     -RepositoryRoot $repositoryRoot

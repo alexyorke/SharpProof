@@ -11,8 +11,7 @@ param(
 
     [switch]$ArchitectureOnly,
 
-    [ValidateRange(1, 86400)]
-    [int]$TimeoutSeconds = 1800,
+    [int]$TimeoutSeconds,
 
     [string]$TestFilter = '',
 
@@ -34,6 +33,10 @@ if ($Fast -and $NoBuild) {
 
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+$TimeoutSeconds = Resolve-SharpProofSolutionTestTimeoutSeconds `
+    -RepositoryRoot $repositoryRoot `
+    -TimeoutSeconds $TimeoutSeconds `
+    -WasSpecified $PSBoundParameters.ContainsKey('TimeoutSeconds')
 $parallelism = Get-SharpProofSemanticTestParallelism `
     -RepositoryRoot $repositoryRoot
 $architectureParallelRunSettings = Join-Path `

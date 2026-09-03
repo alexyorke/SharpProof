@@ -378,6 +378,31 @@ function Get-SharpProofBuildParallelism {
         $RepositoryRoot 'build'
 }
 
+function Resolve-SharpProofSolutionTestTimeoutSeconds {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [int]$TimeoutSeconds,
+
+        [Parameter(Mandatory = $true)]
+        [bool]$WasSpecified
+    )
+
+    if (-not $WasSpecified) {
+        $contract = Get-Content -LiteralPath (Join-Path `
+            $RepositoryRoot 'eng/acceptance/contract.json') -Raw |
+            ConvertFrom-Json
+        $TimeoutSeconds = [int]$contract.automation.solutionTestWallSeconds
+    }
+    if ($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 86400) {
+        throw 'Solution-test timeout must be between 1 and 86400 seconds.'
+    }
+    return $TimeoutSeconds
+}
+
 function Get-SharpProofTestAssemblyPath {
     [CmdletBinding()]
     param(
@@ -817,6 +842,7 @@ Export-ModuleMember -Function @(
     'Get-SharpProofPackageTestParallelism',
     'Get-SharpProofSemanticTestParallelism',
     'Get-SharpProofTestProjectParallelism',
+    'Resolve-SharpProofSolutionTestTimeoutSeconds',
     'Get-SharpProofTestAssemblyPath',
     'Get-SharpProofDotnetWrapperPath',
     'Invoke-SharpProofCheckedCommand',

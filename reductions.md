@@ -316,6 +316,7 @@ the smallest relevant containerized test target passes.
 | R522 | Cache response hash validity during protocol validation | `SharpProof.Worker.Test`: protocol tests passed |
 | R523 | Reuse the cache filename hexadecimal-digit predicate | `SharpProof.Worker.Test`: 695 passed |
 | R527 | Aggregate worker callable and claim reasons in one pass | `SharpProof.Worker.Test`: 695 passed |
+| R991 | Share the contract-owned solution-test timeout fallback across direct runners | PowerShell parsing and module helper validation |
 | R529 | Delegate string ordering validation to the generic fingerprint helper | `SharpProof.Worker.Test`: 695 passed |
 | R541 | Share canonical corpus snapshot data validation | `SharpProof.Gates.Test`: corpus tests passed |
 | R518 | Share potential-null effect handling for receivers and locks | `SharpProof.Effects.Test`: 323 passed |
@@ -10240,9 +10241,10 @@ changed-test invocation silently keeps the old deadline.
 
 ### Status (part two hundred twenty-two)
 
-R991 is `deferred`: centralize the direct-run fallback or explicitly declare
-that it is intentionally independent of `automation.solutionTestWallSeconds`;
-preserve the caller override and the narrower command-specific deadlines.
+R991 is applied: the four direct solution-test runners now resolve their
+unspecified timeout from `automation.solutionTestWallSeconds` through the
+container-execution module. Explicit timeout overrides and the narrower
+command-specific deadlines remain unchanged.
 
 ## Second survey, part two hundred twenty-three: R992 - repeated response canonicalization at output boundaries
 
