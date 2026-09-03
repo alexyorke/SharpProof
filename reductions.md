@@ -15649,11 +15649,10 @@ writing, which remains the cheap mitigation.
 
 ### Status (part five hundred ninety-one)
 
-R1305 is `pending` and is a few lines inside a function that already demonstrates
-the technique. It is worth more than its size because the artifact is a legal
-notice in a published package: the failure mode is not a broken build but a
-correct-looking attribution for software the product no longer redistributes, and
-nothing in the release pipeline would report it.
+R1305 is applied: release evidence now parses every `Package:` line and requires
+the notice set to equal the manifest's union of declared components. The release
+publication test slice passes (24 passed), preventing stale attributions from
+silently shipping.
 ## Second survey, continued: R1306 - coverage enablement rechecks both inputs
 
 New-SharpProofCoverageContext first tests whether either coverage argument is nonblank, then, when coverage is enabled, repeats both nonblank tests to reject a half-configured pair. The two stable input predicates can be stored once and reused for the enabled/mismatch decision, preserving the requirement that coverage settings and results are supplied together while removing repeated string checks.
