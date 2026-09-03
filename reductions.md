@@ -13342,15 +13342,11 @@ in-flight numbering.
 
 ### Status (part four hundred seventy-nine)
 
-R1157 is `pending`, and six of its seven sites are a mechanical substitution with
-no build change: replace the hand-written block with
-`TestRepository.DeleteOwnedTemporaryDirectory(root, rootName, message)`. The
-decision that needs an owner is which containment test becomes canonical, because
-the four `GetRelativePath` sites are stricter than the helper they would be folded
-into - adopting the helper as written would **weaken** them. The honest sequence is
-to move the helper to form (b) first, then substitute. The seventh site is
-production code and needs the same production/test placement decision R725 left
-open.
+R1157 is partly applied: `TestRepository.DeleteOwnedTemporaryDirectory` now uses
+the stronger `GetRelativePath` containment check, and the six test-only copies
+use it with their existing error messages. The Analyzer, Specs, and Package
+cleanup tests pass (55/55, 12/12, and 45/45). The seventh site is production
+code and still needs a production/test placement decision, so it remains open.
 
 ## Second survey, part four hundred eighty: R1158 - whether a script runs under strict mode depends on which helper it dot-sources
 

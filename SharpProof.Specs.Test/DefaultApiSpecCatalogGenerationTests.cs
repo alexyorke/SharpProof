@@ -780,23 +780,10 @@ public sealed class DefaultApiSpecCatalogGenerationTests
 
         public void Dispose()
         {
-            var parent = Path.GetFullPath(
-                Path.Combine(
-                    Path.GetTempPath(),
-                    "SharpProof.ApiSpecCatalog.Test"));
-            var resolved = Path.GetFullPath(_root);
-            if (!resolved.StartsWith(
-                    parent + Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Refusing to remove an unexpected generator directory.");
-            }
-
-            if (Directory.Exists(resolved))
-            {
-                Directory.Delete(resolved, recursive: true);
-            }
+            TestRepository.DeleteOwnedTemporaryDirectory(
+                _root,
+                "SharpProof.ApiSpecCatalog.Test",
+                "Refusing to remove an unexpected generator directory.");
         }
     }
 }

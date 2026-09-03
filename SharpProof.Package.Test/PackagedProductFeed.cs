@@ -108,26 +108,10 @@ internal sealed class PackagedProductFeed : IDisposable
             return;
         }
 
-        var expectedParent = Path.GetFullPath(Path.Combine(
-            Path.GetTempPath(),
-            "SharpProof.PackagedProductFeed"));
-        var resolved = Path.GetFullPath(_ownedRoot);
-        var relative = Path.GetRelativePath(expectedParent, resolved);
-        if (Path.IsPathRooted(relative) ||
-            relative == "." ||
-            relative == ".." ||
-            relative.StartsWith(
-                ".." + Path.DirectorySeparatorChar,
-                StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                "Refusing to remove an unexpected package-feed directory.");
-        }
-
-        if (Directory.Exists(resolved))
-        {
-            Directory.Delete(resolved, recursive: true);
-        }
+        TestRepository.DeleteOwnedTemporaryDirectory(
+            _ownedRoot,
+            "SharpProof.PackagedProductFeed",
+            "Refusing to remove an unexpected package-feed directory.");
     }
 
     private static async Task<PackagedProductFeed> CreateAsync()

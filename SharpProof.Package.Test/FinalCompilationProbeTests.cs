@@ -873,24 +873,10 @@ public sealed class FinalCompilationProbeTests
 
         public void Dispose()
         {
-            var resolved = Path.GetFullPath(_root);
-            var expectedParent = Path.GetFullPath(s_workspaceParent);
-            var relative = Path.GetRelativePath(expectedParent, resolved);
-            if (Path.IsPathRooted(relative) ||
-                relative == "." ||
-                relative == ".." ||
-                relative.StartsWith(
-                    ".." + Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Refusing to remove an unexpected test directory.");
-            }
-
-            if (Directory.Exists(resolved))
-            {
-                Directory.Delete(resolved, recursive: true);
-            }
+            TestRepository.DeleteOwnedTemporaryDirectory(
+                _root,
+                "SharpProof.FinalProbe",
+                "Refusing to remove an unexpected test directory.");
         }
 
         private static string CreateProjectXml(

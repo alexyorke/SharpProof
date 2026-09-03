@@ -1466,19 +1466,10 @@ public sealed class FinalCompilationCollectorTests
 
         public void Dispose()
         {
-            var resolved = System.IO.Path.GetFullPath(Path);
-            var root = System.IO.Path.GetFullPath(System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "SharpProof.FinalCompilationCollector"));
-            if (!resolved.StartsWith(
-                    root + System.IO.Path.DirectorySeparatorChar,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException(
-                    "Collector workspace escaped its temporary root.");
-            }
-
-            Directory.Delete(resolved, recursive: true);
+            TestRepository.DeleteOwnedTemporaryDirectory(
+                Path,
+                "SharpProof.FinalCompilationCollector",
+                "Collector workspace escaped its temporary root.");
         }
     }
 }

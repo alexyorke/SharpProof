@@ -64,8 +64,12 @@ internal static class TestRepository
         var resolved = Path.GetFullPath(path);
         var expectedRoot = Path.GetFullPath(
             Path.Combine(Path.GetTempPath(), rootName));
-        if (!resolved.StartsWith(
-                expectedRoot + Path.DirectorySeparatorChar,
+        var relative = Path.GetRelativePath(expectedRoot, resolved);
+        if (Path.IsPathRooted(relative) ||
+            relative == "." ||
+            relative == ".." ||
+            relative.StartsWith(
+                ".." + Path.DirectorySeparatorChar,
                 StringComparison.Ordinal))
         {
             throw new InvalidOperationException(errorMessage);

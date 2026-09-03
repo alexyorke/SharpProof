@@ -1008,23 +1008,10 @@ public sealed class ReleasePublicationScriptTests
 
         public void Dispose()
         {
-            var resolved = Path.GetFullPath(Root);
-            var relative = Path.GetRelativePath(_expectedParent, resolved);
-            if (Path.IsPathRooted(relative) ||
-                relative == "." ||
-                relative == ".." ||
-                relative.StartsWith(
-                    ".." + Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Refusing to remove an unexpected publication directory.");
-            }
-
-            if (Directory.Exists(resolved))
-            {
-                Directory.Delete(resolved, recursive: true);
-            }
+            TestRepository.DeleteOwnedTemporaryDirectory(
+                Root,
+                Path.GetFileName(_expectedParent),
+                "Refusing to remove an unexpected publication directory.");
         }
     }
 

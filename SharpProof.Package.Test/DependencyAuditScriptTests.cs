@@ -518,32 +518,21 @@ public sealed class DependencyAuditScriptTests
 
         public void Dispose()
         {
-            var resolved = Path.GetFullPath(Root);
-            var relative = Path.GetRelativePath(
-                _expectedParent,
-                resolved);
-            if (Path.IsPathRooted(relative) ||
-                relative == "." ||
-                relative == ".." ||
-                relative.StartsWith(
-                    ".." + Path.DirectorySeparatorChar,
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Refusing to remove an unexpected audit directory.");
-            }
-
-            if (Directory.Exists(resolved))
+            if (Directory.Exists(Root))
             {
                 foreach (var file in Directory.EnumerateFiles(
-                             resolved,
+                             Root,
                              "*",
                              SearchOption.AllDirectories))
                 {
                     File.SetAttributes(file, FileAttributes.Normal);
                 }
-                Directory.Delete(resolved, recursive: true);
             }
+
+            TestRepository.DeleteOwnedTemporaryDirectory(
+                Root,
+                Path.GetFileName(_expectedParent),
+                "Refusing to remove an unexpected audit directory.");
         }
 
         private void Initialize()
