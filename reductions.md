@@ -18934,3 +18934,11 @@ one declaration/tuple traversal while retaining their distinct leaf effects,
 value mapping, and short-circuit ordering. `SharpProof.Effects.Test` passes
 (323/323). R520 remains pending because its native-loader exception cleanup
 needs a focused failure-path test before changing behavior.
+
+## Second survey, continued: R1664 - Semantic-cache tests repeat one synthetic Answer/ProofCache fixture prefix
+
+`SharpProofSoundnessAnalyzerTests` has a broad semantic-cache matrix, but many independent cases redeclare the same `namespace SharpProof.Verify; enum Answer { Unknown, Proven }` and `sealed class ProofCache { internal void Write(Answer answer) { } }` prelude. The behavior-specific `C` or producer declarations are the actual inputs under test; a shared source prefix or small fixture builder can supply the repeated model while keeping specialized `TryUpdate`, envelope, nullable/compound-assignment, field, generic, and `GetOrAdd` shapes local. This would reduce fixture noise and prevent a change to the common synthetic cache contract from requiring edits across the matrix without merging semantically different cases.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1664 | The semantic-cache matrix repeats the same `Answer` enum and `ProofCache.Write` source prefix across many fixtures; centralize that common synthetic prelude while retaining specialized cache shapes locally. | `SharpProof.Meta.Analyzers.Test/SharpProofSoundnessAnalyzerTests.cs:465-483,596-632,677-737,886-946,1009-1054,1063-1124,1171-1187` |
