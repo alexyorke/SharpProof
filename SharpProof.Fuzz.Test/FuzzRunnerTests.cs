@@ -285,20 +285,12 @@ public sealed class FuzzRunnerTests
     }
 
     [Test]
-    public async Task CancellationPropagates()
+    public void CancellationPropagates()
     {
         var cancellation = new CancellationToken(canceled: true);
-        try
-        {
-            await FuzzRunner.RunAsync(
-                new FuzzOptions(Cases: 10, Seed: 1, MaximumParallelism: 1),
-                cancellation);
-            Assert.Fail("Expected cancellation to propagate.");
-        }
-        catch (OperationCanceledException)
-        {
-            Assert.Pass();
-        }
+        Assert.ThrowsAsync<OperationCanceledException>(() => FuzzRunner.RunAsync(
+            new FuzzOptions(Cases: 10, Seed: 1, MaximumParallelism: 1),
+            cancellation));
     }
 
     [Test]
@@ -646,15 +638,7 @@ public sealed class FuzzRunnerTests
     [TestCase("--unknown", "1")]
     public void InvalidOptionsFailClosed(string option, string value)
     {
-        try
-        {
-            FuzzOptions.Parse([option, value]);
-            Assert.Fail("Expected invalid options to fail.");
-        }
-        catch (FuzzUsageException)
-        {
-            Assert.Pass();
-        }
+        Assert.Throws<FuzzUsageException>(() => FuzzOptions.Parse([option, value]));
     }
 
     [TestCase(0, 1)]
