@@ -19146,3 +19146,10 @@ R1678 is applied: opaque-identity tests now share one pure-abstention assertion
 helper parameterized by the expected frontend abstention, while conversion and
 unsupported-operation expectations remain explicit at their call sites.
 `OpaqueSemanticIdentityTests` passes (3/3).
+
+R1679 is applied: `Directory.Build.props` now links `TestCompilation.cs` only
+to its Contracts and Worker consumers, so `SharpProof.Package.Test` receives
+only the `TestMetadataReferences` helper it uses. The focused
+`CompilerProbeInputConsistencyTests` test passes (1/1); the package suite also
+builds, while unrelated release-packaging integration cases remain blocked by
+the existing `SPMETA003` `ContainerNativeLibrary` gate.
