@@ -18884,3 +18884,11 @@ explicit temporary parents. The affected cleanup paths are covered by
 class still has its pre-existing complexity-ratchet failure
 (`members 5970/5808`), and the acceptance class still has its pre-existing
 `$activeTimingStopwatch` failures (11/15 passed).
+
+## Second survey, continued: R1661 - Package and worker tests duplicate the allocation-witness wire vocabulary
+
+`PackageLayoutSmokeTests` and `WorkerTests` each own a two-entry list containing the same serialized witness kinds, `managed-allocation` and `managed-array-allocation`. The package suite uses its copy while validating packaged result JSON, and the worker suite uses its copy while validating live responses; the separate pipelines and assertions are useful, but the protocol names are identical contract data. A shared test vocabulary derived from the production replay-event mapping, or one common linked test constant, would remove this drift point while preserving both end-to-end checks.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1661 | The package and worker suites independently hard-code the same two allocation-witness wire names; derive or share the vocabulary instead of maintaining parallel lists. | `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:57-60,1192-1197`; `SharpProof.Worker.Test/WorkerTests.cs:91-94,1123-1129`; production witness mapping searched by both tests |
