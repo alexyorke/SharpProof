@@ -14769,3 +14769,11 @@ tests pass (14 passed).
 | ID | Finding | Evidence |
 |---|---|---|
 | R1227 | **`AnalyzeProperty` invokes `IsAutoProperty` twice for the same property.** The string-field and mutable-static checks perform identical declaration/accessor syntax analysis when both conditions reach their final conjunct. A per-property cached boolean removes the repeated Roslyn traversal without merging the distinct diagnostics. | `SharpProof.Meta.Analyzers/SharpProofSoundnessAnalyzer.cs:676-704,922-934` |
+
+## Second survey, part five hundred fifty: R1228 - companion method resolution materializes three method collections
+
+`ContractForSymbolMatcher.ResolveCompanion` first materializes all ordinary methods on the companion type, then materializes a same-name subset, and then materializes a signature-matching subset of that same array. The final decision only needs to know whether any same-name method exists, how many candidates match, and which method is the unique match. One ordered pass over ordinary methods can retain those three pieces of state, preserving the existing `HasUniqueTarget` check and failure distinctions while removing the intermediate `named` and `matches` arrays and the second candidate scan.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1228 | **`ResolveCompanion` performs two successive filters and allocations for method selection.** It builds `named` from `GetOrdinaryMethods`, then scans that immutable array again to build `matches`; only `named.IsDefaultOrEmpty`, `matches.Length`, and `matches[0]` are consumed. A single pass that tracks name presence, match count, and the unique match removes the redundant buffers and traversal without changing ambiguity or missing-companion classification. | `SharpProof.Contracts/ContractForSymbolMatcher.cs:139-143,297-313` |
