@@ -978,6 +978,28 @@ internal static partial class RequiresCallSiteTreeAnalyzer
             return field.Name;
         }
 
+        private static int FindTupleElementIndex(
+            INamedTypeSymbol tuple,
+            string component)
+        {
+            for (var index = 0; index < tuple.TupleElements.Length; index++)
+            {
+                var element = tuple.TupleElements[index];
+                if (string.Equals(
+                        element.Name,
+                        component,
+                        StringComparison.Ordinal) ||
+                    string.Equals(
+                        element.CorrespondingTupleField?.Name,
+                        component,
+                        StringComparison.Ordinal))
+                {
+                    return index;
+                }
+            }
+            return -1;
+        }
+
         private bool TryGetDeconstructionDestination(
             SyntaxNode reference,
             string[]? tuplePath,
@@ -1012,25 +1034,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                    consumed < tuplePath.Length)
             {
                 var component = tuplePath[consumed];
-                var index = -1;
-                for (var candidate = 0;
-                     candidate < sourceType.TupleElements.Length;
-                     candidate++)
-                {
-                    var element = sourceType.TupleElements[candidate];
-                    if (string.Equals(
-                            element.Name,
-                            component,
-                            StringComparison.Ordinal) ||
-                        string.Equals(
-                            element.CorrespondingTupleField?.Name,
-                            component,
-                            StringComparison.Ordinal))
-                    {
-                        index = candidate;
-                        break;
-                    }
-                }
+                var index = FindTupleElementIndex(sourceType, component);
                 var elements = GetDeconstructionElements(target);
                 if (index < 0 || index >= elements.Length)
                 {
@@ -1486,25 +1490,7 @@ internal static partial class RequiresCallSiteTreeAnalyzer
                     yield break;
                 }
 
-                var componentIndex = -1;
-                for (var index = 0;
-                     index < tuple.TupleElements.Length;
-                     index++)
-                {
-                    var element = tuple.TupleElements[index];
-                    if (string.Equals(
-                            element.Name,
-                            component,
-                            StringComparison.Ordinal) ||
-                        string.Equals(
-                            element.CorrespondingTupleField?.Name,
-                            component,
-                            StringComparison.Ordinal))
-                    {
-                        componentIndex = index;
-                        break;
-                    }
-                }
+                var componentIndex = FindTupleElementIndex(tuple, component);
                 if (componentIndex >= 0 &&
                     componentIndex <
                         recursive.DeconstructionSubpatterns.Length)

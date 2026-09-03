@@ -20881,3 +20881,7 @@ SharpProofAnalyzerEngine.GetAdvisoryActivation and CompilationContainsRequiresCl
 | ID | Finding | Evidence |
 |---|---|---|
 | R1985 | SharpProofAnalyzerEngine repeats the same syntax-tree cancellation and MayContainAdvisoryActivationSyntax prefilter in two advisory scans; share the eligible-tree iterator while retaining distinct attribute and invocation analysis. | SharpProof.Analyzer.Core/SharpProofAnalyzerEngine.cs:208-239,403-452 |
+R1982 is applied: tuple element name and corresponding-field lookup now lives in
+one `FindTupleElementIndex` helper shared by assignment deconstruction and
+recursive-pattern traversal. The full analyzer suite passes 476/476 tests with
+zero warnings or errors.
