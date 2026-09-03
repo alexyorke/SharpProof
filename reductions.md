@@ -16407,3 +16407,8 @@ R1357 is applied: contract intrinsic discovery now enumerates the contract type
 once and categorizes the valid `Result` and `Old` methods, rejecting duplicate
 matches while preserving the existing shape checks. The focused contract identity
 suite passes (5 passed).
+
+R1358 is applied: the three compilation-reference activation tests now share one
+parameterized compilation and assertion helper while retaining their distinct
+external and caller source fixtures and the nested-parameter AD0001 assertion.
+The focused AdvisoryActivationTests suite passes (26 passed).
