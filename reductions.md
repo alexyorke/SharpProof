@@ -18835,3 +18835,7 @@ unused Fuzz test IR-alias link is removed. `SharpProof.Fuzz.Test` passes
 (39/39) and the architecture scheduling gate passes (1/1); the unrelated
 `SharpProof.Attributes.Test` suite remains blocked by pre-existing NUnit
 `Assert.Throws` overload ambiguities.
+
+R1657 is applied: the unreferenced `ContractSelectionInventory.ContractForMetadataName`
+alias is removed; `ContractApiMetadata.ContractFor` remains the single metadata
+authority. `SharpProof.Contracts.Test` passes (142/142).

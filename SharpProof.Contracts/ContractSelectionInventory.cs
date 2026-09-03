@@ -13,8 +13,6 @@ internal sealed class ContractSelectionInventory
     private static readonly ConditionalWeakTable<
         Compilation, ContractSelectionInventory> Cache = new();
 
-    internal const string ContractForMetadataName =
-        ContractApiMetadata.ContractFor;
     private readonly ContractApiIdentityResolver _identity;
 
     private ContractSelectionInventory(Compilation compilation)
