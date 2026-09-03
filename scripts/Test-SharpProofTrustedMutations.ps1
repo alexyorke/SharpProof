@@ -2216,17 +2216,35 @@ if ($catalogCount -ne [int]$mutationPolicy.expectedCatalogCount) {
 }
 
 $invalidTargets = [Collections.Generic.List[string]]::new()
+$liveTargetCache = [Collections.Generic.Dictionary[string, object]]::new(
+    [StringComparer]::Ordinal)
 foreach ($mutation in $mutations) {
-    $targetPath = Join-Path $repositoryRoot ([string]$mutation.File)
-    if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
+    $targetKey = ([string]$mutation.File).Replace('\', '/')
+    $targetState = $null
+    if (-not $liveTargetCache.TryGetValue($targetKey, [ref]$targetState)) {
+        $targetPath = Join-Path $repositoryRoot $targetKey
+        if (Test-Path -LiteralPath $targetPath -PathType Leaf) {
+            $targetState = [pscustomobject]@{
+                Exists = $true
+                Content = Get-Content -LiteralPath $targetPath -Raw
+            }
+        }
+        else {
+            $targetState = [pscustomobject]@{
+                Exists = $false
+                Content = $null
+            }
+        }
+        $liveTargetCache.Add($targetKey, $targetState)
+    }
+
+    if (-not $targetState.Exists) {
         $invalidTargets.Add(
             ([string]$mutation.Name) + ': target file was not found')
         continue
     }
-
-    $content = Get-Content -LiteralPath $targetPath -Raw
     $issue = Get-MutationTargetIssue `
-        -Content $content `
+        -Content $targetState.Content `
         -Needle ([string]$mutation.Original)
     if ($null -ne $issue) {
         $invalidTargets.Add(
@@ -2476,9 +2494,16 @@ try {
     }
     Expand-Archive -LiteralPath $archive -DestinationPath $sourceRoot
 
+    $archivedTargetCache = [Collections.Generic.Dictionary[string, string]]::new(
+        [StringComparer]::Ordinal)
     foreach ($mutation in $mutations) {
-        $path = Join-Path $sourceRoot $mutation.File
-        $content = [IO.File]::ReadAllText($path)
+        $targetKey = ([string]$mutation.File).Replace('\', '/')
+        $content = $null
+        if (-not $archivedTargetCache.TryGetValue($targetKey, [ref]$content)) {
+            $path = Join-Path $sourceRoot $targetKey
+            $content = [IO.File]::ReadAllText($path)
+            $archivedTargetCache.Add($targetKey, $content)
+        }
         Assert-UniqueMutationTarget `
             -Content $content `
             -Needle $mutation.Original `
