@@ -416,22 +416,30 @@ public sealed class FuzzRunnerTests
         var sat = await oracle.CompareAsync(factory, satisfiable);
         var unsat = await oracle.CompareAsync(factory, unsatisfiable);
 
-        Assert.That(sat.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
-        Assert.That(
-            sat.Expected,
-            Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
-        Assert.That(
-            sat.Actual,
-            Is.EqualTo(FiniteDomainSatisfiability.Satisfiable));
-        Assert.That(sat.FiniteDomainAssumptions, Is.EqualTo(2));
-        Assert.That(unsat.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
-        Assert.That(
-            unsat.Expected,
-            Is.EqualTo(FiniteDomainSatisfiability.Unsatisfiable));
-        Assert.That(
-            unsat.Actual,
-            Is.EqualTo(FiniteDomainSatisfiability.Unsatisfiable));
-        Assert.That(unsat.FiniteDomainAssumptions, Is.EqualTo(1));
+        AssertAgreement(
+            sat,
+            FiniteDomainSatisfiability.Satisfiable,
+            assumptions: 2);
+        AssertAgreement(
+            unsat,
+            FiniteDomainSatisfiability.Unsatisfiable,
+            assumptions: 1);
+
+        static void AssertAgreement(
+            FiniteDomainDifferentialResult result,
+            FiniteDomainSatisfiability expected,
+            int assumptions)
+        {
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Status, Is.EqualTo(FuzzOracleStatus.Agreement));
+                Assert.That(result.Expected, Is.EqualTo(expected));
+                Assert.That(result.Actual, Is.EqualTo(expected));
+                Assert.That(
+                    result.FiniteDomainAssumptions,
+                    Is.EqualTo(assumptions));
+            }
+        }
     }
 
     [Test]
