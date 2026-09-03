@@ -14378,3 +14378,17 @@ return the existing reachable set alongside it) for the omission test.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1204 | **`RoslynProgramLowerer.LoweringSession` performs linear selected-block membership scans.** `SelectBlocks` materializes an ordered `BasicBlock[]`, but `Lower` calls `selected.Contains(block)` while enumerating every graph block to find an omitted catch handler. Reusing the `HashSet<BasicBlock>` already built during reachability, or returning a membership set alongside the ordered array, preserves emission order and equality semantics while removing the repeated linear search. | `SharpProof.Frontend/RoslynProgramLowerer.cs:80-88,741-762` |
+
+## Second survey, part five hundred twenty-seven: R1205 - artifact identity validation uses two scans
+
+At the start of lowered-artifact decoding, the callable artifact array must be
+unique, non-null, and a member of the manifest's callable dictionary. The
+current guard projects every artifact ID into a distinct set and then walks
+the same array again for null and membership checks. One imperative validation
+pass can reject null rows, add each ID to a set, and probe `callables` while
+retaining the separate array-length equality check and the existing fail-fast
+error boundary.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1205 | **`CompilerLoweredArtifact.Decode` scans callable artifacts twice for one identity gate.** Its pre-loop condition materializes `artifacts.Select(item => item?.CallableId).Distinct(...).Count()` and then runs `artifacts.Any(item => item == null || !callables.ContainsKey(item.CallableId))` over the same rows. A single loop can combine null, duplicate-ID, and manifest-membership validation without changing the accepted artifact set or exception behavior. | `SharpProof.CompilerArtifact/CompilerLoweredArtifact.cs:337-340` |
