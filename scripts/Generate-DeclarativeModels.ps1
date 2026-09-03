@@ -105,10 +105,17 @@ function Emit-Class([Collections.Generic.List[string]]$Lines,
     $storageTagProperty = $Class.PSObject.Properties['storageTag']
     $storageTag = $null -ne $storageTagProperty -and [bool]$storageTagProperty.Value
     $propertyNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $propertyDescriptors = [Collections.Generic.List[object]]::new()
     foreach ($property in $properties) {
         $propertyName = Identifier ([string](Required $property 'name' "$Context property")) "$Context property name"
+        $propertyAccess = Identifier ([string](Required $property 'accessibility' "$Context property")) "$Context property accessibility"
+        $propertyType = TypeName ([string](Required $property 'type' "$Context property")) "$Context property type"
         [void]$propertyNames.Add($propertyName)
-        [void](TypeName ([string](Required $property 'type' "$Context property")) "$Context property type")
+        $propertyDescriptors.Add([pscustomobject]@{
+            Accessibility = $propertyAccess
+            Type = $propertyType
+            Name = $propertyName
+        })
     }
     $Lines.Add("$Indent$accessibility $modifierSource`partial class $name$baseSource")
     $Lines.Add("$Indent{")
@@ -151,11 +158,8 @@ function Emit-Class([Collections.Generic.List[string]]$Lines,
         $Lines.Add("$Indent        $propertyName = $parameterName;")
     }
     $Lines.Add("$Indent    }")
-    foreach ($property in $properties) {
-        $propertyAccess = Identifier ([string](Required $property 'accessibility' "$Context property")) "$Context property accessibility"
-        $propertyType = TypeName ([string](Required $property 'type' "$Context property")) "$Context property type"
-        $propertyName = Identifier ([string](Required $property 'name' "$Context property")) "$Context property name"
-        $Lines.Add("$Indent    $propertyAccess $propertyType $propertyName { get; }")
+    foreach ($property in $propertyDescriptors) {
+        $Lines.Add("$Indent    $($property.Accessibility) $($property.Type) $($property.Name) { get; }")
     }
     $Lines.Add("$Indent}")
 }
