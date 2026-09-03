@@ -546,9 +546,11 @@ internal static class CompilerImplementationIlSummaryLowerer
                 }
             }
 
-            var offsets = new HashSet<int>(instructions.Select(
-                static item => item.Offset));
-            if (leaders.Any(leader => !offsets.Contains(leader)))
+            var instructionIndexes = instructions
+                .Select((instruction, index) =>
+                    new KeyValuePair<int, int>(instruction.Offset, index))
+                .ToDictionary(static pair => pair.Key, static pair => pair.Value);
+            if (leaders.Any(leader => !instructionIndexes.ContainsKey(leader)))
             {
                 return null;
             }
@@ -574,10 +576,6 @@ internal static class CompilerImplementationIlSummaryLowerer
             // Instructions are already decoded in offset order.  Keep an
             // offset-to-index map so each basic block can walk its contiguous
             // slice once instead of filtering the complete instruction list.
-            var instructionIndexes = instructions
-                .Select((instruction, index) =>
-                    new KeyValuePair<int, int>(instruction.Offset, index))
-                .ToDictionary(static pair => pair.Key, static pair => pair.Value);
             for (var blockIndex = 0;
                  blockIndex < leaderArray.Length;
                  blockIndex++)
