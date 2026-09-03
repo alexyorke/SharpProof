@@ -34,7 +34,9 @@ internal sealed partial class ClaimManifestBuilder(
                 targets.Add(seed.Method, target);
             }
         }
-        var ordered = targets.Values.OrderBy(static target => target.Entry.CallableId, StringComparer.Ordinal);
+        var ordered = targets.Values
+            .OrderBy(static target => target.Entry.CallableId, StringComparer.Ordinal)
+            .ToImmutableArray();
         var manifest = new WorkerClaimManifest
         {
             Callables = [.. ordered.Select(static target => target.Entry)],

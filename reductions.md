@@ -9225,3 +9225,62 @@ suite passed.
 R963 is `deferred`: the reduction is local and preserves the builder's distinct
 global operation-charge and per-term depth semantics, but changing the shared
 traversal needs focused resource-limit tests for DAG reuse and depth overflow.
+
+## Second survey, part one hundred eighty-seven: four clean sweeps - no new finding
+
+Four techniques applied to areas not previously measured: resource-disposal
+patterns, lazy-initialization and caching strategy, thread-safety of deferred
+initialization, and unused private members. **All four come back clean.** No ID is
+allocated. The measurements are recorded because a negative result is only useful
+if it is written down with its evidence, and because three of these are areas a
+future pass would otherwise re-derive.
+
+### Checked and not proposed (part one hundred eighty-seven)
+
+- **Disposal is uniform, modern, and needs no finalizers.** Twelve `IDisposable`
+  implementations across ten production files, one `IAsyncDisposable`, and
+  **zero finalizers and zero `GC.SuppressFinalize` calls repository-wide**. That is
+  correct rather than missing: every disposable owns *managed* resources, native
+  handles go through `Microsoft.Win32.SafeHandles`
+  (`SharpProof.Host/LinuxPathIdentity.cs:6`), and the one Z3 wrapper documents the
+  reasoning in place - `SharpProof.Smt/Z3ExpressionOwner.cs:3-5`: *"Z3 keeps a
+  native reference for each managed wrapper, so relying on the finalizer would make
+  a long-lived backend's native footprint nondeterministic."* The single
+  `Dispose(bool)` is `BoundedReadStream.cs:109`, a required `Stream` override, not
+  a half-implemented dispose pattern. Style is consistent too: 114 `using var` to 9
+  `using (`.
+- **Every production `Lazy<T>` states its thread-safety mode, and the mode is the
+  same everywhere.** All production sites pass
+  `LazyThreadSafetyMode.ExecutionAndPublication` explicitly -
+  `AnalyzerSession.cs:340` through a shared `CreateLazy<T>` factory that covers
+  eight fields, `CompilerSpecificationPackProvider.cs:16`, and
+  `EffectCallPreconditionPolicy.cs:70`. The convention is additionally **gated**:
+  `ArchitectureTests.cs:1974-1976` asserts that `PackagedProductFeed` constructs
+  its lazy with exactly that mode. The only unqualified `Lazy<>` is a local in a
+  test, where the default is the same value.
+- **The sixteen `??=` lazy assignments are all safe.** Thirteen are on locals or
+  parameters - `printer`, `visited`, `resolvedBody`, `repositoryRoot`, `limits`,
+  `calls`, `failure`, `literal`, `unreadableReason`, `semanticReachability`. The
+  three on instance fields - `ContractExpressionBinder.cs:56` `_result`,
+  `RoslynOperationLowerer.cs:287` `_missingInstance`, `IrProgramBuilder.cs:22`
+  `_entry` - are all on per-invocation builder objects, not state shared across
+  concurrent analyzer callbacks. There is no unsynchronized publication of shared
+  state through `??=`.
+- **Unused private members, unused parameters, and unnecessary usings are
+  structurally impossible here.** `Directory.Build.props:21` promotes **`CA1811`**
+  (unused private member), **`IDE0051`** and **`IDE0052`** (unused/write-only
+  private member), **`IDE0060`** (unused parameter), and **`CS8019`** (unnecessary
+  using directive) from warnings to **errors**, and `.globalconfig:12` scopes
+  `CA1811` to `private, internal`. A build that succeeds is a proof that none of
+  those five categories has an instance. Three separate techniques a future pass
+  might apply - dead private members, dead parameters, dead imports - are therefore
+  answered by the build configuration rather than by scanning, and should not be
+  re-derived.
+
+### Status (part one hundred eighty-seven)
+
+No ID allocated. Together with R962's finding that sealing discipline is total and
+its accompanying measurements, and with the 153-for-153 `ConfigureAwait` result in
+part one hundred eighty-four, the object-lifetime, concurrency, and dead-code
+dimensions of this codebase are now measured and clean. What remains open in this
+ledger is duplication and shadowed authority, not hygiene.
