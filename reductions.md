@@ -11916,3 +11916,15 @@ R1118 is deferred: extract the common operator/key uniqueness, coverage, and ord
 ### Status (part three hundred fifty)
 
 R1119 is deferred: have `Get-RequiredArrayProperty` reuse `Get-RequiredProperty`, retaining its array-kind validation and context-specific failure text.
+
+## Second survey, part three hundred fifty-one: R1120 - duplicated analyzer tuple vocabulary in protocol generation
+
+`Generate-ProtocolModel.ps1` creates three hard-coded `HashSet`s for the allowed analyzer outcomes, reasons, and certainties, then uses them to filter rows from the schema-owned `EffectCertainty` table before emitting `EffectEvaluationProducerTupleCatalog`. Those names are also maintained as the members of the internal `EffectEvaluationOutcome`, `EffectEvaluationReason`, and `EffectEvaluationCertainty` enums. The domains must remain distinct because the generator bridges internal analyzer types to worker protocol types, but the membership list is an unvalidated second authority: adding or removing an analyzer enum member requires synchronizing the generator lists and the schema table, and a mismatch silently omits or rejects producer tuples. A small analyzer-producer metadata section in the schema, or a dedicated bridge catalog consumed by both generation paths, can retain the type boundary while making the accepted tuple vocabulary declarative and checkable.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1120 | **Protocol generation duplicates the internal analyzer tuple vocabulary in three hard-coded allow-lists.** The generator's outcome/reason/certainty sets mirror the members of the three `EffectEvaluation*` enums, but no check proves they remain synchronized; the bridge should keep separate internal and wire types while deriving or validating the producer vocabulary from one metadata source. | `scripts/Generate-ProtocolModel.ps1:351-375,377-400`; `SharpProof.Analyzer.Core/EffectEvaluationTypes.cs:13-37`; `SharpProof.Worker.Protocol/ProtocolModel.schema.json:154-176` |
+
+### Status (part three hundred fifty-one)
+
+R1120 is deferred: give the analyzer-to-protocol tuple bridge one declarative, validated vocabulary while preserving the separate internal analyzer and worker-wire enum types.
