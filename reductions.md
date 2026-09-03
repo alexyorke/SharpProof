@@ -10777,6 +10777,8 @@ R1022 is applied: the two static-initialization regression tests now share one d
 
 R1023 is deferred: share only the assertions for methods after a conditionally throwing initializer, and retain the first-initializer expectations separately.
 
+R1023 is applied: the later module-initializer and entry-point results now share one assertion helper while the first-initializer empty-effect expectations remain separate. `ModuleInitializerOrderingRegressionTests` pass (3/3).
+
 ## Second survey, part two hundred fifty-five: R1024 - repeated internal assumption construction
 
 `SourceDomainPredicateIsRetainedAlongsideIdenticalUserAssumption` and `NormalCompletionAuthorityReplacesAliasedResultDomain` both construct an `Assumption` by reflecting over its non-public constructor, selecting the single instance constructor, and invoking it with the factory, predicate, and justification. The justification types and later assertions intentionally differ, but the reflection and argument plumbing are identical. A test-only `CreateAssumption` helper can encapsulate that access workaround and make the two scenarios' actual policy differences visible.

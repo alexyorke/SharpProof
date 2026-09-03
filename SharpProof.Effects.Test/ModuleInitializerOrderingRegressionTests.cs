@@ -78,31 +78,10 @@ public sealed class ModuleInitializerOrderingRegressionTests
         {
             Assert.That(first.Summary.Writes.IsEmpty, Is.True);
             Assert.That(first.Summary.Capabilities.IsEmpty, Is.True);
-            Assert.That(
-                second.Summary.Writes.Contains(EffectRegionId.Static()),
-                Is.True);
-            Assert.That(
-                second.Summary.Capabilities.Contains(
-                    EffectCapabilityKind.Synchronization),
-                Is.True);
-            Assert.That(
-                entry.Summary.Writes.Contains(EffectRegionId.Static()),
-                Is.True);
-            Assert.That(
-                entry.Summary.Capabilities.Contains(
-                    EffectCapabilityKind.Synchronization),
-                Is.True);
-            Assert.That(
-                second.Summary.Throws.Types.Select(
-                    static type => type.Name),
-                Is.EqualTo(FirstExceptionOnly));
-            Assert.That(
-                entry.Summary.Throws.Types.Select(
-                    static type => type.Name),
-                Is.EqualTo(FirstExceptionOnly));
-            Assert.That(second.DirectWitnesses, Is.Empty);
-            Assert.That(entry.DirectWitnesses, Is.Empty);
         }
+
+        AssertLaterInitializerEffects(second);
+        AssertLaterInitializerEffects(entry);
     }
 
     [Test]
@@ -194,6 +173,29 @@ public sealed class ModuleInitializerOrderingRegressionTests
                 result.Method.Name);
             Assert.That(result.Summary.Completeness,
                 Is.EqualTo(EffectCompleteness.Complete),
+                result.Method.Name);
+        }
+    }
+
+    private static void AssertLaterInitializerEffects(EffectMethodResult result)
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                result.Summary.Writes.Contains(EffectRegionId.Static()),
+                Is.True,
+                result.Method.Name);
+            Assert.That(
+                result.Summary.Capabilities.Contains(
+                    EffectCapabilityKind.Synchronization),
+                Is.True,
+                result.Method.Name);
+            Assert.That(
+                result.Summary.Throws.Types.Select(static type => type.Name),
+                Is.EqualTo(FirstExceptionOnly),
+                result.Method.Name);
+            Assert.That(result.DirectWitnesses,
+                Is.Empty,
                 result.Method.Name);
         }
     }
