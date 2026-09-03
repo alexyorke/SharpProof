@@ -14565,6 +14565,12 @@ re-entry and making the target's ownership easier to reason about.
 |---|---|---|
 | R1209 | **`SharpProof.Verifier.targets` wires `_SharpProofCleanupInvocation` through redundant failure hooks.** The initialization target, `_SharpProofVerifyCore`, and public `SharpProofVerify` each declare an `OnError` for the same cleanup target, and `_SharpProofVerifyCore` also invokes it with `CallTarget` on success. Consolidating the failure hook at one boundary while retaining the success call preserves the cleanup contract without repeated target scheduling and directory checks. | `SharpProof.Verifier/buildTransitive/SharpProof.Verifier.targets:71-140,164-164,251-259` |
 
+### Status (part five hundred thirty-one)
+
+R1209 is applied: verifier invocation cleanup now has one failure hook at the
+core boundary, with the successful cleanup call retained. MSBuild integration
+tests pass (75 passed, 1 host skip).
+
 ## Second survey, part five hundred thirty-two: R1210 - timeout termination bookkeeping is duplicated
 
 `RunVerifier.Execute` can time out while waiting for the verifier process or
