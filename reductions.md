@@ -16957,3 +16957,11 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 | ID | Finding | Evidence |
 |---|---|---|
 | R1401 | `EffectContractDiagnostics.Evaluate` performs declared effect-contract resolution and projection for methods with no `EffectContract` claim; defer that work until `summaryContracts` is nonempty. | `SharpProof.Analyzer.Core/EffectContractDiagnostics.cs:73-154,171-236` |
+
+## Second survey, continued: R1402 - Corpus transaction destination validation makes a second pass for uniqueness
+
+`CorpusFileTransaction.WriteAllAsync` first materializes every normalized destination, walks that array to enforce containment, and then rescans it with `Distinct(...).Count()` solely to reject duplicate targets. Populate an ordinal destination set while canonicalizing the updates, or combine uniqueness with the containment loop, preserving input order and the fail-closed destination checks without the extra traversal.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1402 | `CorpusFileTransaction.WriteAllAsync` projects all update destinations, enumerates them for containment, and then rescans them with `Distinct` for duplicate rejection; combine projection and uniqueness tracking. | `SharpProof.Gates/Corpus/CorpusFileTransaction.cs:28-47` |
