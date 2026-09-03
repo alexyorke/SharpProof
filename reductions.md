@@ -21284,3 +21284,11 @@ mechanical reduction pass.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2008 | Three production CFG helpers repeat method/constructor `ControlFlowGraph.Create` arms; share only that operation-root factory while retaining each caller's block, fallback, cancellation, and exception policies. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:431-447`; `SharpProof.Effects/EffectMethodNodeBuilder.cs:1121-1137`; `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1062-1088` |
+
+## Second survey, continued: R2009 - RequiresCallSiteDispatch and CacheSoundnessRules duplicate method override-chain traversal
+
+`RequiresCallSiteDispatch.Overrides` and the method arm of `CacheSoundnessRules.Overrides` both walk `IMethodSymbol.OverriddenMethod` and compare each `OriginalDefinition` with the target's `OriginalDefinition` using `SymbolEqualityComparer.Default`. The two callers have a real boundary difference: Requires starts at the candidate itself, while the cache resolver starts at `method.OverriddenMethod` because the original symbol was already added to its target set; the cache helper also has a separate property-override arm. A small shared method-only chain predicate with an explicit include-self/seed policy can remove the duplicated Roslyn inheritance traversal without changing exact receiver resolution, dispatch-target collection, or property handling. The assemblies' standalone dependency posture may require a linked utility rather than a new project reference.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R2009 | RequiresCallSiteDispatch and CacheSoundnessRules repeat the method `OverriddenMethod`/`OriginalDefinition` walk; share only the method-chain predicate with each caller's self-inclusion and property policies explicit. | `SharpProof.Analyzer.Core/RequiresCallSiteDispatch.cs:82-96`; `SharpProof.Meta.Analyzers/CacheSoundnessRules.cs:1492-1514` |
