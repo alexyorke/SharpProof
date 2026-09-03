@@ -26,17 +26,22 @@ internal static class CorpusFileTransaction
             return;
         }
 
-        var destinations = updates
-            .Select(static update => Path.GetFullPath(update.Path))
-            .ToArray();
-        foreach (var destination in destinations)
+        var destinations = new string[updates.Count];
+        var seenDestinations = new HashSet<string>(StringComparer.Ordinal);
+        var hasDuplicateDestination = false;
+        for (var index = 0; index < updates.Count; index++)
         {
+            var destination = Path.GetFullPath(updates[index].Path);
+            destinations[index] = destination;
             OpenSourceCorpusCatalog.EnsureContained(
                 transactionRoot,
                 destination);
+            if (!seenDestinations.Add(destination))
+            {
+                hasDuplicateDestination = true;
+            }
         }
-        if (destinations.Distinct(StringComparer.Ordinal).Count() !=
-            destinations.Length)
+        if (hasDuplicateDestination)
         {
             throw new ArgumentException(
                 "Corpus transaction destinations must be unique.",

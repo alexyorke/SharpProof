@@ -17929,3 +17929,8 @@ R1401 is applied: effect contract resolution and projection are now performed
 only when an `EffectContract` claim is selected; facet-only claims retain the
 same argument validation and effect-summary evaluation path. `AnalyzerModeAndEffectTests`
 pass (104/104).
+
+R1402 is applied: corpus transaction destination canonicalization now fills
+the ordered destination array, checks containment, and records duplicate
+targets in one pass, preserving containment-first error precedence and the
+original uniqueness diagnostic. `CorpusGateTests` pass (23/23).
