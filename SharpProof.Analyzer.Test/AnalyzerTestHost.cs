@@ -91,6 +91,21 @@ internal static class AnalyzerTestHost
             options);
     }
 
+    internal static CSharpCompilation WithEnabledDiagnostics(
+        CSharpCompilation compilation,
+        params string[] enabledIds)
+    {
+        var enabled = enabledIds.ToImmutableHashSet(StringComparer.Ordinal);
+        var options = compilation.Options.WithSpecificDiagnosticOptions(
+            new SharpProofAnalyzer().SupportedDiagnostics.ToImmutableDictionary(
+                static descriptor => descriptor.Id,
+                descriptor => enabled.Contains(descriptor.Id)
+                    ? ReportDiagnostic.Warn
+                    : ReportDiagnostic.Suppress,
+                StringComparer.Ordinal));
+        return compilation.WithOptions(options);
+    }
+
     internal static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(
         CSharpCompilation compilation,
         string? mode,

@@ -19995,3 +19995,71 @@ Four source literals in `RequiresAndControlTests` repeat the same `using SharpPr
 | ID | Finding | Evidence |
 |---|---|---|
 | R1821 | Four generated/initializer tests duplicate the same Positive guard source; share only that invariant source fragment and retain each suppression boundary. | `SharpProof.Analyzer.Test/RequiresAndControlTests.cs:735-766,834-895`; related R1344 |
+## Second survey, part six hundred nineteen: R1840 - twenty-five mutation entries pin exact text inside generated files, and the check that notices runs only after the pull request
+
+The PowerShell block-duplication measurement that had not been run - 101 files,
+31,763 significant lines, contiguous five-line runs shared across files - led into
+the trusted-mutation catalog, which turns out to be coupled to the generators in a
+way nothing records.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1840 | **Twenty-five of the 248 trusted-mutation entries pin exact source text inside ten generated files, so a generator whose output formatting shifts breaks a preflight in a lane that pull requests never run.** `scripts/Test-SharpProofTrustedMutations.ps1` declares 248 entries over 108 distinct target files, each carrying an `Original` string that must occur verbatim in its `File`. `:2240-2257` runs `Get-MutationTargetIssue -Content -Needle ([string]$mutation.Original)` over every entry before any mutation is applied and throws *"Trusted mutation target preflight failed"* listing each bad one - a real and well-built check. **Ten of the 108 targets are generated files**, carrying 25 entries between them: `ContractApiMetadata.generated.cs` (5), `CSharpScalarSemantics.generated.cs` (4), `PortableIrModel.generated.cs` (4), `CompilerWireMappings.generated.cs` (3), `LauncherArguments.generated.cs` (2), `IrOperatorCatalog.generated.cs` (2), `EffectContractMappings.generated.cs` (2), and one each in `ProtocolModel.generated.cs`, `OperationSupportCatalog.generated.cs` and `EffectEvaluationProjections.generated.cs`. Their generators are eight of the fifteen `Generate-*.ps1` scripts, and **no generator records that fragments of its output are pinned elsewhere, nor does any catalog entry record that its target is generated.** **The failure is silent where it is caused and loud where it is not.** A generator edit that changes a line break, an indent, or member order inside one of the 25 pinned strings leaves the generator's own `-Verify` passing - the file still regenerates deterministically - leaves `BoundaryEnforcementTests.GeneratedProductionFilesAreExplicitlyApproved` passing, and leaves the build passing. The mutation preflight then fails with a message naming a catalog entry, not the generator change. **And it fails late.** `mutation` runs in exactly two places: `Invoke-SharpProofContainer.ps1:136`, inside the `nightly` pipeline, and `.github/workflows/package-consumers.yml:194`, inside the `release-qualification` job whose condition at `:124-127` is `github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')`. **Neither runs on a pull request**, so a generator change that breaks 25 pinned strings merges green and surfaces in the nightly run or at release-tag time. The cheap mitigation is a line in each affected generator's header, or a `Generated = $true` marker on those 25 entries so the preflight failure names the generator; the thorough one is to select the mutation target by a stable anchor rather than by exact text where the file is generated. | `scripts/Test-SharpProofTrustedMutations.ps1:2240-2257` (the preflight), 248 `Original`/`File` entries over 108 files; the ten generated targets listed above; `scripts/Invoke-SharpProofContainer.ps1:135-140,478`; `.github/workflows/package-consumers.yml:122-127,194`; `.github/workflows/nightly.yml:28`; related R980, R459, R755 |
+
+### Checked and not proposed (part six hundred nineteen)
+
+- **The PowerShell block-duplication measurement reproduces R305 and adds nothing
+  unclaimed.** Across 101 files and 31,763 significant lines there are **126**
+  five-line runs shared between files. The heaviest pairs are
+  `Invoke-SharpProofPackageTests` / `Invoke-SharpProofSemanticTests` (17 runs),
+  `Generate-CompilerArtifactModel` / `Generate-ProtocolModel` (16),
+  `Assert-SharpProofFuzzRunnerResult` / `SharpProof.FuzzEvidenceLifecycle` (11) and
+  `Invoke-SharpProofGateEvidence` / `Test-SharpProofDependencyAudit` (9). **R305
+  names every one of these**, including the two it flags as "new and unclaimed",
+  and the generator pairs it correctly assigns to R249, R250 and R268. Most of the
+  shared runs are script preambles - `Set-StrictMode -Version Latest`,
+  `$ErrorActionPreference = 'Stop'`, the `$repositoryRoot` resolution and the
+  `GeneratedFileHelpers.ps1` dot-source - which is R1158's subject seen from the
+  text side.
+- **The fuzz pair's shared text is larger than R305 recorded and is worth
+  describing rather than re-filing.** R305 measures it at 32 lines; at HEAD it is
+  **six contiguous runs totalling about 44 lines**, and what they implement is one
+  routine: open a `FileStream` with explicit `Open`/`Read`/`Read`, reject empty or
+  over-1-MiB files, read the exact length in a loop failing on a zero-length read,
+  require `ReadByte()` to return `-1` so there are no trailing bytes, dispose in
+  `finally`, decode with `UTF8Encoding(false, true)` so invalid UTF-8 throws, parse,
+  and assert an exact JSON property set. That is a deliberately hardened reader
+  duplicated verbatim in two trusted-computing-base scripts. R305 stands; this is
+  what it is about.
+- **Consolidating that pair has a prerequisite R305 does not mention**, and it is
+  R1840's mechanism in miniature: `Test-SharpProofTrustedMutations.ps1:2086-2088`
+  and `:2158-2160` pin the guard `$stream.Length -eq 0 -or $stream.Length -gt
+  1048576` as literal text in **both** files, under the names
+  `fuzz-result-byte-upper-bound` and `retained-fuzz-manifest-byte-upper-bound`.
+  Merging the two readers into one deletes one of those strings and the preflight
+  fails - correctly, but in the nightly lane. Whoever applies R305's fuzz half must
+  update the catalog in the same change.
+- **The one-mebibyte bound is repeated five times and three of the five are
+  correct.** Beyond the two readers, `Test-SharpProofFuzzEvidenceLifecycle.ps1:160`
+  and `Test-SharpProofFuzzRunnerResult.ps1:108` build a payload **exactly** at
+  1048576 bytes to test the boundary from the accepting side, which pins both sides
+  of the limit and is the right shape; the remaining two are the mutation entries
+  above. There is no shared constant, but four of the five uses are a matched
+  boundary test and its subject.
+- **Every one of the 108 mutation-target files is already cited in this ledger**,
+  and every `File` path in the catalog resolves. There is no stale target and no
+  unexamined mutation subject.
+
+### Status (part six hundred nineteen)
+
+R1840 is `pending`. The preflight it depends on is good and should not change; what
+is missing is that nothing tells a generator author that 25 fragments of generated
+output are load-bearing elsewhere, and that the only lane which would tell them
+runs after the change has merged.
+
+### Applied reduction follow-up
+
+R1800 is applied: `ContractApiIdentityAnalyzerTests` now uses the shared
+`AnalyzerTestHost.WithEnabledDiagnostics` helper for its three custom-reference
+compilations. The focused ContractApiIdentity analyzer suite passes (13/13),
+while the existing diagnostic-suppression policy remains explicit at the host.
