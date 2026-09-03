@@ -14651,3 +14651,11 @@ decision points.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1219 | **`HasReplayableCallEvaluation` repeats the same accessor-evaluation return across five branches.** Accessor/list-pattern, foreach, recursive-pattern, indirect-delegate, and implicit-operation cases all return `HasReplayableAccessorEvaluation(call, operationFacts)` independently. Combining those shape tests into one branch reduces accidental control-flow duplication without merging the separate `using` or ordinary-prefix rules. | `SharpProof.Analyzer.Core/RequiresCallSiteDiscovery.cs:608-649` |
+
+## Second survey, part five hundred forty-two: R1220 - primary-initializer arguments are copied twice
+
+`RequiresCallSiteAnalyzer.AnalyzePrimaryConstructorInitializer` stores initializer arguments in an `ImmutableArray<IArgumentOperation?>`, whether they came from an invocation operation or syntax-based semantic-model lookups. After checking that the array contains no nulls, it immediately calls `OfType<IArgumentOperation>().ToImmutableArray()` to build the `RequiresCallSiteCandidate`, re-enumerating and allocating the same argument sequence. A typed validated projection can serve both paths, retaining the null rejection for syntax-derived operations while removing the post-validation filtering copy.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1220 | **`AnalyzePrimaryConstructorInitializer` materializes the same arguments twice.** It first builds `ImmutableArray<IArgumentOperation?>`, validates `arguments.Any(argument => argument == null)`, then filters the proven non-null array through `OfType<IArgumentOperation>().ToImmutableArray()` for `baseCall`. Reusing a single typed projection after validation removes an iterator and array allocation without changing malformed-operation handling. | `SharpProof.Analyzer.Core/RequiresCallSiteAnalyzer.cs:59-101` |
