@@ -464,18 +464,7 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         for (var index = staged.Count - 1; index >= 0; index--)
         {
             var entry = staged[index];
-            try
-            {
-                if (File.Exists(entry.StagedPath) &&
-                    !File.Exists(entry.OriginalPath))
-                {
-                    File.Move(entry.StagedPath, entry.OriginalPath);
-                }
-            }
-            catch (Exception exception) when (exception is
-                ArgumentException or IOException or UnauthorizedAccessException)
-            {
-            }
+            TryRestoreFile(entry.StagedPath, entry.OriginalPath);
         }
     }
 
@@ -485,11 +474,16 @@ internal sealed partial class VerificationCache(string directory, long maximumBy
         {
             return;
         }
+        TryRestoreFile(previousPath, path);
+    }
+
+    private static void TryRestoreFile(string source, string destination)
+    {
         try
         {
-            if (File.Exists(previousPath) && !File.Exists(path))
+            if (File.Exists(source) && !File.Exists(destination))
             {
-                File.Move(previousPath, path);
+                File.Move(source, destination);
             }
         }
         catch (Exception exception) when (exception is
