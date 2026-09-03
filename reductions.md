@@ -18892,3 +18892,11 @@ class still has its pre-existing complexity-ratchet failure
 | ID | Finding | Evidence |
 |---|---|---|
 | R1661 | The package and worker suites independently hard-code the same two allocation-witness wire names; derive or share the vocabulary instead of maintaining parallel lists. | `SharpProof.Package.Test/PackageLayoutSmokeTests.cs:57-60,1192-1197`; `SharpProof.Worker.Test/WorkerTests.cs:91-94,1123-1129`; production witness mapping searched by both tests |
+
+## Second survey, continued: R1662 - Worker tests duplicate the ordered user/trusted assumption expectation
+
+`ClaimManifestBuilderTests.UserAndTrusted` and `ProtocolJsonTests.s_assumptionKinds` independently define the same ordered pair, `WorkerAssumptionKind.UserAssume` followed by `WorkerAssumptionKind.TrustedBoundary`, and each is used as an exact expected array. The manifest-builder and protocol round-trip tests should remain separate, but the shared wire ordering is contract data that can drift between them; a common test constant or projection from the authoritative assumption order would remove the duplicate.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1662 | Two worker test classes hard-code the same ordered `UserAssume`/`TrustedBoundary` expectation; share or derive the protocol-order fixture. | `SharpProof.Worker.Test/ClaimManifestBuilderTests.cs:23-26,1154-1174`; `SharpProof.Worker.Test/ProtocolJsonTests.cs:23-26,356-373` |
