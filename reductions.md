@@ -16252,3 +16252,27 @@ also include the writer's required release-json and package-identity scripts.
 | ID | Finding | Evidence |
 |---|---|---|
 | R1350 | **`RuntimeDependencyTests` checks `visited` at dequeue but enqueues every SharpProof reference without a pending-set guard, so shared dependencies can be queued repeatedly before one copy is processed.** | `SharpProof.Worker.Test/RuntimeDependencyTests.cs:16-39` |
+
+## Second survey, continued: R1351 - Reuse immutable lattice-law samples across tests
+
+**`EffectLatticeTests` rebuilds the same sample domain twice.** `JoinSatisfiesFiniteLatticeLaws` and `ProjectionIsMonotoneUnderPublicUnknownOrder` each call `CreateSamples`; every call creates a Roslyn compilation, resolves `System.InvalidOperationException`, and constructs the same immutable summary set. A shared lazy/test-fixture sample (or a split cache for the symbol-dependent throw sample) can remove the repeated setup while leaving the two law checks independent.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1351 | **`EffectLatticeTests` calls `CreateSamples` separately in two tests even though it constructs the same immutable summaries and Roslyn exception symbol; cache the shared sample fixture to avoid repeated setup.** | `SharpProof.Effects.Test/EffectLatticeTests.cs:7-10,32-43,118-146` |
+
+## Second survey, continued: R1352 - Table-drive getter/setter language-subset property cases
+
+**`LanguageSubsetGatePropertyTests` has two tests with the same setup and assertion envelope.** The read and write methods both allocate a request list, call `Classify`, assert support, and assert exactly one requested accessor; only the method name, `MethodKind` predicate, and expected kind differ. A parameterized case or local assertion helper can preserve the getter/setter distinction while removing the duplicated test plumbing; the shared `Classify` compilation helper already isolates the common fixture.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1352 | **`LanguageSubsetGatePropertyTests` duplicates the request capture, classification, and two assertions for getter and setter cases; table-driven inputs can retain both semantics with one test envelope.** | `SharpProof.Analyzer.Test/LanguageSubsetGatePropertyTests.cs:12-52,54-97` |
+
+## Second survey, continued: R1353 - Use a list for compiler-artifact parameter-source emission
+
+**`Generate-CompilerArtifactModel.Get-ParameterSource` grows a PowerShell array with `+=` for every constructor parameter.** Each append can create and copy a new array, and the helper is called while emitting many generated declarations; `Add-ParameterList` immediately consumes the complete result as an array. A `List[string]` (or a pre-sized collection) preserves parameter order and validation while avoiding repeated whole-array copies in the generator.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1353 | **`Generate-CompilerArtifactModel.Get-ParameterSource` appends each validated parameter string with `+=`; use a growable list or pre-sized array to avoid repeated generator-time array copying.** | `scripts/Generate-CompilerArtifactModel.ps1:86-124` |
