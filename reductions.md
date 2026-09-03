@@ -12093,7 +12093,10 @@ focused standalone-gate architecture tests pass (2/2).
 
 ### Status (part three hundred sixty-three)
 
-R1132 is deferred: remove the now-unconditional change flag and preserve the required authority append plus XML save.
+R1132 is applied: coverage post-processing now appends the required authority
+metadata and saves each report directly; the dead `$changed` flag and
+conditional branch are gone. The complete focused `CoverageScriptTests` suite
+passes (33/33).
 
 ## Second survey, part three hundred sixty-four: R1133 - repeated per-file declaration walks in OSS corpus instrumentation
 

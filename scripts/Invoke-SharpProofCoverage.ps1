@@ -265,7 +265,6 @@ foreach ($coverageReport in $coverageReports) {
     [xml]$coverageDocument = Get-Content `
         -LiteralPath $coverageReport.FullName `
         -Raw
-    $changed = $false
     foreach ($class in $coverageDocument.SelectNodes('//class[@filename]')) {
         $fileName = [string]$class.filename
         if (-not [IO.Path]::IsPathRooted($fileName)) {
@@ -280,7 +279,6 @@ foreach ($coverageReport in $coverageReports) {
         $class.SetAttribute(
             'filename',
             $fullPath.Substring($repositoryPrefix.Length).Replace('\', '/'))
-        $changed = $true
     }
     $authorityNodes = @(
         $coverageDocument.SelectNodes('/coverage/sharpProofAuthority'))
@@ -296,10 +294,7 @@ foreach ($coverageReport in $coverageReports) {
         'modules',
         ($coverageModuleIdentities -join ','))
     [void]$coverageDocument.DocumentElement.AppendChild($authorityNode)
-    $changed = $true
-    if ($changed) {
-        Save-CoverageXml `
-            -Document $coverageDocument `
-            -Path $coverageReport.FullName
-    }
+    Save-CoverageXml `
+        -Document $coverageDocument `
+        -Path $coverageReport.FullName
 }
