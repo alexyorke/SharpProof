@@ -2,6 +2,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $script:SharpProofSolutionTestTimeoutFallbackSeconds = 1800
 
+function Assert-SharpProofContainer {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
+        throw $Message
+    }
+}
+
 function Get-SharpProofDotnetWrapperPath {
     param()
 
@@ -571,9 +582,8 @@ function Invoke-SharpProofParallelDotnetBuilds {
     if ($Builds.Count -eq 0) {
         return
     }
-    if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
-        throw 'Parallel builds require the canonical Linux container.'
-    }
+    Assert-SharpProofContainer `
+        'Parallel builds require the canonical Linux container.'
 
     $lanesPerBuild = [Math]::Max(
         1,
@@ -811,9 +821,8 @@ function New-SharpProofIsolatedTestOutput {
         [string]$DestinationDirectory
     )
 
-    if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
-        throw 'Isolated test outputs require the canonical Linux container.'
-    }
+    Assert-SharpProofContainer `
+        'Isolated test outputs require the canonical Linux container.'
     $source = (Resolve-Path `
         -LiteralPath $SourceDirectory `
         -ErrorAction Stop).Path
@@ -858,6 +867,7 @@ function New-SharpProofIsolatedTestOutput {
 }
 
 Export-ModuleMember -Function @(
+    'Assert-SharpProofContainer',
     'Add-SharpProofStaticGraphArgument',
     'Get-SharpProofBuildParallelism',
     'Get-SharpProofPackageTestParallelism',

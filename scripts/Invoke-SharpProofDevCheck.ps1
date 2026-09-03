@@ -12,12 +12,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
-    throw 'The developer check requires the canonical Linux container.'
-}
-$planScript = Join-Path $PSScriptRoot 'Get-SharpProofDevCheckPlan.ps1'
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+Assert-SharpProofContainer `
+    'The developer check requires the canonical Linux container.'
+$planScript = Join-Path $PSScriptRoot 'Get-SharpProofDevCheckPlan.ps1'
 $TimeoutSeconds = Resolve-SharpProofSolutionTestTimeoutSeconds `
     -RepositoryRoot $repositoryRoot `
     -TimeoutSeconds $TimeoutSeconds `

@@ -14,12 +14,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
-    throw 'SharpProof .NET commands must run in the canonical Linux container. Use docker compose run --rm tooling <command>.'
-}
-
 Import-Module (Join-Path `
     $PSScriptRoot 'SharpProof.ContainerExecution.psm1')
+Assert-SharpProofContainer `
+    'SharpProof .NET commands must run in the canonical Linux container. Use docker compose run --rm tooling <command>.'
 $effectiveArguments = @(
     Add-SharpProofStaticGraphArgument -Arguments $DotnetArgs
 )

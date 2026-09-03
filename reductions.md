@@ -325,6 +325,7 @@ the smallest relevant containerized test target passes.
 | R970 | Use static-field naming for shared mutable state | Architecture and worker builds/tests passed |
 | R961 | Replace CompilerArtifact global usings with explicit per-file imports | CompilerArtifact build and generator verification passed |
 | R972 | Reuse scalar-catalog integer bounds in the IL lowerer | CompilerCollector build and Worker.Test: 695 passed |
+| R975 | Share PowerShell canonical-container admission checks | PowerShell smoke check; ContainerAuthorityScriptTests: 15; BuildSchedulingTests: 25 passed |
 | R996 | Share the left-associated addition-chain fixture in IR depth tests | `SharpProof.Ir.Test`: 114 passed |
 | R999 | Read analyzer option aliases once during validation | `SharpProof.Analyzer.Test`: 476 passed |
 | R1000 | Reuse the existing effect-manifest test factory | `SharpProof.Worker.Test`: ProtocolJsonTests, 108 passed |
@@ -9730,13 +9731,12 @@ Move R949 to applied.
 
 ### Status (part two hundred five)
 
-R975 is `pending`. The PowerShell half is straightforward - one exported
-`Assert-SharpProofContainer` in the module that already contains two copies of the
-check, taking the caller's message. The harder half is the decision the four
-predicates currently avoid: which of OS, architecture, environment variable and
-contract file each layer is responsible for. The architecture gap is the concrete
-part - `arm64Supported: false` is declared in the toolchain contract and enforced
-by two of the four layers.
+R975 is partially applied: all eight PowerShell OS/container-environment checks
+now call one exported module helper with caller-specific messages. The stronger
+architecture and contract checks in the container entrypoint, build entry, and C#
+supervisor remain explicit pending a cross-layer ownership decision; the toolchain
+still declares `arm64Supported: false`, so those predicates must not be collapsed
+without preserving that enforcement.
 
 ## Second survey, part two hundred six: R976 - duplicated SMT oracle sessions
 

@@ -24,15 +24,14 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
-    throw 'Package tests require the canonical Linux container.'
-}
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+Assert-SharpProofContainer `
+    'Package tests require the canonical Linux container.'
 if ($Fast -and $NoBuild) {
     throw '-Fast and -NoBuild cannot be combined.'
 }
 
-Import-Module (Join-Path `
-    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
 $TimeoutSeconds = Resolve-SharpProofSolutionTestTimeoutSeconds `
     -RepositoryRoot $repositoryRoot `
     -TimeoutSeconds $TimeoutSeconds `

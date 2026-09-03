@@ -14,9 +14,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (-not $IsLinux -or $env:SHARPPROOF_CONTAINER -cne '1') {
-    throw 'Release operations must run in the canonical Linux container.'
-}
+Import-Module (Join-Path `
+    $PSScriptRoot 'SharpProof.ContainerExecution.psm1') -Force
+Assert-SharpProofContainer `
+    'Release operations must run in the canonical Linux container.'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repositoryRoot
