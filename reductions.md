@@ -16487,3 +16487,27 @@ R417 is applied: unsat-core bounds validation, duplicate suppression, and
 justification projection now share one cancellation-aware pass with a pre-sized
 builder, retaining malformed-result handling and deterministic first occurrence
 ordering. ProofKernelTests passes (14 passed).
+
+## Second survey, continued: R1364 - EffectAnalysisTests repeats the fresh-container alias assertion block
+
+`FreshArrayContentsDoNotBecomeFreshOwnedAliases`, `FreshObjectContentsDoNotBecomeFreshOwnedAliases`, and `NestedFreshContainerContentsDoNotBecomeFreshOwnedAliases` use different source fixtures but repeat the same three assertions: writes are nonempty, at least one write is non-fresh or unknown, and the summary is not observably pure. A small assertion helper can keep the fixtures independent while removing this repeated result-verification block.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1364 | **Three fresh-container effects tests repeat the same alias-result assertions.** Extract the shared assertion helper while preserving each test's distinct array, object, and nested-container fixture. | `SharpProof.Effects.Test/EffectAnalysisTests.cs:3186-3196,3222-3232,3256-3266` |
+
+## Second survey, continued: R1365 - EffectAnalysisTests repeats the closed-precondition incompleteness assertions
+
+`UnprovenExternalClosedPreconditionMakesTrustedSummaryIncomplete`, `DirectExternalAnalysisAppliesClosedEntryPreconditions`, and `StandaloneCompanionPreconditionIntentFailsClosed` each assert the same incompleteness reason (`CallPreconditionNotProven`) and incomplete projection after constructing different external/companion fixtures. A focused helper can own those three assertions while leaving the fixture construction and distinct boundary scenarios visible.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1365 | **Three external-precondition effects tests repeat the same incompleteness assertion block.** Share the `CallPreconditionNotProven`/incomplete-projection helper and retain the distinct fixture setup. | `SharpProof.Effects.Test/EffectAnalysisTests.cs:3429-3441,3475-3485,3614-3626` |
+
+## Second survey, continued: R1366 - EffectAnalysisTests repeats parameter-write remapping assertions
+
+`SourceSummaryRemapsParameterWritesAtDepthZero`, `ReducedSourceExtensionRemapsItsReceiverArgument`, and `RefParameterWritesRemapToTheCaller` all verify that the analyzed invocation writes parameter region zero, is not unknown, and completes. The first test additionally checks the projected effect set and throw type, so a helper for the common three assertions can remove only the repeated oracle while preserving that extra coverage.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1366 | **Three parameter-remapping tests repeat the same write-summary oracle.** Extract the common parameter-zero/non-unknown/complete assertions and keep the first test's additional projection checks local. | `SharpProof.Effects.Test/EffectAnalysisTests.cs:4501-4512,4535-4540,4555-4560` |
