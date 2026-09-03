@@ -11822,3 +11822,15 @@ R1111 is deferred: share only the shard-shape formatter, and keep the two indepe
 ### Status (part three hundred forty-three)
 
 R1112 is deferred: retain one authoritative closure-path deduplication mechanism and avoid a partial second guard that does not cover pending entries.
+
+## Second survey, part three hundred forty-four: R1113 - conditional namespace on a linked UTF-16 helper
+
+`Utf16WellFormedness.cs` contains one implementation of `IsWellFormed`, but wraps the type name and namespace in `#if SHARPPROOF_WORKER_PROTOCOL` so the same source can be linked into `SharpProof.Worker.Protocol` under `ProtocolUtf16WellFormedness` while the owning `SharpProof.Ir` project uses `Utf16WellFormedness`. The helper has no project-specific types or behavior. A neutral shared namespace plus ordinary `using`/qualified references can remove the conditional compilation branch and the protocol-only symbol while retaining the source-link boundary that avoids a forbidden protocol-to-IR project reference.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1113 | **The linked UTF-16 validator carries a namespace-only conditional-compilation split.** `SharpProof.Ir/Utf16WellFormedness.cs` emits two names for identical code, and `SharpProof.Worker.Protocol.csproj` defines `SHARPPROOF_WORKER_PROTOCOL` only to select the second name. Moving the internal helper to a neutral namespace and updating its two namespace-local call sites removes the branch and symbol indirection without merging the protocol and IR assemblies or changing validation behavior. | `SharpProof.Ir/Utf16WellFormedness.cs:1-9`; `SharpProof.Worker.Protocol/SharpProof.Worker.Protocol.csproj:3-14`; `SharpProof.Ir/IrFactory.cs:292,385`; `SharpProof.Specs/ApiSpecTermValidator.cs:92`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerCompilationCapture.cs:444, SharpProof.CompilerCollector/CompilerArtifact/SemanticClaimIdentity.cs:502`; `SharpProof.Worker.Protocol/ProtocolJsonSupport.cs:209` |
+
+### Status (part three hundred forty-four)
+
+R1113 is deferred: use one namespace-neutral linked UTF-16 helper, preserving the separate assembly dependency boundaries.
