@@ -12011,7 +12011,11 @@ R1126 is applied: centralize the pilot evidence-path projection, preserving the 
 
 ### Status (part three hundred fifty-eight)
 
-R1127 is deferred: validate the report's six package rows through a keyed package-ID and extension projection, preserving the independent producer-side source checks.
+R1127 is applied in `Test-SharpProofPilotReport.ps1`: the report now projects each
+artifact to a package-ID/extension key from `SharpProof.PackageIdentity.psm1`,
+requiring exactly one `.nupkg` and `.snupkg` row for every canonical package ID
+and matching each filename to its package ID and report version. The focused
+`PilotAuthority` architecture test passes (1/1).
 
 ## Second survey, part three hundred fifty-nine: R1128 - non-atomic qualification receipt publication
 
@@ -12023,7 +12027,12 @@ R1127 is deferred: validate the report's six package rows through a keyed packag
 
 ### Status (part three hundred fifty-nine)
 
-R1128 is deferred: publish receipts atomically within the existing repository containment boundary, preserving the receipt schema and gate-specific validation.
+R1128 is applied: `SharpProof.ReleaseJson.ps1` now owns the shared
+`Write-SharpProofAtomicText` temp-write-and-move helper, used by both release
+manifest and qualification-receipt publication. The receipt writer keeps its
+repository containment and schema checks while publishing the final JSON via
+the atomic helper. The focused qualification-receipt architecture tests pass
+(2/2).
 
 ## Second survey, part three hundred sixty: R1129 - project re-evaluation around a verified fuzz assembly
 
@@ -12035,7 +12044,12 @@ R1128 is deferred: publish receipts atomically within the existing repository co
 
 ### Status (part three hundred sixty)
 
-R1129 is deferred: execute the already-verified fuzz assembly directly, preserving its adjacent runtime files, timeout policy, and output/evidence contract.
+R1129 is applied: `Invoke-SharpProofFuzzCampaign.ps1` still rebuilds and
+commit-checks the runner, but each batch now invokes the verified
+`SharpProof.Fuzz.dll` directly through the bounded dotnet wrapper instead of
+re-evaluating the project with `dotnet run --project --no-build`. Existing
+timeout, redirected output, and evidence validation remain intact. The focused
+fuzz evidence architecture tests pass (3/3).
 
 ## Second survey, part three hundred sixty-one: R1130 - incomplete retained-seed property-set validation
 
@@ -12262,3 +12276,125 @@ for repeated scans independent of the build-context finding above.
 R1145-R1146 are `pending`: fuse the per-variable completeness and difference
 scan in summary merging, and make callable-evidence depth accounting cover new
 assumptions without rechecking predicates that already passed the same limit.
+
+## Second survey, part four hundred sixty-two: R1147, and the complete cross-assembly enum census
+
+Generalising R1143 from two schemas to the whole tree: every one of the 128
+production enums, compared member-sequence by member-sequence across assemblies.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1147 | **`IrSummaryOrigin` and `CompilerSummaryOrigin` are the same three-member vocabulary in two assemblies, and the only thing keeping them aligned is a runtime `throw`.** `SharpProof.Summaries/IrRelationalSummary.cs` declares `IrSummaryOrigin` and `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs` declares `CompilerSummaryOrigin`, both `Source, ImplementationIl, SpecificationPack` in that order. `SharpProof.CompilerCollector` consumes both and converts between them at `CompilerCallableLowerer.cs:374-384` with a `switch` expression whose final arm is `_ => throw new InvalidOperationException("A relational summary has an unsupported origin.")`. Because the discard arm makes the switch exhaustive to the compiler, **adding a fourth member to `IrSummaryOrigin` produces no warning at the conversion site** - the mismatch surfaces at run time, inside the collector, only on the input that reaches the new member. Nothing else compares the two: no test names both enums, and the artifact schema that generates `CompilerSummaryOrigin` contains no reference to `SharpProof.Summaries`. This is R1143's shape on a different pair - and unlike R1143's three, this one is not even co-located in two schemas a single test could be extended to cover, since one side is hand-written C# and the other is generated from JSON. | `SharpProof.Summaries/IrRelationalSummary.cs`; `SharpProof.CompilerArtifact/CompilerArtifactModel.generated.cs`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerCallableLowerer.cs:374-384`; `SharpProof.CompilerCollector/CompilerArtifact/CompilerRelationalSummaryProvider.cs:407` |
+
+### Checked and not proposed (part four hundred sixty-two)
+
+- **The census is complete and small: of 128 production enums, exactly six member
+  sequences appear in two assemblies.** They are: the 17-member effect vocabulary
+  (`SharpProofEffect` / `EffectContractKind`), the 14-member capability vocabulary
+  (`SharpProofCapability` / `EffectContractCapabilityKind`), the three contract
+  enums of R1143, and R1147. **There is no seventh.** A second pass keyed on the
+  member *set* rather than the sequence found **zero** cases of the same members in
+  a different order, which matters because several of these are serialised by
+  ordinal.
+- **The 17-member effect pair is gated, and an earlier hypothesis in this part that
+  it was not is wrong.** `SharpProof.Effects.Test/EffectContractWireParityTests.cs:23-28`
+  passes `typeof(SharpProof.Attributes.SharpProofEffect)` and
+  `typeof(EffectContractKind)` into
+  `NeutralFlagsMatchThePublicAttributeWireVocabulary`, which compares them
+  directly; the same file also checks decoder masks against
+  `Enum.GetValues<EffectContractKind>()` and round-trips capability conversions.
+  This pair needs nothing, and the test is the model R1143 and R1147 both point
+  at.
+- **The 14-member capability pair is already R294**, which records that vocabulary
+  as declared eight times across the repository and confirms all eight agree
+  member-by-member today. Not re-filed.
+- **`CompilerSummaryOrigin` appears in R314**, but for a different concern - the
+  mapping from that enum to wire prefixes (`"source-summary"`, `"il-summary"`,
+  `"spec-pack"`) being duplicated. R314 is about the enum-to-string map; R1147 is
+  about the enum-to-enum pair. Neither subsumes the other.
+
+### Status (part four hundred sixty-two)
+
+R1147 is `pending` and is the smallest of the four cross-assembly vocabulary
+items, but it is the one whose drift is caught latest: R1143's three fail at an
+artifact boundary check, the effect and capability pairs fail a test, and this one
+fails at run time inside the collector. With this part the cross-assembly enum
+question is closed - six pairs, four filed or already covered, two correct.
+
+## Second survey, part four hundred sixty-three: R1148 - a dead symbol left by a partial fix, and a duplicate I filed
+
+A cross-language census of every `SHARPPROOF_*` environment variable and
+preprocessor symbol across all tracked files, grouped by the language that uses
+it.
+
+### Correction: R953 duplicated R355, and I should have found it
+
+R953 recorded that `ArgumentNullGuard.cs` is compiled into three assemblies under
+three namespaces selected by two `DefineConstants`. **R355 had already recorded
+that**, in nearly the same terms - *"`ArgumentNullGuard.cs` carries complex
+conditional compilation for namespace switching across only two linked
+projects"* - and proposed the same direction. R953 added two things R355 did not:
+that for `SharpProof.Smt` the ordinary seam was **already open** (a
+`ProjectReference` plus an `InternalsVisibleTo` grant), so no mechanism was needed
+there at all; and the separate nullability divergence filed as R954. Those two are
+new; the framing is not. Read R953 as a refinement of R355 rather than an
+independent finding.
+
+### Status update: the `SharpProof.Smt` half is applied
+
+`SharpProof.Smt.csproj` no longer defines `SHARPPROOF_SMT_ARGUMENT_GUARD` and no
+longer links `ArgumentNullGuard.cs`. It consumes the class through the
+`ProjectReference` at `:15` and the `InternalsVisibleTo` grant at
+`SharpProof.Ir.csproj:30` - the seam R953 pointed out was already open - and still
+uses it at **six sites across three files**. `SharpProof.Dataflow` correctly still
+links the file and defines its own symbol, having no path to `SharpProof.Ir`.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1148 | **Three preprocessor branches still test a symbol that no project defines any more.** With `SharpProof.Smt` converted to a plain reference, `SHARPPROOF_SMT_ARGUMENT_GUARD` is defined by **no `.csproj` in the repository** - a search across all 60 finds only `SHARPPROOF_DATAFLOW_ARGUMENT_GUARD` in `SharpProof.Dataflow.csproj:4`. The symbol is nevertheless still tested at **three sites** in `SharpProof.Ir/ArgumentNullGuard.cs`: `:1` and `:88` as the second half of `#if SHARPPROOF_DATAFLOW_ARGUMENT_GUARD || SHARPPROOF_SMT_ARGUMENT_GUARD`, and `:13` as the whole of an `#elif` whose body selects `namespace SharpProof.Smt`. All three are now unreachable. The `#elif` branch is the notable one: it is the only remaining statement in the repository that says `ArgumentNullGuard` can live in the `SharpProof.Smt` namespace, and it can no longer be reached, so a reader tracing the file's three-way namespace switch will find one arm that nothing can select. This is the residue of a partial application, the same shape as R747 - which exists because R505's fix landed in `loop-command.sh` without the test coverage its sibling had. | `SharpProof.Ir/ArgumentNullGuard.cs:1,13,88`; `SharpProof.Dataflow/SharpProof.Dataflow.csproj:4`; `SharpProof.Smt/SharpProof.Smt.csproj:15`; `SharpProof.Ir/SharpProof.Ir.csproj:30`; R355, R953 |
+
+### Checked and not proposed (part four hundred sixty-three)
+
+- **`SHARPPROOF_PORTABLE_ARGUMENT_GUARD` is not a repository symbol.** The census
+  reported it as appearing in "markdown", which is misleading: its only occurrence
+  anywhere is inside `reductions.md` itself, in the text of an earlier finding. It
+  is not defined, read, or documented in the product. Recorded so a later pass does
+  not chase a third guard symbol that never existed.
+- **The environment-variable surface is coherent.** Thirty-nine distinct
+  `SHARPPROOF_*` names are used across the repository. The five most-used cross
+  five languages each - `SHARPPROOF_CONTRACTS` (45 sites), `SHARPPROOF_CONTAINER`
+  (31), `SHARPPROOF_CONTAINER_CONTRACT` (28), `SHARPPROOF_TEST_PROJECT_PARALLELISM`
+  (17), `SHARPPROOF_REPO_ROOT` (15) - and every one that crosses a language
+  boundary is defined in `compose.yaml` or the `Dockerfile` and consumed
+  consistently. There is no name used with two meanings and none misspelled at one
+  site.
+- The variables appearing in only one language are all local scaffolding rather
+  than contracts: `SHARPPROOF_TCB_HELPER`, `SHARPPROOF_TCB_PATH`,
+  `SHARPPROOF_MISSING_ANALYZER`, `SHARPPROOF_NESTED_CALLABLE_STACK_CHILD` and
+  `SHARPPROOF_NESTED_CALLABLE_STACK_MARKER` are C#-only test fixtures, and
+  `SHARPPROOF_CHANGED_BASE_REF` is read by one script. None crosses a boundary, so
+  none needs a shared declaration.
+
+### Status (part four hundred sixty-three)
+
+R1148 is `pending` and is three lines. It is worth recording separately from
+R355 and R953 because those two describe a mechanism that should be removed, while
+this describes what removing half of it left behind - and the remaining half, the
+`SharpProof.Dataflow` link, is the one case where the mechanism is still doing
+real work.
+
+## Second survey, part four hundred sixty-four: R1149 - discarded default assumption projection
+
+`CallableClaimResultAssembler.FromOutcome` initializes its mutable result through
+the generic unknown-result factory, then replaces the assumption evidence after
+dispatching the actual proof outcome.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1149 | **`FromOutcome` materializes assumption evidence twice on every outcome path.** Its initial `Unknown(target, contractOrdinal, ...)` call reaches `CreateUnknown`, `Create`, and `ProjectAssumptions`, allocating and populating a complete `WorkerAssumptionEvidence[]`; after the outcome switch, line 63 assigns `record.Assumptions = ProjectAssumptions(...)` again and discards the first array. The initial record is needed for scalar claim identity and default effect certainty, but its assumption projection never survives. Add a construction path that initializes those scalar fields without projecting assumptions, or pass the final usage selector into one projection, while preserving the standalone `Unknown` and batch-helper behavior. This is narrower than R509, which covers the shared projector shape across result paths. | `SharpProof.Worker/CallableClaimResultAssembler.cs:12-13,63-67,70-81,83-92,131-161` |
+
+### Status (part four hundred sixty-four)
+
+R1149 is `pending`: avoid projecting `target.Entry.Assumptions` while creating
+the temporary default record, then retain the single final projection for the
+actual outcome's usage policy.
