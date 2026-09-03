@@ -190,7 +190,6 @@ while IFS= read -r -d '' relative_path; do
 done < "${target_manifest}"
 
 git -C "${target_root}" checkout --quiet --detach "${source_head}"
-git -C "${target_root}" reset --hard --quiet "${source_head}"
 
 if [[ -s "${source_patch}" ]]; then
   git -C "${target_root}" apply \
@@ -206,7 +205,6 @@ while IFS= read -r -d '' relative_path; do
   fi
   cp -a -- "${source_path}" "${target_path}"
 done < "${source_manifest}"
-rm -f -- "${target_root}/.git/sharpproof-loop-source-files"
 
 export SHARPPROOF_REPO_ROOT="${target_root}"
 cd "${target_root}"
