@@ -269,13 +269,6 @@ internal static partial class VerifierProcessSupervisor
                 }
                 try
                 {
-                    if (!IsDescendant(
-                            processId,
-                            supervisorId,
-                            parents))
-                    {
-                        continue;
-                    }
                     if ((sendSignal?.Invoke(
                              descriptor,
                              LinuxProcessControlConstants.SignalStop) ??
