@@ -16975,3 +16975,11 @@ Get-SharpProofTcbPaths splits every candidate path into segments, invokes the Po
 | ID | Finding | Evidence |
 |---|---|---|
 | R1402 | `CorpusFileTransaction.WriteAllAsync` projects all update destinations, enumerates them for containment, and then rescans them with `Distinct` for duplicate rejection; combine projection and uniqueness tracking. | `SharpProof.Gates/Corpus/CorpusFileTransaction.cs:28-47` |
+
+## Second survey, continued: R1403 - `ProtocolJson.ValidateUniqueIds` repeats identity validation passes
+
+**`ProtocolJson.ValidateUniqueIds` scans the same projected ID array separately for materialization, blankness, and uniqueness.** `ValidateResultSet` supplies one lazy identity projection; the helper first copies it to `items`, then runs `All` across the copy to reject blank IDs, and then runs `Distinct(...).Count()` across the same copy to detect duplicates. One loop with an ordinal `HashSet` can retain the returned array, reject null/blank values, and detect duplicates while preserving the existing diagnostic code and the separate exact-set check in the caller. This is narrower than R833/R834: those entries concern projecting result or manifest identities again across helper boundaries, while this is the helper's own three-pass validation of one already-materialized sequence.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1403 | The helper materializes one identity sequence and then performs separate whole-array blankness and distinct-count scans; a single loop can preserve the returned snapshot and both validation conditions. | `SharpProof.Worker.Protocol/ProtocolJson.cs:973-988` |
