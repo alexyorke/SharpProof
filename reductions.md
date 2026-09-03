@@ -10693,3 +10693,15 @@ R1017 is deferred: share only the `1 / 0 == 0` expression fixture, and retain ea
 ### Status (part two hundred forty-nine)
 
 R1018 is deferred: share the independent region mapping data, but keep direct projection checks and catalog reverse-direction checks as separate assertions.
+
+## Second survey, part two hundred fifty: R1019 - implied dataflow exception assertion
+
+`NonConvergenceRaisesATypedConvergenceFailure` already uses `Assert.Throws<DataflowConvergenceException>` for the failing analysis. It then asserts that the returned exception is an `InvalidOperationException`, but `DataflowConvergenceException` is a sealed subclass of `InvalidOperationException`, so that second assertion cannot fail independently. The following message assertion and the separate constructor-surface test still cover the exception contract; removing only the implied subtype check reduces test noise.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1019 | **The dataflow convergence test repeats an inherited exception-type fact.** After asserting `DataflowConvergenceException`, the test checks `Is.InstanceOf<InvalidOperationException>` even though the production declaration makes that relationship unconditional (`sealed ... : InvalidOperationException`). The redundant assertion can be removed while retaining the typed throw, message, and constructor-surface coverage. | `SharpProof.Dataflow.Test/ForwardDataflowAnalysisTests.cs:280-292`; `SharpProof.Dataflow/ForwardDataflowAnalysis.cs:59-63` |
+
+### Status (part two hundred fifty)
+
+R1019 is deferred: keep the specific exception assertion and message check, and remove only the inherited-base-type assertion if the test is simplified.
