@@ -609,15 +609,6 @@ internal sealed partial class RequiresCallSiteDiscovery(
         bool hasFlowState,
         bool flowAnalysisIsComplete)
     {
-        if (IsAccessorCall(call.TargetMethod) ||
-            operation is IListPatternOperation)
-        {
-            return HasReplayableAccessorEvaluation(call, operationFacts);
-        }
-        if (operation is IForEachLoopOperation)
-        {
-            return HasReplayableAccessorEvaluation(call, operationFacts);
-        }
         if (operation is IUsingOperation or IUsingDeclarationOperation)
         {
             return operationFacts.MayCompleteNormally(
@@ -626,19 +617,15 @@ internal sealed partial class RequiresCallSiteDiscovery(
                     : ((IUsingDeclarationOperation)operation)
                         .DeclarationGroup);
         }
-        if (operation is IRecursivePatternOperation)
-        {
-            return HasReplayableAccessorEvaluation(call, operationFacts);
-        }
-        if (operation is IInvocationOperation invocation &&
-            invocation.TargetMethod.MethodKind == MethodKind.DelegateInvoke &&
-            !SymbolEqualityComparer.Default.Equals(
-                call.TargetMethod,
-                invocation.TargetMethod))
-        {
-            return HasReplayableAccessorEvaluation(call, operationFacts);
-        }
-        if (operation.IsImplicit)
+        if (IsAccessorCall(call.TargetMethod) ||
+            operation is IListPatternOperation or IForEachLoopOperation or
+                IRecursivePatternOperation ||
+            operation is IInvocationOperation invocation &&
+                invocation.TargetMethod.MethodKind == MethodKind.DelegateInvoke &&
+                !SymbolEqualityComparer.Default.Equals(
+                    call.TargetMethod,
+                    invocation.TargetMethod) ||
+            operation.IsImplicit)
         {
             return HasReplayableAccessorEvaluation(call, operationFacts);
         }
