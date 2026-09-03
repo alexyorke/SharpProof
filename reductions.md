@@ -15319,6 +15319,13 @@ API catalog tests pass (8 passed).
 |---|---|---|
 | R1261 | **`VerifierProcessSupervisor.DescendantProcessIds` allocates a cycle-detection set for every candidate PID.** The outer `parents.Keys` filter calls `IsDescendant`, whose new `HashSet<int>` and parent-chain walk are repeated for every PID in the snapshot before the result set is built. Compute descendant membership with one snapshot-level traversal or memoized parent states while retaining cycle termination and the same PID set. | `SharpProof.BuildTasks/VerifierProcessSupervisor.cs:373-405` |
 
+### Status (part five hundred eighty-three)
+
+R1261 is applied: descendant membership now memoizes shared ancestry results and
+reuses one path/cycle workspace for each process snapshot, retaining
+fail-closed cycle handling and the same descendant set. Verifier supervisor
+tests pass (3 passed).
+
 ## Second survey, part five hundred eighty-four: R1262 - reserve descriptors are copied to satisfy a close-only parameter
 
 `VerifierProcessSupervisor.Run` retains the first reserve descriptor as `supervisorPidFd` and passes the remaining descriptors to `StopDescendants` as `descriptorReserves.Skip(1).ToArray()`. `StopDescendants` immediately forwards that value to `CloseDescriptors`, which only enumerates it once; it does not index, retain, or mutate the list. The two-element array is therefore a shape adapter rather than a required snapshot. Accepting an enumerable close list or passing an allocation-free array segment can preserve descriptor ownership and the first-descriptor identity boundary without creating a per-run copy.
