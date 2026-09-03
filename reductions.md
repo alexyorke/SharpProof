@@ -13581,3 +13581,17 @@ R1163 is applied: the record copy-constructor branch carries its computed clone
 completion result into the final step instead of evaluating it twice; other
 `with` paths retain their existing completion checks. The Effects test suite
 passes (323/323).
+
+## Second survey, part four hundred eighty-six: R1164 - event receiver classification repeated
+
+`OperationEffectScanner.ScanEventAssignment` first scans the event reference's
+instance and then calls `_conversionOwnership.ClassifyRegion(reference.Instance)`
+twice while constructing the call resolver input. The two results occupy the
+resolver's separate `receiver` and `writeReceiver` slots, but the operation being
+classified and the analysis state are identical. Caching one `EffectRegionSet`
+locally preserves those distinct slots and the handler-region calculation while
+removing a repeated ownership/classification traversal.
+
+| ID | Finding | Evidence |
+|---|---|---|
+| R1164 | **`OperationEffectScanner.ScanEventAssignment` classifies the same event receiver twice.** The call-site resolver receives `_conversionOwnership.ClassifyRegion(reference.Instance)` once as its receiver region and immediately again as its write-receiver region, with no intervening state change. Reusing the computed region set keeps the resolver's read/write distinction explicit while eliminating the duplicate classification. | `SharpProof.Effects/OperationEffectScanner.Expressions.cs:159-216`; resolver parameters `SharpProof.Effects/EffectCallSiteResolver.cs:39-58` |
