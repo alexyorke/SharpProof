@@ -768,8 +768,7 @@ foreach ($table in $validationTables) {
     }) -join ', '
     $patterns = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::Ordinal)
-    $patternSources = [Collections.Generic.List[string]]::new()
-    $partRows = [Collections.Generic.List[object]]::new()
+    $rowRecords = [Collections.Generic.List[object]]::new()
     $containsWildcard = $false
     foreach ($row in @(
             Get-RequiredMember $table 'rows' "validation table '$tableName'")) {
@@ -803,13 +802,15 @@ foreach ($table in $validationTables) {
         if (-not $patterns.Add($pattern)) {
             throw "Validation table '$tableName' repeats row '$pattern'."
         }
-        $patternSources.Add($pattern)
-        $partRows.Add([PSCustomObject]@{ Parts = @($parts) })
+        $rowRecords.Add([PSCustomObject]@{
+            Pattern = $pattern
+            Parts = @($parts)
+        })
     }
     $lines.Add("    internal static bool Matches$tableName($signature) =>")
     if ($parameters.Count -eq 2 -and -not $containsWildcard) {
         $firstGroups = [Collections.Generic.List[object]]::new()
-        foreach ($row in $partRows) {
+        foreach ($row in $rowRecords) {
             $first = [string]$row.Parts[0]
             $group = @($firstGroups | Where-Object { $_.First -ceq $first })
             if ($group.Count -eq 0) {
@@ -864,7 +865,7 @@ foreach ($table in $validationTables) {
     }
     $lines.Add("        ($($parameterOrder -join ', ')) is")
     Add-WrappedAlternatives $lines '            ' '            ' `
-        $patternSources.ToArray() ';'
+        @($rowRecords | ForEach-Object { [string]$_.Pattern }) ';'
 }
 $lines.Add('')
 foreach ($plan in $validationPlans) {
