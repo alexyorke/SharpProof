@@ -403,12 +403,16 @@ function Invoke-V3Get {
         [string]$Uri,
 
         [Parameter()]
+        [ValidateSet('Get', 'Head')]
+        [string]$Method = 'Get',
+
+        [Parameter()]
         [string]$OutputPath
     )
 
     $parameters = @{
         Uri = $Uri
-        Method = 'Get'
+        Method = $Method
         SkipHttpErrorCheck = $true
         TimeoutSec = $TimeoutSeconds
         ErrorAction = 'Stop'
@@ -510,8 +514,8 @@ function Get-RemotePackageState {
         -Package $Package `
         -BaseAddress $BaseAddress `
         -Get {
-            param($uri, $outputPath)
-            Invoke-V3Get -Uri $uri -OutputPath $outputPath
+            param($uri)
+            Invoke-V3Get -Uri $uri -Method Head
         }
 }
 

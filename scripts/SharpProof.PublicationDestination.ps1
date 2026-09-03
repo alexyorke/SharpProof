@@ -341,30 +341,21 @@ function Invoke-SharpProofMainPackagePreflight {
         -BaseAddress $BaseAddress `
         -PackageId $Package.packageId `
         -Version $Package.version
-    $temporaryPath = [IO.Path]::GetTempFileName()
-    try {
-        [IO.File]::Delete($temporaryPath)
-        $response = & $Get $remoteUrl $temporaryPath
-        $status = [int]$response.StatusCode
-        if ($status -eq 404) {
-            return [pscustomobject][ordered]@{
-                state = 'Absent'
-                remoteUrl = $remoteUrl
-            }
-        }
-        if ($status -ne 200) {
-            throw (
-                "NuGet PackageBaseAddress returned HTTP $status for " +
-                "$($Package.packageId) $($Package.version).")
-        }
+    $response = & $Get $remoteUrl
+    $status = [int]$response.StatusCode
+    if ($status -eq 404) {
         return [pscustomobject][ordered]@{
-            state = 'Present'
+            state = 'Absent'
             remoteUrl = $remoteUrl
         }
     }
-    finally {
-        if ([IO.File]::Exists($temporaryPath)) {
-            [IO.File]::Delete($temporaryPath)
-        }
+    if ($status -ne 200) {
+        throw (
+            "NuGet PackageBaseAddress returned HTTP $status for " +
+            "$($Package.packageId) $($Package.version).")
+    }
+    return [pscustomobject][ordered]@{
+        state = 'Present'
+        remoteUrl = $remoteUrl
     }
 }

@@ -21182,3 +21182,17 @@ tests pass 7/7 with zero warnings or errors.
 | ID | Finding | Evidence |
 |---|---|---|
 | R2004 | `ci.yml` uploads `artifacts/ci/performance*.json` once inside `container-pr-evidence` and again as `fast-pr-performance`; narrow one upload or document the intentional duplicate after checking consumers. | .github/workflows/ci.yml:36-52; SharpProof.ArchitectureTest/ArchitectureTests.cs:1768-1790 |
+
+R2001 is deferred: evidence generation validates the source packages before
+copying them into the final bundle, while `Test-SharpProofReleaseArtifacts`
+validates the copied bundle against its manifest. Removing either package
+inspection would weaken a distinct source-to-bundle integrity boundary; a
+future typed validation receipt can revisit the duplicate work without
+introducing an unsafe skip switch.
+
+R2002 is applied: main-package preflight now uses the NuGet PackageBaseAddress
+`HEAD` request and passes only the package URL through the callback. It keeps
+the existing 200/404/other-status projection while removing the temporary
+file and discarded package download. The publication destination fixture and
+the canonical NuGet endpoint HEAD probe both pass; the focused architecture
+run still reports its pre-existing publisher-text assertion failure.
